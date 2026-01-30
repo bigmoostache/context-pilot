@@ -34,7 +34,18 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     // Calculate ID width for alignment based on longest ID
     let id_width = state.context.iter().map(|c| c.id.len()).max().unwrap_or(2);
 
+    let mut prev_was_fixed = true;
     for (i, ctx) in state.context.iter().enumerate() {
+        let is_fixed = ctx.context_type.is_fixed();
+
+        // Add separator when transitioning from fixed to dynamic contexts
+        if prev_was_fixed && !is_fixed {
+            lines.push(Line::from(vec![
+                Span::styled(format!("  {:─<32}", ""), Style::default().fg(theme::BORDER_MUTED)),
+            ]));
+        }
+        prev_was_fixed = is_fixed;
+
         let is_selected = i == state.selected_context;
         let icon = ctx.context_type.icon();
 

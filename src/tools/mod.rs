@@ -29,7 +29,7 @@ use crate::state::{estimate_tokens, ContextType, MessageStatus};
 pub fn refresh_conversation_context(state: &mut State) {
     // Calculate total tokens from all active messages
     let total_tokens: usize = state.messages.iter()
-        .filter(|m| m.status != MessageStatus::Forgotten)
+        .filter(|m| m.status != MessageStatus::Deleted)
         .map(|m| {
             match m.status {
                 MessageStatus::Summarized => m.tl_dr_token_count.max(estimate_tokens(m.tl_dr.as_deref().unwrap_or(""))),
@@ -80,7 +80,9 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "edit_file" => edit_file::execute_edit(tool, state),
         "create_file" => edit_file::execute_create(tool, state),
         "close_contexts" => close_context::execute(tool, state),
-        "edit_tree_filter" => tree::execute(tool, state),
+        "edit_tree_filter" => tree::execute_edit_filter(tool, state),
+        "tree_toggle_folders" => tree::execute_toggle_folders(tool, state),
+        "tree_describe_files" => tree::execute_describe_files(tool, state),
         "glob" => glob::execute(tool, state),
         "set_message_status" => message_status::execute(tool, state),
         "create_tmux_pane" => tmux::execute_create_pane(tool, state),

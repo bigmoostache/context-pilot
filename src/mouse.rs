@@ -30,10 +30,37 @@ fn handle_left_click(x: u16, y: u16, state: &State) -> Action {
 fn handle_sidebar_click(_x: u16, y: u16, state: &State) -> Action {
     let context_count = state.context.len();
 
-    // Check if click is on a context item
-    // Context items are at rows CONTEXT_LIST_START_ROW to CONTEXT_LIST_START_ROW + context_count - 1
-    if y >= CONTEXT_LIST_START_ROW && y < CONTEXT_LIST_START_ROW + context_count as u16 {
-        let clicked_index = (y - CONTEXT_LIST_START_ROW) as usize;
+    // Count fixed contexts at the start to find separator position
+    let fixed_count = state.context.iter()
+        .take_while(|c| c.context_type.is_fixed())
+        .count();
+
+    // There's a separator line if we have both fixed and non-fixed contexts
+    let has_separator = fixed_count > 0 && fixed_count < context_count;
+    let separator_row = if has_separator {
+        CONTEXT_LIST_START_ROW + fixed_count as u16
+    } else {
+        u16::MAX // No separator
+    };
+
+    // Total rows including separator
+    let total_rows = context_count as u16 + if has_separator { 1 } else { 0 };
+
+    if y >= CONTEXT_LIST_START_ROW && y < CONTEXT_LIST_START_ROW + total_rows {
+        let visual_row = y - CONTEXT_LIST_START_ROW;
+
+        // Ignore clicks on the separator line
+        if has_separator && y == separator_row {
+            return Action::None;
+        }
+
+        // Calculate actual context index, accounting for separator
+        let clicked_index = if has_separator && y > separator_row {
+            visual_row as usize - 1 // Subtract 1 for the separator line
+        } else {
+            visual_row as usize
+        };
+
         if clicked_index < context_count {
             return Action::SelectContext(clicked_index);
         }

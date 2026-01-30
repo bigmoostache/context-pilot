@@ -2,7 +2,7 @@ use std::fs;
 
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::constants::MAX_CONTEXT_TOKENS;
@@ -88,6 +88,7 @@ pub fn render_file(frame: &mut Frame, state: &mut State, area: Rect) {
 
     let paragraph = Paragraph::new(text)
         .style(base_style)
+        .wrap(Wrap { trim: false })
         .scroll((state.scroll_offset.round() as u16, 0));
 
     frame.render_widget(paragraph, content_area);
@@ -116,17 +117,43 @@ pub fn render_tree(frame: &mut Frame, state: &mut State, area: Rect) {
 
     let mut text: Vec<Line> = Vec::new();
     for line in tree_content.lines() {
-        if let Some(size_start) = find_size_pattern(line) {
-            let (main_part, size_part) = line.split_at(size_start);
-            text.push(Line::from(vec![
-                Span::styled(format!(" {}", main_part), Style::default().fg(theme::TEXT)),
-                Span::styled(size_part.trim_end(), Style::default().fg(theme::ACCENT_DIM)),
-            ]));
+        let mut spans: Vec<Span> = Vec::new();
+        spans.push(Span::styled(" ", Style::default().fg(theme::TEXT)));
+
+        // Check for description (after " - ")
+        let (main_line, description) = if let Some(desc_idx) = line.find(" - ") {
+            (&line[..desc_idx], Some(&line[desc_idx..]))
         } else {
-            text.push(Line::from(vec![
-                Span::styled(format!(" {}", line), Style::default().fg(theme::TEXT)),
-            ]));
+            (line, None)
+        };
+
+        // Parse the main part
+        if let Some(size_start) = find_size_pattern(main_line) {
+            // File with size (and possibly [!] marker)
+            let (before_size, size_part) = main_line.split_at(size_start);
+            spans.push(Span::styled(before_size.to_string(), Style::default().fg(theme::TEXT)));
+            spans.push(Span::styled(size_part.to_string(), Style::default().fg(theme::ACCENT_DIM)));
+        } else if let Some((start, end)) = find_children_pattern(main_line) {
+            // Folder with children count
+            let before = &main_line[..start];
+            let children_part = &main_line[start..end];
+            let after = &main_line[end..];
+            spans.push(Span::styled(before.to_string(), Style::default().fg(theme::TEXT)));
+            spans.push(Span::styled(children_part.to_string(), Style::default().fg(theme::ACCENT)));
+            if !after.is_empty() {
+                spans.push(Span::styled(after.to_string(), Style::default().fg(theme::TEXT)));
+            }
+        } else {
+            // Plain line (folder name, etc.)
+            spans.push(Span::styled(main_line.to_string(), Style::default().fg(theme::TEXT)));
         }
+
+        // Add description if present
+        if let Some(desc) = description {
+            spans.push(Span::styled(desc.to_string(), Style::default().fg(theme::TEXT_MUTED)));
+        }
+
+        text.push(Line::from(spans));
     }
 
     // Calculate and set max scroll
@@ -138,6 +165,7 @@ pub fn render_tree(frame: &mut Frame, state: &mut State, area: Rect) {
 
     let paragraph = Paragraph::new(text)
         .style(base_style)
+        .wrap(Wrap { trim: false })
         .scroll((state.scroll_offset.round() as u16, 0));
 
     frame.render_widget(paragraph, content_area);
@@ -189,6 +217,7 @@ pub fn render_glob(frame: &mut Frame, state: &mut State, area: Rect) {
 
     let paragraph = Paragraph::new(text)
         .style(base_style)
+        .wrap(Wrap { trim: false })
         .scroll((state.scroll_offset.round() as u16, 0));
 
     frame.render_widget(paragraph, content_area);
@@ -264,6 +293,7 @@ pub fn render_tmux(frame: &mut Frame, state: &mut State, area: Rect) {
 
     let paragraph = Paragraph::new(text)
         .style(base_style)
+        .wrap(Wrap { trim: false })
         .scroll((state.scroll_offset.round() as u16, 0));
 
     frame.render_widget(paragraph, content_area);
@@ -358,6 +388,7 @@ pub fn render_todo(frame: &mut Frame, state: &mut State, area: Rect) {
 
     let paragraph = Paragraph::new(text)
         .style(base_style)
+        .wrap(Wrap { trim: false })
         .scroll((state.scroll_offset.round() as u16, 0));
 
     frame.render_widget(paragraph, content_area);
@@ -557,6 +588,7 @@ pub fn render_overview(frame: &mut Frame, state: &mut State, area: Rect) {
 
     let paragraph = Paragraph::new(text)
         .style(base_style)
+        .wrap(Wrap { trim: false })
         .scroll((state.scroll_offset.round() as u16, 0));
 
     frame.render_widget(paragraph, content_area);
@@ -636,6 +668,7 @@ pub fn render_memory(frame: &mut Frame, state: &mut State, area: Rect) {
 
     let paragraph = Paragraph::new(text)
         .style(base_style)
+        .wrap(Wrap { trim: false })
         .scroll((state.scroll_offset.round() as u16, 0));
 
     frame.render_widget(paragraph, content_area);
@@ -808,6 +841,7 @@ pub fn render_tools(frame: &mut Frame, state: &mut State, area: Rect) {
 
     let paragraph = Paragraph::new(text)
         .style(base_style)
+        .wrap(Wrap { trim: false })
         .scroll((state.scroll_offset.round() as u16, 0));
 
     frame.render_widget(paragraph, content_area);

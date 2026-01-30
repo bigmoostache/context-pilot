@@ -262,6 +262,44 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             enabled: true,
             category: ToolCategory::FileSystem,
         },
+        ToolDefinition {
+            id: "tree_toggle_folders".to_string(),
+            name: "Toggle Tree Folders".to_string(),
+            short_desc: "Open/close folders".to_string(),
+            description: "Opens or closes folders in the directory tree view. Closed folders show child count, open folders show contents.".to_string(),
+            params: vec![
+                ToolParam::new("paths", ParamType::Array(Box::new(ParamType::String)))
+                    .desc("Folder paths to toggle (e.g., ['src', 'src/ui'])")
+                    .required(),
+                ToolParam::new("action", ParamType::String)
+                    .desc("Action to perform")
+                    .enum_vals(&["open", "close", "toggle"])
+                    .default_val("toggle"),
+            ],
+            enabled: true,
+            category: ToolCategory::FileSystem,
+        },
+        ToolDefinition {
+            id: "tree_describe_files".to_string(),
+            name: "Describe Tree Items".to_string(),
+            short_desc: "Add file/folder descriptions".to_string(),
+            description: "Adds or updates descriptions for files and folders in the tree. Descriptions appear next to items. A [!] marker indicates the file changed since description was written.".to_string(),
+            params: vec![
+                ToolParam::new("descriptions", ParamType::Array(Box::new(ParamType::Object(vec![
+                    ToolParam::new("path", ParamType::String)
+                        .desc("File or folder path")
+                        .required(),
+                    ToolParam::new("description", ParamType::String)
+                        .desc("Description text"),
+                    ToolParam::new("delete", ParamType::Boolean)
+                        .desc("Set true to remove description"),
+                ]))))
+                    .desc("Array of path descriptions")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::FileSystem,
+        },
 
         // Context tools
         ToolDefinition {
@@ -281,17 +319,20 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             id: "set_message_status".to_string(),
             name: "Set Message Status".to_string(),
             short_desc: "Manage message visibility".to_string(),
-            description: "Changes message status to control what's sent to the LLM.".to_string(),
+            description: "Changes message status to control what's sent to the LLM. Batched.".to_string(),
             params: vec![
-                ToolParam::new("message_id", ParamType::String)
-                    .desc("Message ID (e.g., U1, A3)")
+                ToolParam::new("changes", ParamType::Array(Box::new(ParamType::Object(vec![
+                    ToolParam::new("message_id", ParamType::String)
+                        .desc("Message ID (e.g., U1, A3)")
+                        .required(),
+                    ToolParam::new("status", ParamType::String)
+                        .desc("full | summarized | deleted")
+                        .required(),
+                    ToolParam::new("tl_dr", ParamType::String)
+                        .desc("Required when status is 'summarized'"),
+                ]))))
+                    .desc("Array of status changes")
                     .required(),
-                ToolParam::new("status", ParamType::String)
-                    .desc("New status for the message")
-                    .enum_vals(&["full", "summarized", "forgotten"])
-                    .required(),
-                ToolParam::new("tl_dr", ParamType::String)
-                    .desc("TL;DR summary (required when status is 'summarized')"),
             ],
             enabled: true,
             category: ToolCategory::Context,

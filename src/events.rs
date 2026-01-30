@@ -1,6 +1,6 @@
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 
-use crate::actions::{parse_context_pattern, Action};
+use crate::actions::{parse_context_pattern, find_context_by_id, Action};
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::mouse::handle_mouse;
 use crate::state::State;
@@ -45,11 +45,14 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 return Some(Action::InputSubmit);
             }
 
-            // Enter or Space on context pattern (c1, C2, etc.) submits immediately
-            if (key.code == KeyCode::Enter || key.code == KeyCode::Char(' '))
-                && parse_context_pattern(&state.input).is_some()
-            {
-                return Some(Action::InputSubmit);
+            // Enter or Space on context pattern (p1, P2, etc.) submits immediately
+            // Only if the context actually exists
+            if key.code == KeyCode::Enter || key.code == KeyCode::Char(' ') {
+                if let Some(id) = parse_context_pattern(&state.input) {
+                    if find_context_by_id(state, &id).is_some() {
+                        return Some(Action::InputSubmit);
+                    }
+                }
             }
 
             // Ctrl+arrows for word navigation and scrolling

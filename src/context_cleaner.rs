@@ -82,7 +82,7 @@ pub fn build_cleaner_context(state: &State) -> String {
         let status_str = match msg.status {
             crate::state::MessageStatus::Full => "full",
             crate::state::MessageStatus::Summarized => "summarized",
-            crate::state::MessageStatus::Forgotten => "forgotten",
+            crate::state::MessageStatus::Deleted => "deleted",
         };
 
         let type_str = match msg.message_type {

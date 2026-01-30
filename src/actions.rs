@@ -3,8 +3,8 @@ use crate::persistence::{delete_message, save_message};
 use crate::state::{estimate_tokens, ContextElement, ContextType, Message, MessageStatus, MessageType, State};
 
 /// Parse context selection patterns like p1, p-1, p_1, P1, P-1, P_1
-/// Returns the 0-based index if matched
-pub fn parse_context_pattern(input: &str) -> Option<usize> {
+/// Returns the context ID (e.g., "P1", "P28") if matched
+pub fn parse_context_pattern(input: &str) -> Option<String> {
     let input = input.trim();
     if input.is_empty() {
         return None;
@@ -27,8 +27,13 @@ pub fn parse_context_pattern(input: &str) -> Option<usize> {
         rest
     };
 
-    // Parse the number (1-based in input, convert to 0-based)
-    num_str.parse::<usize>().ok().and_then(|n| n.checked_sub(1))
+    // Parse the number and return the canonical ID format
+    num_str.parse::<usize>().ok().map(|n| format!("P{}", n))
+}
+
+/// Find context index by ID
+pub fn find_context_by_id(state: &State, id: &str) -> Option<usize> {
+    state.context.iter().position(|c| c.id == id)
 }
 
 #[derive(Debug, Clone)]
@@ -191,8 +196,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
 
             // Context switching is always allowed, even during streaming
-            if let Some(index) = parse_context_pattern(&state.input) {
-                if index < state.context.len() {
+            if let Some(id) = parse_context_pattern(&state.input) {
+                if let Some(index) = find_context_by_id(state, &id) {
                     state.selected_context = index;
                     state.scroll_offset = 0.0;
                     state.user_scrolled = false;

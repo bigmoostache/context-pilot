@@ -25,26 +25,16 @@ pub const API_VERSION: &str = "2023-06-01";
 // =============================================================================
 
 /// Maximum context size in tokens
-pub const MAX_CONTEXT_TOKENS: usize = 100_000;
+pub const MAX_CONTEXT_TOKENS: usize = 200_000;
 
 /// Threshold percentage to trigger automatic context cleaning (0.0 - 1.0)
-pub const CLEANING_THRESHOLD: f32 = 0.10; // TODO: Set back to 0.70 after testing
+pub const CLEANING_THRESHOLD: f32 = 0.70;
 
 /// Target percentage to stop cleaning (0.0 - 1.0)
-pub const CLEANING_TARGET: f32 = 0.05; // TODO: Set back to 0.50 after testing
+pub const CLEANING_TARGET: f32 = 0.50;
 
 /// Maximum cleaning iterations before forcing stop
 pub const MAX_CLEANING_ITERATIONS: u32 = 10;
-
-// =============================================================================
-// DIRECTORY TREE
-// =============================================================================
-
-/// Maximum depth for directory tree traversal
-pub const TREE_MAX_DEPTH: usize = 10;
-
-/// Maximum entries to show in directory tree
-pub const TREE_MAX_ENTRIES: usize = 100;
 
 // =============================================================================
 // SCROLLING
@@ -159,6 +149,7 @@ pub mod theme {
 
     // Border colors
     pub const BORDER: Color = Color::Rgb(66, 66, 64);          // Subtle border
+    pub const BORDER_MUTED: Color = Color::Rgb(50, 50, 48);    // Very subtle separator
     pub const BORDER_FOCUS: Color = Color::Rgb(218, 118, 89);  // Accent color for focus
 
     // Role-specific colors
@@ -204,7 +195,7 @@ pub mod icons {
     // Message status
     pub const STATUS_FULL: &str = "●";
     pub const STATUS_SUMMARIZED: &str = "◐";
-    pub const STATUS_FORGOTTEN: &str = "○";
+    pub const STATUS_DELETED: &str = "○";
 
     // Todo status
     pub const TODO_PENDING: &str = "○";
@@ -240,14 +231,14 @@ Current context is above 70% capacity and needs to be reduced.
    - Close files that were only opened for quick lookup
    - Keep files actively being edited
 
-2. **Summarize or forget old messages** - Conversation history grows fast
-   - FORGET: Old tool calls/results that are no longer relevant
-   - FORGET: Superseded discussions (e.g., old approaches that were abandoned)
+2. **Summarize or delete old messages** - Conversation history grows fast
+   - DELETE: Old tool calls/results that are no longer relevant
+   - DELETE: Superseded discussions (e.g., old approaches that were abandoned)
    - SUMMARIZE: Long assistant responses - keep key decisions only
    - SUMMARIZE: Long user messages with detailed context already acted upon
    - Keep recent messages (last 5-10 exchanges) at full status
 
-3. **Close glob searches** - Often opened for exploration then forgotten
+3. **Close glob searches** - Often opened for exploration then deleted
    - Close globs that found what was needed
    - Close globs with too many results
 
@@ -266,7 +257,7 @@ Current context is above 70% capacity and needs to be reduced.
 ## Rules:
 - Be aggressive but smart - aim to reduce by 30-50%
 - NEVER close P1-P6 (core context elements)
-- Prefer forgetting over summarizing when content is truly obsolete
+- Prefer deleting over summarizing when content is truly obsolete
 - Make multiple tool calls in one response for efficiency
 - After cleaning, briefly report what was removed
 "#;

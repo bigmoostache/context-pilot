@@ -134,8 +134,8 @@ fn messages_to_api(
     }
 
     for (idx, msg) in messages.iter().enumerate() {
-        // Skip forgotten messages entirely
-        if msg.status == MessageStatus::Forgotten {
+        // Skip deleted messages entirely
+        if msg.status == MessageStatus::Deleted {
             continue;
         }
 
@@ -148,9 +148,11 @@ fn messages_to_api(
         // Handle ToolResult messages - these go as user messages with tool_result blocks
         if msg.message_type == MessageType::ToolResult {
             for result in &msg.tool_results {
+                // Include message ID in result content so AI can reference it
+                let prefixed_content = format!("[{}]: {}", msg.id, result.content);
                 content_blocks.push(ContentBlock::ToolResult {
                     tool_use_id: result.tool_use_id.clone(),
-                    content: result.content.clone(),
+                    content: prefixed_content,
                 });
             }
 

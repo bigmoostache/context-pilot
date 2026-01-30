@@ -1,6 +1,6 @@
 # Context Pilot
 
-A terminal-based AI coding assistant built in Rust that provides an interactive interface for AI-assisted development with full project context awareness.
+A terminal-based AI coding assistant built in Rust that provides an interactive interface for AI-assisted development with full project context awareness. A terminal-based AI coding assistant built in Rust that provides an interactive interface for AI-assisted development with full project context awareness.
 
 ![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)

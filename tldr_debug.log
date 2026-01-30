@@ -1847,3 +1847,306 @@ Token count: 44
 Calling LLM for summary...
 Got summary: The user has full control over wait durations, cho
 Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 517
+Calling LLM for summary...
+Got summary: Context Pilot is a Rust TUI application for managi
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 154
+Calling LLM for summary...
+Got summary: Added descriptions to all 51 project files and fol
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 29
+Calling LLM for summary...
+Got summary: The user has collapsed all folders in the tree vie
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 25
+Calling LLM for summary...
+Got summary: The user confirms they've completed reopening all 
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 441
+Calling LLM for summary...
+Got summary: The assistant lists 17 available tools across 5 ca
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 533
+Calling LLM for summary...
+Got summary: The assistant shares a prioritized wishlist of des
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 69
+Calling LLM for summary...
+Token count: 1
+Using content directly (short message)
+Send result: true
+Got summary: The assistant opened 5 Rust files (main.rs, state.
+Send result: true
+Token count: 305
+Calling LLM for summary...
+Got summary: The `main.rs` entry point sets up terminal (raw mo
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 396
+Calling LLM for summary...
+Got summary: `src/state.rs` defines core data structures: `Cont
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 93
+Calling LLM for summary...
+Got summary: The assistant notes they already covered P28 (`src
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 298
+Calling LLM for summary...
+Got summary: A whimsical story about Blinky, a cursor who witne
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 282
+Calling LLM for summary...
+Got summary: Context Pilot is a Rust-based terminal AI coding a
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 233
+Calling LLM for summary...
+Got summary: The largest files by size are Cargo.lock (74K), tl
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 251
+Calling LLM for summary...
+Got summary: The 9 largest source files total ~40K tokens, with
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 49
+Calling LLM for summary...
+Got summary: The user is checking which files have the `[!]` st
+Send result: true
+Token count: 52
+Calling LLM for summary...
+Got summary: The assistant updated descriptions for 7 files tha
+Send result: true
+Token count: 61
+Calling LLM for summary...
+Got summary: The user wants file descriptions to be more detail
+Send result: true
+Token count: 28
+Calling LLM for summary...
+Got summary: The sender agrees with a suggestion and offers to 
+Send result: true
+Token count: 19
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 12
+Using content directly (short message)
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 25
+Calling LLM for summary...
+Got summary: **Summary:** Batch 10 is complete, with UI and roo
+Send result: true
+Token count: 26
+Calling LLM for summary...
+Got summary: The message indicates that Batch 11 has been compl
+Send result: true
+Token count: 127
+Calling LLM for summary...
+Got summary: The user updated 35 source files with detailed par
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 62
+Calling LLM for summary...
+Got summary: **Summary:** The user completed closing 14 file/gl
+Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 133
+Calling LLM for summary...
+Got summary: The assistant cannot bulk delete/truncate conversa
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 89
+Calling LLM for summary...
+Got summary: The user cannot bulk-forget messages due to an une
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 70
+Calling LLM for summary...
+Got summary: The assistant opened 5 core source files (main.rs,
+Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 40
+Calling LLM for summary...
+Got summary: The user realizes they need to examine the `set_me
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 21
+Using content directly (short message)
+Send result: true
+Token count: 53
+Calling LLM for summary...
+Got summary: The assistant confirmed it has deleted 54 older me
+Send result: true
+Token count: 14
+Using content directly (short message)
+Send result: true
+Token count: 34
+Calling LLM for summary...
+Got summary: The open folders have been closed, making the tree
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 36
+Calling LLM for summary...
+Got summary: The `src` folder is now expanded showing top-level
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 225
+Calling LLM for summary...
+Got summary: User is at 21% token usage (~21K/100K) with 5 file
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 157
+Calling LLM for summary...
+Got summary: The context window is at 21% capacity (~21,434/100
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 188
+Calling LLM for summary...
+Got summary: The context is now at ~18K/100K tokens (18%) after
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 163
+Calling LLM for summary...
+Got summary: The assistant lacks a tool to remove just tool cal
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 32
+Calling LLM for summary...
+Got summary: The user notes that a tool is behaving inconsisten
+Send result: true
+Token count: 20
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 48
+Calling LLM for summary...
+Got summary: The user completed a cleanup task, removing 8 mess
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 91
+Calling LLM for summary...
+Got summary: The assistant couldn't find a message with ID "R66
+Send result: true

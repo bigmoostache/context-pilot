@@ -5,7 +5,7 @@ use ratatui::{
 
 use crate::constants::icons;
 use crate::state::{MessageStatus, MessageType, State};
-use super::{theme, helpers::wrap_text, markdown::*};
+use super::{theme, helpers::{wrap_text, count_wrapped_lines}, markdown::*};
 
 pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
     let base_style = Style::default().bg(theme::BG_SURFACE);
@@ -45,7 +45,7 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
         ]));
     } else {
         for msg in &state.messages {
-            if msg.status == MessageStatus::Forgotten {
+            if msg.status == MessageStatus::Deleted {
                 continue;
             }
 
@@ -154,7 +154,7 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
             let status_icon = match msg.status {
                 MessageStatus::Full => icons::STATUS_FULL,
                 MessageStatus::Summarized => icons::STATUS_SUMMARIZED,
-                MessageStatus::Forgotten => icons::STATUS_FORGOTTEN,
+                MessageStatus::Deleted => icons::STATUS_DELETED,
             };
 
             // Message content
@@ -316,17 +316,11 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
         text.push(Line::from(""));
     }
 
-    // Calculate scroll
-    let viewport_width = content_area.width.saturating_sub(2) as usize;
+    // Calculate scroll with wrapped line count
+    let viewport_width = content_area.width as usize;
     let viewport_height = content_area.height as usize;
-
     let content_height: usize = text.iter()
-        .map(|line| {
-            let char_count: usize = line.spans.iter()
-                .map(|span| span.content.chars().count())
-                .sum();
-            if char_count == 0 || viewport_width == 0 { 1 } else { (char_count + viewport_width - 1) / viewport_width }
-        })
+        .map(|line| count_wrapped_lines(line, viewport_width))
         .sum();
 
     let max_scroll = content_height.saturating_sub(viewport_height) as f32;

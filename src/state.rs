@@ -18,6 +18,18 @@ pub enum ContextType {
 }
 
 impl ContextType {
+    /// Returns true if this is a fixed/system context type
+    pub fn is_fixed(&self) -> bool {
+        matches!(self,
+            ContextType::Conversation |
+            ContextType::Tree |
+            ContextType::Todo |
+            ContextType::Memory |
+            ContextType::Overview |
+            ContextType::Tools
+        )
+    }
+
     /// Get icon for this context type
     pub fn icon(&self) -> &'static str {
         match self {
@@ -158,6 +170,17 @@ pub struct MemoryItem {
     pub importance: MemoryImportance,
 }
 
+/// A file description in the tree
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TreeFileDescription {
+    /// File path (relative to project root)
+    pub path: String,
+    /// Description of the file
+    pub description: String,
+    /// File hash when description was created (to detect staleness)
+    pub file_hash: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageType {
@@ -179,7 +202,7 @@ pub enum MessageStatus {
     #[default]
     Full,
     Summarized,
-    Forgotten,
+    Deleted,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -246,6 +269,12 @@ pub struct PersistedState {
     /// Gitignore-style filter for directory tree
     #[serde(default = "default_tree_filter")]
     pub tree_filter: String,
+    /// Open folders in tree view (paths relative to project root)
+    #[serde(default)]
+    pub tree_open_folders: Vec<String>,
+    /// File descriptions in tree view
+    #[serde(default)]
+    pub tree_descriptions: Vec<TreeFileDescription>,
     /// Next user message ID
     #[serde(default = "default_one")]
     pub next_user_id: usize,
@@ -320,6 +349,10 @@ pub struct State {
     pub copy_mode: bool,
     /// Gitignore-style filter for directory tree
     pub tree_filter: String,
+    /// Open folders in tree view (paths relative to project root)
+    pub tree_open_folders: Vec<String>,
+    /// File descriptions in tree view
+    pub tree_descriptions: Vec<TreeFileDescription>,
     /// Number of pending TL;DR background jobs
     pub pending_tldrs: usize,
     /// Next user message ID (U1, U2, ...)
@@ -447,6 +480,8 @@ impl Default for State {
             streaming_estimated_tokens: 0,
             copy_mode: false,
             tree_filter: DEFAULT_TREE_FILTER.to_string(),
+            tree_open_folders: vec![".".to_string()], // Root open by default
+            tree_descriptions: vec![],
             pending_tldrs: 0,
             next_user_id: 1,
             next_assistant_id: 1,

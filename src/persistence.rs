@@ -56,6 +56,12 @@ pub fn load_state() -> State {
                 .filter_map(|id| load_message(id))
                 .collect();
 
+            // Ensure root is always open
+            let mut open_folders = persisted.tree_open_folders;
+            if !open_folders.contains(&".".to_string()) {
+                open_folders.insert(0, ".".to_string());
+            }
+
             return State {
                 context: persisted.context,
                 messages,
@@ -70,6 +76,8 @@ pub fn load_state() -> State {
                 streaming_estimated_tokens: 0,
                 copy_mode: false,
                 tree_filter: persisted.tree_filter,
+                tree_open_folders: open_folders,
+                tree_descriptions: persisted.tree_descriptions,
                 pending_tldrs: 0,
                 next_user_id: persisted.next_user_id,
                 next_assistant_id: persisted.next_assistant_id,
@@ -98,6 +106,8 @@ pub fn save_state(state: &State) {
         message_ids: state.messages.iter().map(|m| m.id.clone()).collect(),
         selected_context: state.selected_context,
         tree_filter: state.tree_filter.clone(),
+        tree_open_folders: state.tree_open_folders.clone(),
+        tree_descriptions: state.tree_descriptions.clone(),
         next_user_id: state.next_user_id,
         next_assistant_id: state.next_assistant_id,
         next_tool_id: state.next_tool_id,
