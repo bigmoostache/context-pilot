@@ -86,6 +86,7 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "create_tmux_pane" => tmux::execute_create_pane(tool, state),
         "edit_tmux_config" => tmux::execute_edit_config(tool, state),
         "tmux_send_keys" => tmux::execute_send_keys(tool, state),
+        "sleep" => tmux::execute_sleep(tool),
         "create_todos" => todo::execute_create(tool, state),
         "update_todos" => todo::execute_update(tool, state),
         "create_memories" => memory::execute_create(tool, state),

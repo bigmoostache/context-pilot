@@ -1,13 +1,8 @@
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use crate::actions::Action;
+use crate::constants::{SIDEBAR_WIDTH, CONTEXT_LIST_START_ROW};
 use crate::state::State;
-
-/// Sidebar width in characters
-const SIDEBAR_WIDTH: u16 = 36;
-
-/// Context list starts at this row (after "CONTEXT" header + blank line)
-const CONTEXT_LIST_START_ROW: u16 = 2;
 
 /// Handle mouse events and return appropriate action
 pub fn handle_mouse(event: &MouseEvent, state: &State) -> Action {

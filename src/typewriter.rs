@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-const MOVING_AVG_SIZE: usize = 10;
-const MIN_CHAR_DELAY_MS: f64 = 5.0;
-const MAX_CHAR_DELAY_MS: f64 = 50.0;
-const DEFAULT_CHAR_DELAY_MS: f64 = 15.0;
+use crate::constants::{
+    TYPEWRITER_MOVING_AVG_SIZE, TYPEWRITER_MIN_DELAY_MS,
+    TYPEWRITER_MAX_DELAY_MS, TYPEWRITER_DEFAULT_DELAY_MS,
+};
 
 pub struct TypewriterBuffer {
     pub pending_chars: VecDeque<char>,
@@ -24,7 +24,7 @@ impl TypewriterBuffer {
             chunk_sizes: VecDeque::new(),
             last_chunk_time: None,
             last_char_time: Instant::now(),
-            chars_per_ms: 1.0 / DEFAULT_CHAR_DELAY_MS,
+            chars_per_ms: 1.0 / TYPEWRITER_DEFAULT_DELAY_MS,
             stream_done: false,
         }
     }
@@ -35,7 +35,7 @@ impl TypewriterBuffer {
         self.chunk_sizes.clear();
         self.last_chunk_time = None;
         self.last_char_time = Instant::now();
-        self.chars_per_ms = 1.0 / DEFAULT_CHAR_DELAY_MS;
+        self.chars_per_ms = 1.0 / TYPEWRITER_DEFAULT_DELAY_MS;
         self.stream_done = false;
     }
 
@@ -44,7 +44,7 @@ impl TypewriterBuffer {
 
         if let Some(last_time) = self.last_chunk_time {
             let interval = now.duration_since(last_time);
-            if self.chunk_intervals.len() >= MOVING_AVG_SIZE {
+            if self.chunk_intervals.len() >= TYPEWRITER_MOVING_AVG_SIZE {
                 self.chunk_intervals.pop_front();
             }
             self.chunk_intervals.push_back(interval);
@@ -52,7 +52,7 @@ impl TypewriterBuffer {
         self.last_chunk_time = Some(now);
 
         let char_count = text.chars().count();
-        if self.chunk_sizes.len() >= MOVING_AVG_SIZE {
+        if self.chunk_sizes.len() >= TYPEWRITER_MOVING_AVG_SIZE {
             self.chunk_sizes.pop_front();
         }
         self.chunk_sizes.push_back(char_count);
@@ -79,7 +79,7 @@ impl TypewriterBuffer {
 
         if avg_interval_ms > 0.0 && avg_chunk_size > 0.0 {
             let calculated_delay = avg_interval_ms / avg_chunk_size;
-            let clamped_delay = calculated_delay.clamp(MIN_CHAR_DELAY_MS, MAX_CHAR_DELAY_MS);
+            let clamped_delay = calculated_delay.clamp(TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MAX_DELAY_MS);
             self.chars_per_ms = 1.0 / clamped_delay;
         }
     }

@@ -1,3 +1,4 @@
+use crate::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::persistence::{delete_message, save_message};
 use crate::state::{estimate_tokens, ContextElement, ContextType, Message, MessageStatus, MessageType, State};
 
@@ -357,17 +358,13 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             let accel_amount = amount * state.scroll_accel;
             state.scroll_offset = (state.scroll_offset - accel_amount).max(0.0);
             state.user_scrolled = true;
-            // Increase acceleration (max 2.5x)
-            state.scroll_accel = (state.scroll_accel + 0.3).min(2.5);
+            state.scroll_accel = (state.scroll_accel + SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
             ActionResult::Nothing
         }
         Action::ScrollDown(amount) => {
             let accel_amount = amount * state.scroll_accel;
-            // Limit scroll to max_scroll (set by UI during render)
             state.scroll_offset = (state.scroll_offset + accel_amount).min(state.max_scroll);
-            // user_scrolled will be reset in render if at bottom
-            // Increase acceleration (max 2.5x)
-            state.scroll_accel = (state.scroll_accel + 0.3).min(2.5);
+            state.scroll_accel = (state.scroll_accel + SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
             ActionResult::Nothing
         }
         Action::ToggleCopyMode => {

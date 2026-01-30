@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use ignore::gitignore::GitignoreBuilder;
 
 use super::{ToolResult, ToolUse};
+use crate::constants::{TREE_MAX_DEPTH, TREE_MAX_ENTRIES};
 use crate::state::{estimate_tokens, ContextType, State};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -82,10 +83,7 @@ fn build_tree(
     output: &mut String,
     depth: usize,
 ) {
-    const MAX_DEPTH: usize = 10;
-    const MAX_ENTRIES: usize = 100;
-
-    if depth > MAX_DEPTH {
+    if depth > TREE_MAX_DEPTH {
         output.push_str(&format!("{}...(max depth reached)\n", prefix));
         return;
     }
@@ -121,8 +119,8 @@ fn build_tree(
     });
 
     let total = items.len();
-    let truncated = total > MAX_ENTRIES;
-    let items: Vec<_> = items.into_iter().take(MAX_ENTRIES).collect();
+    let truncated = total > TREE_MAX_ENTRIES;
+    let items: Vec<_> = items.into_iter().take(TREE_MAX_ENTRIES).collect();
 
     for (i, entry) in items.iter().enumerate() {
         let is_last = i == items.len() - 1 && !truncated;
@@ -151,6 +149,6 @@ fn build_tree(
     }
 
     if truncated {
-        output.push_str(&format!("{}└── ...({} more items)\n", prefix, total - MAX_ENTRIES));
+        output.push_str(&format!("{}└── ...({} more items)\n", prefix, total - TREE_MAX_ENTRIES));
     }
 }

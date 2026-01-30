@@ -1,16 +1,14 @@
 use std::process::Command;
 
 use super::{ToolResult, ToolUse};
+use crate::constants::{TMUX_BG_SESSION, TMUX_SEND_DELAY_MS, SLEEP_DURATION_SECS};
 use crate::state::{estimate_tokens, ContextElement, ContextType, State};
-
-/// Background session name for context-pilot
-const BG_SESSION: &str = "context-pilot-bg";
 
 /// Ensure the background tmux session exists
 fn ensure_bg_session() -> Result<(), String> {
     // Check if session exists
     let check = Command::new("tmux")
-        .args(["has-session", "-t", BG_SESSION])
+        .args(["has-session", "-t", TMUX_BG_SESSION])
         .output();
 
     match check {
@@ -18,7 +16,7 @@ fn ensure_bg_session() -> Result<(), String> {
         _ => {
             // Create detached session
             let create = Command::new("tmux")
-                .args(["new-session", "-d", "-s", BG_SESSION])
+                .args(["new-session", "-d", "-s", TMUX_BG_SESSION])
                 .output();
 
             match create {
@@ -55,7 +53,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Create a new window in the background session
     let output = Command::new("tmux")
-        .args(["new-window", "-t", BG_SESSION, "-d", "-P", "-F", "#{pane_id}"])
+        .args(["new-window", "-t", TMUX_BG_SESSION, "-d", "-P", "-F", "#{pane_id}"])
         .output();
 
     let pane_id = match output {
@@ -115,19 +113,25 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Execute edit_tmux_config tool
 pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let pane_id = match tool.input.get("pane_id").and_then(|v| v.as_str()) {
+    // Accept either pane_id or context_id
+    let identifier = tool.input.get("pane_id")
+        .or_else(|| tool.input.get("context_id"))
+        .and_then(|v| v.as_str());
+
+    let identifier = match identifier {
         Some(id) => id,
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: "Missing 'pane_id' parameter".to_string(),
+                content: "Missing 'pane_id' or 'context_id' parameter".to_string(),
                 is_error: true,
             };
         }
     };
 
+    // Find the context by context_id or pane_id
     let ctx = state.context.iter_mut()
-        .find(|c| c.tmux_pane_id.as_deref() == Some(pane_id));
+        .find(|c| c.id == identifier || c.tmux_pane_id.as_deref() == Some(identifier));
 
     match ctx {
         Some(c) => {
@@ -150,6 +154,7 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
                     is_error: true,
                 }
             } else {
+                let pane_id = c.tmux_pane_id.as_deref().unwrap_or(identifier);
                 ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Updated pane {}: {}", pane_id, changes.join(", ")),
@@ -160,21 +165,55 @@ pub fn execute_edit_config(tool: &ToolUse, state: &mut State) -> ToolResult {
         None => {
             ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Pane '{}' not found in context", pane_id),
+                content: format!("Pane '{}' not found. Use pane_id (e.g. %23) or context_id (e.g. P7)", identifier),
                 is_error: true,
             }
         }
     }
 }
 
+/// Resolve a pane identifier to the actual tmux pane ID
+/// Accepts either a context_id (like "P7") or a raw pane_id (like "%23")
+fn resolve_pane_id(identifier: &str, state: &State) -> Option<String> {
+    // First, try to find by context_id
+    if let Some(ctx) = state.context.iter().find(|c| c.id == identifier) {
+        return ctx.tmux_pane_id.clone();
+    }
+    // Then try to find by pane_id directly
+    if let Some(ctx) = state.context.iter().find(|c| c.tmux_pane_id.as_deref() == Some(identifier)) {
+        return ctx.tmux_pane_id.clone();
+    }
+    // If it looks like a tmux pane ID (starts with %), return it as-is
+    if identifier.starts_with('%') {
+        return Some(identifier.to_string());
+    }
+    None
+}
+
 /// Execute tmux_send_keys tool
 pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let pane_id = match tool.input.get("pane_id").and_then(|v| v.as_str()) {
+    // Accept either pane_id or context_id
+    let identifier = tool.input.get("pane_id")
+        .or_else(|| tool.input.get("context_id"))
+        .and_then(|v| v.as_str());
+
+    let identifier = match identifier {
         Some(id) => id,
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: "Missing 'pane_id' parameter".to_string(),
+                content: "Missing 'pane_id' or 'context_id' parameter".to_string(),
+                is_error: true,
+            };
+        }
+    };
+
+    let pane_id = match resolve_pane_id(identifier, state) {
+        Some(id) => id,
+        None => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Pane '{}' not found. Use pane_id (e.g. %23) or context_id (e.g. P7)", identifier),
                 is_error: true,
             };
         }
@@ -196,9 +235,9 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
         .unwrap_or(true);
 
     // Send keys to the pane
-    let mut args = vec!["send-keys", "-t", pane_id, keys];
+    let mut args = vec!["send-keys".to_string(), "-t".to_string(), pane_id.clone(), keys.to_string()];
     if enter {
-        args.push("Enter");
+        args.push("Enter".to_string());
     }
 
     let output = Command::new("tmux")
@@ -208,11 +247,11 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     match output {
         Ok(out) if out.status.success() => {
             // Wait 0.5 seconds for output to appear
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(std::time::Duration::from_millis(TMUX_SEND_DELAY_MS));
 
             // Update last keys in context
             if let Some(ctx) = state.context.iter_mut()
-                .find(|c| c.tmux_pane_id.as_deref() == Some(pane_id))
+                .find(|c| c.tmux_pane_id.as_deref() == Some(pane_id.as_str()))
             {
                 ctx.tmux_last_keys = Some(keys.to_string());
             }
@@ -237,6 +276,17 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
                 is_error: true,
             }
         }
+    }
+}
+
+/// Execute sleep tool (fixed duration from constants)
+pub fn execute_sleep(tool: &ToolUse) -> ToolResult {
+    std::thread::sleep(std::time::Duration::from_secs(SLEEP_DURATION_SECS));
+
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("Slept for {} second(s)", SLEEP_DURATION_SECS),
+        is_error: false,
     }
 }
 

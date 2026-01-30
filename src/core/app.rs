@@ -9,6 +9,7 @@ use ratatui::prelude::*;
 use crate::actions::{apply_action, Action, ActionResult};
 use crate::api::{start_cleaning, start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
+use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS};
 use crate::context_cleaner;
 use crate::events::handle_event;
 use crate::persistence::{save_message, save_state};
@@ -18,8 +19,6 @@ use crate::typewriter::TypewriterBuffer;
 use crate::ui;
 
 use super::context::prepare_stream_context;
-
-const MAX_CLEANING_ITERATIONS: u32 = 10;
 
 pub struct App {
     pub state: State,
@@ -69,7 +68,7 @@ impl App {
             terminal.draw(|frame| ui::render(frame, &mut self.state))?;
 
             // Poll events
-            if event::poll(Duration::from_millis(8))? {
+            if event::poll(Duration::from_millis(EVENT_POLL_MS))? {
                 let evt = event::read()?;
 
                 let Some(action) = handle_event(&evt, &self.state) else {
@@ -151,8 +150,7 @@ impl App {
             save_state(&self.state);
 
             let (_, usage_pct) = context_cleaner::calculate_context_usage(&self.state);
-            // TODO: Set back to 0.50 after testing
-            if usage_pct < 0.05 || self.cleaning_iterations >= MAX_CLEANING_ITERATIONS {
+            if usage_pct < CLEANING_TARGET || self.cleaning_iterations >= MAX_CLEANING_ITERATIONS {
                 self.state.is_cleaning_context = false;
                 self.cleaning_pending_done = None;
                 self.cleaning_iterations = 0;

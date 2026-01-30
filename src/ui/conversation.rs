@@ -3,6 +3,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
 };
 
+use crate::constants::icons;
 use crate::state::{MessageStatus, MessageType, State};
 use super::{theme, helpers::wrap_text, markdown::*};
 
@@ -86,7 +87,7 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                     };
 
                     text.push(Line::from(vec![
-                        Span::styled("⚙ ", Style::default().fg(theme::SUCCESS)),
+                        Span::styled(format!("{} ", icons::MSG_TOOL_CALL), Style::default().fg(theme::SUCCESS)),
                         Span::styled(padded_id.clone(), Style::default().fg(theme::SUCCESS).bold()),
                         Span::styled(" ", base_style),
                         Span::styled(&tool_use.name, Style::default().fg(theme::TEXT)),
@@ -101,9 +102,9 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
             if msg.message_type == MessageType::ToolResult {
                 for result in &msg.tool_results {
                     let (status_icon, status_color) = if result.is_error {
-                        ("✗", theme::WARNING)
+                        (icons::MSG_ERROR, theme::WARNING)
                     } else {
-                        ("✓", theme::SUCCESS)
+                        (icons::MSG_TOOL_RESULT, theme::SUCCESS)
                     };
 
                     // Prefix: "✓ Rx   " - same width as tool calls "⚙ Tx   "
@@ -144,9 +145,16 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
 
             // Regular text message
             let (role_icon, role_color) = if msg.role == "user" {
-                ("▸", theme::USER)
+                (icons::MSG_USER, theme::USER)
             } else {
-                ("●", theme::ASSISTANT)
+                (icons::MSG_ASSISTANT, theme::ASSISTANT)
+            };
+
+            // Status icon
+            let status_icon = match msg.status {
+                MessageStatus::Full => icons::STATUS_FULL,
+                MessageStatus::Summarized => icons::STATUS_SUMMARIZED,
+                MessageStatus::Forgotten => icons::STATUS_FORGOTTEN,
             };
 
             // Message content
@@ -158,8 +166,8 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
             // Fixed-width padded ID (4 chars)
             let padded_id = format!("{:<4}", msg.id);
 
-            // Calculate available width for text (after icon + id + spaces)
-            let prefix = format!("{} {} ", role_icon, padded_id);
+            // Calculate available width for text (after icon + id + status + spaces)
+            let prefix = format!("{} {}{} ", role_icon, padded_id, status_icon);
             let prefix_width = prefix.chars().count();
             let text_width = content_area.width.saturating_sub(2) as usize; // -2 for margins
             let wrap_width = text_width.saturating_sub(prefix_width);
@@ -170,6 +178,7 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                     text.push(Line::from(vec![
                         Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                         Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
+                        Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
                         Span::styled(" ", base_style),
                         Span::styled("...", Style::default().fg(theme::TEXT_MUTED).italic()),
                     ]));
@@ -177,6 +186,7 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                     text.push(Line::from(vec![
                         Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                         Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
+                        Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
                     ]));
                 }
             } else {
@@ -224,6 +234,7 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                                     let mut line_spans = vec![
                                         Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                                         Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
+                                        Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
                                         Span::styled(" ", base_style),
                                     ];
                                     line_spans.extend(row_spans);
@@ -249,6 +260,7 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                             let mut line_spans = vec![
                                 Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                                 Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
+                                Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
                                 Span::styled(" ", base_style),
                             ];
                             line_spans.extend(md_spans);
@@ -270,6 +282,7 @@ pub fn render_conversation(frame: &mut Frame, state: &mut State, area: Rect) {
                                 text.push(Line::from(vec![
                                     Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                                     Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
+                                    Span::styled(status_icon, Style::default().fg(theme::TEXT_MUTED)),
                                     Span::styled(" ", base_style),
                                     Span::styled(line_text.clone(), Style::default().fg(theme::TEXT)),
                                 ]));

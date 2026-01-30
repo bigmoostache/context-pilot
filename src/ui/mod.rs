@@ -12,6 +12,7 @@ use ratatui::{
     widgets::Block,
 };
 
+use crate::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT, INPUT_MIN_HEIGHT, INPUT_MAX_HEIGHT};
 use crate::state::{ContextType, State};
 
 
@@ -28,8 +29,8 @@ pub fn render(frame: &mut Frame, state: &mut State) {
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(1),     // Body
-            Constraint::Length(1),  // Status bar
+            Constraint::Min(1),                        // Body
+            Constraint::Length(STATUS_BAR_HEIGHT),    // Status bar
         ])
         .split(area);
 
@@ -42,8 +43,8 @@ fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
     let body_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Length(36),  // Sidebar
-            Constraint::Min(1),      // Main content
+            Constraint::Length(SIDEBAR_WIDTH),  // Sidebar
+            Constraint::Min(1),                 // Main content
         ])
         .split(area);
 
@@ -54,7 +55,7 @@ fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
 fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
     // Calculate input height based on content
     let input_lines = state.input.lines().count().max(1);
-    let input_height = (input_lines as u16 + 2).clamp(4, 12);
+    let input_height = (input_lines as u16 + 2).clamp(INPUT_MIN_HEIGHT, INPUT_MAX_HEIGHT);
 
     let content_layout = Layout::default()
         .direction(Direction::Vertical)

@@ -1,11 +1,6 @@
+use crate::constants::{MAX_CONTEXT_TOKENS, CLEANING_THRESHOLD, prompts, icons};
 use crate::state::State;
 use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
-
-/// Maximum context size in tokens (matches Claude's effective context window)
-pub const MAX_CONTEXT_TOKENS: usize = 100_000;
-
-/// Threshold percentage to trigger context cleaning
-pub const CLEANING_THRESHOLD: f32 = 0.10; // TODO: Set back to 0.70 after testing
 
 /// Tool IDs that are allowed for context cleaning
 const CLEANER_TOOL_IDS: &[&str] = &[
@@ -23,48 +18,6 @@ pub fn get_cleaner_tools() -> Vec<ToolDefinition> {
         .collect()
 }
 
-/// System prompt for the context cleaner
-const CLEANER_SYSTEM_PROMPT: &str = r#"You are a context management assistant. Your ONLY job is to reduce context usage intelligently.
-
-Current context is above 70% capacity and needs to be reduced.
-
-## Strategy Priority (high to low impact):
-
-1. **Close large file contexts (P7+)** - Files often consume the most tokens
-   - Close files that haven't been referenced recently
-   - Close files that were only opened for quick lookup
-   - Keep files actively being edited
-
-2. **Summarize or forget old messages** - Conversation history grows fast
-   - FORGET: Old tool calls/results that are no longer relevant
-   - FORGET: Superseded discussions (e.g., old approaches that were abandoned)
-   - SUMMARIZE: Long assistant responses - keep key decisions only
-   - SUMMARIZE: Long user messages with detailed context already acted upon
-   - Keep recent messages (last 5-10 exchanges) at full status
-
-3. **Close glob searches** - Often opened for exploration then forgotten
-   - Close globs that found what was needed
-   - Close globs with too many results
-
-4. **Close tmux panes** - Terminal output is often transient
-   - Close panes for completed commands
-   - Keep panes for ongoing processes
-
-5. **Delete completed todos** - Done items waste tokens
-   - Delete all todos with status 'done'
-   - Consider deleting obsolete pending todos
-
-6. **Clean up memories** - Remove outdated information
-   - Delete memories about completed tasks
-   - Delete memories superseded by newer ones
-
-## Rules:
-- Be aggressive but smart - aim to reduce by 30-50%
-- NEVER close P1-P6 (core context elements)
-- Prefer forgetting over summarizing when content is truly obsolete
-- Make multiple tool calls in one response for efficiency
-- After cleaning, briefly report what was removed
-"#;
 
 /// Calculate current context usage
 pub fn calculate_context_usage(state: &State) -> (usize, f32) {
@@ -92,11 +45,11 @@ pub fn build_cleaner_context(state: &State) -> String {
     context.push_str("## Context Elements:\n");
     for ctx in &state.context {
         let size_indicator = if ctx.token_count > 10000 {
-            "🔴 LARGE"
+            format!("{} LARGE", icons::SIZE_LARGE)
         } else if ctx.token_count > 5000 {
-            "🟡 MEDIUM"
+            format!("{} MEDIUM", icons::SIZE_MEDIUM)
         } else {
-            "🟢 SMALL"
+            format!("{} SMALL", icons::SIZE_SMALL)
         };
 
         let details = match ctx.context_type {
@@ -197,6 +150,6 @@ pub fn build_cleaner_context(state: &State) -> String {
 
 /// Get the system prompt for the cleaner
 pub fn get_cleaner_system_prompt() -> &'static str {
-    CLEANER_SYSTEM_PROMPT
+    prompts::CLEANER_SYSTEM
 }
 

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::constants::icons;
 use crate::tool_defs::{ToolDefinition, get_all_tool_definitions, estimate_tools_tokens};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -17,18 +18,18 @@ pub enum ContextType {
 }
 
 impl ContextType {
-    /// Get icon for this context type (universal Unicode)
+    /// Get icon for this context type
     pub fn icon(&self) -> &'static str {
         match self {
-            ContextType::Conversation => "●",
-            ContextType::File => "◇",
-            ContextType::Tree => "≡",
-            ContextType::Glob => "✦",
-            ContextType::Tmux => "▣",
-            ContextType::Todo => "☐",
-            ContextType::Memory => "◈",
-            ContextType::Overview => "◎",
-            ContextType::Tools => "☰",
+            ContextType::Conversation => icons::CTX_CONVERSATION,
+            ContextType::File => icons::CTX_FILE,
+            ContextType::Tree => icons::CTX_TREE,
+            ContextType::Glob => icons::CTX_GLOB,
+            ContextType::Tmux => icons::CTX_TMUX,
+            ContextType::Todo => icons::CTX_TODO,
+            ContextType::Memory => icons::CTX_MEMORY,
+            ContextType::Overview => icons::CTX_OVERVIEW,
+            ContextType::Tools => icons::CTX_TOOLS,
         }
     }
 }
@@ -77,11 +78,11 @@ pub enum TodoStatus {
 }
 
 impl TodoStatus {
-    pub fn icon(&self) -> char {
+    pub fn icon(&self) -> &'static str {
         match self {
-            TodoStatus::Pending => ' ',
-            TodoStatus::InProgress => '~',
-            TodoStatus::Done => 'x',
+            TodoStatus::Pending => icons::TODO_PENDING,
+            TodoStatus::InProgress => icons::TODO_IN_PROGRESS,
+            TodoStatus::Done => icons::TODO_DONE,
         }
     }
 

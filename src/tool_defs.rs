@@ -349,6 +349,15 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             enabled: true,
             category: ToolCategory::Tmux,
         },
+        ToolDefinition {
+            id: "sleep".to_string(),
+            name: "Sleep".to_string(),
+            short_desc: "Wait 2 seconds".to_string(),
+            description: "Pauses execution for 2 seconds. Useful for waiting for terminal output or processes to complete.".to_string(),
+            params: vec![],
+            enabled: true,
+            category: ToolCategory::Tmux,
+        },
 
         // Task tools
         ToolDefinition {

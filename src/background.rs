@@ -5,6 +5,7 @@ use std::thread;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
+use crate::constants::{MODEL_TLDR, MAX_TLDR_TOKENS, API_ENDPOINT, API_VERSION, prompts};
 use crate::state::estimate_tokens;
 
 /// Simple debug logging to file
@@ -35,7 +36,7 @@ pub fn generate_tldr(message_id: String, content: String, tx: Sender<TlDrResult>
         log(&format!("Token count: {}", token_count));
 
         // If short enough, use content directly
-        if token_count < 25 {
+        if token_count < prompts::TLDR_MIN_TOKENS {
             log("Using content directly (short message)");
             let result = tx.send(TlDrResult {
                 message_id,
@@ -113,21 +114,18 @@ fn summarize_content(content: &str) -> Result<String, String> {
     }
 
     let request = SummaryRequest {
-        model: "claude-opus-4-5".to_string(),
-        max_tokens: 100,
+        model: MODEL_TLDR.to_string(),
+        max_tokens: MAX_TLDR_TOKENS,
         messages: vec![SummaryMessage {
             role: "user".to_string(),
-            content: format!(
-                "Summarize the following message in 1-2 short sentences (max 50 words). Be concise and capture the key point:\n\n{}",
-                content
-            ),
+            content: format!("{}{}", prompts::TLDR_PROMPT, content),
         }],
     };
 
     let response = client
-        .post("https://api.anthropic.com/v1/messages")
+        .post(API_ENDPOINT)
         .header("x-api-key", &api_key)
-        .header("anthropic-version", "2023-06-01")
+        .header("anthropic-version", API_VERSION)
         .header("content-type", "application/json")
         .json(&request)
         .send()

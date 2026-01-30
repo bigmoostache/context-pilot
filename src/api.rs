@@ -7,6 +7,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::constants::{MODEL_MAIN, MAX_RESPONSE_TOKENS, API_ENDPOINT, API_VERSION};
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::{ToolDefinition, build_api_tools};
 use crate::tools::{ToolResult, ToolUse};
@@ -67,17 +68,15 @@ struct StreamMessage {
     #[serde(rename = "type")]
     event_type: String,
     #[serde(default)]
-    #[allow(dead_code)]
-    index: Option<usize>,
+    _index: Option<usize>,
     content_block: Option<StreamContentBlock>,
     delta: Option<StreamDelta>,
     usage: Option<StreamUsage>,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct StreamUsage {
-    input_tokens: Option<usize>,
+    _input_tokens: Option<usize>,
     output_tokens: Option<usize>,
 }
 
@@ -342,8 +341,8 @@ fn stream_response(
     };
 
     let request = ApiRequest {
-        model: "claude-opus-4-5".to_string(),
-        max_tokens: 4096,
+        model: MODEL_MAIN.to_string(),
+        max_tokens: MAX_RESPONSE_TOKENS,
         system: system_prompt,
         messages: api_messages,
         tools: build_api_tools(tools),
@@ -351,9 +350,9 @@ fn stream_response(
     };
 
     let response = client
-        .post("https://api.anthropic.com/v1/messages")
+        .post(API_ENDPOINT)
         .header("x-api-key", &api_key)
-        .header("anthropic-version", "2023-06-01")
+        .header("anthropic-version", API_VERSION)
         .header("content-type", "application/json")
         .json(&request)
         .send()

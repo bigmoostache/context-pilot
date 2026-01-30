@@ -1651,3 +1651,199 @@ Token count: 139
 Calling LLM for summary...
 Got summary: The assistant opened 4 key files (tool dispatcher,
 Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 38
+Calling LLM for summary...
+Got summary: The user plans to open multiple large/key files to
+Send result: true
+Token count: 229
+Calling LLM for summary...
+Got summary: You've loaded 6 files (~30.7K tokens) covering a T
+Send result: true
+Token count: 12
+Using content directly (short message)
+Send result: true
+Token count: 124
+Calling LLM for summary...
+Got summary: The context cleaner automatically removed recently
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 68
+Calling LLM for summary...
+Got summary: The context cleaner is working correctly, automati
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 146
+Calling LLM for summary...
+Got summary: You're observing a Rust-based TUI chat application
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 134
+Calling LLM for summary...
+Got summary: A Rust-based TUI project is described with core mo
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 343
+Calling LLM for summary...
+Got summary: Context Pilot is a terminal-based AI coding assist
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 133
+Calling LLM for summary...
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 112
+Calling LLM for summary...
+Got summary: The assistant is offering to help with a Rust TUI 
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 136
+Calling LLM for summary...
+Got summary: A Rust TUI project with core modules (app state, c
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 20
+Using content directly (short message)
+Send result: true
+Token count: 35
+Calling LLM for summary...
+Got summary: The user notes that file paths include a `tui/` pr
+Send result: true
+Token count: 166
+Calling LLM for summary...
+Got summary: The user has loaded 5 core Rust files into context
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 57
+Calling LLM for summary...
+Got summary: The assistant asks for clarification on the unclea
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 138
+Calling LLM for summary...
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 324
+Calling LLM for summary...
+Got summary: Claude is an AI assistant in Context Pilot, a TUI 
+Send result: true
+Token count: 30
+Calling LLM for summary...
+Got summary: The message asks what additional capabilities I wo
+Send result: true
+Token count: 466
+Calling LLM for summary...
+Got summary: The message lists desired coding assistant capabil
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 18
+Using content directly (short message)
+Send result: true
+Token count: 27
+Calling LLM for summary...
+Got summary: The user notes they already have a tmux pane P7 (%
+Send result: true
+Token count: 20
+Using content directly (short message)
+Send result: true
+Token count: 31
+Calling LLM for summary...
+Got summary: The user confirms the project is initialized and i
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 162
+Calling LLM for summary...
+Got summary: A classic snake game was built with features inclu
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 31
+Calling LLM for summary...
+Got summary: The user identified compilation errors in the tmux
+Send result: true
+Token count: 36
+Calling LLM for summary...
+Got summary: The user identified an error with `crossterm::Resu
+Send result: true
+Token count: 55
+Calling LLM for summary...
+Token count: 15
+Using content directly (short message)
+Send result: true
+Got summary: The snake game build succeeded and is ready to pla
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 127
+Calling LLM for summary...
+Got summary: The assistant explains it doesn't have a built-in 
+Send result: true
+Token count: 34
+Calling LLM for summary...
+Got summary: The user explains that running in the shell is the
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 120
+Calling LLM for summary...
+Got summary: A sleep/wait tool could be useful for automation t
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 64
+Calling LLM for summary...
+Got summary: The user is excited about a new `sleep` tool (1-30
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 29
+Calling LLM for summary...
+Got summary: The user confirms they have a `sleep` tool that ac
+Send result: true
+Token count: 44
+Calling LLM for summary...
+Got summary: The user has full control over wait durations, cho
+Send result: true

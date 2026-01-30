@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
-use crate::context_cleaner::MAX_CONTEXT_TOKENS;
+use crate::constants::MAX_CONTEXT_TOKENS;
 use crate::highlight::highlight_file;
 use crate::state::{ContextType, State, TodoStatus, MemoryImportance};
 use crate::tool_defs::{ParamType, ToolCategory, ToolParam};

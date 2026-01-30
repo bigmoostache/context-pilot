@@ -1,6 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 
 use crate::actions::{parse_context_pattern, Action};
+use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::mouse::handle_mouse;
 use crate::state::State;
 
@@ -56,8 +57,8 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 return Some(match key.code {
                     KeyCode::Left => Action::CursorWordLeft,
                     KeyCode::Right => Action::CursorWordRight,
-                    KeyCode::Up => Action::ScrollUp(3.0),
-                    KeyCode::Down => Action::ScrollDown(3.0),
+                    KeyCode::Up => Action::ScrollUp(SCROLL_ARROW_AMOUNT),
+                    KeyCode::Down => Action::ScrollDown(SCROLL_ARROW_AMOUNT),
                     KeyCode::Backspace => Action::CursorWordLeft, // TODO: delete word
                     _ => Action::None,
                 });
@@ -74,8 +75,8 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 KeyCode::Down => Action::CursorDown,
                 KeyCode::Home => Action::CursorHome,
                 KeyCode::End => Action::CursorEnd,
-                KeyCode::PageUp => Action::ScrollUp(10.0),
-                KeyCode::PageDown => Action::ScrollDown(10.0),
+                KeyCode::PageUp => Action::ScrollUp(SCROLL_PAGE_AMOUNT),
+                KeyCode::PageDown => Action::ScrollDown(SCROLL_PAGE_AMOUNT),
                 _ => Action::None,
             };
             Some(action)

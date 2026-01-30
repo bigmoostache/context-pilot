@@ -1,11 +1,9 @@
 use std::fs;
 use std::path::PathBuf;
 
+use crate::constants::{STORE_DIR, STATE_FILE, MESSAGES_DIR};
 use crate::state::{Message, PersistedState, State};
-
-const STORE_DIR: &str = "./.context-pilot";
-const STATE_FILE: &str = "state.yaml";
-const MESSAGES_DIR: &str = "messages";
+use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
 
 fn messages_dir() -> PathBuf {
     PathBuf::from(STORE_DIR).join(MESSAGES_DIR)
@@ -35,11 +33,24 @@ pub fn delete_message(id: &str) {
     fs::remove_file(path).ok();
 }
 
+/// Merge persisted tools with current tool definitions.
+/// Preserves enabled state for existing tools, adds new tools as enabled.
+fn merge_tools(persisted: Vec<ToolDefinition>) -> Vec<ToolDefinition> {
+    let current = get_all_tool_definitions();
+    current.into_iter().map(|mut tool| {
+        // If tool existed in persisted state, preserve its enabled state
+        if let Some(old) = persisted.iter().find(|t| t.id == tool.id) {
+            tool.enabled = old.enabled;
+        }
+        tool
+    }).collect()
+}
+
 pub fn load_state() -> State {
     let path = PathBuf::from(STORE_DIR).join(STATE_FILE);
 
-    if let Ok(yaml) = fs::read_to_string(&path) {
-        if let Ok(persisted) = serde_yaml::from_str::<PersistedState>(&yaml) {
+    if let Ok(json) = fs::read_to_string(&path) {
+        if let Ok(persisted) = serde_json::from_str::<PersistedState>(&json) {
             let messages: Vec<Message> = persisted.message_ids
                 .iter()
                 .filter_map(|id| load_message(id))
@@ -69,7 +80,7 @@ pub fn load_state() -> State {
                 next_todo_id: persisted.next_todo_id,
                 memories: persisted.memories,
                 next_memory_id: persisted.next_memory_id,
-                tools: persisted.tools,
+                tools: merge_tools(persisted.tools),
                 is_cleaning_context: false,
             };
         }
@@ -100,7 +111,7 @@ pub fn save_state(state: &State) {
     };
 
     let path = dir.join(STATE_FILE);
-    if let Ok(yaml) = serde_yaml::to_string(&persisted) {
-        fs::write(path, yaml).ok();
+    if let Ok(json) = serde_json::to_string_pretty(&persisted) {
+        fs::write(path, json).ok();
     }
 }

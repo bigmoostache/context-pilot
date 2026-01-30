@@ -3,7 +3,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::context_cleaner::MAX_CONTEXT_TOKENS;
+use crate::constants::{MAX_CONTEXT_TOKENS, SIDEBAR_HELP_HEIGHT};
 use crate::state::State;
 use super::{theme, chars, helpers::*};
 
@@ -14,8 +14,8 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     let sidebar_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(1),      // Context list
-            Constraint::Length(7),   // Help hints
+            Constraint::Min(1),                        // Context list
+            Constraint::Length(SIDEBAR_HELP_HEIGHT),   // Help hints
         ])
         .split(area);
 
