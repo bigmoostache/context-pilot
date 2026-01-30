@@ -159,7 +159,7 @@ impl App {
                 let cleaner_tools = context_cleaner::get_cleaner_tools();
                 self.cleaning_pending_done = None;
                 start_cleaning(
-                    ctx.messages, ctx.file_context, ctx.glob_context, ctx.tmux_context,
+                    ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
                     ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
                     cleaner_tools, &self.state, clean_tx.clone(),
                 );
@@ -287,7 +287,7 @@ impl App {
             let ctx = prepare_stream_context(&mut self.state, true);
             let cleaner_tools = context_cleaner::get_cleaner_tools();
             start_cleaning(
-                ctx.messages, ctx.file_context, ctx.glob_context, ctx.tmux_context,
+                ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
                 ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
                 cleaner_tools, &self.state, clean_tx.clone(),
             );
@@ -298,7 +298,7 @@ impl App {
         self.typewriter.reset();
         self.pending_done = None;
         start_streaming(
-            ctx.messages, ctx.file_context, ctx.glob_context, ctx.tmux_context,
+            ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
             ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
             ctx.tools, None, tx.clone(),
         );
@@ -342,7 +342,7 @@ impl App {
                     let ctx = prepare_stream_context(&mut self.state, true);
                     let cleaner_tools = context_cleaner::get_cleaner_tools();
                     start_cleaning(
-                        ctx.messages, ctx.file_context, ctx.glob_context, ctx.tmux_context,
+                        ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
                         ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
                         cleaner_tools, &self.state, clean_tx.clone(),
                     );
@@ -383,7 +383,7 @@ impl App {
                 }
                 let ctx = prepare_stream_context(&mut self.state, false);
                 start_streaming(
-                    ctx.messages, ctx.file_context, ctx.glob_context, ctx.tmux_context,
+                    ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
                     ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
                     ctx.tools, None, tx.clone(),
                 );
@@ -425,7 +425,7 @@ impl App {
                 let ctx = prepare_stream_context(&mut self.state, true);
                 let cleaner_tools = context_cleaner::get_cleaner_tools();
                 start_cleaning(
-                    ctx.messages, ctx.file_context, ctx.glob_context, ctx.tmux_context,
+                    ctx.messages, ctx.file_context, ctx.glob_context, ctx.grep_context, ctx.tmux_context,
                     ctx.todo_context, ctx.memory_context, ctx.overview_context, ctx.directory_tree,
                     cleaner_tools, &self.state, clean_tx.clone(),
                 );

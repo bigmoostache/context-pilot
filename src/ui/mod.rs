@@ -77,6 +77,7 @@ fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
         Some(ContextType::File) => panels::render_file(frame, state, area),
         Some(ContextType::Tree) => panels::render_tree(frame, state, area),
         Some(ContextType::Glob) => panels::render_glob(frame, state, area),
+        Some(ContextType::Grep) => panels::render_grep(frame, state, area),
         Some(ContextType::Tmux) => panels::render_tmux(frame, state, area),
         Some(ContextType::Todo) => panels::render_todo(frame, state, area),
         Some(ContextType::Memory) => panels::render_memory(frame, state, area),

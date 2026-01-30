@@ -2,6 +2,7 @@ mod close_context;
 mod edit_file;
 mod file;
 mod glob;
+mod grep;
 mod memory;
 mod message_status;
 mod overview;
@@ -17,6 +18,7 @@ use crate::state::State;
 // Re-export public items
 pub use file::{get_context_files, refresh_file_hashes};
 pub use glob::{compute_glob_results, get_glob_context, refresh_glob_results};
+pub use grep::{compute_grep_results, get_grep_context, refresh_grep_results};
 pub use memory::{get_memory_context, refresh_memory_context};
 pub use overview::{get_overview_context, refresh_overview_context};
 pub use tmux::{capture_pane_content, get_tmux_context, refresh_tmux_context};
@@ -84,6 +86,7 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "tree_toggle_folders" => tree::execute_toggle_folders(tool, state),
         "tree_describe_files" => tree::execute_describe_files(tool, state),
         "glob" => glob::execute(tool, state),
+        "grep" => grep::execute(tool, state),
         "set_message_status" => message_status::execute(tool, state),
         "create_tmux_pane" => tmux::execute_create_pane(tool, state),
         "edit_tmux_config" => tmux::execute_edit_config(tool, state),

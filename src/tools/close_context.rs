@@ -59,6 +59,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 state.context.remove(idx);
                 closed.push(format!("{} (glob: {})", id, pattern));
             }
+            ContextType::Grep => {
+                let pattern = ctx.grep_pattern.clone().unwrap_or_default();
+                state.context.remove(idx);
+                closed.push(format!("{} (grep: {})", id, pattern));
+            }
             ContextType::Tmux => {
                 let pane_id = ctx.tmux_pane_id.clone();
                 let desc = ctx.tmux_description.clone().unwrap_or_default();

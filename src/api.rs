@@ -7,7 +7,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::constants::{MODEL_MAIN, MAX_RESPONSE_TOKENS, API_ENDPOINT, API_VERSION};
+use crate::constants::{MODEL_MAIN, MAX_RESPONSE_TOKENS, API_ENDPOINT, API_VERSION, prompts};
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::{ToolDefinition, build_api_tools};
 use crate::tools::{ToolResult, ToolUse};
@@ -86,6 +86,7 @@ fn messages_to_api(
     messages: &[Message],
     file_context: &[(String, String)],
     glob_context: &[(String, String)],
+    grep_context: &[(String, String)],
     tmux_context: &[(String, String)],
     todo_context: &str,
     memory_context: &str,
@@ -128,6 +129,11 @@ fn messages_to_api(
         context_parts.push(format!("=== {} ===\n{}\n=== End of {} ===", name, results, name));
     }
 
+    // Add grep results
+    for (name, results) in grep_context {
+        context_parts.push(format!("=== {} ===\n{}\n=== End of {} ===", name, results, name));
+    }
+
     // Add tmux pane outputs
     for (header, content) in tmux_context {
         context_parts.push(format!("=== {} ===\n{}\n=== End of {} ===", header, content, header));
@@ -165,13 +171,18 @@ fn messages_to_api(
             continue;
         }
 
-        // Handle tool call messages - include if there's a ToolResult message after them
+        // Handle tool call messages - include if there's a matching non-deleted ToolResult after them
         if msg.message_type == MessageType::ToolCall {
-            // Check if there's a ToolResult message after this tool call
-            let has_tool_result_after = messages[idx + 1..].iter()
-                .any(|m| m.message_type == MessageType::ToolResult);
+            // Get tool_use_ids from this tool call
+            let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
 
-            if has_tool_result_after {
+            // Check if there's a non-deleted ToolResult message after this that matches these tool_use_ids
+            let has_matching_tool_result = messages[idx + 1..].iter()
+                .filter(|m| m.status != MessageStatus::Deleted)
+                .filter(|m| m.message_type == MessageType::ToolResult)
+                .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
+
+            if has_matching_tool_result {
                 for tool_use in &msg.tool_uses {
                     content_blocks.push(ContentBlock::ToolUse {
                         id: tool_use.id.clone(),
@@ -189,7 +200,7 @@ fn messages_to_api(
                     }
                 }
             } else {
-                // Skip tool call messages without results - they can't be included
+                // Skip tool call messages without matching results - they can't be included
                 continue;
             }
         } else {
@@ -248,6 +259,7 @@ pub fn start_streaming(
     messages: Vec<Message>,
     file_context: Vec<(String, String)>,
     glob_context: Vec<(String, String)>,
+    grep_context: Vec<(String, String)>,
     tmux_context: Vec<(String, String)>,
     todo_context: String,
     memory_context: String,
@@ -258,7 +270,7 @@ pub fn start_streaming(
     tx: Sender<StreamEvent>,
 ) {
     thread::spawn(move || {
-        if let Err(e) = stream_response(&messages, &file_context, &glob_context, &tmux_context, &todo_context, &memory_context, &overview_context, &directory_tree, &tools, None, tool_results.as_deref(), &tx) {
+        if let Err(e) = stream_response(&messages, &file_context, &glob_context, &grep_context, &tmux_context, &todo_context, &memory_context, &overview_context, &directory_tree, &tools, None, tool_results.as_deref(), &tx) {
             let _ = tx.send(StreamEvent::Error(e));
         }
     });
@@ -269,6 +281,7 @@ pub fn start_cleaning(
     messages: Vec<Message>,
     file_context: Vec<(String, String)>,
     glob_context: Vec<(String, String)>,
+    grep_context: Vec<(String, String)>,
     tmux_context: Vec<(String, String)>,
     todo_context: String,
     memory_context: String,
@@ -282,7 +295,7 @@ pub fn start_cleaning(
     let system_prompt = crate::context_cleaner::get_cleaner_system_prompt().to_string();
 
     thread::spawn(move || {
-        if let Err(e) = stream_response(&messages, &file_context, &glob_context, &tmux_context, &todo_context, &memory_context, &overview_context, &directory_tree, &tools, Some((&system_prompt, &cleaner_context)), None, &tx) {
+        if let Err(e) = stream_response(&messages, &file_context, &glob_context, &grep_context, &tmux_context, &todo_context, &memory_context, &overview_context, &directory_tree, &tools, Some((&system_prompt, &cleaner_context)), None, &tx) {
             let _ = tx.send(StreamEvent::Error(e));
         }
     });
@@ -292,6 +305,7 @@ fn stream_response(
     messages: &[Message],
     file_context: &[(String, String)],
     glob_context: &[(String, String)],
+    grep_context: &[(String, String)],
     tmux_context: &[(String, String)],
     todo_context: &str,
     memory_context: &str,
@@ -310,7 +324,7 @@ fn stream_response(
 
     // Include tool_uses in last assistant message only if we're sending tool_results
     let include_tool_uses = tool_results.is_some();
-    let mut api_messages = messages_to_api(messages, file_context, glob_context, tmux_context, todo_context, memory_context, overview_context, directory_tree, include_tool_uses);
+    let mut api_messages = messages_to_api(messages, file_context, glob_context, grep_context, tmux_context, todo_context, memory_context, overview_context, directory_tree, include_tool_uses);
 
     // If we have tool results, add them
     if let Some(results) = tool_results {
@@ -339,7 +353,7 @@ fn stream_response(
         });
         prompt.to_string()
     } else {
-        String::new()
+        prompts::MAIN_SYSTEM.to_string()
     };
 
     let request = ApiRequest {

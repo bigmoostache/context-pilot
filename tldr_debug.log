@@ -2150,3 +2150,133 @@ Token count: 91
 Calling LLM for summary...
 Got summary: The assistant couldn't find a message with ID "R66
 Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 119
+Calling LLM for summary...
+Got summary: User confirmed understanding of the message prefix
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 115
+Calling LLM for summary...
+Got summary: The assistant reports no T-blocks in their current
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 125
+Calling LLM for summary...
+Got summary: The assistant explains it cannot remove R-blocks (
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 123
+Calling LLM for summary...
+Token count: 3
+Using content directly (short message)
+Send result: true
+Got summary: **Summary:** The assistant cannot delete tool resu
+Send result: true
+Token count: 12
+Using content directly (short message)
+Send result: true
+Token count: 28
+Calling LLM for summary...
+Got summary: The user confirmed that 3 tool-heavy messages have
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 56
+Calling LLM for summary...
+Got summary: The user explains they cannot delete R68 separatel
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 451
+Calling LLM for summary...
+Got summary: **Context Pilot** is a terminal UI for AI conversa
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 31
+Calling LLM for summary...
+Got summary: The assistant confirmed opening `test.md` as conte
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 327
+Calling LLM for summary...
+Got summary: The assistant has 18 tools across 5 categories: Fi
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 372
+Calling LLM for summary...
+Got summary: The assistant shares a wishlist of tools that woul
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 111
+Calling LLM for summary...
+Got summary: The user confirmed grep is working, finding 21 mat
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 132
+Calling LLM for summary...
+Got summary: The grep tool uses the same `ignore` crate as ripg
+Send result: true
+Token count: 30
+Calling LLM for summary...
+Got summary: The user is surprised to find no matches for "fn m
+Send result: true
+Token count: 65
+Calling LLM for summary...
+Got summary: The user found 1 match in `src/main.rs:32` and ide
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 29
+Calling LLM for summary...
+Got summary: The sender indicates they will delete messages aft
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 43
+Calling LLM for summary...
+Got summary: The assistant confirms that the user's requested m
+Send result: true

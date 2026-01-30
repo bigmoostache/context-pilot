@@ -9,7 +9,7 @@ use crate::constants::MAX_CONTEXT_TOKENS;
 use crate::highlight::highlight_file;
 use crate::state::{ContextType, State, TodoStatus, MemoryImportance};
 use crate::tool_defs::{ParamType, ToolCategory, ToolParam};
-use crate::tools::{capture_pane_content, compute_glob_results, generate_directory_tree};
+use crate::tools::{capture_pane_content, compute_glob_results, compute_grep_results, generate_directory_tree};
 use super::{theme, chars, helpers::*};
 
 pub fn render_file(frame: &mut Frame, state: &mut State, area: Rect) {
@@ -206,6 +206,74 @@ pub fn render_glob(frame: &mut Frame, state: &mut State, area: Rect) {
             Span::styled(format!("  {} ", chars::DOT), Style::default().fg(theme::ACCENT_DIM)),
             Span::styled(line, Style::default().fg(theme::TEXT)),
         ]))
+        .collect();
+
+    // Calculate and set max scroll
+    let content_height = text.len();
+    let viewport_height = content_area.height as usize;
+    let max_scroll = content_height.saturating_sub(viewport_height) as f32;
+    state.max_scroll = max_scroll;
+    state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
+
+    let paragraph = Paragraph::new(text)
+        .style(base_style)
+        .wrap(Wrap { trim: false })
+        .scroll((state.scroll_offset.round() as u16, 0));
+
+    frame.render_widget(paragraph, content_area);
+}
+
+pub fn render_grep(frame: &mut Frame, state: &mut State, area: Rect) {
+    let base_style = Style::default().bg(theme::BG_SURFACE);
+    let selected = state.context.get(state.selected_context);
+
+    let (title, content) = if let Some(ctx) = selected {
+        let pattern = ctx.grep_pattern.as_deref().unwrap_or("*");
+        let search_path = ctx.grep_path.as_deref().unwrap_or(".");
+        let file_pattern = ctx.grep_file_pattern.as_deref();
+        let (results, count) = compute_grep_results(pattern, search_path, file_pattern);
+        (format!("{} ({} matches)", ctx.name, count), results)
+    } else {
+        ("Grep".to_string(), String::new())
+    };
+
+    let inner_area = Rect::new(
+        area.x + 1,
+        area.y,
+        area.width.saturating_sub(2),
+        area.height
+    );
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(theme::BORDER))
+        .style(base_style)
+        .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::ACCENT).bold()));
+
+    let content_area = block.inner(inner_area);
+    frame.render_widget(block, inner_area);
+
+    let text: Vec<Line> = content.lines()
+        .map(|line| {
+            // Parse file:line:content format
+            let parts: Vec<&str> = line.splitn(3, ':').collect();
+            if parts.len() >= 3 {
+                Line::from(vec![
+                    Span::styled("  ", base_style),
+                    Span::styled(parts[0], Style::default().fg(theme::ACCENT_DIM)),
+                    Span::styled(":", Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(parts[1], Style::default().fg(theme::WARNING)),
+                    Span::styled(":", Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(parts[2], Style::default().fg(theme::TEXT)),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(format!("  {} ", chars::DOT), Style::default().fg(theme::ACCENT_DIM)),
+                    Span::styled(line, Style::default().fg(theme::TEXT)),
+                ])
+            }
+        })
         .collect();
 
     // Calculate and set max scroll
@@ -480,6 +548,7 @@ pub fn render_overview(frame: &mut Frame, state: &mut State, area: Rect) {
             ContextType::File => "file",
             ContextType::Tree => "tree",
             ContextType::Glob => "glob",
+            ContextType::Grep => "grep",
             ContextType::Tmux => "tmux",
             ContextType::Todo => "todo",
             ContextType::Memory => "memory",
@@ -490,6 +559,7 @@ pub fn render_overview(frame: &mut Frame, state: &mut State, area: Rect) {
         let details = match ctx.context_type {
             ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
             ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
+            ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
             ContextType::Tmux => {
                 let pane = ctx.tmux_pane_id.as_deref().unwrap_or("?");
                 let desc = ctx.tmux_description.as_deref().unwrap_or("");

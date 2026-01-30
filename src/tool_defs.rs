@@ -250,6 +250,24 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::FileSystem,
         },
         ToolDefinition {
+            id: "grep".to_string(),
+            name: "Grep Search".to_string(),
+            short_desc: "Search file contents".to_string(),
+            description: "Searches file contents for a regex pattern. Results show matching lines with file:line context. Results are added to context and update dynamically.".to_string(),
+            params: vec![
+                ToolParam::new("pattern", ParamType::String)
+                    .desc("Regex pattern to search for")
+                    .required(),
+                ToolParam::new("path", ParamType::String)
+                    .desc("Base path to search from")
+                    .default_val("."),
+                ToolParam::new("file_pattern", ParamType::String)
+                    .desc("Glob pattern to filter files (e.g., '*.rs', '*.ts')"),
+            ],
+            enabled: true,
+            category: ToolCategory::FileSystem,
+        },
+        ToolDefinition {
             id: "edit_tree_filter".to_string(),
             name: "Edit Tree Filter".to_string(),
             short_desc: "Configure directory filter".to_string(),

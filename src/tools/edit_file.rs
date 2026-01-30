@@ -184,6 +184,9 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         file_hash: None, // Will be computed on next refresh
         glob_pattern: None,
         glob_path: None,
+        grep_pattern: None,
+        grep_path: None,
+        grep_file_pattern: None,
         tmux_pane_id: None,
         tmux_lines: None,
         tmux_last_keys: None,

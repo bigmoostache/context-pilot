@@ -87,6 +87,7 @@ The AI assistant can use these tools to interact with your project:
 | `edit_file` | Edit an existing file |
 | `close_contexts` | Remove context elements |
 | `glob` | Search for files matching a pattern |
+| `grep` | Search file contents with regex pattern |
 | `edit_tree_filter` | Modify directory tree filtering |
 | `set_message_status` | Manage message context (full/summarized/forgotten) |
 | `create_tmux_pane` | Create a new terminal pane |
@@ -94,6 +95,157 @@ The AI assistant can use these tools to interact with your project:
 | `edit_tmux_config` | Configure tmux pane settings |
 | `create_todos` | Create todo items |
 | `update_todos` | Update or delete todo items |
+
+## API Request Structure
+
+This section documents exactly how the prompt sent to Claude is constructed.
+
+### Top-Level Request
+
+```
+ApiRequest {
+    model: "claude-sonnet-4-20250514"
+    max_tokens: 8192
+    system: ""                          # Empty for normal mode, custom for cleaner mode
+    messages: Vec<ApiMessage>           # See below
+    tools: [...]                        # Tool definitions JSON
+    stream: true
+}
+```
+
+### Message Construction
+
+Messages are built by `messages_to_api()` in `src/api.rs`.
+
+#### Step 1: Build Context Parts
+
+Context is collected into `context_parts: Vec<String>` in this order:
+
+```
+1. Directory Tree (if non-empty)
+   === Directory Tree ===
+   {tree content}
+   === End of Directory Tree ===
+
+2. Todo List (if non-empty)
+   === Todo List ===
+   {todos}
+   === End of Todo List ===
+
+3. Memories (if non-empty and not "No memories")
+   === Memories ===
+   {memories}
+   === End of Memories ===
+
+4. Context Overview (if non-empty)
+   === Context Overview ===
+   {overview with token counts}
+   === End of Context Overview ===
+
+5. Open Files (for each file)
+   === File: {path} ===
+   {file content}
+   === End of {path} ===
+
+6. Glob Results (for each glob)
+   === {glob name} ===
+   {matching files}
+   === End of {glob name} ===
+
+7. Grep Results (for each grep)
+   === grep:{pattern} ===
+   {file:line:content matches}
+   === End of grep:{pattern} ===
+
+8. Tmux Panes (for each pane)
+   === {pane header} ===
+   {terminal output}
+   === End of {pane header} ===
+```
+
+#### Step 2: Convert Messages to API Format
+
+For each message in `state.messages` (skipping `status == Deleted`):
+
+**TextMessage (U/A prefixes):**
+```
+role: "user" or "assistant"
+content: [
+    Text { text: "[U1]: {content}" }      # First user msg gets context prepended
+]
+```
+
+First user message format:
+```
+{context_parts joined by \n\n}
+
+[U1]: {user message}
+```
+
+**ToolCall (T prefix):**
+- Only included if a ToolResult exists after it
+- Appended to previous assistant message's content blocks:
+```
+content: [
+    Text { text: "[A1]: {assistant text}" },
+    ToolUse { id: "toolu_xxx", name: "open_file", input: {...} },
+    ToolUse { id: "toolu_yyy", name: "edit_file", input: {...} }
+]
+```
+
+**ToolResult (R prefix):**
+```
+role: "user"
+content: [
+    ToolResult { tool_use_id: "toolu_xxx", content: "[R1]: {result}" },
+    ToolResult { tool_use_id: "toolu_yyy", content: "[R2]: {result}" }
+]
+```
+
+#### Step 3: Final Assembly
+
+```
+messages: [
+    { role: "user",      content: [Text { "[context...]\n\n[U1]: hello" }] },
+    { role: "assistant", content: [Text { "[A1]: I'll help" }, ToolUse {...}] },
+    { role: "user",      content: [ToolResult { "[R1]: file opened" }] },
+    { role: "assistant", content: [Text { "[A2]: Done!" }] },
+    { role: "user",      content: [Text { "[U2]: thanks" }] },
+    ...
+]
+```
+
+### Message ID Visibility to LLM
+
+| ID Type | Prefix | Visible to LLM | How |
+|---------|--------|----------------|-----|
+| User message | U | Yes | `[U1]: {content}` |
+| Assistant message | A | Yes | `[A1]: {content}` |
+| Tool call | T | **No** | Only `tool_use` block sent (API constraint) |
+| Tool result | R | Yes | `[R1]: {content}` in tool_result |
+
+**Note:** T-block IDs cannot be exposed due to Claude API constraints - `tool_use` blocks cannot have text mixed in; they must be immediately followed by `tool_result` blocks.
+
+### Summarized Messages
+
+When `status == Summarized`:
+- Uses `tl_dr` field instead of `content`
+- Same format: `[A5]: {tl_dr text}`
+
+### Tool Results Flow
+
+When assistant calls tools:
+1. Assistant message with `tool_use` blocks is sent
+2. Tools execute locally, results collected
+3. New request sent with `tool_result` blocks as user message
+4. Assistant continues with access to results
+
+### Cleaner Mode
+
+Special mode triggered by `/clean` command:
+- Custom system prompt from `context_cleaner.rs`
+- Adds user message: `"Please clean up the context to reduce token usage:\n\n{cleaner_context}"`
+- Cleaner context includes all message IDs, types, statuses, and token counts
 
 ## Dependencies
 

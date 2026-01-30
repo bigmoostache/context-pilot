@@ -24,6 +24,7 @@ pub fn get_overview_context(state: &State) -> String {
             ContextType::File => "file",
             ContextType::Tree => "tree",
             ContextType::Glob => "glob",
+            ContextType::Grep => "grep",
             ContextType::Tmux => "tmux",
             ContextType::Todo => "todo",
             ContextType::Memory => "memory",
@@ -34,6 +35,7 @@ pub fn get_overview_context(state: &State) -> String {
         let details = match ctx.context_type {
             ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
             ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
+            ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
             ContextType::Tmux => {
                 let pane = ctx.tmux_pane_id.as_deref().unwrap_or("?");
                 let desc = ctx.tmux_description.as_deref().unwrap_or("");

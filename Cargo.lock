@@ -2333,6 +2333,7 @@ dependencies = [
  "ignore",
  "lazy_static",
  "ratatui",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

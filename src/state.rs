@@ -10,6 +10,7 @@ pub enum ContextType {
     File,
     Tree,
     Glob,
+    Grep,
     Tmux,
     Todo,
     Memory,
@@ -37,6 +38,7 @@ impl ContextType {
             ContextType::File => icons::CTX_FILE,
             ContextType::Tree => icons::CTX_TREE,
             ContextType::Glob => icons::CTX_GLOB,
+            ContextType::Grep => icons::CTX_GREP,
             ContextType::Tmux => icons::CTX_TMUX,
             ContextType::Todo => icons::CTX_TODO,
             ContextType::Memory => icons::CTX_MEMORY,
@@ -65,6 +67,15 @@ pub struct ContextElement {
     /// Glob search path (for Glob context type)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub glob_path: Option<String>,
+    /// Grep regex pattern (for Grep context type)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grep_pattern: Option<String>,
+    /// Grep search path (for Grep context type)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grep_path: Option<String>,
+    /// Grep file filter pattern (for Grep context type)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grep_file_pattern: Option<String>,
     /// Tmux pane ID (for Tmux context type)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tmux_pane_id: Option<String>,
@@ -392,6 +403,9 @@ impl Default for State {
                     file_hash: None,
                     glob_pattern: None,
                     glob_path: None,
+                    grep_pattern: None,
+                    grep_path: None,
+                    grep_file_pattern: None,
                     tmux_pane_id: None,
                     tmux_lines: None,
                     tmux_last_keys: None,
@@ -406,6 +420,9 @@ impl Default for State {
                     file_hash: None,
                     glob_pattern: None,
                     glob_path: None,
+                    grep_pattern: None,
+                    grep_path: None,
+                    grep_file_pattern: None,
                     tmux_pane_id: None,
                     tmux_lines: None,
                     tmux_last_keys: None,
@@ -420,6 +437,9 @@ impl Default for State {
                     file_hash: None,
                     glob_pattern: None,
                     glob_path: None,
+                    grep_pattern: None,
+                    grep_path: None,
+                    grep_file_pattern: None,
                     tmux_pane_id: None,
                     tmux_lines: None,
                     tmux_last_keys: None,
@@ -434,6 +454,9 @@ impl Default for State {
                     file_hash: None,
                     glob_pattern: None,
                     glob_path: None,
+                    grep_pattern: None,
+                    grep_path: None,
+                    grep_file_pattern: None,
                     tmux_pane_id: None,
                     tmux_lines: None,
                     tmux_last_keys: None,
@@ -448,6 +471,9 @@ impl Default for State {
                     file_hash: None,
                     glob_pattern: None,
                     glob_path: None,
+                    grep_pattern: None,
+                    grep_path: None,
+                    grep_file_pattern: None,
                     tmux_pane_id: None,
                     tmux_lines: None,
                     tmux_last_keys: None,
@@ -462,6 +488,9 @@ impl Default for State {
                     file_hash: None,
                     glob_pattern: None,
                     glob_path: None,
+                    grep_pattern: None,
+                    grep_path: None,
+                    grep_file_pattern: None,
                     tmux_pane_id: None,
                     tmux_lines: None,
                     tmux_last_keys: None,
