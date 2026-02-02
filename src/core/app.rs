@@ -9,14 +9,17 @@ use ratatui::prelude::*;
 use crate::actions::{apply_action, Action, ActionResult};
 use crate::api::{start_cleaning, start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
-use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS};
+use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
+use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS};
 use crate::context_cleaner;
 use crate::events::handle_event;
+use crate::panels::now_ms;
 use crate::persistence::{save_message, save_state};
-use crate::state::{Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
+use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
 use crate::tools::{execute_tool, ToolResult, ToolUse};
 use crate::typewriter::TypewriterBuffer;
 use crate::ui;
+use crate::watcher::{FileWatcher, WatchEvent};
 
 use super::context::prepare_stream_context;
 
@@ -29,10 +32,20 @@ pub struct App {
     cleaning_pending_tools: Vec<ToolUse>,
     cleaning_iterations: u32,
     mouse_captured: bool,
+    cache_tx: Sender<CacheUpdate>,
+    file_watcher: Option<FileWatcher>,
+    /// Tracks which file paths are being watched
+    watched_file_paths: std::collections::HashSet<String>,
+    /// Tracks which directory paths are being watched (for tree)
+    watched_dir_paths: std::collections::HashSet<String>,
+    /// Last time we checked timer-based caches
+    last_timer_check_ms: u64,
 }
 
 impl App {
-    pub fn new(state: State) -> Self {
+    pub fn new(state: State, cache_tx: Sender<CacheUpdate>) -> Self {
+        let file_watcher = FileWatcher::new().ok();
+
         Self {
             state,
             typewriter: TypewriterBuffer::new(),
@@ -42,6 +55,11 @@ impl App {
             cleaning_pending_tools: Vec::new(),
             cleaning_iterations: 0,
             mouse_captured: true,
+            cache_tx,
+            file_watcher,
+            watched_file_paths: std::collections::HashSet::new(),
+            watched_dir_paths: std::collections::HashSet::new(),
+            last_timer_check_ms: now_ms(),
         }
     }
 
@@ -54,12 +72,20 @@ impl App {
         tldr_rx: Receiver<TlDrResult>,
         clean_tx: Sender<StreamEvent>,
         clean_rx: Receiver<StreamEvent>,
+        cache_rx: Receiver<CacheUpdate>,
     ) -> io::Result<()> {
+        // Initial cache setup - watch files and schedule initial refreshes
+        self.setup_file_watchers();
+        self.schedule_initial_cache_refreshes();
+
         loop {
             self.process_stream_events(&rx);
             self.process_typewriter();
             self.process_cleaning_events(&clean_rx, &clean_tx);
             self.process_tldr_results(&tldr_rx);
+            self.process_cache_updates(&cache_rx);
+            self.process_watcher_events();
+            self.check_timer_based_deprecation();
             self.handle_tool_execution(&tx, &tldr_tx, &clean_tx);
             self.finalize_stream(&tldr_tx, &clean_tx);
             self.update_mouse_capture()?;
@@ -139,6 +165,7 @@ impl App {
                     self.state.is_cleaning_context = false;
                     self.cleaning_pending_tools.clear();
                     self.cleaning_pending_done = None;
+                    self.state.dirty = true;
                 }
             }
         }
@@ -175,6 +202,7 @@ impl App {
             self.state.is_cleaning_context = false;
             self.cleaning_pending_done = None;
             self.cleaning_iterations = 0;
+            self.state.dirty = true;
             save_state(&self.state);
         }
     }
@@ -431,6 +459,276 @@ impl App {
                 save_state(&self.state);
             }
             ActionResult::Nothing => {}
+        }
+    }
+
+    /// Set up file watchers for all current file contexts and tree open folders
+    fn setup_file_watchers(&mut self) {
+        let Some(watcher) = &mut self.file_watcher else { return };
+
+        // Watch files in File contexts
+        for ctx in &self.state.context {
+            if ctx.context_type == ContextType::File {
+                if let Some(path) = &ctx.file_path {
+                    if !self.watched_file_paths.contains(path) {
+                        if watcher.watch_file(path).is_ok() {
+                            self.watched_file_paths.insert(path.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Watch directories for Tree panel (only open folders)
+        for folder in &self.state.tree_open_folders {
+            if !self.watched_dir_paths.contains(folder) {
+                if watcher.watch_dir(folder).is_ok() {
+                    self.watched_dir_paths.insert(folder.clone());
+                }
+            }
+        }
+    }
+
+    /// Schedule initial cache refreshes for all context elements
+    fn schedule_initial_cache_refreshes(&self) {
+        let current_ms = now_ms();
+
+        for ctx in &self.state.context {
+            match ctx.context_type {
+                ContextType::File => {
+                    if let Some(path) = &ctx.file_path {
+                        process_cache_request(
+                            CacheRequest::RefreshFile {
+                                context_id: ctx.id.clone(),
+                                file_path: path.clone(),
+                                current_hash: ctx.file_hash.clone(),
+                            },
+                            self.cache_tx.clone(),
+                        );
+                    }
+                }
+                ContextType::Tree => {
+                    process_cache_request(
+                        CacheRequest::RefreshTree {
+                            context_id: ctx.id.clone(),
+                            tree_filter: self.state.tree_filter.clone(),
+                            tree_open_folders: self.state.tree_open_folders.clone(),
+                            tree_descriptions: self.state.tree_descriptions.clone(),
+                        },
+                        self.cache_tx.clone(),
+                    );
+                }
+                ContextType::Glob => {
+                    if let Some(pattern) = &ctx.glob_pattern {
+                        process_cache_request(
+                            CacheRequest::RefreshGlob {
+                                context_id: ctx.id.clone(),
+                                pattern: pattern.clone(),
+                                base_path: ctx.glob_path.clone(),
+                            },
+                            self.cache_tx.clone(),
+                        );
+                    }
+                }
+                ContextType::Grep => {
+                    if let Some(pattern) = &ctx.grep_pattern {
+                        process_cache_request(
+                            CacheRequest::RefreshGrep {
+                                context_id: ctx.id.clone(),
+                                pattern: pattern.clone(),
+                                path: ctx.grep_path.clone(),
+                                file_pattern: ctx.grep_file_pattern.clone(),
+                            },
+                            self.cache_tx.clone(),
+                        );
+                    }
+                }
+                ContextType::Tmux => {
+                    if let Some(pane_id) = &ctx.tmux_pane_id {
+                        process_cache_request(
+                            CacheRequest::RefreshTmux {
+                                context_id: ctx.id.clone(),
+                                pane_id: pane_id.clone(),
+                                current_last_lines_hash: ctx.tmux_last_lines_hash.clone(),
+                            },
+                            self.cache_tx.clone(),
+                        );
+                    }
+                }
+                // Conversation, Memory, Todo, Overview - internal state triggers, no initial refresh needed
+                _ => {}
+            }
+        }
+
+        // Update last timer check
+        // (This is handled in the mutable version - we just set it in new())
+        let _ = current_ms;
+    }
+
+    /// Process incoming cache updates from background threads
+    fn process_cache_updates(&mut self, cache_rx: &Receiver<CacheUpdate>) {
+        while let Ok(update) = cache_rx.try_recv() {
+            self.state.dirty = true;
+
+            match update {
+                CacheUpdate::FileContent { context_id, content, hash, token_count } => {
+                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                        ctx.cached_content = Some(content);
+                        ctx.file_hash = Some(hash);
+                        ctx.token_count = token_count;
+                        ctx.cache_deprecated = false;
+                        ctx.last_refresh_ms = now_ms();
+                    }
+                }
+                CacheUpdate::TreeContent { context_id, content, token_count } => {
+                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                        ctx.cached_content = Some(content);
+                        ctx.token_count = token_count;
+                        ctx.cache_deprecated = false;
+                        ctx.last_refresh_ms = now_ms();
+                    }
+                }
+                CacheUpdate::GlobContent { context_id, content, token_count } => {
+                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                        ctx.cached_content = Some(content);
+                        ctx.token_count = token_count;
+                        ctx.cache_deprecated = false;
+                        ctx.last_refresh_ms = now_ms();
+                    }
+                }
+                CacheUpdate::GrepContent { context_id, content, token_count } => {
+                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                        ctx.cached_content = Some(content);
+                        ctx.token_count = token_count;
+                        ctx.cache_deprecated = false;
+                        ctx.last_refresh_ms = now_ms();
+                    }
+                }
+                CacheUpdate::TmuxContent { context_id, content, last_lines_hash, token_count } => {
+                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                        ctx.cached_content = Some(content);
+                        ctx.tmux_last_lines_hash = Some(last_lines_hash);
+                        ctx.token_count = token_count;
+                        ctx.cache_deprecated = false;
+                        ctx.last_refresh_ms = now_ms();
+                    }
+                }
+            }
+        }
+    }
+
+    /// Process file watcher events
+    fn process_watcher_events(&mut self) {
+        let Some(watcher) = &self.file_watcher else { return };
+
+        let events = watcher.poll_events();
+        for event in events {
+            match event {
+                WatchEvent::FileChanged(path) => {
+                    // Find and mark file context as deprecated, then schedule refresh
+                    for ctx in &mut self.state.context {
+                        if ctx.context_type == ContextType::File && ctx.file_path.as_deref() == Some(&path) {
+                            ctx.cache_deprecated = true;
+                            self.state.dirty = true;
+
+                            // Schedule background refresh
+                            process_cache_request(
+                                CacheRequest::RefreshFile {
+                                    context_id: ctx.id.clone(),
+                                    file_path: path.clone(),
+                                    current_hash: ctx.file_hash.clone(),
+                                },
+                                self.cache_tx.clone(),
+                            );
+                        }
+                    }
+                }
+                WatchEvent::DirChanged(_path) => {
+                    // Mark tree context as deprecated and schedule refresh
+                    for ctx in &mut self.state.context {
+                        if ctx.context_type == ContextType::Tree {
+                            ctx.cache_deprecated = true;
+                            self.state.dirty = true;
+
+                            // Schedule background refresh
+                            process_cache_request(
+                                CacheRequest::RefreshTree {
+                                    context_id: ctx.id.clone(),
+                                    tree_filter: self.state.tree_filter.clone(),
+                                    tree_open_folders: self.state.tree_open_folders.clone(),
+                                    tree_descriptions: self.state.tree_descriptions.clone(),
+                                },
+                                self.cache_tx.clone(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check timer-based deprecation for glob, grep, tmux
+    fn check_timer_based_deprecation(&mut self) {
+        let current_ms = now_ms();
+
+        // Only check every 100ms to avoid excessive work
+        if current_ms.saturating_sub(self.last_timer_check_ms) < 100 {
+            return;
+        }
+        self.last_timer_check_ms = current_ms;
+
+        for ctx in &self.state.context {
+            let threshold = match ctx.context_type {
+                ContextType::Glob => GLOB_DEPRECATION_MS,
+                ContextType::Grep => GREP_DEPRECATION_MS,
+                ContextType::Tmux => TMUX_DEPRECATION_MS,
+                _ => continue,
+            };
+
+            let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
+            if elapsed >= threshold && !ctx.cache_deprecated {
+                // Schedule check/refresh in background
+                match ctx.context_type {
+                    ContextType::Glob => {
+                        if let Some(pattern) = &ctx.glob_pattern {
+                            process_cache_request(
+                                CacheRequest::RefreshGlob {
+                                    context_id: ctx.id.clone(),
+                                    pattern: pattern.clone(),
+                                    base_path: ctx.glob_path.clone(),
+                                },
+                                self.cache_tx.clone(),
+                            );
+                        }
+                    }
+                    ContextType::Grep => {
+                        if let Some(pattern) = &ctx.grep_pattern {
+                            process_cache_request(
+                                CacheRequest::RefreshGrep {
+                                    context_id: ctx.id.clone(),
+                                    pattern: pattern.clone(),
+                                    path: ctx.grep_path.clone(),
+                                    file_pattern: ctx.grep_file_pattern.clone(),
+                                },
+                                self.cache_tx.clone(),
+                            );
+                        }
+                    }
+                    ContextType::Tmux => {
+                        if let Some(pane_id) = &ctx.tmux_pane_id {
+                            process_cache_request(
+                                CacheRequest::RefreshTmux {
+                                    context_id: ctx.id.clone(),
+                                    pane_id: pane_id.clone(),
+                                    current_last_lines_hash: ctx.tmux_last_lines_hash.clone(),
+                                },
+                                self.cache_tx.clone(),
+                            );
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 }

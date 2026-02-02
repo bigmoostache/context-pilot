@@ -1,6 +1,7 @@
 mod actions;
 mod api;
 mod background;
+mod cache;
 mod constants;
 mod context_cleaner;
 mod core;
@@ -14,6 +15,7 @@ mod tool_defs;
 mod tools;
 mod typewriter;
 mod ui;
+mod watcher;
 
 use std::io;
 use std::sync::mpsc;
@@ -27,6 +29,7 @@ use ratatui::prelude::*;
 
 use api::StreamEvent;
 use background::TlDrResult;
+use cache::CacheUpdate;
 use core::{ensure_default_contexts, App};
 use persistence::load_state;
 
@@ -45,10 +48,11 @@ fn main() -> io::Result<()> {
     let (tx, rx) = mpsc::channel::<StreamEvent>();
     let (tldr_tx, tldr_rx) = mpsc::channel::<TlDrResult>();
     let (clean_tx, clean_rx) = mpsc::channel::<StreamEvent>();
+    let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
 
     // Create and run app
-    let mut app = App::new(state);
-    app.run(&mut terminal, tx, rx, tldr_tx, tldr_rx, clean_tx, clean_rx)?;
+    let mut app = App::new(state, cache_tx);
+    app.run(&mut terminal, tx, rx, tldr_tx, tldr_rx, clean_tx, clean_rx, cache_rx)?;
 
     // Cleanup
     io::stdout().execute(DisableMouseCapture)?;

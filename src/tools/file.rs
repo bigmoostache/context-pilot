@@ -56,7 +56,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     let context_id = format!("P{}", state.next_context_id);
     state.next_context_id += 1;
 
-    // Add to context
+    // Add to context with cached content
     state.context.push(ContextElement {
         id: context_id.clone(),
         context_type: ContextType::File,
@@ -73,6 +73,10 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_lines: None,
         tmux_last_keys: None,
         tmux_description: None,
+        cached_content: Some(content),
+        cache_deprecated: false,
+        last_refresh_ms: 0,
+        tmux_last_lines_hash: None,
     });
 
     ToolResult {

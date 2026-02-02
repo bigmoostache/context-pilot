@@ -1,8 +1,7 @@
 use ratatui::prelude::*;
 
 use super::{ContextItem, Panel};
-use crate::state::{estimate_tokens, ContextType, State};
-use crate::tools::capture_pane_content;
+use crate::state::{ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct TmuxPanel;
@@ -17,17 +16,9 @@ impl Panel for TmuxPanel {
         }
     }
 
-    fn refresh(&self, state: &mut State) {
-        for ctx in &mut state.context {
-            if ctx.context_type != ContextType::Tmux {
-                continue;
-            }
-
-            let Some(pane_id) = &ctx.tmux_pane_id else { continue };
-            let lines = ctx.tmux_lines.unwrap_or(50);
-            let content = capture_pane_content(pane_id, lines);
-            ctx.token_count = estimate_tokens(&content);
-        }
+    fn refresh(&self, _state: &mut State) {
+        // Tmux refresh is handled by background cache system
+        // No blocking operations here
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
@@ -35,8 +26,8 @@ impl Panel for TmuxPanel {
             .filter(|c| c.context_type == ContextType::Tmux)
             .filter_map(|c| {
                 let pane_id = c.tmux_pane_id.as_ref()?;
-                let lines = c.tmux_lines.unwrap_or(50);
-                let content = capture_pane_content(pane_id, lines);
+                // Use cached content only - no blocking operations
+                let content = c.cached_content.as_ref().cloned()?;
                 let desc = c.tmux_description.as_deref().unwrap_or("");
                 let header = if desc.is_empty() {
                     format!("Tmux Pane {}", pane_id)
@@ -50,9 +41,16 @@ impl Panel for TmuxPanel {
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let (content, description, last_keys) = if let Some(ctx) = state.context.get(state.selected_context) {
-            let pane_id = ctx.tmux_pane_id.as_deref().unwrap_or("?");
-            let lines = ctx.tmux_lines.unwrap_or(50);
-            let content = capture_pane_content(pane_id, lines);
+            // Use cached content only - no blocking operations
+            let content = ctx.cached_content.as_ref()
+                .cloned()
+                .unwrap_or_else(|| {
+                    if ctx.cache_deprecated {
+                        "Loading...".to_string()
+                    } else {
+                        "No content".to_string()
+                    }
+                });
             let desc = ctx.tmux_description.clone().unwrap_or_default();
             let last = ctx.tmux_last_keys.clone();
             (content, desc, last)

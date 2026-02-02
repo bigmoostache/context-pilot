@@ -181,7 +181,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         name: file_name,
         token_count,
         file_path: Some(path.to_string()),
-        file_hash: None, // Will be computed on next refresh
+        file_hash: None, // Will be computed by background cache
         glob_pattern: None,
         glob_path: None,
         grep_pattern: None,
@@ -191,6 +191,10 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_lines: None,
         tmux_last_keys: None,
         tmux_description: None,
+        cached_content: Some(contents.to_string()),
+        cache_deprecated: true, // Mark as deprecated so background computes hash
+        last_refresh_ms: 0,
+        tmux_last_lines_hash: None,
     });
 
     ToolResult {

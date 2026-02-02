@@ -102,26 +102,6 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             ActionResult::Nothing
         }
-        Action::CursorLeft => {
-            if state.input_cursor > 0 {
-                state.input_cursor = state.input[..state.input_cursor]
-                    .char_indices()
-                    .last()
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
-            }
-            ActionResult::Nothing
-        }
-        Action::CursorRight => {
-            if state.input_cursor < state.input.len() {
-                state.input_cursor = state.input[state.input_cursor..]
-                    .char_indices()
-                    .nth(1)
-                    .map(|(i, _)| state.input_cursor + i)
-                    .unwrap_or(state.input.len());
-            }
-            ActionResult::Nothing
-        }
         Action::CursorWordLeft => {
             if state.input_cursor > 0 {
                 let before = &state.input[..state.input_cursor];
@@ -263,6 +243,10 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tmux_lines: None,
                 tmux_last_keys: None,
                 tmux_description: None,
+                cached_content: None,
+                cache_deprecated: false,
+                last_refresh_ms: 0,
+                tmux_last_lines_hash: None,
             });
             ActionResult::Save
         }

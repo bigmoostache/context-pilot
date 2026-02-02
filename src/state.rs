@@ -85,6 +85,20 @@ pub struct ContextElement {
     /// Description of what this tmux pane is for
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tmux_description: Option<String>,
+
+    // === Caching fields (not persisted) ===
+    /// Cached content for LLM context and UI rendering
+    #[serde(skip)]
+    pub cached_content: Option<String>,
+    /// Cache is deprecated - source data changed, needs regeneration
+    #[serde(skip)]
+    pub cache_deprecated: bool,
+    /// Last time this element was refreshed (for timer-based deprecation)
+    #[serde(skip)]
+    pub last_refresh_ms: u64,
+    /// Hash of tmux last 2 lines (for change detection)
+    #[serde(skip)]
+    pub tmux_last_lines_hash: Option<String>,
 }
 
 /// Todo item status
@@ -409,6 +423,10 @@ impl Default for State {
                     tmux_lines: None,
                     tmux_last_keys: None,
                     tmux_description: None,
+                    cached_content: None,
+                    cache_deprecated: false,
+                    last_refresh_ms: 0,
+                    tmux_last_lines_hash: None,
                 },
                 ContextElement {
                     id: "P2".to_string(),
@@ -426,6 +444,10 @@ impl Default for State {
                     tmux_lines: None,
                     tmux_last_keys: None,
                     tmux_description: None,
+                    cached_content: None,
+                    cache_deprecated: true, // Initial refresh needed
+                    last_refresh_ms: 0,
+                    tmux_last_lines_hash: None,
                 },
                 ContextElement {
                     id: "P3".to_string(),
@@ -443,6 +465,10 @@ impl Default for State {
                     tmux_lines: None,
                     tmux_last_keys: None,
                     tmux_description: None,
+                    cached_content: None,
+                    cache_deprecated: false,
+                    last_refresh_ms: 0,
+                    tmux_last_lines_hash: None,
                 },
                 ContextElement {
                     id: "P4".to_string(),
@@ -460,6 +486,10 @@ impl Default for State {
                     tmux_lines: None,
                     tmux_last_keys: None,
                     tmux_description: None,
+                    cached_content: None,
+                    cache_deprecated: false,
+                    last_refresh_ms: 0,
+                    tmux_last_lines_hash: None,
                 },
                 ContextElement {
                     id: "P5".to_string(),
@@ -477,6 +507,10 @@ impl Default for State {
                     tmux_lines: None,
                     tmux_last_keys: None,
                     tmux_description: None,
+                    cached_content: None,
+                    cache_deprecated: false,
+                    last_refresh_ms: 0,
+                    tmux_last_lines_hash: None,
                 },
             ],
             messages: vec![],

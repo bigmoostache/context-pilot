@@ -1,8 +1,7 @@
 use ratatui::prelude::*;
 
 use super::{ContextItem, Panel};
-use crate::state::{estimate_tokens, ContextType, State};
-use crate::tools::generate_tree_string;
+use crate::state::{ContextType, State};
 use crate::ui::{theme, helpers::*};
 
 pub struct TreePanel;
@@ -12,42 +11,33 @@ impl Panel for TreePanel {
         "Directory Tree".to_string()
     }
 
-    fn refresh(&self, state: &mut State) {
-        let tree_content = generate_tree_string(
-            &state.tree_filter,
-            &state.tree_open_folders,
-            &state.tree_descriptions,
-        );
-        let token_count = estimate_tokens(&tree_content);
-
-        for ctx in &mut state.context {
-            if ctx.context_type == ContextType::Tree {
-                ctx.token_count = token_count;
-                break;
-            }
-        }
+    fn refresh(&self, _state: &mut State) {
+        // Tree refresh is handled by background cache system
+        // No blocking operations here
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        let tree_content = generate_tree_string(
-            &state.tree_filter,
-            &state.tree_open_folders,
-            &state.tree_descriptions,
-        );
-
-        if tree_content.is_empty() {
-            Vec::new()
-        } else {
-            vec![ContextItem::new("Directory Tree", tree_content)]
+        // Find tree context and use cached content
+        for ctx in &state.context {
+            if ctx.context_type == ContextType::Tree {
+                if let Some(content) = &ctx.cached_content {
+                    if !content.is_empty() {
+                        return vec![ContextItem::new("Directory Tree", content.clone())];
+                    }
+                }
+                break;
+            }
         }
+        Vec::new()
     }
 
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        let tree_content = generate_tree_string(
-            &state.tree_filter,
-            &state.tree_open_folders,
-            &state.tree_descriptions,
-        );
+        // Find tree context and use cached content
+        let tree_content = state.context.iter()
+            .find(|c| c.context_type == ContextType::Tree)
+            .and_then(|ctx| ctx.cached_content.as_ref())
+            .cloned()
+            .unwrap_or_else(|| "Loading...".to_string());
 
         let mut text: Vec<Line> = Vec::new();
         for line in tree_content.lines() {

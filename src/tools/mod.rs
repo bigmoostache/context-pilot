@@ -15,11 +15,9 @@ use serde_json::Value;
 
 use crate::state::{estimate_tokens, ContextType, MessageStatus, State};
 
-// Re-export public items used by panels
+// Re-export public items used by cache module
 pub use glob::compute_glob_results;
 pub use grep::compute_grep_results;
-pub use tmux::capture_pane_content;
-pub use tree::{generate_directory_tree, generate_tree_string};
 
 /// Refresh token count for the Conversation context element
 pub fn refresh_conversation_context(state: &mut State) {

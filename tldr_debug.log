@@ -47,3 +47,17 @@ Token count: 381
 Calling LLM for summary...
 Got summary: The `src` directory is organized into: **core/** (
 Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 70
+Calling LLM for summary...
+Got summary: **Summary:** The sender offers to help with a TUI 
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 499
+Calling LLM for summary...
+Got summary: **Context Pilot** is a Rust-based terminal AI codi
+Send result: true

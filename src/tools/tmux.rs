@@ -87,7 +87,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
     let context_id = format!("P{}", state.next_context_id);
     state.next_context_id += 1;
 
-    // Add to context
+    // Add to context (cache will be populated by background system)
     let name = format!("tmux:{}", pane_id);
     state.context.push(ContextElement {
         id: context_id.clone(),
@@ -105,6 +105,10 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_lines: Some(lines),
         tmux_last_keys: command.map(|s| s.to_string()),
         tmux_description: Some(description.clone()),
+        cached_content: None,
+        cache_deprecated: true, // Mark as deprecated so background refresh runs
+        last_refresh_ms: 0,
+        tmux_last_lines_hash: None,
     });
 
     ToolResult {
@@ -290,19 +294,5 @@ pub fn execute_sleep(tool: &ToolUse) -> ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("Slept for {} second(s)", SLEEP_DURATION_SECS),
         is_error: false,
-    }
-}
-
-/// Capture content from a tmux pane
-pub fn capture_pane_content(pane_id: &str, lines: usize) -> String {
-    let output = Command::new("tmux")
-        .args(["capture-pane", "-t", pane_id, "-p", "-S", &format!("-{}", lines)])
-        .output();
-
-    match output {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).to_string()
-        }
-        _ => String::from("(failed to capture pane content)"),
     }
 }

@@ -1,5 +1,4 @@
 use crate::state::{ContextElement, ContextType, State};
-use crate::tools::generate_directory_tree;
 
 /// Ensure all default context elements exist with correct IDs
 /// P1 = Main (Conversation), P2 = Directory (Tree), P3 = Todo, P4 = Memory, P5 = Overview
@@ -22,6 +21,10 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_lines: None,
             tmux_last_keys: None,
             tmux_description: None,
+            cached_content: None,
+            cache_deprecated: true, // Mark as deprecated so background refresh runs
+            last_refresh_ms: 0,
+            tmux_last_lines_hash: None,
         });
     }
 
@@ -43,6 +46,10 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_lines: None,
             tmux_last_keys: None,
             tmux_description: None,
+            cached_content: None,
+            cache_deprecated: true, // Mark as deprecated so background refresh runs
+            last_refresh_ms: 0,
+            tmux_last_lines_hash: None,
         });
     }
 
@@ -64,6 +71,10 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_lines: None,
             tmux_last_keys: None,
             tmux_description: None,
+            cached_content: None,
+            cache_deprecated: false,
+            last_refresh_ms: 0,
+            tmux_last_lines_hash: None,
         });
     }
 
@@ -85,6 +96,10 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_lines: None,
             tmux_last_keys: None,
             tmux_description: None,
+            cached_content: None,
+            cache_deprecated: false,
+            last_refresh_ms: 0,
+            tmux_last_lines_hash: None,
         });
     }
 
@@ -106,9 +121,12 @@ pub fn ensure_default_contexts(state: &mut State) {
             tmux_lines: None,
             tmux_last_keys: None,
             tmux_description: None,
+            cached_content: None,
+            cache_deprecated: false,
+            last_refresh_ms: 0,
+            tmux_last_lines_hash: None,
         });
     }
 
-    // Generate initial tree to populate token count
-    let _ = generate_directory_tree(state);
+    // Note: Tree content is now populated by background cache system
 }

@@ -1,8 +1,7 @@
 use ratatui::prelude::*;
 
 use super::{ContextItem, Panel};
-use crate::state::{estimate_tokens, ContextType, State};
-use crate::tools::compute_glob_results;
+use crate::state::{ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct GlobPanel;
@@ -10,26 +9,19 @@ pub struct GlobPanel;
 impl Panel for GlobPanel {
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context) {
-            let pattern = ctx.glob_pattern.as_deref().unwrap_or("*");
-            let search_path = ctx.glob_path.as_deref().unwrap_or(".");
-            let (_, count) = compute_glob_results(pattern, search_path);
+            // Use cached content to count files
+            let count = ctx.cached_content.as_ref()
+                .map(|c| c.lines().count())
+                .unwrap_or(0);
             format!("{} ({} files)", ctx.name, count)
         } else {
             "Glob".to_string()
         }
     }
 
-    fn refresh(&self, state: &mut State) {
-        for ctx in &mut state.context {
-            if ctx.context_type != ContextType::Glob {
-                continue;
-            }
-
-            let Some(pattern) = &ctx.glob_pattern else { continue };
-            let search_path = ctx.glob_path.as_deref().unwrap_or(".");
-            let (results, _) = compute_glob_results(pattern, search_path);
-            ctx.token_count = estimate_tokens(&results);
-        }
+    fn refresh(&self, _state: &mut State) {
+        // Glob refresh is handled by background cache system
+        // No blocking operations here
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
@@ -37,19 +29,25 @@ impl Panel for GlobPanel {
             .filter(|c| c.context_type == ContextType::Glob)
             .filter_map(|c| {
                 let pattern = c.glob_pattern.as_ref()?;
-                let search_path = c.glob_path.as_deref().unwrap_or(".");
-                let (results, _) = compute_glob_results(pattern, search_path);
-                Some(ContextItem::new(format!("Glob: {}", pattern), results))
+                // Use cached content only - no blocking operations
+                let content = c.cached_content.as_ref().cloned()?;
+                Some(ContextItem::new(format!("Glob: {}", pattern), content))
             })
             .collect()
     }
 
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         let content = if let Some(ctx) = state.context.get(state.selected_context) {
-            let pattern = ctx.glob_pattern.as_deref().unwrap_or("*");
-            let search_path = ctx.glob_path.as_deref().unwrap_or(".");
-            let (results, _) = compute_glob_results(pattern, search_path);
-            results
+            // Use cached content only - no blocking operations
+            ctx.cached_content.as_ref()
+                .cloned()
+                .unwrap_or_else(|| {
+                    if ctx.cache_deprecated {
+                        "Loading...".to_string()
+                    } else {
+                        "No results".to_string()
+                    }
+                })
         } else {
             String::new()
         };

@@ -2,6 +2,19 @@
 //!
 //! Each panel type implements the Panel trait, providing a consistent
 //! interface for rendering AND context generation for the LLM.
+//!
+//! ## Caching Architecture
+//!
+//! Panels use a two-level caching system:
+//! - `cache_deprecated`: Source data changed, cache needs regeneration
+//! - `cached_content`: The actual cached content string
+//!
+//! When `refresh()` is called:
+//! 1. Check if cache is deprecated (or missing)
+//! 2. If so, regenerate cache from source data
+//! 3. Update token count from cached content
+//!
+//! `context()` returns the cached content without regenerating.
 
 mod conversation;
 mod file;
@@ -13,6 +26,8 @@ mod tmux;
 mod todo;
 mod tree;
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -20,6 +35,14 @@ use ratatui::{
 
 use crate::state::{ContextType, State};
 use crate::ui::theme;
+
+/// Get current time in milliseconds since UNIX epoch
+pub fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 
 // Re-export panels
 pub use conversation::ConversationPanel;

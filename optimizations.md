@@ -2,21 +2,21 @@
 
 ## High Impact
 
-### 1. Dirty Flag Rendering
-Currently renders every loop iteration (~125fps). Only re-render when state changes.
+### 1. Dirty Flag Rendering ✅ IMPLEMENTED
+Only re-render when state changes. Saves CPU by avoiding widget tree construction when nothing changed.
 
-```rust
-// In App struct
-dirty: bool,
+**Implementation:**
+- `dirty: bool` field in `State`
+- Main loop only calls `terminal.draw()` when `dirty == true`
+- All state mutations set `dirty = true`:
+  - Stream events (chunks, tool use, done, error)
+  - Typewriter character release
+  - Cleaning events
+  - TL;DR results
+  - Tool execution
+  - All user actions
 
-// In loop
-if self.dirty {
-    terminal.draw(|frame| ui::render(frame, &mut self.state))?;
-    self.dirty = false;
-}
-
-// Set dirty = true when state mutates
-```
+Note: Ratatui already does cell-level diffing, so the dirty flag's main benefit is avoiding widget tree construction.
 
 ### 2. Async Tool Execution
 Tools block the main thread. Move I/O-heavy tools to background:

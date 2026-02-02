@@ -1,8 +1,7 @@
 use ratatui::prelude::*;
 
 use super::{ContextItem, Panel};
-use crate::state::{estimate_tokens, ContextType, State};
-use crate::tools::compute_grep_results;
+use crate::state::{ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct GrepPanel;
@@ -10,28 +9,19 @@ pub struct GrepPanel;
 impl Panel for GrepPanel {
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context) {
-            let pattern = ctx.grep_pattern.as_deref().unwrap_or("*");
-            let search_path = ctx.grep_path.as_deref().unwrap_or(".");
-            let file_pattern = ctx.grep_file_pattern.as_deref();
-            let (_, count) = compute_grep_results(pattern, search_path, file_pattern);
+            // Use cached content to count matches
+            let count = ctx.cached_content.as_ref()
+                .map(|c| c.lines().count())
+                .unwrap_or(0);
             format!("{} ({} matches)", ctx.name, count)
         } else {
             "Grep".to_string()
         }
     }
 
-    fn refresh(&self, state: &mut State) {
-        for ctx in &mut state.context {
-            if ctx.context_type != ContextType::Grep {
-                continue;
-            }
-
-            let Some(pattern) = &ctx.grep_pattern else { continue };
-            let search_path = ctx.grep_path.as_deref().unwrap_or(".");
-            let file_pattern = ctx.grep_file_pattern.as_deref();
-            let (results, _) = compute_grep_results(pattern, search_path, file_pattern);
-            ctx.token_count = estimate_tokens(&results);
-        }
+    fn refresh(&self, _state: &mut State) {
+        // Grep refresh is handled by background cache system
+        // No blocking operations here
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
@@ -39,21 +29,25 @@ impl Panel for GrepPanel {
             .filter(|c| c.context_type == ContextType::Grep)
             .filter_map(|c| {
                 let pattern = c.grep_pattern.as_ref()?;
-                let search_path = c.grep_path.as_deref().unwrap_or(".");
-                let file_pattern = c.grep_file_pattern.as_deref();
-                let (results, _) = compute_grep_results(pattern, search_path, file_pattern);
-                Some(ContextItem::new(format!("Grep: {}", pattern), results))
+                // Use cached content only - no blocking operations
+                let content = c.cached_content.as_ref().cloned()?;
+                Some(ContextItem::new(format!("Grep: {}", pattern), content))
             })
             .collect()
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let content = if let Some(ctx) = state.context.get(state.selected_context) {
-            let pattern = ctx.grep_pattern.as_deref().unwrap_or("*");
-            let search_path = ctx.grep_path.as_deref().unwrap_or(".");
-            let file_pattern = ctx.grep_file_pattern.as_deref();
-            let (results, _) = compute_grep_results(pattern, search_path, file_pattern);
-            results
+            // Use cached content only - no blocking operations
+            ctx.cached_content.as_ref()
+                .cloned()
+                .unwrap_or_else(|| {
+                    if ctx.cache_deprecated {
+                        "Loading...".to_string()
+                    } else {
+                        "No results".to_string()
+                    }
+                })
         } else {
             String::new()
         };

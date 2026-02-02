@@ -1,6 +1,6 @@
 # Context Pilot
 
-A terminal-based AI coding assistant built in Rust that provides an interactive interface for AI-assisted development with full project context awareness. A terminal-based AI coding assistant built in Rust that provides an interactive interface for AI-assisted development with full project context awareness.
+A terminal-based AI coding assistant built in Rust that provides an interactive interface for AI-assisted development with full project context awareness.
 
 ![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
@@ -16,8 +16,16 @@ A terminal-based AI coding assistant built in Rust that provides an interactive 
 - **File Context** - Open files and keep them in context for reference
 - **Directory Tree** - Filtered view of your project structure (gitignore-style filtering)
 - **Glob Search** - Create persistent file searches that update automatically
+- **Grep Search** - Search file contents with regex patterns
 - **Tmux Integration** - Create terminal panes, run commands, capture output
 - **Todo Lists** - Hierarchical task management with status tracking
+- **Memory System** - Persistent notes with importance levels
+
+### Non-Blocking Architecture
+- **Background Caching** - All file I/O, searches, and terminal captures run in background threads
+- **File Watching** - Automatic cache invalidation when files change (using inotify)
+- **Timer-Based Refresh** - Glob/grep results refresh every 30s, tmux every 1s
+- **Instant UI** - Main thread never blocks on I/O operations
 
 ### 💬 Conversation Features
 - **Message Summarization** - Automatic TL;DR generation for long messages
@@ -65,16 +73,20 @@ cargo run --release
 | Shortcut | Action |
 |----------|--------|
 | `Shift+Enter` or `Alt+Enter` | Send message |
+| `Up/Down` | Scroll panel content |
+| `Left/Right` | Switch between panels |
+| `PageUp/PageDown` | Fast scroll |
 | `Ctrl+L` | Clear conversation |
 | `Ctrl+Y` | Toggle copy mode |
 | `Ctrl+Q` | Quit |
 | `Esc` | Stop streaming / Exit copy mode |
-| `PageUp/PageDown` | Scroll content |
 | `p1`, `p2`, etc. | Quick switch context panels |
 
 ### Context Panel Navigation
 
-Type `p1`, `p2`, `p3`, etc. in the input and press Enter/Space to quickly switch between context panels.
+- Use `Left/Right` arrow keys to cycle through panels
+- Type `p1`, `p2`, `p3`, etc. in the input and press Enter/Space to jump to a specific panel
+- Click on panel names in the sidebar to select them
 
 ## Available Tools
 
@@ -89,12 +101,17 @@ The AI assistant can use these tools to interact with your project:
 | `glob` | Search for files matching a pattern |
 | `grep` | Search file contents with regex pattern |
 | `edit_tree_filter` | Modify directory tree filtering |
+| `tree_toggle_folders` | Open/close folders in directory tree |
+| `tree_describe_files` | Add descriptions to files/folders in tree |
 | `set_message_status` | Manage message context (full/summarized/forgotten) |
 | `create_tmux_pane` | Create a new terminal pane |
 | `tmux_send_keys` | Send commands to a tmux pane |
 | `edit_tmux_config` | Configure tmux pane settings |
+| `sleep` | Wait for command output (2 seconds) |
 | `create_todos` | Create todo items |
 | `update_todos` | Update or delete todo items |
+| `create_memories` | Create memory/note items |
+| `update_memories` | Update or delete memory items |
 
 ## API Request Structure
 
@@ -247,6 +264,49 @@ Special mode triggered by `/clean` command:
 - Adds user message: `"Please clean up the context to reduce token usage:\n\n{cleaner_context}"`
 - Cleaner context includes all message IDs, types, statuses, and token counts
 
+## Architecture
+
+### Panel Caching System
+
+The application uses a non-blocking caching architecture to ensure the UI remains responsive:
+
+```
+┌─────────────┐     CacheRequest      ┌──────────────────┐
+│  Main Loop  │ ───────────────────▸ │ Background Thread │
+│  (UI Thread)│                       │  (Cache Worker)   │
+│             │ ◂─────────────────── │                   │
+└─────────────┘     CacheUpdate       └──────────────────┘
+       │                                      │
+       │                                      ▼
+       │                              ┌──────────────────┐
+       │                              │   File System    │
+       │                              │   Tmux Sessions  │
+       │                              │   Glob/Grep Exec │
+       │                              └──────────────────┘
+       ▼
+┌─────────────┐
+│ File Watcher│ ──▸ Detects changes, triggers cache refresh
+└─────────────┘
+```
+
+**Cache Invalidation Strategies:**
+
+| Context Type | Invalidation Method |
+|--------------|---------------------|
+| File | File watcher (inotify) detects changes |
+| Tree | Directory watcher on open folders |
+| Glob | Timer-based (30 second refresh) |
+| Grep | Timer-based (30 second refresh) |
+| Tmux | Timer-based (1 second) + hash of last 2 lines |
+| Conversation | Internal state changes |
+| Todo/Memory | Internal state changes |
+
+**Key Properties:**
+- Same cached content used for both UI rendering and LLM context
+- Background threads handle all blocking I/O
+- Main thread only reads from cache, never blocks
+- File watchers only monitor actively open files/folders
+
 ## Dependencies
 
 - **ratatui** - Terminal UI framework
@@ -256,6 +316,7 @@ Special mode triggered by `/clean` command:
 - **syntect** - Syntax highlighting
 - **ignore** - Gitignore-style file filtering
 - **globset** - Glob pattern matching
+- **notify** - File system notifications (inotify on Linux)
 
 ## License
 

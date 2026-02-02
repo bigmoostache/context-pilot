@@ -25,13 +25,18 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let context_id = format!("P{}", state.next_context_id);
     state.next_context_id += 1;
 
-    // Create context element
+    // Compute initial results
+    let (results, _) = compute_glob_results(pattern, &search_path);
+    let count = results.lines().count();
+    let token_count = estimate_tokens(&results);
+
+    // Create context element with cached content
     let name = format!("glob:{}", pattern);
     state.context.push(ContextElement {
         id: context_id.clone(),
         context_type: ContextType::Glob,
         name,
-        token_count: 0,
+        token_count,
         file_path: None,
         file_hash: None,
         glob_pattern: Some(pattern.to_string()),
@@ -43,16 +48,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_lines: None,
         tmux_last_keys: None,
         tmux_description: None,
+        cached_content: Some(results),
+        cache_deprecated: false,
+        last_refresh_ms: 0,
+        tmux_last_lines_hash: None,
     });
-
-    // Compute initial results
-    let (results, _) = compute_glob_results(pattern, &search_path);
-    let count = results.lines().count();
-
-    // Update token count
-    if let Some(ctx) = state.context.last_mut() {
-        ctx.token_count = estimate_tokens(&results);
-    }
 
     ToolResult {
         tool_use_id: tool.id.clone(),

@@ -6,7 +6,7 @@ use ignore::gitignore::GitignoreBuilder;
 use sha2::{Sha256, Digest};
 
 use super::{ToolResult, ToolUse};
-use crate::state::{estimate_tokens, ContextType, State, TreeFileDescription};
+use crate::state::{State, TreeFileDescription};
 
 /// Generate tree string without mutating state (for read-only rendering)
 pub fn generate_tree_string(
@@ -37,18 +37,12 @@ pub fn generate_tree_string(
 
     let mut output = String::new();
 
-    // Root folder name
+    // Show pwd at the top
     if let Ok(cwd) = std::env::current_dir() {
-        if let Some(name) = cwd.file_name() {
-            output.push_str(&format!("{}/\n", name.to_string_lossy()));
-        } else {
-            output.push_str("./\n");
-        }
-    } else {
-        output.push_str("./\n");
+        output.push_str(&format!("pwd: {}\n", cwd.display()));
     }
 
-    // Build tree recursively
+    // Build tree recursively - directly show contents without root folder line
     build_tree_new(
         &root,
         ".",
@@ -305,22 +299,6 @@ fn count_children(dir: &Path, gitignore: &Option<ignore::gitignore::Gitignore>) 
             }
         })
         .count()
-}
-
-/// Generate a directory tree showing only open folders (updates token count in state)
-pub fn generate_directory_tree(state: &mut State) -> String {
-    let output = generate_tree_string(&state.tree_filter, &state.tree_open_folders, &state.tree_descriptions);
-
-    // Update token count for Tree context element
-    let token_count = estimate_tokens(&output);
-    for ctx in &mut state.context {
-        if ctx.context_type == ContextType::Tree {
-            ctx.token_count = token_count;
-            break;
-        }
-    }
-
-    output
 }
 
 fn build_tree_new(

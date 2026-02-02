@@ -1,19 +1,9 @@
-use std::collections::hash_map::DefaultHasher;
-use std::fs;
-use std::hash::{Hash, Hasher};
-
 use ratatui::prelude::*;
 
 use super::{ContextItem, Panel};
 use crate::highlight::highlight_file;
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::state::{ContextType, State};
 use crate::ui::theme;
-
-fn hash_content(content: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    content.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
-}
 
 pub struct FilePanel;
 
@@ -24,23 +14,9 @@ impl Panel for FilePanel {
             .unwrap_or_else(|| "File".to_string())
     }
 
-    fn refresh(&self, state: &mut State) {
-        // Check all open files for changes and update hashes/token counts
-        for ctx in &mut state.context {
-            if ctx.context_type != ContextType::File {
-                continue;
-            }
-
-            let Some(path) = &ctx.file_path else { continue };
-            let Ok(content) = fs::read_to_string(path) else { continue };
-
-            let new_hash = hash_content(&content);
-
-            if ctx.file_hash.as_ref() != Some(&new_hash) {
-                ctx.file_hash = Some(new_hash);
-                ctx.token_count = estimate_tokens(&content);
-            }
-        }
+    fn refresh(&self, _state: &mut State) {
+        // File refresh is handled by background cache system
+        // No blocking operations here
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
@@ -48,7 +24,8 @@ impl Panel for FilePanel {
             .filter(|c| c.context_type == ContextType::File)
             .filter_map(|c| {
                 let path = c.file_path.as_ref()?;
-                let content = fs::read_to_string(path).ok()?;
+                // Use cached content only - no blocking file reads
+                let content = c.cached_content.as_ref().cloned()?;
                 Some(ContextItem::new(format!("File: {}", path), content))
             })
             .collect()
@@ -59,11 +36,15 @@ impl Panel for FilePanel {
 
         let (content, file_path) = if let Some(ctx) = selected {
             let path = ctx.file_path.as_deref().unwrap_or("");
-            let content = if !path.is_empty() {
-                fs::read_to_string(path).unwrap_or_else(|e| format!("Error reading file: {}", e))
-            } else {
-                "No file path".to_string()
-            };
+            // Use cached content only - no blocking file reads
+            let content = ctx.cached_content.clone()
+                .unwrap_or_else(|| {
+                    if ctx.cache_deprecated {
+                        "Loading...".to_string()
+                    } else {
+                        "No content".to_string()
+                    }
+                });
             (content, path.to_string())
         } else {
             (String::new(), String::new())

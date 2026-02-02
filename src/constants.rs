@@ -37,6 +37,19 @@ pub const CLEANING_TARGET: f32 = 0.50;
 pub const MAX_CLEANING_ITERATIONS: u32 = 10;
 
 // =============================================================================
+// PANEL CACHE DEPRECATION
+// =============================================================================
+
+/// Deprecation timer for glob panels (milliseconds)
+pub const GLOB_DEPRECATION_MS: u64 = 30_000; // 30 seconds
+
+/// Deprecation timer for grep panels (milliseconds)
+pub const GREP_DEPRECATION_MS: u64 = 30_000; // 30 seconds
+
+/// Deprecation timer for tmux panels (milliseconds)
+pub const TMUX_DEPRECATION_MS: u64 = 1_000; // 1 second (check hash of last 2 lines)
+
+// =============================================================================
 // SCROLLING
 // =============================================================================
 
