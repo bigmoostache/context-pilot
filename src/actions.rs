@@ -1,6 +1,15 @@
+use regex::Regex;
+
 use crate::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::persistence::{delete_message, save_message};
 use crate::state::{estimate_tokens, ContextElement, ContextType, Message, MessageStatus, MessageType, State};
+
+/// Remove LLM's mistaken ID prefixes like "[A84]: " from the start of responses
+fn clean_llm_id_prefix(content: &str) -> String {
+    // Pattern: one or more [A##]: or [A###]: at the start, with optional whitespace
+    let re = Regex::new(r"^(\s*\[A\d+\]:\s*)+").unwrap();
+    re.replace(content, "").to_string()
+}
 
 /// Parse context selection patterns like p1, p-1, p_1, P1, P-1, P_1
 /// Returns the context ID (e.g., "P1", "P28") if matched
@@ -48,7 +57,6 @@ pub enum Action {
     CursorEnd,
     ClearConversation,
     NewContext,
-    SelectContext(usize),
     SelectNextContext,
     SelectPrevContext,
     AppendChars(String),
@@ -56,7 +64,6 @@ pub enum Action {
     StreamError(String),
     ScrollUp(f32),
     ScrollDown(f32),
-    ToggleCopyMode,
     StopStreaming,
     StartContextCleaning,
     None,
@@ -225,8 +232,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Save
         }
         Action::NewContext => {
-            let context_id = format!("P{}", state.next_context_id);
-            state.next_context_id += 1;
+            let context_id = state.next_available_context_id();
             state.context.push(ContextElement {
                 id: context_id,
                 context_type: ContextType::Conversation,
@@ -249,14 +255,6 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tmux_last_lines_hash: None,
             });
             ActionResult::Save
-        }
-        Action::SelectContext(index) => {
-            if index < state.context.len() {
-                state.selected_context = index;
-                state.scroll_offset = 0.0;
-                state.user_scrolled = false;
-            }
-            ActionResult::Nothing
         }
         Action::SelectNextContext => {
             if !state.context.is_empty() {
@@ -309,9 +307,11 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             state.streaming_estimated_tokens = 0;
 
-            // Store actual token count on message
+            // Store actual token count on message and clean up LLM prefixes
             if let Some(msg) = state.messages.last_mut() {
                 if msg.role == "assistant" {
+                    // Remove any [A##]: prefixes the LLM mistakenly added
+                    msg.content = clean_llm_id_prefix(&msg.content);
                     msg.content_token_count = output_tokens;
                     let id = msg.id.clone();
                     return ActionResult::SaveMessage(id);
@@ -348,10 +348,6 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             let accel_amount = amount * state.scroll_accel;
             state.scroll_offset = (state.scroll_offset + accel_amount).min(state.max_scroll);
             state.scroll_accel = (state.scroll_accel + SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
-            ActionResult::Nothing
-        }
-        Action::ToggleCopyMode => {
-            state.copy_mode = !state.copy_mode;
             ActionResult::Nothing
         }
         Action::StopStreaming => {

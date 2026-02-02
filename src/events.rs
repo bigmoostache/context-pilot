@@ -2,7 +2,6 @@ use crossterm::event::{Event, KeyCode, KeyModifiers};
 
 use crate::actions::{parse_context_pattern, find_context_by_id, Action};
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::mouse::handle_mouse;
 use crate::state::State;
 
 pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
@@ -23,7 +22,6 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     KeyCode::Char('q') => return None, // Quit
                     KeyCode::Char('l') => return Some(Action::ClearConversation),
                     KeyCode::Char('n') => return Some(Action::NewContext),
-                    KeyCode::Char('y') => return Some(Action::ToggleCopyMode),
                     KeyCode::Char('j') => return Some(Action::InputSubmit), // Ctrl+J as alternative to Ctrl+Enter
                     KeyCode::Char('k') => return Some(Action::StartContextCleaning),
                     // Ctrl+arrows for word navigation (handled below in Input focus)
@@ -31,11 +29,9 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 }
             }
 
-            // Escape exits copy mode or stops streaming
+            // Escape stops streaming
             if key.code == KeyCode::Esc {
-                if state.copy_mode {
-                    return Some(Action::ToggleCopyMode);
-                } else if state.is_streaming {
+                if state.is_streaming {
                     return Some(Action::StopStreaming);
                 }
             }
@@ -82,7 +78,6 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
             };
             Some(action)
         }
-        Event::Mouse(mouse) => Some(handle_mouse(mouse, state)),
         _ => Some(Action::None),
     }
 }

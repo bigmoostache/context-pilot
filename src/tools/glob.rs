@@ -1,7 +1,7 @@
 use ignore::WalkBuilder;
 
 use super::{ToolResult, ToolUse};
-use crate::state::{estimate_tokens, ContextElement, ContextType, State};
+use crate::state::{ContextElement, ContextType, State};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let pattern = match tool.input.get("pattern").and_then(|v| v.as_str()) {
@@ -15,28 +15,36 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
+    // Validate glob pattern early (cheap operation)
+    if globset::GlobBuilder::new(pattern)
+        .literal_separator(true)
+        .build()
+        .is_err()
+    {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Invalid glob pattern: '{}'", pattern),
+            is_error: true,
+        };
+    }
+
     let path = tool.input.get("path")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
     let search_path = path.as_deref().unwrap_or(".").to_string();
 
-    // Generate context ID
-    let context_id = format!("P{}", state.next_context_id);
-    state.next_context_id += 1;
+    // Generate context ID (fills gaps)
+    let context_id = state.next_available_context_id();
 
-    // Compute initial results
-    let (results, _) = compute_glob_results(pattern, &search_path);
-    let count = results.lines().count();
-    let token_count = estimate_tokens(&results);
-
-    // Create context element with cached content
+    // Create context element WITHOUT computing results
+    // Background cache system will populate it
     let name = format!("glob:{}", pattern);
     state.context.push(ContextElement {
         id: context_id.clone(),
         context_type: ContextType::Glob,
         name,
-        token_count,
+        token_count: 0, // Will be updated by cache
         file_path: None,
         file_hash: None,
         glob_pattern: Some(pattern.to_string()),
@@ -48,15 +56,15 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_lines: None,
         tmux_last_keys: None,
         tmux_description: None,
-        cached_content: Some(results),
-        cache_deprecated: false,
+        cached_content: None, // Background will populate
+        cache_deprecated: true, // Trigger background refresh
         last_refresh_ms: 0,
         tmux_last_lines_hash: None,
     });
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!("Created glob {} for '{}' in '{}': {} files found", context_id, pattern, &search_path, count),
+        content: format!("Created glob {} for '{}' in '{}'", context_id, pattern, &search_path),
         is_error: false,
     }
 }

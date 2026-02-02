@@ -4,7 +4,7 @@ use ratatui::{
 };
 
 use crate::state::State;
-use super::theme;
+use super::{theme, spinner};
 
 pub fn render_input(frame: &mut Frame, state: &State, area: Rect) {
     let inner_area = Rect::new(
@@ -19,9 +19,10 @@ pub fn render_input(frame: &mut Frame, state: &State, area: Rect) {
     let is_busy = state.is_streaming;
 
     let (title, title_color, border_color) = if state.is_streaming {
-        (" Streaming... ", theme::TEXT_MUTED, theme::TEXT_MUTED)
+        let spin = spinner::spinner(state.spinner_frame);
+        (format!(" {} Streaming... ", spin), theme::SUCCESS, theme::SUCCESS)
     } else {
-        (" Message ", theme::ACCENT, theme::BORDER_FOCUS)
+        (" Message ".to_string(), theme::ACCENT, theme::BORDER_FOCUS)
     };
 
     let block = Block::default()
@@ -29,7 +30,7 @@ pub fn render_input(frame: &mut Frame, state: &State, area: Rect) {
         .border_type(ratatui::widgets::BorderType::Rounded)
         .border_style(Style::default().fg(border_color))
         .style(Style::default().bg(theme::BG_INPUT))
-        .title(Span::styled(title, Style::default().fg(title_color)));
+        .title(Span::styled(&title, Style::default().fg(title_color)));
 
     let content_area = block.inner(inner_area);
     frame.render_widget(block, inner_area);
@@ -75,40 +76,54 @@ pub fn render_input(frame: &mut Frame, state: &State, area: Rect) {
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     let base_style = Style::default().bg(theme::BG_BASE).fg(theme::TEXT_MUTED);
+    let spin = spinner::spinner(state.spinner_frame);
 
     let mut spans = vec![
         Span::styled(" ", base_style),
     ];
 
-    // Copy mode takes precedence as it changes behavior
-    if state.copy_mode {
-        spans.push(Span::styled(" COPY ", Style::default().fg(theme::BG_BASE).bg(theme::WARNING).bold()));
-        spans.push(Span::styled(" Press Esc to exit ", base_style));
-    } else {
-        // Show all active states as separate badges
-        if state.is_streaming {
-            spans.push(Span::styled(" STREAMING ", Style::default().fg(theme::BG_BASE).bg(theme::SUCCESS).bold()));
-            spans.push(Span::styled(" ", base_style));
-        }
+    // Show all active states as separate badges with spinners
+    if state.is_streaming {
+        spans.push(Span::styled(
+            format!(" {} STREAMING ", spin),
+            Style::default().fg(theme::BG_BASE).bg(theme::SUCCESS).bold()
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
 
-        if state.is_cleaning_context {
-            spans.push(Span::styled(" CLEANING ", Style::default().fg(theme::BG_BASE).bg(theme::ACCENT).bold()));
-            spans.push(Span::styled(" ", base_style));
-        }
+    if state.is_cleaning_context {
+        spans.push(Span::styled(
+            format!(" {} CLEANING ", spin),
+            Style::default().fg(theme::BG_BASE).bg(theme::ACCENT).bold()
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
 
-        if state.pending_tldrs > 0 {
-            spans.push(Span::styled(
-                format!(" SUMMARIZING {} ", state.pending_tldrs),
-                Style::default().fg(theme::BG_BASE).bg(theme::WARNING).bold()
-            ));
-            spans.push(Span::styled(" ", base_style));
-        }
+    if state.pending_tldrs > 0 {
+        spans.push(Span::styled(
+            format!(" {} SUMMARIZING {} ", spin, state.pending_tldrs),
+            Style::default().fg(theme::BG_BASE).bg(theme::WARNING).bold()
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
 
-        // If nothing active, show READY
-        if !state.is_streaming && !state.is_cleaning_context && state.pending_tldrs == 0 {
-            spans.push(Span::styled(" READY ", Style::default().fg(theme::BG_BASE).bg(theme::TEXT_MUTED).bold()));
-            spans.push(Span::styled(" ", base_style));
-        }
+    // Count loading context elements (those without cached content)
+    let loading_count = state.context.iter()
+        .filter(|c| c.cached_content.is_none() && c.context_type.needs_cache())
+        .count();
+
+    if loading_count > 0 {
+        spans.push(Span::styled(
+            format!(" {} LOADING {} ", spin, loading_count),
+            Style::default().fg(theme::BG_BASE).bg(theme::TEXT_MUTED).bold()
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
+    // If nothing active, show READY
+    if !state.is_streaming && !state.is_cleaning_context && state.pending_tldrs == 0 && loading_count == 0 {
+        spans.push(Span::styled(" READY ", Style::default().fg(theme::BG_BASE).bg(theme::TEXT_MUTED).bold()));
+        spans.push(Span::styled(" ", base_style));
     }
 
     // Right side info

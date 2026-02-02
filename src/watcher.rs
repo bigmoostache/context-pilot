@@ -1,6 +1,6 @@
 //! File watcher for detecting changes to open files and directories.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
@@ -19,16 +19,18 @@ pub enum WatchEvent {
 /// File watcher that monitors open files and directories
 pub struct FileWatcher {
     watcher: RecommendedWatcher,
-    watched_files: Arc<Mutex<HashSet<PathBuf>>>,
-    watched_dirs: Arc<Mutex<HashSet<PathBuf>>>,
+    /// Maps canonical path -> original path (for returning original path in events)
+    watched_files: Arc<Mutex<HashMap<PathBuf, String>>>,
+    /// Maps canonical path -> original path
+    watched_dirs: Arc<Mutex<HashMap<PathBuf, String>>>,
     event_rx: Receiver<WatchEvent>,
 }
 
 impl FileWatcher {
     pub fn new() -> notify::Result<Self> {
         let (tx, rx) = mpsc::channel();
-        let watched_files = Arc::new(Mutex::new(HashSet::new()));
-        let watched_dirs = Arc::new(Mutex::new(HashSet::new()));
+        let watched_files: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
+        let watched_dirs: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
 
         let files_clone = watched_files.clone();
         let dirs_clone = watched_dirs.clone();
@@ -37,23 +39,22 @@ impl FileWatcher {
             move |res: Result<Event, notify::Error>| {
                 if let Ok(event) = res {
                     for path in event.paths {
+                        // Canonicalize the event path for comparison
+                        let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
+
                         // Check if it's a watched file
                         if let Ok(files) = files_clone.lock() {
-                            if files.contains(&path) {
-                                let _ = tx.send(WatchEvent::FileChanged(
-                                    path.to_string_lossy().to_string()
-                                ));
+                            if let Some(original_path) = files.get(&canonical) {
+                                let _ = tx.send(WatchEvent::FileChanged(original_path.clone()));
                                 continue;
                             }
                         }
 
                         // Check if it's in a watched directory
                         if let Ok(dirs) = dirs_clone.lock() {
-                            if let Some(parent) = path.parent() {
-                                if dirs.contains(&parent.to_path_buf()) {
-                                    let _ = tx.send(WatchEvent::DirChanged(
-                                        parent.to_string_lossy().to_string()
-                                    ));
+                            if let Some(parent) = canonical.parent() {
+                                if let Some(original_path) = dirs.get(&parent.to_path_buf()) {
+                                    let _ = tx.send(WatchEvent::DirChanged(original_path.clone()));
                                 }
                             }
                         }
@@ -78,9 +79,13 @@ impl FileWatcher {
             return Ok(());
         }
 
+        // Canonicalize for storage and comparison
+        let canonical = path_buf.canonicalize().unwrap_or_else(|_| path_buf.clone());
+
         if let Ok(mut files) = self.watched_files.lock() {
-            if files.insert(path_buf.clone()) {
-                self.watcher.watch(&path_buf, RecursiveMode::NonRecursive)?;
+            if !files.contains_key(&canonical) {
+                files.insert(canonical.clone(), path.to_string());
+                self.watcher.watch(&canonical, RecursiveMode::NonRecursive)?;
             }
         }
         Ok(())
@@ -93,9 +98,13 @@ impl FileWatcher {
             return Ok(());
         }
 
+        // Canonicalize for storage and comparison
+        let canonical = path_buf.canonicalize().unwrap_or_else(|_| path_buf.clone());
+
         if let Ok(mut dirs) = self.watched_dirs.lock() {
-            if dirs.insert(path_buf.clone()) {
-                self.watcher.watch(&path_buf, RecursiveMode::NonRecursive)?;
+            if !dirs.contains_key(&canonical) {
+                dirs.insert(canonical.clone(), path.to_string());
+                self.watcher.watch(&canonical, RecursiveMode::NonRecursive)?;
             }
         }
         Ok(())

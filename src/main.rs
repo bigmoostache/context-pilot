@@ -7,7 +7,6 @@ mod context_cleaner;
 mod core;
 mod events;
 mod highlight;
-mod mouse;
 mod panels;
 mod persistence;
 mod state;
@@ -21,7 +20,6 @@ use std::io;
 use std::sync::mpsc;
 
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -36,7 +34,6 @@ use persistence::load_state;
 fn main() -> io::Result<()> {
     enable_raw_mode()?;
     io::stdout().execute(EnterAlternateScreen)?;
-    io::stdout().execute(EnableMouseCapture)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut state = load_state();
@@ -55,7 +52,6 @@ fn main() -> io::Result<()> {
     app.run(&mut terminal, tx, rx, tldr_tx, tldr_rx, clean_tx, clean_rx, cache_rx)?;
 
     // Cleanup
-    io::stdout().execute(DisableMouseCapture)?;
     disable_raw_mode()?;
     io::stdout().execute(LeaveAlternateScreen)?;
     Ok(())

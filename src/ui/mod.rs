@@ -3,6 +3,7 @@ pub mod helpers;
 mod input;
 pub mod markdown;
 mod sidebar;
+pub mod spinner;
 pub mod theme;
 
 use ratatui::{

@@ -164,9 +164,8 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    // Generate context ID and add to context
-    let context_id = format!("P{}", state.next_context_id);
-    state.next_context_id += 1;
+    // Generate context ID (fills gaps)
+    let context_id = state.next_available_context_id();
 
     let file_name = Path::new(path)
         .file_name()

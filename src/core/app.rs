@@ -2,8 +2,7 @@ use std::io;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture};
-use crossterm::ExecutableCommand;
+use crossterm::event;
 use ratatui::prelude::*;
 
 use crate::actions::{apply_action, Action, ActionResult};
@@ -31,7 +30,6 @@ pub struct App {
     cleaning_pending_done: Option<(usize, usize)>,
     cleaning_pending_tools: Vec<ToolUse>,
     cleaning_iterations: u32,
-    mouse_captured: bool,
     cache_tx: Sender<CacheUpdate>,
     file_watcher: Option<FileWatcher>,
     /// Tracks which file paths are being watched
@@ -54,7 +52,6 @@ impl App {
             cleaning_pending_done: None,
             cleaning_pending_tools: Vec::new(),
             cleaning_iterations: 0,
-            mouse_captured: true,
             cache_tx,
             file_watcher,
             watched_file_paths: std::collections::HashSet::new(),
@@ -79,6 +76,26 @@ impl App {
         self.schedule_initial_cache_refreshes();
 
         loop {
+            // === INPUT FIRST: Process user input with minimal latency ===
+            // Non-blocking check for input - handle immediately for responsive feel
+            if event::poll(Duration::ZERO)? {
+                let evt = event::read()?;
+
+                let Some(action) = handle_event(&evt, &self.state) else {
+                    save_state(&self.state);
+                    break;
+                };
+
+                self.handle_action(action, &tx, &tldr_tx, &clean_tx);
+
+                // Render immediately after input for instant feedback
+                if self.state.dirty {
+                    terminal.draw(|frame| ui::render(frame, &mut self.state))?;
+                    self.state.dirty = false;
+                }
+            }
+
+            // === BACKGROUND PROCESSING ===
             self.process_stream_events(&rx);
             self.process_typewriter();
             self.process_cleaning_events(&clean_rx, &clean_tx);
@@ -88,25 +105,18 @@ impl App {
             self.check_timer_based_deprecation();
             self.handle_tool_execution(&tx, &tldr_tx, &clean_tx);
             self.finalize_stream(&tldr_tx, &clean_tx);
-            self.update_mouse_capture()?;
 
-            // Only render when state has changed
+            // Update spinner animation if there's active loading/streaming
+            self.update_spinner_animation();
+
+            // Render if state changed from background processing
             if self.state.dirty {
                 terminal.draw(|frame| ui::render(frame, &mut self.state))?;
                 self.state.dirty = false;
             }
 
-            // Poll events
-            if event::poll(Duration::from_millis(EVENT_POLL_MS))? {
-                let evt = event::read()?;
-
-                let Some(action) = handle_event(&evt, &self.state) else {
-                    save_state(&self.state);
-                    break;
-                };
-
-                self.handle_action(action, &tx, &tldr_tx, &clean_tx);
-            }
+            // Wait for next event (with timeout to keep checking background channels)
+            let _ = event::poll(Duration::from_millis(EVENT_POLL_MS))?;
         }
 
         Ok(())
@@ -378,17 +388,6 @@ impl App {
                 }
             }
         }
-    }
-
-    fn update_mouse_capture(&mut self) -> io::Result<()> {
-        if self.state.copy_mode && self.mouse_captured {
-            io::stdout().execute(DisableMouseCapture)?;
-            self.mouse_captured = false;
-        } else if !self.state.copy_mode && !self.mouse_captured {
-            io::stdout().execute(EnableMouseCapture)?;
-            self.mouse_captured = true;
-        }
-        Ok(())
     }
 
     fn handle_action(
@@ -668,6 +667,7 @@ impl App {
     }
 
     /// Check timer-based deprecation for glob, grep, tmux
+    /// Also handles initial population for newly created context elements
     fn check_timer_based_deprecation(&mut self) {
         let current_ms = now_ms();
 
@@ -678,17 +678,51 @@ impl App {
         self.last_timer_check_ms = current_ms;
 
         for ctx in &self.state.context {
-            let threshold = match ctx.context_type {
-                ContextType::Glob => GLOB_DEPRECATION_MS,
-                ContextType::Grep => GREP_DEPRECATION_MS,
-                ContextType::Tmux => TMUX_DEPRECATION_MS,
-                _ => continue,
+            // Check if this element needs initial population (newly created via tool)
+            let needs_initial_population = ctx.cached_content.is_none();
+
+            // For timer-based types, also check if refresh timer has elapsed
+            let timer_refresh_needed = match ctx.context_type {
+                ContextType::Glob => {
+                    let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
+                    elapsed >= GLOB_DEPRECATION_MS && !ctx.cache_deprecated
+                }
+                ContextType::Grep => {
+                    let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
+                    elapsed >= GREP_DEPRECATION_MS && !ctx.cache_deprecated
+                }
+                ContextType::Tmux => {
+                    let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
+                    elapsed >= TMUX_DEPRECATION_MS && !ctx.cache_deprecated
+                }
+                _ => false,
             };
 
-            let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
-            if elapsed >= threshold && !ctx.cache_deprecated {
-                // Schedule check/refresh in background
+            if needs_initial_population || timer_refresh_needed {
+                // Schedule refresh in background based on context type
                 match ctx.context_type {
+                    ContextType::File => {
+                        if let Some(path) = &ctx.file_path {
+                            // Set up file watcher for new file
+                            if needs_initial_population {
+                                if let Some(watcher) = &mut self.file_watcher {
+                                    if !self.watched_file_paths.contains(path) {
+                                        if watcher.watch_file(path).is_ok() {
+                                            self.watched_file_paths.insert(path.clone());
+                                        }
+                                    }
+                                }
+                            }
+                            process_cache_request(
+                                CacheRequest::RefreshFile {
+                                    context_id: ctx.id.clone(),
+                                    file_path: path.clone(),
+                                    current_hash: ctx.file_hash.clone(),
+                                },
+                                self.cache_tx.clone(),
+                            );
+                        }
+                    }
                     ContextType::Glob => {
                         if let Some(pattern) = &ctx.glob_pattern {
                             process_cache_request(
@@ -726,9 +760,28 @@ impl App {
                             );
                         }
                     }
+                    // Tree, Conversation, Todo, Memory, Overview - handled by state changes
                     _ => {}
                 }
             }
+        }
+    }
+
+    /// Update spinner animation frame if there's active loading/streaming
+    fn update_spinner_animation(&mut self) {
+        // Check if there's any active operation that needs spinner animation
+        let has_active_spinner = self.state.is_streaming
+            || self.state.is_cleaning_context
+            || self.state.pending_tldrs > 0
+            || self.state.context.iter().any(|c| {
+                c.cached_content.is_none() && c.context_type.needs_cache()
+            });
+
+        if has_active_spinner {
+            // Increment spinner frame (wraps around automatically with u64)
+            self.state.spinner_frame = self.state.spinner_frame.wrapping_add(1);
+            // Mark dirty to trigger re-render with new spinner frame
+            self.state.dirty = true;
         }
     }
 }

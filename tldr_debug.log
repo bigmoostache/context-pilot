@@ -61,3 +61,266 @@ Token count: 499
 Calling LLM for summary...
 Got summary: **Context Pilot** is a Rust-based terminal AI codi
 Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 443
+Calling LLM for summary...
+Got summary: The message lists available tools organized by cat
+Send result: true
+Token count: 18
+Using content directly (short message)
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 162
+Calling LLM for summary...
+Got summary: The assistant demonstrated tmux integration by cre
+Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 43
+Calling LLM for summary...
+Got summary: The user confirms that Tmux pane P10 is now open a
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 28
+Calling LLM for summary...
+Got summary: The user confirmed they closed and reopened three 
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 75
+Calling LLM for summary...
+LLM error: Request failed: error sending request for url (https://api.anthropic.com/v1/messages)
+Fallback send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 54
+Calling LLM for summary...
+Got summary: The user confirms they can see the edit was succes
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 197
+Calling LLM for summary...
+Got summary: The caching system provides live updates: files re
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 39
+Calling LLM for summary...
+Got summary: The assistant confirms seeing the user's addition 
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 26
+Calling LLM for summary...
+Got summary: The user confirmed they can see the command `echo 
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 31
+Calling LLM for summary...
+Got summary: The message confirms that the user wrote an echo c
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 182
+Calling LLM for summary...
+Got summary: A humorous tale about a developer's "quick feature
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 288
+Calling LLM for summary...
+Got summary: In a future where AI writes all code, a student na
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 19
+Using content directly (short message)
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 17
+Using content directly (short message)
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 248
+Calling LLM for summary...
+Token count: 3
+Using content directly (short message)
+Send result: true
+Got summary: The message praises a Rust-based terminal AI codin
+Send result: true
+Token count: 28
+Calling LLM for summary...
+Got summary: The message playfully acknowledges that the recipi
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 445
+Calling LLM for summary...
+Got summary: The message suggests IDE panel ideas to enhance AI
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 53
+Calling LLM for summary...
+Got summary: The user reports that P15 doesn't exist and lists 
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 27
+Calling LLM for summary...
+Got summary: The user confirmed they closed P9 (README.md) and 
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 79
+Calling LLM for summary...
+Got summary: Current context contains P7 (src/main.rs), P8 (Car
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 31
+Calling LLM for summary...
+Got summary: The user closed `main.rs` and now has three items 
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 37
+Calling LLM for summary...
+Got summary: The user opened `src/state.rs` (18K) as P7, which 
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 150
+Calling LLM for summary...
+Got summary: The speaker expresses appreciation for a well-desi
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 46
+Calling LLM for summary...
+Got summary: The assistant greets the user and offers help, not
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 89
+Calling LLM for summary...
+Got summary: The user finds it cool they're talking through the
+Send result: true

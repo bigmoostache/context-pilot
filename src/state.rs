@@ -43,6 +43,17 @@ impl ContextType {
             ContextType::Overview => icons::CTX_OVERVIEW,
         }
     }
+
+    /// Returns true if this context type uses cached_content from background loading
+    pub fn needs_cache(&self) -> bool {
+        matches!(self,
+            ContextType::File |
+            ContextType::Tree |
+            ContextType::Glob |
+            ContextType::Grep |
+            ContextType::Tmux
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,8 +66,8 @@ pub struct ContextElement {
     /// File path (for File context type)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_path: Option<String>,
-    /// File content hash (for File context type)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// File content hash (for change detection - not persisted)
+    #[serde(skip)]
     pub file_hash: Option<String>,
     /// Glob pattern (for Glob context type)
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -309,9 +320,6 @@ pub struct PersistedState {
     /// Next result message ID
     #[serde(default = "default_one")]
     pub next_result_id: usize,
-    /// Next context element ID
-    #[serde(default = "default_context_id")]
-    pub next_context_id: usize,
     /// Todo items
     #[serde(default)]
     pub todos: Vec<TodoItem>,
@@ -335,10 +343,6 @@ fn default_tools() -> Vec<ToolDefinition> {
 
 fn default_one() -> usize {
     1
-}
-
-fn default_context_id() -> usize {
-    7 // Start at 7 since P1-P6 are defaults (Main, Directory, Todo, Memory, Overview, Tools)
 }
 
 fn default_tree_filter() -> String {
@@ -367,8 +371,6 @@ pub struct State {
     pub max_scroll: f32,
     /// Estimated tokens added during current streaming session (for correction when done)
     pub streaming_estimated_tokens: usize,
-    /// Copy mode - disables mouse capture for text selection
-    pub copy_mode: bool,
     /// Gitignore-style filter for directory tree
     pub tree_filter: String,
     /// Open folders in tree view (paths relative to project root)
@@ -385,8 +387,6 @@ pub struct State {
     pub next_tool_id: usize,
     /// Next result message ID (R1, R2, ...)
     pub next_result_id: usize,
-    /// Next context element ID (P1, P2, ...)
-    pub next_context_id: usize,
     /// Todo items
     pub todos: Vec<TodoItem>,
     /// Next todo ID (X1, X2, ...)
@@ -401,6 +401,8 @@ pub struct State {
     pub is_cleaning_context: bool,
     /// Whether the UI needs to be redrawn
     pub dirty: bool,
+    /// Frame counter for spinner animations (wraps around)
+    pub spinner_frame: u64,
 }
 
 impl Default for State {
@@ -523,7 +525,6 @@ impl Default for State {
             scroll_accel: 1.0,
             max_scroll: 0.0,
             streaming_estimated_tokens: 0,
-            copy_mode: false,
             tree_filter: DEFAULT_TREE_FILTER.to_string(),
             tree_open_folders: vec![".".to_string()], // Root open by default
             tree_descriptions: vec![],
@@ -532,7 +533,6 @@ impl Default for State {
             next_assistant_id: 1,
             next_tool_id: 1,
             next_result_id: 1,
-            next_context_id: 6, // P1-P5 are defaults
             todos: vec![],
             next_todo_id: 1,
             memories: vec![],
@@ -540,6 +540,21 @@ impl Default for State {
             tools: get_all_tool_definitions(),
             is_cleaning_context: false,
             dirty: true, // Start dirty to ensure initial render
+            spinner_frame: 0,
         }
+    }
+}
+
+impl State {
+    /// Find the first available context ID (fills gaps instead of always incrementing)
+    pub fn next_available_context_id(&self) -> String {
+        // Collect all existing numeric IDs
+        let used_ids: std::collections::HashSet<usize> = self.context.iter()
+            .filter_map(|c| c.id.strip_prefix('P').and_then(|n| n.parse().ok()))
+            .collect();
+
+        // Find first available starting from 6 (P1-P5 are fixed defaults)
+        let id = (6..).find(|n| !used_ids.contains(n)).unwrap_or(6);
+        format!("P{}", id)
     }
 }

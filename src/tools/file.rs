@@ -1,16 +1,7 @@
-use std::collections::hash_map::DefaultHasher;
-use std::fs;
-use std::hash::{Hash, Hasher};
 use std::path::Path;
 
 use super::{ToolResult, ToolUse};
-use crate::state::{estimate_tokens, ContextElement, ContextType, State};
-
-fn hash_content(content: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    content.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
-}
+use crate::state::{ContextElement, ContextType, State};
 
 pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     let path = match tool.input.get("path").and_then(|v| v.as_str()) {
@@ -33,37 +24,41 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    // Read the file
-    let content = match fs::read_to_string(path) {
-        Ok(c) => c,
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Failed to read file '{}': {}", path, e),
-                is_error: true,
-            }
-        }
-    };
+    // Check if file exists (quick metadata check, not a full read)
+    let path_obj = Path::new(path);
+    if !path_obj.exists() {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("File '{}' not found", path),
+            is_error: true,
+        };
+    }
 
-    let hash = hash_content(&content);
-    let token_count = estimate_tokens(&content);
-    let file_name = Path::new(path)
+    if !path_obj.is_file() {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("'{}' is not a file", path),
+            is_error: true,
+        };
+    }
+
+    let file_name = path_obj
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| path.to_string());
 
-    // Generate context ID
-    let context_id = format!("P{}", state.next_context_id);
-    state.next_context_id += 1;
+    // Generate context ID (fills gaps)
+    let context_id = state.next_available_context_id();
 
-    // Add to context with cached content
+    // Create context element WITHOUT reading file content
+    // Background cache system will populate it
     state.context.push(ContextElement {
         id: context_id.clone(),
         context_type: ContextType::File,
         name: file_name,
-        token_count,
+        token_count: 0, // Will be updated by cache
         file_path: Some(path.to_string()),
-        file_hash: Some(hash),
+        file_hash: None, // Will be computed by cache
         glob_pattern: None,
         glob_path: None,
         grep_pattern: None,
@@ -73,15 +68,15 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_lines: None,
         tmux_last_keys: None,
         tmux_description: None,
-        cached_content: Some(content),
-        cache_deprecated: false,
+        cached_content: None, // Background will populate
+        cache_deprecated: true, // Trigger background refresh
         last_refresh_ms: 0,
         tmux_last_lines_hash: None,
     });
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!("Opened '{}' as {} ({} tokens)", path, context_id, token_count),
+        content: format!("Opened '{}' as {}", path, context_id),
         is_error: false,
     }
 }

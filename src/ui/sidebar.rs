@@ -5,7 +5,7 @@ use ratatui::{
 
 use crate::constants::{MAX_CONTEXT_TOKENS, SIDEBAR_HELP_HEIGHT};
 use crate::state::State;
-use super::{theme, chars, helpers::*};
+use super::{theme, chars, spinner, helpers::*};
 
 pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     let base_style = Style::default().bg(theme::BG_BASE);
@@ -34,8 +34,19 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     // Calculate ID width for alignment based on longest ID
     let id_width = state.context.iter().map(|c| c.id.len()).max().unwrap_or(2);
 
+    let spin = spinner::spinner(state.spinner_frame);
+
+    // Sort contexts by ID for display (P1, P2, P3, ...)
+    let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
+    sorted_indices.sort_by(|&a, &b| {
+        let id_a = state.context[a].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_b = state.context[b].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        id_a.cmp(&id_b)
+    });
+
     let mut prev_was_fixed = true;
-    for (i, ctx) in state.context.iter().enumerate() {
+    for &i in &sorted_indices {
+        let ctx = &state.context[i];
         let is_fixed = ctx.context_type.is_fixed();
 
         // Add separator when transitioning from fixed to dynamic contexts
@@ -49,23 +60,40 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         let is_selected = i == state.selected_context;
         let icon = ctx.context_type.icon();
 
+        // Check if this context is loading (has no cached content but needs it)
+        let is_loading = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
+
         // Build the line with right-aligned ID
         let shortcut = format!("{:>width$}", &ctx.id, width = id_width);
         let name = truncate_string(&ctx.name, 18);
-        let tokens = format_number(ctx.token_count);
+
+        // Show spinner instead of token count when loading
+        let tokens_or_spinner = if is_loading {
+            format!("{:>6}", spin)
+        } else {
+            format_number(ctx.token_count)
+        };
 
         let indicator = if is_selected { chars::ARROW_RIGHT } else { " " };
 
         // Selected element: orange text, no background change
-        let name_color = if is_selected { theme::ACCENT } else { theme::TEXT_SECONDARY };
+        // Loading elements: dimmed
+        let name_color = if is_loading {
+            theme::TEXT_MUTED
+        } else if is_selected {
+            theme::ACCENT
+        } else {
+            theme::TEXT_SECONDARY
+        };
         let indicator_color = if is_selected { theme::ACCENT } else { theme::BG_BASE };
+        let tokens_color = if is_loading { theme::WARNING } else { theme::ACCENT_DIM };
 
         lines.push(Line::from(vec![
             Span::styled(format!(" {}", indicator), Style::default().fg(indicator_color)),
             Span::styled(format!(" {} ", shortcut), Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(format!("{} ", icon), Style::default().fg(if is_selected { theme::ACCENT } else { theme::TEXT_MUTED })),
             Span::styled(format!("{:<18}", name), Style::default().fg(name_color)),
-            Span::styled(format!("{:>6}", tokens), Style::default().fg(theme::ACCENT_DIM)),
+            Span::styled(format!("{:>6}", tokens_or_spinner), Style::default().fg(tokens_color)),
             Span::styled(" ", base_style),
         ]));
     }

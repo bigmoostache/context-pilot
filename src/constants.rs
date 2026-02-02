@@ -100,9 +100,6 @@ pub const INPUT_MIN_HEIGHT: u16 = 4;
 /// Maximum input box height
 pub const INPUT_MAX_HEIGHT: u16 = 12;
 
-/// Starting row for context list (after header)
-pub const CONTEXT_LIST_START_ROW: u16 = 2;
-
 // =============================================================================
 // EVENT LOOP
 // =============================================================================

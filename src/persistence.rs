@@ -74,7 +74,6 @@ pub fn load_state() -> State {
                 scroll_accel: 1.0,
                 max_scroll: 0.0,
                 streaming_estimated_tokens: 0,
-                copy_mode: false,
                 tree_filter: persisted.tree_filter,
                 tree_open_folders: open_folders,
                 tree_descriptions: persisted.tree_descriptions,
@@ -83,7 +82,6 @@ pub fn load_state() -> State {
                 next_assistant_id: persisted.next_assistant_id,
                 next_tool_id: persisted.next_tool_id,
                 next_result_id: persisted.next_result_id,
-                next_context_id: persisted.next_context_id,
                 todos: persisted.todos,
                 next_todo_id: persisted.next_todo_id,
                 memories: persisted.memories,
@@ -91,6 +89,7 @@ pub fn load_state() -> State {
                 tools: merge_tools(persisted.tools),
                 is_cleaning_context: false,
                 dirty: true,
+                spinner_frame: 0,
             };
         }
     }
@@ -113,7 +112,6 @@ pub fn save_state(state: &State) {
         next_assistant_id: state.next_assistant_id,
         next_tool_id: state.next_tool_id,
         next_result_id: state.next_result_id,
-        next_context_id: state.next_context_id,
         todos: state.todos.clone(),
         next_todo_id: state.next_todo_id,
         memories: state.memories.clone(),

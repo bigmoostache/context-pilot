@@ -83,9 +83,8 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
             .output();
     }
 
-    // Generate context ID
-    let context_id = format!("P{}", state.next_context_id);
-    state.next_context_id += 1;
+    // Generate context ID (fills gaps)
+    let context_id = state.next_available_context_id();
 
     // Add to context (cache will be populated by background system)
     let name = format!("tmux:{}", pane_id);
