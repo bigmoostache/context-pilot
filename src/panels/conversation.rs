@@ -424,6 +424,17 @@ impl Panel for ConversationPanel {
                 ]));
             }
 
+            // Dev mode: show token counts for assistant messages
+            if state.dev_mode && msg.role == "assistant" && (msg.input_tokens > 0 || msg.content_token_count > 0) {
+                text.push(Line::from(vec![
+                    Span::styled(" ".repeat(prefix_width), base_style),
+                    Span::styled(
+                        format!("[in:{} out:{}]", msg.input_tokens, msg.content_token_count),
+                        Style::default().fg(theme::TEXT_MUTED).italic()
+                    ),
+                ]));
+            }
+
             text.push(Line::from(""));
         }
 

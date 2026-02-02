@@ -39,17 +39,23 @@ pub fn delete_message(id: &str) {
     fs::remove_file(path).ok();
 }
 
-/// Merge persisted tools with current tool definitions.
-/// Preserves enabled state for existing tools, adds new tools as enabled.
-fn merge_tools(persisted: Vec<ToolDefinition>) -> Vec<ToolDefinition> {
-    let current = get_all_tool_definitions();
-    current.into_iter().map(|mut tool| {
-        // If tool existed in persisted state, preserve its enabled state
-        if let Some(old) = persisted.iter().find(|t| t.id == tool.id) {
-            tool.enabled = old.enabled;
+/// Build tools from defaults, applying disabled_tools list
+fn build_tools_from_disabled(disabled_tools: &[String]) -> Vec<ToolDefinition> {
+    let mut tools = get_all_tool_definitions();
+    for tool in &mut tools {
+        if disabled_tools.contains(&tool.id) {
+            tool.enabled = false;
         }
-        tool
-    }).collect()
+    }
+    tools
+}
+
+/// Extract disabled tool IDs from tools list
+fn extract_disabled_tools(tools: &[ToolDefinition]) -> Vec<String> {
+    tools.iter()
+        .filter(|t| !t.enabled)
+        .map(|t| t.id.clone())
+        .collect()
 }
 
 pub fn load_state() -> State {
@@ -92,10 +98,11 @@ pub fn load_state() -> State {
                 next_todo_id: persisted.next_todo_id,
                 memories: persisted.memories,
                 next_memory_id: persisted.next_memory_id,
-                tools: merge_tools(persisted.tools),
+                tools: build_tools_from_disabled(&persisted.disabled_tools),
                 is_cleaning_context: false,
                 dirty: true,
                 spinner_frame: 0,
+                dev_mode: persisted.dev_mode,
             };
         }
     }
@@ -124,8 +131,9 @@ pub fn save_state(state: &State) {
         next_todo_id: state.next_todo_id,
         memories: state.memories.clone(),
         next_memory_id: state.next_memory_id,
-        tools: state.tools.clone(),
+        disabled_tools: extract_disabled_tools(&state.tools),
         owner_pid: Some(current_pid()),
+        dev_mode: state.dev_mode,
     };
 
     let path = dir.join(STATE_FILE);

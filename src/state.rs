@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::constants::icons;
 use crate::tool_defs::{ToolDefinition, get_all_tool_definitions};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ContextType {
     Conversation,
@@ -276,6 +276,9 @@ pub struct Message {
     /// Tool results in this message (for ToolResult messages)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_results: Vec<ToolResultRecord>,
+    /// Input tokens used for this response (from API, for assistant messages)
+    #[serde(default)]
+    pub input_tokens: usize,
 }
 
 /// Default tree filter (gitignore-style patterns)
@@ -338,16 +341,15 @@ pub struct PersistedState {
     /// Next memory ID
     #[serde(default = "default_one")]
     pub next_memory_id: usize,
-    /// Tool definitions with enabled state
-    #[serde(default = "default_tools")]
-    pub tools: Vec<ToolDefinition>,
+    /// Disabled tool IDs (tools not in this list are enabled)
+    #[serde(default)]
+    pub disabled_tools: Vec<String>,
     /// PID of the process that owns this state (for preventing concurrent instances)
     #[serde(default)]
     pub owner_pid: Option<u32>,
-}
-
-fn default_tools() -> Vec<ToolDefinition> {
-    get_all_tool_definitions()
+    /// Dev mode - shows additional debug info like token counts
+    #[serde(default)]
+    pub dev_mode: bool,
 }
 
 fn default_one() -> usize {
@@ -412,6 +414,8 @@ pub struct State {
     pub dirty: bool,
     /// Frame counter for spinner animations (wraps around)
     pub spinner_frame: u64,
+    /// Dev mode - shows additional debug info like token counts
+    pub dev_mode: bool,
 }
 
 impl Default for State {
@@ -550,6 +554,7 @@ impl Default for State {
             is_cleaning_context: false,
             dirty: true, // Start dirty to ensure initial render
             spinner_frame: 0,
+            dev_mode: false,
         }
     }
 }

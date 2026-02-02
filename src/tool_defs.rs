@@ -170,16 +170,20 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             id: "edit_file".to_string(),
             name: "Edit File".to_string(),
             short_desc: "Modify file content".to_string(),
-            description: "Edits a file by replacing old_string with new_string. The file must be in context first.".to_string(),
+            description: "Edits a file by applying one or more replacements sequentially. Each edit replaces old_string with new_string. The file must be in context first.".to_string(),
             params: vec![
                 ToolParam::new("path", ParamType::String)
                     .desc("Path to the file to edit")
                     .required(),
-                ToolParam::new("old_string", ParamType::String)
-                    .desc("The exact string to find and replace")
-                    .required(),
-                ToolParam::new("new_string", ParamType::String)
-                    .desc("The string to replace with")
+                ToolParam::new("edits", ParamType::Array(Box::new(ParamType::Object(vec![
+                    ToolParam::new("old_string", ParamType::String)
+                        .desc("The exact string to find and replace")
+                        .required(),
+                    ToolParam::new("new_string", ParamType::String)
+                        .desc("The string to replace with")
+                        .required(),
+                ]))))
+                    .desc("Array of edits to apply sequentially")
                     .required(),
             ],
             enabled: true,

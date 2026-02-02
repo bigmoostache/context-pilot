@@ -224,6 +224,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 status: MessageStatus::Full,
                 tool_uses: Vec::new(),
                 tool_results: Vec::new(),
+                input_tokens: 0,
             };
             save_message(&user_msg);
 
@@ -258,6 +259,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 status: MessageStatus::Full,
                 tool_uses: Vec::new(),
                 tool_results: Vec::new(),
+                input_tokens: 0,
             };
             state.messages.push(assistant_msg);
 
@@ -341,7 +343,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             ActionResult::Nothing
         }
-        Action::StreamDone { _input_tokens: _, output_tokens } => {
+        Action::StreamDone { _input_tokens, output_tokens } => {
             state.is_streaming = false;
 
             // Correct the estimated tokens with actual output tokens
@@ -359,6 +361,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     // Remove any [A##]: prefixes the LLM mistakenly added
                     msg.content = clean_llm_id_prefix(&msg.content);
                     msg.content_token_count = output_tokens;
+                    msg.input_tokens = _input_tokens;
                     let id = msg.id.clone();
                     return ActionResult::SaveMessage(id);
                 }

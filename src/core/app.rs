@@ -285,6 +285,7 @@ impl App {
                     input: tool.input.clone(),
                 }],
                 tool_results: Vec::new(),
+                input_tokens: 0,
             };
             save_message(&tool_msg);
             self.state.messages.push(tool_msg);
@@ -314,6 +315,7 @@ impl App {
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
+            input_tokens: 0,
         };
         save_message(&result_msg);
         self.state.messages.push(result_msg);
@@ -332,6 +334,7 @@ impl App {
             status: MessageStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
+            input_tokens: 0,
         };
         self.state.messages.push(new_assistant_msg);
 

@@ -24,9 +24,60 @@ impl Panel for OverviewPanel {
         "Context Overview".to_string()
     }
 
-    // Overview is a meta-panel; it doesn't contribute content to the LLM context
-    fn context(&self, _state: &State) -> Vec<ContextItem> {
-        Vec::new()
+    fn context(&self, state: &State) -> Vec<ContextItem> {
+        // LLM should see the same overview the user sees
+        let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+        let max_tokens = MAX_CONTEXT_TOKENS;
+        let usage_pct = (total_tokens as f64 / max_tokens as f64 * 100.0).min(100.0);
+
+        let mut output = format!("Context Usage: {} / {} tokens ({:.1}%)\n\n",
+            total_tokens, max_tokens, usage_pct);
+
+        output.push_str("Context Elements:\n");
+        for ctx in &state.context {
+            let type_name = match ctx.context_type {
+                ContextType::Conversation => "conversation",
+                ContextType::File => "file",
+                ContextType::Tree => "tree",
+                ContextType::Glob => "glob",
+                ContextType::Grep => "grep",
+                ContextType::Tmux => "tmux",
+                ContextType::Todo => "todo",
+                ContextType::Memory => "memory",
+                ContextType::Overview => "overview",
+            };
+
+            let details = match ctx.context_type {
+                ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
+                ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
+                ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
+                ContextType::Tmux => ctx.tmux_pane_id.as_deref().unwrap_or("").to_string(),
+                _ => String::new(),
+            };
+
+            if details.is_empty() {
+                output.push_str(&format!("  {} {}: {} tokens\n", ctx.id, type_name, ctx.token_count));
+            } else {
+                output.push_str(&format!("  {} {} ({}): {} tokens\n", ctx.id, type_name, details, ctx.token_count));
+            }
+        }
+
+        // Statistics
+        let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
+        let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
+        output.push_str(&format!("\nMessages: {} ({} user, {} assistant)\n",
+            state.messages.len(), user_msgs, assistant_msgs));
+
+        if !state.todos.is_empty() {
+            let done = state.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
+            output.push_str(&format!("Todos: {}/{} done\n", done, state.todos.len()));
+        }
+
+        if !state.memories.is_empty() {
+            output.push_str(&format!("Memories: {}\n", state.memories.len()));
+        }
+
+        vec![ContextItem::new("Context Overview", output)]
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {

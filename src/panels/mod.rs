@@ -181,9 +181,11 @@ pub fn refresh_all_panels(state: &mut State) {
 pub fn collect_all_context(state: &State) -> Vec<ContextItem> {
     let mut items = Vec::new();
 
-    // Get unique context types from state
+    // Get UNIQUE context types from state (dedup to avoid multiplying items!)
+    let mut seen = std::collections::HashSet::new();
     let context_types: Vec<ContextType> = state.context.iter()
         .map(|c| c.context_type)
+        .filter(|ct| seen.insert(*ct))
         .collect();
 
     for context_type in context_types {

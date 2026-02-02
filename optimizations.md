@@ -151,4 +151,4 @@ input_buffer: VecDeque<Event>,
 
 ---
 
-**Biggest wins**: #1 (dirty rendering) and #2 (async tools) would have the most noticeable impact.
+**Biggest wins**: #1 (dirty rendering) and #2 (async tools) have the most noticeable impact. Both are now implemented! ✅

@@ -77,7 +77,7 @@ struct StreamMessage {
 
 #[derive(Debug, Deserialize)]
 struct StreamUsage {
-    _input_tokens: Option<usize>,
+    input_tokens: Option<usize>,
     output_tokens: Option<usize>,
 }
 
@@ -90,10 +90,10 @@ fn messages_to_api(
 ) -> Vec<ApiMessage> {
     let mut api_messages: Vec<ApiMessage> = Vec::new();
 
-    // Format all context items
+    // Format all context items (include empty todos/memories so LLM knows the tools exist)
     let context_parts: Vec<String> = context_items
         .iter()
-        .filter(|item| !item.content.is_empty() && item.content != "No memories" && item.content != "No todos")
+        .filter(|item| !item.content.is_empty())
         .map(|item| item.format())
         .collect();
 
@@ -330,6 +330,7 @@ fn stream_response(
     }
 
     let reader = BufReader::new(response);
+    let mut input_tokens = 0;
     let mut output_tokens = 0;
 
     // Track current tool use being built
@@ -389,7 +390,12 @@ fn stream_response(
                 }
                 "message_delta" => {
                     if let Some(usage) = event.usage {
-                        output_tokens = usage.output_tokens.unwrap_or(0);
+                        if let Some(inp) = usage.input_tokens {
+                            input_tokens = inp;
+                        }
+                        if let Some(out) = usage.output_tokens {
+                            output_tokens = out;
+                        }
                     }
                 }
                 "message_stop" => break,
@@ -398,6 +404,6 @@ fn stream_response(
         }
     }
 
-    let _ = tx.send(StreamEvent::Done { input_tokens: 0, output_tokens });
+    let _ = tx.send(StreamEvent::Done { input_tokens, output_tokens });
     Ok(())
 }
