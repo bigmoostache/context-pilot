@@ -89,13 +89,21 @@ impl Panel for GitPanel {
     }
 
     fn refresh(&self, state: &mut State) {
-        let git_content = Self::format_git_for_context(state);
-        let token_count = estimate_tokens(&git_content);
+        // Token count is already set by cache system when GitStatus arrives
+        // Only recalculate if no cached content exists (shouldn't happen normally)
+        let needs_calc = state.context.iter()
+            .find(|c| c.context_type == ContextType::Git)
+            .map(|ctx| ctx.cached_content.is_none())
+            .unwrap_or(false);
 
-        for ctx in &mut state.context {
-            if ctx.context_type == ContextType::Git {
-                ctx.token_count = token_count;
-                break;
+        if needs_calc {
+            let git_content = Self::format_git_for_context(state);
+            let token_count = estimate_tokens(&git_content);
+            for ctx in &mut state.context {
+                if ctx.context_type == ContextType::Git {
+                    ctx.token_count = token_count;
+                    break;
+                }
             }
         }
     }

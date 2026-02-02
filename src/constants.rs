@@ -50,7 +50,7 @@ pub const GREP_DEPRECATION_MS: u64 = 30_000; // 30 seconds
 pub const TMUX_DEPRECATION_MS: u64 = 1_000; // 1 second (check hash of last 2 lines)
 
 /// Refresh interval for git status (milliseconds)
-pub const GIT_STATUS_REFRESH_MS: u64 = 2_000; // 2 seconds
+pub const GIT_STATUS_REFRESH_MS: u64 = 5_000; // 5 seconds
 
 // =============================================================================
 // SCROLLING

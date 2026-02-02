@@ -439,6 +439,8 @@ pub struct State {
     pub git_last_refresh_ms: u64,
     /// Whether to show full diff content in Git panel (vs summary only)
     pub git_show_diffs: bool,
+    /// Hash of last git status --porcelain output (for change detection)
+    pub git_status_hash: Option<String>,
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
 }
@@ -634,6 +636,7 @@ impl Default for State {
             git_file_changes: vec![],
             git_last_refresh_ms: 0,
             git_show_diffs: true, // Show diffs by default
+            git_status_hash: None,
             // API retry
             api_retry_count: 0,
         }

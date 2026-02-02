@@ -619,6 +619,7 @@ impl App {
         process_cache_request(
             CacheRequest::RefreshGitStatus {
                 show_diffs: self.state.git_show_diffs,
+                current_hash: None, // Force full refresh on startup
             },
             self.cache_tx.clone(),
         );
@@ -682,6 +683,7 @@ impl App {
                     file_changes,
                     formatted_content,
                     token_count,
+                    status_hash,
                 } => {
                     use crate::state::{GitFileChange, ContextType};
                     self.state.git_branch = branch;
@@ -696,6 +698,7 @@ impl App {
                         })
                         .collect();
                     self.state.git_last_refresh_ms = now_ms();
+                    self.state.git_status_hash = Some(status_hash);
 
                     // Update cached content and token count for Git panel
                     for ctx in &mut self.state.context {
@@ -707,6 +710,11 @@ impl App {
                             break;
                         }
                     }
+                }
+                CacheUpdate::GitStatusUnchanged => {
+                    // Just update the refresh time, no other changes needed
+                    self.state.git_last_refresh_ms = now_ms();
+                    self.state.dirty = false; // No actual change, don't trigger re-render
                 }
             }
         }
@@ -871,6 +879,7 @@ impl App {
             process_cache_request(
                 CacheRequest::RefreshGitStatus {
                     show_diffs: self.state.git_show_diffs,
+                    current_hash: self.state.git_status_hash.clone(),
                 },
                 self.cache_tx.clone(),
             );

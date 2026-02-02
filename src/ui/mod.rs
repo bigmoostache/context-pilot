@@ -17,6 +17,7 @@ use crate::state::{ContextType, State};
 
 
 pub fn render(frame: &mut Frame, state: &mut State) {
+    let _guard = crate::profile!("ui::render");
     let area = frame.area();
 
     // Fill base background
@@ -58,6 +59,7 @@ fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
 }
 
 fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
+    let _guard = crate::profile!("ui::render_panel");
     let context_type = state.context.get(state.selected_context)
         .map(|c| c.context_type)
         .unwrap_or(ContextType::Conversation);

@@ -57,7 +57,11 @@ pub enum CacheUpdate {
         formatted_content: String,
         /// Token count for formatted content
         token_count: usize,
+        /// Hash of git status --porcelain output (for change detection)
+        status_hash: String,
     },
+    /// Git status unchanged (hash matched, no need to update)
+    GitStatusUnchanged,
 }
 
 /// Request for background cache operations
@@ -99,6 +103,8 @@ pub enum CacheRequest {
     RefreshGitStatus {
         /// Whether to include full diff content in formatted output
         show_diffs: bool,
+        /// Current status hash (for change detection - skip if unchanged)
+        current_hash: Option<String>,
     },
 }
 
@@ -136,8 +142,8 @@ pub fn process_cache_request(request: CacheRequest, tx: Sender<CacheUpdate>) {
             CacheRequest::RefreshTmux { context_id, pane_id, current_last_lines_hash } => {
                 refresh_tmux_cache(context_id, pane_id, current_last_lines_hash, tx);
             }
-            CacheRequest::RefreshGitStatus { show_diffs } => {
-                refresh_git_status(show_diffs, tx);
+            CacheRequest::RefreshGitStatus { show_diffs, current_hash } => {
+                refresh_git_status(show_diffs, current_hash, tx);
             }
         }
     });
@@ -266,12 +272,13 @@ fn refresh_tmux_cache(
     }
 }
 
-fn refresh_git_status(show_diffs: bool, tx: Sender<CacheUpdate>) {
+fn refresh_git_status(show_diffs: bool, current_hash: Option<String>, tx: Sender<CacheUpdate>) {
+    let _guard = crate::profile!("cache::git_status");
     use std::process::Command;
     use std::collections::HashMap;
     use crate::state::GitChangeType;
 
-    // Check if we're in a git repo
+    // Check if we're in a git repo (fast check)
     let is_repo = Command::new("git")
         .args(["rev-parse", "--git-dir"])
         .output()
@@ -285,156 +292,124 @@ fn refresh_git_status(show_diffs: bool, tx: Sender<CacheUpdate>) {
             file_changes: vec![],
             formatted_content: "Not a git repository".to_string(),
             token_count: estimate_tokens("Not a git repository"),
+            status_hash: String::new(),
         });
         return;
     }
 
-    // Get branch name
-    let branch = Command::new("git")
+    // Get status first for change detection (fast)
+    let status_output = Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+
+    // Also include branch in hash (branch switch = change)
+    let branch_output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
         .ok()
-        .and_then(|o| {
-            if o.status.success() {
-                let name = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                if name == "HEAD" {
-                    // Detached HEAD - get short hash
-                    Command::new("git")
-                        .args(["rev-parse", "--short", "HEAD"])
-                        .output()
-                        .ok()
-                        .map(|o| format!("detached:{}", String::from_utf8_lossy(&o.stdout).trim()))
-                } else {
-                    Some(name)
-                }
-            } else {
-                None
-            }
-        });
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
 
-    // Collect per-file changes
-    // Map: path -> (additions, deletions, change_type)
+    let new_hash = hash_content(&format!("{}\n{}", branch_output, status_output));
+
+    // If hash unchanged, skip expensive operations
+    if current_hash.as_ref() == Some(&new_hash) {
+        let _ = tx.send(CacheUpdate::GitStatusUnchanged);
+        return;
+    }
+
+    // Get branch name (already have it from above)
+    let branch = if branch_output == "HEAD" {
+        // Detached HEAD - get short hash
+        Command::new("git")
+            .args(["rev-parse", "--short", "HEAD"])
+            .output()
+            .ok()
+            .map(|o| format!("detached:{}", String::from_utf8_lossy(&o.stdout).trim()))
+    } else if branch_output.is_empty() {
+        None
+    } else {
+        Some(branch_output)
+    };
+
+    // Collect per-file changes from status output (already have it)
     let mut file_changes: HashMap<String, (i32, i32, GitChangeType)> = HashMap::new();
 
-    // Get status to identify file types (added, deleted, modified, untracked)
-    if let Ok(output) = Command::new("git").args(["status", "--porcelain"]).output() {
-        if output.status.success() {
-            let content = String::from_utf8_lossy(&output.stdout);
-            for line in content.lines() {
-                if line.len() < 3 {
-                    continue;
-                }
-                let x = line.chars().next().unwrap_or(' ');
-                let y = line.chars().nth(1).unwrap_or(' ');
-                let path = line[3..].trim().to_string();
-                // Handle renames: "R  old -> new"
-                let path = if path.contains(" -> ") {
-                    path.split(" -> ").last().unwrap_or(&path).to_string()
-                } else {
-                    path
-                };
-
-                let change_type = match (x, y) {
-                    ('?', '?') => GitChangeType::Added, // Untracked = new file
-                    ('A', _) | (_, 'A') => GitChangeType::Added,
-                    ('D', _) | (_, 'D') => GitChangeType::Deleted,
-                    ('R', _) | (_, 'R') => GitChangeType::Renamed,
-                    _ => GitChangeType::Modified,
-                };
-
-                file_changes.entry(path).or_insert((0, 0, change_type));
-            }
+    for line in status_output.lines() {
+        if line.len() < 3 {
+            continue;
         }
+        let x = line.chars().next().unwrap_or(' ');
+        let y = line.chars().nth(1).unwrap_or(' ');
+        let path = line[3..].trim().to_string();
+        // Handle renames: "R  old -> new"
+        let path = if path.contains(" -> ") {
+            path.split(" -> ").last().unwrap_or(&path).to_string()
+        } else {
+            path
+        };
+
+        let change_type = match (x, y) {
+            ('?', '?') => GitChangeType::Added, // Untracked = new file
+            ('A', _) | (_, 'A') => GitChangeType::Added,
+            ('D', _) | (_, 'D') => GitChangeType::Deleted,
+            ('R', _) | (_, 'R') => GitChangeType::Renamed,
+            _ => GitChangeType::Modified,
+        };
+
+        file_changes.entry(path).or_insert((0, 0, change_type));
     }
 
-    // Get line counts for staged changes
-    if let Ok(output) = Command::new("git").args(["diff", "--cached", "--numstat"]).output() {
-        if output.status.success() {
-            parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
-        }
-    }
-
-    // Get line counts for unstaged changes
-    if let Ok(output) = Command::new("git").args(["diff", "--numstat"]).output() {
-        if output.status.success() {
-            parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
-        }
-    }
-
-    // For untracked files, count lines
-    let untracked_files: Vec<String> = file_changes.iter()
-        .filter(|(_, (add, del, ct))| *ct == GitChangeType::Added && *add == 0 && *del == 0)
-        .map(|(path, _)| path.clone())
-        .collect();
-
-    for path in untracked_files {
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            let lines = content.lines().count() as i32;
-            if let Some(entry) = file_changes.get_mut(&path) {
-                entry.0 = lines; // additions = total lines for new files
-            }
-        }
-    }
-
-    // For deleted files, get line count from HEAD
-    let deleted_files: Vec<String> = file_changes.iter()
-        .filter(|(_, (add, del, ct))| *ct == GitChangeType::Deleted && *add == 0 && *del == 0)
-        .map(|(path, _)| path.clone())
-        .collect();
-
-    for path in deleted_files {
-        if let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output() {
+    // Only fetch numstat if we have changes (skip if working tree clean)
+    if !file_changes.is_empty() {
+        // Get line counts for staged changes
+        if let Ok(output) = Command::new("git").args(["diff", "--cached", "--numstat"]).output() {
             if output.status.success() {
-                let content = String::from_utf8_lossy(&output.stdout);
+                parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+            }
+        }
+
+        // Get line counts for unstaged changes
+        if let Ok(output) = Command::new("git").args(["diff", "--numstat"]).output() {
+            if output.status.success() {
+                parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+            }
+        }
+
+        // For untracked files, count lines
+        let untracked_files: Vec<String> = file_changes.iter()
+            .filter(|(_, (add, del, ct))| *ct == GitChangeType::Added && *add == 0 && *del == 0)
+            .map(|(path, _)| path.clone())
+            .collect();
+
+        for path in untracked_files {
+            if let Ok(content) = std::fs::read_to_string(&path) {
                 let lines = content.lines().count() as i32;
                 if let Some(entry) = file_changes.get_mut(&path) {
-                    entry.1 = lines; // deletions = total lines for deleted files
+                    entry.0 = lines;
                 }
             }
         }
-    }
 
-    // Fetch diff content for each file
-    let mut diff_contents: HashMap<String, String> = HashMap::new();
+        // For deleted files, get line count from HEAD
+        let deleted_files: Vec<String> = file_changes.iter()
+            .filter(|(_, (add, del, ct))| *ct == GitChangeType::Deleted && *add == 0 && *del == 0)
+            .map(|(path, _)| path.clone())
+            .collect();
 
-    // Get combined diff (staged + unstaged)
-    if let Ok(output) = Command::new("git").args(["diff", "HEAD"]).output() {
-        if output.status.success() {
-            let diff_output = String::from_utf8_lossy(&output.stdout);
-            parse_diff_by_file(&diff_output, &mut diff_contents);
-        }
-    }
-
-    // For untracked files, create a pseudo-diff showing all lines as additions
-    for (path, (_, _, ct)) in &file_changes {
-        if *ct == GitChangeType::Added && !diff_contents.contains_key(path) {
-            if let Ok(content) = std::fs::read_to_string(path) {
-                let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
-                pseudo_diff.push_str("new file\n");
-                pseudo_diff.push_str(&format!("--- /dev/null\n+++ b/{}\n", path));
-                pseudo_diff.push_str("@@ -0,0 +1 @@\n");
-                for line in content.lines() {
-                    pseudo_diff.push_str(&format!("+{}\n", line));
-                }
-                diff_contents.insert(path.clone(), pseudo_diff);
-            }
-        }
-    }
-
-    // For deleted files, create a pseudo-diff showing all lines as deletions
-    for (path, (_, _, ct)) in &file_changes {
-        if *ct == GitChangeType::Deleted && !diff_contents.contains_key(path) {
+        for path in deleted_files {
             if let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output() {
                 if output.status.success() {
                     let content = String::from_utf8_lossy(&output.stdout);
-                    let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
-                    pseudo_diff.push_str("deleted file\n");
-                    pseudo_diff.push_str(&format!("--- a/{}\n+++ /dev/null\n", path));
-                    pseudo_diff.push_str("@@ -1 +0,0 @@\n");
-                    for line in content.lines() {
-                        pseudo_diff.push_str(&format!("-{}\n", line));
+                    let lines = content.lines().count() as i32;
+                    if let Some(entry) = file_changes.get_mut(&path) {
+                        entry.1 = lines;
                     }
-                    diff_contents.insert(path.clone(), pseudo_diff);
                 }
             }
         }
@@ -442,12 +417,64 @@ fn refresh_git_status(show_diffs: bool, tx: Sender<CacheUpdate>) {
 
     // Convert to vec and sort by path
     let mut changes: Vec<_> = file_changes.into_iter()
-        .map(|(path, (add, del, ct))| {
-            let diff = diff_contents.remove(&path).unwrap_or_default();
-            (path, add, del, ct, diff)
-        })
+        .map(|(path, (add, del, ct))| (path, add, del, ct, String::new()))
         .collect();
     changes.sort_by(|a, b| a.0.cmp(&b.0));
+
+    // Only fetch diffs if show_diffs is enabled AND we have changes
+    if show_diffs && !changes.is_empty() {
+        let mut diff_contents: HashMap<String, String> = HashMap::new();
+
+        // Get combined diff (staged + unstaged)
+        if let Ok(output) = Command::new("git").args(["diff", "HEAD"]).output() {
+            if output.status.success() {
+                let diff_output = String::from_utf8_lossy(&output.stdout);
+                parse_diff_by_file(&diff_output, &mut diff_contents);
+            }
+        }
+
+        // For untracked files, create a pseudo-diff
+        for (path, _, _, ct, _) in &changes {
+            if *ct == GitChangeType::Added && !diff_contents.contains_key(path) {
+                if let Ok(content) = std::fs::read_to_string(path) {
+                    let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
+                    pseudo_diff.push_str("new file\n");
+                    pseudo_diff.push_str(&format!("--- /dev/null\n+++ b/{}\n", path));
+                    pseudo_diff.push_str("@@ -0,0 +1 @@\n");
+                    for line in content.lines() {
+                        pseudo_diff.push_str(&format!("+{}\n", line));
+                    }
+                    diff_contents.insert(path.clone(), pseudo_diff);
+                }
+            }
+        }
+
+        // For deleted files, create a pseudo-diff
+        for (path, _, _, ct, _) in &changes {
+            if *ct == GitChangeType::Deleted && !diff_contents.contains_key(path) {
+                if let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output() {
+                    if output.status.success() {
+                        let content = String::from_utf8_lossy(&output.stdout);
+                        let mut pseudo_diff = format!("diff --git a/{} b/{}\n", path, path);
+                        pseudo_diff.push_str("deleted file\n");
+                        pseudo_diff.push_str(&format!("--- a/{}\n+++ /dev/null\n", path));
+                        pseudo_diff.push_str("@@ -1 +0,0 @@\n");
+                        for line in content.lines() {
+                            pseudo_diff.push_str(&format!("-{}\n", line));
+                        }
+                        diff_contents.insert(path.clone(), pseudo_diff);
+                    }
+                }
+            }
+        }
+
+        // Attach diff content to changes
+        for (path, _, _, _, diff) in &mut changes {
+            if let Some(d) = diff_contents.remove(path) {
+                *diff = d;
+            }
+        }
+    }
 
     // Generate formatted content for LLM context
     let formatted_content = format_git_content(&branch, &changes, show_diffs);
@@ -459,6 +486,7 @@ fn refresh_git_status(show_diffs: bool, tx: Sender<CacheUpdate>) {
         file_changes: changes,
         formatted_content,
         token_count,
+        status_hash: new_hash,
     });
 }
 

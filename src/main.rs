@@ -9,6 +9,7 @@ mod events;
 mod highlight;
 mod panels;
 mod persistence;
+mod profiler;
 mod state;
 mod tool_defs;
 mod tools;

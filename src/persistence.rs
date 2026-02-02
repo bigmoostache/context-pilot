@@ -115,6 +115,7 @@ pub fn load_state() -> State {
                 git_file_changes: vec![],
                 git_last_refresh_ms: 0,
                 git_show_diffs: persisted.git_show_diffs,
+                git_status_hash: None,
                 // API retry (runtime-only)
                 api_retry_count: 0,
             };
