@@ -13,7 +13,7 @@ use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, 
 use crate::context_cleaner;
 use crate::events::handle_event;
 use crate::panels::now_ms;
-use crate::persistence::{check_ownership, log_error, save_message, save_state};
+use crate::persistence::{check_ownership, save_message, save_state};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
 use crate::tools::{execute_tool, ToolResult, ToolUse};
 use crate::typewriter::TypewriterBuffer;

@@ -114,6 +114,9 @@ pub fn load_state() -> State {
                 git_is_repo: false,
                 git_file_changes: vec![],
                 git_last_refresh_ms: 0,
+                git_show_diffs: persisted.git_show_diffs,
+                // API retry (runtime-only)
+                api_retry_count: 0,
             };
         }
     }
@@ -145,6 +148,7 @@ pub fn save_state(state: &State) {
         disabled_tools: extract_disabled_tools(&state.tools),
         owner_pid: Some(current_pid()),
         dev_mode: state.dev_mode,
+        git_show_diffs: state.git_show_diffs,
     };
 
     let path = dir.join(STATE_FILE);

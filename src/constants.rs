@@ -110,6 +110,9 @@ pub const TMUX_SEND_DELAY_MS: u64 = 2000;
 /// Fixed sleep duration in seconds for the sleep tool
 pub const SLEEP_DURATION_SECS: u64 = 2;
 
+/// Maximum number of retries for API errors
+pub const MAX_API_RETRIES: u32 = 3;
+
 // =============================================================================
 // PERSISTENCE
 // =============================================================================
