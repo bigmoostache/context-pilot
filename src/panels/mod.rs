@@ -33,6 +33,9 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
+use crossterm::event::KeyEvent;
+
+use crate::actions::Action;
 use crate::state::{ContextType, State};
 use crate::ui::theme;
 
@@ -85,6 +88,12 @@ pub trait Panel {
 
     /// Generate the panel's content lines for rendering (uses 'static since we create owned data)
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>>;
+
+    /// Handle keyboard input for this panel
+    /// Returns None to use default handling, Some(action) to override
+    fn handle_key(&self, _key: &KeyEvent, _state: &State) -> Option<Action> {
+        None // Default: use global key handling
+    }
 
     /// Refresh token counts and any cached data (called before generating context)
     fn refresh(&self, _state: &mut State) {

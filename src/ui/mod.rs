@@ -11,7 +11,7 @@ use ratatui::{
     widgets::Block,
 };
 
-use crate::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT, INPUT_MIN_HEIGHT, INPUT_MAX_HEIGHT};
+use crate::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT};
 use crate::panels;
 use crate::state::{ContextType, State};
 
@@ -53,20 +53,8 @@ fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
 }
 
 fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
-    // Calculate input height based on content
-    let input_lines = state.input.lines().count().max(1);
-    let input_height = (input_lines as u16 + 2).clamp(INPUT_MIN_HEIGHT, INPUT_MAX_HEIGHT);
-
-    let content_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(1),                    // Content panel
-            Constraint::Length(input_height),      // Input area
-        ])
-        .split(area);
-
-    render_content_panel(frame, state, content_layout[0]);
-    input::render_input(frame, state, content_layout[1]);
+    // No separate input box - panels handle their own input display
+    render_content_panel(frame, state, area);
 }
 
 fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {

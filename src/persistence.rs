@@ -1,9 +1,15 @@
 use std::fs;
 use std::path::PathBuf;
+use std::process;
 
 use crate::constants::{STORE_DIR, STATE_FILE, MESSAGES_DIR};
 use crate::state::{Message, PersistedState, State};
 use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
+
+/// Get current process PID
+fn current_pid() -> u32 {
+    process::id()
+}
 
 fn messages_dir() -> PathBuf {
     PathBuf::from(STORE_DIR).join(MESSAGES_DIR)
@@ -65,8 +71,8 @@ pub fn load_state() -> State {
             return State {
                 context: persisted.context,
                 messages,
-                input: String::new(),
-                input_cursor: 0,
+                input: persisted.draft_input,
+                input_cursor: persisted.draft_cursor,
                 selected_context: persisted.selected_context,
                 is_streaming: false,
                 scroll_offset: 0.0,
@@ -105,6 +111,8 @@ pub fn save_state(state: &State) {
         context: state.context.clone(),
         message_ids: state.messages.iter().map(|m| m.id.clone()).collect(),
         selected_context: state.selected_context,
+        draft_input: state.input.clone(),
+        draft_cursor: state.input_cursor,
         tree_filter: state.tree_filter.clone(),
         tree_open_folders: state.tree_open_folders.clone(),
         tree_descriptions: state.tree_descriptions.clone(),
@@ -117,10 +125,28 @@ pub fn save_state(state: &State) {
         memories: state.memories.clone(),
         next_memory_id: state.next_memory_id,
         tools: state.tools.clone(),
+        owner_pid: Some(current_pid()),
     };
 
     let path = dir.join(STATE_FILE);
     if let Ok(json) = serde_json::to_string_pretty(&persisted) {
         fs::write(path, json).ok();
     }
+}
+
+/// Check if we still own the state file (another instance may have taken over)
+/// Returns false if another process has claimed ownership
+pub fn check_ownership() -> bool {
+    let path = PathBuf::from(STORE_DIR).join(STATE_FILE);
+
+    if let Ok(json) = fs::read_to_string(&path) {
+        if let Ok(persisted) = serde_json::from_str::<PersistedState>(&json) {
+            if let Some(owner) = persisted.owner_pid {
+                return owner == current_pid();
+            }
+        }
+    }
+
+    // If we can't read the file or there's no owner, assume we're still the owner
+    true
 }

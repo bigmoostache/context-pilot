@@ -144,28 +144,23 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("Shift+Enter", Style::default().fg(theme::ACCENT)),
+            Span::styled("Enter", Style::default().fg(theme::ACCENT)),
             Span::styled(" send", Style::default().fg(theme::TEXT_MUTED)),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("Ctrl+L", Style::default().fg(theme::ACCENT)),
-            Span::styled(" clear", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("Tab", Style::default().fg(theme::ACCENT)),
+            Span::styled(" next panel", Style::default().fg(theme::TEXT_MUTED)),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("Ctrl+Y", Style::default().fg(theme::ACCENT)),
-            Span::styled(" copy mode", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("↑↓", Style::default().fg(theme::ACCENT)),
+            Span::styled(" scroll", Style::default().fg(theme::TEXT_MUTED)),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),
             Span::styled("Ctrl+K", Style::default().fg(theme::ACCENT)),
-            Span::styled(" clean context", Style::default().fg(theme::TEXT_MUTED)),
-        ]),
-        Line::from(vec![
-            Span::styled("  ", base_style),
-            Span::styled("Ctrl+↑↓", Style::default().fg(theme::ACCENT)),
-            Span::styled(" scroll", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(" clean", Style::default().fg(theme::TEXT_MUTED)),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),

@@ -324,3 +324,179 @@ Token count: 89
 Calling LLM for summary...
 Got summary: The user finds it cool they're talking through the
 Send result: true
+Token count: 46
+Calling LLM for summary...
+Got summary: The message suggests viewing oneself as the first 
+Send result: true
+Token count: 289
+Calling LLM for summary...
+Got summary: The AI clarifies it's not self-aware, can't modify
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 18
+Using content directly (short message)
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 120
+Calling LLM for summary...
+Got summary: The user demonstrated basic terminal commands (hel
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 25
+Calling LLM for summary...
+Token count: 1
+Using content directly (short message)
+Send result: true
+Got summary: The message playfully asks for clarification after
+Send result: true
+Token count: 49
+Calling LLM for summary...
+Got summary: **Summary:** The message asks for clarification ab
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 77
+Calling LLM for summary...
+Got summary: The sender notices fragmented input ("tell", "le",
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 107
+Calling LLM for summary...
+Got summary: The message encourages testing and offers to help 
+Send result: true
+Token count: 11
+Using content directly (short message)
+Send result: true
+Token count: 106
+Calling LLM for summary...
+Got summary: Ran system exploration commands showing Ubuntu 24.
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
+Token count: 50
+Calling LLM for summary...
+Got summary: The message playfully acknowledges receiving gibbe
+Send result: true
+Token count: 7
+Using content directly (short message)
+Send result: true
+Token count: 229
+Calling LLM for summary...
+Got summary: A small Rust TUI app becomes "self-aware" when a u
+Send result: true
+Token count: 43
+Calling LLM for summary...
+Got summary: The user wants to test the sleep tool functionalit
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 41
+Calling LLM for summary...
+Got summary: The assistant acknowledges seeing the name "bob" a
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 10
+Using content directly (short message)
+Send result: true
+Token count: 41
+Calling LLM for summary...
+Got summary: **Summary:** User "alice" confirms the TUI message
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 28
+Calling LLM for summary...
+Got summary: The message playfully responds to someone saying "
+Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 76
+Calling LLM for summary...
+Got summary: The user confirmed that the TUI (text user interfa
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 42
+Calling LLM for summary...
+Got summary: **Summary:** The user confirms their test message 
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 65
+Calling LLM for summary...
+LLM error: Request failed: error sending request for url (https://api.anthropic.com/v1/messages)
+Fallback send result: true
+Token count: 12
+Using content directly (short message)
+Send result: true
+Token count: 122
+Calling LLM for summary...
+Got summary: The message congratulates someone on building a 3,
+Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 13
+Using content directly (short message)
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 20
+Using content directly (short message)
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 23
+Using content directly (short message)
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 32
+Calling LLM for summary...
+Got summary: The message confirms that a numbered list test was
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 12
+Using content directly (short message)
+Send result: true
+Token count: 33
+Calling LLM for summary...
+Got summary: **Summary:** The message confirms that a test of m
+Send result: true

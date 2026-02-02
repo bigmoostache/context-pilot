@@ -1,25 +1,170 @@
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
 };
 
 use super::{ContextItem, Panel};
+use crate::actions::Action;
 use crate::constants::icons;
 use crate::state::{MessageStatus, MessageType, State};
 use crate::ui::{theme, helpers::{wrap_text, count_wrapped_lines}, markdown::*};
 
 pub struct ConversationPanel;
 
+/// Actions for list continuation behavior
+enum ListAction {
+    Continue(String),  // Insert list continuation (e.g., "\n- " or "\n2. ")
+    RemoveItem,        // Remove empty list item but keep the newline
+}
+
+/// Increment alphabetical list marker: a->b, z->aa, A->B, Z->AA
+fn next_alpha_marker(marker: &str) -> String {
+    let chars: Vec<char> = marker.chars().collect();
+    let is_upper = chars[0].is_ascii_uppercase();
+    let base = if is_upper { b'A' } else { b'a' };
+
+    // Convert to number (a=0, b=1, ..., z=25, aa=26, ab=27, ...)
+    let mut num: usize = 0;
+    for c in &chars {
+        num = num * 26 + (c.to_ascii_lowercase() as usize - b'a' as usize);
+    }
+    num += 1; // Increment
+
+    // Convert back to letters
+    let mut result = String::new();
+    let mut n = num;
+    loop {
+        result.insert(0, (base + (n % 26) as u8) as char);
+        n /= 26;
+        if n == 0 { break; }
+        n -= 1; // Adjust for 1-based (a=1, not a=0 for multi-char)
+    }
+    result
+}
+
+/// Detect list context and return appropriate action
+/// - On non-empty list item: continue the list
+/// - On empty list item (just "- " or "1. "): remove it, keep newline
+/// - On empty line or non-list: None (send message)
+fn detect_list_action(input: &str) -> Option<ListAction> {
+    // Get the current line - handle trailing newline specially
+    // (lines() doesn't return empty trailing lines)
+    let current_line = if input.ends_with('\n') {
+        "" // Cursor is on a new empty line
+    } else {
+        input.lines().last().unwrap_or("")
+    };
+    let trimmed = current_line.trim_start();
+
+    // Completely empty line - send the message
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // Check for EMPTY list items (just the prefix with nothing after)
+    // Unordered: exactly "- " or "* "
+    if trimmed == "- " || trimmed == "* " {
+        return Some(ListAction::RemoveItem);
+    }
+
+    // Ordered (numeric or alphabetic): exactly "X. " with nothing after
+    if let Some(dot_pos) = trimmed.find(". ") {
+        let marker = &trimmed[..dot_pos];
+        let after = &trimmed[dot_pos + 2..];
+        if after.is_empty() {
+            // Check if it's a valid marker (numeric or alphabetic)
+            let is_numeric = marker.chars().all(|c| c.is_ascii_digit());
+            let is_alpha = marker.chars().all(|c| c.is_ascii_alphabetic())
+                && (marker.chars().all(|c| c.is_ascii_lowercase())
+                    || marker.chars().all(|c| c.is_ascii_uppercase()));
+            if is_numeric || is_alpha {
+                return Some(ListAction::RemoveItem);
+            }
+        }
+    }
+
+    // Check for NON-EMPTY list items - continue the list
+    // Unordered list: "- text" or "* text"
+    if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+        let prefix = &trimmed[..2];
+        let indent = current_line.len() - trimmed.len();
+        return Some(ListAction::Continue(format!("\n{}{}", " ".repeat(indent), prefix)));
+    }
+
+    // Ordered list: "1. text", "a. text", "A. text", etc.
+    if let Some(dot_pos) = trimmed.find(". ") {
+        let marker = &trimmed[..dot_pos];
+        let indent = current_line.len() - trimmed.len();
+
+        // Numeric: 1, 2, 3, ...
+        if marker.chars().all(|c| c.is_ascii_digit()) {
+            if let Ok(num) = marker.parse::<usize>() {
+                return Some(ListAction::Continue(format!("\n{}{}. ", " ".repeat(indent), num + 1)));
+            }
+        }
+
+        // Alphabetic: a, b, c, ... or A, B, C, ...
+        if marker.chars().all(|c| c.is_ascii_alphabetic()) {
+            let all_lower = marker.chars().all(|c| c.is_ascii_lowercase());
+            let all_upper = marker.chars().all(|c| c.is_ascii_uppercase());
+            if all_lower || all_upper {
+                let next = next_alpha_marker(marker);
+                return Some(ListAction::Continue(format!("\n{}{}. ", " ".repeat(indent), next)));
+            }
+        }
+    }
+
+    None // Not a list line, send the message
+}
+
 impl Panel for ConversationPanel {
     // Conversations are sent to the API as messages, not as context items
     fn context(&self, _state: &State) -> Vec<ContextItem> {
         Vec::new()
     }
+
     fn title(&self, state: &State) -> String {
         if state.is_streaming {
             "Conversation *".to_string()
         } else {
             "Conversation".to_string()
+        }
+    }
+
+    fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let alt = key.modifiers.contains(KeyModifiers::ALT);
+
+        // Alt+Enter = newline
+        if alt && key.code == KeyCode::Enter {
+            return Some(Action::InputChar('\n'));
+        }
+
+        // Ctrl+Backspace for delete word
+        if ctrl && key.code == KeyCode::Backspace {
+            return Some(Action::DeleteWordLeft);
+        }
+
+        // Regular typing and editing
+        match key.code {
+            KeyCode::Char(c) => Some(Action::InputChar(c)),
+            KeyCode::Backspace => Some(Action::InputBackspace),
+            KeyCode::Delete => Some(Action::InputDelete),
+            KeyCode::Left => Some(Action::CursorWordLeft),
+            KeyCode::Right => Some(Action::CursorWordRight),
+            KeyCode::Enter => {
+                // Smart Enter: handle list continuation
+                match detect_list_action(&state.input) {
+                    Some(ListAction::Continue(text)) => Some(Action::InsertText(text)),
+                    Some(ListAction::RemoveItem) => Some(Action::RemoveListItem),
+                    None => Some(Action::InputSubmit),
+                }
+            }
+            KeyCode::Home => Some(Action::CursorHome),
+            KeyCode::End => Some(Action::CursorEnd),
+            // Arrow keys: let global handle for scrolling
+            _ => None,
         }
     }
 
@@ -282,6 +427,86 @@ impl Panel for ConversationPanel {
             text.push(Line::from(""));
         }
 
+        // Always show draft input area at the bottom
+        {
+            let role_icon = icons::MSG_USER;
+            let role_color = theme::USER;
+            let prefix_width = 8;
+            let wrap_width = 80;
+            let cursor_char = "▎"; // Visible cursor character
+
+            // Insert cursor character at cursor position
+            let input_with_cursor = if state.input_cursor >= state.input.len() {
+                format!("{}{}", state.input, cursor_char)
+            } else {
+                format!("{}{}{}",
+                    &state.input[..state.input_cursor],
+                    cursor_char,
+                    &state.input[state.input_cursor..])
+            };
+
+            if state.input.is_empty() {
+                // Show empty input line with just cursor
+                text.push(Line::from(vec![
+                    Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
+                    Span::styled("... ", Style::default().fg(role_color).dim()),
+                    Span::styled(" ", base_style),
+                    Span::styled(cursor_char, Style::default().fg(theme::ACCENT)),
+                ]));
+            } else {
+                // Show the draft input with cursor
+                let mut is_first_line = true;
+                for line in input_with_cursor.lines() {
+                    if line.is_empty() {
+                        text.push(Line::from(vec![
+                            Span::styled(" ".repeat(prefix_width), base_style),
+                        ]));
+                        continue;
+                    }
+
+                    // Split line around cursor char to style it differently
+                    let wrapped = wrap_text(line, wrap_width);
+                    for line_text in wrapped.iter() {
+                        let spans = if line_text.contains(cursor_char) {
+                            // Style cursor differently
+                            let parts: Vec<&str> = line_text.splitn(2, cursor_char).collect();
+                            vec![
+                                Span::styled(parts.get(0).unwrap_or(&"").to_string(), Style::default().fg(theme::TEXT)),
+                                Span::styled(cursor_char, Style::default().fg(theme::ACCENT).bold()),
+                                Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(theme::TEXT)),
+                            ]
+                        } else {
+                            vec![Span::styled(line_text.clone(), Style::default().fg(theme::TEXT))]
+                        };
+
+                        if is_first_line {
+                            let mut line_spans = vec![
+                                Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
+                                Span::styled("... ", Style::default().fg(role_color).dim()),
+                                Span::styled(" ".to_string(), base_style),
+                            ];
+                            line_spans.extend(spans);
+                            text.push(Line::from(line_spans));
+                            is_first_line = false;
+                        } else {
+                            let mut line_spans = vec![
+                                Span::styled(" ".repeat(prefix_width), base_style),
+                            ];
+                            line_spans.extend(spans);
+                            text.push(Line::from(line_spans));
+                        }
+                    }
+                }
+                // Handle trailing newline (cursor on new empty line)
+                if input_with_cursor.ends_with('\n') {
+                    text.push(Line::from(vec![
+                        Span::styled(" ".repeat(prefix_width), base_style),
+                    ]));
+                }
+            }
+            text.push(Line::from(""));
+        }
+
         // Padding at end for scroll
         for _ in 0..3 {
             text.push(Line::from(""));
@@ -356,5 +581,6 @@ impl Panel for ConversationPanel {
                 &mut scrollbar_state
             );
         }
+
     }
 }

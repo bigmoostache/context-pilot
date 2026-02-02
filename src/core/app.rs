@@ -13,7 +13,7 @@ use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, 
 use crate::context_cleaner;
 use crate::events::handle_event;
 use crate::panels::now_ms;
-use crate::persistence::{save_message, save_state};
+use crate::persistence::{check_ownership, save_message, save_state};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
 use crate::tools::{execute_tool, ToolResult, ToolUse};
 use crate::typewriter::TypewriterBuffer;
@@ -38,6 +38,8 @@ pub struct App {
     watched_dir_paths: std::collections::HashSet<String>,
     /// Last time we checked timer-based caches
     last_timer_check_ms: u64,
+    /// Last time we checked ownership
+    last_ownership_check_ms: u64,
 }
 
 impl App {
@@ -57,6 +59,7 @@ impl App {
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
             last_timer_check_ms: now_ms(),
+            last_ownership_check_ms: now_ms(),
         }
     }
 
@@ -74,6 +77,9 @@ impl App {
         // Initial cache setup - watch files and schedule initial refreshes
         self.setup_file_watchers();
         self.schedule_initial_cache_refreshes();
+
+        // Claim ownership immediately
+        save_state(&self.state);
 
         loop {
             // === INPUT FIRST: Process user input with minimal latency ===
@@ -105,6 +111,16 @@ impl App {
             self.check_timer_based_deprecation();
             self.handle_tool_execution(&tx, &tldr_tx, &clean_tx);
             self.finalize_stream(&tldr_tx, &clean_tx);
+
+            // Check ownership periodically (every 1 second)
+            let current_ms = now_ms();
+            if current_ms.saturating_sub(self.last_ownership_check_ms) >= 1000 {
+                self.last_ownership_check_ms = current_ms;
+                if !check_ownership() {
+                    // Another instance took over - exit gracefully
+                    break;
+                }
+            }
 
             // Update spinner animation if there's active loading/streaming
             self.update_spinner_animation();
@@ -681,24 +697,27 @@ impl App {
             // Check if this element needs initial population (newly created via tool)
             let needs_initial_population = ctx.cached_content.is_none();
 
+            // Check if cache was explicitly marked as deprecated (e.g., after sending keys to tmux)
+            let explicitly_deprecated = ctx.cache_deprecated;
+
             // For timer-based types, also check if refresh timer has elapsed
             let timer_refresh_needed = match ctx.context_type {
                 ContextType::Glob => {
                     let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
-                    elapsed >= GLOB_DEPRECATION_MS && !ctx.cache_deprecated
+                    elapsed >= GLOB_DEPRECATION_MS
                 }
                 ContextType::Grep => {
                     let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
-                    elapsed >= GREP_DEPRECATION_MS && !ctx.cache_deprecated
+                    elapsed >= GREP_DEPRECATION_MS
                 }
                 ContextType::Tmux => {
                     let elapsed = current_ms.saturating_sub(ctx.last_refresh_ms);
-                    elapsed >= TMUX_DEPRECATION_MS && !ctx.cache_deprecated
+                    elapsed >= TMUX_DEPRECATION_MS
                 }
                 _ => false,
             };
 
-            if needs_initial_population || timer_refresh_needed {
+            if needs_initial_population || explicitly_deprecated || timer_refresh_needed {
                 // Schedule refresh in background based on context type
                 match ctx.context_type {
                     ContextType::File => {

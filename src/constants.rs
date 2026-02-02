@@ -94,12 +94,6 @@ pub const STATUS_BAR_HEIGHT: u16 = 1;
 /// Height of the help hints section in sidebar
 pub const SIDEBAR_HELP_HEIGHT: u16 = 7;
 
-/// Minimum input box height
-pub const INPUT_MIN_HEIGHT: u16 = 4;
-
-/// Maximum input box height
-pub const INPUT_MAX_HEIGHT: u16 = 12;
-
 // =============================================================================
 // EVENT LOOP
 // =============================================================================
@@ -155,12 +149,10 @@ pub mod theme {
     pub const BG_BASE: Color = Color::Rgb(34, 34, 32);         // #222220 - darkest background
     pub const BG_SURFACE: Color = Color::Rgb(51, 51, 49);      // #333331 - content panels
     pub const BG_ELEVATED: Color = Color::Rgb(66, 66, 64);     // Elevated elements
-    pub const BG_INPUT: Color = Color::Rgb(58, 58, 56);        // #3a3a38 - input field
 
     // Border colors
     pub const BORDER: Color = Color::Rgb(66, 66, 64);          // Subtle border
     pub const BORDER_MUTED: Color = Color::Rgb(50, 50, 48);    // Very subtle separator
-    pub const BORDER_FOCUS: Color = Color::Rgb(218, 118, 89);  // Accent color for focus
 
     // Role-specific colors
     pub const USER: Color = Color::Rgb(218, 118, 89);          // Warm orange for user

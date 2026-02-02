@@ -1,12 +1,41 @@
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::prelude::*;
 
 use super::{ContextItem, Panel};
+use crate::actions::Action;
 use crate::state::{ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct TmuxPanel;
 
 impl Panel for TmuxPanel {
+    fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
+        // Get current tmux pane ID
+        let pane_id = state.context.get(state.selected_context)
+            .and_then(|c| c.tmux_pane_id.clone())?;
+
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+
+        // Convert key to tmux send-keys format
+        // Note: Tab is reserved for panel switching, not sent to tmux
+        let keys = match key.code {
+            KeyCode::Char(c) if ctrl => format!("C-{}", c),
+            KeyCode::Char(c) => c.to_string(),
+            KeyCode::Enter => "Enter".to_string(),
+            KeyCode::Backspace => "BSpace".to_string(),
+            KeyCode::Esc => "Escape".to_string(),
+            KeyCode::Up => "Up".to_string(),
+            KeyCode::Down => "Down".to_string(),
+            KeyCode::Left => "Left".to_string(),
+            KeyCode::Right => "Right".to_string(),
+            KeyCode::Home => "Home".to_string(),
+            KeyCode::End => "End".to_string(),
+            KeyCode::Delete => "DC".to_string(),
+            _ => return None, // Let global handle (Tab, PageUp/Down, etc.)
+        };
+
+        Some(Action::TmuxSendKeys { pane_id, keys })
+    }
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context) {
             let pane_id = ctx.tmux_pane_id.as_deref().unwrap_or("?");

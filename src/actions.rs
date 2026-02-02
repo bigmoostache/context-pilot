@@ -48,11 +48,14 @@ pub fn find_context_by_id(state: &State, id: &str) -> Option<usize> {
 #[derive(Debug, Clone)]
 pub enum Action {
     InputChar(char),
+    InsertText(String),
     InputBackspace,
     InputDelete,
     InputSubmit,
     CursorWordLeft,
     CursorWordRight,
+    DeleteWordLeft,
+    RemoveListItem,  // Remove empty list item, keep newline
     CursorHome,
     CursorEnd,
     ClearConversation,
@@ -66,6 +69,7 @@ pub enum Action {
     ScrollDown(f32),
     StopStreaming,
     StartContextCleaning,
+    TmuxSendKeys { pane_id: String, keys: String },
     None,
 }
 
@@ -88,6 +92,11 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::InputChar(c) => {
             state.input.insert(state.input_cursor, c);
             state.input_cursor += c.len_utf8();
+            ActionResult::Nothing
+        }
+        Action::InsertText(text) => {
+            state.input.insert_str(state.input_cursor, &text);
+            state.input_cursor += text.len();
             ActionResult::Nothing
         }
         Action::InputBackspace => {
@@ -136,6 +145,37 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             ActionResult::Nothing
         }
+        Action::DeleteWordLeft => {
+            if state.input_cursor > 0 {
+                let before = &state.input[..state.input_cursor];
+                // Find word start (same logic as CursorWordLeft)
+                let trimmed = before.trim_end();
+                let word_start = if trimmed.is_empty() {
+                    0
+                } else {
+                    trimmed.rfind(|c: char| c.is_whitespace())
+                        .map(|i| i + 1)
+                        .unwrap_or(0)
+                };
+                // Delete from word_start to cursor
+                state.input = format!("{}{}", &state.input[..word_start], &state.input[state.input_cursor..]);
+                state.input_cursor = word_start;
+            }
+            ActionResult::Nothing
+        }
+        Action::RemoveListItem => {
+            // Remove the current line's content (empty list prefix) but keep the newline
+            // Input: "- item\n- " -> "- item\n"
+            if state.input_cursor > 0 {
+                let before = &state.input[..state.input_cursor];
+                // Find the last newline
+                let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+                // Delete from line_start to cursor
+                state.input = format!("{}{}", &state.input[..line_start], &state.input[state.input_cursor..]);
+                state.input_cursor = line_start;
+            }
+            ActionResult::Nothing
+        }
         Action::CursorHome => {
             // Move to start of current line
             let before_cursor = &state.input[..state.input_cursor];
@@ -165,20 +205,13 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 }
             }
 
-            // Starting a new message is blocked during streaming
-            if state.is_streaming {
-                return ActionResult::Nothing;
-            }
-
             let content = std::mem::take(&mut state.input);
             state.input_cursor = 0;
             let user_token_estimate = estimate_tokens(&content);
 
-            // Assign IDs
+            // Assign user ID
             let user_id = format!("U{}", state.next_user_id);
             state.next_user_id += 1;
-            let assistant_id = format!("A{}", state.next_assistant_id);
-            state.next_assistant_id += 1;
 
             let user_msg = Message {
                 id: user_id,
@@ -199,7 +232,20 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 ctx.token_count += user_token_estimate;
             }
 
+            // During streaming: insert BEFORE the streaming assistant message
+            // Otherwise: append normally
+            if state.is_streaming {
+                // Insert before the last message (the streaming assistant message)
+                let insert_pos = state.messages.len().saturating_sub(1);
+                state.messages.insert(insert_pos, user_msg);
+                return ActionResult::SaveMessage(state.messages[insert_pos].id.clone());
+            }
+
             state.messages.push(user_msg);
+
+            // Create assistant message and start streaming
+            let assistant_id = format!("A{}", state.next_assistant_id);
+            state.next_assistant_id += 1;
 
             let assistant_msg = Message {
                 id: assistant_id,
@@ -377,6 +423,23 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 state.is_cleaning_context = true;
                 ActionResult::StartCleaning
             }
+        }
+        Action::TmuxSendKeys { pane_id, keys } => {
+            // Send keys to tmux pane
+            use std::process::Command;
+            let _ = Command::new("tmux")
+                .args(["send-keys", "-t", &pane_id, &keys])
+                .output();
+
+            // Update last_keys on the context
+            if let Some(ctx) = state.context.iter_mut()
+                .find(|c| c.tmux_pane_id.as_ref() == Some(&pane_id))
+            {
+                ctx.tmux_last_keys = Some(keys);
+                // Mark cache as deprecated to refresh the pane content
+                ctx.cache_deprecated = true;
+            }
+            ActionResult::Nothing
         }
         Action::None => ActionResult::Nothing,
     }

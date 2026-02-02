@@ -299,6 +299,12 @@ pub struct PersistedState {
     pub context: Vec<ContextElement>,
     pub message_ids: Vec<String>,
     pub selected_context: usize,
+    /// Draft input text (not yet sent)
+    #[serde(default)]
+    pub draft_input: String,
+    /// Cursor position in draft input
+    #[serde(default)]
+    pub draft_cursor: usize,
     /// Gitignore-style filter for directory tree
     #[serde(default = "default_tree_filter")]
     pub tree_filter: String,
@@ -335,6 +341,9 @@ pub struct PersistedState {
     /// Tool definitions with enabled state
     #[serde(default = "default_tools")]
     pub tools: Vec<ToolDefinition>,
+    /// PID of the process that owns this state (for preventing concurrent instances)
+    #[serde(default)]
+    pub owner_pid: Option<u32>,
 }
 
 fn default_tools() -> Vec<ToolDefinition> {

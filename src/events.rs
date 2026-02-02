@@ -2,47 +2,31 @@ use crossterm::event::{Event, KeyCode, KeyModifiers};
 
 use crate::actions::{parse_context_pattern, find_context_by_id, Action};
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::panels::get_panel;
 use crate::state::State;
 
 pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
     match event {
         Event::Key(key) => {
             let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-            let alt = key.modifiers.contains(KeyModifiers::ALT);
-            let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 
-            // Alt+Enter to submit
-            if alt && key.code == KeyCode::Enter {
-                return Some(Action::InputSubmit);
-            }
-
-            // Ctrl shortcuts (global)
+            // Global Ctrl shortcuts (always handled first)
             if ctrl {
                 match key.code {
                     KeyCode::Char('q') => return None, // Quit
                     KeyCode::Char('l') => return Some(Action::ClearConversation),
                     KeyCode::Char('n') => return Some(Action::NewContext),
-                    KeyCode::Char('j') => return Some(Action::InputSubmit), // Ctrl+J as alternative to Ctrl+Enter
                     KeyCode::Char('k') => return Some(Action::StartContextCleaning),
-                    // Ctrl+arrows for word navigation (handled below in Input focus)
                     _ => {}
                 }
             }
 
             // Escape stops streaming
-            if key.code == KeyCode::Esc {
-                if state.is_streaming {
-                    return Some(Action::StopStreaming);
-                }
-            }
-
-            // Shift+Enter to submit
-            if shift && key.code == KeyCode::Enter {
-                return Some(Action::InputSubmit);
+            if key.code == KeyCode::Esc && state.is_streaming {
+                return Some(Action::StopStreaming);
             }
 
             // Enter or Space on context pattern (p1, P2, etc.) submits immediately
-            // Only if the context actually exists
             if key.code == KeyCode::Enter || key.code == KeyCode::Char(' ') {
                 if let Some(id) = parse_context_pattern(&state.input) {
                     if find_context_by_id(state, &id).is_some() {
@@ -51,27 +35,22 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 }
             }
 
-            // Ctrl+arrows for word navigation in input
-            if ctrl {
-                return Some(match key.code {
-                    KeyCode::Left => Action::CursorWordLeft,
-                    KeyCode::Right => Action::CursorWordRight,
-                    KeyCode::Backspace => Action::CursorWordLeft, // TODO: delete word
-                    _ => Action::None,
-                });
+            // Let the current panel handle the key first
+            if let Some(ctx) = state.context.get(state.selected_context) {
+                let panel = get_panel(ctx.context_type);
+                if let Some(action) = panel.handle_key(key, state) {
+                    return Some(action);
+                }
             }
 
+            // Global fallback handling (scrolling, context switching)
+            let shift = key.modifiers.contains(KeyModifiers::SHIFT);
             let action = match key.code {
-                KeyCode::Char(c) => Action::InputChar(c),
-                KeyCode::Backspace => Action::InputBackspace,
-                KeyCode::Delete => Action::InputDelete,
-                KeyCode::Enter => Action::InputChar('\n'),
-                KeyCode::Left => Action::SelectPrevContext,
-                KeyCode::Right => Action::SelectNextContext,
+                KeyCode::Tab if shift => Action::SelectPrevContext,
+                KeyCode::Tab => Action::SelectNextContext,
+                KeyCode::BackTab => Action::SelectPrevContext, // Shift+Tab on some terminals
                 KeyCode::Up => Action::ScrollUp(SCROLL_ARROW_AMOUNT),
                 KeyCode::Down => Action::ScrollDown(SCROLL_ARROW_AMOUNT),
-                KeyCode::Home => Action::CursorHome,
-                KeyCode::End => Action::CursorEnd,
                 KeyCode::PageUp => Action::ScrollUp(SCROLL_PAGE_AMOUNT),
                 KeyCode::PageDown => Action::ScrollDown(SCROLL_PAGE_AMOUNT),
                 _ => Action::None,
