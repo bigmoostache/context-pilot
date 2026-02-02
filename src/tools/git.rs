@@ -3,6 +3,35 @@ use std::process::Command;
 use crate::state::State;
 use super::{ToolUse, ToolResult};
 
+/// Execute toggle_git_details tool
+pub fn execute_toggle_details(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let show = tool.input.get("show")
+        .and_then(|v| v.as_bool());
+
+    // Toggle or set explicitly
+    let new_value = match show {
+        Some(v) => v,
+        None => !state.git_show_diffs, // Toggle if not specified
+    };
+
+    state.git_show_diffs = new_value;
+
+    // Mark git context as needing refresh so content updates
+    for ctx in &mut state.context {
+        if ctx.context_type == crate::state::ContextType::Git {
+            ctx.cache_deprecated = true;
+            break;
+        }
+    }
+
+    let status = if new_value { "enabled" } else { "disabled" };
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("Git diff details {}", status),
+        is_error: false,
+    }
+}
+
 /// Execute git_commit tool
 pub fn execute_commit(tool: &ToolUse, _state: &mut State) -> ToolResult {
     let message = match tool.input.get("message").and_then(|v| v.as_str()) {

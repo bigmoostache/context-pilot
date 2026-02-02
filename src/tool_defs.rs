@@ -512,6 +512,18 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
 
         // Git tools
         ToolDefinition {
+            id: "toggle_git_details".to_string(),
+            name: "Toggle Git Details".to_string(),
+            short_desc: "Show/hide diff content".to_string(),
+            description: "Toggles whether the Git panel shows full diff content or just a summary. When disabled, only shows file names and line counts. Useful for reducing context size.".to_string(),
+            params: vec![
+                ToolParam::new("show", ParamType::Boolean)
+                    .desc("Set true to show diffs, false to hide. Omit to toggle."),
+            ],
+            enabled: true,
+            category: ToolCategory::Git,
+        },
+        ToolDefinition {
             id: "git_commit".to_string(),
             name: "Git Commit".to_string(),
             short_desc: "Commit changes".to_string(),

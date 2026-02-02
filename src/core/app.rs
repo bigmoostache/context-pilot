@@ -9,11 +9,11 @@ use crate::actions::{apply_action, clean_llm_id_prefix, Action, ActionResult};
 use crate::api::{start_cleaning, start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
 use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
-use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS};
+use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS};
 use crate::context_cleaner;
 use crate::events::handle_event;
 use crate::panels::now_ms;
-use crate::persistence::{check_ownership, save_message, save_state};
+use crate::persistence::{check_ownership, log_error, save_message, save_state};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
 use crate::tools::{execute_tool, ToolResult, ToolUse};
 use crate::typewriter::TypewriterBuffer;
@@ -40,6 +40,8 @@ pub struct App {
     last_timer_check_ms: u64,
     /// Last time we checked ownership
     last_ownership_check_ms: u64,
+    /// Pending retry error (will retry on next loop iteration)
+    pending_retry_error: Option<String>,
 }
 
 impl App {
@@ -60,6 +62,7 @@ impl App {
             watched_dir_paths: std::collections::HashSet::new(),
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
+            pending_retry_error: None,
         }
     }
 
@@ -103,6 +106,7 @@ impl App {
 
             // === BACKGROUND PROCESSING ===
             self.process_stream_events(&rx);
+            self.handle_retry(&tx);
             self.process_typewriter();
             self.process_cleaning_events(&clean_rx, &clean_tx);
             self.process_tldr_results(&tldr_rx);
@@ -157,8 +161,37 @@ impl App {
                 }
                 StreamEvent::Error(e) => {
                     self.typewriter.reset();
-                    apply_action(&mut self.state, Action::StreamError(e));
+                    // Check if we should retry
+                    if self.state.api_retry_count < MAX_API_RETRIES {
+                        self.state.api_retry_count += 1;
+                        self.pending_retry_error = Some(e);
+                    } else {
+                        // Max retries reached, show error
+                        self.state.api_retry_count = 0;
+                        apply_action(&mut self.state, Action::StreamError(e));
+                    }
                 }
+            }
+        }
+    }
+
+    fn handle_retry(&mut self, tx: &Sender<StreamEvent>) {
+        if let Some(_error) = self.pending_retry_error.take() {
+            // Still streaming, retry the request
+            if self.state.is_streaming {
+                // Clear any partial assistant message content before retrying
+                if let Some(msg) = self.state.messages.last_mut() {
+                    if msg.role == "assistant" {
+                        msg.content.clear();
+                    }
+                }
+                let ctx = prepare_stream_context(&mut self.state, true);
+                self.typewriter.reset();
+                self.pending_done = None;
+                start_streaming(
+                    ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
+                );
+                self.state.dirty = true;
             }
         }
     }
@@ -392,6 +425,8 @@ impl App {
                     ActionResult::Save => save_state(&self.state),
                     _ => {}
                 }
+                // Reset retry count on successful completion
+                self.state.api_retry_count = 0;
                 self.typewriter.reset();
                 self.pending_done = None;
 
@@ -582,7 +617,9 @@ impl App {
 
         // Schedule initial git status refresh
         process_cache_request(
-            CacheRequest::RefreshGitStatus,
+            CacheRequest::RefreshGitStatus {
+                show_diffs: self.state.git_show_diffs,
+            },
             self.cache_tx.clone(),
         );
 
@@ -643,6 +680,8 @@ impl App {
                     branch,
                     is_repo,
                     file_changes,
+                    formatted_content,
+                    token_count,
                 } => {
                     use crate::state::{GitFileChange, ContextType};
                     self.state.git_branch = branch;
@@ -658,19 +697,13 @@ impl App {
                         .collect();
                     self.state.git_last_refresh_ms = now_ms();
 
-                    // Calculate and update token count for Git panel
-                    // Count chars from all diff content plus overhead for table/formatting
-                    let mut total_chars: usize = 200; // Base overhead for branch, table headers
-                    for file in &self.state.git_file_changes {
-                        total_chars += file.path.len() + 50; // Table row overhead
-                        total_chars += file.diff_content.len();
-                    }
-                    // estimate_tokens uses ~4 chars per token
-                    let token_count = (total_chars + 3) / 4;
-
+                    // Update cached content and token count for Git panel
                     for ctx in &mut self.state.context {
                         if ctx.context_type == ContextType::Git {
+                            ctx.cached_content = Some(formatted_content);
                             ctx.token_count = token_count;
+                            ctx.cache_deprecated = false;
+                            ctx.last_refresh_ms = now_ms();
                             break;
                         }
                     }
@@ -836,7 +869,9 @@ impl App {
         let git_elapsed = current_ms.saturating_sub(self.state.git_last_refresh_ms);
         if git_elapsed >= GIT_STATUS_REFRESH_MS {
             process_cache_request(
-                CacheRequest::RefreshGitStatus,
+                CacheRequest::RefreshGitStatus {
+                    show_diffs: self.state.git_show_diffs,
+                },
                 self.cache_tx.clone(),
             );
         }

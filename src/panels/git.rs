@@ -52,13 +52,15 @@ impl GitPanel {
             output.push_str(&format!("| **Total** | | **+{}** | **-{}** | **{}** |\n",
                 total_add, total_del, total_net_str));
 
-            // Add diff content
-            output.push_str("\n## Diffs\n\n");
-            for file in &state.git_file_changes {
-                if !file.diff_content.is_empty() {
-                    output.push_str("```diff\n");
-                    output.push_str(&file.diff_content);
-                    output.push_str("```\n\n");
+            // Add diff content only if git_show_diffs is enabled
+            if state.git_show_diffs {
+                output.push_str("\n## Diffs\n\n");
+                for file in &state.git_file_changes {
+                    if !file.diff_content.is_empty() {
+                        output.push_str("```diff\n");
+                        output.push_str(&file.diff_content);
+                        output.push_str("```\n\n");
+                    }
                 }
             }
         }
@@ -102,7 +104,24 @@ impl Panel for GitPanel {
         if !state.git_is_repo {
             return vec![];
         }
-        let content = Self::format_git_for_context(state);
+        
+        // Use cached content if available
+        let content = state.context.iter()
+            .find(|c| c.context_type == ContextType::Git)
+            .and_then(|ctx| ctx.cached_content.as_ref())
+            .map(|c| {
+                if state.context.iter()
+                    .find(|ctx| ctx.context_type == ContextType::Git)
+                    .map(|ctx| ctx.cache_deprecated)
+                    .unwrap_or(false)
+                {
+                    format!("[refreshing...]\n{}", c)
+                } else {
+                    c.clone()
+                }
+            })
+            .unwrap_or_else(|| Self::format_git_for_context(state));
+        
         vec![ContextItem::new("Git Status", content)]
     }
 

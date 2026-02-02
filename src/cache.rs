@@ -53,6 +53,10 @@ pub enum CacheUpdate {
         is_repo: bool,
         /// (path, additions, deletions, change_type, diff_content)
         file_changes: Vec<(String, i32, i32, crate::state::GitChangeType, String)>,
+        /// Formatted content for LLM context
+        formatted_content: String,
+        /// Token count for formatted content
+        token_count: usize,
     },
 }
 
@@ -92,7 +96,10 @@ pub enum CacheRequest {
         current_last_lines_hash: Option<String>,
     },
     /// Refresh git status
-    RefreshGitStatus,
+    RefreshGitStatus {
+        /// Whether to include full diff content in formatted output
+        show_diffs: bool,
+    },
 }
 
 /// Hash content for change detection
@@ -129,8 +136,8 @@ pub fn process_cache_request(request: CacheRequest, tx: Sender<CacheUpdate>) {
             CacheRequest::RefreshTmux { context_id, pane_id, current_last_lines_hash } => {
                 refresh_tmux_cache(context_id, pane_id, current_last_lines_hash, tx);
             }
-            CacheRequest::RefreshGitStatus => {
-                refresh_git_status(tx);
+            CacheRequest::RefreshGitStatus { show_diffs } => {
+                refresh_git_status(show_diffs, tx);
             }
         }
     });
@@ -259,7 +266,7 @@ fn refresh_tmux_cache(
     }
 }
 
-fn refresh_git_status(tx: Sender<CacheUpdate>) {
+fn refresh_git_status(show_diffs: bool, tx: Sender<CacheUpdate>) {
     use std::process::Command;
     use std::collections::HashMap;
     use crate::state::GitChangeType;
@@ -276,6 +283,8 @@ fn refresh_git_status(tx: Sender<CacheUpdate>) {
             branch: None,
             is_repo: false,
             file_changes: vec![],
+            formatted_content: "Not a git repository".to_string(),
+            token_count: estimate_tokens("Not a git repository"),
         });
         return;
     }
@@ -440,11 +449,77 @@ fn refresh_git_status(tx: Sender<CacheUpdate>) {
         .collect();
     changes.sort_by(|a, b| a.0.cmp(&b.0));
 
+    // Generate formatted content for LLM context
+    let formatted_content = format_git_content(&branch, &changes, show_diffs);
+    let token_count = estimate_tokens(&formatted_content);
+
     let _ = tx.send(CacheUpdate::GitStatus {
         branch,
         is_repo: true,
         file_changes: changes,
+        formatted_content,
+        token_count,
     });
+}
+
+/// Format git status for LLM context (as markdown table + optional diffs)
+fn format_git_content(
+    branch: &Option<String>,
+    changes: &[(String, i32, i32, crate::state::GitChangeType, String)],
+    show_diffs: bool,
+) -> String {
+    use crate::state::GitChangeType;
+
+    let mut output = String::new();
+
+    // Branch
+    if let Some(branch) = branch {
+        output.push_str(&format!("Branch: {}\n", branch));
+    }
+
+    if changes.is_empty() {
+        output.push_str("\nWorking tree clean\n");
+    } else {
+        output.push_str("\n| File | Type | + | - | Net |\n");
+        output.push_str("|------|------|---|---|-----|\n");
+
+        let mut total_add: i32 = 0;
+        let mut total_del: i32 = 0;
+
+        for (path, additions, deletions, change_type, _) in changes {
+            total_add += additions;
+            total_del += deletions;
+            let net = additions - deletions;
+            let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
+            let type_str = match change_type {
+                GitChangeType::Added => "A",
+                GitChangeType::Deleted => "D",
+                GitChangeType::Modified => "M",
+                GitChangeType::Renamed => "R",
+            };
+            output.push_str(&format!("| {} | {} | +{} | -{} | {} |\n",
+                path, type_str, additions, deletions, net_str));
+        }
+
+        let total_net = total_add - total_del;
+        let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
+        output.push_str(&format!("| **Total** | | **+{}** | **-{}** | **{}** |\n",
+            total_add, total_del, total_net_str));
+
+        // Add diff content only if show_diffs is enabled
+        if show_diffs {
+            output.push_str("\n## Diffs\n\n");
+            for (_, _, _, _, diff_content) in changes {
+                if !diff_content.is_empty() {
+                    output.push_str("```diff\n");
+                    output.push_str(diff_content);
+                    output.push_str("```\n\n");
+                }
+            }
+        }
+    }
+
+    output
 }
 
 /// Parse unified diff output and group by file

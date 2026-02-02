@@ -84,6 +84,7 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "create_memories" => memory::execute_create(tool, state),
         "update_memories" => memory::execute_update(tool, state),
         "git_commit" => git::execute_commit(tool, state),
+        "toggle_git_details" => git::execute_toggle_details(tool, state),
         _ => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Unknown tool: {}", tool.name),

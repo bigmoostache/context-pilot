@@ -54,7 +54,8 @@ impl ContextType {
             ContextType::Tree |
             ContextType::Glob |
             ContextType::Grep |
-            ContextType::Tmux
+            ContextType::Tmux |
+            ContextType::Git
         )
     }
 }
@@ -347,6 +348,9 @@ pub struct PersistedState {
     /// Disabled tool IDs (tools not in this list are enabled)
     #[serde(default)]
     pub disabled_tools: Vec<String>,
+    /// Whether to show full diff content in Git panel
+    #[serde(default = "default_true")]
+    pub git_show_diffs: bool,
     /// PID of the process that owns this state (for preventing concurrent instances)
     #[serde(default)]
     pub owner_pid: Option<u32>,
@@ -357,6 +361,10 @@ pub struct PersistedState {
 
 fn default_one() -> usize {
     1
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_tree_filter() -> String {
@@ -429,6 +437,10 @@ pub struct State {
     pub git_file_changes: Vec<GitFileChange>,
     /// Last time git status was refreshed (milliseconds)
     pub git_last_refresh_ms: u64,
+    /// Whether to show full diff content in Git panel (vs summary only)
+    pub git_show_diffs: bool,
+    /// Current API retry count (reset on success)
+    pub api_retry_count: u32,
 }
 
 /// Represents a file change in git status
@@ -621,6 +633,9 @@ impl Default for State {
             git_is_repo: false,
             git_file_changes: vec![],
             git_last_refresh_ms: 0,
+            git_show_diffs: true, // Show diffs by default
+            // API retry
+            api_retry_count: 0,
         }
     }
 }
