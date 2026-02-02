@@ -1,6 +1,9 @@
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use super::{ContextItem, Panel};
+use crate::actions::Action;
+use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::highlight::highlight_file;
 use crate::state::{ContextType, State};
 use crate::ui::theme;
@@ -8,6 +11,16 @@ use crate::ui::theme;
 pub struct FilePanel;
 
 impl Panel for FilePanel {
+    fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
+        match key.code {
+            KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
+            KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
+            KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
+            KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
+            _ => None,
+        }
+    }
+
     fn title(&self, state: &State) -> String {
         state.context.get(state.selected_context)
             .map(|ctx| ctx.name.clone())

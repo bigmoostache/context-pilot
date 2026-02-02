@@ -37,7 +37,7 @@ use crossterm::event::KeyEvent;
 
 use crate::actions::Action;
 use crate::state::{ContextType, State};
-use crate::ui::theme;
+use crate::ui::{theme, helpers::count_wrapped_lines};
 
 /// Get current time in milliseconds since UNIX epoch
 pub fn now_ms() -> u64 {
@@ -130,9 +130,12 @@ pub trait Panel {
 
         let text = self.content(state, base_style);
 
-        // Calculate and set max scroll
-        let content_height = text.len();
+        // Calculate and set max scroll (accounting for wrapped lines)
+        let viewport_width = content_area.width as usize;
         let viewport_height = content_area.height as usize;
+        let content_height: usize = text.iter()
+            .map(|line| count_wrapped_lines(line, viewport_width))
+            .sum();
         let max_scroll = content_height.saturating_sub(viewport_height) as f32;
         state.max_scroll = max_scroll;
         state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);

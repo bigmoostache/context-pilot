@@ -6,7 +6,16 @@ use ignore::gitignore::GitignoreBuilder;
 use sha2::{Sha256, Digest};
 
 use super::{ToolResult, ToolUse};
-use crate::state::{State, TreeFileDescription};
+use crate::state::{ContextType, State, TreeFileDescription};
+
+/// Mark tree context cache as deprecated (needs refresh)
+fn invalidate_tree_cache(state: &mut State) {
+    for ctx in &mut state.context {
+        if ctx.context_type == ContextType::Tree {
+            ctx.cache_deprecated = true;
+        }
+    }
+}
 
 /// Generate tree string without mutating state (for read-only rendering)
 pub fn generate_tree_string(
@@ -145,6 +154,11 @@ pub fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
         result.push(format!("Errors: {}", errors.join(", ")));
     }
 
+    // Invalidate tree cache to trigger refresh
+    if !opened.is_empty() || !closed.is_empty() {
+        invalidate_tree_cache(state);
+    }
+
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
@@ -240,6 +254,11 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
         result.push(format!("Errors: {}", errors.join("; ")));
     }
 
+    // Invalidate tree cache to trigger refresh
+    if !added.is_empty() || !updated.is_empty() || !removed.is_empty() {
+        invalidate_tree_cache(state);
+    }
+
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
@@ -261,6 +280,9 @@ pub fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     state.tree_filter = filter.to_string();
+
+    // Invalidate tree cache to trigger refresh
+    invalidate_tree_cache(state);
 
     ToolResult {
         tool_use_id: tool.id.clone(),

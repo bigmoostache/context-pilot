@@ -392,7 +392,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ScrollDown(amount) => {
             let accel_amount = amount * state.scroll_accel;
-            state.scroll_offset = (state.scroll_offset + accel_amount).min(state.max_scroll);
+            // Don't clamp here - render will clamp to actual max_scroll for current panel
+            state.scroll_offset += accel_amount;
             state.scroll_accel = (state.scroll_accel + SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
             ActionResult::Nothing
         }

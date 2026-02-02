@@ -500,3 +500,59 @@ Token count: 33
 Calling LLM for summary...
 Got summary: **Summary:** The message confirms that a test of m
 Send result: true
+Token count: 1
+Using content directly (short message)
+Send result: true
+Token count: 15
+Using content directly (short message)
+Send result: true
+Token count: 9
+Using content directly (short message)
+Send result: true
+Token count: 282
+Calling LLM for summary...
+Got summary: The user is describing their available tools for c
+Send result: true
+Token count: 8
+Using content directly (short message)
+Send result: true
+Token count: 372
+Calling LLM for summary...
+Got summary: **Context Pilot** is a TUI AI coding assistant bui
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 406
+Calling LLM for summary...
+Got summary: The src/ directory has 4 clean submodules: core (a
+Send result: true
+Token count: 38
+Calling LLM for summary...
+Got summary: The user is requesting a step-by-step process: ope
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 4
+Using content directly (short message)
+Send result: true
+Token count: 3
+Using content directly (short message)
+Send result: true
+Token count: 5
+Using content directly (short message)
+Send result: true
+Token count: 6
+Using content directly (short message)
+Send result: true
+Token count: 248
+Calling LLM for summary...
+Got summary: The assistant documented all major source files ac
+Send result: true
+Token count: 16
+Using content directly (short message)
+Send result: true
+Token count: 2
+Using content directly (short message)
+Send result: true
