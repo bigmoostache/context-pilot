@@ -2,6 +2,7 @@ mod close_context;
 mod create;
 mod edit_file;
 mod file;
+mod git;
 mod glob;
 mod grep;
 mod manage_tools;
@@ -82,6 +83,7 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "update_todos" => todo::execute_update(tool, state),
         "create_memories" => memory::execute_create(tool, state),
         "update_memories" => memory::execute_update(tool, state),
+        "git_commit" => git::execute_commit(tool, state),
         _ => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Unknown tool: {}", tool.name),

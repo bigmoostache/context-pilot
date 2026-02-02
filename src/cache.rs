@@ -47,6 +47,12 @@ pub enum CacheUpdate {
         last_lines_hash: String,
         token_count: usize,
     },
+    /// Git status was fetched
+    GitStatus {
+        branch: Option<String>,
+        is_repo: bool,
+        file_changes: Vec<(String, i32, i32, crate::state::GitChangeType)>,
+    },
 }
 
 /// Request for background cache operations
@@ -84,6 +90,8 @@ pub enum CacheRequest {
         pane_id: String,
         current_last_lines_hash: Option<String>,
     },
+    /// Refresh git status
+    RefreshGitStatus,
 }
 
 /// Hash content for change detection
@@ -119,6 +127,9 @@ pub fn process_cache_request(request: CacheRequest, tx: Sender<CacheUpdate>) {
             }
             CacheRequest::RefreshTmux { context_id, pane_id, current_last_lines_hash } => {
                 refresh_tmux_cache(context_id, pane_id, current_last_lines_hash, tx);
+            }
+            CacheRequest::RefreshGitStatus => {
+                refresh_git_status(tx);
             }
         }
     });
@@ -244,5 +255,171 @@ fn refresh_tmux_cache(
             last_lines_hash: new_hash,
             token_count,
         });
+    }
+}
+
+fn refresh_git_status(tx: Sender<CacheUpdate>) {
+    use std::process::Command;
+    use std::collections::HashMap;
+    use crate::state::GitChangeType;
+
+    // Check if we're in a git repo
+    let is_repo = Command::new("git")
+        .args(["rev-parse", "--git-dir"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if !is_repo {
+        let _ = tx.send(CacheUpdate::GitStatus {
+            branch: None,
+            is_repo: false,
+            file_changes: vec![],
+        });
+        return;
+    }
+
+    // Get branch name
+    let branch = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                let name = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                if name == "HEAD" {
+                    // Detached HEAD - get short hash
+                    Command::new("git")
+                        .args(["rev-parse", "--short", "HEAD"])
+                        .output()
+                        .ok()
+                        .map(|o| format!("detached:{}", String::from_utf8_lossy(&o.stdout).trim()))
+                } else {
+                    Some(name)
+                }
+            } else {
+                None
+            }
+        });
+
+    // Collect per-file changes
+    // Map: path -> (additions, deletions, change_type)
+    let mut file_changes: HashMap<String, (i32, i32, GitChangeType)> = HashMap::new();
+
+    // Get status to identify file types (added, deleted, modified, untracked)
+    if let Ok(output) = Command::new("git").args(["status", "--porcelain"]).output() {
+        if output.status.success() {
+            let content = String::from_utf8_lossy(&output.stdout);
+            for line in content.lines() {
+                if line.len() < 3 {
+                    continue;
+                }
+                let x = line.chars().next().unwrap_or(' ');
+                let y = line.chars().nth(1).unwrap_or(' ');
+                let path = line[3..].trim().to_string();
+                // Handle renames: "R  old -> new"
+                let path = if path.contains(" -> ") {
+                    path.split(" -> ").last().unwrap_or(&path).to_string()
+                } else {
+                    path
+                };
+
+                let change_type = match (x, y) {
+                    ('?', '?') => GitChangeType::Added, // Untracked = new file
+                    ('A', _) | (_, 'A') => GitChangeType::Added,
+                    ('D', _) | (_, 'D') => GitChangeType::Deleted,
+                    ('R', _) | (_, 'R') => GitChangeType::Renamed,
+                    _ => GitChangeType::Modified,
+                };
+
+                file_changes.entry(path).or_insert((0, 0, change_type));
+            }
+        }
+    }
+
+    // Get line counts for staged changes
+    if let Ok(output) = Command::new("git").args(["diff", "--cached", "--numstat"]).output() {
+        if output.status.success() {
+            parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+        }
+    }
+
+    // Get line counts for unstaged changes
+    if let Ok(output) = Command::new("git").args(["diff", "--numstat"]).output() {
+        if output.status.success() {
+            parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+        }
+    }
+
+    // For untracked files, count lines
+    let untracked_files: Vec<String> = file_changes.iter()
+        .filter(|(_, (add, del, ct))| *ct == GitChangeType::Added && *add == 0 && *del == 0)
+        .map(|(path, _)| path.clone())
+        .collect();
+
+    for path in untracked_files {
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            let lines = content.lines().count() as i32;
+            if let Some(entry) = file_changes.get_mut(&path) {
+                entry.0 = lines; // additions = total lines for new files
+            }
+        }
+    }
+
+    // For deleted files, get line count from HEAD
+    let deleted_files: Vec<String> = file_changes.iter()
+        .filter(|(_, (add, del, ct))| *ct == GitChangeType::Deleted && *add == 0 && *del == 0)
+        .map(|(path, _)| path.clone())
+        .collect();
+
+    for path in deleted_files {
+        if let Ok(output) = Command::new("git").args(["show", &format!("HEAD:{}", path)]).output() {
+            if output.status.success() {
+                let content = String::from_utf8_lossy(&output.stdout);
+                let lines = content.lines().count() as i32;
+                if let Some(entry) = file_changes.get_mut(&path) {
+                    entry.1 = lines; // deletions = total lines for deleted files
+                }
+            }
+        }
+    }
+
+    // Convert to vec and sort by path
+    let mut changes: Vec<_> = file_changes.into_iter()
+        .map(|(path, (add, del, ct))| (path, add, del, ct))
+        .collect();
+    changes.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let _ = tx.send(CacheUpdate::GitStatus {
+        branch,
+        is_repo: true,
+        file_changes: changes,
+    });
+}
+
+/// Parse git diff --numstat output and add to file_changes map
+fn parse_numstat_to_map(
+    output: &str,
+    file_changes: &mut std::collections::HashMap<String, (i32, i32, crate::state::GitChangeType)>,
+) {
+    use crate::state::GitChangeType;
+
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 3 {
+            let add: i32 = parts[0].parse().unwrap_or(0);
+            let del: i32 = parts[1].parse().unwrap_or(0);
+            let path = parts[2].to_string();
+            // Handle renames: "old => new" or "{old => new}"
+            let path = if path.contains(" => ") {
+                path.split(" => ").last().unwrap_or(&path).trim_end_matches('}').to_string()
+            } else {
+                path
+            };
+
+            let entry = file_changes.entry(path).or_insert((0, 0, GitChangeType::Modified));
+            entry.0 += add;
+            entry.1 += del;
+        }
     }
 }

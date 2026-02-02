@@ -105,6 +105,11 @@ pub fn load_state() -> State {
                 dirty: true,
                 spinner_frame: 0,
                 dev_mode: persisted.dev_mode,
+                // Git status defaults (runtime-only, fetched on startup)
+                git_branch: None,
+                git_is_repo: false,
+                git_file_changes: vec![],
+                git_last_refresh_ms: 0,
             };
         }
     }

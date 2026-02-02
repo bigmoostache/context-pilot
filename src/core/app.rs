@@ -9,7 +9,7 @@ use crate::actions::{apply_action, clean_llm_id_prefix, Action, ActionResult};
 use crate::api::{start_cleaning, start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
 use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
-use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS};
+use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS};
 use crate::context_cleaner;
 use crate::events::handle_event;
 use crate::panels::now_ms;
@@ -580,6 +580,12 @@ impl App {
             }
         }
 
+        // Schedule initial git status refresh
+        process_cache_request(
+            CacheRequest::RefreshGitStatus,
+            self.cache_tx.clone(),
+        );
+
         // Update last timer check
         // (This is handled in the mutable version - we just set it in new())
         let _ = current_ms;
@@ -632,6 +638,24 @@ impl App {
                         ctx.cache_deprecated = false;
                         ctx.last_refresh_ms = now_ms();
                     }
+                }
+                CacheUpdate::GitStatus {
+                    branch,
+                    is_repo,
+                    file_changes,
+                } => {
+                    use crate::state::GitFileChange;
+                    self.state.git_branch = branch;
+                    self.state.git_is_repo = is_repo;
+                    self.state.git_file_changes = file_changes.into_iter()
+                        .map(|(path, additions, deletions, change_type)| GitFileChange {
+                            path,
+                            additions,
+                            deletions,
+                            change_type,
+                        })
+                        .collect();
+                    self.state.git_last_refresh_ms = now_ms();
                 }
             }
         }
@@ -788,6 +812,15 @@ impl App {
                     _ => {}
                 }
             }
+        }
+
+        // Check if git status needs refresh
+        let git_elapsed = current_ms.saturating_sub(self.state.git_last_refresh_ms);
+        if git_elapsed >= GIT_STATUS_REFRESH_MS {
+            process_cache_request(
+                CacheRequest::RefreshGitStatus,
+                self.cache_tx.clone(),
+            );
         }
     }
 

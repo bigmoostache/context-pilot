@@ -77,6 +77,38 @@ impl Panel for OverviewPanel {
             output.push_str(&format!("Memories: {}\n", state.memories.len()));
         }
 
+        // Git status for LLM (as markdown table)
+        if state.git_is_repo {
+            if let Some(branch) = &state.git_branch {
+                output.push_str(&format!("\nGit Branch: {}\n", branch));
+            }
+
+            if state.git_file_changes.is_empty() {
+                output.push_str("Git Status: Working tree clean\n");
+            } else {
+                output.push_str("\nGit Changes:\n\n");
+                output.push_str("| File | + | - | Net |\n");
+                output.push_str("|------|---|---|-----|\n");
+
+                let mut total_add: i32 = 0;
+                let mut total_del: i32 = 0;
+
+                for file in &state.git_file_changes {
+                    total_add += file.additions;
+                    total_del += file.deletions;
+                    let net = file.additions - file.deletions;
+                    let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
+                    output.push_str(&format!("| {} | +{} | -{} | {} |\n",
+                        file.path, file.additions, file.deletions, net_str));
+                }
+
+                let total_net = total_add - total_del;
+                let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
+                output.push_str(&format!("| **Total** | **+{}** | **-{}** | **{}** |\n",
+                    total_add, total_del, total_net_str));
+            }
+        }
+
         // Tools table (markdown format for LLM)
         let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
         let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
@@ -139,6 +171,156 @@ impl Panel for OverviewPanel {
             Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::BORDER)),
         ]));
         text.push(Line::from(""));
+
+        // Git status section (only if in a git repo)
+        if state.git_is_repo {
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled("GIT STATUS".to_string(), Style::default().fg(theme::TEXT_MUTED).bold()),
+            ]));
+            text.push(Line::from(""));
+
+            // Branch name
+            if let Some(branch) = &state.git_branch {
+                let branch_color = if branch.starts_with("detached:") {
+                    theme::WARNING
+                } else {
+                    theme::ACCENT
+                };
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled("Branch: ".to_string(), Style::default().fg(theme::TEXT_SECONDARY)),
+                    Span::styled(branch.clone(), Style::default().fg(branch_color).bold()),
+                ]));
+            }
+
+            if state.git_file_changes.is_empty() {
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled("Working tree clean".to_string(), Style::default().fg(theme::SUCCESS)),
+                ]));
+            } else {
+                text.push(Line::from(""));
+
+                // Calculate column widths
+                let path_width = state.git_file_changes.iter()
+                    .map(|f| f.path.len())
+                    .max()
+                    .unwrap_or(4)
+                    .max(4)
+                    .min(40); // Cap at 40 chars
+
+                // Table header
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled(format!("{:<width$}", "File", width = path_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                    Span::styled("  ", base_style),
+                    Span::styled(format!("{:>6}", "+"), Style::default().fg(theme::SUCCESS).bold()),
+                    Span::styled("  ", base_style),
+                    Span::styled(format!("{:>6}", "-"), Style::default().fg(Color::Rgb(200, 80, 80)).bold()),
+                    Span::styled("  ", base_style),
+                    Span::styled(format!("{:>6}", "Net"), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                ]));
+
+                // Separator
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled(chars::HORIZONTAL.repeat(path_width + 26), Style::default().fg(theme::BORDER)),
+                ]));
+
+                // File rows
+                let mut total_add: i32 = 0;
+                let mut total_del: i32 = 0;
+
+                for file in &state.git_file_changes {
+                    use crate::state::GitChangeType;
+
+                    total_add += file.additions;
+                    total_del += file.deletions;
+                    let net = file.additions - file.deletions;
+
+                    // Type indicator
+                    let (type_char, type_color) = match file.change_type {
+                        GitChangeType::Added => ("A", theme::SUCCESS),
+                        GitChangeType::Deleted => ("D", Color::Rgb(200, 80, 80)),
+                        GitChangeType::Modified => ("M", theme::WARNING),
+                        GitChangeType::Renamed => ("R", theme::ACCENT),
+                    };
+
+                    // Truncate path if needed (account for type indicator)
+                    let effective_path_width = path_width.saturating_sub(2);
+                    let display_path = if file.path.len() > effective_path_width {
+                        format!("...{}", &file.path[file.path.len() - effective_path_width + 3..])
+                    } else {
+                        file.path.clone()
+                    };
+
+                    let net_color = if net > 0 {
+                        theme::SUCCESS
+                    } else if net < 0 {
+                        Color::Rgb(200, 80, 80)
+                    } else {
+                        theme::TEXT_MUTED
+                    };
+
+                    let net_str = if net > 0 {
+                        format!("+{}", net)
+                    } else {
+                        format!("{}", net)
+                    };
+
+                    text.push(Line::from(vec![
+                        Span::styled(" ".to_string(), base_style),
+                        Span::styled(format!("{} ", type_char), Style::default().fg(type_color)),
+                        Span::styled(format!("{:<width$}", display_path, width = effective_path_width), Style::default().fg(theme::TEXT)),
+                        Span::styled("  ", base_style),
+                        Span::styled(format!("{:>6}", format!("+{}", file.additions)), Style::default().fg(theme::SUCCESS)),
+                        Span::styled("  ", base_style),
+                        Span::styled(format!("{:>6}", format!("-{}", file.deletions)), Style::default().fg(Color::Rgb(200, 80, 80))),
+                        Span::styled("  ", base_style),
+                        Span::styled(format!("{:>6}", net_str), Style::default().fg(net_color)),
+                    ]));
+                }
+
+                // Total row separator
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled(chars::HORIZONTAL.repeat(path_width + 26), Style::default().fg(theme::BORDER)),
+                ]));
+
+                // Total row
+                let total_net = total_add - total_del;
+                let total_net_color = if total_net > 0 {
+                    theme::SUCCESS
+                } else if total_net < 0 {
+                    Color::Rgb(200, 80, 80)
+                } else {
+                    theme::TEXT_MUTED
+                };
+                let total_net_str = if total_net > 0 {
+                    format!("+{}", total_net)
+                } else {
+                    format!("{}", total_net)
+                };
+
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled(format!("{:<width$}", "Total", width = path_width), Style::default().fg(theme::TEXT).bold()),
+                    Span::styled("  ", base_style),
+                    Span::styled(format!("{:>6}", format!("+{}", total_add)), Style::default().fg(theme::SUCCESS).bold()),
+                    Span::styled("  ", base_style),
+                    Span::styled(format!("{:>6}", format!("-{}", total_del)), Style::default().fg(Color::Rgb(200, 80, 80)).bold()),
+                    Span::styled("  ", base_style),
+                    Span::styled(format!("{:>6}", total_net_str), Style::default().fg(total_net_color).bold()),
+                ]));
+            }
+
+            text.push(Line::from(""));
+            text.push(Line::from(vec![
+                Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::BORDER)),
+            ]));
+            text.push(Line::from(""));
+        }
 
         // Context elements header
         text.push(Line::from(vec![

@@ -416,6 +416,41 @@ pub struct State {
     pub spinner_frame: u64,
     /// Dev mode - shows additional debug info like token counts
     pub dev_mode: bool,
+
+    // === Git Status (runtime-only, not persisted) ===
+    /// Current git branch name (None if not a git repo)
+    pub git_branch: Option<String>,
+    /// Whether we're in a git repository
+    pub git_is_repo: bool,
+    /// Per-file git changes
+    pub git_file_changes: Vec<GitFileChange>,
+    /// Last time git status was refreshed (milliseconds)
+    pub git_last_refresh_ms: u64,
+}
+
+/// Represents a file change in git status
+#[derive(Debug, Clone)]
+pub struct GitFileChange {
+    /// File path (relative to repo root)
+    pub path: String,
+    /// Lines added
+    pub additions: i32,
+    /// Lines deleted
+    pub deletions: i32,
+    /// Type of change
+    pub change_type: GitChangeType,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitChangeType {
+    /// Modified file (staged or unstaged)
+    Modified,
+    /// Newly added/untracked file
+    Added,
+    /// Deleted file
+    Deleted,
+    /// Renamed file
+    Renamed,
 }
 
 impl Default for State {
@@ -555,6 +590,11 @@ impl Default for State {
             dirty: true, // Start dirty to ensure initial render
             spinner_frame: 0,
             dev_mode: false,
+            // Git status defaults
+            git_branch: None,
+            git_is_repo: false,
+            git_file_changes: vec![],
+            git_last_refresh_ms: 0,
         }
     }
 }

@@ -147,6 +147,7 @@ pub enum ToolCategory {
     Tmux,
     Tasks,
     Memory,
+    Git,
 }
 
 /// Get all available tool definitions
@@ -507,6 +508,23 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             ],
             enabled: true,
             category: ToolCategory::Memory,
+        },
+
+        // Git tools
+        ToolDefinition {
+            id: "git_commit".to_string(),
+            name: "Git Commit".to_string(),
+            short_desc: "Commit changes".to_string(),
+            description: "Stages specified files (or uses current staging) and creates a git commit. Returns the commit hash and summary of changes.".to_string(),
+            params: vec![
+                ToolParam::new("message", ParamType::String)
+                    .desc("Commit message")
+                    .required(),
+                ToolParam::new("files", ParamType::Array(Box::new(ParamType::String)))
+                    .desc("File paths to stage before committing. If empty, commits currently staged files."),
+            ],
+            enabled: true,
+            category: ToolCategory::Git,
         },
 
         // Meta tools
