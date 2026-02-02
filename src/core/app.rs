@@ -9,7 +9,7 @@ use crate::actions::{apply_action, clean_llm_id_prefix, Action, ActionResult};
 use crate::api::{start_cleaning, start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
 use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
-use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS};
+use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS, RENDER_THROTTLE_MS};
 use crate::context_cleaner;
 use crate::events::handle_event;
 use crate::panels::now_ms;
@@ -42,6 +42,8 @@ pub struct App {
     last_ownership_check_ms: u64,
     /// Pending retry error (will retry on next loop iteration)
     pending_retry_error: Option<String>,
+    /// Last render time for throttling
+    last_render_ms: u64,
 }
 
 impl App {
@@ -63,6 +65,7 @@ impl App {
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
             pending_retry_error: None,
+            last_render_ms: 0,
         }
     }
 
@@ -85,6 +88,8 @@ impl App {
         save_state(&self.state);
 
         loop {
+            let current_ms = now_ms();
+
             // === INPUT FIRST: Process user input with minimal latency ===
             // Non-blocking check for input - handle immediately for responsive feel
             if event::poll(Duration::ZERO)? {
@@ -101,6 +106,7 @@ impl App {
                 if self.state.dirty {
                     terminal.draw(|frame| ui::render(frame, &mut self.state))?;
                     self.state.dirty = false;
+                    self.last_render_ms = current_ms;
                 }
             }
 
@@ -117,7 +123,6 @@ impl App {
             self.finalize_stream(&tldr_tx, &clean_tx);
 
             // Check ownership periodically (every 1 second)
-            let current_ms = now_ms();
             if current_ms.saturating_sub(self.last_ownership_check_ms) >= 1000 {
                 self.last_ownership_check_ms = current_ms;
                 if !check_ownership() {
@@ -129,10 +134,15 @@ impl App {
             // Update spinner animation if there's active loading/streaming
             self.update_spinner_animation();
 
-            // Render if state changed from background processing
+            // Render if state changed from background processing (throttled during streaming)
             if self.state.dirty {
-                terminal.draw(|frame| ui::render(frame, &mut self.state))?;
-                self.state.dirty = false;
+                let should_render = !self.state.is_streaming
+                    || current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS;
+                if should_render {
+                    terminal.draw(|frame| ui::render(frame, &mut self.state))?;
+                    self.state.dirty = false;
+                    self.last_render_ms = current_ms;
+                }
             }
 
             // Wait for next event (with timeout to keep checking background channels)

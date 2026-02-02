@@ -1,14 +1,14 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
+    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
 use super::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::icons;
 use crate::state::{MessageStatus, MessageType, State};
-use crate::ui::{theme, helpers::{wrap_text, count_wrapped_lines}, markdown::*};
+use crate::ui::{theme, helpers::wrap_text, markdown::*};
 
 pub struct ConversationPanel;
 
@@ -169,6 +169,7 @@ impl Panel for ConversationPanel {
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+        let _guard = crate::profile!("panel::conversation::content");
         let mut text: Vec<Line<'static>> = Vec::new();
 
         if state.messages.is_empty() {
@@ -550,12 +551,9 @@ impl Panel for ConversationPanel {
 
         let text = self.content(state, base_style);
 
-        // Calculate scroll with wrapped line count
-        let viewport_width = content_area.width as usize;
+        // Calculate scroll - just count lines (no wrap calculation needed)
         let viewport_height = content_area.height as usize;
-        let content_height: usize = text.iter()
-            .map(|line| count_wrapped_lines(line, viewport_width))
-            .sum();
+        let content_height = text.len();
 
         let max_scroll = content_height.saturating_sub(viewport_height) as f32;
         state.max_scroll = max_scroll;
@@ -569,12 +567,18 @@ impl Panel for ConversationPanel {
         }
         state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
 
-        let paragraph = Paragraph::new(text)
-            .style(base_style)
-            .wrap(Wrap { trim: false })
-            .scroll((state.scroll_offset.round() as u16, 0));
+        let paragraph = {
+            let _guard = crate::profile!("conv::paragraph_new");
+            Paragraph::new(text)
+                .style(base_style)
+                // .wrap(Wrap { trim: false })  // DISABLED: Too slow, causes 60-80ms per render
+                .scroll((state.scroll_offset.round() as u16, 0))
+        };
 
-        frame.render_widget(paragraph, content_area);
+        {
+            let _guard = crate::profile!("conv::frame_render");
+            frame.render_widget(paragraph, content_area);
+        }
 
         // Scrollbar
         if content_height > viewport_height {

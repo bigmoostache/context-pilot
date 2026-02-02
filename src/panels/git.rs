@@ -134,6 +134,7 @@ impl Panel for GitPanel {
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+        let _guard = crate::profile!("panel::git::content");
         let mut text: Vec<Line> = Vec::new();
 
         if !state.git_is_repo {

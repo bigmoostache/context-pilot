@@ -104,6 +104,9 @@ pub const SIDEBAR_HELP_HEIGHT: u16 = 7;
 /// Poll interval for events in milliseconds
 pub const EVENT_POLL_MS: u64 = 8;
 
+/// Minimum time between renders during streaming (ms) - caps at ~30fps
+pub const RENDER_THROTTLE_MS: u64 = 33;
+
 /// Delay after tmux send-keys in milliseconds (allows command output to appear)
 pub const TMUX_SEND_DELAY_MS: u64 = 2000;
 

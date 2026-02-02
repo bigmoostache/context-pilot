@@ -135,19 +135,28 @@ pub trait Panel {
         // Calculate and set max scroll (accounting for wrapped lines)
         let viewport_width = content_area.width as usize;
         let viewport_height = content_area.height as usize;
-        let content_height: usize = text.iter()
-            .map(|line| count_wrapped_lines(line, viewport_width))
-            .sum();
+        let content_height: usize = {
+            let _guard = crate::profile!("panel::scroll_calc");
+            text.iter()
+                .map(|line| count_wrapped_lines(line, viewport_width))
+                .sum()
+        };
         let max_scroll = content_height.saturating_sub(viewport_height) as f32;
         state.max_scroll = max_scroll;
         state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
 
-        let paragraph = Paragraph::new(text)
-            .style(base_style)
-            .wrap(Wrap { trim: false })
-            .scroll((state.scroll_offset.round() as u16, 0));
+        let paragraph = {
+            let _guard = crate::profile!("panel::paragraph_new");
+            Paragraph::new(text)
+                .style(base_style)
+                .wrap(Wrap { trim: false })
+                .scroll((state.scroll_offset.round() as u16, 0))
+        };
 
-        frame.render_widget(paragraph, content_area);
+        {
+            let _guard = crate::profile!("panel::frame_render");
+            frame.render_widget(paragraph, content_area);
+        }
     }
 }
 

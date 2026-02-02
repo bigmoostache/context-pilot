@@ -8,6 +8,7 @@ use crate::state::State;
 use super::{theme, chars, spinner, helpers::*};
 
 pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
+    let _guard = crate::profile!("ui::sidebar");
     let base_style = Style::default().bg(theme::BG_BASE);
 
     // Sidebar layout: context list + help hints
