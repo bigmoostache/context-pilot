@@ -458,3 +458,116 @@ fn get_commit_stats() -> Option<(usize, usize, usize)> {
 
     Some((files_changed, insertions, deletions))
 }
+
+/// Execute git_pull tool
+pub fn execute_pull(tool: &ToolUse, _state: &mut State) -> ToolResult {
+    let result = Command::new("git")
+        .args(["pull"])
+        .output();
+
+    match result {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Pull successful:\n{}", stdout),
+                is_error: false,
+            }
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Pull failed: {}{}", stderr, stdout),
+                is_error: true,
+            }
+        }
+        Err(e) => {
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Error running git pull: {}", e),
+                is_error: true,
+            }
+        }
+    }
+}
+
+/// Execute git_push tool
+pub fn execute_push(tool: &ToolUse, _state: &mut State) -> ToolResult {
+    let result = Command::new("git")
+        .args(["push"])
+        .output();
+
+    match result {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // git push often outputs to stderr even on success
+            let output_text = if stdout.is_empty() { stderr.to_string() } else { stdout.to_string() };
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Push successful:\n{}", output_text),
+                is_error: false,
+            }
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Push failed: {}{}", stderr, stdout),
+                is_error: true,
+            }
+        }
+        Err(e) => {
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Error running git push: {}", e),
+                is_error: true,
+            }
+        }
+    }
+}
+
+/// Execute git_fetch tool
+pub fn execute_fetch(tool: &ToolUse, _state: &mut State) -> ToolResult {
+    let result = Command::new("git")
+        .args(["fetch"])
+        .output();
+
+    match result {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let output_text = if stdout.is_empty() && stderr.is_empty() {
+                "No new changes from remote".to_string()
+            } else if stdout.is_empty() {
+                stderr.to_string()
+            } else {
+                stdout.to_string()
+            };
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Fetch successful:\n{}", output_text),
+                is_error: false,
+            }
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Fetch failed: {}{}", stderr, stdout),
+                is_error: true,
+            }
+        }
+        Err(e) => {
+            ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Error running git fetch: {}", e),
+                is_error: true,
+            }
+        }
+    }
+}

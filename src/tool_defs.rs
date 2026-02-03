@@ -618,6 +618,33 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             enabled: true,
             category: ToolCategory::Git,
         },
+        ToolDefinition {
+            id: "git_pull".to_string(),
+            name: "Git Pull".to_string(),
+            short_desc: "Pull from remote".to_string(),
+            description: "Pulls changes from the remote repository (git pull).".to_string(),
+            params: vec![],
+            enabled: true,
+            category: ToolCategory::Git,
+        },
+        ToolDefinition {
+            id: "git_push".to_string(),
+            name: "Git Push".to_string(),
+            short_desc: "Push to remote".to_string(),
+            description: "Pushes local commits to the remote repository (git push).".to_string(),
+            params: vec![],
+            enabled: true,
+            category: ToolCategory::Git,
+        },
+        ToolDefinition {
+            id: "git_fetch".to_string(),
+            name: "Git Fetch".to_string(),
+            short_desc: "Fetch from remote".to_string(),
+            description: "Fetches changes from the remote repository without merging (git fetch).".to_string(),
+            params: vec![],
+            enabled: true,
+            category: ToolCategory::Git,
+        },
 
         // Meta tools
         ToolDefinition {
