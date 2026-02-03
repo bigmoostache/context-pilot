@@ -8,6 +8,7 @@ mod core;
 mod events;
 mod highlight;
 mod panels;
+mod perf;
 mod persistence;
 mod profiler;
 mod state;

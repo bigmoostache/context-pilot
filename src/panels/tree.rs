@@ -45,6 +45,7 @@ impl Panel for TreePanel {
     }
 
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
+        let _guard = crate::profile!("panel::tree::content");
         // Find tree context and use cached content
         let tree_content = state.context.iter()
             .find(|c| c.context_type == ContextType::Tree)

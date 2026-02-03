@@ -427,6 +427,8 @@ pub struct State {
     pub spinner_frame: u64,
     /// Dev mode - shows additional debug info like token counts
     pub dev_mode: bool,
+    /// Performance monitoring overlay enabled (F12 to toggle)
+    pub perf_enabled: bool,
 
     // === Git Status (runtime-only, not persisted) ===
     /// Current git branch name (None if not a git repo)
@@ -630,6 +632,7 @@ impl Default for State {
             dirty: true, // Start dirty to ensure initial render
             spinner_frame: 0,
             dev_mode: false,
+            perf_enabled: false,
             // Git status defaults
             git_branch: None,
             git_is_repo: false,

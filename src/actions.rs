@@ -77,6 +77,7 @@ pub enum Action {
     StopStreaming,
     StartContextCleaning,
     TmuxSendKeys { pane_id: String, keys: String },
+    TogglePerfMonitor,
     None,
 }
 
@@ -453,6 +454,11 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 // Mark cache as deprecated to refresh the pane content
                 ctx.cache_deprecated = true;
             }
+            ActionResult::Nothing
+        }
+        Action::TogglePerfMonitor => {
+            state.perf_enabled = crate::perf::PERF.toggle();
+            state.dirty = true;
             ActionResult::Nothing
         }
         Action::None => ActionResult::Nothing,

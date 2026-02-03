@@ -26,6 +26,11 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 return Some(Action::StopStreaming);
             }
 
+            // F12 toggles performance monitor
+            if key.code == KeyCode::F(12) {
+                return Some(Action::TogglePerfMonitor);
+            }
+
             // Enter or Space on context pattern (p1, P2, etc.) submits immediately
             if key.code == KeyCode::Enter || key.code == KeyCode::Char(' ') {
                 if let Some(id) = parse_context_pattern(&state.input) {

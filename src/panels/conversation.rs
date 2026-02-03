@@ -1,14 +1,14 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
 };
 
 use super::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::icons;
 use crate::state::{MessageStatus, MessageType, State};
-use crate::ui::{theme, helpers::wrap_text, markdown::*};
+use crate::ui::{theme, helpers::{wrap_text, count_wrapped_lines}, markdown::*};
 
 pub struct ConversationPanel;
 
@@ -551,9 +551,15 @@ impl Panel for ConversationPanel {
 
         let text = self.content(state, base_style);
 
-        // Calculate scroll - just count lines (no wrap calculation needed)
+        // Calculate scroll with wrapped line count
+        let viewport_width = content_area.width as usize;
         let viewport_height = content_area.height as usize;
-        let content_height = text.len();
+        let content_height: usize = {
+            let _guard = crate::profile!("conv::scroll_calc");
+            text.iter()
+                .map(|line| count_wrapped_lines(line, viewport_width))
+                .sum()
+        };
 
         let max_scroll = content_height.saturating_sub(viewport_height) as f32;
         state.max_scroll = max_scroll;
@@ -571,7 +577,7 @@ impl Panel for ConversationPanel {
             let _guard = crate::profile!("conv::paragraph_new");
             Paragraph::new(text)
                 .style(base_style)
-                // .wrap(Wrap { trim: false })  // DISABLED: Too slow, causes 60-80ms per render
+                .wrap(Wrap { trim: false })
                 .scroll((state.scroll_offset.round() as u16, 0))
         };
 

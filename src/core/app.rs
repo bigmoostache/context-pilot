@@ -153,6 +153,7 @@ impl App {
     }
 
     fn process_stream_events(&mut self, rx: &Receiver<StreamEvent>) {
+        let _guard = crate::profile!("app::stream_events");
         while let Ok(evt) = rx.try_recv() {
             if !self.state.is_streaming {
                 continue;
@@ -207,6 +208,7 @@ impl App {
     }
 
     fn process_typewriter(&mut self) {
+        let _guard = crate::profile!("app::typewriter");
         if self.state.is_streaming {
             if let Some(chars) = self.typewriter.take_chars() {
                 apply_action(&mut self.state, Action::AppendChars(chars));

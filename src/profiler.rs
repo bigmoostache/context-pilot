@@ -31,9 +31,14 @@ impl ProfileGuard {
 impl Drop for ProfileGuard {
     fn drop(&mut self) {
         let elapsed = self.start.elapsed();
-        let ms = elapsed.as_millis();
+        let us = elapsed.as_micros() as u64;
+        let ms = us / 1000;
 
-        if ms >= THRESHOLD_MS {
+        // Always record to in-memory perf system
+        crate::perf::PERF.record_op(self.name, us);
+
+        // Log to file only for slow operations
+        if ms as u128 >= THRESHOLD_MS {
             if let Ok(mut file) = OpenOptions::new()
                 .create(true)
                 .append(true)
