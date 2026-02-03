@@ -186,8 +186,8 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("Ctrl+H", Style::default().fg(theme::ACCENT)),
-            Span::styled(" config", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("Ctrl+P", Style::default().fg(theme::ACCENT)),
+            Span::styled(" commands", Style::default().fg(theme::TEXT_MUTED)),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),

@@ -90,6 +90,8 @@ pub enum Action {
     ConfigSelectPrevBar,
     ConfigIncreaseSelectedBar,
     ConfigDecreaseSelectedBar,
+    OpenCommandPalette,
+    SelectContextById(String),
     None,
 }
 
@@ -583,6 +585,20 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             state.dirty = true;
             ActionResult::Save
+        }
+        Action::OpenCommandPalette => {
+            // Handled in app.rs directly
+            ActionResult::Nothing
+        }
+        Action::SelectContextById(id) => {
+            // Find context by ID and select it
+            if let Some(idx) = state.context.iter().position(|c| c.id == id) {
+                state.selected_context = idx;
+                state.scroll_offset = 0.0;
+                state.user_scrolled = false;
+                state.dirty = true;
+            }
+            ActionResult::Nothing
         }
         Action::None => ActionResult::Nothing,
     }

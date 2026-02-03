@@ -19,6 +19,7 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     KeyCode::Char('n') => return Some(Action::NewContext),
                     KeyCode::Char('k') => return Some(Action::StartContextCleaning),
                     KeyCode::Char('h') => return Some(Action::ToggleConfigView),
+                    KeyCode::Char('p') => return Some(Action::OpenCommandPalette),
                     _ => {}
                 }
             }

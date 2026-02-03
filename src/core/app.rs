@@ -115,16 +115,44 @@ impl App {
             if event::poll(Duration::ZERO)? {
                 let evt = event::read()?;
 
+                // Handle command palette events first if it's open
+                if self.command_palette.is_open {
+                    if let Some(action) = self.handle_palette_event(&evt) {
+                        self.handle_action(action, &tx, &tldr_tx, &clean_tx);
+                    }
+                    self.state.dirty = true;
+
+                    // Render immediately after input for instant feedback
+                    if self.state.dirty {
+                        terminal.draw(|frame| {
+                            ui::render(frame, &mut self.state);
+                            self.command_palette.render(frame, &self.state);
+                        })?;
+                        self.state.dirty = false;
+                        self.last_render_ms = current_ms;
+                    }
+                    continue;
+                }
+
                 let Some(action) = handle_event(&evt, &self.state) else {
                     save_state(&self.state);
                     break;
                 };
 
-                self.handle_action(action, &tx, &tldr_tx, &clean_tx);
+                // Check for Ctrl+P to open palette
+                if let Action::OpenCommandPalette = action {
+                    self.command_palette.open(&self.state);
+                    self.state.dirty = true;
+                } else {
+                    self.handle_action(action, &tx, &tldr_tx, &clean_tx);
+                }
 
                 // Render immediately after input for instant feedback
                 if self.state.dirty {
-                    terminal.draw(|frame| ui::render(frame, &mut self.state))?;
+                    terminal.draw(|frame| {
+                        ui::render(frame, &mut self.state);
+                        self.command_palette.render(frame, &self.state);
+                    })?;
                     self.state.dirty = false;
                     self.last_render_ms = current_ms;
                 }
@@ -157,7 +185,10 @@ impl App {
 
             // Render if dirty and enough time has passed (capped at ~28fps)
             if self.state.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
-                terminal.draw(|frame| ui::render(frame, &mut self.state))?;
+                terminal.draw(|frame| {
+                    ui::render(frame, &mut self.state);
+                    self.command_palette.render(frame, &self.state);
+                })?;
                 self.state.dirty = false;
                 self.last_render_ms = current_ms;
             }
@@ -981,6 +1012,103 @@ impl App {
             self.state.spinner_frame = self.state.spinner_frame.wrapping_add(1);
             // Mark dirty to trigger re-render with new spinner frame
             self.state.dirty = true;
+        }
+    }
+
+    /// Handle keyboard events when command palette is open
+    fn handle_palette_event(&mut self, event: &event::Event) -> Option<Action> {
+        use crossterm::event::{KeyCode, KeyModifiers};
+
+        let event::Event::Key(key) = event else {
+            return Some(Action::None);
+        };
+
+        match key.code {
+            // Escape closes palette
+            KeyCode::Esc => {
+                self.command_palette.close();
+                None
+            }
+            // Enter executes selected command
+            KeyCode::Enter => {
+                if let Some(cmd) = self.command_palette.get_selected() {
+                    let id = cmd.id.clone();
+                    self.command_palette.close();
+
+                    // Handle different command types
+                    match id.as_str() {
+                        "quit" => return None, // Signal quit
+                        "reload" => {
+                            // Set reload flag and quit to trigger reload
+                            self.state.dirty = true;
+                            // Use persistence to signal reload
+                            crate::persistence::save_state(&self.state);
+                            return None;
+                        }
+                        "config" => return Some(Action::ToggleConfigView),
+                        _ if id.starts_with('P') => {
+                            return Some(Action::SelectContextById(id));
+                        }
+                        _ => {}
+                    }
+                }
+                Some(Action::None)
+            }
+            // Up/Down navigate results
+            KeyCode::Up => {
+                self.command_palette.select_prev();
+                None
+            }
+            KeyCode::Down => {
+                self.command_palette.select_next();
+                None
+            }
+            // Left/Right move cursor in query
+            KeyCode::Left => {
+                self.command_palette.cursor_left();
+                None
+            }
+            KeyCode::Right => {
+                self.command_palette.cursor_right();
+                None
+            }
+            // Home/End for cursor
+            KeyCode::Home => {
+                self.command_palette.cursor = 0;
+                None
+            }
+            KeyCode::End => {
+                self.command_palette.cursor = self.command_palette.query.len();
+                None
+            }
+            // Backspace/Delete
+            KeyCode::Backspace => {
+                self.command_palette.backspace(&self.state);
+                None
+            }
+            KeyCode::Delete => {
+                self.command_palette.delete(&self.state);
+                None
+            }
+            // Character input
+            KeyCode::Char(c) => {
+                // Ignore Ctrl+char combinations
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    return None;
+                }
+                self.command_palette.insert_char(c, &self.state);
+                None
+            }
+            // Tab could cycle through results
+            KeyCode::Tab => {
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    self.command_palette.select_prev();
+                } else {
+                    self.command_palette.select_next();
+                }
+                None
+            }
+            _ => None,
         }
     }
 }
