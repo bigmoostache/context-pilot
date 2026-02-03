@@ -68,25 +68,11 @@ struct GroqFunction {
 }
 
 #[derive(Debug, Serialize)]
-struct GroqTool {
-    #[serde(rename = "type")]
-    tool_type: String,
-    function: GroqFunctionDef,
-}
-
-#[derive(Debug, Serialize)]
-struct GroqFunctionDef {
-    name: String,
-    description: String,
-    parameters: Value,
-}
-
-#[derive(Debug, Serialize)]
 struct GroqRequest {
     model: String,
     messages: Vec<GroqMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    tools: Vec<GroqTool>,
+    tools: Vec<Value>,  // Can be function tools or built-in tools
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
     max_completion_tokens: u32,
@@ -145,6 +131,7 @@ impl LlmClient for GroqClient {
             &request.context_items,
             &request.system_prompt,
             &request.extra_context,
+            &request.model,
         );
 
         // Add tool results if present
@@ -160,8 +147,8 @@ impl LlmClient for GroqClient {
             }
         }
 
-        // Convert tools to OpenAI format
-        let groq_tools = tools_to_groq(&request.tools);
+        // Convert tools to Groq format (includes built-in tools for GPT-OSS models)
+        let groq_tools = tools_to_groq(&request.tools, &request.model);
 
         // Set tool_choice to "auto" when tools are available
         let tool_choice = if groq_tools.is_empty() {
@@ -378,13 +365,20 @@ fn messages_to_groq(
     context_items: &[ContextItem],
     system_prompt: &Option<String>,
     extra_context: &Option<String>,
+    model: &str,
 ) -> Vec<GroqMessage> {
     let mut groq_messages: Vec<GroqMessage> = Vec::new();
 
     // Add system message
-    let system_content = system_prompt
+    let mut system_content = system_prompt
         .clone()
         .unwrap_or_else(|| prompts::MAIN_SYSTEM.to_string());
+
+    // For GPT-OSS models, add info about built-in tools
+    if model.starts_with("openai/gpt-oss") {
+        system_content.push_str("\n\nYou have access to built-in tools: browser_search (for web searches) and code_interpreter (for running code). Use browser_search when the user asks to search the web or look up current information.");
+    }
+
     groq_messages.push(GroqMessage {
         role: "system".to_string(),
         content: Some(system_content),
@@ -498,17 +492,27 @@ fn messages_to_groq(
 }
 
 /// Convert tool definitions to Groq/OpenAI format
-fn tools_to_groq(tools: &[ToolDefinition]) -> Vec<GroqTool> {
-    tools
+/// Convert tool definitions to Groq format
+/// For GPT-OSS models, also adds built-in tools (browser_search, code_interpreter)
+fn tools_to_groq(tools: &[ToolDefinition], model: &str) -> Vec<Value> {
+    let mut groq_tools: Vec<Value> = tools
         .iter()
         .filter(|t| t.enabled)
-        .map(|t| GroqTool {
-            tool_type: "function".to_string(),
-            function: GroqFunctionDef {
-                name: t.id.clone(),
-                description: t.description.clone(),
-                parameters: t.to_json_schema(),
-            },
-        })
-        .collect()
+        .map(|t| serde_json::json!({
+            "type": "function",
+            "function": {
+                "name": t.id,
+                "description": t.description,
+                "parameters": t.to_json_schema(),
+            }
+        }))
+        .collect();
+
+    // Add built-in tools for GPT-OSS models
+    if model.starts_with("openai/gpt-oss") {
+        groq_tools.push(serde_json::json!({"type": "browser_search"}));
+        groq_tools.push(serde_json::json!({"type": "code_interpreter"}));
+    }
+
+    groq_tools
 }

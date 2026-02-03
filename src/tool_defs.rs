@@ -172,7 +172,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             id: "open_file".to_string(),
             name: "Open File".to_string(),
             short_desc: "Read file into context".to_string(),
-            description: "Opens a file and adds it to the context. The file content will be visible and can be referenced.".to_string(),
+            description: "Opens a file and adds it to context so you can see its content. ALWAYS use this BEFORE edit_file to see current content - you need exact text for edits.".to_string(),
             params: vec![
                 ToolParam::new("path", ParamType::String)
                     .desc("Path to the file to open")
@@ -185,17 +185,17 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             id: "edit_file".to_string(),
             name: "Edit File".to_string(),
             short_desc: "Modify file content".to_string(),
-            description: "Edits a file by applying one or more replacements sequentially. Each edit replaces old_string with new_string. The file must be in context first.".to_string(),
+            description: "Edits a file by replacing exact text. IMPORTANT: 1) Use open_file FIRST to see current content. 2) old_string must be EXACT text from file (copy from context) - empty string will fail. 3) To append, use the last line as old_string and include it + new content in new_string.".to_string(),
             params: vec![
                 ToolParam::new("path", ParamType::String)
                     .desc("Path to the file to edit")
                     .required(),
                 ToolParam::new("edits", ParamType::Array(Box::new(ParamType::Object(vec![
                     ToolParam::new("old_string", ParamType::String)
-                        .desc("The exact string to find and replace")
+                        .desc("EXACT text to find (copy from file context, never empty or guessed)")
                         .required(),
                     ToolParam::new("new_string", ParamType::String)
-                        .desc("The string to replace with")
+                        .desc("Text to replace with (to append: include old_string + new content)")
                         .required(),
                 ]))))
                     .desc("Array of edits to apply sequentially")
@@ -208,7 +208,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             id: "create_file".to_string(),
             name: "Create File".to_string(),
             short_desc: "Create new file".to_string(),
-            description: "Creates a new file with the specified content. Will fail if file already exists.".to_string(),
+            description: "Creates a NEW file. Fails if file exists - use edit_file to modify existing files.".to_string(),
             params: vec![
                 ToolParam::new("path", ParamType::String)
                     .desc("Path for the new file")
@@ -244,7 +244,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::FileSystem,
         },
         ToolDefinition {
-            id: "glob".to_string(),
+            id: "file_glob".to_string(),
             name: "Glob Search".to_string(),
             short_desc: "Find files by pattern".to_string(),
             description: "Searches for files matching a glob pattern. Results are added to context.".to_string(),
@@ -260,7 +260,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::FileSystem,
         },
         ToolDefinition {
-            id: "grep".to_string(),
+            id: "file_grep".to_string(),
             name: "Grep Search".to_string(),
             short_desc: "Search file contents".to_string(),
             description: "Searches file contents for a regex pattern. Results show matching lines with file:line context. Results are added to context and update dynamically.".to_string(),

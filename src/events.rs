@@ -87,20 +87,20 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         KeyCode::Char('a') => match _state.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45)),
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Fast)),
-            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama33_70b)),
+            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss120b)),
         },
         KeyCode::Char('b') => match _state.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45)),
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Fast)),
-            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama31_8b)),
+            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss20b)),
         },
         KeyCode::Char('c') => match _state.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45)),
             LlmProvider::Grok => Some(Action::None), // Only 2 Grok models
-            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama4Scout)),
+            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama33_70b)),
         },
         KeyCode::Char('d') => match _state.llm_provider {
-            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Qwen3_32b)),
+            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama31_8b)),
             _ => Some(Action::None),
         }
         // Up/Down select which bar to edit

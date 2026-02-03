@@ -165,33 +165,35 @@ impl ModelInfo for GrokModel {
     }
 }
 
-/// Available models for Groq (models with Local & Remote Tool Use support)
+/// Available models for Groq
+/// - GPT-OSS models: Support BOTH custom tools AND built-in tools (browser search, code exec)
+/// - Llama models: Custom tools only
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum GroqModel {
     #[default]
+    GptOss120b,
+    GptOss20b,
     Llama33_70b,
     Llama31_8b,
-    Llama4Scout,
-    Qwen3_32b,
 }
 
 impl ModelInfo for GroqModel {
     fn api_name(&self) -> &'static str {
         match self {
+            GroqModel::GptOss120b => "openai/gpt-oss-120b",
+            GroqModel::GptOss20b => "openai/gpt-oss-20b",
             GroqModel::Llama33_70b => "llama-3.3-70b-versatile",
             GroqModel::Llama31_8b => "llama-3.1-8b-instant",
-            GroqModel::Llama4Scout => "meta-llama/llama-4-scout-17b-16e-instruct",
-            GroqModel::Qwen3_32b => "qwen/qwen3-32b",
         }
     }
 
     fn display_name(&self) -> &'static str {
         match self {
+            GroqModel::GptOss120b => "GPT-OSS 120B (+web)",
+            GroqModel::GptOss20b => "GPT-OSS 20B (+web)",
             GroqModel::Llama33_70b => "Llama 3.3 70B",
             GroqModel::Llama31_8b => "Llama 3.1 8B",
-            GroqModel::Llama4Scout => "Llama 4 Scout",
-            GroqModel::Qwen3_32b => "Qwen3 32B",
         }
     }
 
@@ -201,19 +203,19 @@ impl ModelInfo for GroqModel {
 
     fn input_price_per_mtok(&self) -> f32 {
         match self {
+            GroqModel::GptOss120b => 1.20,
+            GroqModel::GptOss20b => 0.20,
             GroqModel::Llama33_70b => 0.59,
             GroqModel::Llama31_8b => 0.05,
-            GroqModel::Llama4Scout => 0.11,
-            GroqModel::Qwen3_32b => 0.29,
         }
     }
 
     fn output_price_per_mtok(&self) -> f32 {
         match self {
+            GroqModel::GptOss120b => 1.20,
+            GroqModel::GptOss20b => 0.20,
             GroqModel::Llama33_70b => 0.79,
             GroqModel::Llama31_8b => 0.08,
-            GroqModel::Llama4Scout => 0.34,
-            GroqModel::Qwen3_32b => 0.59,
         }
     }
 }

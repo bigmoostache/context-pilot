@@ -348,10 +348,10 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         }
         LlmProvider::Groq => {
             for (model, key) in [
-                (GroqModel::Llama33_70b, "a"),
-                (GroqModel::Llama31_8b, "b"),
-                (GroqModel::Llama4Scout, "c"),
-                (GroqModel::Qwen3_32b, "d"),
+                (GroqModel::GptOss120b, "a"),
+                (GroqModel::GptOss20b, "b"),
+                (GroqModel::Llama33_70b, "c"),
+                (GroqModel::Llama31_8b, "d"),
             ] {
                 let is_selected = state.groq_model == model;
                 render_model_line_with_info(&mut lines, is_selected, key, &model);
