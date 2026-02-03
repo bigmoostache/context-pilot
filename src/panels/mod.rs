@@ -23,6 +23,7 @@ mod glob;
 mod grep;
 mod memory;
 mod overview;
+mod system;
 mod tmux;
 mod todo;
 mod tree;
@@ -56,6 +57,7 @@ pub use glob::GlobPanel;
 pub use grep::GrepPanel;
 pub use memory::MemoryPanel;
 pub use overview::OverviewPanel;
+pub use system::SystemPanel;
 pub use tmux::TmuxPanel;
 pub use todo::TodoPanel;
 pub use tree::TreePanel;
@@ -167,6 +169,7 @@ pub trait Panel {
 /// Get the appropriate panel for a context type
 pub fn get_panel(context_type: ContextType) -> Box<dyn Panel> {
     match context_type {
+        ContextType::System => Box::new(SystemPanel),
         ContextType::Conversation => Box::new(ConversationPanel),
         ContextType::File => Box::new(FilePanel),
         ContextType::Tree => Box::new(TreePanel),

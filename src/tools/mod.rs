@@ -8,6 +8,7 @@ mod grep;
 mod manage_tools;
 mod memory;
 mod message_status;
+mod system;
 mod overview;
 mod tmux;
 mod todo;
@@ -83,6 +84,10 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "update_todos" => todo::execute_update(tool, state),
         "create_memories" => memory::execute_create(tool, state),
         "update_memories" => memory::execute_update(tool, state),
+        "create_system" => system::create_system(tool, state),
+        "edit_system" => system::edit_system(tool, state),
+        "delete_system" => system::delete_system(tool, state),
+        "load_system" => system::load_system(tool, state),
         "git_commit" => git::execute_commit(tool, state),
         "git_create_branch" => git::execute_create_branch(tool, state),
         "git_change_branch" => git::execute_change_branch(tool, state),

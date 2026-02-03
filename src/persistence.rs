@@ -64,11 +64,28 @@ fn extract_disabled_tools(tools: &[ToolDefinition]) -> Vec<String> {
         .collect()
 }
 
+/// Migrate old context element names to new names
+fn migrate_context_names(context: &mut [crate::state::ContextElement]) {
+    for elem in context.iter_mut() {
+        // Migrate old names to new names (feature-dump rename)
+        match (elem.id.as_str(), elem.name.as_str()) {
+            ("P1", "Main") => elem.name = "Chat".to_string(),
+            ("P3", "Todo") => elem.name = "WIP".to_string(),
+            ("P4", "Memory") => elem.name = "Notes".to_string(),
+            ("P5", "Overview") => elem.name = "World".to_string(),
+            ("P6", "Git") => elem.name = "Changes".to_string(),
+            _ => {}
+        }
+    }
+}
+
 pub fn load_state() -> State {
     let path = PathBuf::from(STORE_DIR).join(STATE_FILE);
 
     if let Ok(json) = fs::read_to_string(&path) {
-        if let Ok(persisted) = serde_json::from_str::<PersistedState>(&json) {
+        if let Ok(mut persisted) = serde_json::from_str::<PersistedState>(&json) {
+            // Migrate old context names to new names
+            migrate_context_names(&mut persisted.context);
             let messages: Vec<Message> = persisted.message_ids
                 .iter()
                 .filter_map(|id| load_message(id))
@@ -104,6 +121,9 @@ pub fn load_state() -> State {
                 next_todo_id: persisted.next_todo_id,
                 memories: persisted.memories,
                 next_memory_id: persisted.next_memory_id,
+                systems: persisted.systems,
+                next_system_id: persisted.next_system_id,
+                active_system_id: persisted.active_system_id,
                 tools: build_tools_from_disabled(&persisted.disabled_tools),
                 is_cleaning_context: false,
                 dirty: true,
@@ -168,6 +188,9 @@ pub fn save_state(state: &State) {
         next_todo_id: state.next_todo_id,
         memories: state.memories.clone(),
         next_memory_id: state.next_memory_id,
+        systems: state.systems.clone(),
+        next_system_id: state.next_system_id,
+        active_system_id: state.active_system_id.clone(),
         disabled_tools: extract_disabled_tools(&state.tools),
         owner_pid: Some(current_pid()),
         dev_mode: state.dev_mode,

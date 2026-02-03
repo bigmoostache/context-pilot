@@ -526,6 +526,70 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             category: ToolCategory::Memory,
         },
 
+        // System Prompt tools
+        ToolDefinition {
+            id: "create_system".to_string(),
+            name: "Create System".to_string(),
+            short_desc: "Create system prompt".to_string(),
+            description: "Creates a new system prompt with a name, description, and content. System prompts define the agent's identity and behavior.".to_string(),
+            params: vec![
+                ToolParam::new("name", ParamType::String)
+                    .desc("System prompt name")
+                    .required(),
+                ToolParam::new("description", ParamType::String)
+                    .desc("Short description of this system prompt"),
+                ToolParam::new("content", ParamType::String)
+                    .desc("Full system prompt content")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::Context,
+        },
+        ToolDefinition {
+            id: "edit_system".to_string(),
+            name: "Edit System".to_string(),
+            short_desc: "Edit system prompt".to_string(),
+            description: "Edits an existing system prompt. Can update name, description, or content.".to_string(),
+            params: vec![
+                ToolParam::new("id", ParamType::String)
+                    .desc("System prompt ID (e.g., S0, S1)")
+                    .required(),
+                ToolParam::new("name", ParamType::String)
+                    .desc("New name"),
+                ToolParam::new("description", ParamType::String)
+                    .desc("New description"),
+                ToolParam::new("content", ParamType::String)
+                    .desc("New content"),
+            ],
+            enabled: true,
+            category: ToolCategory::Context,
+        },
+        ToolDefinition {
+            id: "delete_system".to_string(),
+            name: "Delete System".to_string(),
+            short_desc: "Delete system prompt".to_string(),
+            description: "Deletes a system prompt. If the deleted prompt was active, reverts to default.".to_string(),
+            params: vec![
+                ToolParam::new("id", ParamType::String)
+                    .desc("System prompt ID to delete (e.g., S0)")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::Context,
+        },
+        ToolDefinition {
+            id: "load_system".to_string(),
+            name: "Load System".to_string(),
+            short_desc: "Activate system prompt".to_string(),
+            description: "Loads/activates a system prompt. Pass empty id to revert to default system prompt.".to_string(),
+            params: vec![
+                ToolParam::new("id", ParamType::String)
+                    .desc("System prompt ID to activate (e.g., S0). Empty to use default."),
+            ],
+            enabled: true,
+            category: ToolCategory::Context,
+        },
+
         // System tools
         ToolDefinition {
             id: "reload_tui".to_string(),

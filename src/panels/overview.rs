@@ -37,16 +37,17 @@ impl Panel for OverviewPanel {
         output.push_str("Context Elements:\n");
         for ctx in &state.context {
             let type_name = match ctx.context_type {
-                ContextType::Conversation => "conversation",
+                ContextType::System => "seed",
+                ContextType::Conversation => "chat",
                 ContextType::File => "file",
                 ContextType::Tree => "tree",
                 ContextType::Glob => "glob",
                 ContextType::Grep => "grep",
                 ContextType::Tmux => "tmux",
-                ContextType::Todo => "todo",
-                ContextType::Memory => "memory",
-                ContextType::Overview => "overview",
-                ContextType::Git => "git",
+                ContextType::Todo => "wip",
+                ContextType::Memory => "notes",
+                ContextType::Overview => "world",
+                ContextType::Git => "changes",
             };
 
             let details = match ctx.context_type {
@@ -77,6 +78,15 @@ impl Panel for OverviewPanel {
 
         if !state.memories.is_empty() {
             output.push_str(&format!("Memories: {}\n", state.memories.len()));
+        }
+
+        // Available seeds (system prompts) for LLM
+        output.push_str("\nSeeds (System Prompts):\n\n");
+        output.push_str("| ID | Name | Active | Description |\n");
+        output.push_str("|-----|------|--------|-------------|\n");
+        for sys in &state.systems {
+            let active = if state.active_system_id.as_deref() == Some(&sys.id) { "✓" } else { " " };
+            output.push_str(&format!("| {} | {} | {} | {} |\n", sys.id, sys.name, active, sys.description));
         }
 
         // Git status for LLM (as markdown table)
@@ -365,6 +375,7 @@ impl Panel for OverviewPanel {
         for ctx in &state.context {
             let icon = ctx.context_type.icon();
             let type_name = match ctx.context_type {
+                ContextType::System => "system",
                 ContextType::Conversation => "conversation",
                 ContextType::File => "file",
                 ContextType::Tree => "tree",
@@ -465,6 +476,80 @@ impl Panel for OverviewPanel {
                 Span::styled(format!("{}", total_memories), Style::default().fg(theme::TEXT).bold()),
                 Span::styled(format!(" ({} critical, {} high, {} medium, {} low)", critical, high, medium, low), Style::default().fg(theme::TEXT_MUTED)),
             ]));
+        }
+
+        text.push(Line::from(""));
+        text.push(Line::from(vec![
+            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::BORDER)),
+        ]));
+        text.push(Line::from(""));
+
+        // Seeds section
+        text.push(Line::from(vec![
+            Span::styled(" ".to_string(), base_style),
+            Span::styled("SEEDS".to_string(), Style::default().fg(theme::TEXT_MUTED).bold()),
+            Span::styled(format!("  ({} available)", state.systems.len()), Style::default().fg(theme::TEXT_MUTED)),
+        ]));
+        text.push(Line::from(""));
+
+        {
+            // Calculate column widths
+            let id_width = state.systems.iter().map(|s| s.id.len()).max().unwrap_or(4).max(4);
+            let name_width = state.systems.iter().map(|s| s.name.len()).max().unwrap_or(10).max(10).min(20);
+
+            // Table header
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled(format!("{:<width$}", "ID", width = id_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                Span::styled("  ", base_style),
+                Span::styled(format!("{:<width$}", "Name", width = name_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                Span::styled("  ", base_style),
+                Span::styled("Active", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                Span::styled("  ", base_style),
+                Span::styled("Description", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+            ]));
+
+            // Table separator
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled(format!("{}", chars::HORIZONTAL.repeat(id_width + name_width + 50)), Style::default().fg(theme::BORDER)),
+            ]));
+
+            // Table rows
+            for sys in &state.systems {
+                let is_active = state.active_system_id.as_deref() == Some(&sys.id);
+                let (active_icon, active_color) = if is_active {
+                    ("✓", theme::SUCCESS)
+                } else {
+                    (" ", theme::TEXT_MUTED)
+                };
+
+                // Truncate name if needed
+                let display_name = if sys.name.len() > name_width {
+                    format!("{}...", &sys.name[..name_width.saturating_sub(3)])
+                } else {
+                    sys.name.clone()
+                };
+
+                // Truncate description
+                let desc_max = 35;
+                let display_desc = if sys.description.len() > desc_max {
+                    format!("{}...", &sys.description[..desc_max.saturating_sub(3)])
+                } else {
+                    sys.description.clone()
+                };
+
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled(format!("{:<width$}", sys.id, width = id_width), Style::default().fg(theme::ACCENT_DIM)),
+                    Span::styled("  ", base_style),
+                    Span::styled(format!("{:<width$}", display_name, width = name_width), Style::default().fg(theme::TEXT)),
+                    Span::styled("  ", base_style),
+                    Span::styled(format!("  {}   ", active_icon), Style::default().fg(active_color)),
+                    Span::styled("  ", base_style),
+                    Span::styled(display_desc, Style::default().fg(theme::TEXT_MUTED)),
+                ]));
+            }
         }
 
         text.push(Line::from(""));

@@ -12,6 +12,7 @@ use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
 use crate::constants::{EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS, RENDER_THROTTLE_MS};
 use crate::context_cleaner;
 use crate::events::handle_event;
+use crate::help::CommandPalette;
 use crate::panels::now_ms;
 use crate::persistence::{check_ownership, save_message, save_state};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
@@ -21,6 +22,7 @@ use crate::ui;
 use crate::watcher::{FileWatcher, WatchEvent};
 
 use super::context::prepare_stream_context;
+use super::init::get_active_seed_content;
 
 pub struct App {
     pub state: State,
@@ -48,6 +50,8 @@ pub struct App {
     api_check_rx: Option<Receiver<crate::llms::ApiCheckResult>>,
     /// Whether to auto-start streaming on first loop iteration
     resume_stream: bool,
+    /// Command palette state
+    pub command_palette: CommandPalette,
 }
 
 impl App {
@@ -72,6 +76,7 @@ impl App {
             last_render_ms: 0,
             api_check_rx: None,
             resume_stream,
+            command_palette: CommandPalette::new(),
         }
     }
 
@@ -209,12 +214,13 @@ impl App {
                     }
                 }
                 let ctx = prepare_stream_context(&mut self.state, true);
+                let system_prompt = get_active_seed_content(&self.state);
                 self.typewriter.reset();
                 self.pending_done = None;
                 start_streaming(
                     self.state.llm_provider,
                     self.state.current_model(),
-                    ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
+                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt, tx.clone(),
                 );
                 self.state.dirty = true;
             }
@@ -237,20 +243,16 @@ impl App {
                 continue;
             }
             match evt {
-                StreamEvent::Chunk(text) => {
-                    // Log cleaner text output for debugging
-                    eprintln!("[CLEANER] Text chunk: {}", text.chars().take(100).collect::<String>());
+                StreamEvent::Chunk(_text) => {
+                    // Ignore text output from cleaner
                 }
                 StreamEvent::ToolUse(tool) => {
-                    eprintln!("[CLEANER] Tool use: {}", tool.name);
                     self.cleaning_pending_tools.push(tool);
                 }
                 StreamEvent::Done { input_tokens, output_tokens } => {
-                    eprintln!("[CLEANER] Done. Tools pending: {}", self.cleaning_pending_tools.len());
                     self.cleaning_pending_done = Some((input_tokens, output_tokens));
                 }
-                StreamEvent::Error(e) => {
-                    eprintln!("[CLEANER] Error: {}", e);
+                StreamEvent::Error(_e) => {
                     self.state.is_cleaning_context = false;
                     self.cleaning_pending_tools.clear();
                     self.cleaning_pending_done = None;
@@ -437,12 +439,13 @@ impl App {
 
         // Continue streaming
         let ctx = prepare_stream_context(&mut self.state, true);
+        let system_prompt = get_active_seed_content(&self.state);
         self.typewriter.reset();
         self.pending_done = None;
         start_streaming(
             self.state.llm_provider,
             self.state.current_model(),
-            ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
+            ctx.messages, ctx.context_items, ctx.tools, None, system_prompt, tx.clone(),
         );
     }
 
@@ -518,10 +521,11 @@ impl App {
                     }
                 }
                 let ctx = prepare_stream_context(&mut self.state, false);
+                let system_prompt = get_active_seed_content(&self.state);
                 start_streaming(
                     self.state.llm_provider,
                     self.state.current_model(),
-                    ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
+                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt, tx.clone(),
                 );
                 save_state(&self.state);
             }

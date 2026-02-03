@@ -185,16 +185,17 @@ pub mod icons {
     pub const MSG_ERROR: &str = "⚠️";
 
     // Context panel types
-    pub const CTX_CONVERSATION: &str = "💬";
-    pub const CTX_TREE: &str = "📁";
-    pub const CTX_TODO: &str = "✅";
-    pub const CTX_MEMORY: &str = "🧠";
-    pub const CTX_OVERVIEW: &str = "📊";
-    pub const CTX_FILE: &str = "📄";
-    pub const CTX_GLOB: &str = "🔍";
-    pub const CTX_GREP: &str = "🔎";
-    pub const CTX_TMUX: &str = "🎮";
-    pub const CTX_GIT: &str = "🔀";
+    pub const CTX_SYSTEM: &str = "🌱";
+    pub const CTX_CONVERSATION: &str = "📜";
+    pub const CTX_TREE: &str = "🌲";
+    pub const CTX_TODO: &str = "🪓";
+    pub const CTX_MEMORY: &str = "💡";
+    pub const CTX_OVERVIEW: &str = "🌍";
+    pub const CTX_FILE: &str = "💾";
+    pub const CTX_GLOB: &str = "🔭";
+    pub const CTX_GREP: &str = "👓";
+    pub const CTX_TMUX: &str = "🕹️";
+    pub const CTX_GIT: &str = "🐙";
 
     // Message status
     pub const STATUS_FULL: &str = "";
@@ -217,12 +218,24 @@ pub mod icons {
 // =============================================================================
 
 pub mod prompts {
-    /// Main system prompt for the assistant
-    pub const MAIN_SYSTEM: &str = r#"You are a helpful coding assistant.
+    /// Default seed ID
+    pub const DEFAULT_SEED_ID: &str = "S0";
+
+    /// Default seed name
+    pub const DEFAULT_SEED_NAME: &str = "Default";
+
+    /// Default seed description
+    pub const DEFAULT_SEED_DESC: &str = "Default coding assistant";
+
+    /// Default seed content (main system prompt)
+    pub const DEFAULT_SEED_CONTENT: &str = r#"You are a helpful coding assistant.
 
 IMPORTANT: Messages in context have ID prefixes like [U1], [A1], [R1] for internal tracking.
 These are for context management only - NEVER include these prefixes in your responses.
 Just respond naturally without any [Axxx] or similar prefixes."#;
+
+    /// Main system prompt for the assistant (alias for backward compatibility)
+    pub const MAIN_SYSTEM: &str = DEFAULT_SEED_CONTENT;
 
     /// TL;DR summarization prompt
     pub const TLDR_PROMPT: &str = "Summarize the following message in 1-2 short sentences (max 50 words). Be concise and capture the key point:\n\n";

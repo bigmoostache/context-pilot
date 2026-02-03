@@ -53,6 +53,7 @@ pub fn hash_values<T: Hash>(values: &[T]) -> u64 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ContextType {
+    System,
     Conversation,
     File,
     Tree,
@@ -69,6 +70,7 @@ impl ContextType {
     /// Returns true if this is a fixed/system context type
     pub fn is_fixed(&self) -> bool {
         matches!(self,
+            ContextType::System |
             ContextType::Conversation |
             ContextType::Tree |
             ContextType::Todo |
@@ -81,6 +83,7 @@ impl ContextType {
     /// Get icon for this context type
     pub fn icon(&self) -> &'static str {
         match self {
+            ContextType::System => icons::CTX_SYSTEM,
             ContextType::Conversation => icons::CTX_CONVERSATION,
             ContextType::File => icons::CTX_FILE,
             ContextType::Tree => icons::CTX_TREE,
@@ -254,6 +257,19 @@ pub struct MemoryItem {
     pub importance: MemoryImportance,
 }
 
+/// A system prompt item
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemItem {
+    /// System ID (S0, S1, ...)
+    pub id: String,
+    /// System name
+    pub name: String,
+    /// Short description
+    pub description: String,
+    /// Full system prompt content
+    pub content: String,
+}
+
 /// A file description in the tree
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TreeFileDescription {
@@ -392,6 +408,15 @@ pub struct PersistedState {
     /// Next memory ID
     #[serde(default = "default_one")]
     pub next_memory_id: usize,
+    /// System prompt items
+    #[serde(default)]
+    pub systems: Vec<SystemItem>,
+    /// Next system ID
+    #[serde(default)]
+    pub next_system_id: usize,
+    /// Active system ID (None = default)
+    #[serde(default)]
+    pub active_system_id: Option<String>,
     /// Disabled tool IDs (tools not in this list are enabled)
     #[serde(default)]
     pub disabled_tools: Vec<String>,
@@ -496,6 +521,12 @@ pub struct State {
     pub memories: Vec<MemoryItem>,
     /// Next memory ID (M1, M2, ...)
     pub next_memory_id: usize,
+    /// System prompt items
+    pub systems: Vec<SystemItem>,
+    /// Next system ID (S0, S1, ...)
+    pub next_system_id: usize,
+    /// Active system ID (None = default)
+    pub active_system_id: Option<String>,
     /// Tool definitions with enabled state
     pub tools: Vec<ToolDefinition>,
     /// Whether context cleaning is in progress
@@ -600,9 +631,30 @@ impl Default for State {
         Self {
             context: vec![
                 ContextElement {
+                    id: "P0".to_string(),
+                    context_type: ContextType::System,
+                    name: "Seed".to_string(),
+                    token_count: 0,
+                    file_path: None,
+                    file_hash: None,
+                    glob_pattern: None,
+                    glob_path: None,
+                    grep_pattern: None,
+                    grep_path: None,
+                    grep_file_pattern: None,
+                    tmux_pane_id: None,
+                    tmux_lines: None,
+                    tmux_last_keys: None,
+                    tmux_description: None,
+                    cached_content: None,
+                    cache_deprecated: false,
+                    last_refresh_ms: 0,
+                    tmux_last_lines_hash: None,
+                },
+                ContextElement {
                     id: "P1".to_string(),
                     context_type: ContextType::Conversation,
-                    name: "Main".to_string(),
+                    name: "Chat".to_string(),
                     token_count: 0,
                     file_path: None,
                     file_hash: None,
@@ -623,7 +675,7 @@ impl Default for State {
                 ContextElement {
                     id: "P2".to_string(),
                     context_type: ContextType::Tree,
-                    name: "Directory".to_string(),
+                    name: "Tree".to_string(),
                     token_count: 0,
                     file_path: None,
                     file_hash: None,
@@ -644,7 +696,7 @@ impl Default for State {
                 ContextElement {
                     id: "P3".to_string(),
                     context_type: ContextType::Todo,
-                    name: "Todo".to_string(),
+                    name: "WIP".to_string(),
                     token_count: 0,
                     file_path: None,
                     file_hash: None,
@@ -665,7 +717,7 @@ impl Default for State {
                 ContextElement {
                     id: "P4".to_string(),
                     context_type: ContextType::Memory,
-                    name: "Memory".to_string(),
+                    name: "Notes".to_string(),
                     token_count: 0,
                     file_path: None,
                     file_hash: None,
@@ -686,7 +738,7 @@ impl Default for State {
                 ContextElement {
                     id: "P5".to_string(),
                     context_type: ContextType::Overview,
-                    name: "Overview".to_string(),
+                    name: "World".to_string(),
                     token_count: 0,
                     file_path: None,
                     file_hash: None,
@@ -707,7 +759,7 @@ impl Default for State {
                 ContextElement {
                     id: "P6".to_string(),
                     context_type: ContextType::Git,
-                    name: "Git".to_string(),
+                    name: "Changes".to_string(),
                     token_count: 0,
                     file_path: None,
                     file_hash: None,
@@ -748,6 +800,9 @@ impl Default for State {
             next_todo_id: 1,
             memories: vec![],
             next_memory_id: 1,
+            systems: vec![],
+            next_system_id: 0,
+            active_system_id: None,
             tools: get_all_tool_definitions(),
             is_cleaning_context: false,
             dirty: true, // Start dirty to ensure initial render

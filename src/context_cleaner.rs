@@ -54,6 +54,7 @@ pub fn build_cleaner_context(state: &State) -> String {
         };
 
         let details = match ctx.context_type {
+            crate::state::ContextType::System => String::new(),
             crate::state::ContextType::File => {
                 format!(" - {}", ctx.file_path.as_deref().unwrap_or("unknown"))
             }

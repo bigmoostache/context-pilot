@@ -327,7 +327,18 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::SelectNextContext => {
             if !state.context.is_empty() {
-                state.selected_context = (state.selected_context + 1) % state.context.len();
+                // Sort indices by P-number to match visual order in sidebar
+                let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
+                sorted_indices.sort_by(|&a, &b| {
+                    let id_a = state.context[a].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+                    let id_b = state.context[b].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+                    id_a.cmp(&id_b)
+                });
+
+                // Find current position in sorted order
+                let current_pos = sorted_indices.iter().position(|&i| i == state.selected_context).unwrap_or(0);
+                let next_pos = (current_pos + 1) % sorted_indices.len();
+                state.selected_context = sorted_indices[next_pos];
                 state.scroll_offset = 0.0;
                 state.user_scrolled = false;
             }
@@ -335,11 +346,22 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::SelectPrevContext => {
             if !state.context.is_empty() {
-                state.selected_context = if state.selected_context == 0 {
-                    state.context.len() - 1
+                // Sort indices by P-number to match visual order in sidebar
+                let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
+                sorted_indices.sort_by(|&a, &b| {
+                    let id_a = state.context[a].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+                    let id_b = state.context[b].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+                    id_a.cmp(&id_b)
+                });
+
+                // Find current position in sorted order
+                let current_pos = sorted_indices.iter().position(|&i| i == state.selected_context).unwrap_or(0);
+                let prev_pos = if current_pos == 0 {
+                    sorted_indices.len() - 1
                 } else {
-                    state.selected_context - 1
+                    current_pos - 1
                 };
+                state.selected_context = sorted_indices[prev_pos];
                 state.scroll_offset = 0.0;
                 state.user_scrolled = false;
             }

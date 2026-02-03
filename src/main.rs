@@ -6,6 +6,7 @@ mod constants;
 mod context_cleaner;
 mod core;
 mod events;
+mod help;
 mod highlight;
 mod llms;
 mod panels;
@@ -31,7 +32,7 @@ use ratatui::prelude::*;
 use api::StreamEvent;
 use background::TlDrResult;
 use cache::CacheUpdate;
-use core::{ensure_default_contexts, App};
+use core::{ensure_default_contexts, ensure_default_seed, App};
 use persistence::load_state;
 
 fn main() -> io::Result<()> {
@@ -45,8 +46,9 @@ fn main() -> io::Result<()> {
 
     let mut state = load_state();
 
-    // Ensure default context elements exist
+    // Ensure default context elements and seed exist
     ensure_default_contexts(&mut state);
+    ensure_default_seed(&mut state);
 
     // Create channels
     let (tx, rx) = mpsc::channel::<StreamEvent>();

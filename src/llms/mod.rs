@@ -272,6 +272,7 @@ pub fn start_streaming(
     context_items: Vec<ContextItem>,
     tools: Vec<ToolDefinition>,
     tool_results: Option<Vec<ToolResult>>,
+    system_prompt: String,
     tx: Sender<StreamEvent>,
 ) {
     let client = get_client(provider);
@@ -283,7 +284,7 @@ pub fn start_streaming(
             context_items,
             tools,
             tool_results,
-            system_prompt: None,
+            system_prompt: Some(system_prompt),
             extra_context: None,
         };
 

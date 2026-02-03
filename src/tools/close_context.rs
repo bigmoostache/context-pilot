@@ -45,7 +45,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let ctx = &state.context[idx];
 
         match ctx.context_type {
-            ContextType::Tree | ContextType::Conversation | ContextType::Todo | ContextType::Memory | ContextType::Overview | ContextType::Git => {
+            ContextType::System | ContextType::Tree | ContextType::Conversation | ContextType::Todo | ContextType::Memory | ContextType::Overview | ContextType::Git => {
                 // Protected - cannot close
                 skipped.push(format!("{} (protected)", id));
             }
