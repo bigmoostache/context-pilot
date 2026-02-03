@@ -531,7 +531,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             id: "reload_tui".to_string(),
             name: "Reload TUI".to_string(),
             short_desc: "Restart the TUI".to_string(),
-            description: "Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved.".to_string(),
+            description: "Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.".to_string(),
             params: vec![],
             enabled: true,
             category: ToolCategory::Context,
