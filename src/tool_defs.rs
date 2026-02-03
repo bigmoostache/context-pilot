@@ -565,6 +565,45 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             enabled: true,
             category: ToolCategory::Git,
         },
+        ToolDefinition {
+            id: "git_create_branch".to_string(),
+            name: "Git Create Branch".to_string(),
+            short_desc: "Create new branch".to_string(),
+            description: "Creates a new git branch from the current branch and switches to it.".to_string(),
+            params: vec![
+                ToolParam::new("name", ParamType::String)
+                    .desc("Name for the new branch")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::Git,
+        },
+        ToolDefinition {
+            id: "git_change_branch".to_string(),
+            name: "Git Change Branch".to_string(),
+            short_desc: "Switch branch".to_string(),
+            description: "Switches to another git branch. Fails if there are uncommitted or unstaged changes.".to_string(),
+            params: vec![
+                ToolParam::new("branch", ParamType::String)
+                    .desc("Branch name to switch to")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::Git,
+        },
+        ToolDefinition {
+            id: "git_merge".to_string(),
+            name: "Git Merge".to_string(),
+            short_desc: "Merge branch".to_string(),
+            description: "Merges a branch into the current branch. On success, deletes the merged branch.".to_string(),
+            params: vec![
+                ToolParam::new("branch", ParamType::String)
+                    .desc("Branch name to merge into current branch")
+                    .required(),
+            ],
+            enabled: true,
+            category: ToolCategory::Git,
+        },
 
         // Meta tools
         ToolDefinition {

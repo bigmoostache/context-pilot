@@ -84,6 +84,9 @@ pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
         "create_memories" => memory::execute_create(tool, state),
         "update_memories" => memory::execute_update(tool, state),
         "git_commit" => git::execute_commit(tool, state),
+        "git_create_branch" => git::execute_create_branch(tool, state),
+        "git_change_branch" => git::execute_change_branch(tool, state),
+        "git_merge" => git::execute_merge(tool, state),
         "toggle_git_details" => git::execute_toggle_details(tool, state),
         "reload_tui" => execute_reload_tui(tool, state),
         _ => ToolResult {
