@@ -470,16 +470,29 @@ pub fn execute_pull(tool: &ToolUse, _state: &mut State) -> ToolResult {
             let stdout = String::from_utf8_lossy(&output.stdout);
             ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Pull successful:\n{}", stdout),
+                content: if stdout.trim().is_empty() {
+                    "Pull successful: Already up to date".to_string()
+                } else {
+                    format!("Pull successful:\n{}", stdout.trim())
+                },
                 is_error: false,
             }
         }
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
+            let error_msg = format!("{}{}", stderr.trim(), stdout.trim());
             ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Pull failed: {}{}", stderr, stdout),
+                content: if error_msg.contains("Authentication") || error_msg.contains("credential") {
+                    "Pull failed: Git authentication required. Please configure git credentials.".to_string()
+                } else if error_msg.contains("Could not resolve host") || error_msg.contains("unable to access") {
+                    "Pull failed: Network error or remote unreachable.".to_string()
+                } else if error_msg.is_empty() {
+                    "Pull failed: Unknown error".to_string()
+                } else {
+                    format!("Pull failed: {}", error_msg)
+                },
                 is_error: true,
             }
         }
@@ -504,7 +517,13 @@ pub fn execute_push(tool: &ToolUse, _state: &mut State) -> ToolResult {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
             // git push often outputs to stderr even on success
-            let output_text = if stdout.is_empty() { stderr.to_string() } else { stdout.to_string() };
+            let output_text = if !stderr.trim().is_empty() { 
+                stderr.trim().to_string() 
+            } else if !stdout.trim().is_empty() { 
+                stdout.trim().to_string() 
+            } else {
+                "Push successful".to_string()
+            };
             ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Push successful:\n{}", output_text),
@@ -514,9 +533,20 @@ pub fn execute_push(tool: &ToolUse, _state: &mut State) -> ToolResult {
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
+            let error_msg = format!("{}{}", stderr.trim(), stdout.trim());
             ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Push failed: {}{}", stderr, stdout),
+                content: if error_msg.contains("Authentication") || error_msg.contains("credential") {
+                    "Push failed: Git authentication required. Please configure git credentials.".to_string()
+                } else if error_msg.contains("Could not resolve host") || error_msg.contains("unable to access") {
+                    "Push failed: Network error or remote unreachable.".to_string()
+                } else if error_msg.contains("no upstream branch") {
+                    "Push failed: No upstream branch configured. Try: git push -u origin <branch>".to_string()
+                } else if error_msg.is_empty() {
+                    "Push failed: Unknown error".to_string()
+                } else {
+                    format!("Push failed: {}", error_msg)
+                },
                 is_error: true,
             }
         }
@@ -540,12 +570,12 @@ pub fn execute_fetch(tool: &ToolUse, _state: &mut State) -> ToolResult {
         Ok(output) if output.status.success() => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let output_text = if stdout.is_empty() && stderr.is_empty() {
+            let output_text = if stdout.trim().is_empty() && stderr.trim().is_empty() {
                 "No new changes from remote".to_string()
-            } else if stdout.is_empty() {
-                stderr.to_string()
+            } else if !stderr.trim().is_empty() {
+                stderr.trim().to_string()
             } else {
-                stdout.to_string()
+                stdout.trim().to_string()
             };
             ToolResult {
                 tool_use_id: tool.id.clone(),
@@ -556,9 +586,18 @@ pub fn execute_fetch(tool: &ToolUse, _state: &mut State) -> ToolResult {
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
+            let error_msg = format!("{}{}", stderr.trim(), stdout.trim());
             ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Fetch failed: {}{}", stderr, stdout),
+                content: if error_msg.contains("Authentication") || error_msg.contains("credential") {
+                    "Fetch failed: Git authentication required. Please configure git credentials.".to_string()
+                } else if error_msg.contains("Could not resolve host") || error_msg.contains("unable to access") {
+                    "Fetch failed: Network error or remote unreachable.".to_string()
+                } else if error_msg.is_empty() {
+                    "Fetch failed: Unknown error".to_string()
+                } else {
+                    format!("Fetch failed: {}", error_msg)
+                },
                 is_error: true,
             }
         }
