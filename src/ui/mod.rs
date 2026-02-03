@@ -274,7 +274,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
 
     // Center the overlay
     let overlay_width = 56u16;
-    let overlay_height = 28u16;
+    let overlay_height = 34u16;
     let x = area.width.saturating_sub(overlay_width) / 2;
     let y = area.height.saturating_sub(overlay_height) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
@@ -290,7 +290,8 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     // Provider options
     let providers = [
         (LlmProvider::Anthropic, "1", "Anthropic Claude"),
-        (LlmProvider::Grok, "2", "Grok (xAI)"),
+        (LlmProvider::ClaudeCode, "2", "Claude Code (OAuth)"),
+        (LlmProvider::Grok, "3", "Grok (xAI)"),
     ];
 
     for (provider, key, name) in providers {
@@ -325,7 +326,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     lines.push(Line::from(""));
 
     match state.llm_provider {
-        LlmProvider::Anthropic => {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCode => {
             for (model, key) in [
                 (AnthropicModel::ClaudeOpus45, "a"),
                 (AnthropicModel::ClaudeSonnet45, "b"),
@@ -337,13 +338,40 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         }
         LlmProvider::Grok => {
             for (model, key) in [
-                (GrokModel::Grok41Reasoning, "a"),
-                (GrokModel::Grok4Reasoning, "b"),
+                (GrokModel::Grok41Fast, "a"),
+                (GrokModel::Grok4Fast, "b"),
             ] {
                 let is_selected = state.grok_model == model;
                 render_model_line_with_info(&mut lines, is_selected, key, &model);
             }
         }
+    }
+
+    // API check status
+    lines.push(Line::from(""));
+    if state.api_check_in_progress {
+        let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+        let spinner = spinner_chars[(state.spinner_frame as usize) % spinner_chars.len()];
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {} ", spinner), Style::default().fg(theme::ACCENT)),
+            Span::styled("Checking API...", Style::default().fg(theme::TEXT_MUTED)),
+        ]));
+    } else if let Some(result) = &state.api_check_result {
+        let (icon, color, msg) = if result.all_ok() {
+            ("✓", theme::SUCCESS, "API OK")
+        } else if let Some(err) = &result.error {
+            ("✗", theme::ERROR, err.as_str())
+        } else {
+            let mut issues = Vec::new();
+            if !result.auth_ok { issues.push("auth"); }
+            if !result.streaming_ok { issues.push("streaming"); }
+            if !result.tools_ok { issues.push("tools"); }
+            ("!", theme::WARNING, if issues.is_empty() { "Unknown issue" } else { "Issues detected" })
+        };
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {} ", icon), Style::default().fg(color)),
+            Span::styled(msg.to_string(), Style::default().fg(color)),
+        ]));
     }
 
     lines.push(Line::from(""));
@@ -352,49 +380,80 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     ]));
     lines.push(Line::from(""));
 
-    // Cleaning threshold
-    lines.push(Line::from(vec![
-        Span::styled("  Auto-Clean Threshold", Style::default().fg(theme::TEXT_SECONDARY).bold()),
-    ]));
-    lines.push(Line::from(""));
+    // Helper to format token count
+    let format_tokens = |tokens: usize| -> String {
+        if tokens >= 1_000_000 {
+            format!("{:.1}M", tokens as f64 / 1_000_000.0)
+        } else if tokens >= 1_000 {
+            format!("{}K", tokens / 1_000)
+        } else {
+            format!("{}", tokens)
+        }
+    };
 
-    // Progress bar for threshold
+    let bar_width = 24usize;
+    let max_budget = state.model_context_window();
+    let effective_budget = state.effective_context_budget();
+    let selected = state.config_selected_bar;
+
+    // Helper to render a progress bar with selection indicator
+    let render_bar = |lines: &mut Vec<Line>, idx: usize, label: &str, pct: usize, filled: usize, tokens: usize, bar_color: Color, extra: Option<&str>| {
+        let is_selected = selected == idx;
+        let indicator = if is_selected { ">" } else { " " };
+        let label_style = if is_selected {
+            Style::default().fg(theme::ACCENT).bold()
+        } else {
+            Style::default().fg(theme::TEXT_SECONDARY).bold()
+        };
+        let arrow_color = if is_selected { theme::ACCENT } else { theme::TEXT_MUTED };
+
+        lines.push(Line::from(vec![
+            Span::styled(format!(" {} ", indicator), Style::default().fg(theme::ACCENT)),
+            Span::styled(label.to_string(), label_style),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("   ◀ ", Style::default().fg(arrow_color)),
+            Span::styled(chars::BLOCK_FULL.repeat(filled.min(bar_width)), Style::default().fg(bar_color)),
+            Span::styled(chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)), Style::default().fg(theme::BG_ELEVATED)),
+            Span::styled(" ▶ ", Style::default().fg(arrow_color)),
+            Span::styled(format!("{}%", pct), Style::default().fg(theme::TEXT).bold()),
+            Span::styled(format!("  {} tok{}", format_tokens(tokens), extra.unwrap_or("")), Style::default().fg(theme::TEXT_MUTED)),
+        ]));
+    };
+
+    // 1. Context Budget
+    let budget_pct = (effective_budget as f64 / max_budget as f64 * 100.0) as usize;
+    let budget_filled = ((effective_budget as f64 / max_budget as f64) * bar_width as f64) as usize;
+    render_bar(&mut lines, 0, "Context Budget", budget_pct, budget_filled, effective_budget, theme::SUCCESS, None);
+
+    // 2. Cleaning Threshold
     let threshold_pct = (state.cleaning_threshold * 100.0) as usize;
-    let target_pct = (state.cleaning_target() * 100.0) as usize;
-    let bar_width = 30usize;
-    let filled = ((state.cleaning_threshold * bar_width as f32) as usize).min(bar_width);
+    let threshold_tokens = state.cleaning_threshold_tokens();
+    let threshold_filled = ((state.cleaning_threshold * bar_width as f32) as usize).min(bar_width);
+    render_bar(&mut lines, 1, "Clean Trigger", threshold_pct, threshold_filled, threshold_tokens, theme::WARNING, None);
 
-    lines.push(Line::from(vec![
-        Span::styled("  ◀ ", Style::default().fg(theme::ACCENT)),
-        Span::styled(chars::BLOCK_FULL.repeat(filled), Style::default().fg(theme::WARNING)),
-        Span::styled(chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)), Style::default().fg(theme::BG_ELEVATED)),
-        Span::styled(" ▶", Style::default().fg(theme::ACCENT)),
-        Span::styled(format!("  {}%", threshold_pct), Style::default().fg(theme::TEXT).bold()),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled(format!("     Target: {}%", target_pct), Style::default().fg(theme::TEXT_MUTED)),
-    ]));
+    // 3. Target Cleaning
+    let target_pct = (state.cleaning_target_proportion * 100.0) as usize;
+    let target_tokens = state.cleaning_target_tokens();
+    let target_abs_pct = (state.cleaning_target() * 100.0) as usize;
+    let target_filled = ((state.cleaning_target_proportion * bar_width as f32) as usize).min(bar_width);
+    let extra = format!(" ({}%)", target_abs_pct);
+    render_bar(&mut lines, 2, "Clean Target", target_pct, target_filled, target_tokens, theme::ACCENT, Some(&extra));
 
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::BORDER)),
     ]));
-    lines.push(Line::from(""));
 
     // Help text
     lines.push(Line::from(vec![
         Span::styled("  ", Style::default()),
-        Span::styled("1-2", Style::default().fg(theme::WARNING)),
+        Span::styled("1-3", Style::default().fg(theme::WARNING)),
         Span::styled(" provider  ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled("a-d", Style::default().fg(theme::WARNING)),
+        Span::styled("a-c", Style::default().fg(theme::WARNING)),
         Span::styled(" model  ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled("◀▶", Style::default().fg(theme::WARNING)),
-        Span::styled(" threshold", Style::default().fg(theme::TEXT_MUTED)),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled("  ", Style::default()),
-        Span::styled("Esc", Style::default().fg(theme::ACCENT)),
-        Span::styled(" close", Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled("↑↓◀▶", Style::default().fg(theme::WARNING)),
+        Span::styled(" adjust", Style::default().fg(theme::TEXT_MUTED)),
     ]));
 
     let block = Block::default()

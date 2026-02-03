@@ -85,8 +85,10 @@ pub enum Action {
     ConfigSelectProvider(crate::llms::LlmProvider),
     ConfigSelectAnthropicModel(crate::llms::AnthropicModel),
     ConfigSelectGrokModel(crate::llms::GrokModel),
-    ConfigIncreaseCleaningThreshold,
-    ConfigDecreaseCleaningThreshold,
+    ConfigSelectNextBar,
+    ConfigSelectPrevBar,
+    ConfigIncreaseSelectedBar,
+    ConfigDecreaseSelectedBar,
     None,
 }
 
@@ -95,6 +97,7 @@ pub enum ActionResult {
     StartStream,
     StopStream,
     StartCleaning,
+    StartApiCheck,
     Save,
     SaveMessage(String),
 }
@@ -477,26 +480,77 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ConfigSelectProvider(provider) => {
             state.llm_provider = provider;
+            state.api_check_in_progress = true;
+            state.api_check_result = None;
             state.dirty = true;
-            ActionResult::Save
+            ActionResult::StartApiCheck
         }
         Action::ConfigSelectAnthropicModel(model) => {
             state.anthropic_model = model;
+            state.api_check_in_progress = true;
+            state.api_check_result = None;
             state.dirty = true;
-            ActionResult::Save
+            ActionResult::StartApiCheck
         }
         Action::ConfigSelectGrokModel(model) => {
             state.grok_model = model;
+            state.api_check_in_progress = true;
+            state.api_check_result = None;
+            state.dirty = true;
+            ActionResult::StartApiCheck
+        }
+        Action::ConfigSelectNextBar => {
+            state.config_selected_bar = (state.config_selected_bar + 1) % 3;
+            state.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ConfigSelectPrevBar => {
+            state.config_selected_bar = if state.config_selected_bar == 0 { 2 } else { state.config_selected_bar - 1 };
+            state.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ConfigIncreaseSelectedBar => {
+            match state.config_selected_bar {
+                0 => {
+                    // Context budget
+                    let max_budget = state.model_context_window();
+                    let step = max_budget / 20; // 5% steps
+                    let current = state.context_budget.unwrap_or(max_budget);
+                    state.context_budget = Some((current + step).min(max_budget));
+                }
+                1 => {
+                    // Cleaning threshold
+                    state.cleaning_threshold = (state.cleaning_threshold + 0.05).min(0.95);
+                }
+                2 => {
+                    // Target proportion
+                    state.cleaning_target_proportion = (state.cleaning_target_proportion + 0.05).min(0.95);
+                }
+                _ => {}
+            }
             state.dirty = true;
             ActionResult::Save
         }
-        Action::ConfigIncreaseCleaningThreshold => {
-            state.cleaning_threshold = (state.cleaning_threshold + 0.05).min(0.95);
-            state.dirty = true;
-            ActionResult::Save
-        }
-        Action::ConfigDecreaseCleaningThreshold => {
-            state.cleaning_threshold = (state.cleaning_threshold - 0.05).max(0.30);
+        Action::ConfigDecreaseSelectedBar => {
+            match state.config_selected_bar {
+                0 => {
+                    // Context budget
+                    let max_budget = state.model_context_window();
+                    let step = max_budget / 20; // 5% steps
+                    let min_budget = max_budget / 10; // Minimum 10% of context
+                    let current = state.context_budget.unwrap_or(max_budget);
+                    state.context_budget = Some((current.saturating_sub(step)).max(min_budget));
+                }
+                1 => {
+                    // Cleaning threshold
+                    state.cleaning_threshold = (state.cleaning_threshold - 0.05).max(0.30);
+                }
+                2 => {
+                    // Target proportion
+                    state.cleaning_target_proportion = (state.cleaning_target_proportion - 0.05).max(0.30);
+                }
+                _ => {}
+            }
             state.dirty = true;
             ActionResult::Save
         }

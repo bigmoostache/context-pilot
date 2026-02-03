@@ -62,6 +62,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     // Show current LLM provider and model
     let (provider_name, model_name) = match state.llm_provider {
         LlmProvider::Anthropic => ("Claude", state.anthropic_model.display_name()),
+        LlmProvider::ClaudeCode => ("OAuth", state.anthropic_model.display_name()),
         LlmProvider::Grok => ("Grok", state.grok_model.display_name()),
     };
     spans.push(Span::styled(

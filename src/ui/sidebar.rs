@@ -3,7 +3,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::constants::{MAX_CONTEXT_TOKENS, SIDEBAR_HELP_HEIGHT};
+use crate::constants::SIDEBAR_HELP_HEIGHT;
 use crate::state::State;
 use super::{theme, chars, spinner, helpers::*};
 
@@ -30,7 +30,8 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     ];
 
     let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-    let max_tokens = MAX_CONTEXT_TOKENS;
+    let max_tokens = state.effective_context_budget();
+    let threshold_tokens = state.cleaning_threshold_tokens();
 
     // Calculate ID width for alignment based on longest ID
     let id_width = state.context.iter().map(|c| c.id.len()).max().unwrap_or(2);
@@ -106,35 +107,60 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     ]));
 
     // Token usage bar - full width
-    let usage_pct = (total_tokens as f64 / max_tokens as f64 * 100.0).min(100.0);
-    let bar_width = 34; // Full sidebar width minus margins
-    let filled = ((usage_pct / 100.0) * bar_width as f64) as usize;
-    let empty = bar_width - filled;
+    let bar_width = 34usize;
+    let threshold_pct = state.cleaning_threshold;
+    let usage_pct = (total_tokens as f64 / max_tokens as f64).min(1.0);
 
-    let bar_color = if usage_pct > 80.0 {
+    // Calculate bar positions
+    let filled = (usage_pct * bar_width as f64) as usize;
+    let threshold_pos = (threshold_pct as f64 * bar_width as f64) as usize;
+
+    // Color based on threshold
+    let bar_color = if total_tokens >= threshold_tokens {
+        theme::ERROR
+    } else if total_tokens as f64 >= threshold_tokens as f64 * 0.9 {
         theme::WARNING
     } else {
         theme::ACCENT
     };
 
-    // Format: "12.5K/100K (45%)"
+    // Format: "12.5K / 140K threshold / 200K budget"
     let current = format_number(total_tokens);
-    let max = format_number(max_tokens);
-    let pct = format!("{:.0}%", usage_pct);
+    let threshold = format_number(threshold_tokens);
+    let budget = format_number(max_tokens);
 
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled(" ", base_style),
         Span::styled(&current, Style::default().fg(theme::TEXT).bold()),
-        Span::styled("/", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled(&max, Style::default().fg(theme::ACCENT).bold()),
-        Span::styled(format!(" ({})", pct), Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(" / ", Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(&threshold, Style::default().fg(theme::WARNING)),
+        Span::styled(" / ", Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(&budget, Style::default().fg(theme::ACCENT)),
     ]));
-    lines.push(Line::from(vec![
-        Span::styled(" ", base_style),
-        Span::styled(chars::BLOCK_FULL.repeat(filled), Style::default().fg(bar_color)),
-        Span::styled(chars::BLOCK_LIGHT.repeat(empty), Style::default().fg(theme::BG_ELEVATED)),
-    ]));
+
+    // Build bar with threshold marker
+    let mut bar_spans = vec![Span::styled(" ", base_style)];
+    for i in 0..bar_width {
+        let char = if i == threshold_pos && threshold_pos < bar_width {
+            "|" // Threshold marker
+        } else if i < filled {
+            chars::BLOCK_FULL
+        } else {
+            chars::BLOCK_LIGHT
+        };
+
+        let color = if i == threshold_pos {
+            theme::WARNING
+        } else if i < filled {
+            bar_color
+        } else {
+            theme::BG_ELEVATED
+        };
+
+        bar_spans.push(Span::styled(char, Style::default().fg(color)));
+    }
+    lines.push(Line::from(bar_spans));
 
     let paragraph = Paragraph::new(lines)
         .style(base_style);
@@ -157,6 +183,11 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
             Span::styled("  ", base_style),
             Span::styled("↑↓", Style::default().fg(theme::ACCENT)),
             Span::styled(" scroll", Style::default().fg(theme::TEXT_MUTED)),
+        ]),
+        Line::from(vec![
+            Span::styled("  ", base_style),
+            Span::styled("Ctrl+H", Style::default().fg(theme::ACCENT)),
+            Span::styled(" config", Style::default().fg(theme::TEXT_MUTED)),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),

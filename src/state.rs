@@ -416,10 +416,20 @@ pub struct PersistedState {
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     #[serde(default = "default_cleaning_threshold")]
     pub cleaning_threshold: f32,
+    /// Cleaning target as proportion of threshold (0.0 - 1.0)
+    #[serde(default = "default_cleaning_target_proportion")]
+    pub cleaning_target_proportion: f32,
+    /// Context budget in tokens (None = use model's full context window)
+    #[serde(default)]
+    pub context_budget: Option<usize>,
 }
 
 fn default_cleaning_threshold() -> f32 {
     0.70
+}
+
+fn default_cleaning_target_proportion() -> f32 {
+    0.70 // 70% of threshold
 }
 
 fn default_one() -> usize {
@@ -494,6 +504,8 @@ pub struct State {
     pub perf_enabled: bool,
     /// Configuration view is open (Ctrl+H to toggle)
     pub config_view: bool,
+    /// Selected bar in config view (0=budget, 1=threshold, 2=target)
+    pub config_selected_bar: usize,
     /// Selected LLM provider
     pub llm_provider: crate::llms::LlmProvider,
     /// Selected Anthropic model
@@ -502,6 +514,16 @@ pub struct State {
     pub grok_model: crate::llms::GrokModel,
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     pub cleaning_threshold: f32,
+    /// Cleaning target as proportion of threshold (0.0 - 1.0)
+    pub cleaning_target_proportion: f32,
+    /// Context budget in tokens (None = use model's full context window)
+    pub context_budget: Option<usize>,
+
+    // === API Check Status (runtime-only) ===
+    /// Whether an API check is in progress
+    pub api_check_in_progress: bool,
+    /// Result of the last API check
+    pub api_check_result: Option<crate::llms::ApiCheckResult>,
 
     // === Git Status (runtime-only, not persisted) ===
     /// Current git branch name (None if not a git repo)
@@ -717,10 +739,16 @@ impl Default for State {
             dev_mode: false,
             perf_enabled: false,
             config_view: false,
+            config_selected_bar: 0,
             llm_provider: crate::llms::LlmProvider::default(),
             anthropic_model: crate::llms::AnthropicModel::default(),
             grok_model: crate::llms::GrokModel::default(),
             cleaning_threshold: 0.70,
+            cleaning_target_proportion: 0.70,
+            context_budget: None, // Use model's full context window
+            // API check defaults
+            api_check_in_progress: false,
+            api_check_result: None,
             // Git status defaults
             git_branch: None,
             git_is_repo: false,
@@ -755,13 +783,40 @@ impl State {
     /// Get the API model string for the current provider/model selection
     pub fn current_model(&self) -> String {
         match self.llm_provider {
-            crate::llms::LlmProvider::Anthropic => self.anthropic_model.api_name().to_string(),
+            crate::llms::LlmProvider::Anthropic | crate::llms::LlmProvider::ClaudeCode => {
+                self.anthropic_model.api_name().to_string()
+            }
             crate::llms::LlmProvider::Grok => self.grok_model.api_name().to_string(),
         }
     }
 
-    /// Get the cleaning target (threshold - 20%)
+    /// Get the cleaning target as absolute proportion (threshold * target_proportion)
     pub fn cleaning_target(&self) -> f32 {
-        (self.cleaning_threshold - 0.20).max(0.10)
+        self.cleaning_threshold * self.cleaning_target_proportion
+    }
+
+    /// Get the current model's context window
+    pub fn model_context_window(&self) -> usize {
+        match self.llm_provider {
+            crate::llms::LlmProvider::Anthropic | crate::llms::LlmProvider::ClaudeCode => {
+                self.anthropic_model.context_window()
+            }
+            crate::llms::LlmProvider::Grok => self.grok_model.context_window(),
+        }
+    }
+
+    /// Get effective context budget (custom or model's full context)
+    pub fn effective_context_budget(&self) -> usize {
+        self.context_budget.unwrap_or_else(|| self.model_context_window())
+    }
+
+    /// Get cleaning threshold in tokens
+    pub fn cleaning_threshold_tokens(&self) -> usize {
+        (self.effective_context_budget() as f32 * self.cleaning_threshold) as usize
+    }
+
+    /// Get cleaning target in tokens
+    pub fn cleaning_target_tokens(&self) -> usize {
+        (self.effective_context_budget() as f32 * self.cleaning_target()) as usize
     }
 }

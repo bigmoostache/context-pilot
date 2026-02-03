@@ -82,9 +82,9 @@ pub enum AnthropicModel {
 impl ModelInfo for AnthropicModel {
     fn api_name(&self) -> &'static str {
         match self {
-            AnthropicModel::ClaudeOpus45 => "claude-opus-4-5-20250514",
-            AnthropicModel::ClaudeSonnet45 => "claude-sonnet-4-5-20250514",
-            AnthropicModel::ClaudeHaiku45 => "claude-haiku-4-5-20250514",
+            AnthropicModel::ClaudeOpus45 => "claude-opus-4-5",
+            AnthropicModel::ClaudeSonnet45 => "claude-sonnet-4-5",
+            AnthropicModel::ClaudeHaiku45 => "claude-haiku-4-5",
         }
     }
 
@@ -117,48 +117,48 @@ impl ModelInfo for AnthropicModel {
     }
 }
 
-/// Available models for Grok (reasoning models only - required for function calling)
+/// Available models for Grok (fast models optimized for tool calling)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum GrokModel {
     #[default]
-    Grok41Reasoning,
-    Grok4Reasoning,
+    Grok41Fast,
+    Grok4Fast,
 }
 
 impl ModelInfo for GrokModel {
     fn api_name(&self) -> &'static str {
         match self {
-            GrokModel::Grok41Reasoning => "grok-4-1-fast-reasoning",
-            GrokModel::Grok4Reasoning => "grok-4-fast-reasoning",
+            GrokModel::Grok41Fast => "grok-4-1-fast",
+            GrokModel::Grok4Fast => "grok-4-fast",
         }
     }
 
     fn display_name(&self) -> &'static str {
         match self {
-            GrokModel::Grok41Reasoning => "Grok 4.1",
-            GrokModel::Grok4Reasoning => "Grok 4",
+            GrokModel::Grok41Fast => "Grok 4.1 Fast",
+            GrokModel::Grok4Fast => "Grok 4 Fast",
         }
     }
 
     fn context_window(&self) -> usize {
         match self {
-            GrokModel::Grok41Reasoning => 2_000_000,
-            GrokModel::Grok4Reasoning => 2_000_000,
+            GrokModel::Grok41Fast => 2_000_000,
+            GrokModel::Grok4Fast => 2_000_000,
         }
     }
 
     fn input_price_per_mtok(&self) -> f32 {
         match self {
-            GrokModel::Grok41Reasoning => 4.0,
-            GrokModel::Grok4Reasoning => 4.0,
+            GrokModel::Grok41Fast => 0.20,  // $0.20/1M input
+            GrokModel::Grok4Fast => 0.20,
         }
     }
 
     fn output_price_per_mtok(&self) -> f32 {
         match self {
-            GrokModel::Grok41Reasoning => 16.0,
-            GrokModel::Grok4Reasoning => 16.0,
+            GrokModel::Grok41Fast => 0.50,  // $0.50/1M output
+            GrokModel::Grok4Fast => 0.50,
         }
     }
 }

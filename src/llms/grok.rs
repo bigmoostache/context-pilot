@@ -85,6 +85,8 @@ struct GrokRequest {
     messages: Vec<GrokMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tools: Vec<GrokTool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_choice: Option<String>,
     max_tokens: u32,
     stream: bool,
 }
@@ -158,10 +160,18 @@ impl LlmClient for GrokClient {
         // Convert tools to OpenAI format
         let grok_tools = tools_to_grok(&request.tools);
 
+        // Set tool_choice to "auto" when tools are available
+        let tool_choice = if grok_tools.is_empty() {
+            None
+        } else {
+            Some("auto".to_string())
+        };
+
         let api_request = GrokRequest {
             model: request.model.clone(),
             messages: grok_messages,
             tools: grok_tools,
+            tool_choice,
             max_tokens: MAX_RESPONSE_TOKENS,
             stream: true,
         };
@@ -265,6 +275,97 @@ impl LlmClient for GrokClient {
             output_tokens,
         });
         Ok(())
+    }
+
+    fn check_api(&self, model: &str) -> super::ApiCheckResult {
+        let api_key = match &self.api_key {
+            Some(k) => k.clone(),
+            None => {
+                return super::ApiCheckResult {
+                    auth_ok: false,
+                    streaming_ok: false,
+                    tools_ok: false,
+                    error: Some("XAI_API_KEY not set".to_string()),
+                }
+            }
+        };
+
+        let client = Client::new();
+
+        // Test 1: Basic auth
+        let auth_result = client
+            .post(GROK_API_ENDPOINT)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "model": model,
+                "max_tokens": 10,
+                "messages": [{"role": "user", "content": "Hi"}]
+            }))
+            .send();
+
+        let auth_ok = auth_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+
+        if !auth_ok {
+            let error = auth_result
+                .err()
+                .map(|e| e.to_string())
+                .or_else(|| Some("Auth failed".to_string()));
+            return super::ApiCheckResult {
+                auth_ok: false,
+                streaming_ok: false,
+                tools_ok: false,
+                error,
+            };
+        }
+
+        // Test 2: Streaming
+        let stream_result = client
+            .post(GROK_API_ENDPOINT)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "model": model,
+                "max_tokens": 10,
+                "stream": true,
+                "messages": [{"role": "user", "content": "Say ok"}]
+            }))
+            .send();
+
+        let streaming_ok = stream_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+
+        // Test 3: Tools
+        let tools_result = client
+            .post(GROK_API_ENDPOINT)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "model": model,
+                "max_tokens": 50,
+                "tools": [{
+                    "type": "function",
+                    "function": {
+                        "name": "test_tool",
+                        "description": "A test tool",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                }],
+                "messages": [{"role": "user", "content": "Hi"}]
+            }))
+            .send();
+
+        let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+
+        super::ApiCheckResult {
+            auth_ok,
+            streaming_ok,
+            tools_ok,
+            error: None,
+        }
     }
 }
 

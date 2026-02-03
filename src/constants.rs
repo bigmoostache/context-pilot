@@ -21,9 +21,6 @@ pub const API_VERSION: &str = "2023-06-01";
 // CONTEXT & TOKEN MANAGEMENT
 // =============================================================================
 
-/// Maximum context size in tokens
-pub const MAX_CONTEXT_TOKENS: usize = 200_000;
-
 /// Maximum cleaning iterations before forcing stop
 pub const MAX_CLEANING_ITERATIONS: u32 = 10;
 
@@ -86,7 +83,7 @@ pub const SIDEBAR_WIDTH: u16 = 36;
 pub const STATUS_BAR_HEIGHT: u16 = 1;
 
 /// Height of the help hints section in sidebar
-pub const SIDEBAR_HELP_HEIGHT: u16 = 7;
+pub const SIDEBAR_HELP_HEIGHT: u16 = 8;
 
 // =============================================================================
 // EVENT LOOP

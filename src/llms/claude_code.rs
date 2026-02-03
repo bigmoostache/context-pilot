@@ -1,42 +1,99 @@
-//! Anthropic Claude API implementation.
+//! Claude Code OAuth API implementation.
+//!
+//! Uses OAuth tokens from ~/.claude/.credentials.json with Bearer authentication.
 
 use std::env;
+use std::fs;
 use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
+use super::{ApiCheckResult, ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
 use crate::constants::{prompts, API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS};
 use crate::panels::ContextItem;
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::build_api_tools;
 use crate::tools::ToolUse;
 
-/// Anthropic Claude client
-pub struct AnthropicClient {
-    api_key: Option<String>,
-}
+const OAUTH_BETA_HEADER: &str = "oauth-2025-04-20";
 
-impl AnthropicClient {
-    pub fn new() -> Self {
-        dotenvy::dotenv().ok();
-        Self {
-            api_key: env::var("ANTHROPIC_API_KEY").ok(),
-        }
+/// Map Claude 4.5 models to 3.5 equivalents (OAuth doesn't support 4.x models)
+fn map_model_for_oauth(model: &str) -> &str {
+    match model {
+        "claude-opus-4-5" | "claude-opus-4-5-latest" => "claude-3-5-sonnet-20241022", // No 3.5 opus, use sonnet
+        "claude-sonnet-4-5" | "claude-sonnet-4-5-latest" => "claude-3-5-sonnet-20241022",
+        "claude-haiku-4-5" | "claude-haiku-4-5-latest" => "claude-3-5-haiku-20241022",
+        _ => model, // Pass through unknown models
     }
 }
 
-impl Default for AnthropicClient {
+/// Claude Code OAuth client
+pub struct ClaudeCodeClient {
+    access_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CredentialsFile {
+    #[serde(rename = "claudeAiOauth")]
+    claude_ai_oauth: OAuthCredentials,
+}
+
+#[derive(Debug, Deserialize)]
+struct OAuthCredentials {
+    #[serde(rename = "accessToken")]
+    access_token: String,
+    #[serde(rename = "expiresAt")]
+    expires_at: u64,
+}
+
+impl ClaudeCodeClient {
+    pub fn new() -> Self {
+        let access_token = Self::load_oauth_token();
+        Self { access_token }
+    }
+
+    fn load_oauth_token() -> Option<String> {
+        let home = env::var("HOME").ok()?;
+        let home_path = PathBuf::from(&home);
+
+        // Try hidden credentials file first
+        let creds_path = home_path.join(".claude").join(".credentials.json");
+        let path = if creds_path.exists() {
+            creds_path
+        } else {
+            // Fallback to non-hidden
+            home_path.join(".claude").join("credentials.json")
+        };
+
+        let content = fs::read_to_string(&path).ok()?;
+        let creds: CredentialsFile = serde_json::from_str(&content).ok()?;
+
+        // Check if token is expired
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_millis() as u64;
+
+        if now_ms > creds.claude_ai_oauth.expires_at {
+            return None; // Token expired
+        }
+
+        Some(creds.claude_ai_oauth.access_token)
+    }
+}
+
+impl Default for ClaudeCodeClient {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[derive(Debug, Serialize)]
-struct AnthropicRequest {
+struct ClaudeCodeRequest {
     model: String,
     max_tokens: u32,
     system: String,
@@ -65,8 +122,6 @@ struct StreamDelta {
 struct StreamMessage {
     #[serde(rename = "type")]
     event_type: String,
-    #[serde(default)]
-    _index: Option<usize>,
     content_block: Option<StreamContentBlock>,
     delta: Option<StreamDelta>,
     usage: Option<StreamUsage>,
@@ -78,12 +133,12 @@ struct StreamUsage {
     output_tokens: Option<usize>,
 }
 
-impl LlmClient for AnthropicClient {
+impl LlmClient for ClaudeCodeClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
-        let api_key = self
-            .api_key
+        let access_token = self
+            .access_token
             .clone()
-            .ok_or_else(|| "ANTHROPIC_API_KEY not set".to_string())?;
+            .ok_or_else(|| "Claude Code OAuth token not found or expired. Run 'claude login'".to_string())?;
 
         let client = Client::new();
 
@@ -126,8 +181,8 @@ impl LlmClient for AnthropicClient {
             prompts::MAIN_SYSTEM.to_string()
         };
 
-        let api_request = AnthropicRequest {
-            model: request.model.clone(),
+        let api_request = ClaudeCodeRequest {
+            model: map_model_for_oauth(&request.model).to_string(),
             max_tokens: MAX_RESPONSE_TOKENS,
             system: system_prompt,
             messages: api_messages,
@@ -137,8 +192,9 @@ impl LlmClient for AnthropicClient {
 
         let response = client
             .post(API_ENDPOINT)
-            .header("x-api-key", &api_key)
+            .header("Authorization", format!("Bearer {}", access_token))
             .header("anthropic-version", API_VERSION)
+            .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("content-type", "application/json")
             .json(&api_request)
             .send()
@@ -229,42 +285,47 @@ impl LlmClient for AnthropicClient {
         Ok(())
     }
 
-    fn check_api(&self, model: &str) -> super::ApiCheckResult {
-        let api_key = match &self.api_key {
-            Some(k) => k.clone(),
+    fn check_api(&self, model: &str) -> ApiCheckResult {
+        let access_token = match &self.access_token {
+            Some(t) => t.clone(),
             None => {
-                return super::ApiCheckResult {
+                return ApiCheckResult {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some("ANTHROPIC_API_KEY not set".to_string()),
+                    error: Some("OAuth token not found or expired".to_string()),
                 }
             }
         };
 
         let client = Client::new();
+        let mapped_model = map_model_for_oauth(model);
 
-        // Test 1: Basic auth
+        // Test 1: Basic auth with simple non-streaming request
         let auth_result = client
             .post(API_ENDPOINT)
-            .header("x-api-key", &api_key)
+            .header("Authorization", format!("Bearer {}", access_token))
             .header("anthropic-version", API_VERSION)
+            .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("content-type", "application/json")
             .json(&serde_json::json!({
-                "model": model,
+                "model": mapped_model,
                 "max_tokens": 10,
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
             .send();
 
-        let auth_ok = auth_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+        let auth_ok = match &auth_result {
+            Ok(resp) => resp.status().is_success(),
+            Err(_) => false,
+        };
 
         if !auth_ok {
             let error = auth_result
                 .err()
                 .map(|e| e.to_string())
                 .or_else(|| Some("Auth failed".to_string()));
-            return super::ApiCheckResult {
+            return ApiCheckResult {
                 auth_ok: false,
                 streaming_ok: false,
                 tools_ok: false,
@@ -272,14 +333,15 @@ impl LlmClient for AnthropicClient {
             };
         }
 
-        // Test 2: Streaming
+        // Test 2: Streaming request
         let stream_result = client
             .post(API_ENDPOINT)
-            .header("x-api-key", &api_key)
+            .header("Authorization", format!("Bearer {}", access_token))
             .header("anthropic-version", API_VERSION)
+            .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("content-type", "application/json")
             .json(&serde_json::json!({
-                "model": model,
+                "model": mapped_model,
                 "max_tokens": 10,
                 "stream": true,
                 "messages": [{"role": "user", "content": "Say ok"}]
@@ -288,14 +350,15 @@ impl LlmClient for AnthropicClient {
 
         let streaming_ok = stream_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
-        // Test 3: Tools
+        // Test 3: Tool calling
         let tools_result = client
             .post(API_ENDPOINT)
-            .header("x-api-key", &api_key)
+            .header("Authorization", format!("Bearer {}", access_token))
             .header("anthropic-version", API_VERSION)
+            .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("content-type", "application/json")
             .json(&serde_json::json!({
-                "model": model,
+                "model": mapped_model,
                 "max_tokens": 50,
                 "tools": [{
                     "name": "test_tool",
@@ -312,7 +375,7 @@ impl LlmClient for AnthropicClient {
 
         let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
-        super::ApiCheckResult {
+        ApiCheckResult {
             auth_ok,
             streaming_ok,
             tools_ok,
@@ -321,7 +384,7 @@ impl LlmClient for AnthropicClient {
     }
 }
 
-/// Convert internal messages to Anthropic API format
+/// Convert internal messages to API format (same as anthropic.rs)
 fn messages_to_api(
     messages: &[Message],
     context_items: &[ContextItem],

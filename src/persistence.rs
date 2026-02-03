@@ -111,10 +111,16 @@ pub fn load_state() -> State {
                 dev_mode: persisted.dev_mode,
                 perf_enabled: false, // Runtime only, not persisted
                 config_view: false, // Runtime only
+                config_selected_bar: 0,
                 llm_provider: persisted.llm_provider,
                 anthropic_model: persisted.anthropic_model,
                 grok_model: persisted.grok_model,
                 cleaning_threshold: persisted.cleaning_threshold,
+                cleaning_target_proportion: persisted.cleaning_target_proportion,
+                context_budget: persisted.context_budget,
+                // API check defaults (runtime-only)
+                api_check_in_progress: false,
+                api_check_result: None,
                 // Git status defaults (runtime-only, fetched on startup)
                 git_branch: None,
                 git_is_repo: false,
@@ -165,6 +171,8 @@ pub fn save_state(state: &State) {
         anthropic_model: state.anthropic_model,
         grok_model: state.grok_model,
         cleaning_threshold: state.cleaning_threshold,
+        cleaning_target_proportion: state.cleaning_target_proportion,
+        context_budget: state.context_budget,
     };
 
     let path = dir.join(STATE_FILE);

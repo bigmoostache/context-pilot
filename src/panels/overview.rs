@@ -3,7 +3,7 @@ use ratatui::prelude::*;
 
 use super::{ContextItem, Panel};
 use crate::actions::Action;
-use crate::constants::{MAX_CONTEXT_TOKENS, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::state::{ContextType, State, TodoStatus, MemoryImportance};
 use crate::ui::{theme, chars, helpers::format_number};
 
@@ -27,11 +27,12 @@ impl Panel for OverviewPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // LLM should see the same overview the user sees
         let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-        let max_tokens = MAX_CONTEXT_TOKENS;
-        let usage_pct = (total_tokens as f64 / max_tokens as f64 * 100.0).min(100.0);
+        let budget = state.effective_context_budget();
+        let threshold = state.cleaning_threshold_tokens();
+        let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
 
-        let mut output = format!("Context Usage: {} / {} tokens ({:.1}%)\n\n",
-            total_tokens, max_tokens, usage_pct);
+        let mut output = format!("Context Usage: {} / {} threshold / {} budget ({:.1}%)\n\n",
+            total_tokens, threshold, budget, usage_pct);
 
         output.push_str("Context Elements:\n");
         for ctx in &state.context {
@@ -135,8 +136,9 @@ impl Panel for OverviewPanel {
 
         // Token usage header
         let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-        let max_tokens = MAX_CONTEXT_TOKENS;
-        let usage_pct = (total_tokens as f64 / max_tokens as f64 * 100.0).min(100.0);
+        let budget = state.effective_context_budget();
+        let threshold = state.cleaning_threshold_tokens();
+        let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
@@ -145,33 +147,55 @@ impl Panel for OverviewPanel {
         text.push(Line::from(""));
 
         let current = format_number(total_tokens);
-        let max = format_number(max_tokens);
+        let threshold_str = format_number(threshold);
+        let budget_str = format_number(budget);
         let pct = format!("{:.1}%", usage_pct);
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled(current, Style::default().fg(theme::TEXT).bold()),
             Span::styled(" / ".to_string(), Style::default().fg(theme::TEXT_MUTED)),
-            Span::styled(max, Style::default().fg(theme::ACCENT).bold()),
+            Span::styled(threshold_str, Style::default().fg(theme::WARNING)),
+            Span::styled(" / ".to_string(), Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(budget_str, Style::default().fg(theme::ACCENT).bold()),
             Span::styled(format!(" ({})", pct), Style::default().fg(theme::TEXT_MUTED)),
         ]));
 
-        // Progress bar
+        // Progress bar with threshold marker
         let bar_width = 60usize;
+        let threshold_pct = state.cleaning_threshold;
         let filled = ((usage_pct / 100.0) * bar_width as f64) as usize;
-        let empty = bar_width.saturating_sub(filled);
+        let threshold_pos = (threshold_pct as f64 * bar_width as f64) as usize;
 
-        let bar_color = if usage_pct > 80.0 {
+        let bar_color = if total_tokens >= threshold {
+            theme::ERROR
+        } else if total_tokens as f64 >= threshold as f64 * 0.9 {
             theme::WARNING
         } else {
             theme::ACCENT
         };
 
-        text.push(Line::from(vec![
-            Span::styled(" ".to_string(), base_style),
-            Span::styled(chars::BLOCK_FULL.repeat(filled), Style::default().fg(bar_color)),
-            Span::styled(chars::BLOCK_LIGHT.repeat(empty), Style::default().fg(theme::BG_ELEVATED)),
-        ]));
+        let mut bar_spans = vec![Span::styled(" ".to_string(), base_style)];
+        for i in 0..bar_width {
+            let char = if i == threshold_pos && threshold_pos < bar_width {
+                "|" // Threshold marker
+            } else if i < filled {
+                chars::BLOCK_FULL
+            } else {
+                chars::BLOCK_LIGHT
+            };
+
+            let color = if i == threshold_pos {
+                theme::WARNING
+            } else if i < filled {
+                bar_color
+            } else {
+                theme::BG_ELEVATED
+            };
+
+            bar_spans.push(Span::styled(char, Style::default().fg(color)));
+        }
+        text.push(Line::from(bar_spans));
 
         text.push(Line::from(""));
         text.push(Line::from(vec![

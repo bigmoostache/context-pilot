@@ -74,30 +74,34 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
 }
 
 /// Handle key events when config view is open
-fn handle_config_event(key: &KeyEvent, state: &State) -> Option<Action> {
+fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
     match key.code {
-        // Escape or Ctrl+H closes config
+        // Escape closes config
         KeyCode::Esc => Some(Action::ToggleConfigView),
         // Number keys select provider
         KeyCode::Char('1') => Some(Action::ConfigSelectProvider(LlmProvider::Anthropic)),
-        KeyCode::Char('2') => Some(Action::ConfigSelectProvider(LlmProvider::Grok)),
+        KeyCode::Char('2') => Some(Action::ConfigSelectProvider(LlmProvider::ClaudeCode)),
+        KeyCode::Char('3') => Some(Action::ConfigSelectProvider(LlmProvider::Grok)),
         // Letter keys select model based on current provider
-        KeyCode::Char('a') => match state.llm_provider {
-            LlmProvider::Anthropic => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45)),
-            LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Reasoning)),
+        KeyCode::Char('a') => match _state.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45)),
+            LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Fast)),
         },
-        KeyCode::Char('b') => match state.llm_provider {
-            LlmProvider::Anthropic => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45)),
-            LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Reasoning)),
+        KeyCode::Char('b') => match _state.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45)),
+            LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Fast)),
         },
-        KeyCode::Char('c') => match state.llm_provider {
-            LlmProvider::Anthropic => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45)),
+        KeyCode::Char('c') => match _state.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45)),
             LlmProvider::Grok => Some(Action::None), // Only 2 Grok models
         },
-        KeyCode::Char('d') => Some(Action::None), // No 4th model for either provider
-        // Arrow keys adjust cleaning threshold
-        KeyCode::Left => Some(Action::ConfigDecreaseCleaningThreshold),
-        KeyCode::Right => Some(Action::ConfigIncreaseCleaningThreshold),
+        KeyCode::Char('d') => Some(Action::None), // No 4th model for any provider
+        // Up/Down select which bar to edit
+        KeyCode::Up => Some(Action::ConfigSelectPrevBar),
+        KeyCode::Down => Some(Action::ConfigSelectNextBar),
+        // Left/Right adjust the selected bar
+        KeyCode::Left => Some(Action::ConfigDecreaseSelectedBar),
+        KeyCode::Right => Some(Action::ConfigIncreaseSelectedBar),
         // Any other key is ignored in config view
         _ => Some(Action::None),
     }

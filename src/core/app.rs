@@ -44,6 +44,8 @@ pub struct App {
     pending_retry_error: Option<String>,
     /// Last render time for throttling
     last_render_ms: u64,
+    /// Channel for API check results
+    api_check_rx: Option<Receiver<crate::llms::ApiCheckResult>>,
 }
 
 impl App {
@@ -66,6 +68,7 @@ impl App {
             last_ownership_check_ms: now_ms(),
             pending_retry_error: None,
             last_render_ms: 0,
+            api_check_rx: None,
         }
     }
 
@@ -121,6 +124,7 @@ impl App {
             self.check_timer_based_deprecation();
             self.handle_tool_execution(&tx, &tldr_tx, &clean_tx);
             self.finalize_stream(&tldr_tx, &clean_tx);
+            self.process_api_check_results();
 
             // Check ownership periodically (every 1 second)
             if current_ms.saturating_sub(self.last_ownership_check_ms) >= 1000 {
@@ -286,6 +290,18 @@ impl App {
                 msg.tl_dr = Some(tldr.tl_dr);
                 msg.tl_dr_token_count = tldr.token_count;
                 save_message(msg);
+            }
+        }
+    }
+
+    fn process_api_check_results(&mut self) {
+        if let Some(rx) = &self.api_check_rx {
+            if let Ok(result) = rx.try_recv() {
+                self.state.api_check_in_progress = false;
+                self.state.api_check_result = Some(result);
+                self.state.dirty = true;
+                self.api_check_rx = None;
+                save_state(&self.state);
             }
         }
     }
@@ -532,6 +548,16 @@ impl App {
                     self.state.llm_provider,
                     self.state.current_model(),
                     ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
+                );
+                save_state(&self.state);
+            }
+            ActionResult::StartApiCheck => {
+                let (api_tx, api_rx) = std::sync::mpsc::channel();
+                self.api_check_rx = Some(api_rx);
+                crate::llms::start_api_check(
+                    self.state.llm_provider,
+                    self.state.current_model(),
+                    api_tx,
                 );
                 save_state(&self.state);
             }
@@ -914,6 +940,7 @@ impl App {
         let has_active_spinner = self.state.is_streaming
             || self.state.is_cleaning_context
             || self.state.pending_tldrs > 0
+            || self.state.api_check_in_progress
             || self.state.context.iter().any(|c| {
                 c.cached_content.is_none() && c.context_type.needs_cache()
             });
