@@ -237,16 +237,20 @@ impl App {
                 continue;
             }
             match evt {
-                StreamEvent::Chunk(_text) => {
-                    // Ignore text output from cleaner
+                StreamEvent::Chunk(text) => {
+                    // Log cleaner text output for debugging
+                    eprintln!("[CLEANER] Text chunk: {}", text.chars().take(100).collect::<String>());
                 }
                 StreamEvent::ToolUse(tool) => {
+                    eprintln!("[CLEANER] Tool use: {}", tool.name);
                     self.cleaning_pending_tools.push(tool);
                 }
                 StreamEvent::Done { input_tokens, output_tokens } => {
+                    eprintln!("[CLEANER] Done. Tools pending: {}", self.cleaning_pending_tools.len());
                     self.cleaning_pending_done = Some((input_tokens, output_tokens));
                 }
-                StreamEvent::Error(_e) => {
+                StreamEvent::Error(e) => {
+                    eprintln!("[CLEANER] Error: {}", e);
                     self.state.is_cleaning_context = false;
                     self.cleaning_pending_tools.clear();
                     self.cleaning_pending_done = None;
