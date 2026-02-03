@@ -1,10 +1,11 @@
 //! LLM provider abstraction layer.
 //!
-//! Provides a unified interface for different LLM providers (Anthropic, Grok, Claude Code OAuth)
+//! Provides a unified interface for different LLM providers (Anthropic, Grok, Groq, Claude Code OAuth)
 
 pub mod anthropic;
 pub mod claude_code;
 pub mod grok;
+pub mod groq;
 
 use std::sync::mpsc::Sender;
 
@@ -67,6 +68,7 @@ pub enum LlmProvider {
     #[serde(alias = "claudecode")]
     ClaudeCode,
     Grok,
+    Groq,
 }
 
 /// Available models for Anthropic
@@ -163,6 +165,58 @@ impl ModelInfo for GrokModel {
     }
 }
 
+/// Available models for Groq (models with Local & Remote Tool Use support)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum GroqModel {
+    #[default]
+    Llama33_70b,
+    Llama31_8b,
+    Llama4Scout,
+    Qwen3_32b,
+}
+
+impl ModelInfo for GroqModel {
+    fn api_name(&self) -> &'static str {
+        match self {
+            GroqModel::Llama33_70b => "llama-3.3-70b-versatile",
+            GroqModel::Llama31_8b => "llama-3.1-8b-instant",
+            GroqModel::Llama4Scout => "meta-llama/llama-4-scout-17b-16e-instruct",
+            GroqModel::Qwen3_32b => "qwen/qwen3-32b",
+        }
+    }
+
+    fn display_name(&self) -> &'static str {
+        match self {
+            GroqModel::Llama33_70b => "Llama 3.3 70B",
+            GroqModel::Llama31_8b => "Llama 3.1 8B",
+            GroqModel::Llama4Scout => "Llama 4 Scout",
+            GroqModel::Qwen3_32b => "Qwen3 32B",
+        }
+    }
+
+    fn context_window(&self) -> usize {
+        131_072 // All models have 131K context
+    }
+
+    fn input_price_per_mtok(&self) -> f32 {
+        match self {
+            GroqModel::Llama33_70b => 0.59,
+            GroqModel::Llama31_8b => 0.05,
+            GroqModel::Llama4Scout => 0.11,
+            GroqModel::Qwen3_32b => 0.29,
+        }
+    }
+
+    fn output_price_per_mtok(&self) -> f32 {
+        match self {
+            GroqModel::Llama33_70b => 0.79,
+            GroqModel::Llama31_8b => 0.08,
+            GroqModel::Llama4Scout => 0.34,
+            GroqModel::Qwen3_32b => 0.59,
+        }
+    }
+}
 
 /// Configuration for an LLM request
 #[derive(Debug, Clone)]
@@ -191,6 +245,7 @@ pub fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
         LlmProvider::Anthropic => Box::new(anthropic::AnthropicClient::new()),
         LlmProvider::ClaudeCode => Box::new(claude_code::ClaudeCodeClient::new()),
         LlmProvider::Grok => Box::new(grok::GrokClient::new()),
+        LlmProvider::Groq => Box::new(groq::GroqClient::new()),
     }
 }
 

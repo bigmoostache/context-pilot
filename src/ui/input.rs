@@ -64,6 +64,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         LlmProvider::Anthropic => ("Claude", state.anthropic_model.display_name()),
         LlmProvider::ClaudeCode => ("OAuth", state.anthropic_model.display_name()),
         LlmProvider::Grok => ("Grok", state.grok_model.display_name()),
+        LlmProvider::Groq => ("Groq", state.groq_model.display_name()),
     };
     spans.push(Span::styled(
         format!(" {} ", provider_name),

@@ -85,6 +85,7 @@ pub enum Action {
     ConfigSelectProvider(crate::llms::LlmProvider),
     ConfigSelectAnthropicModel(crate::llms::AnthropicModel),
     ConfigSelectGrokModel(crate::llms::GrokModel),
+    ConfigSelectGroqModel(crate::llms::GroqModel),
     ConfigSelectNextBar,
     ConfigSelectPrevBar,
     ConfigIncreaseSelectedBar,
@@ -494,6 +495,13 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ConfigSelectGrokModel(model) => {
             state.grok_model = model;
+            state.api_check_in_progress = true;
+            state.api_check_result = None;
+            state.dirty = true;
+            ActionResult::StartApiCheck
+        }
+        Action::ConfigSelectGroqModel(model) => {
+            state.groq_model = model;
             state.api_check_in_progress = true;
             state.api_check_result = None;
             state.dirty = true;

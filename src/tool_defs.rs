@@ -454,7 +454,7 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
             id: "update_todos".to_string(),
             name: "Update Todos".to_string(),
             short_desc: "Modify task items".to_string(),
-            description: "Updates existing todos: change status, name, description, or delete.".to_string(),
+            description: "Updates existing todos: change status, name, description, or delete. Use delete:true to remove a todo.".to_string(),
             params: vec![
                 ToolParam::new("updates", ParamType::Array(Box::new(ParamType::Object(vec![
                     ToolParam::new("id", ParamType::String)
@@ -462,13 +462,15 @@ pub fn get_all_tool_definitions() -> Vec<ToolDefinition> {
                         .required(),
                     ToolParam::new("status", ParamType::String)
                         .desc("New status")
-                        .enum_vals(&["pending", "in_progress", "done"]),
+                        .enum_vals(&["pending", "in_progress", "done", "deleted"]),
                     ToolParam::new("name", ParamType::String)
                         .desc("New name"),
                     ToolParam::new("description", ParamType::String)
                         .desc("New description"),
+                    ToolParam::new("parent_id", ParamType::String)
+                        .desc("New parent ID, or null to make top-level"),
                     ToolParam::new("delete", ParamType::Boolean)
-                        .desc("Set true to delete"),
+                        .desc("Set true to delete this todo"),
                 ]))))
                     .desc("Array of todo updates")
                     .required(),

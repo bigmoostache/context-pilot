@@ -2,7 +2,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::actions::{parse_context_pattern, find_context_by_id, Action};
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::llms::{AnthropicModel, GrokModel, LlmProvider};
+use crate::llms::{AnthropicModel, GrokModel, GroqModel, LlmProvider};
 use crate::panels::get_panel;
 use crate::state::State;
 
@@ -82,20 +82,27 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         KeyCode::Char('1') => Some(Action::ConfigSelectProvider(LlmProvider::Anthropic)),
         KeyCode::Char('2') => Some(Action::ConfigSelectProvider(LlmProvider::ClaudeCode)),
         KeyCode::Char('3') => Some(Action::ConfigSelectProvider(LlmProvider::Grok)),
+        KeyCode::Char('4') => Some(Action::ConfigSelectProvider(LlmProvider::Groq)),
         // Letter keys select model based on current provider
         KeyCode::Char('a') => match _state.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45)),
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Fast)),
+            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama33_70b)),
         },
         KeyCode::Char('b') => match _state.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45)),
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Fast)),
+            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama31_8b)),
         },
         KeyCode::Char('c') => match _state.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45)),
             LlmProvider::Grok => Some(Action::None), // Only 2 Grok models
+            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama4Scout)),
         },
-        KeyCode::Char('d') => Some(Action::None), // No 4th model for any provider
+        KeyCode::Char('d') => match _state.llm_provider {
+            LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Qwen3_32b)),
+            _ => Some(Action::None),
+        }
         // Up/Down select which bar to edit
         KeyCode::Up => Some(Action::ConfigSelectPrevBar),
         KeyCode::Down => Some(Action::ConfigSelectNextBar),

@@ -38,14 +38,30 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             .unwrap_or("")
             .to_string();
 
+        // Normalize parent_id: treat "none", "null", "" as None
         let parent_id = todo_value.get("parent_id")
-            .and_then(|v| v.as_str())
+            .and_then(|v| {
+                if v.is_null() {
+                    return None;
+                }
+                v.as_str()
+            })
+            .filter(|s| {
+                let lower = s.to_lowercase();
+                !s.is_empty() && lower != "none" && lower != "null"
+            })
             .map(|s| s.to_string());
 
         // Validate parent exists if specified
         if let Some(ref pid) = parent_id {
             if !state.todos.iter().any(|t| t.id == *pid) {
-                errors.push(format!("Parent '{}' not found for '{}'", pid, name));
+                let available: Vec<&str> = state.todos.iter().map(|t| t.id.as_str()).collect();
+                let available_str = if available.is_empty() {
+                    "no todos exist yet".to_string()
+                } else {
+                    format!("available: {}", available.join(", "))
+                };
+                errors.push(format!("Parent '{}' not found for '{}' ({})", pid, name, available_str));
                 continue;
             }
         }
@@ -123,33 +139,56 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         };
 
-        // Check for deletion
-        if let Some(status_str) = update_value.get("status").and_then(|v| v.as_str()) {
-            if status_str == "deleted" {
-                let initial_len = state.todos.len();
-                state.todos.retain(|t| t.id != id);
-                if state.todos.len() < initial_len {
-                    deleted.push(id.to_string());
-                } else {
-                    not_found.push(id.to_string());
-                }
-                continue;
+        // Check for deletion (support both delete:true and status:"deleted")
+        let should_delete = update_value.get("delete").and_then(|v| v.as_bool()).unwrap_or(false)
+            || update_value.get("status").and_then(|v| v.as_str()) == Some("deleted");
+
+        if should_delete {
+            let initial_len = state.todos.len();
+            state.todos.retain(|t| t.id != id);
+            if state.todos.len() < initial_len {
+                deleted.push(id.to_string());
+            } else {
+                not_found.push(id.to_string());
             }
+            continue;
         }
 
-        // Pre-validate parent_id if specified
-        if update_value.get("parent_id").is_some() {
-            if let Some(pid) = update_value.get("parent_id").and_then(|v| v.as_str()) {
-                if pid == id {
-                    errors.push(format!("{}: cannot be its own parent", id));
-                    continue;
+        // Pre-validate parent_id if specified (normalize "none", "null", "" to None)
+        let normalized_parent = if update_value.get("parent_id").is_some() {
+            let raw = update_value.get("parent_id");
+            if raw.map(|v| v.is_null()).unwrap_or(false) {
+                Some(None) // explicitly set to None
+            } else if let Some(pid) = raw.and_then(|v| v.as_str()) {
+                let lower = pid.to_lowercase();
+                if pid.is_empty() || lower == "none" || lower == "null" {
+                    Some(None) // normalize to None
+                } else {
+                    if pid == id {
+                        errors.push(format!("{}: cannot be its own parent", id));
+                        continue;
+                    }
+                    if !state.todos.iter().any(|other| other.id == pid) {
+                        let available: Vec<&str> = state.todos.iter()
+                            .filter(|t| t.id != id)
+                            .map(|t| t.id.as_str())
+                            .collect();
+                        let available_str = if available.is_empty() {
+                            "no other todos exist".to_string()
+                        } else {
+                            format!("available: {}", available.join(", "))
+                        };
+                        errors.push(format!("{}: parent '{}' not found ({})", id, pid, available_str));
+                        continue;
+                    }
+                    Some(Some(pid.to_string()))
                 }
-                if !state.todos.iter().any(|other| other.id == pid) {
-                    errors.push(format!("{}: parent '{}' not found", id, pid));
-                    continue;
-                }
+            } else {
+                None // no change
             }
-        }
+        } else {
+            None // no change
+        };
 
         // Find and update the todo
         let todo = state.todos.iter_mut().find(|t| t.id == id);
@@ -168,14 +207,9 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                     changes.push("description");
                 }
 
-                // Handle parent_id - can be string or null (already validated above)
-                if update_value.get("parent_id").is_some() {
-                    let new_parent = update_value.get("parent_id").and_then(|v| v.as_str());
-                    if let Some(pid) = new_parent {
-                        t.parent_id = Some(pid.to_string());
-                    } else {
-                        t.parent_id = None;
-                    }
+                // Handle parent_id - use normalized value (already validated above)
+                if let Some(new_parent) = &normalized_parent {
+                    t.parent_id = new_parent.clone();
                     changes.push("parent");
                 }
 

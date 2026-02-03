@@ -1,0 +1,514 @@
+//! Groq API implementation.
+//!
+//! Groq uses an OpenAI-compatible API format.
+
+use std::env;
+use std::io::{BufRead, BufReader};
+use std::sync::mpsc::Sender;
+
+use reqwest::blocking::Client;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use super::{LlmClient, LlmRequest, StreamEvent};
+use crate::constants::{prompts, MAX_RESPONSE_TOKENS};
+use crate::panels::ContextItem;
+use crate::state::{Message, MessageStatus, MessageType};
+use crate::tool_defs::ToolDefinition;
+use crate::tools::ToolUse;
+
+const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
+
+/// Groq client
+pub struct GroqClient {
+    api_key: Option<String>,
+}
+
+impl GroqClient {
+    pub fn new() -> Self {
+        dotenvy::dotenv().ok();
+        Self {
+            api_key: env::var("GROQ_API_KEY").ok(),
+        }
+    }
+}
+
+impl Default for GroqClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// OpenAI-compatible message format
+#[derive(Debug, Serialize)]
+struct GroqMessage {
+    role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<GroqToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GroqToolCall {
+    id: String,
+    #[serde(rename = "type")]
+    call_type: String,
+    function: GroqFunction,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GroqFunction {
+    name: String,
+    arguments: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GroqTool {
+    #[serde(rename = "type")]
+    tool_type: String,
+    function: GroqFunctionDef,
+}
+
+#[derive(Debug, Serialize)]
+struct GroqFunctionDef {
+    name: String,
+    description: String,
+    parameters: Value,
+}
+
+#[derive(Debug, Serialize)]
+struct GroqRequest {
+    model: String,
+    messages: Vec<GroqMessage>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tools: Vec<GroqTool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_choice: Option<String>,
+    max_completion_tokens: u32,
+    stream: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamChoice {
+    delta: Option<StreamDelta>,
+    finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamDelta {
+    content: Option<String>,
+    tool_calls: Option<Vec<StreamToolCall>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamToolCall {
+    index: Option<usize>,
+    id: Option<String>,
+    function: Option<StreamFunction>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamFunction {
+    name: Option<String>,
+    arguments: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamResponse {
+    choices: Vec<StreamChoice>,
+    usage: Option<StreamUsage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamUsage {
+    prompt_tokens: Option<usize>,
+    completion_tokens: Option<usize>,
+}
+
+impl LlmClient for GroqClient {
+    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
+        let api_key = self
+            .api_key
+            .clone()
+            .ok_or_else(|| "GROQ_API_KEY not set".to_string())?;
+
+        let client = Client::new();
+
+        // Build messages in OpenAI format
+        let mut groq_messages = messages_to_groq(
+            &request.messages,
+            &request.context_items,
+            &request.system_prompt,
+            &request.extra_context,
+        );
+
+        // Add tool results if present
+        if let Some(results) = &request.tool_results {
+            for result in results {
+                groq_messages.push(GroqMessage {
+                    role: "tool".to_string(),
+                    content: Some(result.content.clone()),
+                    tool_calls: None,
+                    tool_call_id: Some(result.tool_use_id.clone()),
+                    name: None,
+                });
+            }
+        }
+
+        // Convert tools to OpenAI format
+        let groq_tools = tools_to_groq(&request.tools);
+
+        // Set tool_choice to "auto" when tools are available
+        let tool_choice = if groq_tools.is_empty() {
+            None
+        } else {
+            Some("auto".to_string())
+        };
+
+        let api_request = GroqRequest {
+            model: request.model.clone(),
+            messages: groq_messages,
+            tools: groq_tools,
+            tool_choice,
+            max_completion_tokens: MAX_RESPONSE_TOKENS,
+            stream: true,
+        };
+
+        let response = client
+            .post(GROQ_API_ENDPOINT)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&api_request)
+            .send()
+            .map_err(|e| format!("Request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().unwrap_or_default();
+            return Err(format!("API error {}: {}", status, body));
+        }
+
+        let reader = BufReader::new(response);
+        let mut input_tokens = 0;
+        let mut output_tokens = 0;
+
+        // Track tool calls being built (index -> (id, name, arguments))
+        let mut tool_calls: std::collections::HashMap<usize, (String, String, String)> =
+            std::collections::HashMap::new();
+
+        for line in reader.lines() {
+            let line = line.map_err(|e| format!("Read error: {}", e))?;
+
+            if !line.starts_with("data: ") {
+                continue;
+            }
+
+            let json_str = &line[6..];
+            if json_str == "[DONE]" {
+                break;
+            }
+
+            if let Ok(resp) = serde_json::from_str::<StreamResponse>(json_str) {
+                // Handle usage info
+                if let Some(usage) = resp.usage {
+                    if let Some(inp) = usage.prompt_tokens {
+                        input_tokens = inp;
+                    }
+                    if let Some(out) = usage.completion_tokens {
+                        output_tokens = out;
+                    }
+                }
+
+                for choice in resp.choices {
+                    if let Some(delta) = choice.delta {
+                        // Handle text content
+                        if let Some(content) = delta.content {
+                            if !content.is_empty() {
+                                let _ = tx.send(StreamEvent::Chunk(content));
+                            }
+                        }
+
+                        // Handle tool calls
+                        if let Some(calls) = delta.tool_calls {
+                            for call in calls {
+                                let idx = call.index.unwrap_or(0);
+
+                                // Initialize or update tool call
+                                let entry = tool_calls.entry(idx).or_insert_with(|| {
+                                    (String::new(), String::new(), String::new())
+                                });
+
+                                if let Some(id) = call.id {
+                                    entry.0 = id;
+                                }
+                                if let Some(func) = call.function {
+                                    if let Some(name) = func.name {
+                                        entry.1 = name;
+                                    }
+                                    if let Some(args) = func.arguments {
+                                        entry.2.push_str(&args);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Check for finish reason
+                    if choice.finish_reason.is_some() {
+                        // Emit any completed tool calls
+                        for (_, (id, name, arguments)) in tool_calls.drain() {
+                            if !id.is_empty() && !name.is_empty() {
+                                let input: Value = serde_json::from_str(&arguments)
+                                    .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
+                                let _ = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let _ = tx.send(StreamEvent::Done {
+            input_tokens,
+            output_tokens,
+        });
+        Ok(())
+    }
+
+    fn check_api(&self, model: &str) -> super::ApiCheckResult {
+        let api_key = match &self.api_key {
+            Some(k) => k.clone(),
+            None => {
+                return super::ApiCheckResult {
+                    auth_ok: false,
+                    streaming_ok: false,
+                    tools_ok: false,
+                    error: Some("GROQ_API_KEY not set".to_string()),
+                }
+            }
+        };
+
+        let client = Client::new();
+
+        // Test 1: Basic auth
+        let auth_result = client
+            .post(GROQ_API_ENDPOINT)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "model": model,
+                "max_completion_tokens": 10,
+                "messages": [{"role": "user", "content": "Hi"}]
+            }))
+            .send();
+
+        let auth_ok = auth_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+
+        if !auth_ok {
+            let error = auth_result
+                .err()
+                .map(|e| e.to_string())
+                .or_else(|| Some("Auth failed".to_string()));
+            return super::ApiCheckResult {
+                auth_ok: false,
+                streaming_ok: false,
+                tools_ok: false,
+                error,
+            };
+        }
+
+        // Test 2: Streaming
+        let stream_result = client
+            .post(GROQ_API_ENDPOINT)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "model": model,
+                "max_completion_tokens": 10,
+                "stream": true,
+                "messages": [{"role": "user", "content": "Say ok"}]
+            }))
+            .send();
+
+        let streaming_ok = stream_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+
+        // Test 3: Tools
+        let tools_result = client
+            .post(GROQ_API_ENDPOINT)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "model": model,
+                "max_completion_tokens": 50,
+                "tools": [{
+                    "type": "function",
+                    "function": {
+                        "name": "test_tool",
+                        "description": "A test tool",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                }],
+                "messages": [{"role": "user", "content": "Hi"}]
+            }))
+            .send();
+
+        let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+
+        super::ApiCheckResult {
+            auth_ok,
+            streaming_ok,
+            tools_ok,
+            error: None,
+        }
+    }
+}
+
+/// Convert internal messages to Groq/OpenAI format
+fn messages_to_groq(
+    messages: &[Message],
+    context_items: &[ContextItem],
+    system_prompt: &Option<String>,
+    extra_context: &Option<String>,
+) -> Vec<GroqMessage> {
+    let mut groq_messages: Vec<GroqMessage> = Vec::new();
+
+    // Add system message
+    let system_content = system_prompt
+        .clone()
+        .unwrap_or_else(|| prompts::MAIN_SYSTEM.to_string());
+    groq_messages.push(GroqMessage {
+        role: "system".to_string(),
+        content: Some(system_content),
+        tool_calls: None,
+        tool_call_id: None,
+        name: None,
+    });
+
+    // Format context items
+    let context_parts: Vec<String> = context_items
+        .iter()
+        .filter(|item| !item.content.is_empty())
+        .map(|item| item.format())
+        .collect();
+
+    // Add extra context if present (for cleaner mode)
+    if let Some(ctx) = extra_context {
+        groq_messages.push(GroqMessage {
+            role: "user".to_string(),
+            content: Some(format!(
+                "Please clean up the context to reduce token usage:\n\n{}",
+                ctx
+            )),
+            tool_calls: None,
+            tool_call_id: None,
+            name: None,
+        });
+    }
+
+    let mut first_user_message = true;
+
+    for msg in messages.iter() {
+        if msg.status == MessageStatus::Deleted {
+            continue;
+        }
+
+        if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
+            continue;
+        }
+
+        // Handle tool results
+        if msg.message_type == MessageType::ToolResult {
+            for result in &msg.tool_results {
+                groq_messages.push(GroqMessage {
+                    role: "tool".to_string(),
+                    content: Some(format!("[{}]: {}", msg.id, result.content)),
+                    tool_calls: None,
+                    tool_call_id: Some(result.tool_use_id.clone()),
+                    name: None,
+                });
+            }
+            continue;
+        }
+
+        // Handle tool calls
+        if msg.message_type == MessageType::ToolCall {
+            let tool_calls: Vec<GroqToolCall> = msg
+                .tool_uses
+                .iter()
+                .map(|tu| GroqToolCall {
+                    id: tu.id.clone(),
+                    call_type: "function".to_string(),
+                    function: GroqFunction {
+                        name: tu.name.clone(),
+                        arguments: serde_json::to_string(&tu.input).unwrap_or_default(),
+                    },
+                })
+                .collect();
+
+            groq_messages.push(GroqMessage {
+                role: "assistant".to_string(),
+                content: None,
+                tool_calls: Some(tool_calls),
+                tool_call_id: None,
+                name: None,
+            });
+            continue;
+        }
+
+        // Regular text message
+        let message_content = match msg.status {
+            MessageStatus::Summarized => msg.tl_dr.as_ref().unwrap_or(&msg.content).clone(),
+            _ => msg.content.clone(),
+        };
+
+        if !message_content.is_empty() {
+            let prefixed_content = format!("[{}]: {}", msg.id, message_content);
+
+            let text = if msg.role == "user" && first_user_message && !context_parts.is_empty() {
+                first_user_message = false;
+                let context = context_parts.join("\n\n");
+                format!("{}\n\n{}", context, prefixed_content)
+            } else {
+                if msg.role == "user" {
+                    first_user_message = false;
+                }
+                prefixed_content
+            };
+
+            groq_messages.push(GroqMessage {
+                role: msg.role.clone(),
+                content: Some(text),
+                tool_calls: None,
+                tool_call_id: None,
+                name: None,
+            });
+        }
+    }
+
+    groq_messages
+}
+
+/// Convert tool definitions to Groq/OpenAI format
+fn tools_to_groq(tools: &[ToolDefinition]) -> Vec<GroqTool> {
+    tools
+        .iter()
+        .filter(|t| t.enabled)
+        .map(|t| GroqTool {
+            tool_type: "function".to_string(),
+            function: GroqFunctionDef {
+                name: t.id.clone(),
+                description: t.description.clone(),
+                parameters: t.to_json_schema(),
+            },
+        })
+        .collect()
+}

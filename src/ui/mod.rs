@@ -270,7 +270,7 @@ fn truncate_op_name(name: &str, max_len: usize) -> String {
 }
 
 fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
-    use crate::llms::{AnthropicModel, GrokModel, LlmProvider};
+    use crate::llms::{AnthropicModel, GrokModel, GroqModel, LlmProvider};
 
     // Center the overlay
     let overlay_width = 56u16;
@@ -292,6 +292,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         (LlmProvider::Anthropic, "1", "Anthropic Claude"),
         (LlmProvider::ClaudeCode, "2", "Claude Code (OAuth)"),
         (LlmProvider::Grok, "3", "Grok (xAI)"),
+        (LlmProvider::Groq, "4", "Groq"),
     ];
 
     for (provider, key, name) in providers {
@@ -342,6 +343,17 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
                 (GrokModel::Grok4Fast, "b"),
             ] {
                 let is_selected = state.grok_model == model;
+                render_model_line_with_info(&mut lines, is_selected, key, &model);
+            }
+        }
+        LlmProvider::Groq => {
+            for (model, key) in [
+                (GroqModel::Llama33_70b, "a"),
+                (GroqModel::Llama31_8b, "b"),
+                (GroqModel::Llama4Scout, "c"),
+                (GroqModel::Qwen3_32b, "d"),
+            ] {
+                let is_selected = state.groq_model == model;
                 render_model_line_with_info(&mut lines, is_selected, key, &model);
             }
         }

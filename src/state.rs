@@ -413,6 +413,9 @@ pub struct PersistedState {
     /// Selected Grok model
     #[serde(default)]
     pub grok_model: crate::llms::GrokModel,
+    /// Selected Groq model
+    #[serde(default)]
+    pub groq_model: crate::llms::GroqModel,
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     #[serde(default = "default_cleaning_threshold")]
     pub cleaning_threshold: f32,
@@ -512,6 +515,8 @@ pub struct State {
     pub anthropic_model: crate::llms::AnthropicModel,
     /// Selected Grok model
     pub grok_model: crate::llms::GrokModel,
+    /// Selected Groq model
+    pub groq_model: crate::llms::GroqModel,
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     pub cleaning_threshold: f32,
     /// Cleaning target as proportion of threshold (0.0 - 1.0)
@@ -743,6 +748,7 @@ impl Default for State {
             llm_provider: crate::llms::LlmProvider::default(),
             anthropic_model: crate::llms::AnthropicModel::default(),
             grok_model: crate::llms::GrokModel::default(),
+            groq_model: crate::llms::GroqModel::default(),
             cleaning_threshold: 0.70,
             cleaning_target_proportion: 0.70,
             context_budget: None, // Use model's full context window
@@ -787,6 +793,7 @@ impl State {
                 self.anthropic_model.api_name().to_string()
             }
             crate::llms::LlmProvider::Grok => self.grok_model.api_name().to_string(),
+            crate::llms::LlmProvider::Groq => self.groq_model.api_name().to_string(),
         }
     }
 
@@ -802,6 +809,7 @@ impl State {
                 self.anthropic_model.context_window()
             }
             crate::llms::LlmProvider::Grok => self.grok_model.context_window(),
+            crate::llms::LlmProvider::Groq => self.groq_model.context_window(),
         }
     }
 
