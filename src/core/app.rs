@@ -921,13 +921,22 @@ impl App {
             }
         }
 
-        // Check if git status needs refresh
+        // Check if git status needs refresh (timer-based or explicitly deprecated)
         let git_elapsed = current_ms.saturating_sub(self.state.git_last_refresh_ms);
-        if git_elapsed >= GIT_STATUS_REFRESH_MS {
+        let git_deprecated = self.state.context.iter()
+            .any(|c| c.context_type == ContextType::Git && c.cache_deprecated);
+        
+        if git_elapsed >= GIT_STATUS_REFRESH_MS || git_deprecated {
+            // Clear the deprecated flag before requesting refresh
+            for ctx in &mut self.state.context {
+                if ctx.context_type == ContextType::Git {
+                    ctx.cache_deprecated = false;
+                }
+            }
             process_cache_request(
                 CacheRequest::RefreshGitStatus {
                     show_diffs: self.state.git_show_diffs,
-                    current_hash: self.state.git_status_hash.clone(),
+                    current_hash: if git_deprecated { None } else { self.state.git_status_hash.clone() },
                 },
                 self.cache_tx.clone(),
             );
