@@ -536,6 +536,8 @@ pub struct State {
     // === Git Status (runtime-only, not persisted) ===
     /// Current git branch name (None if not a git repo)
     pub git_branch: Option<String>,
+    /// All local branches (name, is_current)
+    pub git_branches: Vec<(String, bool)>,
     /// Whether we're in a git repository
     pub git_is_repo: bool,
     /// Per-file git changes
@@ -760,6 +762,7 @@ impl Default for State {
             api_check_result: None,
             // Git status defaults
             git_branch: None,
+            git_branches: vec![],
             git_is_repo: false,
             git_file_changes: vec![],
             git_last_refresh_ms: 0,

@@ -124,6 +124,7 @@ pub fn load_state() -> State {
                 api_check_result: None,
                 // Git status defaults (runtime-only, fetched on startup)
                 git_branch: None,
+                git_branches: vec![],
                 git_is_repo: false,
                 git_file_changes: vec![],
                 git_last_refresh_ms: 0,

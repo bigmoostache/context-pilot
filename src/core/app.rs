@@ -741,12 +741,14 @@ impl App {
                     branch,
                     is_repo,
                     file_changes,
+                    branches,
                     formatted_content,
                     token_count,
                     status_hash,
                 } => {
                     use crate::state::{GitFileChange, ContextType};
                     self.state.git_branch = branch;
+                    self.state.git_branches = branches;
                     self.state.git_is_repo = is_repo;
                     self.state.git_file_changes = file_changes.into_iter()
                         .map(|(path, additions, deletions, change_type, diff_content)| GitFileChange {

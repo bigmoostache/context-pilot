@@ -162,8 +162,30 @@ impl Panel for GitPanel {
                 Span::styled("Branch: ".to_string(), Style::default().fg(theme::TEXT_SECONDARY)),
                 Span::styled(branch.clone(), Style::default().fg(branch_color).bold()),
             ]));
-            text.push(Line::from(""));
         }
+
+        // All branches
+        if !state.git_branches.is_empty() {
+            text.push(Line::from(""));
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled("Branches:".to_string(), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+            ]));
+            for (branch_name, is_current) in &state.git_branches {
+                let (prefix, style) = if *is_current {
+                    ("* ", Style::default().fg(theme::ACCENT).bold())
+                } else {
+                    ("  ", Style::default().fg(theme::TEXT_MUTED))
+                };
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled(prefix.to_string(), style),
+                    Span::styled(branch_name.clone(), style),
+                ]));
+            }
+        }
+
+        text.push(Line::from(""));
 
         if state.git_file_changes.is_empty() {
             text.push(Line::from(vec![

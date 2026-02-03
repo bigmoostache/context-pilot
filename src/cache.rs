@@ -53,6 +53,8 @@ pub enum CacheUpdate {
         is_repo: bool,
         /// (path, additions, deletions, change_type, diff_content)
         file_changes: Vec<(String, i32, i32, crate::state::GitChangeType, String)>,
+        /// All local branches (name, is_current)
+        branches: Vec<(String, bool)>,
         /// Formatted content for LLM context
         formatted_content: String,
         /// Token count for formatted content
@@ -290,6 +292,7 @@ fn refresh_git_status(show_diffs: bool, current_hash: Option<String>, tx: Sender
             branch: None,
             is_repo: false,
             file_changes: vec![],
+            branches: vec![],
             formatted_content: "Not a git repository".to_string(),
             token_count: estimate_tokens("Not a git repository"),
             status_hash: String::new(),
@@ -421,6 +424,21 @@ fn refresh_git_status(show_diffs: bool, current_hash: Option<String>, tx: Sender
         .collect();
     changes.sort_by(|a, b| a.0.cmp(&b.0));
 
+    // Get all local branches
+    let branches: Vec<(String, bool)> = Command::new("git")
+        .args(["branch", "--format=%(refname:short)"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| {
+            let current = branch.as_deref().unwrap_or("");
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(|b| (b.to_string(), b == current))
+                .collect()
+        })
+        .unwrap_or_default();
+
     // Only fetch diffs if show_diffs is enabled AND we have changes
     if show_diffs && !changes.is_empty() {
         let mut diff_contents: HashMap<String, String> = HashMap::new();
@@ -484,6 +502,7 @@ fn refresh_git_status(show_diffs: bool, current_hash: Option<String>, tx: Sender
         branch,
         is_repo: true,
         file_changes: changes,
+        branches,
         formatted_content,
         token_count,
         status_hash: new_hash,
