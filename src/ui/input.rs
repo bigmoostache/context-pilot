@@ -3,6 +3,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 
+use crate::llms::{LlmProvider, ModelInfo};
 use crate::state::State;
 use super::{theme, spinner};
 
@@ -57,6 +58,22 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" READY ", Style::default().fg(theme::BG_BASE).bg(theme::TEXT_MUTED).bold()));
         spans.push(Span::styled(" ", base_style));
     }
+
+    // Show current LLM provider and model
+    let (provider_name, model_name) = match state.llm_provider {
+        LlmProvider::Anthropic => ("Claude", state.anthropic_model.display_name()),
+        LlmProvider::Grok => ("Grok", state.grok_model.display_name()),
+    };
+    spans.push(Span::styled(
+        format!(" {} ", provider_name),
+        Style::default().fg(theme::BG_BASE).bg(theme::ACCENT_DIM).bold()
+    ));
+    spans.push(Span::styled(" ", base_style));
+    spans.push(Span::styled(
+        format!(" {} ", model_name),
+        Style::default().fg(theme::TEXT).bg(theme::BG_ELEVATED)
+    ));
+    spans.push(Span::styled(" ", base_style));
 
     // Right side info
     let char_count = state.input.chars().count();

@@ -9,7 +9,7 @@ use crate::actions::{apply_action, clean_llm_id_prefix, Action, ActionResult};
 use crate::api::{start_cleaning, start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
 use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
-use crate::constants::{CLEANING_TARGET, EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS, RENDER_THROTTLE_MS};
+use crate::constants::{EVENT_POLL_MS, MAX_CLEANING_ITERATIONS, MAX_API_RETRIES, GLOB_DEPRECATION_MS, GREP_DEPRECATION_MS, TMUX_DEPRECATION_MS, GIT_STATUS_REFRESH_MS, RENDER_THROTTLE_MS};
 use crate::context_cleaner;
 use crate::events::handle_event;
 use crate::panels::now_ms;
@@ -196,6 +196,8 @@ impl App {
                 self.typewriter.reset();
                 self.pending_done = None;
                 start_streaming(
+                    self.state.llm_provider,
+                    self.state.current_model(),
                     ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
                 );
                 self.state.dirty = true;
@@ -250,7 +252,7 @@ impl App {
             save_state(&self.state);
 
             let (_, usage_pct) = context_cleaner::calculate_context_usage(&self.state);
-            if usage_pct < CLEANING_TARGET || self.cleaning_iterations >= MAX_CLEANING_ITERATIONS {
+            if usage_pct < self.state.cleaning_target() || self.cleaning_iterations >= MAX_CLEANING_ITERATIONS {
                 self.state.is_cleaning_context = false;
                 self.cleaning_pending_done = None;
                 self.cleaning_iterations = 0;
@@ -259,6 +261,8 @@ impl App {
                 let cleaner_tools = context_cleaner::get_cleaner_tools();
                 self.cleaning_pending_done = None;
                 start_cleaning(
+                    self.state.llm_provider,
+                    self.state.current_model(),
                     ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
                 );
             }
@@ -393,6 +397,8 @@ impl App {
             let ctx = prepare_stream_context(&mut self.state, true);
             let cleaner_tools = context_cleaner::get_cleaner_tools();
             start_cleaning(
+                self.state.llm_provider,
+                self.state.current_model(),
                 ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
             );
         }
@@ -402,6 +408,8 @@ impl App {
         self.typewriter.reset();
         self.pending_done = None;
         start_streaming(
+            self.state.llm_provider,
+            self.state.current_model(),
             ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
         );
     }
@@ -447,6 +455,8 @@ impl App {
                     let ctx = prepare_stream_context(&mut self.state, true);
                     let cleaner_tools = context_cleaner::get_cleaner_tools();
                     start_cleaning(
+                        self.state.llm_provider,
+                        self.state.current_model(),
                         ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
                     );
                 }
@@ -477,6 +487,8 @@ impl App {
                 }
                 let ctx = prepare_stream_context(&mut self.state, false);
                 start_streaming(
+                    self.state.llm_provider,
+                    self.state.current_model(),
                     ctx.messages, ctx.context_items, ctx.tools, None, tx.clone(),
                 );
                 save_state(&self.state);
@@ -517,6 +529,8 @@ impl App {
                 let ctx = prepare_stream_context(&mut self.state, true);
                 let cleaner_tools = context_cleaner::get_cleaner_tools();
                 start_cleaning(
+                    self.state.llm_provider,
+                    self.state.current_model(),
                     ctx.messages, ctx.context_items, cleaner_tools, &self.state, clean_tx.clone(),
                 );
                 save_state(&self.state);

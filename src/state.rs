@@ -7,6 +7,7 @@ use ratatui::text::Line;
 use serde::{Deserialize, Serialize};
 
 use crate::constants::icons;
+use crate::llms::ModelInfo;
 use crate::tool_defs::{ToolDefinition, get_all_tool_definitions};
 
 /// Cached rendered lines for a message (using Rc to avoid clones)
@@ -403,6 +404,22 @@ pub struct PersistedState {
     /// Dev mode - shows additional debug info like token counts
     #[serde(default)]
     pub dev_mode: bool,
+    /// Selected LLM provider
+    #[serde(default)]
+    pub llm_provider: crate::llms::LlmProvider,
+    /// Selected Anthropic model
+    #[serde(default)]
+    pub anthropic_model: crate::llms::AnthropicModel,
+    /// Selected Grok model
+    #[serde(default)]
+    pub grok_model: crate::llms::GrokModel,
+    /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
+    #[serde(default = "default_cleaning_threshold")]
+    pub cleaning_threshold: f32,
+}
+
+fn default_cleaning_threshold() -> f32 {
+    0.70
 }
 
 fn default_one() -> usize {
@@ -475,6 +492,16 @@ pub struct State {
     pub dev_mode: bool,
     /// Performance monitoring overlay enabled (F12 to toggle)
     pub perf_enabled: bool,
+    /// Configuration view is open (Ctrl+H to toggle)
+    pub config_view: bool,
+    /// Selected LLM provider
+    pub llm_provider: crate::llms::LlmProvider,
+    /// Selected Anthropic model
+    pub anthropic_model: crate::llms::AnthropicModel,
+    /// Selected Grok model
+    pub grok_model: crate::llms::GrokModel,
+    /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
+    pub cleaning_threshold: f32,
 
     // === Git Status (runtime-only, not persisted) ===
     /// Current git branch name (None if not a git repo)
@@ -689,6 +716,11 @@ impl Default for State {
             spinner_frame: 0,
             dev_mode: false,
             perf_enabled: false,
+            config_view: false,
+            llm_provider: crate::llms::LlmProvider::default(),
+            anthropic_model: crate::llms::AnthropicModel::default(),
+            grok_model: crate::llms::GrokModel::default(),
+            cleaning_threshold: 0.70,
             // Git status defaults
             git_branch: None,
             git_is_repo: false,
@@ -718,5 +750,18 @@ impl State {
         // Find first available starting from 7 (P1-P6 are fixed defaults)
         let id = (7..).find(|n| !used_ids.contains(n)).unwrap_or(7);
         format!("P{}", id)
+    }
+
+    /// Get the API model string for the current provider/model selection
+    pub fn current_model(&self) -> String {
+        match self.llm_provider {
+            crate::llms::LlmProvider::Anthropic => self.anthropic_model.api_name().to_string(),
+            crate::llms::LlmProvider::Grok => self.grok_model.api_name().to_string(),
+        }
+    }
+
+    /// Get the cleaning target (threshold - 20%)
+    pub fn cleaning_target(&self) -> f32 {
+        (self.cleaning_threshold - 0.20).max(0.10)
     }
 }

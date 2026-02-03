@@ -110,6 +110,11 @@ pub fn load_state() -> State {
                 spinner_frame: 0,
                 dev_mode: persisted.dev_mode,
                 perf_enabled: false, // Runtime only, not persisted
+                config_view: false, // Runtime only
+                llm_provider: persisted.llm_provider,
+                anthropic_model: persisted.anthropic_model,
+                grok_model: persisted.grok_model,
+                cleaning_threshold: persisted.cleaning_threshold,
                 // Git status defaults (runtime-only, fetched on startup)
                 git_branch: None,
                 git_is_repo: false,
@@ -156,6 +161,10 @@ pub fn save_state(state: &State) {
         owner_pid: Some(current_pid()),
         dev_mode: state.dev_mode,
         git_show_diffs: state.git_show_diffs,
+        llm_provider: state.llm_provider,
+        anthropic_model: state.anthropic_model,
+        grok_model: state.grok_model,
+        cleaning_threshold: state.cleaning_threshold,
     };
 
     let path = dir.join(STATE_FILE);

@@ -45,6 +45,11 @@ pub fn render(frame: &mut Frame, state: &mut State) {
         render_perf_overlay(frame, area);
     }
 
+    // Render config overlay if open
+    if state.config_view {
+        render_config_overlay(frame, state, area);
+    }
+
     PERF.frame_end();
 }
 
@@ -262,4 +267,175 @@ fn truncate_op_name(name: &str, max_len: usize) -> String {
     } else {
         format!("..{}", &name[name.len() - max_len + 2..])
     }
+}
+
+fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
+    use crate::llms::{AnthropicModel, GrokModel, LlmProvider};
+
+    // Center the overlay
+    let overlay_width = 56u16;
+    let overlay_height = 28u16;
+    let x = area.width.saturating_sub(overlay_width) / 2;
+    let y = area.height.saturating_sub(overlay_height) / 2;
+    let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("  LLM Provider", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+    ]));
+    lines.push(Line::from(""));
+
+    // Provider options
+    let providers = [
+        (LlmProvider::Anthropic, "1", "Anthropic Claude"),
+        (LlmProvider::Grok, "2", "Grok (xAI)"),
+    ];
+
+    for (provider, key, name) in providers {
+        let is_selected = state.llm_provider == provider;
+        let indicator = if is_selected { ">" } else { " " };
+        let check = if is_selected { "[x]" } else { "[ ]" };
+
+        let style = if is_selected {
+            Style::default().fg(theme::ACCENT).bold()
+        } else {
+            Style::default().fg(theme::TEXT)
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {} ", indicator), Style::default().fg(theme::ACCENT)),
+            Span::styled(format!("{} ", key), Style::default().fg(theme::WARNING)),
+            Span::styled(format!("{} ", check), style),
+            Span::styled(name.to_string(), style),
+        ]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::BORDER)),
+    ]));
+    lines.push(Line::from(""));
+
+    // Model selection based on current provider
+    lines.push(Line::from(vec![
+        Span::styled("  Model", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+    ]));
+    lines.push(Line::from(""));
+
+    match state.llm_provider {
+        LlmProvider::Anthropic => {
+            for (model, key) in [
+                (AnthropicModel::ClaudeOpus45, "a"),
+                (AnthropicModel::ClaudeSonnet45, "b"),
+                (AnthropicModel::ClaudeHaiku45, "c"),
+            ] {
+                let is_selected = state.anthropic_model == model;
+                render_model_line_with_info(&mut lines, is_selected, key, &model);
+            }
+        }
+        LlmProvider::Grok => {
+            for (model, key) in [
+                (GrokModel::Grok41Reasoning, "a"),
+                (GrokModel::Grok4Reasoning, "b"),
+            ] {
+                let is_selected = state.grok_model == model;
+                render_model_line_with_info(&mut lines, is_selected, key, &model);
+            }
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::BORDER)),
+    ]));
+    lines.push(Line::from(""));
+
+    // Cleaning threshold
+    lines.push(Line::from(vec![
+        Span::styled("  Auto-Clean Threshold", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+    ]));
+    lines.push(Line::from(""));
+
+    // Progress bar for threshold
+    let threshold_pct = (state.cleaning_threshold * 100.0) as usize;
+    let target_pct = (state.cleaning_target() * 100.0) as usize;
+    let bar_width = 30usize;
+    let filled = ((state.cleaning_threshold * bar_width as f32) as usize).min(bar_width);
+
+    lines.push(Line::from(vec![
+        Span::styled("  ◀ ", Style::default().fg(theme::ACCENT)),
+        Span::styled(chars::BLOCK_FULL.repeat(filled), Style::default().fg(theme::WARNING)),
+        Span::styled(chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)), Style::default().fg(theme::BG_ELEVATED)),
+        Span::styled(" ▶", Style::default().fg(theme::ACCENT)),
+        Span::styled(format!("  {}%", threshold_pct), Style::default().fg(theme::TEXT).bold()),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled(format!("     Target: {}%", target_pct), Style::default().fg(theme::TEXT_MUTED)),
+    ]));
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::BORDER)),
+    ]));
+    lines.push(Line::from(""));
+
+    // Help text
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled("1-2", Style::default().fg(theme::WARNING)),
+        Span::styled(" provider  ", Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled("a-d", Style::default().fg(theme::WARNING)),
+        Span::styled(" model  ", Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled("◀▶", Style::default().fg(theme::WARNING)),
+        Span::styled(" threshold", Style::default().fg(theme::TEXT_MUTED)),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled("Esc", Style::default().fg(theme::ACCENT)),
+        Span::styled(" close", Style::default().fg(theme::TEXT_MUTED)),
+    ]));
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme::ACCENT))
+        .style(Style::default().bg(theme::BG_SURFACE))
+        .title(Span::styled(" Configuration ", Style::default().fg(theme::ACCENT).bold()));
+
+    let paragraph = Paragraph::new(lines).block(block);
+    frame.render_widget(Clear, overlay_area);
+    frame.render_widget(paragraph, overlay_area);
+}
+
+fn render_model_line_with_info<M: crate::llms::ModelInfo>(lines: &mut Vec<Line>, is_selected: bool, key: &str, model: &M) {
+    let indicator = if is_selected { ">" } else { " " };
+    let check = if is_selected { "[x]" } else { "[ ]" };
+
+    let style = if is_selected {
+        Style::default().fg(theme::ACCENT).bold()
+    } else {
+        Style::default().fg(theme::TEXT)
+    };
+
+    // Format context window (e.g., "200K" or "2M")
+    let ctx = model.context_window();
+    let ctx_str = if ctx >= 1_000_000 {
+        format!("{}M", ctx / 1_000_000)
+    } else {
+        format!("{}K", ctx / 1_000)
+    };
+
+    // Format pricing info
+    let price_str = format!("${:.0}/${:.0}", model.input_price_per_mtok(), model.output_price_per_mtok());
+
+    lines.push(Line::from(vec![
+        Span::styled(format!("  {} ", indicator), Style::default().fg(theme::ACCENT)),
+        Span::styled(format!("{} ", key), Style::default().fg(theme::WARNING)),
+        Span::styled(format!("{} ", check), style),
+        Span::styled(format!("{:<12}", model.display_name()), style),
+        Span::styled(format!("{:>4} ", ctx_str), Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(price_str, Style::default().fg(theme::TEXT_MUTED)),
+    ]));
 }

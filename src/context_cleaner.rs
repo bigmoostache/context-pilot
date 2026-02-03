@@ -1,4 +1,4 @@
-use crate::constants::{MAX_CONTEXT_TOKENS, CLEANING_THRESHOLD, prompts, icons};
+use crate::constants::{MAX_CONTEXT_TOKENS, prompts, icons};
 use crate::state::State;
 use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
 
@@ -32,7 +32,7 @@ pub fn should_clean_context(state: &State) -> bool {
         return false;
     }
     let (_, percentage) = calculate_context_usage(state);
-    percentage >= CLEANING_THRESHOLD
+    percentage >= state.cleaning_threshold
 }
 
 /// Build the context overview for the cleaner
@@ -143,7 +143,7 @@ pub fn build_cleaner_context(state: &State) -> String {
         MAX_CONTEXT_TOKENS,
         percentage * 100.0
     ));
-    context.push_str(&format!("## Target: Reduce to below {:.0}%\n", CLEANING_THRESHOLD * 100.0 - 20.0));
+    context.push_str(&format!("## Target: Reduce to below {:.0}%\n", state.cleaning_target() * 100.0));
 
     context
 }

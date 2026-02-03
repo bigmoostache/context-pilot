@@ -81,6 +81,12 @@ pub enum Action {
     StartContextCleaning,
     TmuxSendKeys { pane_id: String, keys: String },
     TogglePerfMonitor,
+    ToggleConfigView,
+    ConfigSelectProvider(crate::llms::LlmProvider),
+    ConfigSelectAnthropicModel(crate::llms::AnthropicModel),
+    ConfigSelectGrokModel(crate::llms::GrokModel),
+    ConfigIncreaseCleaningThreshold,
+    ConfigDecreaseCleaningThreshold,
     None,
 }
 
@@ -463,6 +469,36 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.perf_enabled = crate::perf::PERF.toggle();
             state.dirty = true;
             ActionResult::Nothing
+        }
+        Action::ToggleConfigView => {
+            state.config_view = !state.config_view;
+            state.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ConfigSelectProvider(provider) => {
+            state.llm_provider = provider;
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSelectAnthropicModel(model) => {
+            state.anthropic_model = model;
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSelectGrokModel(model) => {
+            state.grok_model = model;
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigIncreaseCleaningThreshold => {
+            state.cleaning_threshold = (state.cleaning_threshold + 0.05).min(0.95);
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigDecreaseCleaningThreshold => {
+            state.cleaning_threshold = (state.cleaning_threshold - 0.05).max(0.30);
+            state.dirty = true;
+            ActionResult::Save
         }
         Action::None => ActionResult::Nothing,
     }

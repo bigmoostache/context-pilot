@@ -1,7 +1,8 @@
-use crossterm::event::{Event, KeyCode, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::actions::{parse_context_pattern, find_context_by_id, Action};
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::llms::{AnthropicModel, GrokModel, LlmProvider};
 use crate::panels::get_panel;
 use crate::state::State;
 
@@ -17,8 +18,14 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     KeyCode::Char('l') => return Some(Action::ClearConversation),
                     KeyCode::Char('n') => return Some(Action::NewContext),
                     KeyCode::Char('k') => return Some(Action::StartContextCleaning),
+                    KeyCode::Char('h') => return Some(Action::ToggleConfigView),
                     _ => {}
                 }
+            }
+
+            // Config view handles its own keys when open
+            if state.config_view {
+                return handle_config_event(key, state);
             }
 
             // Escape stops streaming
@@ -62,6 +69,36 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
             };
             Some(action)
         }
+        _ => Some(Action::None),
+    }
+}
+
+/// Handle key events when config view is open
+fn handle_config_event(key: &KeyEvent, state: &State) -> Option<Action> {
+    match key.code {
+        // Escape or Ctrl+H closes config
+        KeyCode::Esc => Some(Action::ToggleConfigView),
+        // Number keys select provider
+        KeyCode::Char('1') => Some(Action::ConfigSelectProvider(LlmProvider::Anthropic)),
+        KeyCode::Char('2') => Some(Action::ConfigSelectProvider(LlmProvider::Grok)),
+        // Letter keys select model based on current provider
+        KeyCode::Char('a') => match state.llm_provider {
+            LlmProvider::Anthropic => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45)),
+            LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Reasoning)),
+        },
+        KeyCode::Char('b') => match state.llm_provider {
+            LlmProvider::Anthropic => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45)),
+            LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Reasoning)),
+        },
+        KeyCode::Char('c') => match state.llm_provider {
+            LlmProvider::Anthropic => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45)),
+            LlmProvider::Grok => Some(Action::None), // Only 2 Grok models
+        },
+        KeyCode::Char('d') => Some(Action::None), // No 4th model for either provider
+        // Arrow keys adjust cleaning threshold
+        KeyCode::Left => Some(Action::ConfigDecreaseCleaningThreshold),
+        KeyCode::Right => Some(Action::ConfigIncreaseCleaningThreshold),
+        // Any other key is ignored in config view
         _ => Some(Action::None),
     }
 }

@@ -2,9 +2,6 @@
 // API & MODELS
 // =============================================================================
 
-/// Main model for streaming responses
-pub const MODEL_MAIN: &str = "claude-opus-4-5";
-
 /// Model for TL;DR summarization
 pub const MODEL_TLDR: &str = "claude-opus-4-5";
 
@@ -26,12 +23,6 @@ pub const API_VERSION: &str = "2023-06-01";
 
 /// Maximum context size in tokens
 pub const MAX_CONTEXT_TOKENS: usize = 200_000;
-
-/// Threshold percentage to trigger automatic context cleaning (0.0 - 1.0)
-pub const CLEANING_THRESHOLD: f32 = 0.70;
-
-/// Target percentage to stop cleaning (0.0 - 1.0)
-pub const CLEANING_TARGET: f32 = 0.50;
 
 /// Maximum cleaning iterations before forcing stop
 pub const MAX_CLEANING_ITERATIONS: u32 = 10;

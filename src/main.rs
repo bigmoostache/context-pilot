@@ -7,6 +7,7 @@ mod context_cleaner;
 mod core;
 mod events;
 mod highlight;
+mod llms;
 mod panels;
 mod perf;
 mod persistence;
