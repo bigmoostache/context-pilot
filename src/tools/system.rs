@@ -113,10 +113,10 @@ pub fn delete_system(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Cannot delete the default seed
-    if id == prompts::DEFAULT_SEED_ID {
+    if id == prompts::default_seed_id() {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!("Cannot delete the default seed ({})", prompts::DEFAULT_SEED_ID),
+            content: format!("Cannot delete the default seed ({})", prompts::default_seed_id()),
             is_error: true,
         };
     }
@@ -136,7 +136,7 @@ pub fn delete_system(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // If this was the active system, switch to default
     if state.active_system_id.as_deref() == Some(id) {
-        state.active_system_id = Some(prompts::DEFAULT_SEED_ID.to_string());
+        state.active_system_id = Some(prompts::default_seed_id().to_string());
     }
 
     ToolResult {
@@ -152,10 +152,10 @@ pub fn load_system(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // If id is None or empty, switch to default seed
     if id.is_none() || id.map(|s| s.is_empty()).unwrap_or(true) {
-        state.active_system_id = Some(prompts::DEFAULT_SEED_ID.to_string());
+        state.active_system_id = Some(prompts::default_seed_id().to_string());
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!("Switched to default seed ({})", prompts::DEFAULT_SEED_ID),
+            content: format!("Switched to default seed ({})", prompts::default_seed_id()),
             is_error: false,
         };
     }

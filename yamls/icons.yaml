@@ -1,0 +1,36 @@
+# Emoji and icon constants
+
+# Message type icons
+messages:
+  user: "🦊"
+  assistant: "🤖"
+  tool_call: "🪵"
+  tool_result: "🔥"
+  error: "⚠️"
+
+# Context panel icons
+context:
+  system: "🌱"
+  conversation: "📜"
+  tree: "🌲"
+  todo: "🪓"
+  memory: "✨"
+  overview: "🌍"
+  file: "💾"
+  glob: "🔭"
+  grep: "👓"
+  tmux: "💻"
+  git: "🐙"
+  scratchpad: "🪶"
+
+# Message status icons
+status:
+  full: ""
+  summarized: "◐"
+  deleted: "○"
+
+# Todo status icons
+todo:
+  pending: "○"
+  in_progress: "◐"
+  done: "●"

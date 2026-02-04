@@ -407,7 +407,7 @@ fn format_time_delta(delta_ms: u64) -> String {
 
 /// Generate the header text for dynamic panel display
 pub fn panel_header_text() -> &'static str {
-    crate::constants::prompts::PANEL_HEADER
+    crate::constants::prompts::panel_header()
 }
 
 /// Generate the timestamp text for an individual panel
@@ -418,7 +418,7 @@ pub fn panel_timestamp_text(timestamp_ms: u64, current_ms: u64) -> String {
     // Check for zero/invalid timestamp (1970-01-01 or very old)
     // Consider anything before year 2020 as invalid (timestamp < ~1577836800000)
     if timestamp_ms < 1577836800000 {
-        return prompts::PANEL_TIMESTAMP_UNKNOWN.to_string();
+        return prompts::panel_timestamp_unknown().to_string();
     }
 
     let iso_time = ms_to_iso8601(timestamp_ms);
@@ -428,7 +428,7 @@ pub fn panel_timestamp_text(timestamp_ms: u64, current_ms: u64) -> String {
         "just now".to_string()
     };
 
-    prompts::PANEL_TIMESTAMP
+    prompts::panel_timestamp()
         .replace("{iso_time}", &iso_time)
         .replace("{time_delta}", &time_delta)
 }
@@ -447,7 +447,7 @@ pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
 
     // Build message timestamps section
     let message_timestamps = if !recent_messages.is_empty() {
-        let mut lines = String::from(prompts::PANEL_FOOTER_MSG_HEADER);
+        let mut lines = String::from(prompts::panel_footer_msg_header());
         lines.push('\n');
         for msg in recent_messages.iter().rev() {
             let iso_time = ms_to_iso8601(msg.timestamp_ms);
@@ -456,7 +456,7 @@ pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
             } else {
                 "just now".to_string()
             };
-            let line = prompts::PANEL_FOOTER_MSG_LINE
+            let line = prompts::panel_footer_msg_line()
                 .replace("{id}", &msg.id)
                 .replace("{role}", &msg.role)
                 .replace("{iso_time}", &iso_time)
@@ -469,7 +469,7 @@ pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
         String::new()
     };
 
-    prompts::PANEL_FOOTER
+    prompts::panel_footer()
         .replace("{message_timestamps}", &message_timestamps)
         .replace("{current_datetime}", &ms_to_iso8601(current_ms))
 }

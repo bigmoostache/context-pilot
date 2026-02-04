@@ -382,7 +382,7 @@ fn messages_to_grok(
     // Add system message
     let system_content = system_prompt
         .clone()
-        .unwrap_or_else(|| prompts::MAIN_SYSTEM.to_string());
+        .unwrap_or_else(|| prompts::main_system().to_string());
     grok_messages.push(GrokMessage {
         role: "system".to_string(),
         content: Some(system_content),
@@ -444,7 +444,7 @@ fn messages_to_grok(
         });
         grok_messages.push(GrokMessage {
             role: "tool".to_string(),
-            content: Some(crate::constants::prompts::PANEL_FOOTER_ACK.to_string()),
+            content: Some(crate::constants::prompts::panel_footer_ack().to_string()),
             tool_calls: None,
             tool_call_id: Some("panel_footer".to_string()),
         });

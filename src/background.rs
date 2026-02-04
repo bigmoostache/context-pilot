@@ -36,7 +36,7 @@ pub fn generate_tldr(message_id: String, content: String, tx: Sender<TlDrResult>
         log(&format!("Token count: {}", token_count));
 
         // If short enough, use content directly
-        if token_count < prompts::TLDR_MIN_TOKENS {
+        if token_count < prompts::tldr_min_tokens() {
             log("Using content directly (short message)");
             let result = tx.send(TlDrResult {
                 message_id,
@@ -118,7 +118,7 @@ fn summarize_content(content: &str) -> Result<String, String> {
         max_tokens: MAX_TLDR_TOKENS,
         messages: vec![SummaryMessage {
             role: "user".to_string(),
-            content: format!("{}{}", prompts::TLDR_PROMPT, content),
+            content: format!("{}{}", prompts::tldr_prompt(), content),
         }],
     };
 

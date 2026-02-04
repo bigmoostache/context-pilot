@@ -4,27 +4,27 @@ use crate::state::{ContextElement, ContextType, State, SystemItem};
 /// Ensure the default seed exists and there's always an active seed
 pub fn ensure_default_seed(state: &mut State) {
     // Check if default seed (S0) exists
-    let has_default = state.systems.iter().any(|s| s.id == prompts::DEFAULT_SEED_ID);
+    let has_default = state.systems.iter().any(|s| s.id == prompts::default_seed_id());
 
     if !has_default {
         // Create the default seed
         state.systems.insert(0, SystemItem {
-            id: prompts::DEFAULT_SEED_ID.to_string(),
-            name: prompts::DEFAULT_SEED_NAME.to_string(),
-            description: prompts::DEFAULT_SEED_DESC.to_string(),
-            content: prompts::DEFAULT_SEED_CONTENT.to_string(),
+            id: prompts::default_seed_id().to_string(),
+            name: prompts::default_seed_name().to_string(),
+            description: prompts::default_seed_desc().to_string(),
+            content: prompts::default_seed_content().to_string(),
         });
     }
 
     // Ensure there's always an active seed
     if state.active_system_id.is_none() {
-        state.active_system_id = Some(prompts::DEFAULT_SEED_ID.to_string());
+        state.active_system_id = Some(prompts::default_seed_id().to_string());
     } else {
         // Verify the active seed still exists
         let active_id = state.active_system_id.as_ref().unwrap();
         if !state.systems.iter().any(|s| &s.id == active_id) {
             // Active seed was deleted, fall back to default
-            state.active_system_id = Some(prompts::DEFAULT_SEED_ID.to_string());
+            state.active_system_id = Some(prompts::default_seed_id().to_string());
         }
     }
 
@@ -46,7 +46,7 @@ pub fn get_active_seed_content(state: &State) -> String {
         }
     }
     // Fallback to default (shouldn't happen if ensure_default_seed was called)
-    prompts::DEFAULT_SEED_CONTENT.to_string()
+    prompts::default_seed_content().to_string()
 }
 
 /// Ensure all default context elements exist with correct IDs

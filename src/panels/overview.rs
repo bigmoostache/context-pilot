@@ -586,14 +586,14 @@ impl Panel for OverviewPanel {
 
             // Category header with description
             let (cat_name, cat_desc) = match category {
-                ToolCategory::File => ("FILE", tool_categories::FILE_DESC),
-                ToolCategory::Tree => ("TREE", tool_categories::TREE_DESC),
-                ToolCategory::Console => ("CONSOLE", tool_categories::CONSOLE_DESC),
-                ToolCategory::Context => ("CONTEXT", tool_categories::CONTEXT_DESC),
-                ToolCategory::Todo => ("TODO", tool_categories::TODO_DESC),
-                ToolCategory::Memory => ("MEMORY", tool_categories::MEMORY_DESC),
-                ToolCategory::Git => ("GIT", tool_categories::GIT_DESC),
-                ToolCategory::Scratchpad => ("SCRATCHPAD", tool_categories::SCRATCHPAD_DESC),
+                ToolCategory::File => ("FILE", tool_categories::file_desc()),
+                ToolCategory::Tree => ("TREE", tool_categories::tree_desc()),
+                ToolCategory::Console => ("CONSOLE", tool_categories::console_desc()),
+                ToolCategory::Context => ("CONTEXT", tool_categories::context_desc()),
+                ToolCategory::Todo => ("TODO", tool_categories::todo_desc()),
+                ToolCategory::Memory => ("MEMORY", tool_categories::memory_desc()),
+                ToolCategory::Git => ("GIT", tool_categories::git_desc()),
+                ToolCategory::Scratchpad => ("SCRATCHPAD", tool_categories::scratchpad_desc()),
             };
 
             text.push(Line::from(vec![

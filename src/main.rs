@@ -2,6 +2,7 @@ mod actions;
 mod api;
 mod background;
 mod cache;
+mod config;
 mod constants;
 mod core;
 mod events;

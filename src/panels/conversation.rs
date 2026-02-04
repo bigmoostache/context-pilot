@@ -79,7 +79,7 @@ impl ConversationPanel {
                 };
 
                 lines.push(Line::from(vec![
-                    Span::styled(format!("{} ", icons::MSG_TOOL_CALL), Style::default().fg(theme::SUCCESS)),
+                    Span::styled(format!("{} ", icons::msg_tool_call()), Style::default().fg(theme::SUCCESS)),
                     Span::styled(padded_id.clone(), Style::default().fg(theme::SUCCESS).bold()),
                     Span::styled(" ".to_string(), base_style),
                     Span::styled(tool_use.name.clone(), Style::default().fg(theme::TEXT)),
@@ -94,9 +94,9 @@ impl ConversationPanel {
         if msg.message_type == MessageType::ToolResult {
             for result in &msg.tool_results {
                 let (status_icon, status_color) = if result.is_error {
-                    (icons::MSG_ERROR, theme::WARNING)
+                    (icons::msg_error(), theme::WARNING)
                 } else {
-                    (icons::MSG_TOOL_RESULT, theme::SUCCESS)
+                    (icons::msg_tool_result(), theme::SUCCESS)
                 };
 
                 let prefix_width = 8;
@@ -136,15 +136,15 @@ impl ConversationPanel {
 
         // Regular text message
         let (role_icon, role_color) = if msg.role == "user" {
-            (icons::MSG_USER, theme::USER)
+            (icons::msg_user(), theme::USER)
         } else {
-            (icons::MSG_ASSISTANT, theme::ASSISTANT)
+            (icons::msg_assistant(), theme::ASSISTANT)
         };
 
         let status_icon = match msg.status {
-            MessageStatus::Full => icons::STATUS_FULL,
-            MessageStatus::Summarized => icons::STATUS_SUMMARIZED,
-            MessageStatus::Deleted => icons::STATUS_DELETED,
+            MessageStatus::Full => icons::status_full(),
+            MessageStatus::Summarized => icons::status_summarized(),
+            MessageStatus::Deleted => icons::status_deleted(),
         };
 
         let content = match msg.status {
@@ -303,7 +303,7 @@ impl ConversationPanel {
     /// Render input area to lines
     fn render_input(input: &str, cursor: usize, viewport_width: u16, base_style: Style) -> Vec<Line<'static>> {
         let mut lines: Vec<Line<'static>> = Vec::new();
-        let role_icon = icons::MSG_USER;
+        let role_icon = icons::msg_user();
         let role_color = theme::USER;
         let prefix_width = 8;
         let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);

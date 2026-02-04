@@ -173,126 +173,80 @@ pub mod chars {
 }
 
 // =============================================================================
-// ICONS / EMOJIS
+// ICONS / EMOJIS (loaded from yamls/icons.yaml via config module)
 // =============================================================================
 
 pub mod icons {
-    // Message types
-    pub const MSG_USER: &str = "🦊";
-    pub const MSG_ASSISTANT: &str = "🤖";
-    pub const MSG_TOOL_CALL: &str = "🪵";
-    pub const MSG_TOOL_RESULT: &str = "🔥";
-    pub const MSG_ERROR: &str = "⚠️";
+    use crate::config::ICONS;
+
+    // Message types - accessor functions for lazy_static values
+    pub fn msg_user() -> &'static str { &ICONS.messages.user }
+    pub fn msg_assistant() -> &'static str { &ICONS.messages.assistant }
+    pub fn msg_tool_call() -> &'static str { &ICONS.messages.tool_call }
+    pub fn msg_tool_result() -> &'static str { &ICONS.messages.tool_result }
+    pub fn msg_error() -> &'static str { &ICONS.messages.error }
 
     // Context panel types
-    pub const CTX_SYSTEM: &str = "🌱";
-    pub const CTX_CONVERSATION: &str = "📜";
-    pub const CTX_TREE: &str = "🌲";
-    pub const CTX_TODO: &str = "🪓";
-    pub const CTX_MEMORY: &str = "✨";
-    pub const CTX_OVERVIEW: &str = "🌍";
-    pub const CTX_FILE: &str = "💾";
-    pub const CTX_GLOB: &str = "🔭";
-    pub const CTX_GREP: &str = "👓";
-    pub const CTX_TMUX: &str = "💻";
-    pub const CTX_GIT: &str = "🐙";
-    pub const CTX_SCRATCHPAD: &str = "🪶";
+    pub fn ctx_system() -> &'static str { &ICONS.context.system }
+    pub fn ctx_conversation() -> &'static str { &ICONS.context.conversation }
+    pub fn ctx_tree() -> &'static str { &ICONS.context.tree }
+    pub fn ctx_todo() -> &'static str { &ICONS.context.todo }
+    pub fn ctx_memory() -> &'static str { &ICONS.context.memory }
+    pub fn ctx_overview() -> &'static str { &ICONS.context.overview }
+    pub fn ctx_file() -> &'static str { &ICONS.context.file }
+    pub fn ctx_glob() -> &'static str { &ICONS.context.glob }
+    pub fn ctx_grep() -> &'static str { &ICONS.context.grep }
+    pub fn ctx_tmux() -> &'static str { &ICONS.context.tmux }
+    pub fn ctx_git() -> &'static str { &ICONS.context.git }
+    pub fn ctx_scratchpad() -> &'static str { &ICONS.context.scratchpad }
 
     // Message status
-    pub const STATUS_FULL: &str = "";
-    pub const STATUS_SUMMARIZED: &str = "◐";
-    pub const STATUS_DELETED: &str = "○";
+    pub fn status_full() -> &'static str { &ICONS.status.full }
+    pub fn status_summarized() -> &'static str { &ICONS.status.summarized }
+    pub fn status_deleted() -> &'static str { &ICONS.status.deleted }
 
     // Todo status
-    pub const TODO_PENDING: &str = "○";
-    pub const TODO_IN_PROGRESS: &str = "◐";
-    pub const TODO_DONE: &str = "●";
+    pub fn todo_pending() -> &'static str { &ICONS.todo.pending }
+    pub fn todo_in_progress() -> &'static str { &ICONS.todo.in_progress }
+    pub fn todo_done() -> &'static str { &ICONS.todo.done }
 }
 
 // =============================================================================
-// TOOL CATEGORY DESCRIPTIONS
+// TOOL CATEGORY DESCRIPTIONS (loaded from yamls/ui.yaml via config module)
 // =============================================================================
 
 pub mod tool_categories {
-    /// Description for File tools category
-    pub const FILE_DESC: &str = "Read, write, and search files in the project";
-    
-    /// Description for Tree tools category
-    pub const TREE_DESC: &str = "Navigate and annotate the directory structure";
-    
-    /// Description for Console tools category
-    pub const CONSOLE_DESC: &str = "Execute commands and monitor terminal output";
-    
-    /// Description for Context tools category
-    pub const CONTEXT_DESC: &str = "Manage conversation context and system prompts";
-    
-    /// Description for Todo tools category
-    pub const TODO_DESC: &str = "Track tasks and progress during the session";
-    
-    /// Description for Memory tools category
-    pub const MEMORY_DESC: &str = "Store persistent memories across the conversation";
-    
-    /// Description for Git tools category
-    pub const GIT_DESC: &str = "Version control operations and repository management";
-    
-    /// Description for Scratchpad tools category
-    pub const SCRATCHPAD_DESC: &str = "A useful scratchpad for you to use however you like";
+    use crate::config::UI;
+
+    pub fn file_desc() -> &'static str { &UI.tool_categories.file }
+    pub fn tree_desc() -> &'static str { &UI.tool_categories.tree }
+    pub fn console_desc() -> &'static str { &UI.tool_categories.console }
+    pub fn context_desc() -> &'static str { &UI.tool_categories.context }
+    pub fn todo_desc() -> &'static str { &UI.tool_categories.todo }
+    pub fn memory_desc() -> &'static str { &UI.tool_categories.memory }
+    pub fn git_desc() -> &'static str { &UI.tool_categories.git }
+    pub fn scratchpad_desc() -> &'static str { &UI.tool_categories.scratchpad }
 }
 
 // =============================================================================
-// PROMPTS
+// PROMPTS (loaded from yamls/prompts.yaml via config module)
 // =============================================================================
 
 pub mod prompts {
-    /// Default seed ID
-    pub const DEFAULT_SEED_ID: &str = "S0";
+    use crate::config::PROMPTS;
 
-    /// Default seed name
-    pub const DEFAULT_SEED_NAME: &str = "Default";
-
-    /// Default seed description
-    pub const DEFAULT_SEED_DESC: &str = "Default coding assistant";
-
-    /// Default seed content (main system prompt)
-    pub const DEFAULT_SEED_CONTENT: &str = r#"You are a helpful coding assistant.
-
-IMPORTANT: Messages in context have ID prefixes like [U1], [A1], [R1] for internal tracking.
-These are for context management only - NEVER include these prefixes in your responses.
-Just respond naturally without any [Axxx] or similar prefixes."#;
-
-    /// Main system prompt for the assistant (alias for backward compatibility)
-    pub const MAIN_SYSTEM: &str = DEFAULT_SEED_CONTENT;
-
-    /// TL;DR summarization prompt
-    pub const TLDR_PROMPT: &str = "Summarize the following message in 1-2 short sentences (max 50 words). Be concise and capture the key point:\n\n";
-
-    /// Minimum token count to trigger LLM summarization (below this, use content directly)
-    pub const TLDR_MIN_TOKENS: usize = 25;
-
-    /// Header text for dynamic panel display (shown before panels)
-    pub const PANEL_HEADER: &str = "Beginning of dynamic panel display. All content displayed below may be considered up to date.";
-
-    /// Template for individual panel timestamp line
-    /// Placeholders: {iso_time}, {time_delta}
-    pub const PANEL_TIMESTAMP: &str = "Panel automatically generated at {iso_time} ({time_delta})";
-
-    /// Fallback for panels with unknown/zero timestamp
-    pub const PANEL_TIMESTAMP_UNKNOWN: &str = "Panel content (timestamp unknown - static or never refreshed)";
-
-    /// Footer text template for dynamic panel display (shown after panels)
-    /// Placeholders: {message_timestamps}, {current_datetime}
-    pub const PANEL_FOOTER: &str = r#"End of dynamic panel displays. All content displayed above may be considered up to date: it is automatically kept updated as we speak.
-
-{message_timestamps}
-Current datetime: {current_datetime}"#;
-
-    /// Template for each message timestamp line in footer
-    /// Placeholders: {id}, {role}, {iso_time}, {time_delta}
-    pub const PANEL_FOOTER_MSG_LINE: &str = "  - [{id}] {role}: {iso_time} ({time_delta})";
-
-    /// Header for the message timestamps section in footer
-    pub const PANEL_FOOTER_MSG_HEADER: &str = "Last message datetimes:";
-
-    /// Text for panel footer tool result acknowledgment
-    pub const PANEL_FOOTER_ACK: &str = "Panel display complete. Proceeding with conversation.";
+    pub fn default_seed_id() -> &'static str { &PROMPTS.default_seed.id }
+    pub fn default_seed_name() -> &'static str { &PROMPTS.default_seed.name }
+    pub fn default_seed_desc() -> &'static str { &PROMPTS.default_seed.description }
+    pub fn default_seed_content() -> &'static str { &PROMPTS.default_seed.content }
+    pub fn main_system() -> &'static str { &PROMPTS.default_seed.content }
+    pub fn tldr_prompt() -> &'static str { &PROMPTS.tldr_prompt }
+    pub fn tldr_min_tokens() -> usize { PROMPTS.tldr_min_tokens }
+    pub fn panel_header() -> &'static str { &PROMPTS.panel.header }
+    pub fn panel_timestamp() -> &'static str { &PROMPTS.panel.timestamp }
+    pub fn panel_timestamp_unknown() -> &'static str { &PROMPTS.panel.timestamp_unknown }
+    pub fn panel_footer() -> &'static str { &PROMPTS.panel.footer }
+    pub fn panel_footer_msg_line() -> &'static str { &PROMPTS.panel.footer_msg_line }
+    pub fn panel_footer_msg_header() -> &'static str { &PROMPTS.panel.footer_msg_header }
+    pub fn panel_footer_ack() -> &'static str { &PROMPTS.panel.footer_ack }
 }

@@ -373,7 +373,7 @@ fn messages_to_groq(
     // Add system message
     let mut system_content = system_prompt
         .clone()
-        .unwrap_or_else(|| prompts::MAIN_SYSTEM.to_string());
+        .unwrap_or_else(|| prompts::main_system().to_string());
 
     // For GPT-OSS models, add info about built-in tools
     if model.starts_with("openai/gpt-oss") {
@@ -445,7 +445,7 @@ fn messages_to_groq(
         });
         groq_messages.push(GroqMessage {
             role: "tool".to_string(),
-            content: Some(crate::constants::prompts::PANEL_FOOTER_ACK.to_string()),
+            content: Some(crate::constants::prompts::panel_footer_ack().to_string()),
             tool_calls: None,
             tool_call_id: Some("panel_footer".to_string()),
             name: None,

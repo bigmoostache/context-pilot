@@ -123,7 +123,7 @@ impl LlmClient for AnthropicClient {
             }
             prompt.clone()
         } else {
-            prompts::MAIN_SYSTEM.to_string()
+            prompts::main_system().to_string()
         };
 
         let api_request = AnthropicRequest {
@@ -386,7 +386,7 @@ fn messages_to_api(
             role: "user".to_string(),
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: "panel_footer".to_string(),
-                content: crate::constants::prompts::PANEL_FOOTER_ACK.to_string(),
+                content: crate::constants::prompts::panel_footer_ack().to_string(),
             }],
         });
 

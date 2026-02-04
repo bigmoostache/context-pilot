@@ -1,0 +1,82 @@
+# UI labels and strings
+
+# Default panel names
+panels:
+  system: "Seed"
+  conversation: "Chat"
+  tree: "Tree"
+  todo: "WIP"
+  memory: "Memories"
+  overview: "World"
+  git: "Changes"
+  scratchpad: "Scratch"
+
+# Tool category descriptions
+tool_categories:
+  file: "Read, write, and search files in the project"
+  tree: "Navigate and annotate the directory structure"
+  console: "Execute commands and monitor terminal output"
+  context: "Manage conversation context and system prompts"
+  todo: "Track tasks and progress during the session"
+  memory: "Store persistent memories across the conversation"
+  git: "Version control operations and repository management"
+  scratchpad: "A useful scratchpad for you to use however you like"
+
+# Status bar messages
+status_bar:
+  streaming: "STREAMING"
+  loading_files: "LOADING FILES"
+  summarizing: "SUMMARIZING"
+  loading: "LOADING"
+  ready: "READY"
+
+# Sidebar labels
+sidebar:
+  context_header: "CONTEXT"
+  page_indicator: "page {current}/{total}"
+  help:
+    tab: "next panel"
+    arrows: "scroll"
+    ctrl_p: "commands"
+    ctrl_q: "quit"
+
+# Command palette
+commands:
+  quit:
+    label: "Quit"
+    description: "Exit the application (Ctrl+Q)"
+    keywords: ["exit", "close", "q"]
+  reload:
+    label: "Reload"
+    description: "Reload the TUI"
+    keywords: ["restart", "refresh"]
+  config:
+    label: "Config"
+    description: "Open configuration panel (Ctrl+H)"
+    keywords: ["settings", "options", "preferences", "provider", "model"]
+
+# Panel titles
+panel_titles:
+  file: "File"
+  conversation: "Conversation"
+  conversation_streaming: "Conversation *"
+  git: "Git"
+  glob: "Glob"
+  grep: "Grep"
+  memory: "Memory"
+  overview: "Context Overview"
+  scratchpad: "Scratchpad"
+  system: "System"
+  tmux: "Tmux"
+  todo: "Todo"
+  tree: "Directory Tree"
+
+# Common labels
+labels:
+  loading: "Loading..."
+  no_content: "No content"
+  no_memories: "No memories"
+  not_git_repo: "Not a git repository"
+  branch: "Branch:"
+  branches: "Branches:"
+  working_tree_clean: "Working tree clean"

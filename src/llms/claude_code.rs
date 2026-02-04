@@ -144,7 +144,7 @@ impl LlmClient for ClaudeCodeClient {
         let system_text = if let Some(ref prompt) = request.system_prompt {
             prompt.clone()
         } else {
-            prompts::MAIN_SYSTEM.to_string()
+            prompts::main_system().to_string()
         };
 
         // Build messages as simple JSON (matching Python example format)
@@ -207,7 +207,7 @@ impl LlmClient for ClaudeCodeClient {
                 "content": [{
                     "type": "tool_result",
                     "tool_use_id": "panel_footer",
-                    "content": crate::constants::prompts::PANEL_FOOTER_ACK
+                    "content": crate::constants::prompts::panel_footer_ack()
                 }]
             }));
         }

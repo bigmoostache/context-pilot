@@ -85,18 +85,18 @@ impl ContextType {
     /// Get icon for this context type
     pub fn icon(&self) -> &'static str {
         match self {
-            ContextType::System => icons::CTX_SYSTEM,
-            ContextType::Conversation => icons::CTX_CONVERSATION,
-            ContextType::File => icons::CTX_FILE,
-            ContextType::Tree => icons::CTX_TREE,
-            ContextType::Glob => icons::CTX_GLOB,
-            ContextType::Grep => icons::CTX_GREP,
-            ContextType::Tmux => icons::CTX_TMUX,
-            ContextType::Todo => icons::CTX_TODO,
-            ContextType::Memory => icons::CTX_MEMORY,
-            ContextType::Overview => icons::CTX_OVERVIEW,
-            ContextType::Git => icons::CTX_GIT,
-            ContextType::Scratchpad => icons::CTX_SCRATCHPAD,
+            ContextType::System => icons::ctx_system(),
+            ContextType::Conversation => icons::ctx_conversation(),
+            ContextType::File => icons::ctx_file(),
+            ContextType::Tree => icons::ctx_tree(),
+            ContextType::Glob => icons::ctx_glob(),
+            ContextType::Grep => icons::ctx_grep(),
+            ContextType::Tmux => icons::ctx_tmux(),
+            ContextType::Todo => icons::ctx_todo(),
+            ContextType::Memory => icons::ctx_memory(),
+            ContextType::Overview => icons::ctx_overview(),
+            ContextType::Git => icons::ctx_git(),
+            ContextType::Scratchpad => icons::ctx_scratchpad(),
         }
     }
 
@@ -182,9 +182,9 @@ pub enum TodoStatus {
 impl TodoStatus {
     pub fn icon(&self) -> &'static str {
         match self {
-            TodoStatus::Pending => icons::TODO_PENDING,
-            TodoStatus::InProgress => icons::TODO_IN_PROGRESS,
-            TodoStatus::Done => icons::TODO_DONE,
+            TodoStatus::Pending => icons::todo_pending(),
+            TodoStatus::InProgress => icons::todo_in_progress(),
+            TodoStatus::Done => icons::todo_done(),
         }
     }
 

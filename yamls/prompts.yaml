@@ -1,0 +1,31 @@
+# System prompts and panel messages
+
+# Default seed/system prompt
+default_seed:
+  id: "S0"
+  name: "Default"
+  description: "Default coding assistant"
+  content: |
+    You are a helpful coding assistant.
+
+    IMPORTANT: Messages in context have ID prefixes like [U1], [A1], [R1] for internal tracking.
+    These are for context management only - NEVER include these prefixes in your responses.
+    Just respond naturally without any [Axxx] or similar prefixes.
+
+# TL;DR summarization prompt
+tldr_prompt: "Summarize the following message in 1-2 short sentences (max 50 words). Be concise and capture the key point:\n\n"
+tldr_min_tokens: 25
+
+# Panel display messages
+panel:
+  header: "Beginning of dynamic panel display. All content displayed below may be considered up to date."
+  timestamp: "Panel automatically generated at {iso_time} ({time_delta})"
+  timestamp_unknown: "Panel content (timestamp unknown - static or never refreshed)"
+  footer: |
+    End of dynamic panel displays. All content displayed above may be considered up to date: it is automatically kept updated as we speak.
+
+    {message_timestamps}
+    Current datetime: {current_datetime}
+  footer_msg_line: "  - [{id}] {role}: {iso_time} ({time_delta})"
+  footer_msg_header: "Last message datetimes:"
+  footer_ack: "Panel display complete. Proceeding with conversation."
