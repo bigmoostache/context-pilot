@@ -24,6 +24,9 @@ pub const API_VERSION: &str = "2023-06-01";
 /// Maximum cleaning iterations before forcing stop
 pub const MAX_CLEANING_ITERATIONS: u32 = 10;
 
+/// Average characters per token for token estimation
+pub const CHARS_PER_TOKEN: f32 = 4.0;
+
 // =============================================================================
 // PANEL CACHE DEPRECATION
 // =============================================================================

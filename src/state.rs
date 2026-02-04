@@ -6,7 +6,7 @@ use std::rc::Rc;
 use ratatui::text::Line;
 use serde::{Deserialize, Serialize};
 
-use crate::constants::icons;
+use crate::constants::{icons, CHARS_PER_TOKEN};
 use crate::llms::ModelInfo;
 use crate::tool_defs::{ToolDefinition, get_all_tool_definitions};
 
@@ -498,9 +498,9 @@ fn default_tree_filter() -> String {
     DEFAULT_TREE_FILTER.to_string()
 }
 
-/// Estimate tokens from text (~4 chars per token)
+/// Estimate tokens from text (uses CHARS_PER_TOKEN constant)
 pub fn estimate_tokens(text: &str) -> usize {
-    (text.len() + 3) / 4
+    (text.len() as f32 / CHARS_PER_TOKEN).ceil() as usize
 }
 
 /// Runtime state (messages loaded in memory)
