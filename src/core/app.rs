@@ -478,7 +478,9 @@ impl App {
         }
 
         // Wait for any dirty file panels to be loaded before continuing
-        self.wait_before_continuing(cache_rx, terminal);
+        super::wait::wait_for_panels(&mut self.state, cache_rx, terminal, |state, rx| {
+            Self::process_cache_updates_static(state, rx);
+        });
 
         // Continue streaming
         let ctx = prepare_stream_context(&mut self.state, true);
@@ -490,64 +492,6 @@ impl App {
             self.state.current_model(),
             ctx.messages, ctx.context_items, ctx.tools, None, system_prompt, tx.clone(),
         );
-    }
-
-    /// Wait for dirty file panels to be loaded before continuing stream.
-    /// This ensures the LLM has access to newly opened file content.
-    fn wait_before_continuing(&mut self, cache_rx: &Receiver<CacheUpdate>, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
-        use std::time::{Duration, Instant};
-
-        // Check if any File panels are dirty - if not, return immediately
-        let has_dirty_files = self.state.context.iter().any(|c| {
-            c.context_type == ContextType::File && c.cache_deprecated
-        });
-
-        if !has_dirty_files {
-            return;
-        }
-
-        // Set flag for UI indicator
-        self.state.waiting_for_panels = true;
-        self.state.dirty = true;
-
-        let timeout = Duration::from_secs(5); // Max wait time
-        let start = Instant::now();
-        let mut last_render_ms = 0u64;
-
-        loop {
-            // Check if any File panels are still dirty
-            let has_dirty_files = self.state.context.iter().any(|c| {
-                c.context_type == ContextType::File && c.cache_deprecated
-            });
-
-            if !has_dirty_files {
-                break; // All file panels loaded
-            }
-
-            if start.elapsed() > timeout {
-                break; // Timeout - continue anyway
-            }
-
-            // Process any pending cache updates
-            self.process_cache_updates(cache_rx);
-
-            // Update spinner and redraw periodically
-            let current_ms = now_ms();
-            if current_ms.saturating_sub(last_render_ms) >= 50 {
-                self.state.spinner_frame = self.state.spinner_frame.wrapping_add(1);
-                let _ = terminal.draw(|frame| {
-                    ui::render(frame, &mut self.state);
-                });
-                last_render_ms = current_ms;
-            }
-
-            // Small sleep to avoid busy-waiting
-            std::thread::sleep(Duration::from_millis(10));
-        }
-
-        // Clear flag
-        self.state.waiting_for_panels = false;
-        self.state.dirty = true;
     }
 
     fn finalize_stream(&mut self, tldr_tx: &Sender<TlDrResult>, clean_tx: &Sender<StreamEvent>) {
@@ -800,12 +744,17 @@ impl App {
 
     /// Process incoming cache updates from background threads
     fn process_cache_updates(&mut self, cache_rx: &Receiver<CacheUpdate>) {
+        Self::process_cache_updates_static(&mut self.state, cache_rx);
+    }
+
+    /// Static version of process_cache_updates for use in wait module
+    fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpdate>) {
         while let Ok(update) = cache_rx.try_recv() {
-            self.state.dirty = true;
+            state.dirty = true;
 
             match update {
                 CacheUpdate::FileContent { context_id, content, hash, token_count } => {
-                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
                         ctx.cached_content = Some(content);
                         ctx.file_hash = Some(hash);
                         ctx.token_count = token_count;
@@ -814,7 +763,7 @@ impl App {
                     }
                 }
                 CacheUpdate::TreeContent { context_id, content, token_count } => {
-                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
                         ctx.cached_content = Some(content);
                         ctx.token_count = token_count;
                         ctx.cache_deprecated = false;
@@ -822,7 +771,7 @@ impl App {
                     }
                 }
                 CacheUpdate::GlobContent { context_id, content, token_count } => {
-                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
                         ctx.cached_content = Some(content);
                         ctx.token_count = token_count;
                         ctx.cache_deprecated = false;
@@ -830,7 +779,7 @@ impl App {
                     }
                 }
                 CacheUpdate::GrepContent { context_id, content, token_count } => {
-                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
                         ctx.cached_content = Some(content);
                         ctx.token_count = token_count;
                         ctx.cache_deprecated = false;
@@ -838,7 +787,7 @@ impl App {
                     }
                 }
                 CacheUpdate::TmuxContent { context_id, content, last_lines_hash, token_count } => {
-                    if let Some(ctx) = self.state.context.iter_mut().find(|c| c.id == context_id) {
+                    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
                         ctx.cached_content = Some(content);
                         ctx.tmux_last_lines_hash = Some(last_lines_hash);
                         ctx.token_count = token_count;
@@ -856,10 +805,10 @@ impl App {
                     status_hash,
                 } => {
                     use crate::state::{GitFileChange, ContextType};
-                    self.state.git_branch = branch;
-                    self.state.git_branches = branches;
-                    self.state.git_is_repo = is_repo;
-                    self.state.git_file_changes = file_changes.into_iter()
+                    state.git_branch = branch;
+                    state.git_branches = branches;
+                    state.git_is_repo = is_repo;
+                    state.git_file_changes = file_changes.into_iter()
                         .map(|(path, additions, deletions, change_type, diff_content)| GitFileChange {
                             path,
                             additions,
@@ -868,11 +817,11 @@ impl App {
                             diff_content,
                         })
                         .collect();
-                    self.state.git_last_refresh_ms = now_ms();
-                    self.state.git_status_hash = Some(status_hash);
+                    state.git_last_refresh_ms = now_ms();
+                    state.git_status_hash = Some(status_hash);
 
                     // Update cached content and token count for Git panel
-                    for ctx in &mut self.state.context {
+                    for ctx in &mut state.context {
                         if ctx.context_type == ContextType::Git {
                             ctx.cached_content = Some(formatted_content);
                             ctx.token_count = token_count;
@@ -884,8 +833,8 @@ impl App {
                 }
                 CacheUpdate::GitStatusUnchanged => {
                     // Just update the refresh time, no other changes needed
-                    self.state.git_last_refresh_ms = now_ms();
-                    self.state.dirty = false; // No actual change, don't trigger re-render
+                    state.git_last_refresh_ms = now_ms();
+                    state.dirty = false; // No actual change, don't trigger re-render
                 }
             }
         }
