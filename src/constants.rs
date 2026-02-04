@@ -246,6 +246,13 @@ Just respond naturally without any [Axxx] or similar prefixes."#;
     /// Header text for dynamic panel display (shown before panels)
     pub const PANEL_HEADER: &str = "Beginning of dynamic panel display. All content displayed below may be considered up to date.";
 
+    /// Template for individual panel timestamp line
+    /// Placeholders: {iso_time}, {time_delta}
+    pub const PANEL_TIMESTAMP: &str = "Panel automatically generated at {iso_time} ({time_delta})";
+
+    /// Fallback for panels with unknown/zero timestamp
+    pub const PANEL_TIMESTAMP_UNKNOWN: &str = "Panel content (timestamp unknown - static or never refreshed)";
+
     /// Footer text template for dynamic panel display (shown after panels)
     /// Placeholders: {message_timestamps}, {current_datetime}
     pub const PANEL_FOOTER: &str = r#"End of dynamic panel displays. All content displayed above may be considered up to date: it is automatically kept updated as we speak.

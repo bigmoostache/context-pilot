@@ -10,7 +10,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text};
+use super::{LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
 use crate::constants::{prompts, MAX_RESPONSE_TOKENS};
 use crate::panels::{ContextItem, now_ms};
 use crate::state::{Message, MessageStatus, MessageType};
@@ -396,10 +396,11 @@ fn messages_to_grok(
 
     if !fake_panels.is_empty() {
         for (idx, panel) in fake_panels.iter().enumerate() {
+            let timestamp_text = panel_timestamp_text(panel.timestamp_ms, current_ms);
             let text = if idx == 0 {
-                format!("{}\n\nPanel automatically generated at {}", panel_header_text(), panel.timestamp_iso)
+                format!("{}\n\n{}", panel_header_text(), timestamp_text)
             } else {
-                format!("Panel automatically generated at {}", panel.timestamp_iso)
+                timestamp_text
             };
 
             // Assistant message with tool_call

@@ -13,7 +13,7 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text};
+use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
 use crate::constants::{prompts, API_VERSION, MAX_RESPONSE_TOKENS};
 use crate::panels::now_ms;
 use crate::state::{MessageStatus, MessageType};
@@ -156,10 +156,11 @@ impl LlmClient for ClaudeCodeClient {
 
         if !fake_panels.is_empty() {
             for (idx, panel) in fake_panels.iter().enumerate() {
+                let timestamp_text = panel_timestamp_text(panel.timestamp_ms, current_ms);
                 let text = if idx == 0 {
-                    format!("{}\n\nPanel automatically generated at {}", panel_header_text(), panel.timestamp_iso)
+                    format!("{}\n\n{}", panel_header_text(), timestamp_text)
                 } else {
-                    format!("Panel automatically generated at {}", panel.timestamp_iso)
+                    timestamp_text
                 };
 
                 // Assistant message with tool_use

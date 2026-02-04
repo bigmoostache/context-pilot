@@ -349,8 +349,8 @@ pub struct ApiMessage {
 pub struct FakePanelMessage {
     /// Panel ID (e.g., "P2", "P7")
     pub panel_id: String,
-    /// ISO 8601 timestamp (e.g., "2026-02-04T15:30:45Z")
-    pub timestamp_iso: String,
+    /// Timestamp in milliseconds since UNIX epoch
+    pub timestamp_ms: u64,
     /// Panel content with header
     pub content: String,
 }
@@ -438,6 +438,29 @@ pub fn panel_header_text() -> &'static str {
     crate::constants::prompts::PANEL_HEADER
 }
 
+/// Generate the timestamp text for an individual panel
+/// Handles zero/unknown timestamps gracefully
+pub fn panel_timestamp_text(timestamp_ms: u64, current_ms: u64) -> String {
+    use crate::constants::prompts;
+
+    // Check for zero/invalid timestamp (1970-01-01 or very old)
+    // Consider anything before year 2020 as invalid (timestamp < ~1577836800000)
+    if timestamp_ms < 1577836800000 {
+        return prompts::PANEL_TIMESTAMP_UNKNOWN.to_string();
+    }
+
+    let iso_time = ms_to_iso8601(timestamp_ms);
+    let time_delta = if current_ms > timestamp_ms {
+        format_time_delta(current_ms - timestamp_ms)
+    } else {
+        "just now".to_string()
+    };
+
+    prompts::PANEL_TIMESTAMP
+        .replace("{iso_time}", &iso_time)
+        .replace("{time_delta}", &time_delta)
+}
+
 /// Generate the footer text for dynamic panel display, including message timestamps
 pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
     use crate::constants::prompts;
@@ -498,7 +521,7 @@ pub fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMes
         .into_iter()
         .map(|item| FakePanelMessage {
             panel_id: item.id.clone(),
-            timestamp_iso: ms_to_iso8601(item.last_refresh_ms),
+            timestamp_ms: item.last_refresh_ms,
             content: format!("======= [{}] {} =======\n{}", item.id, item.header, item.content),
         })
         .collect()
