@@ -717,7 +717,7 @@ impl App {
                             CacheRequest::RefreshTmux {
                                 context_id: ctx.id.clone(),
                                 pane_id: pane_id.clone(),
-                                current_last_lines_hash: ctx.tmux_last_lines_hash.clone(),
+                                current_content_hash: ctx.tmux_last_lines_hash.clone(),
                             },
                             self.cache_tx.clone(),
                         );
@@ -786,10 +786,10 @@ impl App {
                         ctx.last_refresh_ms = now_ms();
                     }
                 }
-                CacheUpdate::TmuxContent { context_id, content, last_lines_hash, token_count } => {
+                CacheUpdate::TmuxContent { context_id, content, content_hash, token_count } => {
                     if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
                         ctx.cached_content = Some(content);
-                        ctx.tmux_last_lines_hash = Some(last_lines_hash);
+                        ctx.tmux_last_lines_hash = Some(content_hash);
                         ctx.token_count = token_count;
                         ctx.cache_deprecated = false;
                         ctx.last_refresh_ms = now_ms();
@@ -981,7 +981,7 @@ impl App {
                                 CacheRequest::RefreshTmux {
                                     context_id: ctx.id.clone(),
                                     pane_id: pane_id.clone(),
-                                    current_last_lines_hash: ctx.tmux_last_lines_hash.clone(),
+                                    current_content_hash: ctx.tmux_last_lines_hash.clone(),
                                 },
                                 self.cache_tx.clone(),
                             );

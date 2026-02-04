@@ -44,7 +44,7 @@ pub enum CacheUpdate {
     TmuxContent {
         context_id: String,
         content: String,
-        last_lines_hash: String,
+        content_hash: String,
         token_count: usize,
     },
     /// Git status was fetched
@@ -99,7 +99,7 @@ pub enum CacheRequest {
     RefreshTmux {
         context_id: String,
         pane_id: String,
-        current_last_lines_hash: Option<String>,
+        current_content_hash: Option<String>,
     },
     /// Refresh git status
     RefreshGitStatus {
@@ -141,8 +141,8 @@ pub fn process_cache_request(request: CacheRequest, tx: Sender<CacheUpdate>) {
             CacheRequest::RefreshGrep { context_id, pattern, path, file_pattern } => {
                 refresh_grep_cache(context_id, pattern, path, file_pattern, tx);
             }
-            CacheRequest::RefreshTmux { context_id, pane_id, current_last_lines_hash } => {
-                refresh_tmux_cache(context_id, pane_id, current_last_lines_hash, tx);
+            CacheRequest::RefreshTmux { context_id, pane_id, current_content_hash } => {
+                refresh_tmux_cache(context_id, pane_id, current_content_hash, tx);
             }
             CacheRequest::RefreshGitStatus { show_diffs, current_hash } => {
                 refresh_git_status(show_diffs, current_hash, tx);
@@ -241,7 +241,7 @@ fn refresh_grep_cache(
 fn refresh_tmux_cache(
     context_id: String,
     pane_id: String,
-    current_last_lines_hash: Option<String>,
+    current_content_hash: Option<String>,
     tx: Sender<CacheUpdate>,
 ) {
     use std::process::Command;
@@ -260,15 +260,16 @@ fn refresh_tmux_cache(
     }
 
     let content = String::from_utf8_lossy(&output.stdout).to_string();
-    let new_hash = hash_last_lines(&content, 2);
+    // Hash full content to detect any changes, not just last lines
+    let new_hash = hash_content(&content);
 
-    // Only send update if last lines changed
-    if current_last_lines_hash.as_ref() != Some(&new_hash) {
+    // Only send update if content actually changed
+    if current_content_hash.as_ref() != Some(&new_hash) {
         let token_count = estimate_tokens(&content);
         let _ = tx.send(CacheUpdate::TmuxContent {
             context_id,
             content,
-            last_lines_hash: new_hash,
+            content_hash: new_hash,
             token_count,
         });
     }
