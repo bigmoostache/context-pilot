@@ -67,8 +67,8 @@ impl Panel for GlobPanel {
 
         content.lines()
             .map(|line| Line::from(vec![
-                Span::styled(format!("  {} ", chars::DOT), Style::default().fg(theme::ACCENT_DIM)),
-                Span::styled(line.to_string(), Style::default().fg(theme::TEXT)),
+                Span::styled(format!("  {} ", chars::DOT), Style::default().fg(theme::accent_dim())),
+                Span::styled(line.to_string(), Style::default().fg(theme::text())),
             ]))
             .collect()
     }

@@ -80,7 +80,7 @@ impl Panel for MemoryPanel {
         if state.memories.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("No memories".to_string(), Style::default().fg(theme::TEXT_MUTED).italic()),
+                Span::styled("No memories".to_string(), Style::default().fg(theme::text_muted()).italic()),
             ]));
         } else {
             let mut sorted_memories: Vec<_> = state.memories.iter().collect();
@@ -96,10 +96,10 @@ impl Panel for MemoryPanel {
 
             for memory in sorted_memories {
                 let importance_color = match memory.importance {
-                    MemoryImportance::Critical => theme::WARNING,
-                    MemoryImportance::High => theme::ACCENT,
-                    MemoryImportance::Medium => theme::TEXT_SECONDARY,
-                    MemoryImportance::Low => theme::TEXT_MUTED,
+                    MemoryImportance::Critical => theme::warning(),
+                    MemoryImportance::High => theme::accent(),
+                    MemoryImportance::Medium => theme::text_secondary(),
+                    MemoryImportance::Low => theme::text_muted(),
                 };
 
                 let importance_badge = match memory.importance {
@@ -112,9 +112,9 @@ impl Panel for MemoryPanel {
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
                     Span::styled(importance_badge.to_string(), Style::default().fg(importance_color).bold()),
-                    Span::styled(memory.id.clone(), Style::default().fg(theme::ACCENT_DIM)),
+                    Span::styled(memory.id.clone(), Style::default().fg(theme::accent_dim())),
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled(memory.content.clone(), Style::default().fg(theme::TEXT)),
+                    Span::styled(memory.content.clone(), Style::default().fg(theme::text())),
                 ]));
             }
         }

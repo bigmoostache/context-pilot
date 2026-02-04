@@ -1,0 +1,286 @@
+# Theme definitions - icons and colors for different visual styles
+# Each theme contains icons for messages, context panels, status indicators, todos
+# Plus color palettes for the UI
+
+themes:
+  dnd:
+    name: "D&D"
+    description: "Dungeons & Dragons fantasy theme"
+    messages:
+      user: "🦊"
+      assistant: "🤖"
+      tool_call: "🪵"
+      tool_result: "🔥"
+      error: "⚠️"
+    context:
+      system: "🌱"
+      conversation: "📜"
+      tree: "🌲"
+      todo: "🪓"
+      memory: "✨"
+      overview: "🌍"
+      file: "💾"
+      glob: "🔭"
+      grep: "👓"
+      tmux: "💻"
+      git: "🐙"
+      scratchpad: "🪶"
+    status:
+      full: ""
+      summarized: "◐"
+      deleted: "○"
+    todo:
+      pending: "○"
+      in_progress: "◐"
+      done: "●"
+    colors:
+      accent: [218, 118, 89]       # Warm orange - torch/fire
+      accent_dim: [178, 98, 69]
+      success: [134, 188, 111]     # Forest green
+      warning: [229, 192, 123]     # Gold/amber
+      error: [200, 80, 80]         # Blood red
+      text: [240, 240, 240]
+      text_secondary: [180, 180, 180]
+      text_muted: [144, 144, 144]
+      bg_base: [34, 34, 32]        # Dark dungeon
+      bg_surface: [51, 51, 49]
+      bg_elevated: [66, 66, 64]
+      border: [66, 66, 64]
+      border_muted: [50, 50, 48]
+      user: [218, 118, 89]         # Torch orange
+      assistant: [144, 144, 144]
+
+  modern:
+    name: "Modern"
+    description: "Clean, minimalist modern theme"
+    messages:
+      user: "👤"
+      assistant: "🤖"
+      tool_call: "⚙️"
+      tool_result: "✅"
+      error: "❌"
+    context:
+      system: "⚡"
+      conversation: "💬"
+      tree: "📁"
+      todo: "📋"
+      memory: "💡"
+      overview: "🔍"
+      file: "📄"
+      glob: "🔎"
+      grep: "🔬"
+      tmux: "🖥️"
+      git: "📦"
+      scratchpad: "📝"
+    status:
+      full: ""
+      summarized: "◐"
+      deleted: "○"
+    todo:
+      pending: "☐"
+      in_progress: "◐"
+      done: "☑"
+    colors:
+      accent: [99, 179, 237]       # Clean blue
+      accent_dim: [79, 149, 207]
+      success: [72, 187, 120]      # Mint green
+      warning: [246, 173, 85]      # Soft orange
+      error: [245, 101, 101]       # Coral red
+      text: [245, 245, 245]
+      text_secondary: [190, 190, 190]
+      text_muted: [140, 140, 140]
+      bg_base: [30, 30, 35]        # Near black
+      bg_surface: [45, 45, 52]
+      bg_elevated: [60, 60, 68]
+      border: [70, 70, 80]
+      border_muted: [55, 55, 62]
+      user: [99, 179, 237]         # Blue
+      assistant: [160, 160, 170]
+
+  futuristic:
+    name: "Futuristic"
+    description: "Sci-fi cyberpunk theme"
+    messages:
+      user: "👾"
+      assistant: "🦾"
+      tool_call: "⚡"
+      tool_result: "💠"
+      error: "🚨"
+    context:
+      system: "🔮"
+      conversation: "📡"
+      tree: "🌐"
+      todo: "🎯"
+      memory: "💾"
+      overview: "🛸"
+      file: "💿"
+      glob: "📶"
+      grep: "🔦"
+      tmux: "🖲️"
+      git: "⚛️"
+      scratchpad: "📟"
+    status:
+      full: ""
+      summarized: "◐"
+      deleted: "○"
+    todo:
+      pending: "◇"
+      in_progress: "◈"
+      done: "◆"
+    colors:
+      accent: [0, 255, 255]        # Cyan neon
+      accent_dim: [0, 200, 200]
+      success: [0, 255, 136]       # Matrix green
+      warning: [255, 170, 0]       # Amber warning
+      error: [255, 50, 100]        # Neon pink/red
+      text: [220, 240, 255]        # Cool white
+      text_secondary: [160, 180, 200]
+      text_muted: [100, 120, 140]
+      bg_base: [15, 20, 30]        # Deep space blue
+      bg_surface: [25, 35, 50]
+      bg_elevated: [40, 55, 75]
+      border: [0, 150, 150]        # Cyan border
+      border_muted: [30, 50, 70]
+      user: [0, 255, 255]          # Cyan
+      assistant: [150, 100, 255]   # Purple hologram
+
+  forest:
+    name: "Forest"
+    description: "Natural woodland theme"
+    messages:
+      user: "🦌"
+      assistant: "🦉"
+      tool_call: "🌿"
+      tool_result: "🍄"
+      error: "🥀"
+    context:
+      system: "🌱"
+      conversation: "🍃"
+      tree: "🌳"
+      todo: "🪨"
+      memory: "🌸"
+      overview: "🏔️"
+      file: "🍂"
+      glob: "🔭"
+      grep: "🐛"
+      tmux: "🪵"
+      git: "🌊"
+      scratchpad: "🍁"
+    status:
+      full: ""
+      summarized: "◐"
+      deleted: "○"
+    todo:
+      pending: "○"
+      in_progress: "◐"
+      done: "●"
+    colors:
+      accent: [139, 195, 74]       # Fresh leaf green
+      accent_dim: [109, 165, 54]
+      success: [102, 187, 106]     # Spring green
+      warning: [255, 202, 40]      # Sunlight yellow
+      error: [183, 28, 28]         # Dark berry red
+      text: [238, 238, 230]        # Warm white
+      text_secondary: [180, 180, 170]
+      text_muted: [130, 130, 120]
+      bg_base: [30, 38, 30]        # Dark forest floor
+      bg_surface: [45, 55, 45]     # Mossy
+      bg_elevated: [60, 72, 60]
+      border: [85, 107, 47]        # Olive
+      border_muted: [50, 60, 45]
+      user: [139, 195, 74]         # Leaf green
+      assistant: [161, 136, 127]   # Bark brown
+
+  sea:
+    name: "Sea"
+    description: "Ocean and nautical theme"
+    messages:
+      user: "🧜"
+      assistant: "🐙"
+      tool_call: "⚓"
+      tool_result: "🐚"
+      error: "🦈"
+    context:
+      system: "🌊"
+      conversation: "📯"
+      tree: "🪸"
+      todo: "⛵"
+      memory: "💎"
+      overview: "🗺️"
+      file: "📜"
+      glob: "🔱"
+      grep: "🦑"
+      tmux: "🚢"
+      git: "🐋"
+      scratchpad: "🏝️"
+    status:
+      full: ""
+      summarized: "◐"
+      deleted: "○"
+    todo:
+      pending: "○"
+      in_progress: "◐"
+      done: "●"
+    colors:
+      accent: [64, 224, 208]       # Turquoise
+      accent_dim: [44, 184, 168]
+      success: [102, 205, 170]     # Seafoam
+      warning: [255, 215, 0]       # Gold doubloon
+      error: [255, 99, 71]         # Coral red
+      text: [240, 248, 255]        # Alice blue
+      text_secondary: [176, 196, 222]
+      text_muted: [119, 136, 153]
+      bg_base: [20, 30, 48]        # Deep ocean
+      bg_surface: [30, 45, 65]     # Ocean depth
+      bg_elevated: [45, 65, 90]
+      border: [70, 130, 180]       # Steel blue
+      border_muted: [40, 60, 80]
+      user: [64, 224, 208]         # Turquoise
+      assistant: [147, 112, 219]   # Medium purple (jellyfish)
+
+  space:
+    name: "Space"
+    description: "Cosmic space exploration theme"
+    messages:
+      user: "👨‍🚀"
+      assistant: "👽"
+      tool_call: "🛰️"
+      tool_result: "💫"
+      error: "☄️"
+    context:
+      system: "🌟"
+      conversation: "📻"
+      tree: "🪐"
+      todo: "🎯"
+      memory: "✨"
+      overview: "🌌"
+      file: "📀"
+      glob: "🔭"
+      grep: "👁️"
+      tmux: "🚀"
+      git: "🌑"
+      scratchpad: "📡"
+    status:
+      full: ""
+      summarized: "◐"
+      deleted: "○"
+    todo:
+      pending: "○"
+      in_progress: "◐"
+      done: "●"
+    colors:
+      accent: [186, 85, 211]       # Medium orchid (nebula purple)
+      accent_dim: [153, 50, 204]
+      success: [50, 205, 50]       # Lime green (go signal)
+      warning: [255, 165, 0]       # Orange (caution)
+      error: [255, 69, 0]          # Red-orange (alert)
+      text: [248, 248, 255]        # Ghost white
+      text_secondary: [192, 192, 210]
+      text_muted: [128, 128, 150]
+      bg_base: [10, 10, 25]        # Deep space black
+      bg_surface: [20, 20, 40]     # Void
+      bg_elevated: [35, 35, 60]
+      border: [75, 0, 130]         # Indigo
+      border_muted: [30, 20, 50]
+      user: [186, 85, 211]         # Nebula purple
+      assistant: [100, 149, 237]   # Cornflower blue (starlight)

@@ -153,7 +153,7 @@ impl Panel for OverviewPanel {
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled("TOKEN USAGE".to_string(), Style::default().fg(theme::TEXT_MUTED).bold()),
+            Span::styled("TOKEN USAGE".to_string(), Style::default().fg(theme::text_muted()).bold()),
         ]));
         text.push(Line::from(""));
 
@@ -164,12 +164,12 @@ impl Panel for OverviewPanel {
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled(current, Style::default().fg(theme::TEXT).bold()),
-            Span::styled(" / ".to_string(), Style::default().fg(theme::TEXT_MUTED)),
-            Span::styled(threshold_str, Style::default().fg(theme::WARNING)),
-            Span::styled(" / ".to_string(), Style::default().fg(theme::TEXT_MUTED)),
-            Span::styled(budget_str, Style::default().fg(theme::ACCENT).bold()),
-            Span::styled(format!(" ({})", pct), Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(current, Style::default().fg(theme::text()).bold()),
+            Span::styled(" / ".to_string(), Style::default().fg(theme::text_muted())),
+            Span::styled(threshold_str, Style::default().fg(theme::warning())),
+            Span::styled(" / ".to_string(), Style::default().fg(theme::text_muted())),
+            Span::styled(budget_str, Style::default().fg(theme::accent()).bold()),
+            Span::styled(format!(" ({})", pct), Style::default().fg(theme::text_muted())),
         ]));
 
         // Progress bar with threshold marker
@@ -179,11 +179,11 @@ impl Panel for OverviewPanel {
         let threshold_pos = (threshold_pct as f64 * bar_width as f64) as usize;
 
         let bar_color = if total_tokens >= threshold {
-            theme::ERROR
+            theme::error()
         } else if total_tokens as f64 >= threshold as f64 * 0.9 {
-            theme::WARNING
+            theme::warning()
         } else {
-            theme::ACCENT
+            theme::accent()
         };
 
         let mut bar_spans = vec![Span::styled(" ".to_string(), base_style)];
@@ -197,11 +197,11 @@ impl Panel for OverviewPanel {
             };
 
             let color = if i == threshold_pos {
-                theme::WARNING
+                theme::warning()
             } else if i < filled {
                 bar_color
             } else {
-                theme::BG_ELEVATED
+                theme::bg_elevated()
             };
 
             bar_spans.push(Span::styled(char, Style::default().fg(color)));
@@ -210,7 +210,7 @@ impl Panel for OverviewPanel {
 
         text.push(Line::from(""));
         text.push(Line::from(vec![
-            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::BORDER)),
+            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::border())),
         ]));
         text.push(Line::from(""));
 
@@ -218,20 +218,20 @@ impl Panel for OverviewPanel {
         if state.git_is_repo {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("GIT STATUS".to_string(), Style::default().fg(theme::TEXT_MUTED).bold()),
+                Span::styled("GIT STATUS".to_string(), Style::default().fg(theme::text_muted()).bold()),
             ]));
             text.push(Line::from(""));
 
             // Branch name
             if let Some(branch) = &state.git_branch {
                 let branch_color = if branch.starts_with("detached:") {
-                    theme::WARNING
+                    theme::warning()
                 } else {
-                    theme::ACCENT
+                    theme::accent()
                 };
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled("Branch: ".to_string(), Style::default().fg(theme::TEXT_SECONDARY)),
+                    Span::styled("Branch: ".to_string(), Style::default().fg(theme::text_secondary())),
                     Span::styled(branch.clone(), Style::default().fg(branch_color).bold()),
                 ]));
             }
@@ -239,7 +239,7 @@ impl Panel for OverviewPanel {
             if state.git_file_changes.is_empty() {
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled("Working tree clean".to_string(), Style::default().fg(theme::SUCCESS)),
+                    Span::styled("Working tree clean".to_string(), Style::default().fg(theme::success())),
                 ]));
             } else {
                 text.push(Line::from(""));
@@ -255,19 +255,19 @@ impl Panel for OverviewPanel {
                 // Table header
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled(format!("{:<width$}", "File", width = path_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                    Span::styled(format!("{:<width$}", "File", width = path_width), Style::default().fg(theme::text_secondary()).bold()),
                     Span::styled("  ", base_style),
-                    Span::styled(format!("{:>6}", "+"), Style::default().fg(theme::SUCCESS).bold()),
+                    Span::styled(format!("{:>6}", "+"), Style::default().fg(theme::success()).bold()),
                     Span::styled("  ", base_style),
-                    Span::styled(format!("{:>6}", "-"), Style::default().fg(theme::ERROR).bold()),
+                    Span::styled(format!("{:>6}", "-"), Style::default().fg(theme::error()).bold()),
                     Span::styled("  ", base_style),
-                    Span::styled(format!("{:>6}", "Net"), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                    Span::styled(format!("{:>6}", "Net"), Style::default().fg(theme::text_secondary()).bold()),
                 ]));
 
                 // Separator
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled(chars::HORIZONTAL.repeat(path_width + 26), Style::default().fg(theme::BORDER)),
+                    Span::styled(chars::HORIZONTAL.repeat(path_width + 26), Style::default().fg(theme::border())),
                 ]));
 
                 // File rows
@@ -283,10 +283,10 @@ impl Panel for OverviewPanel {
 
                     // Type indicator
                     let (type_char, type_color) = match file.change_type {
-                        GitChangeType::Added => ("A", theme::SUCCESS),
-                        GitChangeType::Deleted => ("D", theme::ERROR),
-                        GitChangeType::Modified => ("M", theme::WARNING),
-                        GitChangeType::Renamed => ("R", theme::ACCENT),
+                        GitChangeType::Added => ("A", theme::success()),
+                        GitChangeType::Deleted => ("D", theme::error()),
+                        GitChangeType::Modified => ("M", theme::warning()),
+                        GitChangeType::Renamed => ("R", theme::accent()),
                     };
 
                     // Truncate path if needed (account for type indicator)
@@ -298,11 +298,11 @@ impl Panel for OverviewPanel {
                     };
 
                     let net_color = if net > 0 {
-                        theme::SUCCESS
+                        theme::success()
                     } else if net < 0 {
-                        theme::ERROR
+                        theme::error()
                     } else {
-                        theme::TEXT_MUTED
+                        theme::text_muted()
                     };
 
                     let net_str = if net > 0 {
@@ -314,11 +314,11 @@ impl Panel for OverviewPanel {
                     text.push(Line::from(vec![
                         Span::styled(" ".to_string(), base_style),
                         Span::styled(format!("{} ", type_char), Style::default().fg(type_color)),
-                        Span::styled(format!("{:<width$}", display_path, width = effective_path_width), Style::default().fg(theme::TEXT)),
+                        Span::styled(format!("{:<width$}", display_path, width = effective_path_width), Style::default().fg(theme::text())),
                         Span::styled("  ", base_style),
-                        Span::styled(format!("{:>6}", format!("+{}", file.additions)), Style::default().fg(theme::SUCCESS)),
+                        Span::styled(format!("{:>6}", format!("+{}", file.additions)), Style::default().fg(theme::success())),
                         Span::styled("  ", base_style),
-                        Span::styled(format!("{:>6}", format!("-{}", file.deletions)), Style::default().fg(theme::ERROR)),
+                        Span::styled(format!("{:>6}", format!("-{}", file.deletions)), Style::default().fg(theme::error())),
                         Span::styled("  ", base_style),
                         Span::styled(format!("{:>6}", net_str), Style::default().fg(net_color)),
                     ]));
@@ -327,17 +327,17 @@ impl Panel for OverviewPanel {
                 // Total row separator
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled(chars::HORIZONTAL.repeat(path_width + 26), Style::default().fg(theme::BORDER)),
+                    Span::styled(chars::HORIZONTAL.repeat(path_width + 26), Style::default().fg(theme::border())),
                 ]));
 
                 // Total row
                 let total_net = total_add - total_del;
                 let total_net_color = if total_net > 0 {
-                    theme::SUCCESS
+                    theme::success()
                 } else if total_net < 0 {
-                    theme::ERROR
+                    theme::error()
                 } else {
-                    theme::TEXT_MUTED
+                    theme::text_muted()
                 };
                 let total_net_str = if total_net > 0 {
                     format!("+{}", total_net)
@@ -347,11 +347,11 @@ impl Panel for OverviewPanel {
 
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled(format!("{:<width$}", "Total", width = path_width), Style::default().fg(theme::TEXT).bold()),
+                    Span::styled(format!("{:<width$}", "Total", width = path_width), Style::default().fg(theme::text()).bold()),
                     Span::styled("  ", base_style),
-                    Span::styled(format!("{:>6}", format!("+{}", total_add)), Style::default().fg(theme::SUCCESS).bold()),
+                    Span::styled(format!("{:>6}", format!("+{}", total_add)), Style::default().fg(theme::success()).bold()),
                     Span::styled("  ", base_style),
-                    Span::styled(format!("{:>6}", format!("-{}", total_del)), Style::default().fg(theme::ERROR).bold()),
+                    Span::styled(format!("{:>6}", format!("-{}", total_del)), Style::default().fg(theme::error()).bold()),
                     Span::styled("  ", base_style),
                     Span::styled(format!("{:>6}", total_net_str), Style::default().fg(total_net_color).bold()),
                 ]));
@@ -359,7 +359,7 @@ impl Panel for OverviewPanel {
 
             text.push(Line::from(""));
             text.push(Line::from(vec![
-                Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::BORDER)),
+                Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::border())),
             ]));
             text.push(Line::from(""));
         }
@@ -367,7 +367,7 @@ impl Panel for OverviewPanel {
         // Context elements header
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled("CONTEXT ELEMENTS".to_string(), Style::default().fg(theme::TEXT_MUTED).bold()),
+            Span::styled("CONTEXT ELEMENTS".to_string(), Style::default().fg(theme::text_muted()).bold()),
         ]));
         text.push(Line::from(""));
 
@@ -407,10 +407,10 @@ impl Panel for OverviewPanel {
 
             let mut spans = vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(format!("{} ", icon), Style::default().fg(theme::TEXT_MUTED)),
-                Span::styled(format!("{} ", shortcut), Style::default().fg(theme::ACCENT_DIM)),
-                Span::styled(format!("{:<12}", type_name), Style::default().fg(theme::TEXT_SECONDARY)),
-                Span::styled(format!("{:>8}", tokens), Style::default().fg(theme::ACCENT)),
+                Span::styled(format!("{} ", icon), Style::default().fg(theme::text_muted())),
+                Span::styled(format!("{} ", shortcut), Style::default().fg(theme::accent_dim())),
+                Span::styled(format!("{:<12}", type_name), Style::default().fg(theme::text_secondary())),
+                Span::styled(format!("{:>8}", tokens), Style::default().fg(theme::accent())),
             ];
 
             if !details.is_empty() {
@@ -420,7 +420,7 @@ impl Panel for OverviewPanel {
                 } else {
                     details
                 };
-                spans.push(Span::styled(format!("  {}", truncated_details), Style::default().fg(theme::TEXT_MUTED)));
+                spans.push(Span::styled(format!("  {}", truncated_details), Style::default().fg(theme::text_muted())));
             }
 
             text.push(Line::from(spans));
@@ -428,14 +428,14 @@ impl Panel for OverviewPanel {
 
         text.push(Line::from(""));
         text.push(Line::from(vec![
-            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::BORDER)),
+            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::border())),
         ]));
         text.push(Line::from(""));
 
         // Statistics section
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled("STATISTICS".to_string(), Style::default().fg(theme::TEXT_MUTED).bold()),
+            Span::styled("STATISTICS".to_string(), Style::default().fg(theme::text_muted()).bold()),
         ]));
         text.push(Line::from(""));
 
@@ -445,9 +445,9 @@ impl Panel for OverviewPanel {
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled("Messages: ".to_string(), Style::default().fg(theme::TEXT_SECONDARY)),
-            Span::styled(format!("{}", total_msgs), Style::default().fg(theme::TEXT).bold()),
-            Span::styled(format!(" ({} user, {} assistant)", user_msgs, assistant_msgs), Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("Messages: ".to_string(), Style::default().fg(theme::text_secondary())),
+            Span::styled(format!("{}", total_msgs), Style::default().fg(theme::text()).bold()),
+            Span::styled(format!(" ({} user, {} assistant)", user_msgs, assistant_msgs), Style::default().fg(theme::text_muted())),
         ]));
 
         let total_todos = state.todos.len();
@@ -458,10 +458,10 @@ impl Panel for OverviewPanel {
 
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("Todos: ".to_string(), Style::default().fg(theme::TEXT_SECONDARY)),
-                Span::styled(format!("{}/{}", done_todos, total_todos), Style::default().fg(theme::SUCCESS).bold()),
-                Span::styled(" done".to_string(), Style::default().fg(theme::TEXT_MUTED)),
-                Span::styled(format!(", {} in progress, {} pending", in_progress, pending), Style::default().fg(theme::TEXT_MUTED)),
+                Span::styled("Todos: ".to_string(), Style::default().fg(theme::text_secondary())),
+                Span::styled(format!("{}/{}", done_todos, total_todos), Style::default().fg(theme::success()).bold()),
+                Span::styled(" done".to_string(), Style::default().fg(theme::text_muted())),
+                Span::styled(format!(", {} in progress, {} pending", in_progress, pending), Style::default().fg(theme::text_muted())),
             ]));
         }
 
@@ -474,23 +474,23 @@ impl Panel for OverviewPanel {
 
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("Memories: ".to_string(), Style::default().fg(theme::TEXT_SECONDARY)),
-                Span::styled(format!("{}", total_memories), Style::default().fg(theme::TEXT).bold()),
-                Span::styled(format!(" ({} critical, {} high, {} medium, {} low)", critical, high, medium, low), Style::default().fg(theme::TEXT_MUTED)),
+                Span::styled("Memories: ".to_string(), Style::default().fg(theme::text_secondary())),
+                Span::styled(format!("{}", total_memories), Style::default().fg(theme::text()).bold()),
+                Span::styled(format!(" ({} critical, {} high, {} medium, {} low)", critical, high, medium, low), Style::default().fg(theme::text_muted())),
             ]));
         }
 
         text.push(Line::from(""));
         text.push(Line::from(vec![
-            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::BORDER)),
+            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::border())),
         ]));
         text.push(Line::from(""));
 
         // Seeds section
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled("SEEDS".to_string(), Style::default().fg(theme::TEXT_MUTED).bold()),
-            Span::styled(format!("  ({} available)", state.systems.len()), Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("SEEDS".to_string(), Style::default().fg(theme::text_muted()).bold()),
+            Span::styled(format!("  ({} available)", state.systems.len()), Style::default().fg(theme::text_muted())),
         ]));
         text.push(Line::from(""));
 
@@ -502,28 +502,28 @@ impl Panel for OverviewPanel {
             // Table header
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(format!("{:<width$}", "ID", width = id_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                Span::styled(format!("{:<width$}", "ID", width = id_width), Style::default().fg(theme::text_secondary()).bold()),
                 Span::styled("  ", base_style),
-                Span::styled(format!("{:<width$}", "Name", width = name_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                Span::styled(format!("{:<width$}", "Name", width = name_width), Style::default().fg(theme::text_secondary()).bold()),
                 Span::styled("  ", base_style),
-                Span::styled("Active", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                Span::styled("Active", Style::default().fg(theme::text_secondary()).bold()),
                 Span::styled("  ", base_style),
-                Span::styled("Description", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                Span::styled("Description", Style::default().fg(theme::text_secondary()).bold()),
             ]));
 
             // Table separator
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(format!("{}", chars::HORIZONTAL.repeat(id_width + name_width + 50)), Style::default().fg(theme::BORDER)),
+                Span::styled(format!("{}", chars::HORIZONTAL.repeat(id_width + name_width + 50)), Style::default().fg(theme::border())),
             ]));
 
             // Table rows
             for sys in &state.systems {
                 let is_active = state.active_system_id.as_deref() == Some(&sys.id);
                 let (active_icon, active_color) = if is_active {
-                    ("✓", theme::SUCCESS)
+                    ("✓", theme::success())
                 } else {
-                    (" ", theme::TEXT_MUTED)
+                    (" ", theme::text_muted())
                 };
 
                 // Truncate name if needed
@@ -543,20 +543,20 @@ impl Panel for OverviewPanel {
 
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled(format!("{:<width$}", sys.id, width = id_width), Style::default().fg(theme::ACCENT_DIM)),
+                    Span::styled(format!("{:<width$}", sys.id, width = id_width), Style::default().fg(theme::accent_dim())),
                     Span::styled("  ", base_style),
-                    Span::styled(format!("{:<width$}", display_name, width = name_width), Style::default().fg(theme::TEXT)),
+                    Span::styled(format!("{:<width$}", display_name, width = name_width), Style::default().fg(theme::text())),
                     Span::styled("  ", base_style),
                     Span::styled(format!("  {}   ", active_icon), Style::default().fg(active_color)),
                     Span::styled("  ", base_style),
-                    Span::styled(display_desc, Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(display_desc, Style::default().fg(theme::text_muted())),
                 ]));
             }
         }
 
         text.push(Line::from(""));
         text.push(Line::from(vec![
-            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::BORDER)),
+            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::border())),
         ]));
         text.push(Line::from(""));
 
@@ -566,8 +566,8 @@ impl Panel for OverviewPanel {
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled("TOOLS".to_string(), Style::default().fg(theme::TEXT_MUTED).bold()),
-            Span::styled(format!("  ({} enabled, {} disabled)", enabled_count, disabled_count), Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("TOOLS".to_string(), Style::default().fg(theme::text_muted()).bold()),
+            Span::styled(format!("  ({} enabled, {} disabled)", enabled_count, disabled_count), Style::default().fg(theme::text_muted())),
         ]));
         text.push(Line::from(""));
 
@@ -598,35 +598,35 @@ impl Panel for OverviewPanel {
 
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(cat_name.to_string(), Style::default().fg(theme::ACCENT).bold()),
-                Span::styled(format!("  {}", cat_desc), Style::default().fg(theme::TEXT_MUTED)),
+                Span::styled(cat_name.to_string(), Style::default().fg(theme::accent()).bold()),
+                Span::styled(format!("  {}", cat_desc), Style::default().fg(theme::text_muted())),
             ]));
 
             // Table header for this category
             let name_width = category_tools.iter().map(|t| t.id.len()).max().unwrap_or(10).max(10);
             text.push(Line::from(vec![
                 Span::styled("   ".to_string(), base_style),
-                Span::styled(format!("{:<width$}", "Tool", width = name_width), Style::default().fg(theme::TEXT_SECONDARY)),
+                Span::styled(format!("{:<width$}", "Tool", width = name_width), Style::default().fg(theme::text_secondary())),
                 Span::styled("  ", base_style),
                 Span::styled("  ", base_style),
-                Span::styled("Description", Style::default().fg(theme::TEXT_SECONDARY)),
+                Span::styled("Description", Style::default().fg(theme::text_secondary())),
             ]));
 
             // Tool rows for this category
             for tool in &category_tools {
                 let (status_icon, status_color) = if tool.enabled {
-                    ("✓", theme::SUCCESS)
+                    ("✓", theme::success())
                 } else {
-                    ("✗", theme::ERROR)
+                    ("✗", theme::error())
                 };
 
                 text.push(Line::from(vec![
                     Span::styled("   ".to_string(), base_style),
-                    Span::styled(format!("{:<width$}", tool.id, width = name_width), Style::default().fg(theme::TEXT)),
+                    Span::styled(format!("{:<width$}", tool.id, width = name_width), Style::default().fg(theme::text())),
                     Span::styled("  ", base_style),
                     Span::styled(status_icon, Style::default().fg(status_color)),
                     Span::styled("  ", base_style),
-                    Span::styled(tool.short_desc.clone(), Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(tool.short_desc.clone(), Style::default().fg(theme::text_muted())),
                 ]));
             }
 

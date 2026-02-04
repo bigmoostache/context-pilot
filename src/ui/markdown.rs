@@ -122,9 +122,9 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
             let mut spans: Vec<Span<'static>> = Vec::new();
             for (col, width) in col_widths.iter().enumerate() {
                 if col > 0 {
-                    spans.push(Span::styled("─┼─", Style::default().fg(theme::BORDER)));
+                    spans.push(Span::styled("─┼─", Style::default().fg(theme::border())));
                 }
-                spans.push(Span::styled("─".repeat(*width), Style::default().fg(theme::BORDER)));
+                spans.push(Span::styled("─".repeat(*width), Style::default().fg(theme::border())));
             }
             result.push(spans);
         } else {
@@ -134,7 +134,7 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
 
             for (col, width) in col_widths.iter().enumerate() {
                 if col > 0 {
-                    spans.push(Span::styled(" │ ", Style::default().fg(theme::BORDER)));
+                    spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
                 }
 
                 let cell = row.get(col).map(|s| s.as_str()).unwrap_or("");
@@ -143,7 +143,7 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
 
                 if is_header {
                     // Headers: bold, no inline markdown parsing
-                    spans.push(Span::styled(cell.to_string(), Style::default().fg(theme::ACCENT).bold()));
+                    spans.push(Span::styled(cell.to_string(), Style::default().fg(theme::accent()).bold()));
                 } else {
                     // Data cells: parse inline markdown
                     let cell_spans = parse_inline_markdown(cell);
@@ -172,10 +172,10 @@ pub fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> 
         let content = trimmed[level..].trim_start();
 
         let style = match level {
-            1 => Style::default().fg(theme::ACCENT).bold(),
-            2 => Style::default().fg(theme::ACCENT),
-            3 => Style::default().fg(theme::ACCENT).italic(),
-            _ => Style::default().fg(theme::TEXT_SECONDARY).italic(),
+            1 => Style::default().fg(theme::accent()).bold(),
+            2 => Style::default().fg(theme::accent()),
+            3 => Style::default().fg(theme::accent()).italic(),
+            _ => Style::default().fg(theme::text_secondary()).italic(),
         };
 
         return vec![Span::styled(content.to_string(), style)];
@@ -187,7 +187,7 @@ pub fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> 
         let indent = line.len() - trimmed.len();
         let mut spans = vec![
             Span::styled(" ".repeat(indent), base_style),
-            Span::styled("• ", Style::default().fg(theme::ACCENT_DIM)),
+            Span::styled("• ", Style::default().fg(theme::accent_dim())),
         ];
         spans.extend(parse_inline_markdown(&content));
         return spans;
@@ -198,7 +198,7 @@ pub fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> 
         let indent = line.len() - trimmed.len();
         let mut spans = vec![
             Span::styled(" ".repeat(indent), base_style),
-            Span::styled("• ", Style::default().fg(theme::ACCENT_DIM)),
+            Span::styled("• ", Style::default().fg(theme::accent_dim())),
         ];
         spans.extend(parse_inline_markdown(&content));
         return spans;
@@ -219,7 +219,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
             '`' => {
                 // Inline code
                 if !current.is_empty() {
-                    spans.push(Span::styled(current.clone(), Style::default().fg(theme::TEXT)));
+                    spans.push(Span::styled(current.clone(), Style::default().fg(theme::text())));
                     current.clear();
                 }
 
@@ -233,7 +233,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 }
 
                 if !code.is_empty() {
-                    spans.push(Span::styled(code, Style::default().fg(theme::WARNING)));
+                    spans.push(Span::styled(code, Style::default().fg(theme::warning())));
                 }
             }
             '*' | '_' => {
@@ -244,7 +244,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                     chars.next(); // consume second */_
 
                     if !current.is_empty() {
-                        spans.push(Span::styled(current.clone(), Style::default().fg(theme::TEXT)));
+                        spans.push(Span::styled(current.clone(), Style::default().fg(theme::text())));
                         current.clear();
                     }
 
@@ -261,12 +261,12 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                     }
 
                     if !bold_text.is_empty() {
-                        spans.push(Span::styled(bold_text, Style::default().fg(theme::TEXT).bold()));
+                        spans.push(Span::styled(bold_text, Style::default().fg(theme::text()).bold()));
                     }
                 } else {
                     // Italic text - look for closing marker
                     if !current.is_empty() {
-                        spans.push(Span::styled(current.clone(), Style::default().fg(theme::TEXT)));
+                        spans.push(Span::styled(current.clone(), Style::default().fg(theme::text())));
                         current.clear();
                     }
 
@@ -281,7 +281,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                     }
 
                     if found_close && !italic_text.is_empty() {
-                        spans.push(Span::styled(italic_text, Style::default().fg(theme::TEXT).italic()));
+                        spans.push(Span::styled(italic_text, Style::default().fg(theme::text()).italic()));
                     } else {
                         // Not actually italic, restore
                         current.push(c);
@@ -314,10 +314,10 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
 
                     // Display link text in accent color
                     if !current.is_empty() {
-                        spans.push(Span::styled(current.clone(), Style::default().fg(theme::TEXT)));
+                        spans.push(Span::styled(current.clone(), Style::default().fg(theme::text())));
                         current.clear();
                     }
-                    spans.push(Span::styled(link_text, Style::default().fg(theme::ACCENT).underlined()));
+                    spans.push(Span::styled(link_text, Style::default().fg(theme::accent()).underlined()));
                 } else {
                     // Not a valid link, restore
                     current.push('[');
@@ -334,7 +334,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
     }
 
     if !current.is_empty() {
-        spans.push(Span::styled(current, Style::default().fg(theme::TEXT)));
+        spans.push(Span::styled(current, Style::default().fg(theme::text())));
     }
 
     if spans.is_empty() {

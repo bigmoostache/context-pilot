@@ -12,7 +12,7 @@ const MAX_DYNAMIC_PER_PAGE: usize = 10;
 
 pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     let _guard = crate::profile!("ui::sidebar");
-    let base_style = Style::default().bg(theme::BG_BASE);
+    let base_style = Style::default().bg(theme::bg_base());
 
     // Sidebar layout: context list + help hints
     let sidebar_layout = Layout::default()
@@ -27,7 +27,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     let mut lines: Vec<Line> = vec![
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("CONTEXT", Style::default().fg(theme::TEXT_MUTED).bold()),
+            Span::styled("CONTEXT", Style::default().fg(theme::text_muted()).bold()),
         ]),
         Line::from(""),
     ];
@@ -79,7 +79,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     // Add separator if there are dynamic contexts
     if total_dynamic > 0 {
         lines.push(Line::from(vec![
-            Span::styled(format!("  {:─<32}", ""), Style::default().fg(theme::BORDER_MUTED)),
+            Span::styled(format!("  {:─<32}", ""), Style::default().fg(theme::border_muted())),
         ]));
 
         // Render dynamic contexts for current page
@@ -93,7 +93,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
             lines.push(Line::from(vec![
                 Span::styled(
                     format!("  page {}/{}", current_page + 1, total_pages),
-                    Style::default().fg(theme::TEXT_MUTED),
+                    Style::default().fg(theme::text_muted()),
                 ),
             ]));
         }
@@ -102,7 +102,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     // Separator
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
-        Span::styled(format!(" {}", chars::HORIZONTAL.repeat(34)), Style::default().fg(theme::BORDER)),
+        Span::styled(format!(" {}", chars::HORIZONTAL.repeat(34)), Style::default().fg(theme::border())),
     ]));
 
     // Token usage bar - full width
@@ -116,11 +116,11 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
     // Color based on threshold
     let bar_color = if total_tokens >= threshold_tokens {
-        theme::ERROR
+        theme::error()
     } else if total_tokens as f64 >= threshold_tokens as f64 * 0.9 {
-        theme::WARNING
+        theme::warning()
     } else {
-        theme::ACCENT
+        theme::accent()
     };
 
     // Format: "12.5K / 140K threshold / 200K budget"
@@ -131,11 +131,11 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled(" ", base_style),
-        Span::styled(current, Style::default().fg(theme::TEXT).bold()),
-        Span::styled(" / ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled(threshold, Style::default().fg(theme::WARNING)),
-        Span::styled(" / ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled(budget, Style::default().fg(theme::ACCENT)),
+        Span::styled(current, Style::default().fg(theme::text()).bold()),
+        Span::styled(" / ", Style::default().fg(theme::text_muted())),
+        Span::styled(threshold, Style::default().fg(theme::warning())),
+        Span::styled(" / ", Style::default().fg(theme::text_muted())),
+        Span::styled(budget, Style::default().fg(theme::accent())),
     ]));
 
     // Build bar with threshold marker
@@ -150,11 +150,11 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         };
 
         let color = if i == threshold_pos {
-            theme::WARNING
+            theme::warning()
         } else if i < filled {
             bar_color
         } else {
-            theme::BG_ELEVATED
+            theme::bg_elevated()
         };
 
         bar_spans.push(Span::styled(char, Style::default().fg(color)));
@@ -170,23 +170,23 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("Tab", Style::default().fg(theme::ACCENT)),
-            Span::styled(" next panel", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("Tab", Style::default().fg(theme::accent())),
+            Span::styled(" next panel", Style::default().fg(theme::text_muted())),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("↑↓", Style::default().fg(theme::ACCENT)),
-            Span::styled(" scroll", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("↑↓", Style::default().fg(theme::accent())),
+            Span::styled(" scroll", Style::default().fg(theme::text_muted())),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("Ctrl+P", Style::default().fg(theme::ACCENT)),
-            Span::styled(" commands", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("Ctrl+P", Style::default().fg(theme::accent())),
+            Span::styled(" commands", Style::default().fg(theme::text_muted())),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),
-            Span::styled("Ctrl+Q", Style::default().fg(theme::ACCENT)),
-            Span::styled(" quit", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled("Ctrl+Q", Style::default().fg(theme::accent())),
+            Span::styled(" quit", Style::default().fg(theme::text_muted())),
         ]),
     ];
 
@@ -227,19 +227,19 @@ fn render_context_line(
     // Selected element: orange text, no background change
     // Loading elements: dimmed
     let name_color = if is_loading {
-        theme::TEXT_MUTED
+        theme::text_muted()
     } else if is_selected {
-        theme::ACCENT
+        theme::accent()
     } else {
-        theme::TEXT_SECONDARY
+        theme::text_secondary()
     };
-    let indicator_color = if is_selected { theme::ACCENT } else { theme::BG_BASE };
-    let tokens_color = if is_loading { theme::WARNING } else { theme::ACCENT_DIM };
+    let indicator_color = if is_selected { theme::accent() } else { theme::bg_base() };
+    let tokens_color = if is_loading { theme::warning() } else { theme::accent_dim() };
 
     lines.push(Line::from(vec![
         Span::styled(format!(" {}", indicator), Style::default().fg(indicator_color)),
-        Span::styled(format!(" {} ", shortcut), Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled(format!("{} ", icon), Style::default().fg(if is_selected { theme::ACCENT } else { theme::TEXT_MUTED })),
+        Span::styled(format!(" {} ", shortcut), Style::default().fg(theme::text_muted())),
+        Span::styled(format!("{} ", icon), Style::default().fg(if is_selected { theme::accent() } else { theme::text_muted() })),
         Span::styled(format!("{:<18}", name), Style::default().fg(name_color)),
         Span::styled(format!("{:>6}", tokens_or_spinner), Style::default().fg(tokens_color)),
         Span::styled(" ", base_style),

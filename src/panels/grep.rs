@@ -71,16 +71,16 @@ impl Panel for GrepPanel {
                 if parts.len() >= 3 {
                     Line::from(vec![
                         Span::styled("  ".to_string(), base_style),
-                        Span::styled(parts[0].to_string(), Style::default().fg(theme::ACCENT_DIM)),
-                        Span::styled(":".to_string(), Style::default().fg(theme::TEXT_MUTED)),
-                        Span::styled(parts[1].to_string(), Style::default().fg(theme::WARNING)),
-                        Span::styled(":".to_string(), Style::default().fg(theme::TEXT_MUTED)),
-                        Span::styled(parts[2].to_string(), Style::default().fg(theme::TEXT)),
+                        Span::styled(parts[0].to_string(), Style::default().fg(theme::accent_dim())),
+                        Span::styled(":".to_string(), Style::default().fg(theme::text_muted())),
+                        Span::styled(parts[1].to_string(), Style::default().fg(theme::warning())),
+                        Span::styled(":".to_string(), Style::default().fg(theme::text_muted())),
+                        Span::styled(parts[2].to_string(), Style::default().fg(theme::text())),
                     ])
                 } else {
                     Line::from(vec![
-                        Span::styled(format!("  {} ", chars::DOT), Style::default().fg(theme::ACCENT_DIM)),
-                        Span::styled(line.to_string(), Style::default().fg(theme::TEXT)),
+                        Span::styled(format!("  {} ", chars::DOT), Style::default().fg(theme::accent_dim())),
+                        Span::styled(line.to_string(), Style::default().fg(theme::text())),
                     ])
                 }
             })

@@ -8,7 +8,7 @@ use crate::state::State;
 use super::{theme, spinner};
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
-    let base_style = Style::default().bg(theme::BG_BASE).fg(theme::TEXT_MUTED);
+    let base_style = Style::default().bg(theme::bg_base()).fg(theme::text_muted());
     let spin = spinner::spinner(state.spinner_frame);
 
     let mut spans = vec![
@@ -19,7 +19,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     if state.is_streaming {
         spans.push(Span::styled(
             format!(" {} STREAMING ", spin),
-            Style::default().fg(theme::BG_BASE).bg(theme::SUCCESS).bold()
+            Style::default().fg(theme::bg_base()).bg(theme::success()).bold()
         ));
         spans.push(Span::styled(" ", base_style));
     }
@@ -27,7 +27,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     if state.waiting_for_panels {
         spans.push(Span::styled(
             format!(" {} LOADING FILES ", spin),
-            Style::default().fg(theme::BG_BASE).bg(theme::WARNING).bold()
+            Style::default().fg(theme::bg_base()).bg(theme::warning()).bold()
         ));
         spans.push(Span::styled(" ", base_style));
     }
@@ -35,7 +35,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     if state.pending_tldrs > 0 {
         spans.push(Span::styled(
             format!(" {} SUMMARIZING {} ", spin, state.pending_tldrs),
-            Style::default().fg(theme::BG_BASE).bg(theme::WARNING).bold()
+            Style::default().fg(theme::bg_base()).bg(theme::warning()).bold()
         ));
         spans.push(Span::styled(" ", base_style));
     }
@@ -48,14 +48,14 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     if loading_count > 0 {
         spans.push(Span::styled(
             format!(" {} LOADING {} ", spin, loading_count),
-            Style::default().fg(theme::BG_BASE).bg(theme::TEXT_MUTED).bold()
+            Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold()
         ));
         spans.push(Span::styled(" ", base_style));
     }
 
     // If nothing active, show READY
     if !state.is_streaming && state.pending_tldrs == 0 && loading_count == 0 {
-        spans.push(Span::styled(" READY ", Style::default().fg(theme::BG_BASE).bg(theme::TEXT_MUTED).bold()));
+        spans.push(Span::styled(" READY ", Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold()));
         spans.push(Span::styled(" ", base_style));
     }
 
@@ -68,12 +68,12 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     };
     spans.push(Span::styled(
         format!(" {} ", provider_name),
-        Style::default().fg(theme::BG_BASE).bg(theme::ACCENT_DIM).bold()
+        Style::default().fg(theme::bg_base()).bg(theme::accent_dim()).bold()
     ));
     spans.push(Span::styled(" ", base_style));
     spans.push(Span::styled(
         format!(" {} ", model_name),
-        Style::default().fg(theme::TEXT).bg(theme::BG_ELEVATED)
+        Style::default().fg(theme::text()).bg(theme::bg_elevated())
     ));
     spans.push(Span::styled(" ", base_style));
 

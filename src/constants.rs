@@ -128,36 +128,41 @@ pub const MESSAGES_DIR: &str = "messages";
 pub const TMUX_BG_SESSION: &str = "context-pilot-bg";
 
 // =============================================================================
-// THEME COLORS
+// THEME COLORS (loaded from active theme in yamls/themes.yaml)
 // =============================================================================
 
 pub mod theme {
     use ratatui::style::Color;
+    use crate::config::active_theme;
+
+    fn rgb(c: [u8; 3]) -> Color {
+        Color::Rgb(c[0], c[1], c[2])
+    }
 
     // Primary brand colors
-    pub const ACCENT: Color = Color::Rgb(218, 118, 89);        // #DA7659 - warm orange
-    pub const ACCENT_DIM: Color = Color::Rgb(178, 98, 69);     // Dimmed warm orange
-    pub const SUCCESS: Color = Color::Rgb(134, 188, 111);      // Soft green
-    pub const WARNING: Color = Color::Rgb(229, 192, 123);      // Warm amber
-    pub const ERROR: Color = Color::Rgb(200, 80, 80);          // Soft red for errors/deletions
+    pub fn accent() -> Color { rgb(active_theme().colors.accent) }
+    pub fn accent_dim() -> Color { rgb(active_theme().colors.accent_dim) }
+    pub fn success() -> Color { rgb(active_theme().colors.success) }
+    pub fn warning() -> Color { rgb(active_theme().colors.warning) }
+    pub fn error() -> Color { rgb(active_theme().colors.error) }
 
     // Text colors
-    pub const TEXT: Color = Color::Rgb(240, 240, 240);         // #f0f0f0 - primary text
-    pub const TEXT_SECONDARY: Color = Color::Rgb(180, 180, 180); // Secondary text
-    pub const TEXT_MUTED: Color = Color::Rgb(144, 144, 144);   // #909090 - muted text
+    pub fn text() -> Color { rgb(active_theme().colors.text) }
+    pub fn text_secondary() -> Color { rgb(active_theme().colors.text_secondary) }
+    pub fn text_muted() -> Color { rgb(active_theme().colors.text_muted) }
 
     // Background colors
-    pub const BG_BASE: Color = Color::Rgb(34, 34, 32);         // #222220 - darkest background
-    pub const BG_SURFACE: Color = Color::Rgb(51, 51, 49);      // #333331 - content panels
-    pub const BG_ELEVATED: Color = Color::Rgb(66, 66, 64);     // Elevated elements
+    pub fn bg_base() -> Color { rgb(active_theme().colors.bg_base) }
+    pub fn bg_surface() -> Color { rgb(active_theme().colors.bg_surface) }
+    pub fn bg_elevated() -> Color { rgb(active_theme().colors.bg_elevated) }
 
     // Border colors
-    pub const BORDER: Color = Color::Rgb(66, 66, 64);          // Subtle border
-    pub const BORDER_MUTED: Color = Color::Rgb(50, 50, 48);    // Very subtle separator
+    pub fn border() -> Color { rgb(active_theme().colors.border) }
+    pub fn border_muted() -> Color { rgb(active_theme().colors.border_muted) }
 
     // Role-specific colors
-    pub const USER: Color = Color::Rgb(218, 118, 89);          // Warm orange for user
-    pub const ASSISTANT: Color = Color::Rgb(144, 144, 144);    // Muted for assistant
+    pub fn user() -> Color { rgb(active_theme().colors.user) }
+    pub fn assistant() -> Color { rgb(active_theme().colors.assistant) }
 }
 
 // =============================================================================
@@ -173,42 +178,42 @@ pub mod chars {
 }
 
 // =============================================================================
-// ICONS / EMOJIS (loaded from yamls/icons.yaml via config module)
+// ICONS / EMOJIS (loaded from active theme in yamls/themes.yaml)
 // =============================================================================
 
 pub mod icons {
-    use crate::config::ICONS;
+    use crate::config::active_theme;
 
-    // Message types - accessor functions for lazy_static values
-    pub fn msg_user() -> &'static str { &ICONS.messages.user }
-    pub fn msg_assistant() -> &'static str { &ICONS.messages.assistant }
-    pub fn msg_tool_call() -> &'static str { &ICONS.messages.tool_call }
-    pub fn msg_tool_result() -> &'static str { &ICONS.messages.tool_result }
-    pub fn msg_error() -> &'static str { &ICONS.messages.error }
+    // Message types - accessor functions for active theme
+    pub fn msg_user() -> &'static str { &active_theme().messages.user }
+    pub fn msg_assistant() -> &'static str { &active_theme().messages.assistant }
+    pub fn msg_tool_call() -> &'static str { &active_theme().messages.tool_call }
+    pub fn msg_tool_result() -> &'static str { &active_theme().messages.tool_result }
+    pub fn msg_error() -> &'static str { &active_theme().messages.error }
 
     // Context panel types
-    pub fn ctx_system() -> &'static str { &ICONS.context.system }
-    pub fn ctx_conversation() -> &'static str { &ICONS.context.conversation }
-    pub fn ctx_tree() -> &'static str { &ICONS.context.tree }
-    pub fn ctx_todo() -> &'static str { &ICONS.context.todo }
-    pub fn ctx_memory() -> &'static str { &ICONS.context.memory }
-    pub fn ctx_overview() -> &'static str { &ICONS.context.overview }
-    pub fn ctx_file() -> &'static str { &ICONS.context.file }
-    pub fn ctx_glob() -> &'static str { &ICONS.context.glob }
-    pub fn ctx_grep() -> &'static str { &ICONS.context.grep }
-    pub fn ctx_tmux() -> &'static str { &ICONS.context.tmux }
-    pub fn ctx_git() -> &'static str { &ICONS.context.git }
-    pub fn ctx_scratchpad() -> &'static str { &ICONS.context.scratchpad }
+    pub fn ctx_system() -> &'static str { &active_theme().context.system }
+    pub fn ctx_conversation() -> &'static str { &active_theme().context.conversation }
+    pub fn ctx_tree() -> &'static str { &active_theme().context.tree }
+    pub fn ctx_todo() -> &'static str { &active_theme().context.todo }
+    pub fn ctx_memory() -> &'static str { &active_theme().context.memory }
+    pub fn ctx_overview() -> &'static str { &active_theme().context.overview }
+    pub fn ctx_file() -> &'static str { &active_theme().context.file }
+    pub fn ctx_glob() -> &'static str { &active_theme().context.glob }
+    pub fn ctx_grep() -> &'static str { &active_theme().context.grep }
+    pub fn ctx_tmux() -> &'static str { &active_theme().context.tmux }
+    pub fn ctx_git() -> &'static str { &active_theme().context.git }
+    pub fn ctx_scratchpad() -> &'static str { &active_theme().context.scratchpad }
 
     // Message status
-    pub fn status_full() -> &'static str { &ICONS.status.full }
-    pub fn status_summarized() -> &'static str { &ICONS.status.summarized }
-    pub fn status_deleted() -> &'static str { &ICONS.status.deleted }
+    pub fn status_full() -> &'static str { &active_theme().status.full }
+    pub fn status_summarized() -> &'static str { &active_theme().status.summarized }
+    pub fn status_deleted() -> &'static str { &active_theme().status.deleted }
 
     // Todo status
-    pub fn todo_pending() -> &'static str { &ICONS.todo.pending }
-    pub fn todo_in_progress() -> &'static str { &ICONS.todo.in_progress }
-    pub fn todo_done() -> &'static str { &ICONS.todo.done }
+    pub fn todo_pending() -> &'static str { &active_theme().todo.pending }
+    pub fn todo_in_progress() -> &'static str { &active_theme().todo.in_progress }
+    pub fn todo_done() -> &'static str { &active_theme().todo.done }
 }
 
 // =============================================================================

@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
+use std::sync::RwLock;
 
 // ============================================================================
 // Prompts Configuration
@@ -49,7 +50,7 @@ pub struct IconsConfig {
     pub todo: TodoIcons,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct MessageIcons {
     pub user: String,
     pub assistant: String,
@@ -58,7 +59,7 @@ pub struct MessageIcons {
     pub error: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ContextIcons {
     pub system: String,
     pub conversation: String,
@@ -74,14 +75,14 @@ pub struct ContextIcons {
     pub scratchpad: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct StatusIcons {
     pub full: String,
     pub summarized: String,
     pub deleted: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TodoIcons {
     pub pending: String,
     pub in_progress: String,
@@ -187,6 +188,54 @@ pub struct CommonLabels {
 }
 
 // ============================================================================
+// Theme Configuration
+// ============================================================================
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ThemesConfig {
+    pub themes: HashMap<String, Theme>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Theme {
+    pub name: String,
+    pub description: String,
+    pub messages: MessageIcons,
+    pub context: ContextIcons,
+    pub status: StatusIcons,
+    pub todo: TodoIcons,
+    pub colors: ThemeColors,
+}
+
+/// RGB color as [r, g, b] array
+pub type RgbColor = [u8; 3];
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ThemeColors {
+    pub accent: RgbColor,
+    pub accent_dim: RgbColor,
+    pub success: RgbColor,
+    pub warning: RgbColor,
+    pub error: RgbColor,
+    pub text: RgbColor,
+    pub text_secondary: RgbColor,
+    pub text_muted: RgbColor,
+    pub bg_base: RgbColor,
+    pub bg_surface: RgbColor,
+    pub bg_elevated: RgbColor,
+    pub border: RgbColor,
+    pub border_muted: RgbColor,
+    pub user: RgbColor,
+    pub assistant: RgbColor,
+}
+
+/// Default theme ID
+pub const DEFAULT_THEME: &str = "dnd";
+
+/// Available theme IDs in display order
+pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea", "space"];
+
+// ============================================================================
 // Loading Functions
 // ============================================================================
 
@@ -203,29 +252,68 @@ fn load_yaml<T: for<'de> Deserialize<'de>>(path: &str) -> T {
 
 lazy_static! {
     pub static ref PROMPTS: PromptsConfig = load_yaml("yamls/prompts.yaml");
-    pub static ref ICONS: IconsConfig = load_yaml("yamls/icons.yaml");
     pub static ref UI: UiConfig = load_yaml("yamls/ui.yaml");
+    pub static ref THEMES: ThemesConfig = load_yaml("yamls/themes.yaml");
+}
+
+/// Get a theme by ID, falling back to default if not found
+pub fn get_theme(theme_id: &str) -> &'static Theme {
+    THEMES.themes.get(theme_id)
+        .or_else(|| THEMES.themes.get(DEFAULT_THEME))
+        .expect("Default theme must exist")
+}
+
+// ============================================================================
+// Active Theme (Global State)
+// ============================================================================
+
+lazy_static! {
+    /// Global active theme ID - updated when state changes
+    static ref ACTIVE_THEME: RwLock<String> = RwLock::new(DEFAULT_THEME.to_string());
+}
+
+/// Set the active theme ID (call when state is loaded or theme changes)
+pub fn set_active_theme(theme_id: &str) {
+    if let Ok(mut theme) = ACTIVE_THEME.write() {
+        *theme = theme_id.to_string();
+    }
+}
+
+/// Get the currently active theme
+pub fn active_theme() -> &'static Theme {
+    let theme_id = ACTIVE_THEME.read()
+        .map(|t| t.clone())
+        .unwrap_or_else(|_| DEFAULT_THEME.to_string());
+    get_theme(&theme_id)
+}
+
+/// Get the active theme ID
+pub fn active_theme_id() -> String {
+    ACTIVE_THEME.read()
+        .map(|t| t.clone())
+        .unwrap_or_else(|_| DEFAULT_THEME.to_string())
 }
 
 // ============================================================================
 // Convenience Accessors
 // ============================================================================
 
-/// Get icon for a context type
+/// Get icon for a context type from active theme
 pub fn context_icon(context_type: &str) -> &'static str {
+    let theme = active_theme();
     match context_type {
-        "system" => &ICONS.context.system,
-        "conversation" => &ICONS.context.conversation,
-        "tree" => &ICONS.context.tree,
-        "todo" => &ICONS.context.todo,
-        "memory" => &ICONS.context.memory,
-        "overview" => &ICONS.context.overview,
-        "file" => &ICONS.context.file,
-        "glob" => &ICONS.context.glob,
-        "grep" => &ICONS.context.grep,
-        "tmux" => &ICONS.context.tmux,
-        "git" => &ICONS.context.git,
-        "scratchpad" => &ICONS.context.scratchpad,
+        "system" => &theme.context.system,
+        "conversation" => &theme.context.conversation,
+        "tree" => &theme.context.tree,
+        "todo" => &theme.context.todo,
+        "memory" => &theme.context.memory,
+        "overview" => &theme.context.overview,
+        "file" => &theme.context.file,
+        "glob" => &theme.context.glob,
+        "grep" => &theme.context.grep,
+        "tmux" => &theme.context.tmux,
+        "git" => &theme.context.git,
+        "scratchpad" => &theme.context.scratchpad,
         _ => "?",
     }
 }

@@ -178,7 +178,7 @@ impl CommandPalette {
 
         // Background fill
         let bg_block = Block::default()
-            .style(Style::default().bg(theme::BG_SURFACE));
+            .style(Style::default().bg(theme::bg_surface()));
         frame.render_widget(bg_block, palette_area);
 
         // Split area: input line + results + bottom border
@@ -197,11 +197,11 @@ impl CommandPalette {
 
         let input_display = if self.query.is_empty() {
             vec![
-                Span::styled(" > ", Style::default().fg(theme::ACCENT)),
-                Span::styled("Type to search...", Style::default().fg(theme::TEXT_MUTED)),
+                Span::styled(" > ", Style::default().fg(theme::accent())),
+                Span::styled("Type to search...", Style::default().fg(theme::text_muted())),
                 Span::styled(
                     format!("{:>width$}", esc_hint, width = available_width + esc_hint.len() - 17),
-                    Style::default().fg(theme::TEXT_MUTED)
+                    Style::default().fg(theme::text_muted())
                 ),
             ]
         } else {
@@ -209,19 +209,19 @@ impl CommandPalette {
             let query_len = before.len() + after.len();
             let padding = available_width.saturating_sub(query_len);
             vec![
-                Span::styled(" > ", Style::default().fg(theme::ACCENT)),
-                Span::styled(before.to_string(), Style::default().fg(theme::TEXT)),
-                Span::styled("│", Style::default().fg(theme::ACCENT)), // Cursor
-                Span::styled(after.to_string(), Style::default().fg(theme::TEXT)),
+                Span::styled(" > ", Style::default().fg(theme::accent())),
+                Span::styled(before.to_string(), Style::default().fg(theme::text())),
+                Span::styled("│", Style::default().fg(theme::accent())), // Cursor
+                Span::styled(after.to_string(), Style::default().fg(theme::text())),
                 Span::styled(
                     format!("{:>width$}", esc_hint, width = padding + esc_hint.len()),
-                    Style::default().fg(theme::TEXT_MUTED)
+                    Style::default().fg(theme::text_muted())
                 ),
             ]
         };
 
         let input_line = Paragraph::new(Line::from(input_display))
-            .style(Style::default().bg(theme::BG_SURFACE));
+            .style(Style::default().bg(theme::bg_surface()));
         frame.render_widget(input_line, chunks[0]);
 
         // Render filtered results
@@ -235,15 +235,15 @@ impl CommandPalette {
         for (i, cmd) in self.filtered_commands.iter().enumerate().skip(visible_start).take(max_visible_items) {
             let is_selected = i == self.selected;
             let (prefix, style) = if is_selected {
-                (" > ", Style::default().fg(theme::ACCENT).bg(theme::BG_ELEVATED))
+                (" > ", Style::default().fg(theme::accent()).bg(theme::bg_elevated()))
             } else {
-                ("   ", Style::default().fg(theme::TEXT_SECONDARY).bg(theme::BG_SURFACE))
+                ("   ", Style::default().fg(theme::text_secondary()).bg(theme::bg_surface()))
             };
 
             let desc_style = if is_selected {
-                Style::default().fg(theme::TEXT_MUTED).bg(theme::BG_ELEVATED)
+                Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())
             } else {
-                Style::default().fg(theme::TEXT_MUTED).bg(theme::BG_SURFACE)
+                Style::default().fg(theme::text_muted()).bg(theme::bg_surface())
             };
 
             // Pad to full width for consistent highlight
@@ -255,9 +255,9 @@ impl CommandPalette {
                 Span::styled(&cmd.label, style),
                 Span::styled(format!("  {}", cmd.description), desc_style),
                 Span::styled(" ".repeat(padding), if is_selected {
-                    Style::default().bg(theme::BG_ELEVATED)
+                    Style::default().bg(theme::bg_elevated())
                 } else {
-                    Style::default().bg(theme::BG_SURFACE)
+                    Style::default().bg(theme::bg_surface())
                 }),
             ]));
         }
@@ -265,20 +265,20 @@ impl CommandPalette {
         if result_lines.is_empty() {
             result_lines.push(Line::from(Span::styled(
                 "   No matching commands",
-                Style::default().fg(theme::TEXT_MUTED),
+                Style::default().fg(theme::text_muted()),
             )));
         }
 
         let results = Paragraph::new(result_lines)
-            .style(Style::default().bg(theme::BG_SURFACE));
+            .style(Style::default().bg(theme::bg_surface()));
         frame.render_widget(results, chunks[1]);
 
         // Bottom border
         let border_line = "─".repeat(width as usize);
         let border = Paragraph::new(Line::from(Span::styled(
             border_line,
-            Style::default().fg(theme::BORDER),
-        ))).style(Style::default().bg(theme::BG_SURFACE));
+            Style::default().fg(theme::border()),
+        ))).style(Style::default().bg(theme::bg_surface()));
         frame.render_widget(border, chunks[2]);
     }
 }

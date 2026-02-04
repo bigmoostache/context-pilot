@@ -107,6 +107,9 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
             LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama31_8b)),
             _ => Some(Action::None),
         }
+        // Theme selection - t/T to cycle through themes
+        KeyCode::Char('t') => Some(Action::ConfigNextTheme),
+        KeyCode::Char('T') => Some(Action::ConfigPrevTheme),
         // Up/Down select which bar to edit
         KeyCode::Up => Some(Action::ConfigSelectPrevBar),
         KeyCode::Down => Some(Action::ConfigSelectNextBar),

@@ -76,16 +76,16 @@ impl Panel for FilePanel {
             for (i, line) in content.lines().enumerate() {
                 let line_num = i + 1;
                 text.push(Line::from(vec![
-                    Span::styled(format!(" {:4} ", line_num), Style::default().fg(theme::TEXT_MUTED).bg(theme::BG_BASE)),
+                    Span::styled(format!(" {:4} ", line_num), Style::default().fg(theme::text_muted()).bg(theme::bg_base())),
                     Span::styled(" ", base_style),
-                    Span::styled(line.to_string(), Style::default().fg(theme::TEXT)),
+                    Span::styled(line.to_string(), Style::default().fg(theme::text())),
                 ]));
             }
         } else {
             for (i, spans) in highlighted.iter().enumerate() {
                 let line_num = i + 1;
                 let mut line_spans = vec![
-                    Span::styled(format!(" {:4} ", line_num), Style::default().fg(theme::TEXT_MUTED).bg(theme::BG_BASE)),
+                    Span::styled(format!(" {:4} ", line_num), Style::default().fg(theme::text_muted()).bg(theme::bg_base())),
                     Span::styled(" ", base_style),
                 ];
 

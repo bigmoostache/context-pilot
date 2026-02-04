@@ -79,11 +79,11 @@ impl ConversationPanel {
                 };
 
                 lines.push(Line::from(vec![
-                    Span::styled(format!("{} ", icons::msg_tool_call()), Style::default().fg(theme::SUCCESS)),
-                    Span::styled(padded_id.clone(), Style::default().fg(theme::SUCCESS).bold()),
+                    Span::styled(format!("{} ", icons::msg_tool_call()), Style::default().fg(theme::success())),
+                    Span::styled(padded_id.clone(), Style::default().fg(theme::success()).bold()),
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled(tool_use.name.clone(), Style::default().fg(theme::TEXT)),
-                    Span::styled(params_str, Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(tool_use.name.clone(), Style::default().fg(theme::text())),
+                    Span::styled(params_str, Style::default().fg(theme::text_muted())),
                 ]));
             }
             lines.push(Line::from(""));
@@ -94,9 +94,9 @@ impl ConversationPanel {
         if msg.message_type == MessageType::ToolResult {
             for result in &msg.tool_results {
                 let (status_icon, status_color) = if result.is_error {
-                    (icons::msg_error(), theme::WARNING)
+                    (icons::msg_error(), theme::warning())
                 } else {
-                    (icons::msg_tool_result(), theme::SUCCESS)
+                    (icons::msg_tool_result(), theme::success())
                 };
 
                 let prefix_width = 8;
@@ -118,13 +118,13 @@ impl ConversationPanel {
                                 Span::styled(format!("{} ", status_icon), Style::default().fg(status_color)),
                                 Span::styled(padded_id.clone(), Style::default().fg(status_color).bold()),
                                 Span::styled(" ".to_string(), base_style),
-                                Span::styled(wrapped_line, Style::default().fg(theme::TEXT_SECONDARY)),
+                                Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
                             ]));
                             is_first = false;
                         } else {
                             lines.push(Line::from(vec![
                                 Span::styled(" ".repeat(prefix_width), base_style),
-                                Span::styled(wrapped_line, Style::default().fg(theme::TEXT_SECONDARY)),
+                                Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
                             ]));
                         }
                     }
@@ -136,9 +136,9 @@ impl ConversationPanel {
 
         // Regular text message
         let (role_icon, role_color) = if msg.role == "user" {
-            (icons::msg_user(), theme::USER)
+            (icons::msg_user(), theme::user())
         } else {
-            (icons::msg_assistant(), theme::ASSISTANT)
+            (icons::msg_assistant(), theme::assistant())
         };
 
         let status_icon = match msg.status {
@@ -161,15 +161,15 @@ impl ConversationPanel {
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                     Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                    Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled("...".to_string(), Style::default().fg(theme::TEXT_MUTED).italic()),
+                    Span::styled("...".to_string(), Style::default().fg(theme::text_muted()).italic()),
                 ]));
             } else {
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                     Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                    Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                 ]));
             }
         } else {
@@ -210,7 +210,7 @@ impl ConversationPanel {
                                 let mut line_spans = vec![
                                     Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                                     Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                                    Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                                    Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                                     Span::styled(" ".to_string(), base_style),
                                 ];
                                 line_spans.extend(row_spans);
@@ -238,7 +238,7 @@ impl ConversationPanel {
                             let mut line_spans = vec![
                                 Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                                 Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                                Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                                Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                                 Span::styled(" ".to_string(), base_style),
                             ];
                             line_spans.extend(md_spans);
@@ -261,15 +261,15 @@ impl ConversationPanel {
                             lines.push(Line::from(vec![
                                 Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                                 Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                                Span::styled(status_icon.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                                Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
                                 Span::styled(" ".to_string(), base_style),
-                                Span::styled(line_text.clone(), Style::default().fg(theme::TEXT)),
+                                Span::styled(line_text.clone(), Style::default().fg(theme::text())),
                             ]));
                             is_first_line = false;
                         } else {
                             lines.push(Line::from(vec![
                                 Span::styled(" ".repeat(prefix_width), base_style),
-                                Span::styled(line_text.clone(), Style::default().fg(theme::TEXT)),
+                                Span::styled(line_text.clone(), Style::default().fg(theme::text())),
                             ]));
                         }
                     }
@@ -281,7 +281,7 @@ impl ConversationPanel {
         if msg.status == MessageStatus::Summarized {
             lines.push(Line::from(vec![
                 Span::styled(" ".repeat(prefix_width), base_style),
-                Span::styled(" TL;DR ".to_string(), Style::default().fg(theme::BG_BASE).bg(theme::WARNING)),
+                Span::styled(" TL;DR ".to_string(), Style::default().fg(theme::bg_base()).bg(theme::warning())),
             ]));
         }
 
@@ -291,7 +291,7 @@ impl ConversationPanel {
                 Span::styled(" ".repeat(prefix_width), base_style),
                 Span::styled(
                     format!("[in:{} out:{}]", msg.input_tokens, msg.content_token_count),
-                    Style::default().fg(theme::TEXT_MUTED).italic()
+                    Style::default().fg(theme::text_muted()).italic()
                 ),
             ]));
         }
@@ -304,7 +304,7 @@ impl ConversationPanel {
     fn render_input(input: &str, cursor: usize, viewport_width: u16, base_style: Style) -> Vec<Line<'static>> {
         let mut lines: Vec<Line<'static>> = Vec::new();
         let role_icon = icons::msg_user();
-        let role_color = theme::USER;
+        let role_color = theme::user();
         let prefix_width = 8;
         let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
         let cursor_char = "▎";
@@ -321,7 +321,7 @@ impl ConversationPanel {
                 Span::styled(format!("{} ", role_icon), Style::default().fg(role_color)),
                 Span::styled("... ", Style::default().fg(role_color).dim()),
                 Span::styled(" ", base_style),
-                Span::styled(cursor_char, Style::default().fg(theme::ACCENT)),
+                Span::styled(cursor_char, Style::default().fg(theme::accent())),
             ]));
         } else {
             let mut is_first_line = true;
@@ -338,12 +338,12 @@ impl ConversationPanel {
                     let spans = if line_text.contains(cursor_char) {
                         let parts: Vec<&str> = line_text.splitn(2, cursor_char).collect();
                         vec![
-                            Span::styled(parts.get(0).unwrap_or(&"").to_string(), Style::default().fg(theme::TEXT)),
-                            Span::styled(cursor_char, Style::default().fg(theme::ACCENT).bold()),
-                            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(theme::TEXT)),
+                            Span::styled(parts.get(0).unwrap_or(&"").to_string(), Style::default().fg(theme::text())),
+                            Span::styled(cursor_char, Style::default().fg(theme::accent()).bold()),
+                            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(theme::text())),
                         ]
                     } else {
-                        vec![Span::styled(line_text.clone(), Style::default().fg(theme::TEXT))]
+                        vec![Span::styled(line_text.clone(), Style::default().fg(theme::text()))]
                     };
 
                     if is_first_line {
@@ -436,7 +436,7 @@ impl ConversationPanel {
             text.push(Line::from(""));
             text.push(Line::from(vec![
                 Span::styled("  Start a conversation by typing below".to_string(),
-                    Style::default().fg(theme::TEXT_MUTED).italic()),
+                    Style::default().fg(theme::text_muted()).italic()),
             ]));
         } else {
             let last_msg_id = state.messages.last().map(|m| m.id.clone());
@@ -697,7 +697,7 @@ impl Panel for ConversationPanel {
 
     /// Override render to add scrollbar and auto-scroll behavior
     fn render(&self, frame: &mut Frame, state: &mut State, area: Rect) {
-        let base_style = Style::default().bg(theme::BG_SURFACE);
+        let base_style = Style::default().bg(theme::bg_surface());
         let title = self.title(state);
 
         let inner_area = Rect::new(
@@ -710,9 +710,9 @@ impl Panel for ConversationPanel {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(Style::default().fg(theme::BORDER))
+            .border_style(Style::default().fg(theme::border()))
             .style(base_style)
-            .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::ACCENT).bold()));
+            .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::accent()).bold()));
 
         let content_area = block.inner(inner_area);
         frame.render_widget(block, inner_area);
@@ -756,8 +756,8 @@ impl Panel for ConversationPanel {
         if content_height > viewport_height {
             let scrollbar = Scrollbar::default()
                 .orientation(ScrollbarOrientation::VerticalRight)
-                .style(Style::default().fg(theme::BG_ELEVATED))
-                .thumb_style(Style::default().fg(theme::ACCENT_DIM));
+                .style(Style::default().fg(theme::bg_elevated()))
+                .thumb_style(Style::default().fg(theme::accent_dim()));
 
             let mut scrollbar_state = ScrollbarState::new(max_scroll as usize)
                 .position(state.scroll_offset.round() as usize);

@@ -85,7 +85,7 @@ impl Panel for TodoPanel {
         if state.todos.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("No todos".to_string(), Style::default().fg(theme::TEXT_MUTED).italic()),
+                Span::styled("No todos".to_string(), Style::default().fg(theme::text_muted()).italic()),
             ]));
         } else {
             fn collect_todo_lines(
@@ -106,24 +106,24 @@ impl Panel for TodoPanel {
             for (indent, id, name, status, description) in todo_lines {
                 let prefix = "  ".repeat(indent);
                 let (status_char, status_color) = match status {
-                    TodoStatus::Pending => (' ', theme::TEXT_MUTED),
-                    TodoStatus::InProgress => ('~', theme::WARNING),
-                    TodoStatus::Done => ('x', theme::SUCCESS),
+                    TodoStatus::Pending => (' ', theme::text_muted()),
+                    TodoStatus::InProgress => ('~', theme::warning()),
+                    TodoStatus::Done => ('x', theme::success()),
                 };
 
                 let name_style = if status == TodoStatus::Done {
-                    Style::default().fg(theme::TEXT_MUTED)
+                    Style::default().fg(theme::text_muted())
                 } else {
-                    Style::default().fg(theme::TEXT)
+                    Style::default().fg(theme::text())
                 };
 
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
                     Span::styled(prefix.clone(), base_style),
-                    Span::styled("[".to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled("[".to_string(), Style::default().fg(theme::text_muted())),
                     Span::styled(format!("{}", status_char), Style::default().fg(status_color)),
-                    Span::styled("] ".to_string(), Style::default().fg(theme::TEXT_MUTED)),
-                    Span::styled(id, Style::default().fg(theme::ACCENT_DIM)),
+                    Span::styled("] ".to_string(), Style::default().fg(theme::text_muted())),
+                    Span::styled(id, Style::default().fg(theme::accent_dim())),
                     Span::styled(" ".to_string(), base_style),
                     Span::styled(name, name_style),
                 ]));
@@ -133,7 +133,7 @@ impl Panel for TodoPanel {
                     text.push(Line::from(vec![
                         Span::styled(" ".to_string(), base_style),
                         Span::styled(desc_prefix, base_style),
-                        Span::styled(description, Style::default().fg(theme::TEXT_SECONDARY)),
+                        Span::styled(description, Style::default().fg(theme::text_secondary())),
                     ]));
                 }
             }

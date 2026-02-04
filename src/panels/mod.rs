@@ -120,7 +120,7 @@ pub trait Panel {
 
     /// Render the panel to the frame (default implementation)
     fn render(&self, frame: &mut Frame, state: &mut State, area: Rect) {
-        let base_style = Style::default().bg(theme::BG_SURFACE);
+        let base_style = Style::default().bg(theme::bg_surface());
         let title = self.title(state);
 
         let inner_area = Rect::new(
@@ -133,9 +133,9 @@ pub trait Panel {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(Style::default().fg(theme::BORDER))
+            .border_style(Style::default().fg(theme::border()))
             .style(base_style)
-            .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::ACCENT).bold()));
+            .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::accent()).bold()));
 
         let content_area = block.inner(inner_area);
         frame.render_widget(block, inner_area);

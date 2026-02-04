@@ -92,25 +92,25 @@ impl Panel for TmuxPanel {
         if !description.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(description, Style::default().fg(theme::TEXT_MUTED).italic()),
+                Span::styled(description, Style::default().fg(theme::text_muted()).italic()),
             ]));
         }
         if let Some(ref keys) = last_keys {
             text.push(Line::from(vec![
-                Span::styled(" last: ".to_string(), Style::default().fg(theme::TEXT_MUTED)),
-                Span::styled(keys.clone(), Style::default().fg(theme::ACCENT_DIM)),
+                Span::styled(" last: ".to_string(), Style::default().fg(theme::text_muted())),
+                Span::styled(keys.clone(), Style::default().fg(theme::accent_dim())),
             ]));
         }
         if !text.is_empty() {
             text.push(Line::from(vec![
-                Span::styled(format!(" {}", chars::HORIZONTAL.repeat(40)), Style::default().fg(theme::BORDER)),
+                Span::styled(format!(" {}", chars::HORIZONTAL.repeat(40)), Style::default().fg(theme::border())),
             ]));
         }
 
         for line in content.lines() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(line.to_string(), Style::default().fg(theme::TEXT)),
+                Span::styled(line.to_string(), Style::default().fg(theme::text())),
             ]));
         }
 

@@ -24,7 +24,7 @@ pub fn render(frame: &mut Frame, state: &mut State) {
 
     // Fill base background
     frame.render_widget(
-        Block::default().style(Style::default().bg(theme::BG_BASE)),
+        Block::default().style(Style::default().bg(theme::bg_base())),
         area
     );
 
@@ -107,20 +107,20 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
 
     lines.push(Line::from(vec![
         Span::styled(format!(" FPS: {:.0}", fps), Style::default().fg(fps_color).bold()),
-        Span::styled(format!("  Frame: {:.1}ms avg  {:.1}ms max", snapshot.frame_avg_ms, snapshot.frame_max_ms), Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(format!("  Frame: {:.1}ms avg  {:.1}ms max", snapshot.frame_avg_ms, snapshot.frame_max_ms), Style::default().fg(theme::text_muted())),
     ]));
 
     // CPU and RAM line
     let cpu_color = if snapshot.cpu_usage < 25.0 {
-        theme::SUCCESS
+        theme::success()
     } else if snapshot.cpu_usage < 50.0 {
-        theme::WARNING
+        theme::warning()
     } else {
-        theme::ERROR
+        theme::error()
     };
     lines.push(Line::from(vec![
         Span::styled(format!(" CPU: {:.1}%", snapshot.cpu_usage), Style::default().fg(cpu_color)),
-        Span::styled(format!("  RAM: {:.1} MB", snapshot.memory_mb), Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(format!("  RAM: {:.1} MB", snapshot.memory_mb), Style::default().fg(theme::text_muted())),
     ]));
     lines.push(Line::from(""));
 
@@ -134,15 +134,15 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
 
     // Separator
     lines.push(Line::from(vec![
-        Span::styled(format!(" {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::BORDER)),
+        Span::styled(format!(" {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
     ]));
 
     // Operation table header
     lines.push(Line::from(vec![
         Span::styled(" ", Style::default()),
-        Span::styled(format!("{:<26}", "Operation"), Style::default().fg(theme::TEXT_SECONDARY)),
-        Span::styled(format!("{:>10}", "Mean"), Style::default().fg(theme::TEXT_SECONDARY)),
-        Span::styled(format!("{:>10}", "Std"), Style::default().fg(theme::TEXT_SECONDARY)),
+        Span::styled(format!("{:<26}", "Operation"), Style::default().fg(theme::text_secondary())),
+        Span::styled(format!("{:>10}", "Mean"), Style::default().fg(theme::text_secondary())),
+        Span::styled(format!("{:>10}", "Std"), Style::default().fg(theme::text_secondary())),
     ]));
 
     // Calculate total for percentage (use total time for hotspot detection)
@@ -157,24 +157,24 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
         let marker = if is_hotspot { "!" } else { " " };
 
         let name_style = if is_hotspot {
-            Style::default().fg(theme::WARNING).bold()
+            Style::default().fg(theme::warning()).bold()
         } else {
-            Style::default().fg(theme::TEXT)
+            Style::default().fg(theme::text())
         };
 
         // Color mean based on frame time budget
         let mean_color = frame_time_color(op.mean_ms);
         // Color std based on variability (high std = orange/red)
         let std_color = if op.std_ms < 1.0 {
-            theme::SUCCESS
+            theme::success()
         } else if op.std_ms < 5.0 {
-            theme::WARNING
+            theme::warning()
         } else {
-            theme::ERROR
+            theme::error()
         };
 
         lines.push(Line::from(vec![
-            Span::styled(marker, Style::default().fg(theme::WARNING)),
+            Span::styled(marker, Style::default().fg(theme::warning())),
             Span::styled(format!("{:<26}", name), name_style),
             Span::styled(format!("{:>9.2}ms", op.mean_ms), Style::default().fg(mean_color)),
             Span::styled(format!("{:>9.2}ms", op.std_ms), Style::default().fg(std_color)),
@@ -183,22 +183,22 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
 
     // Footer
     lines.push(Line::from(vec![
-        Span::styled(format!(" {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::BORDER)),
+        Span::styled(format!(" {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
     ]));
     lines.push(Line::from(vec![
-        Span::styled(" F12", Style::default().fg(theme::ACCENT)),
-        Span::styled(" toggle  ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled("!", Style::default().fg(theme::WARNING)),
-        Span::styled(" hotspot (>30%)", Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(" F12", Style::default().fg(theme::accent())),
+        Span::styled(" toggle  ", Style::default().fg(theme::text_muted())),
+        Span::styled("!", Style::default().fg(theme::warning())),
+        Span::styled(" hotspot (>30%)", Style::default().fg(theme::text_muted())),
     ]));
 
     // Render
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(theme::BORDER))
+        .border_style(Style::default().fg(theme::border()))
         .style(Style::default().bg(Color::Rgb(20, 20, 28)))
-        .title(Span::styled(" Perf ", Style::default().fg(theme::ACCENT).bold()));
+        .title(Span::styled(" Perf ", Style::default().fg(theme::accent()).bold()));
 
     let paragraph = Paragraph::new(lines).block(block);
     frame.render_widget(Clear, overlay_area);
@@ -207,11 +207,11 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
 
 fn frame_time_color(ms: f64) -> Color {
     if ms < FRAME_BUDGET_60FPS {
-        theme::SUCCESS
+        theme::success()
     } else if ms < FRAME_BUDGET_30FPS {
-        theme::WARNING
+        theme::warning()
     } else {
-        theme::ERROR
+        theme::error()
     }
 }
 
@@ -221,17 +221,17 @@ fn render_budget_bar(current_ms: f64, label: &str, budget_ms: f64) -> Line<'stat
     let filled = ((pct / 100.0) * bar_width as f64) as usize;
 
     let color = if pct <= 80.0 {
-        theme::SUCCESS
+        theme::success()
     } else if pct <= 100.0 {
-        theme::WARNING
+        theme::warning()
     } else {
-        theme::ERROR
+        theme::error()
     };
 
     Line::from(vec![
-        Span::styled(format!(" {:<6}", label), Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(format!(" {:<6}", label), Style::default().fg(theme::text_muted())),
         Span::styled(chars::BLOCK_FULL.repeat(filled.min(bar_width)), Style::default().fg(color)),
-        Span::styled(chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)), Style::default().fg(theme::BG_ELEVATED)),
+        Span::styled(chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)), Style::default().fg(theme::bg_elevated())),
         Span::styled(format!(" {:>5.0}%", pct), Style::default().fg(color)),
     ])
 }
@@ -241,8 +241,8 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
 
     if values.is_empty() {
         return Line::from(vec![
-            Span::styled(" Recent: ", Style::default().fg(theme::TEXT_MUTED)),
-            Span::styled("(collecting...)", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(" Recent: ", Style::default().fg(theme::text_muted())),
+            Span::styled("(collecting...)", Style::default().fg(theme::text_muted())),
         ]);
     }
 
@@ -256,8 +256,8 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
         .collect();
 
     Line::from(vec![
-        Span::styled(" Recent: ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled(sparkline, Style::default().fg(theme::ACCENT)),
+        Span::styled(" Recent: ", Style::default().fg(theme::text_muted())),
+        Span::styled(sparkline, Style::default().fg(theme::accent())),
     ])
 }
 
@@ -274,7 +274,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
 
     // Center the overlay
     let overlay_width = 56u16;
-    let overlay_height = 34u16;
+    let overlay_height = 45u16;
     let x = area.width.saturating_sub(overlay_width) / 2;
     let y = area.height.saturating_sub(overlay_height) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
@@ -283,7 +283,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
-        Span::styled("  LLM Provider", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+        Span::styled("  LLM Provider", Style::default().fg(theme::text_secondary()).bold()),
     ]));
     lines.push(Line::from(""));
 
@@ -301,14 +301,14 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         let check = if is_selected { "[x]" } else { "[ ]" };
 
         let style = if is_selected {
-            Style::default().fg(theme::ACCENT).bold()
+            Style::default().fg(theme::accent()).bold()
         } else {
-            Style::default().fg(theme::TEXT)
+            Style::default().fg(theme::text())
         };
 
         lines.push(Line::from(vec![
-            Span::styled(format!("  {} ", indicator), Style::default().fg(theme::ACCENT)),
-            Span::styled(format!("{} ", key), Style::default().fg(theme::WARNING)),
+            Span::styled(format!("  {} ", indicator), Style::default().fg(theme::accent())),
+            Span::styled(format!("{} ", key), Style::default().fg(theme::warning())),
             Span::styled(format!("{} ", check), style),
             Span::styled(name.to_string(), style),
         ]));
@@ -316,13 +316,13 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
-        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::BORDER)),
+        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
     ]));
     lines.push(Line::from(""));
 
     // Model selection based on current provider
     lines.push(Line::from(vec![
-        Span::styled("  Model", Style::default().fg(theme::TEXT_SECONDARY).bold()),
+        Span::styled("  Model", Style::default().fg(theme::text_secondary()).bold()),
     ]));
     lines.push(Line::from(""));
 
@@ -365,20 +365,20 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
         let spinner = spinner_chars[(state.spinner_frame as usize) % spinner_chars.len()];
         lines.push(Line::from(vec![
-            Span::styled(format!("  {} ", spinner), Style::default().fg(theme::ACCENT)),
-            Span::styled("Checking API...", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(format!("  {} ", spinner), Style::default().fg(theme::accent())),
+            Span::styled("Checking API...", Style::default().fg(theme::text_muted())),
         ]));
     } else if let Some(result) = &state.api_check_result {
         let (icon, color, msg) = if result.all_ok() {
-            ("✓", theme::SUCCESS, "API OK")
+            ("✓", theme::success(), "API OK")
         } else if let Some(err) = &result.error {
-            ("✗", theme::ERROR, err.as_str())
+            ("✗", theme::error(), err.as_str())
         } else {
             let mut issues = Vec::new();
             if !result.auth_ok { issues.push("auth"); }
             if !result.streaming_ok { issues.push("streaming"); }
             if !result.tools_ok { issues.push("tools"); }
-            ("!", theme::WARNING, if issues.is_empty() { "Unknown issue" } else { "Issues detected" })
+            ("!", theme::warning(), if issues.is_empty() { "Unknown issue" } else { "Issues detected" })
         };
         lines.push(Line::from(vec![
             Span::styled(format!("  {} ", icon), Style::default().fg(color)),
@@ -388,7 +388,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
-        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::BORDER)),
+        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
     ]));
     lines.push(Line::from(""));
 
@@ -413,36 +413,36 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         let is_selected = selected == idx;
         let indicator = if is_selected { ">" } else { " " };
         let label_style = if is_selected {
-            Style::default().fg(theme::ACCENT).bold()
+            Style::default().fg(theme::accent()).bold()
         } else {
-            Style::default().fg(theme::TEXT_SECONDARY).bold()
+            Style::default().fg(theme::text_secondary()).bold()
         };
-        let arrow_color = if is_selected { theme::ACCENT } else { theme::TEXT_MUTED };
+        let arrow_color = if is_selected { theme::accent() } else { theme::text_muted() };
 
         lines.push(Line::from(vec![
-            Span::styled(format!(" {} ", indicator), Style::default().fg(theme::ACCENT)),
+            Span::styled(format!(" {} ", indicator), Style::default().fg(theme::accent())),
             Span::styled(label.to_string(), label_style),
         ]));
         lines.push(Line::from(vec![
             Span::styled("   ◀ ", Style::default().fg(arrow_color)),
             Span::styled(chars::BLOCK_FULL.repeat(filled.min(bar_width)), Style::default().fg(bar_color)),
-            Span::styled(chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)), Style::default().fg(theme::BG_ELEVATED)),
+            Span::styled(chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)), Style::default().fg(theme::bg_elevated())),
             Span::styled(" ▶ ", Style::default().fg(arrow_color)),
-            Span::styled(format!("{}%", pct), Style::default().fg(theme::TEXT).bold()),
-            Span::styled(format!("  {} tok{}", format_tokens(tokens), extra.unwrap_or("")), Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(format!("{}%", pct), Style::default().fg(theme::text()).bold()),
+            Span::styled(format!("  {} tok{}", format_tokens(tokens), extra.unwrap_or("")), Style::default().fg(theme::text_muted())),
         ]));
     };
 
     // 1. Context Budget
     let budget_pct = (effective_budget as f64 / max_budget as f64 * 100.0) as usize;
     let budget_filled = ((effective_budget as f64 / max_budget as f64) * bar_width as f64) as usize;
-    render_bar(&mut lines, 0, "Context Budget", budget_pct, budget_filled, effective_budget, theme::SUCCESS, None);
+    render_bar(&mut lines, 0, "Context Budget", budget_pct, budget_filled, effective_budget, theme::success(), None);
 
     // 2. Cleaning Threshold
     let threshold_pct = (state.cleaning_threshold * 100.0) as usize;
     let threshold_tokens = state.cleaning_threshold_tokens();
     let threshold_filled = ((state.cleaning_threshold * bar_width as f32) as usize).min(bar_width);
-    render_bar(&mut lines, 1, "Clean Trigger", threshold_pct, threshold_filled, threshold_tokens, theme::WARNING, None);
+    render_bar(&mut lines, 1, "Clean Trigger", threshold_pct, threshold_filled, threshold_tokens, theme::warning(), None);
 
     // 3. Target Cleaning
     let target_pct = (state.cleaning_target_proportion * 100.0) as usize;
@@ -450,30 +450,70 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     let target_abs_pct = (state.cleaning_target() * 100.0) as usize;
     let target_filled = ((state.cleaning_target_proportion * bar_width as f32) as usize).min(bar_width);
     let extra = format!(" ({}%)", target_abs_pct);
-    render_bar(&mut lines, 2, "Clean Target", target_pct, target_filled, target_tokens, theme::ACCENT, Some(&extra));
+    render_bar(&mut lines, 2, "Clean Target", target_pct, target_filled, target_tokens, theme::accent(), Some(&extra));
 
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
-        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::BORDER)),
+        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
+    ]));
+    lines.push(Line::from(""));
+
+    // Theme selection
+    lines.push(Line::from(vec![
+        Span::styled("  Theme", Style::default().fg(theme::text_secondary()).bold()),
+    ]));
+    lines.push(Line::from(""));
+
+    // Show current theme with preview icons
+    {
+        use crate::config::{get_theme, THEME_ORDER};
+        let current_theme = get_theme(&state.active_theme);
+
+        // Show theme name and preview icons
+        lines.push(Line::from(vec![
+            Span::styled("   ◀ ", Style::default().fg(theme::accent())),
+            Span::styled(format!("{:<12}", current_theme.name), Style::default().fg(theme::accent()).bold()),
+            Span::styled(" ▶  ", Style::default().fg(theme::accent())),
+            Span::styled(format!("{} {} {} {}",
+                current_theme.messages.user,
+                current_theme.messages.assistant,
+                current_theme.context.tree,
+                current_theme.context.file,
+            ), Style::default().fg(theme::text())),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled(format!("     {}", current_theme.description), Style::default().fg(theme::text_muted())),
+        ]));
+
+        // Show position in theme list
+        let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
+        lines.push(Line::from(vec![
+            Span::styled(format!("     ({}/{})", current_idx + 1, THEME_ORDER.len()), Style::default().fg(theme::text_muted())),
+        ]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
     ]));
 
     // Help text
     lines.push(Line::from(vec![
         Span::styled("  ", Style::default()),
-        Span::styled("1-3", Style::default().fg(theme::WARNING)),
-        Span::styled(" provider  ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled("a-c", Style::default().fg(theme::WARNING)),
-        Span::styled(" model  ", Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled("↑↓◀▶", Style::default().fg(theme::WARNING)),
-        Span::styled(" adjust", Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled("1-4", Style::default().fg(theme::warning())),
+        Span::styled(" provider  ", Style::default().fg(theme::text_muted())),
+        Span::styled("a-d", Style::default().fg(theme::warning())),
+        Span::styled(" model  ", Style::default().fg(theme::text_muted())),
+        Span::styled("t", Style::default().fg(theme::warning())),
+        Span::styled(" theme", Style::default().fg(theme::text_muted())),
     ]));
 
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(theme::ACCENT))
-        .style(Style::default().bg(theme::BG_SURFACE))
-        .title(Span::styled(" Configuration ", Style::default().fg(theme::ACCENT).bold()));
+        .border_style(Style::default().fg(theme::accent()))
+        .style(Style::default().bg(theme::bg_surface()))
+        .title(Span::styled(" Configuration ", Style::default().fg(theme::accent()).bold()));
 
     let paragraph = Paragraph::new(lines).block(block);
     frame.render_widget(Clear, overlay_area);
@@ -485,9 +525,9 @@ fn render_model_line_with_info<M: crate::llms::ModelInfo>(lines: &mut Vec<Line>,
     let check = if is_selected { "[x]" } else { "[ ]" };
 
     let style = if is_selected {
-        Style::default().fg(theme::ACCENT).bold()
+        Style::default().fg(theme::accent()).bold()
     } else {
-        Style::default().fg(theme::TEXT)
+        Style::default().fg(theme::text())
     };
 
     // Format context window (e.g., "200K" or "2M")
@@ -502,11 +542,11 @@ fn render_model_line_with_info<M: crate::llms::ModelInfo>(lines: &mut Vec<Line>,
     let price_str = format!("${:.0}/${:.0}", model.input_price_per_mtok(), model.output_price_per_mtok());
 
     lines.push(Line::from(vec![
-        Span::styled(format!("  {} ", indicator), Style::default().fg(theme::ACCENT)),
-        Span::styled(format!("{} ", key), Style::default().fg(theme::WARNING)),
+        Span::styled(format!("  {} ", indicator), Style::default().fg(theme::accent())),
+        Span::styled(format!("{} ", key), Style::default().fg(theme::warning())),
         Span::styled(format!("{} ", check), style),
         Span::styled(format!("{:<12}", model.display_name()), style),
-        Span::styled(format!("{:>4} ", ctx_str), Style::default().fg(theme::TEXT_MUTED)),
-        Span::styled(price_str, Style::default().fg(theme::TEXT_MUTED)),
+        Span::styled(format!("{:>4} ", ctx_str), Style::default().fg(theme::text_muted())),
+        Span::styled(price_str, Style::default().fg(theme::text_muted())),
     ]));
 }

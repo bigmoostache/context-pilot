@@ -68,20 +68,20 @@ impl Panel for ScratchpadPanel {
         if state.scratchpad_cells.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("No scratchpad cells".to_string(), Style::default().fg(theme::TEXT_MUTED).italic()),
+                Span::styled("No scratchpad cells".to_string(), Style::default().fg(theme::text_muted()).italic()),
             ]));
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("Use scratchpad_create_cell to add notes".to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                Span::styled("Use scratchpad_create_cell to add notes".to_string(), Style::default().fg(theme::text_muted())),
             ]));
         } else {
             for cell in &state.scratchpad_cells {
                 // Cell header
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled(cell.id.clone(), Style::default().fg(theme::ACCENT).bold()),
+                    Span::styled(cell.id.clone(), Style::default().fg(theme::accent()).bold()),
                     Span::styled(" ", base_style),
-                    Span::styled(cell.title.clone(), Style::default().fg(theme::TEXT).bold()),
+                    Span::styled(cell.title.clone(), Style::default().fg(theme::text()).bold()),
                 ]));
 
                 // Cell content (show first few lines, truncated)
@@ -89,7 +89,7 @@ impl Panel for ScratchpadPanel {
                 for line in &lines {
                     text.push(Line::from(vec![
                         Span::styled("   ".to_string(), base_style),
-                        Span::styled(line.to_string(), Style::default().fg(theme::TEXT_SECONDARY)),
+                        Span::styled(line.to_string(), Style::default().fg(theme::text_secondary())),
                     ]));
                 }
 
@@ -98,7 +98,7 @@ impl Panel for ScratchpadPanel {
                 if total_lines > 5 {
                     text.push(Line::from(vec![
                         Span::styled("   ".to_string(), base_style),
-                        Span::styled(format!("... ({} more lines)", total_lines - 5), Style::default().fg(theme::TEXT_MUTED).italic()),
+                        Span::styled(format!("... ({} more lines)", total_lines - 5), Style::default().fg(theme::text_muted()).italic()),
                     ]));
                 }
 

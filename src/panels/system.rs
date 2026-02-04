@@ -23,32 +23,32 @@ impl Panel for SystemPanel {
         if let Some(active_id) = &state.active_system_id {
             if let Some(system) = state.systems.iter().find(|s| s.id == *active_id) {
                 lines.push(Line::from(vec![
-                    Span::styled("Active: ", Style::default().fg(theme::TEXT_MUTED)),
-                    Span::styled(format!("[{}] {}", system.id, system.name), Style::default().fg(theme::ACCENT)),
+                    Span::styled("Active: ", Style::default().fg(theme::text_muted())),
+                    Span::styled(format!("[{}] {}", system.id, system.name), Style::default().fg(theme::accent())),
                 ]));
                 lines.push(Line::from(""));
-                lines.push(Line::from(Span::styled(system.description.clone(), Style::default().fg(theme::TEXT_MUTED))));
+                lines.push(Line::from(Span::styled(system.description.clone(), Style::default().fg(theme::text_muted()))));
                 lines.push(Line::from(""));
                 for line in system.content.lines() {
-                    lines.push(Line::from(Span::styled(line.to_string(), Style::default().fg(theme::TEXT))));
+                    lines.push(Line::from(Span::styled(line.to_string(), Style::default().fg(theme::text()))));
                 }
             } else {
-                lines.push(Line::from(Span::styled("Active seed not found. Run ensure_default_seed().", Style::default().fg(theme::ERROR))));
+                lines.push(Line::from(Span::styled("Active seed not found. Run ensure_default_seed().", Style::default().fg(theme::error()))));
             }
         } else {
-            lines.push(Line::from(Span::styled("No active seed. Run ensure_default_seed().", Style::default().fg(theme::ERROR))));
+            lines.push(Line::from(Span::styled("No active seed. Run ensure_default_seed().", Style::default().fg(theme::error()))));
         }
 
         if !state.systems.is_empty() {
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled("Available systems:", Style::default().fg(theme::TEXT_MUTED))));
+            lines.push(Line::from(Span::styled("Available systems:", Style::default().fg(theme::text_muted()))));
             for system in &state.systems {
                 let marker = if Some(&system.id) == state.active_system_id.as_ref() { "● " } else { "  " };
                 lines.push(Line::from(vec![
-                    Span::styled(marker, Style::default().fg(theme::ACCENT)),
-                    Span::styled(format!("[{}] ", system.id), Style::default().fg(theme::TEXT_MUTED)),
-                    Span::styled(system.name.clone(), Style::default().fg(theme::TEXT)),
-                    Span::styled(format!(" - {}", system.description), Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(marker, Style::default().fg(theme::accent())),
+                    Span::styled(format!("[{}] ", system.id), Style::default().fg(theme::text_muted())),
+                    Span::styled(system.name.clone(), Style::default().fg(theme::text())),
+                    Span::styled(format!(" - {}", system.description), Style::default().fg(theme::text_muted())),
                 ]));
             }
         }

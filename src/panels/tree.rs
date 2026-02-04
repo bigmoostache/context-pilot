@@ -61,7 +61,7 @@ impl Panel for TreePanel {
         let mut text: Vec<Line> = Vec::new();
         for line in tree_content.lines() {
             let mut spans: Vec<Span> = Vec::new();
-            spans.push(Span::styled(" ".to_string(), Style::default().fg(theme::TEXT)));
+            spans.push(Span::styled(" ".to_string(), Style::default().fg(theme::text())));
 
             // Check for description (after " - ")
             let (main_line, description) = if let Some(desc_idx) = line.find(" - ") {
@@ -73,23 +73,23 @@ impl Panel for TreePanel {
             // Parse the main part
             if let Some(size_start) = find_size_pattern(main_line) {
                 let (before_size, size_part) = main_line.split_at(size_start);
-                spans.push(Span::styled(before_size.to_string(), Style::default().fg(theme::TEXT)));
-                spans.push(Span::styled(size_part.to_string(), Style::default().fg(theme::ACCENT_DIM)));
+                spans.push(Span::styled(before_size.to_string(), Style::default().fg(theme::text())));
+                spans.push(Span::styled(size_part.to_string(), Style::default().fg(theme::accent_dim())));
             } else if let Some((start, end)) = find_children_pattern(main_line) {
                 let before = &main_line[..start];
                 let children_part = &main_line[start..end];
                 let after = &main_line[end..];
-                spans.push(Span::styled(before.to_string(), Style::default().fg(theme::TEXT)));
-                spans.push(Span::styled(children_part.to_string(), Style::default().fg(theme::ACCENT)));
+                spans.push(Span::styled(before.to_string(), Style::default().fg(theme::text())));
+                spans.push(Span::styled(children_part.to_string(), Style::default().fg(theme::accent())));
                 if !after.is_empty() {
-                    spans.push(Span::styled(after.to_string(), Style::default().fg(theme::TEXT)));
+                    spans.push(Span::styled(after.to_string(), Style::default().fg(theme::text())));
                 }
             } else {
-                spans.push(Span::styled(main_line.to_string(), Style::default().fg(theme::TEXT)));
+                spans.push(Span::styled(main_line.to_string(), Style::default().fg(theme::text())));
             }
 
             if let Some(desc) = description {
-                spans.push(Span::styled(desc.to_string(), Style::default().fg(theme::TEXT_MUTED)));
+                spans.push(Span::styled(desc.to_string(), Style::default().fg(theme::text_muted())));
             }
 
             text.push(Line::from(spans));

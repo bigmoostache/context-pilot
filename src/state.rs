@@ -476,6 +476,13 @@ pub struct PersistedState {
     /// Reload requested flag - checked by run.sh supervisor
     #[serde(default)]
     pub reload_requested: bool,
+    /// Active theme ID
+    #[serde(default = "default_theme")]
+    pub active_theme: String,
+}
+
+fn default_theme() -> String {
+    crate::config::DEFAULT_THEME.to_string()
 }
 
 fn default_cleaning_threshold() -> f32 {
@@ -568,6 +575,8 @@ pub struct State {
     pub config_view: bool,
     /// Selected bar in config view (0=budget, 1=threshold, 2=target)
     pub config_selected_bar: usize,
+    /// Active theme ID (dnd, modern, futuristic, forest, sea, space)
+    pub active_theme: String,
     /// Selected LLM provider
     pub llm_provider: crate::llms::LlmProvider,
     /// Selected Anthropic model
@@ -862,6 +871,7 @@ impl Default for State {
             perf_enabled: false,
             config_view: false,
             config_selected_bar: 0,
+            active_theme: crate::config::DEFAULT_THEME.to_string(),
             llm_provider: crate::llms::LlmProvider::default(),
             anthropic_model: crate::llms::AnthropicModel::default(),
             grok_model: crate::llms::GrokModel::default(),

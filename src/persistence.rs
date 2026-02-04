@@ -7,6 +7,7 @@ use crate::constants::{STORE_DIR, STATE_FILE, MESSAGES_DIR};
 
 /// Errors directory name
 const ERRORS_DIR: &str = "errors";
+use crate::config::set_active_theme;
 use crate::state::{Message, PersistedState, State};
 use crate::tool_defs::{get_all_tool_definitions, ToolDefinition};
 use crate::tools::MANAGE_TOOLS_ID;
@@ -97,7 +98,7 @@ pub fn load_state() -> State {
                 open_folders.insert(0, ".".to_string());
             }
 
-            return State {
+            let state = State {
                 context: persisted.context,
                 messages,
                 input: persisted.draft_input,
@@ -133,6 +134,7 @@ pub fn load_state() -> State {
                 perf_enabled: false, // Runtime only, not persisted
                 config_view: false, // Runtime only
                 config_selected_bar: 0,
+                active_theme: persisted.active_theme.clone(),
                 llm_provider: persisted.llm_provider,
                 anthropic_model: persisted.anthropic_model,
                 grok_model: persisted.grok_model,
@@ -164,10 +166,16 @@ pub fn load_state() -> State {
                 input_cache: None,
                 full_content_cache: None,
             };
+
+            // Set the global active theme
+            set_active_theme(&state.active_theme);
+            return state;
         }
     }
 
-    State::default()
+    let state = State::default();
+    set_active_theme(&state.active_theme);
+    state
 }
 
 pub fn save_state(state: &State) {
@@ -208,6 +216,7 @@ pub fn save_state(state: &State) {
         cleaning_target_proportion: state.cleaning_target_proportion,
         context_budget: state.context_budget,
         reload_requested: false, // Always clear on save
+        active_theme: state.active_theme.clone(),
     };
 
     let path = dir.join(STATE_FILE);

@@ -145,7 +145,7 @@ impl Panel for GitPanel {
         if !state.git_is_repo {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("Not a git repository".to_string(), Style::default().fg(theme::TEXT_MUTED).italic()),
+                Span::styled("Not a git repository".to_string(), Style::default().fg(theme::text_muted()).italic()),
             ]));
             return text;
         }
@@ -153,13 +153,13 @@ impl Panel for GitPanel {
         // Branch name
         if let Some(branch) = &state.git_branch {
             let branch_color = if branch.starts_with("detached:") {
-                theme::WARNING
+                theme::warning()
             } else {
-                theme::ACCENT
+                theme::accent()
             };
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("Branch: ".to_string(), Style::default().fg(theme::TEXT_SECONDARY)),
+                Span::styled("Branch: ".to_string(), Style::default().fg(theme::text_secondary())),
                 Span::styled(branch.clone(), Style::default().fg(branch_color).bold()),
             ]));
         }
@@ -169,13 +169,13 @@ impl Panel for GitPanel {
             text.push(Line::from(""));
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("Branches:".to_string(), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                Span::styled("Branches:".to_string(), Style::default().fg(theme::text_secondary()).bold()),
             ]));
             for (branch_name, is_current) in &state.git_branches {
                 let (prefix, style) = if *is_current {
-                    ("* ", Style::default().fg(theme::ACCENT).bold())
+                    ("* ", Style::default().fg(theme::accent()).bold())
                 } else {
-                    ("  ", Style::default().fg(theme::TEXT_MUTED))
+                    ("  ", Style::default().fg(theme::text_muted()))
                 };
                 text.push(Line::from(vec![
                     Span::styled(" ".to_string(), base_style),
@@ -190,7 +190,7 @@ impl Panel for GitPanel {
         if state.git_file_changes.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("Working tree clean".to_string(), Style::default().fg(theme::SUCCESS)),
+                Span::styled("Working tree clean".to_string(), Style::default().fg(theme::success())),
             ]));
             return text;
         }
@@ -206,20 +206,20 @@ impl Panel for GitPanel {
         // Table header
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled("T ".to_string(), Style::default().fg(theme::TEXT_SECONDARY).bold()),
-            Span::styled(format!("{:<width$}", "File", width = path_width), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+            Span::styled("T ".to_string(), Style::default().fg(theme::text_secondary()).bold()),
+            Span::styled(format!("{:<width$}", "File", width = path_width), Style::default().fg(theme::text_secondary()).bold()),
             Span::styled("  ", base_style),
-            Span::styled(format!("{:>6}", "+"), Style::default().fg(theme::SUCCESS).bold()),
+            Span::styled(format!("{:>6}", "+"), Style::default().fg(theme::success()).bold()),
             Span::styled("  ", base_style),
-            Span::styled(format!("{:>6}", "-"), Style::default().fg(theme::ERROR).bold()),
+            Span::styled(format!("{:>6}", "-"), Style::default().fg(theme::error()).bold()),
             Span::styled("  ", base_style),
-            Span::styled(format!("{:>6}", "Net"), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+            Span::styled(format!("{:>6}", "Net"), Style::default().fg(theme::text_secondary()).bold()),
         ]));
 
         // Separator
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled(chars::HORIZONTAL.repeat(path_width + 30), Style::default().fg(theme::BORDER)),
+            Span::styled(chars::HORIZONTAL.repeat(path_width + 30), Style::default().fg(theme::border())),
         ]));
 
         // File rows
@@ -233,10 +233,10 @@ impl Panel for GitPanel {
 
             // Type indicator
             let (type_char, type_color) = match file.change_type {
-                GitChangeType::Added => ("A", theme::SUCCESS),
-                GitChangeType::Deleted => ("D", theme::ERROR),
-                GitChangeType::Modified => ("M", theme::WARNING),
-                GitChangeType::Renamed => ("R", theme::ACCENT),
+                GitChangeType::Added => ("A", theme::success()),
+                GitChangeType::Deleted => ("D", theme::error()),
+                GitChangeType::Modified => ("M", theme::warning()),
+                GitChangeType::Renamed => ("R", theme::accent()),
             };
 
             // Truncate path if needed
@@ -247,11 +247,11 @@ impl Panel for GitPanel {
             };
 
             let net_color = if net > 0 {
-                theme::SUCCESS
+                theme::success()
             } else if net < 0 {
-                theme::ERROR
+                theme::error()
             } else {
-                theme::TEXT_MUTED
+                theme::text_muted()
             };
 
             let net_str = if net > 0 {
@@ -263,11 +263,11 @@ impl Panel for GitPanel {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
                 Span::styled(format!("{} ", type_char), Style::default().fg(type_color)),
-                Span::styled(format!("{:<width$}", display_path, width = path_width), Style::default().fg(theme::TEXT)),
+                Span::styled(format!("{:<width$}", display_path, width = path_width), Style::default().fg(theme::text())),
                 Span::styled("  ", base_style),
-                Span::styled(format!("{:>6}", format!("+{}", file.additions)), Style::default().fg(theme::SUCCESS)),
+                Span::styled(format!("{:>6}", format!("+{}", file.additions)), Style::default().fg(theme::success())),
                 Span::styled("  ", base_style),
-                Span::styled(format!("{:>6}", format!("-{}", file.deletions)), Style::default().fg(theme::ERROR)),
+                Span::styled(format!("{:>6}", format!("-{}", file.deletions)), Style::default().fg(theme::error())),
                 Span::styled("  ", base_style),
                 Span::styled(format!("{:>6}", net_str), Style::default().fg(net_color)),
             ]));
@@ -276,17 +276,17 @@ impl Panel for GitPanel {
         // Total row separator
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled(chars::HORIZONTAL.repeat(path_width + 30), Style::default().fg(theme::BORDER)),
+            Span::styled(chars::HORIZONTAL.repeat(path_width + 30), Style::default().fg(theme::border())),
         ]));
 
         // Total row
         let total_net = total_add - total_del;
         let total_net_color = if total_net > 0 {
-            theme::SUCCESS
+            theme::success()
         } else if total_net < 0 {
-            theme::ERROR
+            theme::error()
         } else {
-            theme::TEXT_MUTED
+            theme::text_muted()
         };
         let total_net_str = if total_net > 0 {
             format!("+{}", total_net)
@@ -297,11 +297,11 @@ impl Panel for GitPanel {
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("  ".to_string(), base_style),
-            Span::styled(format!("{:<width$}", "Total", width = path_width), Style::default().fg(theme::TEXT).bold()),
+            Span::styled(format!("{:<width$}", "Total", width = path_width), Style::default().fg(theme::text()).bold()),
             Span::styled("  ", base_style),
-            Span::styled(format!("{:>6}", format!("+{}", total_add)), Style::default().fg(theme::SUCCESS).bold()),
+            Span::styled(format!("{:>6}", format!("+{}", total_add)), Style::default().fg(theme::success()).bold()),
             Span::styled("  ", base_style),
-            Span::styled(format!("{:>6}", format!("-{}", total_del)), Style::default().fg(theme::ERROR).bold()),
+            Span::styled(format!("{:>6}", format!("-{}", total_del)), Style::default().fg(theme::error()).bold()),
             Span::styled("  ", base_style),
             Span::styled(format!("{:>6}", total_net_str), Style::default().fg(total_net_color).bold()),
         ]));
@@ -322,7 +322,7 @@ impl Panel for GitPanel {
         if !summary_parts.is_empty() {
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(summary_parts.join(", "), Style::default().fg(theme::TEXT_MUTED)),
+                Span::styled(summary_parts.join(", "), Style::default().fg(theme::text_muted())),
             ]));
         }
 
@@ -331,18 +331,18 @@ impl Panel for GitPanel {
             text.push(Line::from(""));
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(chars::HORIZONTAL.repeat(60), Style::default().fg(theme::BORDER)),
+                Span::styled(chars::HORIZONTAL.repeat(60), Style::default().fg(theme::border())),
             ]));
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("Recent Commits:".to_string(), Style::default().fg(theme::TEXT_SECONDARY).bold()),
+                Span::styled("Recent Commits:".to_string(), Style::default().fg(theme::text_secondary()).bold()),
             ]));
             
             if let Some(log_content) = &state.git_log_content {
                 for line in log_content.lines() {
                     text.push(Line::from(vec![
                         Span::styled(" ".to_string(), base_style),
-                        Span::styled(line.to_string(), Style::default().fg(theme::TEXT_MUTED)),
+                        Span::styled(line.to_string(), Style::default().fg(theme::text_muted())),
                     ]));
                 }
             }
@@ -357,32 +357,32 @@ impl Panel for GitPanel {
             text.push(Line::from(""));
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled(chars::HORIZONTAL.repeat(60), Style::default().fg(theme::BORDER)),
+                Span::styled(chars::HORIZONTAL.repeat(60), Style::default().fg(theme::border())),
             ]));
 
             // Render diff with syntax highlighting
             for line in file.diff_content.lines() {
                 let (style, display_line) = if line.starts_with("+++") || line.starts_with("---") {
                     // File header lines
-                    (Style::default().fg(theme::TEXT_SECONDARY).bold(), line.to_string())
+                    (Style::default().fg(theme::text_secondary()).bold(), line.to_string())
                 } else if line.starts_with("@@") {
                     // Hunk header
-                    (Style::default().fg(theme::ACCENT), line.to_string())
+                    (Style::default().fg(theme::accent()), line.to_string())
                 } else if line.starts_with('+') && !line.starts_with("+++") {
                     // Addition
-                    (Style::default().fg(theme::SUCCESS), line.to_string())
+                    (Style::default().fg(theme::success()), line.to_string())
                 } else if line.starts_with('-') && !line.starts_with("---") {
                     // Deletion
-                    (Style::default().fg(theme::ERROR), line.to_string())
+                    (Style::default().fg(theme::error()), line.to_string())
                 } else if line.starts_with("diff --git") {
                     // Diff header
-                    (Style::default().fg(theme::ACCENT).bold(), line.to_string())
+                    (Style::default().fg(theme::accent()).bold(), line.to_string())
                 } else if line.starts_with("new file") || line.starts_with("deleted file") || line.starts_with("index ") {
                     // Meta info
-                    (Style::default().fg(theme::TEXT_MUTED), line.to_string())
+                    (Style::default().fg(theme::text_muted()), line.to_string())
                 } else {
                     // Context line
-                    (Style::default().fg(theme::TEXT_MUTED), format!(" {}", line))
+                    (Style::default().fg(theme::text_muted()), format!(" {}", line))
                 };
 
                 text.push(Line::from(vec![
