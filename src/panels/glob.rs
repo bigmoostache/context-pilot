@@ -44,7 +44,7 @@ impl Panel for GlobPanel {
                 let pattern = c.glob_pattern.as_ref()?;
                 // Use cached content only - no blocking operations
                 let content = c.cached_content.as_ref().cloned()?;
-                Some(ContextItem::new(&c.id, format!("Glob: {}", pattern), content))
+                Some(ContextItem::new(&c.id, format!("Glob: {}", pattern), content, c.last_refresh_ms))
             })
             .collect()
     }

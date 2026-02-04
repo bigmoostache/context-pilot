@@ -71,21 +71,23 @@ pub struct ContextItem {
     pub header: String,
     /// The actual content
     pub content: String,
+    /// Last refresh timestamp in milliseconds since UNIX epoch (for sorting panels)
+    pub last_refresh_ms: u64,
 }
 
 impl ContextItem {
-    pub fn new(id: impl Into<String>, header: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        header: impl Into<String>,
+        content: impl Into<String>,
+        last_refresh_ms: u64,
+    ) -> Self {
         Self {
             id: id.into(),
             header: header.into(),
             content: content.into(),
+            last_refresh_ms,
         }
-    }
-
-    /// Format this context item for the LLM
-    pub fn format(&self) -> String {
-        format!("=== [{}] {} ===\n{}\n=== End of [{}] {} ===",
-            self.id, self.header, self.content, self.id, self.header)
     }
 }
 

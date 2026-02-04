@@ -71,12 +71,12 @@ impl Panel for TodoPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_todos_for_context(state);
-        // Find the Todo context element to get its ID
-        let id = state.context.iter()
+        // Find the Todo context element to get its ID and timestamp
+        let (id, last_refresh_ms) = state.context.iter()
             .find(|c| c.context_type == ContextType::Todo)
-            .map(|c| c.id.as_str())
-            .unwrap_or("P3");
-        vec![ContextItem::new(id, "Todo List", content)]
+            .map(|c| (c.id.as_str(), c.last_refresh_ms))
+            .unwrap_or(("P3", 0));
+        vec![ContextItem::new(id, "Todo List", content, last_refresh_ms)]
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {

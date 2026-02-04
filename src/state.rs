@@ -346,6 +346,9 @@ pub struct Message {
     /// Input tokens used for this response (from API, for assistant messages)
     #[serde(default)]
     pub input_tokens: usize,
+    /// Timestamp when this message was created (ms since UNIX epoch)
+    #[serde(default)]
+    pub timestamp_ms: u64,
 }
 
 /// Default tree filter (gitignore-style patterns)

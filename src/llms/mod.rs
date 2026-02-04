@@ -343,3 +343,163 @@ pub struct ApiMessage {
     pub role: String,
     pub content: Vec<ContentBlock>,
 }
+
+/// Prepared panel data for injection as fake tool call/result pairs
+#[derive(Debug, Clone)]
+pub struct FakePanelMessage {
+    /// Panel ID (e.g., "P2", "P7")
+    pub panel_id: String,
+    /// ISO 8601 timestamp (e.g., "2026-02-04T15:30:45Z")
+    pub timestamp_iso: String,
+    /// Panel content with header
+    pub content: String,
+}
+
+/// Convert milliseconds since UNIX epoch to ISO 8601 format
+fn ms_to_iso8601(ms: u64) -> String {
+    use std::time::{Duration, UNIX_EPOCH};
+    let duration = Duration::from_millis(ms);
+    let datetime = UNIX_EPOCH + duration;
+
+    // Manual formatting since we don't have chrono
+    if let Ok(since_epoch) = datetime.duration_since(UNIX_EPOCH) {
+        let secs = since_epoch.as_secs();
+        // Calculate components
+        let days_since_epoch = secs / 86400;
+        let time_of_day = secs % 86400;
+        let hours = time_of_day / 3600;
+        let minutes = (time_of_day % 3600) / 60;
+        let seconds = time_of_day % 60;
+
+        // Calculate year/month/day from days since 1970-01-01
+        let mut year = 1970i32;
+        let mut remaining_days = days_since_epoch as i32;
+
+        loop {
+            let days_in_year = if is_leap_year(year) { 366 } else { 365 };
+            if remaining_days < days_in_year {
+                break;
+            }
+            remaining_days -= days_in_year;
+            year += 1;
+        }
+
+        let days_in_months: [i32; 12] = if is_leap_year(year) {
+            [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        } else {
+            [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        };
+
+        let mut month = 1;
+        for days in days_in_months.iter() {
+            if remaining_days < *days {
+                break;
+            }
+            remaining_days -= days;
+            month += 1;
+        }
+        let day = remaining_days + 1;
+
+        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+            year, month, day, hours, minutes, seconds)
+    } else {
+        "1970-01-01T00:00:00Z".to_string()
+    }
+}
+
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
+/// Format a time delta in a human-readable way
+fn format_time_delta(delta_ms: u64) -> String {
+    let seconds = delta_ms / 1000;
+    if seconds < 60 {
+        format!("{} seconds ago", seconds)
+    } else if seconds < 3600 {
+        let minutes = seconds / 60;
+        if minutes == 1 {
+            "1 minute ago".to_string()
+        } else {
+            format!("{} minutes ago", minutes)
+        }
+    } else {
+        let hours = seconds / 3600;
+        if hours == 1 {
+            "1 hour ago".to_string()
+        } else {
+            format!("{} hours ago", hours)
+        }
+    }
+}
+
+/// Generate the header text for dynamic panel display
+pub fn panel_header_text() -> &'static str {
+    crate::constants::prompts::PANEL_HEADER
+}
+
+/// Generate the footer text for dynamic panel display, including message timestamps
+pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
+    use crate::constants::prompts;
+
+    // Get last 25 messages with non-zero timestamps
+    let recent_messages: Vec<&Message> = messages
+        .iter()
+        .filter(|m| m.timestamp_ms > 0)
+        .rev()
+        .take(25)
+        .collect();
+
+    // Build message timestamps section
+    let message_timestamps = if !recent_messages.is_empty() {
+        let mut lines = String::from(prompts::PANEL_FOOTER_MSG_HEADER);
+        lines.push('\n');
+        for msg in recent_messages.iter().rev() {
+            let iso_time = ms_to_iso8601(msg.timestamp_ms);
+            let time_delta = if current_ms > msg.timestamp_ms {
+                format_time_delta(current_ms - msg.timestamp_ms)
+            } else {
+                "just now".to_string()
+            };
+            let line = prompts::PANEL_FOOTER_MSG_LINE
+                .replace("{id}", &msg.id)
+                .replace("{role}", &msg.role)
+                .replace("{iso_time}", &iso_time)
+                .replace("{time_delta}", &time_delta);
+            lines.push_str(&line);
+            lines.push('\n');
+        }
+        lines
+    } else {
+        String::new()
+    };
+
+    prompts::PANEL_FOOTER
+        .replace("{message_timestamps}", &message_timestamps)
+        .replace("{current_datetime}", &ms_to_iso8601(current_ms))
+}
+
+/// Prepare context items for injection as fake tool call/result pairs.
+/// - Filters out P0 (System) and P1 (Conversation)
+/// - Sorts by last_refresh_ms ascending (oldest first, so newest is closest to conversation)
+/// - Returns FakePanelMessage structs that providers can convert to their format
+pub fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMessage> {
+    // Filter out P0 (System) and P1 (Conversation) - they start with these IDs
+    let mut filtered: Vec<&ContextItem> = context_items
+        .iter()
+        .filter(|item| !item.content.is_empty())
+        .filter(|item| item.id != "P0" && item.id != "P1")
+        .collect();
+
+    // Sort by last_refresh_ms ascending (oldest first)
+    filtered.sort_by_key(|item| item.last_refresh_ms);
+
+    filtered
+        .into_iter()
+        .map(|item| FakePanelMessage {
+            panel_id: item.id.clone(),
+            timestamp_iso: ms_to_iso8601(item.last_refresh_ms),
+            content: format!("======= [{}] {} =======\n{}", item.id, item.header, item.content),
+        })
+        .collect()
+}

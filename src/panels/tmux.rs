@@ -63,7 +63,7 @@ impl Panel for TmuxPanel {
                 } else {
                     format!("Tmux Pane {} ({})", pane_id, desc)
                 };
-                Some(ContextItem::new(&c.id, header, content))
+                Some(ContextItem::new(&c.id, header, content, c.last_refresh_ms))
             })
             .collect()
     }

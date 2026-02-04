@@ -248,6 +248,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tool_uses: Vec::new(),
                 tool_results: Vec::new(),
                 input_tokens: 0,
+                timestamp_ms: crate::panels::now_ms(),
             };
             save_message(&user_msg);
 
@@ -283,6 +284,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tool_uses: Vec::new(),
                 tool_results: Vec::new(),
                 input_tokens: 0,
+                timestamp_ms: crate::panels::now_ms(),
             };
             state.messages.push(assistant_msg);
 

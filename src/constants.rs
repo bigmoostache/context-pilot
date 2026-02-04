@@ -178,10 +178,10 @@ pub mod chars {
 
 pub mod icons {
     // Message types
-    pub const MSG_USER: &str = "👤";
+    pub const MSG_USER: &str = "🦊";
     pub const MSG_ASSISTANT: &str = "🤖";
-    pub const MSG_TOOL_CALL: &str = "⚡";
-    pub const MSG_TOOL_RESULT: &str = "🪛";
+    pub const MSG_TOOL_CALL: &str = "🪵";
+    pub const MSG_TOOL_RESULT: &str = "🔥";
     pub const MSG_ERROR: &str = "⚠️";
 
     // Context panel types
@@ -189,7 +189,7 @@ pub mod icons {
     pub const CTX_CONVERSATION: &str = "📜";
     pub const CTX_TREE: &str = "🌲";
     pub const CTX_TODO: &str = "🪓";
-    pub const CTX_MEMORY: &str = "💡";
+    pub const CTX_MEMORY: &str = "💎";
     pub const CTX_OVERVIEW: &str = "🌍";
     pub const CTX_FILE: &str = "💾";
     pub const CTX_GLOB: &str = "🔭";
@@ -242,6 +242,26 @@ Just respond naturally without any [Axxx] or similar prefixes."#;
 
     /// Minimum token count to trigger LLM summarization (below this, use content directly)
     pub const TLDR_MIN_TOKENS: usize = 25;
+
+    /// Header text for dynamic panel display (shown before panels)
+    pub const PANEL_HEADER: &str = "Beginning of dynamic panel display. All content displayed below may be considered up to date.";
+
+    /// Footer text template for dynamic panel display (shown after panels)
+    /// Placeholders: {message_timestamps}, {current_datetime}
+    pub const PANEL_FOOTER: &str = r#"End of dynamic panel displays. All content displayed above may be considered up to date: it is automatically kept updated as we speak.
+
+{message_timestamps}
+Current datetime: {current_datetime}"#;
+
+    /// Template for each message timestamp line in footer
+    /// Placeholders: {id}, {role}, {iso_time}, {time_delta}
+    pub const PANEL_FOOTER_MSG_LINE: &str = "  - [{id}] {role}: {iso_time} ({time_delta})";
+
+    /// Header for the message timestamps section in footer
+    pub const PANEL_FOOTER_MSG_HEADER: &str = "Last message datetimes:";
+
+    /// Text for panel footer tool result acknowledgment
+    pub const PANEL_FOOTER_ACK: &str = "Panel display complete. Proceeding with conversation.";
 
     /// Context cleaner system prompt
     pub const CLEANER_SYSTEM: &str = r#"You are a context management assistant. Your ONLY job is to reduce context usage intelligently.

@@ -8,9 +8,9 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
+use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text};
 use crate::constants::{prompts, API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS};
-use crate::panels::ContextItem;
+use crate::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::build_api_tools;
 use crate::tools::ToolUse;
@@ -322,18 +322,72 @@ impl LlmClient for AnthropicClient {
 }
 
 /// Convert internal messages to Anthropic API format
+/// Context items are injected as fake tool call/result pairs at the start
 fn messages_to_api(
     messages: &[Message],
-    context_items: &[ContextItem],
+    context_items: &[crate::panels::ContextItem],
     include_last_tool_uses: bool,
 ) -> Vec<ApiMessage> {
     let mut api_messages: Vec<ApiMessage> = Vec::new();
+    let current_ms = now_ms();
 
-    let context_parts: Vec<String> = context_items
-        .iter()
-        .filter(|item| !item.content.is_empty())
-        .map(|item| item.format())
-        .collect();
+    // Inject context panels as fake tool call/result pairs (P2+ only, sorted by timestamp)
+    let fake_panels = prepare_panel_messages(context_items);
+
+    if !fake_panels.is_empty() {
+        // Add header as first panel's text
+        for (idx, panel) in fake_panels.iter().enumerate() {
+            let text = if idx == 0 {
+                // First panel includes the header
+                format!("{}\n\nPanel automatically generated at {}", panel_header_text(), panel.timestamp_iso)
+            } else {
+                format!("Panel automatically generated at {}", panel.timestamp_iso)
+            };
+
+            // Assistant message with tool_use
+            api_messages.push(ApiMessage {
+                role: "assistant".to_string(),
+                content: vec![
+                    ContentBlock::Text { text },
+                    ContentBlock::ToolUse {
+                        id: format!("panel_{}", panel.panel_id),
+                        name: "dynamic_panel".to_string(),
+                        input: serde_json::json!({ "id": panel.panel_id }),
+                    },
+                ],
+            });
+
+            // User message with tool_result
+            api_messages.push(ApiMessage {
+                role: "user".to_string(),
+                content: vec![ContentBlock::ToolResult {
+                    tool_use_id: format!("panel_{}", panel.panel_id),
+                    content: panel.content.clone(),
+                }],
+            });
+        }
+
+        // Add footer after all panels
+        let footer = panel_footer_text(messages, current_ms);
+        api_messages.push(ApiMessage {
+            role: "assistant".to_string(),
+            content: vec![
+                ContentBlock::Text { text: footer },
+                ContentBlock::ToolUse {
+                    id: "panel_footer".to_string(),
+                    name: "dynamic_panel".to_string(),
+                    input: serde_json::json!({ "action": "end_panels" }),
+                },
+            ],
+        });
+        api_messages.push(ApiMessage {
+            role: "user".to_string(),
+            content: vec![ContentBlock::ToolResult {
+                tool_use_id: "panel_footer".to_string(),
+                content: crate::constants::prompts::PANEL_FOOTER_ACK.to_string(),
+            }],
+        });
+    }
 
     for (idx, msg) in messages.iter().enumerate() {
         if msg.status == MessageStatus::Deleted {
@@ -348,7 +402,7 @@ fn messages_to_api(
 
         if msg.message_type == MessageType::ToolResult {
             for result in &msg.tool_results {
-                let prefixed_content = format!("[{}]: {}", msg.id, result.content);
+                let prefixed_content = format!("[{}]:\n{}", msg.id, result.content);
                 content_blocks.push(ContentBlock::ToolResult {
                     tool_use_id: result.tool_use_id.clone(),
                     content: prefixed_content,
@@ -407,16 +461,9 @@ fn messages_to_api(
             };
 
             if !message_content.is_empty() {
-                let prefixed_content = format!("[{}]: {}", msg.id, message_content);
-
-                let text =
-                    if msg.role == "user" && !context_parts.is_empty() && api_messages.is_empty() {
-                        let context = context_parts.join("\n\n");
-                        format!("{}\n\n{}", context, prefixed_content)
-                    } else {
-                        prefixed_content
-                    };
-                content_blocks.push(ContentBlock::Text { text });
+                // Use [ID]:\n format (newline after colon)
+                let prefixed_content = format!("[{}]:\n{}", msg.id, message_content);
+                content_blocks.push(ContentBlock::Text { text: prefixed_content });
             }
 
             let is_last = idx == messages.len().saturating_sub(1);

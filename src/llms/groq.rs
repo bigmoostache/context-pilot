@@ -10,9 +10,9 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{LlmClient, LlmRequest, StreamEvent};
+use super::{LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text};
 use crate::constants::{prompts, MAX_RESPONSE_TOKENS};
-use crate::panels::ContextItem;
+use crate::panels::{ContextItem, now_ms};
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::ToolDefinition;
 use crate::tools::ToolUse;
@@ -360,6 +360,7 @@ impl LlmClient for GroqClient {
 }
 
 /// Convert internal messages to Groq/OpenAI format
+/// Context items are injected as fake tool call/result pairs at the start
 fn messages_to_groq(
     messages: &[Message],
     context_items: &[ContextItem],
@@ -387,12 +388,68 @@ fn messages_to_groq(
         name: None,
     });
 
-    // Format context items
-    let context_parts: Vec<String> = context_items
-        .iter()
-        .filter(|item| !item.content.is_empty())
-        .map(|item| item.format())
-        .collect();
+    // Inject context panels as fake tool call/result pairs (P2+ only, sorted by timestamp)
+    let fake_panels = prepare_panel_messages(context_items);
+    let current_ms = now_ms();
+
+    if !fake_panels.is_empty() {
+        for (idx, panel) in fake_panels.iter().enumerate() {
+            let text = if idx == 0 {
+                format!("{}\n\nPanel automatically generated at {}", panel_header_text(), panel.timestamp_iso)
+            } else {
+                format!("Panel automatically generated at {}", panel.timestamp_iso)
+            };
+
+            // Assistant message with tool_call
+            groq_messages.push(GroqMessage {
+                role: "assistant".to_string(),
+                content: Some(text),
+                tool_calls: Some(vec![GroqToolCall {
+                    id: format!("panel_{}", panel.panel_id),
+                    call_type: "function".to_string(),
+                    function: GroqFunction {
+                        name: "dynamic_panel".to_string(),
+                        arguments: format!(r#"{{"id":"{}"}}"#, panel.panel_id),
+                    },
+                }]),
+                tool_call_id: None,
+                name: None,
+            });
+
+            // Tool result message
+            groq_messages.push(GroqMessage {
+                role: "tool".to_string(),
+                content: Some(panel.content.clone()),
+                tool_calls: None,
+                tool_call_id: Some(format!("panel_{}", panel.panel_id)),
+                name: None,
+            });
+        }
+
+        // Add footer after all panels
+        let footer = panel_footer_text(messages, current_ms);
+        groq_messages.push(GroqMessage {
+            role: "assistant".to_string(),
+            content: Some(footer),
+            tool_calls: Some(vec![GroqToolCall {
+                id: "panel_footer".to_string(),
+                call_type: "function".to_string(),
+                function: GroqFunction {
+                    name: "dynamic_panel".to_string(),
+                    arguments: r#"{"action":"end_panels"}"#.to_string(),
+                },
+            }]),
+            tool_call_id: None,
+            name: None,
+        });
+        groq_messages.push(GroqMessage {
+            role: "tool".to_string(),
+            content: Some(crate::constants::prompts::PANEL_FOOTER_ACK.to_string()),
+            tool_calls: None,
+            tool_call_id: Some("panel_footer".to_string()),
+            name: None,
+        });
+    }
 
     // Add extra context if present (for cleaner mode)
     if let Some(ctx) = extra_context {
@@ -408,8 +465,6 @@ fn messages_to_groq(
         });
     }
 
-    let mut first_user_message = true;
-
     for msg in messages.iter() {
         if msg.status == MessageStatus::Deleted {
             continue;
@@ -424,7 +479,7 @@ fn messages_to_groq(
             for result in &msg.tool_results {
                 groq_messages.push(GroqMessage {
                     role: "tool".to_string(),
-                    content: Some(format!("[{}]: {}", msg.id, result.content)),
+                    content: Some(format!("[{}]:\n{}", msg.id, result.content)),
                     tool_calls: None,
                     tool_call_id: Some(result.tool_use_id.clone()),
                     name: None,
@@ -465,22 +520,12 @@ fn messages_to_groq(
         };
 
         if !message_content.is_empty() {
-            let prefixed_content = format!("[{}]: {}", msg.id, message_content);
-
-            let text = if msg.role == "user" && first_user_message && !context_parts.is_empty() {
-                first_user_message = false;
-                let context = context_parts.join("\n\n");
-                format!("{}\n\n{}", context, prefixed_content)
-            } else {
-                if msg.role == "user" {
-                    first_user_message = false;
-                }
-                prefixed_content
-            };
+            // Use [ID]:\n format (newline after colon)
+            let prefixed_content = format!("[{}]:\n{}", msg.id, message_content);
 
             groq_messages.push(GroqMessage {
                 role: msg.role.clone(),
-                content: Some(text),
+                content: Some(prefixed_content),
                 tool_calls: None,
                 tool_call_id: None,
                 name: None,

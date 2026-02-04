@@ -44,7 +44,7 @@ impl Panel for GrepPanel {
                 let pattern = c.grep_pattern.as_ref()?;
                 // Use cached content only - no blocking operations
                 let content = c.cached_content.as_ref().cloned()?;
-                Some(ContextItem::new(&c.id, format!("Grep: {}", pattern), content))
+                Some(ContextItem::new(&c.id, format!("Grep: {}", pattern), content, c.last_refresh_ms))
             })
             .collect()
     }

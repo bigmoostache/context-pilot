@@ -35,7 +35,12 @@ impl Panel for TreePanel {
             if ctx.context_type == ContextType::Tree {
                 if let Some(content) = &ctx.cached_content {
                     if !content.is_empty() {
-                        return vec![ContextItem::new(&ctx.id, "Directory Tree", content.clone())];
+                        return vec![ContextItem::new(
+                            &ctx.id,
+                            "Directory Tree",
+                            content.clone(),
+                            ctx.last_refresh_ms,
+                        )];
                     }
                 }
                 break;

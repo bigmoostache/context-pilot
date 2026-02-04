@@ -13,8 +13,9 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent};
+use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text};
 use crate::constants::{prompts, API_VERSION, MAX_RESPONSE_TOKENS};
+use crate::panels::now_ms;
 use crate::state::{MessageStatus, MessageType};
 use crate::tool_defs::build_api_tools;
 use crate::tools::ToolUse;
@@ -148,13 +149,67 @@ impl LlmClient for ClaudeCodeClient {
 
         // Build messages as simple JSON (matching Python example format)
         let mut json_messages: Vec<Value> = Vec::new();
+        let current_ms = now_ms();
 
-        // Add context to first user message
-        let context_parts: Vec<String> = request.context_items
-            .iter()
-            .filter(|item| !item.content.is_empty())
-            .map(|item| item.format())
-            .collect();
+        // Inject context panels as fake tool call/result pairs (P2+ only, sorted by timestamp)
+        let fake_panels = prepare_panel_messages(&request.context_items);
+
+        if !fake_panels.is_empty() {
+            for (idx, panel) in fake_panels.iter().enumerate() {
+                let text = if idx == 0 {
+                    format!("{}\n\nPanel automatically generated at {}", panel_header_text(), panel.timestamp_iso)
+                } else {
+                    format!("Panel automatically generated at {}", panel.timestamp_iso)
+                };
+
+                // Assistant message with tool_use
+                json_messages.push(serde_json::json!({
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": text},
+                        {
+                            "type": "tool_use",
+                            "id": format!("panel_{}", panel.panel_id),
+                            "name": "dynamic_panel",
+                            "input": {"id": panel.panel_id}
+                        }
+                    ]
+                }));
+
+                // User message with tool_result
+                json_messages.push(serde_json::json!({
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": format!("panel_{}", panel.panel_id),
+                        "content": panel.content
+                    }]
+                }));
+            }
+
+            // Add footer after all panels
+            let footer = panel_footer_text(&request.messages, current_ms);
+            json_messages.push(serde_json::json!({
+                "role": "assistant",
+                "content": [
+                    {"type": "text", "text": footer},
+                    {
+                        "type": "tool_use",
+                        "id": "panel_footer",
+                        "name": "dynamic_panel",
+                        "input": {"action": "end_panels"}
+                    }
+                ]
+            }));
+            json_messages.push(serde_json::json!({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "panel_footer",
+                    "content": crate::constants::prompts::PANEL_FOOTER_ACK
+                }]
+            }));
+        }
 
         // Handle cleaner mode extra context
         if let Some(ref context) = request.extra_context {
@@ -164,7 +219,6 @@ impl LlmClient for ClaudeCodeClient {
             }));
         }
 
-        let mut first_user_message = true;
         let include_tool_uses = request.tool_results.is_some();
 
         // First pass: collect tool_use IDs that have matching results (will be included)
@@ -201,7 +255,7 @@ impl LlmClient for ClaudeCodeClient {
                         serde_json::json!({
                             "type": "tool_result",
                             "tool_use_id": r.tool_use_id,
-                            "content": format!("[{}]: {}", msg.id, r.content)
+                            "content": format!("[{}]:\n{}", msg.id, r.content)
                         })
                     }).collect();
 
@@ -255,21 +309,13 @@ impl LlmClient for ClaudeCodeClient {
             };
 
             if !message_content.is_empty() {
-                let prefixed = format!("[{}]: {}", msg.id, message_content);
-                let text = if msg.role == "user" && first_user_message && !context_parts.is_empty() {
-                    first_user_message = false;
-                    format!("{}\n\n{}", context_parts.join("\n\n"), prefixed)
-                } else {
-                    if msg.role == "user" {
-                        first_user_message = false;
-                    }
-                    prefixed
-                };
+                // Use [ID]:\n format (newline after colon)
+                let prefixed = format!("[{}]:\n{}", msg.id, message_content);
 
                 // Use simple string content like Python example
                 json_messages.push(serde_json::json!({
                     "role": msg.role,
-                    "content": text
+                    "content": prefixed
                 }));
             }
 

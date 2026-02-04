@@ -398,6 +398,7 @@ impl App {
                 }],
                 tool_results: Vec::new(),
                 input_tokens: 0,
+                timestamp_ms: crate::panels::now_ms(),
             };
             save_message(&tool_msg);
             self.state.messages.push(tool_msg);
@@ -428,6 +429,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,
+            timestamp_ms: crate::panels::now_ms(),
         };
         save_message(&result_msg);
         self.state.messages.push(result_msg);
@@ -447,6 +449,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
+            timestamp_ms: crate::panels::now_ms(),
         };
         self.state.messages.push(new_assistant_msg);
 

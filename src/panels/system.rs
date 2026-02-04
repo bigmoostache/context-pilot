@@ -70,13 +70,14 @@ impl Panel for SystemPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Only include if there's an active custom system prompt
+        // Note: P0 (System) is filtered out by prepare_panel_messages() and stays as actual system prompt
         if state.active_system_id.is_none() {
             return Vec::new();
         }
 
         if let Some(ctx) = state.context.iter().find(|c| c.context_type == crate::state::ContextType::System) {
             if let Some(content) = &ctx.cached_content {
-                return vec![ContextItem::new(&ctx.id, "System Prompt", content.clone())];
+                return vec![ContextItem::new(&ctx.id, "System Prompt", content.clone(), ctx.last_refresh_ms)];
             }
         }
 

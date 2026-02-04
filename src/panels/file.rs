@@ -39,7 +39,7 @@ impl Panel for FilePanel {
                 let path = c.file_path.as_ref()?;
                 // Use cached content only - no blocking file reads
                 let content = c.cached_content.as_ref().cloned()?;
-                Some(ContextItem::new(&c.id, format!("File: {}", path), content))
+                Some(ContextItem::new(&c.id, format!("File: {}", path), content, c.last_refresh_ms))
             })
             .collect()
     }
