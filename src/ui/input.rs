@@ -24,6 +24,14 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
+    if state.waiting_for_panels {
+        spans.push(Span::styled(
+            format!(" {} LOADING FILES ", spin),
+            Style::default().fg(theme::BG_BASE).bg(theme::WARNING).bold()
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
     if state.is_cleaning_context {
         spans.push(Span::styled(
             format!(" {} CLEANING ", spin),

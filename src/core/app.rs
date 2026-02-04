@@ -167,7 +167,7 @@ impl App {
             self.process_cache_updates(&cache_rx);
             self.process_watcher_events();
             self.check_timer_based_deprecation();
-            self.handle_tool_execution(&tx, &tldr_tx, &clean_tx);
+            self.handle_tool_execution(&tx, &tldr_tx, &clean_tx, &cache_rx, terminal);
             self.finalize_stream(&tldr_tx, &clean_tx);
             self.process_api_check_results();
 
@@ -355,7 +355,7 @@ impl App {
         }
     }
 
-    fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>, clean_tx: &Sender<StreamEvent>) {
+    fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>, clean_tx: &Sender<StreamEvent>, cache_rx: &Receiver<CacheUpdate>, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
         if !self.state.is_streaming || self.pending_done.is_none() || !self.typewriter.pending_chars.is_empty() || self.pending_tools.is_empty() {
             return;
         }
@@ -477,6 +477,9 @@ impl App {
             );
         }
 
+        // Wait for any dirty file panels to be loaded before continuing
+        self.wait_before_continuing(cache_rx, terminal);
+
         // Continue streaming
         let ctx = prepare_stream_context(&mut self.state, true);
         let system_prompt = get_active_seed_content(&self.state);
@@ -487,6 +490,64 @@ impl App {
             self.state.current_model(),
             ctx.messages, ctx.context_items, ctx.tools, None, system_prompt, tx.clone(),
         );
+    }
+
+    /// Wait for dirty file panels to be loaded before continuing stream.
+    /// This ensures the LLM has access to newly opened file content.
+    fn wait_before_continuing(&mut self, cache_rx: &Receiver<CacheUpdate>, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
+        use std::time::{Duration, Instant};
+
+        // Check if any File panels are dirty - if not, return immediately
+        let has_dirty_files = self.state.context.iter().any(|c| {
+            c.context_type == ContextType::File && c.cache_deprecated
+        });
+
+        if !has_dirty_files {
+            return;
+        }
+
+        // Set flag for UI indicator
+        self.state.waiting_for_panels = true;
+        self.state.dirty = true;
+
+        let timeout = Duration::from_secs(5); // Max wait time
+        let start = Instant::now();
+        let mut last_render_ms = 0u64;
+
+        loop {
+            // Check if any File panels are still dirty
+            let has_dirty_files = self.state.context.iter().any(|c| {
+                c.context_type == ContextType::File && c.cache_deprecated
+            });
+
+            if !has_dirty_files {
+                break; // All file panels loaded
+            }
+
+            if start.elapsed() > timeout {
+                break; // Timeout - continue anyway
+            }
+
+            // Process any pending cache updates
+            self.process_cache_updates(cache_rx);
+
+            // Update spinner and redraw periodically
+            let current_ms = now_ms();
+            if current_ms.saturating_sub(last_render_ms) >= 50 {
+                self.state.spinner_frame = self.state.spinner_frame.wrapping_add(1);
+                let _ = terminal.draw(|frame| {
+                    ui::render(frame, &mut self.state);
+                });
+                last_render_ms = current_ms;
+            }
+
+            // Small sleep to avoid busy-waiting
+            std::thread::sleep(Duration::from_millis(10));
+        }
+
+        // Clear flag
+        self.state.waiting_for_panels = false;
+        self.state.dirty = true;
     }
 
     fn finalize_stream(&mut self, tldr_tx: &Sender<TlDrResult>, clean_tx: &Sender<StreamEvent>) {

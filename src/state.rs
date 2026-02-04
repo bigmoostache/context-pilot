@@ -616,6 +616,8 @@ pub struct State {
     pub api_retry_count: u32,
     /// Reload pending flag (set by system_reload tool, triggers reload after tool result is saved)
     pub reload_pending: bool,
+    /// Waiting for file panels to load before continuing stream
+    pub waiting_for_panels: bool,
 
     // === Render Cache (runtime-only) ===
     /// Last viewport width (for pre-wrapping text)
@@ -887,6 +889,7 @@ impl Default for State {
             // API retry
             api_retry_count: 0,
             reload_pending: false,
+            waiting_for_panels: false,
             // Render cache
             last_viewport_width: 0,
             message_cache: HashMap::new(),
