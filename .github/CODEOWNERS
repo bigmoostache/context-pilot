@@ -1,0 +1,88 @@
+# CODEOWNERS - Automatic reviewer assignment for Pull Requests
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# =============================================================================
+# DEFAULT OWNERS
+# =============================================================================
+# These people are requested for review on all PRs unless overridden below
+* @contextpilot/core-maintainers
+
+# =============================================================================
+# CORE APPLICATION
+# =============================================================================
+# Main application loop, state management, actions
+/src/core/                    @contextpilot/core-maintainers
+/src/state.rs                 @contextpilot/core-maintainers
+/src/actions.rs               @contextpilot/core-maintainers
+/src/main.rs                  @contextpilot/core-maintainers
+
+# =============================================================================
+# LLM INTEGRATIONS
+# =============================================================================
+# API clients for Anthropic, Grok, Groq, Claude Code
+/src/llms/                    @contextpilot/llm-team
+/src/api.rs                   @contextpilot/llm-team
+/src/background.rs            @contextpilot/llm-team
+
+# =============================================================================
+# TOOLS
+# =============================================================================
+# All tool implementations
+/src/tools/                   @contextpilot/tools-team
+/src/tool_defs.rs             @contextpilot/tools-team
+
+# =============================================================================
+# UI / FRONTEND
+# =============================================================================
+# Terminal UI, panels, rendering
+/src/ui/                      @contextpilot/ui-team
+/src/panels/                  @contextpilot/ui-team
+/src/help/                    @contextpilot/ui-team
+/src/events.rs                @contextpilot/ui-team
+
+# =============================================================================
+# PERSISTENCE / BACKEND
+# =============================================================================
+# State persistence, caching, file watching
+/src/persistence/             @contextpilot/backend-team
+/src/cache.rs                 @contextpilot/backend-team
+/src/watcher.rs               @contextpilot/backend-team
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+# Config files, constants, themes
+/src/config.rs                @contextpilot/core-maintainers
+/src/constants.rs             @contextpilot/core-maintainers
+/yamls/                       @contextpilot/core-maintainers
+
+# =============================================================================
+# DOCUMENTATION
+# =============================================================================
+# Docs can be reviewed by anyone on docs team
+*.md                          @contextpilot/docs-team
+/docs/                        @contextpilot/docs-team
+README.md                     @contextpilot/core-maintainers @contextpilot/docs-team
+
+# =============================================================================
+# SECURITY-SENSITIVE
+# =============================================================================
+# Security policy and sensitive files require security review
+SECURITY.md                   @contextpilot/security-team
+/src/llms/                    @contextpilot/security-team
+.env*                         @contextpilot/security-team
+
+# =============================================================================
+# CI/CD & PROJECT CONFIG
+# =============================================================================
+/.github/                     @contextpilot/devops-team
+Cargo.toml                    @contextpilot/core-maintainers
+Cargo.lock                    @contextpilot/core-maintainers
+run.sh                        @contextpilot/devops-team
+
+# =============================================================================
+# OPEN SOURCE / COMMUNITY
+# =============================================================================
+CODE_OF_CONDUCT.md            @contextpilot/community-team
+CONTRIBUTING.md               @contextpilot/community-team
+LICENSE                       @contextpilot/core-maintainers
