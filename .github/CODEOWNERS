@@ -1,94 +1,80 @@
 # CODEOWNERS - Automatic reviewer assignment for Pull Requests
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 #
-# NOTE: Replace placeholder usernames with your actual GitHub usernames.
-# Format: @username1 @username2
-#
-# When you move to a GitHub Organization, you can use team syntax:
-# @org-name/team-name
+# When you grow the team, replace @bigmoostache with specific reviewers per area.
+# When you move to a GitHub Organization, you can use team syntax: @org-name/team-name
 
 # =============================================================================
-# DEFAULT OWNERS
+# DEFAULT OWNERS - All PRs require review from these people
 # =============================================================================
-# These people are requested for review on all PRs unless overridden below
-* @lead-maintainer @senior-dev
+* @bigmoostache
 
 # =============================================================================
 # CORE APPLICATION
 # =============================================================================
-# Main application loop, state management, actions
-/src/core/                    @lead-maintainer @senior-dev
-/src/state.rs                 @lead-maintainer @senior-dev
-/src/actions.rs               @lead-maintainer @senior-dev
-/src/main.rs                  @lead-maintainer @senior-dev
+/src/core/                    @bigmoostache
+/src/state.rs                 @bigmoostache
+/src/actions.rs               @bigmoostache
+/src/main.rs                  @bigmoostache
 
 # =============================================================================
 # LLM INTEGRATIONS
 # =============================================================================
-# API clients for Anthropic, Grok, Groq, Claude Code
-/src/llms/                    @llm-dev-1 @llm-dev-2
-/src/api.rs                   @llm-dev-1 @llm-dev-2
-/src/background.rs            @llm-dev-1 @llm-dev-2
+/src/llms/                    @bigmoostache
+/src/api.rs                   @bigmoostache
+/src/background.rs            @bigmoostache
 
 # =============================================================================
 # TOOLS
 # =============================================================================
-# All tool implementations
-/src/tools/                   @tools-dev-1 @tools-dev-2
-/src/tool_defs.rs             @tools-dev-1 @tools-dev-2
+/src/tools/                   @bigmoostache
+/src/tool_defs.rs             @bigmoostache
 
 # =============================================================================
 # UI / FRONTEND
 # =============================================================================
-# Terminal UI, panels, rendering
-/src/ui/                      @ui-dev-1 @ui-dev-2
-/src/panels/                  @ui-dev-1 @ui-dev-2
-/src/help/                    @ui-dev-1 @ui-dev-2
-/src/events.rs                @ui-dev-1 @ui-dev-2
+/src/ui/                      @bigmoostache
+/src/panels/                  @bigmoostache
+/src/help/                    @bigmoostache
+/src/events.rs                @bigmoostache
 
 # =============================================================================
 # PERSISTENCE / BACKEND
 # =============================================================================
-# State persistence, caching, file watching
-/src/persistence/             @backend-dev-1 @backend-dev-2
-/src/cache.rs                 @backend-dev-1 @backend-dev-2
-/src/watcher.rs               @backend-dev-1 @backend-dev-2
+/src/persistence/             @bigmoostache
+/src/cache.rs                 @bigmoostache
+/src/watcher.rs               @bigmoostache
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-# Config files, constants, themes
-/src/config.rs                @lead-maintainer
-/src/constants.rs             @lead-maintainer
-/yamls/                       @lead-maintainer
+/src/config.rs                @bigmoostache
+/src/constants.rs             @bigmoostache
+/yamls/                       @bigmoostache
 
 # =============================================================================
 # DOCUMENTATION
 # =============================================================================
-# Docs can be reviewed by anyone on docs team
-*.md                          @docs-dev
-/docs/                        @docs-dev
-README.md                     @lead-maintainer @docs-dev
+*.md                          @bigmoostache
+/docs/                        @bigmoostache
 
 # =============================================================================
 # SECURITY-SENSITIVE
 # =============================================================================
-# Security policy and sensitive files require security review
-SECURITY.md                   @lead-maintainer @security-dev
-/src/llms/                    @lead-maintainer @security-dev
-.env*                         @lead-maintainer @security-dev
+SECURITY.md                   @bigmoostache
+.env*                         @bigmoostache
 
 # =============================================================================
 # CI/CD & PROJECT CONFIG
 # =============================================================================
-/.github/                     @lead-maintainer @devops-dev
-Cargo.toml                    @lead-maintainer
-Cargo.lock                    @lead-maintainer
-run.sh                        @devops-dev
+/.github/                     @bigmoostache
+Cargo.toml                    @bigmoostache
+Cargo.lock                    @bigmoostache
+run.sh                        @bigmoostache
 
 # =============================================================================
 # OPEN SOURCE / COMMUNITY
 # =============================================================================
-CODE_OF_CONDUCT.md            @lead-maintainer
-CONTRIBUTING.md               @lead-maintainer @docs-dev
-LICENSE                       @lead-maintainer
+CODE_OF_CONDUCT.md            @bigmoostache
+CONTRIBUTING.md               @bigmoostache
+LICENSE                       @bigmoostache
