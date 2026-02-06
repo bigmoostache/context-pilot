@@ -41,6 +41,12 @@ Describe how you tested your changes:
 - [ ] My changes generate no new warnings
 - [ ] Any dependent changes have been merged and published
 
+## Reviewers
+
+Reviewers are auto-assigned via [CODEOWNERS](/.github/CODEOWNERS) based on files changed.
+
+If you need a specific reviewer, mention them here: 
+
 ## Additional Notes
 
 <!-- Any additional context for reviewers -->

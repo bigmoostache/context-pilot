@@ -315,7 +315,23 @@ flowchart LR
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request. By contributing, you agree that your contributions will be licensed under the AGPL-3.0 license.
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting a PR.
+
+### Quick Start
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`cargo build --release && cargo test`)
+5. Commit (`git commit -m 'feat: add amazing feature'`)
+6. Push (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+### Code Owners
+
+We use [CODEOWNERS](/.github/CODEOWNERS) for automatic reviewer assignment. See the [Contributing Guide](CONTRIBUTING.md#code-owners) for team details.
+
+By contributing, you agree that your contributions will be licensed under the AGPL-3.0 license.
 
 ## License
 

@@ -6,6 +6,17 @@ labels: bug
 assignees: ''
 ---
 
+## Affected Area
+
+<!-- Check the area(s) where you found the bug -->
+
+- [ ] Core (app loop, state, actions)
+- [ ] LLM Integration (Anthropic, Grok, Groq, Claude Code)
+- [ ] Tools (file, git, tmux, etc.)
+- [ ] UI/Panels (rendering, sidebar, input)
+- [ ] Persistence (saving, loading state)
+- [ ] Other
+
 ## Description
 
 A clear and concise description of what the bug is.

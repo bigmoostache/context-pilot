@@ -117,6 +117,20 @@ GROQ_API_KEY=your_groq_key
 5. **Address feedback** promptly
 6. **Squash commits** if requested before merge
 
+### Code Owners
+
+We use [CODEOWNERS](/.github/CODEOWNERS) for automatic reviewer assignment. When you open a PR, the right team is automatically assigned based on the files you changed:
+
+| Team | Owns |
+|------|------|
+| `@contextpilot/core-maintainers` | Core app, state, actions, config |
+| `@contextpilot/llm-team` | LLM provider integrations |
+| `@contextpilot/tools-team` | Tool implementations |
+| `@contextpilot/ui-team` | Panels, UI, events |
+| `@contextpilot/backend-team` | Persistence, caching |
+| `@contextpilot/docs-team` | Documentation |
+| `@contextpilot/security-team` | Security-sensitive files |
+
 ### Commit Message Format
 
 We follow conventional commits:
