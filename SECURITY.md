@@ -15,7 +15,7 @@ We take the security of Context Pilot seriously. If you believe you have found a
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please send an email to **security@contextpilot.dev** with the following information:
+Instead, please send an email to **g.draznieks@gmail.com** with the following information:
 
 1. **Type of vulnerability** (e.g., remote code execution, information disclosure, authentication bypass)
 2. **Location** of the affected source code (file path, line numbers if known)
