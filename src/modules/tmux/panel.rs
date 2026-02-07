@@ -1,9 +1,12 @@
+use std::process::Command;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::prelude::*;
 
+use crate::cache::{hash_content, CacheRequest, CacheUpdate};
 use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
-use crate::state::{ContextType, State};
+use crate::state::{estimate_tokens, ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct TmuxPanel;
@@ -46,8 +49,32 @@ impl Panel for TmuxPanel {
     }
 
     fn refresh(&self, _state: &mut State) {
-        // Tmux refresh is handled by background cache system
-        // No blocking operations here
+        // Tmux refresh is handled by background cache system via refresh_cache
+    }
+
+    fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
+        let CacheRequest::RefreshTmux { context_id, pane_id, current_content_hash } = request else {
+            return None;
+        };
+        let output = Command::new("tmux")
+            .args(["capture-pane", "-p", "-t", &pane_id])
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let content = String::from_utf8_lossy(&output.stdout).to_string();
+        let new_hash = hash_content(&content);
+        if current_content_hash.as_ref() == Some(&new_hash) {
+            return None;
+        }
+        let token_count = estimate_tokens(&content);
+        Some(CacheUpdate::TmuxContent {
+            context_id,
+            content,
+            content_hash: new_hash,
+            token_count,
+        })
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {

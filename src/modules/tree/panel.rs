@@ -1,10 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
+use crate::cache::{CacheRequest, CacheUpdate};
 use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{ContextType, State};
+use crate::state::{estimate_tokens, ContextType, State};
 use crate::ui::{theme, helpers::*};
 
 pub struct TreePanel;
@@ -25,8 +26,20 @@ impl Panel for TreePanel {
     }
 
     fn refresh(&self, _state: &mut State) {
-        // Tree refresh is handled by background cache system
-        // No blocking operations here
+        // Tree refresh is handled by background cache system via refresh_cache
+    }
+
+    fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
+        let CacheRequest::RefreshTree { context_id, tree_filter, tree_open_folders, tree_descriptions } = request else {
+            return None;
+        };
+        let content = super::tools::generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
+        let token_count = estimate_tokens(&content);
+        Some(CacheUpdate::TreeContent {
+            context_id,
+            content,
+            token_count,
+        })
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {

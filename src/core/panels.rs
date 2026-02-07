@@ -26,6 +26,7 @@ use ratatui::{
 use crossterm::event::KeyEvent;
 
 use crate::actions::Action;
+use crate::cache::{CacheRequest, CacheUpdate};
 use crate::state::{ContextType, State};
 use crate::ui::{theme, helpers::count_wrapped_lines};
 
@@ -83,6 +84,13 @@ pub trait Panel {
     /// Refresh token counts and any cached data (called before generating context)
     fn refresh(&self, _state: &mut State) {
         // Default: no refresh needed
+    }
+
+    /// Compute a cache update for this panel in the background.
+    /// Called from a background thread — implementations should do blocking I/O here.
+    /// Returns None if no update is needed (e.g., content unchanged).
+    fn refresh_cache(&self, _request: CacheRequest) -> Option<CacheUpdate> {
+        None
     }
 
     /// Generate context items to send to the LLM

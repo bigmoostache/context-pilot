@@ -1,10 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
+use crate::cache::{CacheRequest, CacheUpdate};
 use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{ContextType, State};
+use crate::state::{estimate_tokens, ContextType, State};
 use crate::ui::{theme, chars};
 
 pub struct GrepPanel;
@@ -33,8 +34,21 @@ impl Panel for GrepPanel {
     }
 
     fn refresh(&self, _state: &mut State) {
-        // Grep refresh is handled by background cache system
-        // No blocking operations here
+        // Grep refresh is handled by background cache system via refresh_cache
+    }
+
+    fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
+        let CacheRequest::RefreshGrep { context_id, pattern, path, file_pattern } = request else {
+            return None;
+        };
+        let search_path = path.as_deref().unwrap_or(".");
+        let (content, _count) = super::tools::compute_grep_results(&pattern, search_path, file_pattern.as_deref());
+        let token_count = estimate_tokens(&content);
+        Some(CacheUpdate::GrepContent {
+            context_id,
+            content: content.to_string(),
+            token_count,
+        })
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {

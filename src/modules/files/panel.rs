@@ -1,11 +1,15 @@
+use std::fs;
+use std::path::PathBuf;
+
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
+use crate::cache::{hash_content, CacheRequest, CacheUpdate};
 use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::highlight::highlight_file;
-use crate::state::{ContextType, State};
+use crate::state::{estimate_tokens, ContextType, State};
 use crate::ui::theme;
 
 pub struct FilePanel;
@@ -28,8 +32,29 @@ impl Panel for FilePanel {
     }
 
     fn refresh(&self, _state: &mut State) {
-        // File refresh is handled by background cache system
-        // No blocking operations here
+        // File refresh is handled by background cache system via refresh_cache
+    }
+
+    fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
+        let CacheRequest::RefreshFile { context_id, file_path, current_hash } = request else {
+            return None;
+        };
+        let path = PathBuf::from(&file_path);
+        if !path.exists() {
+            return None;
+        }
+        let content = fs::read_to_string(&path).ok()?;
+        let new_hash = hash_content(&content);
+        if current_hash.as_ref() == Some(&new_hash) {
+            return None;
+        }
+        let token_count = estimate_tokens(&content);
+        Some(CacheUpdate::FileContent {
+            context_id,
+            content,
+            hash: new_hash,
+            token_count,
+        })
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
