@@ -9,7 +9,7 @@ use crate::actions::{apply_action, clean_llm_id_prefix, Action, ActionResult};
 use crate::api::{start_streaming, StreamEvent};
 use crate::background::{generate_tldr, TlDrResult};
 use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
-use crate::constants::{EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
+use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
 use crate::events::handle_event;
 use crate::help::CommandPalette;
 use crate::core::panels::now_ms;
@@ -241,7 +241,7 @@ impl App {
                 start_streaming(
                     self.state.llm_provider,
                     self.state.current_model(),
-                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), tx.clone(),
+                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
                 );
                 self.state.dirty = true;
             }
@@ -411,7 +411,7 @@ impl App {
         start_streaming(
             self.state.llm_provider,
             self.state.current_model(),
-            ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), tx.clone(),
+            ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
         );
     }
 
@@ -475,7 +475,7 @@ impl App {
                 start_streaming(
                     self.state.llm_provider,
                     self.state.current_model(),
-                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), tx.clone(),
+                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
                 );
                 save_state(&self.state);
             }

@@ -90,6 +90,18 @@ impl Panel for OverviewPanel {
             output.push_str(&format!("| {} | {} | {} | {} |\n", sys.id, sys.name, active, sys.description));
         }
 
+        // Presets table for LLM
+        let presets = crate::modules::preset::tools::list_presets_with_info();
+        if !presets.is_empty() {
+            output.push_str("\nPresets:\n\n");
+            output.push_str("| Name | Type | Description |\n");
+            output.push_str("|------|------|-------------|\n");
+            for p in &presets {
+                let ptype = if p.built_in { "built-in" } else { "custom" };
+                output.push_str(&format!("| {} | {} | {} |\n", p.name, ptype, p.description));
+            }
+        }
+
         // Git status for LLM (as markdown table)
         if state.git_is_repo {
             if let Some(branch) = &state.git_branch {
@@ -549,6 +561,76 @@ impl Panel for OverviewPanel {
                     Span::styled(format!("{:<width$}", display_name, width = name_width), Style::default().fg(theme::text())),
                     Span::styled("  ", base_style),
                     Span::styled(format!("  {} ", active_icon), Style::default().fg(active_color)),
+                    Span::styled("  ", base_style),
+                    Span::styled(display_desc, Style::default().fg(theme::text_muted())),
+                ]));
+            }
+        }
+
+        text.push(Line::from(""));
+        text.push(Line::from(vec![
+            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::border())),
+        ]));
+        text.push(Line::from(""));
+
+        // Presets section
+        let presets = crate::modules::preset::tools::list_presets_with_info();
+        if !presets.is_empty() {
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled("PRESETS".to_string(), Style::default().fg(theme::text_muted()).bold()),
+                Span::styled(format!("  ({} available)", presets.len()), Style::default().fg(theme::text_muted())),
+            ]));
+            text.push(Line::from(""));
+
+            // Calculate column widths
+            let name_width = presets.iter().map(|p| p.name.len()).max().unwrap_or(10).max(10).min(25);
+            let type_width = 8; // "built-in" length
+
+            // Table header
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled(format!("{:<width$}", "Name", width = name_width), Style::default().fg(theme::text_secondary()).bold()),
+                Span::styled("  ", base_style),
+                Span::styled(format!("{:<width$}", "Type", width = type_width), Style::default().fg(theme::text_secondary()).bold()),
+                Span::styled("  ", base_style),
+                Span::styled("Description", Style::default().fg(theme::text_secondary()).bold()),
+            ]));
+
+            // Table separator
+            text.push(Line::from(vec![
+                Span::styled(" ".to_string(), base_style),
+                Span::styled(format!("{}", chars::HORIZONTAL.repeat(name_width + type_width + 40)), Style::default().fg(theme::border())),
+            ]));
+
+            // Table rows
+            for p in &presets {
+                let (type_label, type_color) = if p.built_in {
+                    ("built-in", theme::accent_dim())
+                } else {
+                    ("custom", theme::success())
+                };
+
+                // Truncate name if needed
+                let display_name = if p.name.len() > name_width {
+                    format!("{}...", &p.name[..name_width.saturating_sub(3)])
+                } else {
+                    p.name.clone()
+                };
+
+                // Truncate description
+                let desc_max = 35;
+                let display_desc = if p.description.len() > desc_max {
+                    format!("{}...", &p.description[..desc_max.saturating_sub(3)])
+                } else {
+                    p.description.clone()
+                };
+
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled(format!("{:<width$}", display_name, width = name_width), Style::default().fg(theme::text())),
+                    Span::styled("  ", base_style),
+                    Span::styled(format!("{:<width$}", type_label, width = type_width), Style::default().fg(type_color)),
                     Span::styled("  ", base_style),
                     Span::styled(display_desc, Style::default().fg(theme::text_muted())),
                 ]));

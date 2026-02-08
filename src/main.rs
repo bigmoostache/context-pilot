@@ -53,6 +53,9 @@ fn main() -> io::Result<()> {
     ensure_default_contexts(&mut state);
     ensure_default_seed(&mut state);
 
+    // Ensure built-in presets exist on disk
+    modules::preset::builtin::ensure_builtin_presets();
+
     // Create channels
     let (tx, rx) = mpsc::channel::<StreamEvent>();
     let (tldr_tx, tldr_rx) = mpsc::channel::<TlDrResult>();

@@ -232,6 +232,8 @@ pub struct LlmRequest {
     pub extra_context: Option<String>,
     /// Seed/system prompt content to repeat after panels
     pub seed_content: Option<String>,
+    /// Worker/reverie ID for debug logging
+    pub worker_id: String,
 }
 
 /// Trait for LLM providers
@@ -276,6 +278,7 @@ pub fn start_streaming(
     tool_results: Option<Vec<ToolResult>>,
     system_prompt: String,
     seed_content: Option<String>,
+    worker_id: String,
     tx: Sender<StreamEvent>,
 ) {
     let client = get_client(provider);
@@ -290,6 +293,7 @@ pub fn start_streaming(
             system_prompt: Some(system_prompt),
             extra_context: None,
             seed_content,
+            worker_id,
         };
 
         if let Err(e) = client.stream(request, tx.clone()) {

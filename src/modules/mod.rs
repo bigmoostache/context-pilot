@@ -4,6 +4,7 @@ pub mod git;
 pub mod glob;
 pub mod grep;
 pub mod memory;
+pub mod preset;
 pub mod scratchpad;
 pub mod system;
 pub mod tmux;
@@ -144,6 +145,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(todo::TodoModule),
         Box::new(memory::MemoryModule),
         Box::new(scratchpad::ScratchpadModule),
+        Box::new(preset::PresetModule),
     ]
 }
 

@@ -1,0 +1,104 @@
+# Built-in presets
+# Each preset captures a worker configuration: active modules, disabled tools, etc.
+# These are created on disk at startup if they don't already exist.
+
+presets:
+  - name: admin
+    description: "Full access to all modules and tools. Unrestricted configuration."
+    active_modules:
+      - core
+      - system
+      - preset
+      - files
+      - tree
+      - git
+      - glob
+      - grep
+      - tmux
+      - todo
+      - memory
+      - scratchpad
+    disabled_tools: []
+
+  - name: worker
+    description: "Implementation and testing mode. File editing, git, and console. No exploration or planning tools."
+    system_prompt: worker
+    active_modules:
+      - core
+      - system
+      - preset
+      - files
+      - tree
+      - git
+      - tmux
+      - memory
+    disabled_tools:
+      - tree_filter
+      - tree_describe
+      - git_branch_create
+      - git_branch_switch
+      - git_merge
+      - git_toggle_details
+      - git_toggle_logs
+      - system_create
+      - system_edit
+      - system_delete
+      - system_load
+
+  - name: context-cleaner
+    description: "Minimal read-only mode for context management. Disables write tools."
+    system_prompt: context-cleaner
+    active_modules:
+      - core
+      - system
+      - preset
+      - files
+      - tree
+      - memory
+    disabled_tools:
+      - file_edit
+      - file_create
+      - file_batch_create
+      - git_commit
+      - git_push
+      - git_merge
+      - tmux_send_keys
+
+  - name: context-builder
+    description: "All modules active with a clean slate. Full exploration mode."
+    system_prompt: context-builder
+    active_modules:
+      - core
+      - system
+      - preset
+      - files
+      - tree
+      - git
+      - glob
+      - grep
+      - tmux
+      - todo
+      - memory
+      - scratchpad
+    disabled_tools: []
+
+  - name: planner
+    description: "Planning mode with todo and scratchpad. Disables file write and git push tools."
+    system_prompt: planner
+    active_modules:
+      - core
+      - system
+      - preset
+      - files
+      - tree
+      - todo
+      - memory
+      - scratchpad
+    disabled_tools:
+      - file_edit
+      - file_create
+      - file_batch_create
+      - git_commit
+      - git_push
+      - git_merge
+      - tmux_send_keys
