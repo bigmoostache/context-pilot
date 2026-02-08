@@ -60,9 +60,17 @@ impl Panel for OverviewPanel {
             };
 
             if details.is_empty() {
-                output.push_str(&format!("  {} {}: {} tokens\n", ctx.id, type_name, ctx.token_count));
+                if ctx.total_pages > 1 {
+                    output.push_str(&format!("  {} {} [page {}/{}]: {} tokens\n", ctx.id, type_name, ctx.current_page + 1, ctx.total_pages, ctx.token_count));
+                } else {
+                    output.push_str(&format!("  {} {}: {} tokens\n", ctx.id, type_name, ctx.token_count));
+                }
             } else {
-                output.push_str(&format!("  {} {} ({}): {} tokens\n", ctx.id, type_name, details, ctx.token_count));
+                if ctx.total_pages > 1 {
+                    output.push_str(&format!("  {} {} ({}) [page {}/{}]: {} tokens\n", ctx.id, type_name, details, ctx.current_page + 1, ctx.total_pages, ctx.token_count));
+                } else {
+                    output.push_str(&format!("  {} {} ({}): {} tokens\n", ctx.id, type_name, details, ctx.token_count));
+                }
             }
         }
 
@@ -425,6 +433,13 @@ impl Panel for OverviewPanel {
                 Span::styled(format!("{:<12}", type_name), Style::default().fg(theme::text_secondary())),
                 Span::styled(format!("{:>8}", tokens), Style::default().fg(theme::accent())),
             ];
+
+            if ctx.total_pages > 1 {
+                spans.push(Span::styled(
+                    format!("  [{}/{}]", ctx.current_page + 1, ctx.total_pages),
+                    Style::default().fg(theme::warning()),
+                ));
+            }
 
             if !details.is_empty() {
                 let max_detail_len = 40usize;

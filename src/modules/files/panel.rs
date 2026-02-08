@@ -48,9 +48,16 @@ impl Panel for FilePanel {
         };
         ctx.cached_content = Some(content);
         ctx.file_hash = Some(hash);
-        ctx.token_count = token_count;
+        ctx.full_token_count = token_count;
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
+        // token_count reflects current page, not full content
+        if ctx.total_pages > 1 {
+            let page_content = paginate_content(ctx.cached_content.as_deref().unwrap_or(""), ctx.current_page, ctx.total_pages);
+            ctx.token_count = estimate_tokens(&page_content);
+        } else {
+            ctx.token_count = token_count;
+        }
         ctx.cache_deprecated = false;
         ctx.last_refresh_ms = now_ms();
         true

@@ -216,8 +216,11 @@ fn render_context_line(
     let name = truncate_string(&ctx.name, 18);
 
     // Show spinner instead of token count when loading
+    // Show page indicator for paginated panels
     let tokens_or_spinner = if is_loading {
         format!("{:>6}", spin)
+    } else if ctx.total_pages > 1 {
+        format!("{}/{}", ctx.current_page + 1, ctx.total_pages)
     } else {
         format_number(ctx.token_count)
     };

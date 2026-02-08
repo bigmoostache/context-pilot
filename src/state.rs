@@ -163,6 +163,9 @@ pub struct ContextElement {
     /// Total pages for LLM context pagination
     #[serde(skip)]
     pub total_pages: usize,
+    /// Full content token count (before pagination). token_count reflects current page.
+    #[serde(skip)]
+    pub full_token_count: usize,
 }
 
 // Re-export module-owned types for backwards compatibility

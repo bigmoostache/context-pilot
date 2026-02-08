@@ -339,6 +339,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tmux_last_lines_hash: None,
                 current_page: 0,
                 total_pages: 1,
+                full_token_count: 0,
             });
             ActionResult::Save
         }

@@ -190,6 +190,7 @@ fn create_file(path: &str, content: &str, state: &mut State) -> CreateResult {
         tmux_last_lines_hash: None,
         current_page: 0,
         total_pages: 1,
+        full_token_count: 0,
     });
 
     CreateResult::Success { opened_folders }

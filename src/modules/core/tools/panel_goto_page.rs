@@ -1,5 +1,6 @@
+use crate::core::panels::paginate_content;
 use crate::tools::{ToolResult, ToolUse};
-use crate::state::State;
+use crate::state::{estimate_tokens, State};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = match tool.input.get("panel_id").and_then(|v| v.as_str()) {
@@ -56,6 +57,12 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     ctx.current_page = (page - 1) as usize;
+
+    // Recompute token_count for the new page
+    if let Some(content) = &ctx.cached_content {
+        let page_content = paginate_content(content, ctx.current_page, ctx.total_pages);
+        ctx.token_count = estimate_tokens(&page_content);
+    }
 
     ToolResult {
         tool_use_id: tool.id.clone(),

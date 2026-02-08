@@ -130,6 +130,7 @@ pub fn make_default_context_element(
         tmux_last_lines_hash: None,
         current_page: 0,
         total_pages: 1,
+        full_token_count: 0,
     }
 }
 

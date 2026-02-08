@@ -77,6 +77,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_last_lines_hash: None,
         current_page: 0,
         total_pages: 1,
+        full_token_count: 0,
     });
 
     ToolResult {

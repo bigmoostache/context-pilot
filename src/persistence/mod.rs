@@ -71,6 +71,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         tmux_last_lines_hash: None,
         current_page: 0,
         total_pages: 1,
+        full_token_count: 0,
     }
 }
 
