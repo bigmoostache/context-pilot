@@ -71,13 +71,13 @@ impl Module for TmuxModule {
                 id: "console_send_keys".to_string(),
                 name: "Console Send Keys".to_string(),
                 short_desc: "Send keys to terminal".to_string(),
-                description: "Sends keystrokes to a console. Use for running commands or interacting with terminal apps.".to_string(),
+                description: "Sends keystrokes to a console. Use for running commands or interacting with terminal apps. Enter is sent automatically after the keys — do not include it unless you need to send a blank Enter.".to_string(),
                 params: vec![
                     ToolParam::new("context_id", ParamType::String)
                         .desc("Context ID of the console (e.g., P7)")
                         .required(),
                     ToolParam::new("keys", ParamType::String)
-                        .desc("Keys to send (e.g., 'ls -la' or 'Enter' or 'C-c')")
+                        .desc("Keys to send (e.g., 'ls -la' or 'C-c'). Enter is appended automatically.")
                         .required(),
                 ],
                 enabled: true,
