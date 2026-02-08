@@ -1,5 +1,59 @@
 # Git CLI — Near-Exhaustive Cheat Sheet
 
+## Cache Invalidation Matrix
+
+When a **mutating** git command (row) is executed, which **read-only** GitResult panels (columns) should be invalidated?
+
+P6 (GitPanel) is **NOT** included — the `.git/` filesystem watcher handles it.
+
+| Mutating cmd ↓ \ RO panel → | `git log` | `git diff` | `git show` | `git status` | `git branch` | `git stash list` | `git stash show` | `git tag` | `git config` | `git remote` | `git blame` | `git shortlog` | `git rev-list` | `git rev-parse` | `git ls-files` | `git ls-tree` | `git for-each-ref` | `git grep` | `git describe` | `git reflog` | `git cat-file` | `git format-patch` |
+|-----|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **`git commit`** | ✓ | ✓ | ✓ | ✓ | | | | | | | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
+| **`git add`** | | ✓ | | ✓ | | | | | | | | | | | ✓ | | | | | | | |
+| **`git restore`** | | ✓ | | ✓ | | | | | | | | | | | ✓ | | | ✓ | | | | |
+| **`git rm`** | | ✓ | | ✓ | | | | | | | | | | | ✓ | | | ✓ | | | | |
+| **`git mv`** | | ✓ | | ✓ | | | | | | | ✓ | | | | ✓ | | | ✓ | | | | |
+| **`git checkout`** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **`git switch`** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **`git merge`** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **`git rebase`** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **`git cherry-pick`** | ✓ | ✓ | ✓ | ✓ | | | | | | | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
+| **`git reset`** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **`git revert`** | ✓ | ✓ | ✓ | ✓ | | | | | | | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
+| **`git push`** | ✓ | | | | | | | | | | | | | | | | | | | | | |
+| **`git pull`** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **`git fetch`** | ✓ | | | | ✓ | | | ✓ | | | | | | | | | ✓ | | | | | |
+| **`git stash push`** | | ✓ | | ✓ | | ✓ | ✓ | | | | | | | | ✓ | | | ✓ | | | | |
+| **`git stash pop`** | | ✓ | | ✓ | | ✓ | ✓ | | | | | | | | ✓ | | | ✓ | | | | |
+| **`git stash drop`** | | | | | | ✓ | ✓ | | | | | | | | | | | | | | | |
+| **`git stash clear`** | | | | | | ✓ | ✓ | | | | | | | | | | | | | | | |
+| **`git branch -d/-D`** | | | | | ✓ | | | | | | | | | | | | ✓ | | | | | |
+| **`git branch <new>`** | | | | | ✓ | | | | | | | | | | | | ✓ | | | | | |
+| **`git branch -m`** | | | | | ✓ | | | | | | | | | | | | ✓ | | | ✓ | | |
+| **`git tag <name>`** | | | | | | | | ✓ | | | | | | | | | ✓ | | ✓ | | | |
+| **`git tag -d`** | | | | | | | | ✓ | | | | | | | | | ✓ | | ✓ | | | |
+| **`git config set`** | | | | | | | | | ✓ | | | | | | | | | | | | | |
+| **`git remote add/rm`** | | | | | | | | | | ✓ | | | | | | | | | | | | |
+| **`git remote set-url`** | | | | | | | | | | ✓ | | | | | | | | | | | | |
+| **`git clean`** | | ✓ | | ✓ | | | | | | | | | | | ✓ | | | ✓ | | | | |
+| **`git am`** | ✓ | ✓ | ✓ | ✓ | | | | | | | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
+
+### Simplification: Group by invalidation pattern
+
+To avoid 30+ individual rules, commands can be grouped by their invalidation pattern:
+
+1. **NUCLEAR** (invalidate ALL GitResult panels): `checkout`, `switch`, `merge`, `rebase`, `reset`, `pull` — these change HEAD/branch or rewrite history
+2. **COMMIT-LIKE** (invalidate log, diff, show, status, blame, shortlog, rev-list, rev-parse, ls-tree, for-each-ref, describe, reflog, cat-file, format-patch): `commit`, `cherry-pick`, `revert`, `am`
+3. **STAGING** (invalidate diff, status, ls-files, grep): `add`, `restore`, `rm`, `mv`, `clean`, `stash push`, `stash pop`
+4. **STASH-ONLY** (invalidate stash list/show): `stash drop`, `stash clear`
+5. **PUSH** (invalidate log only): `push`
+6. **FETCH** (invalidate log, branch, tag, for-each-ref): `fetch`
+7. **BRANCH-MGMT** (invalidate branch, for-each-ref): `branch -d/-D/<new>/-m/-c`
+8. **TAG-MGMT** (invalidate tag, for-each-ref, describe): `tag <create>`, `tag -d`
+9. **CONFIG** (invalidate config): `config <set>`
+10. **REMOTE** (invalidate remote): `remote add/rm/set-url/rename`
+11. **UNKNOWN** → blanket invalidation (safe default)
+
 ## Setup & Configuration
 
 | Command | Description | is_pure_description |

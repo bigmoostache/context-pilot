@@ -63,7 +63,7 @@ impl ConversationPanel {
                         obj.iter().map(|(k, v)| {
                             let val = match v {
                                 serde_json::Value::String(s) => {
-                                    if s.len() > 30 { format!("\"{}...\"", &s[..27]) } else { format!("\"{}\"", s) }
+                                    if s.len() > 30 { format!("\"{}...\"", &s[..s.floor_char_boundary(27)]) } else { format!("\"{}\"", s) }
                                 }
                                 _ => v.to_string(),
                             };
