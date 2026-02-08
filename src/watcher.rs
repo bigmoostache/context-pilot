@@ -110,6 +110,24 @@ impl FileWatcher {
         Ok(())
     }
 
+    /// Watch a directory recursively (for .git/refs/ subdirs)
+    pub fn watch_dir_recursive(&mut self, path: &str) -> notify::Result<()> {
+        let path_buf = PathBuf::from(path);
+        if !path_buf.is_dir() {
+            return Ok(());
+        }
+
+        let canonical = path_buf.canonicalize().unwrap_or_else(|_| path_buf.clone());
+
+        if let Ok(mut dirs) = self.watched_dirs.lock() {
+            if !dirs.contains_key(&canonical) {
+                dirs.insert(canonical.clone(), path.to_string());
+                self.watcher.watch(&canonical, RecursiveMode::Recursive)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Re-watch a file that may have been replaced (e.g., by an editor using atomic rename).
     /// Removes the stale watch and creates a new one on the current inode at that path.
     pub fn rewatch_file(&mut self, path: &str) -> notify::Result<()> {

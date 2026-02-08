@@ -19,6 +19,7 @@ use crate::tools::{execute_tool, perform_reload, ToolResult, ToolUse};
 use crate::typewriter::TypewriterBuffer;
 use crate::ui;
 use crate::watcher::{FileWatcher, WatchEvent};
+use crate::gh_watcher::GhWatcher;
 
 use super::context::prepare_stream_context;
 use super::init::get_active_seed_content;
@@ -26,14 +27,17 @@ use super::init::get_active_seed_content;
 pub struct App {
     pub state: State,
     typewriter: TypewriterBuffer,
-    pending_done: Option<(usize, usize)>,
+    pending_done: Option<(usize, usize, Option<String>)>,
     pending_tools: Vec<ToolUse>,
     cache_tx: Sender<CacheUpdate>,
     file_watcher: Option<FileWatcher>,
+    gh_watcher: GhWatcher,
     /// Tracks which file paths are being watched
     watched_file_paths: std::collections::HashSet<String>,
     /// Tracks which directory paths are being watched (for tree)
     watched_dir_paths: std::collections::HashSet<String>,
+    /// Tracks .git/ paths being watched (for GitResult panel deprecation)
+    watched_git_paths: std::collections::HashSet<String>,
     /// Last time we checked timer-based caches
     last_timer_check_ms: u64,
     /// Last time we checked ownership
@@ -53,6 +57,7 @@ pub struct App {
 impl App {
     pub fn new(state: State, cache_tx: Sender<CacheUpdate>, resume_stream: bool) -> Self {
         let file_watcher = FileWatcher::new().ok();
+        let gh_watcher = GhWatcher::new(cache_tx.clone());
 
         Self {
             state,
@@ -61,8 +66,10 @@ impl App {
             pending_tools: Vec::new(),
             cache_tx,
             file_watcher,
+            gh_watcher,
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
+            watched_git_paths: std::collections::HashSet::new(),
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
             pending_retry_error: None,
@@ -84,6 +91,7 @@ impl App {
     ) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
         self.setup_file_watchers();
+        self.sync_gh_watches();
         self.schedule_initial_cache_refreshes();
 
         // Claim ownership immediately
@@ -156,6 +164,7 @@ impl App {
             self.process_tldr_results(&tldr_rx);
             self.process_cache_updates(&cache_rx);
             self.process_watcher_events();
+            self.sync_gh_watches();
             self.check_timer_based_deprecation();
             self.handle_tool_execution(&tx, &tldr_tx, &cache_rx, terminal);
             self.finalize_stream(&tldr_tx);
@@ -204,9 +213,9 @@ impl App {
                 StreamEvent::ToolUse(tool) => {
                     self.pending_tools.push(tool);
                 }
-                StreamEvent::Done { input_tokens, output_tokens } => {
+                StreamEvent::Done { input_tokens, output_tokens, stop_reason } => {
                     self.typewriter.mark_done();
-                    self.pending_done = Some((input_tokens, output_tokens));
+                    self.pending_done = Some((input_tokens, output_tokens, stop_reason));
                 }
                 StreamEvent::Error(e) => {
                     self.typewriter.reset();
@@ -420,10 +429,11 @@ impl App {
             return;
         }
 
-        if let Some((input_tokens, output_tokens)) = self.pending_done {
+        if let Some((input_tokens, output_tokens, ref stop_reason)) = self.pending_done {
             if self.typewriter.pending_chars.is_empty() && self.pending_tools.is_empty() {
                 self.state.dirty = true;
-                match apply_action(&mut self.state, Action::StreamDone { _input_tokens: input_tokens, output_tokens }) {
+                let stop_reason = stop_reason.clone();
+                match apply_action(&mut self.state, Action::StreamDone { _input_tokens: input_tokens, output_tokens, stop_reason }) {
                     ActionResult::SaveMessage(id) => {
                         let tldr_info = self.state.messages.iter().find(|m| m.id == id).and_then(|msg| {
                             save_message(msg);
@@ -547,6 +557,33 @@ impl App {
                 }
             }
         }
+
+        // Watch .git/ paths for GitResult panel deprecation
+        if self.watched_git_paths.is_empty() {
+            for path in &[".git/HEAD", ".git/index", ".git/MERGE_HEAD", ".git/REBASE_HEAD", ".git/CHERRY_PICK_HEAD"] {
+                if watcher.watch_file(path).is_ok() {
+                    self.watched_git_paths.insert(path.to_string());
+                }
+            }
+            for path in &[".git/refs/heads", ".git/refs/tags", ".git/refs/remotes"] {
+                if watcher.watch_dir_recursive(path).is_ok() {
+                    self.watched_git_paths.insert(path.to_string());
+                }
+            }
+        }
+    }
+
+    /// Sync GhWatcher with current GithubResult panels
+    fn sync_gh_watches(&self) {
+        let token = match &self.state.github_token {
+            Some(t) => t.clone(),
+            None => return,
+        };
+        let panels: Vec<(String, String, String)> = self.state.context.iter()
+            .filter(|c| c.context_type == ContextType::GithubResult)
+            .filter_map(|c| c.result_command.as_ref().map(|cmd| (c.id.clone(), cmd.clone(), token.clone())))
+            .collect();
+        self.gh_watcher.sync_watches(&panels);
     }
 
     /// Schedule initial cache refreshes for all context elements
@@ -606,21 +643,45 @@ impl App {
         for event in &events {
             match event {
                 WatchEvent::FileChanged(path) => {
-                    for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                        if ctx.context_type == ContextType::File && ctx.file_path.as_deref() == Some(path.as_str()) {
-                            ctx.cache_deprecated = true;
-                            self.state.dirty = true;
-                            refresh_indices.push(i);
+                    // Check if this is a .git/ file change (HEAD, index)
+                    let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
+                    if is_git_event {
+                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                            if ctx.context_type == ContextType::GitResult || ctx.context_type == ContextType::Git {
+                                ctx.cache_deprecated = true;
+                                self.state.dirty = true;
+                                refresh_indices.push(i);
+                            }
+                        }
+                    } else {
+                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                            if ctx.context_type == ContextType::File && ctx.file_path.as_deref() == Some(path.as_str()) {
+                                ctx.cache_deprecated = true;
+                                self.state.dirty = true;
+                                refresh_indices.push(i);
+                            }
                         }
                     }
                     rewatch_paths.push(path.clone());
                 }
-                WatchEvent::DirChanged(_path) => {
-                    for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                        if ctx.context_type == ContextType::Tree {
-                            ctx.cache_deprecated = true;
-                            self.state.dirty = true;
-                            refresh_indices.push(i);
+                WatchEvent::DirChanged(path) => {
+                    // Check if this is a .git/ directory change
+                    let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
+                    if is_git_event {
+                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                            if ctx.context_type == ContextType::GitResult || ctx.context_type == ContextType::Git {
+                                ctx.cache_deprecated = true;
+                                self.state.dirty = true;
+                                refresh_indices.push(i);
+                            }
+                        }
+                    } else {
+                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                            if ctx.context_type == ContextType::Tree {
+                                ctx.cache_deprecated = true;
+                                self.state.dirty = true;
+                                refresh_indices.push(i);
+                            }
                         }
                     }
                 }

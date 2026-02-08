@@ -184,6 +184,8 @@ fn create_file(path: &str, content: &str, state: &mut State) -> CreateResult {
         tmux_lines: None,
         tmux_last_keys: None,
         tmux_description: None,
+        result_command: None,
+        result_command_hash: None,
         cached_content: Some(content.to_string()),
         cache_deprecated: true,
         last_refresh_ms: crate::core::panels::now_ms(),

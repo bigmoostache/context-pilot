@@ -71,6 +71,8 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_lines: None,
         tmux_last_keys: None,
         tmux_description: None,
+        result_command: None,
+        result_command_hash: None,
         cached_content: None, // Background will populate
         cache_deprecated: true, // Trigger background refresh
         last_refresh_ms: crate::core::panels::now_ms(),

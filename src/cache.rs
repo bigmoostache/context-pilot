@@ -62,6 +62,20 @@ pub enum CacheUpdate {
     },
     /// Git status unchanged (hash matched, no need to update)
     GitStatusUnchanged,
+    /// Git result command output
+    GitResultContent {
+        context_id: String,
+        content: String,
+        token_count: usize,
+        is_error: bool,
+    },
+    /// GitHub result command output
+    GithubResultContent {
+        context_id: String,
+        content: String,
+        token_count: usize,
+        is_error: bool,
+    },
 }
 
 /// Request for background cache operations
@@ -105,6 +119,19 @@ pub enum CacheRequest {
         show_diffs: bool,
         /// Current status hash (for change detection - skip if unchanged)
         current_hash: Option<String>,
+        /// Diff base ref (e.g., "HEAD~3", "main") — None means default (HEAD/working tree)
+        diff_base: Option<String>,
+    },
+    /// Refresh a git result panel (re-execute read-only git command)
+    RefreshGitResult {
+        context_id: String,
+        command: String,
+    },
+    /// Refresh a GitHub result panel (re-execute read-only gh command)
+    RefreshGithubResult {
+        context_id: String,
+        command: String,
+        github_token: String,
     },
 }
 
@@ -119,6 +146,8 @@ impl CacheRequest {
             CacheRequest::RefreshGrep { .. } => ContextType::Grep,
             CacheRequest::RefreshTmux { .. } => ContextType::Tmux,
             CacheRequest::RefreshGitStatus { .. } => ContextType::Git,
+            CacheRequest::RefreshGitResult { .. } => ContextType::GitResult,
+            CacheRequest::RefreshGithubResult { .. } => ContextType::GithubResult,
         }
     }
 }
@@ -134,6 +163,8 @@ impl CacheUpdate {
             CacheUpdate::GrepContent { .. } => ContextType::Grep,
             CacheUpdate::TmuxContent { .. } => ContextType::Tmux,
             CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged => ContextType::Git,
+            CacheUpdate::GitResultContent { .. } => ContextType::GitResult,
+            CacheUpdate::GithubResultContent { .. } => ContextType::GithubResult,
         }
     }
 
@@ -147,6 +178,8 @@ impl CacheUpdate {
             CacheUpdate::GrepContent { context_id, .. } => Some(context_id),
             CacheUpdate::TmuxContent { context_id, .. } => Some(context_id),
             CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged => None,
+            CacheUpdate::GitResultContent { context_id, .. } => Some(context_id),
+            CacheUpdate::GithubResultContent { context_id, .. } => Some(context_id),
         }
     }
 }

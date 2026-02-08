@@ -1,6 +1,7 @@
 pub mod core;
 pub mod files;
 pub mod git;
+pub mod github;
 pub mod glob;
 pub mod grep;
 pub mod memory;
@@ -12,11 +13,40 @@ pub mod todo;
 pub mod tree;
 
 use std::collections::HashSet;
+use std::process::{Command, Output, Stdio};
+use std::time::Duration;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
 use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
 use crate::tools::{ToolUse, ToolResult};
+
+/// Run a Command with a timeout. Returns TimedOut error if the command exceeds the limit.
+pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<Output> {
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
+    let child = cmd.spawn()?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(child.wait_with_output());
+    });
+    match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
+        Ok(result) => result,
+        Err(_) => Err(std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            format!("Command timed out after {}s", timeout_secs),
+        )),
+    }
+}
+
+/// Truncate output to max_bytes, respecting UTF-8 char boundaries.
+pub fn truncate_output(output: &str, max_bytes: usize) -> String {
+    if output.len() <= max_bytes {
+        output.to_string()
+    } else {
+        let truncated = &output[..output.floor_char_boundary(max_bytes)];
+        format!("{}\n\n[Output truncated at 1MB]", truncated)
+    }
+}
 
 /// A module that provides tools, panels, and configuration to the TUI.
 ///
@@ -40,10 +70,19 @@ pub trait Module: Send + Sync {
 
     /// Serialize this module's data from State into a JSON value for persistence.
     /// Returns Value::Null if this module has no data to persist.
+    /// Stored in SharedConfig (if is_global) or WorkerState (if !is_global).
     fn save_module_data(&self, _state: &State) -> serde_json::Value { serde_json::Value::Null }
 
     /// Deserialize this module's data from a JSON value and apply it to State.
+    /// Data comes from SharedConfig (if is_global) or WorkerState (if !is_global).
     fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    /// Serialize worker-specific data for modules that are global but also need per-worker state.
+    /// Returns Value::Null if no worker-specific data. Always stored in WorkerState.
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value { serde_json::Value::Null }
+
+    /// Deserialize worker-specific data. Always loaded from WorkerState.
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
     /// Tool definitions provided by this module
     fn tool_definitions(&self) -> Vec<ToolDefinition>;
@@ -124,6 +163,8 @@ pub fn make_default_context_element(
         tmux_lines: None,
         tmux_last_keys: None,
         tmux_description: None,
+        result_command: None,
+        result_command_hash: None,
         cached_content: None,
         cache_deprecated,
         last_refresh_ms: crate::core::panels::now_ms(),
@@ -142,6 +183,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(files::FilesModule),
         Box::new(tree::TreeModule),
         Box::new(git::GitModule),
+        Box::new(github::GithubModule),
         Box::new(glob::GlobModule),
         Box::new(grep::GrepModule),
         Box::new(tmux::TmuxModule),

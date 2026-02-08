@@ -1,618 +1,273 @@
 use std::process::Command;
 
-use crate::state::State;
+use sha2::{Sha256, Digest};
+
+use crate::constants::{GIT_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
+use crate::modules::{run_with_timeout, truncate_output};
+use crate::state::{ContextType, State};
 use crate::tools::{ToolUse, ToolResult};
 
-/// Execute toggle_git_details tool
-pub fn execute_toggle_details(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let show = tool.input.get("show")
-        .and_then(|v| v.as_bool());
+use super::classify::{validate_git_command, classify_git, CommandClass};
 
-    // Toggle or set explicitly
-    let new_value = match show {
-        Some(v) => v,
-        None => !state.git_show_diffs, // Toggle if not specified
-    };
-
-    state.git_show_diffs = new_value;
-
-    // Mark git context as needing refresh so content updates
-    for ctx in &mut state.context {
-        if ctx.context_type == crate::state::ContextType::Git {
-            ctx.cache_deprecated = true;
-            break;
-        }
-    }
-
-    let status = if new_value { "enabled" } else { "disabled" };
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Git diff details {}", status),
-        is_error: false,
-    }
+/// Compute SHA-256 hex hash of a string
+fn sha256_hex(input: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    format!("{:064x}", hasher.finalize())
 }
 
-/// Execute toggle_git_logs tool
-pub fn execute_toggle_logs(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let show = tool.input.get("show")
-        .and_then(|v| v.as_bool());
-    let args = tool.input.get("args")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-
-    // Toggle or set explicitly
-    let new_value = match show {
-        Some(v) => v,
-        None => !state.git_show_logs, // Toggle if not specified
-    };
-
-    state.git_show_logs = new_value;
-
-    // Update args if provided
-    if args.is_some() {
-        state.git_log_args = args;
-    }
-
-    // Fetch git log if enabled
-    if new_value {
-        let log_args = state.git_log_args.as_deref().unwrap_or("-10 --oneline");
-        let args_vec: Vec<&str> = log_args.split_whitespace().collect();
-
-        let mut cmd = Command::new("git");
-        cmd.arg("log");
-        for arg in args_vec {
-            cmd.arg(arg);
-        }
-
-        match cmd.output() {
-            Ok(output) if output.status.success() => {
-                state.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
-            }
-            _ => {
-                state.git_log_content = Some("Failed to fetch git log".to_string());
-            }
-        }
-    } else {
-        state.git_log_content = None;
-    }
-
-    // Mark git context as needing refresh so content updates
-    for ctx in &mut state.context {
-        if ctx.context_type == crate::state::ContextType::Git {
-            ctx.cache_deprecated = true;
-            break;
-        }
-    }
-
-    let status = if new_value { "enabled" } else { "disabled" };
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Git logs {}", status),
-        is_error: false,
-    }
-}
-
-/// Execute git_commit tool
-pub fn execute_commit(tool: &ToolUse, _state: &mut State) -> ToolResult {
-    let message = match tool.input.get("message").and_then(|v| v.as_str()) {
-        Some(m) => m,
+/// Execute a raw git command.
+/// Read-only commands create/reuse GitResult panels.
+/// Mutating commands execute and return output directly.
+pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let command = match tool.input.get("command").and_then(|v| v.as_str()) {
+        Some(c) => c,
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: "Error: 'message' parameter is required".to_string(),
+                content: "Error: 'command' parameter is required".to_string(),
                 is_error: true,
             };
         }
     };
 
-    let files: Vec<String> = tool.input.get("files")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    // Check if we're in a git repo
-    let repo_check = Command::new("git")
-        .args(["rev-parse", "--git-dir"])
-        .output();
-
-    match repo_check {
-        Ok(output) if !output.status.success() => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Error: Not a git repository".to_string(),
-                is_error: true,
-            };
-        }
+    // Validate
+    let args = match validate_git_command(command) {
+        Ok(a) => a,
         Err(e) => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Error: Failed to run git: {}", e),
+                content: format!("Validation error: {}", e),
                 is_error: true,
             };
         }
-        _ => {}
-    }
+    };
 
-    // Stage files if provided
-    if !files.is_empty() {
-        let mut add_cmd = Command::new("git");
-        add_cmd.arg("add").args(&files);
+    // Classify
+    let class = classify_git(&args);
 
-        match add_cmd.output() {
-            Ok(output) if !output.status.success() => {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return ToolResult {
+    match class {
+        CommandClass::ReadOnly => {
+            let cmd_hash = sha256_hex(command);
+
+            // Search for existing GitResult panel with same command hash
+            let existing_idx = state.context.iter().position(|c| {
+                c.context_type == ContextType::GitResult
+                    && c.result_command_hash.as_deref() == Some(&cmd_hash)
+            });
+
+            if let Some(idx) = existing_idx {
+                // Reuse existing panel — mark deprecated to trigger re-fetch
+                state.context[idx].cache_deprecated = true;
+                let panel_id = state.context[idx].id.clone();
+                ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!("Error staging files: {}", stderr),
-                    is_error: true,
-                };
-            }
-            Err(e) => {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Error running git add: {}", e),
-                    is_error: true,
-                };
-            }
-            _ => {}
-        }
-    }
-
-    // Check if there are staged changes
-    let diff_check = Command::new("git")
-        .args(["diff", "--cached", "--quiet"])
-        .output();
-
-    match diff_check {
-        Ok(output) if output.status.success() => {
-            // Exit code 0 means no staged changes
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Error: No changes staged for commit".to_string(),
-                is_error: true,
-            };
-        }
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error checking staged changes: {}", e),
-                is_error: true,
-            };
-        }
-        _ => {} // Exit code 1 means there are changes
-    }
-
-    // Get stats before committing
-    let stats = get_commit_stats();
-
-    // Create the commit
-    let commit_result = Command::new("git")
-        .args(["commit", "-m", message])
-        .output();
-
-    match commit_result {
-        Ok(output) if output.status.success() => {
-            // Get the commit hash
-            let hash = Command::new("git")
-                .args(["rev-parse", "--short", "HEAD"])
-                .output()
-                .ok()
-                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-                .unwrap_or_else(|| "unknown".to_string());
-
-            let mut result = format!("Committed: {}\n", hash);
-            result.push_str(&format!("Message: {}\n", message));
-
-            if let Some((files_changed, insertions, deletions)) = stats {
-                result.push_str(&format!("\n{} file(s) changed", files_changed));
-                if insertions > 0 {
-                    result.push_str(&format!(", +{} insertions", insertions));
+                    content: format!("Panel updated: {}", panel_id),
+                    is_error: false,
                 }
-                if deletions > 0 {
-                    result.push_str(&format!(", -{} deletions", deletions));
+            } else {
+                // Create new GitResult panel
+                let panel_id = state.next_available_context_id();
+                let uid = format!("UID_{}_P", state.global_next_uid);
+                state.global_next_uid += 1;
+
+                let mut elem = crate::modules::make_default_context_element(
+                    &panel_id, ContextType::GitResult, command, true,
+                );
+                elem.uid = Some(uid);
+                elem.result_command = Some(command.to_string());
+                elem.result_command_hash = Some(cmd_hash);
+                state.context.push(elem);
+
+                ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Panel created: {}", panel_id),
+                    is_error: false,
                 }
             }
+        }
+        CommandClass::Mutating => {
+            // Execute directly with timeout
+            let mut cmd = Command::new("git");
+            cmd.args(&args)
+                .env("GIT_TERMINAL_PROMPT", "0");
+            let result = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: result,
-                is_error: false,
-            }
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error committing: {}{}", stderr, stdout),
-                is_error: true,
-            }
-        }
-        Err(e) => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error running git commit: {}", e),
-                is_error: true,
-            }
-        }
-    }
-}
-
-/// Execute git_create_branch tool
-pub fn execute_create_branch(tool: &ToolUse, _state: &mut State) -> ToolResult {
-    let branch_name = match tool.input.get("name").and_then(|v| v.as_str()) {
-        Some(n) => n,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Error: 'name' parameter is required".to_string(),
-                is_error: true,
-            };
-        }
-    };
-
-    // Create and checkout new branch
-    let result = Command::new("git")
-        .args(["checkout", "-b", branch_name])
-        .output();
-
-    match result {
-        Ok(output) if output.status.success() => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Created and switched to branch '{}'", branch_name),
-                is_error: false,
-            }
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error creating branch: {}", stderr),
-                is_error: true,
-            }
-        }
-        Err(e) => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error running git: {}", e),
-                is_error: true,
-            }
-        }
-    }
-}
-
-/// Execute git_change_branch tool
-pub fn execute_change_branch(tool: &ToolUse, _state: &mut State) -> ToolResult {
-    let branch_name = match tool.input.get("branch").and_then(|v| v.as_str()) {
-        Some(n) => n,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Error: 'branch' parameter is required".to_string(),
-                is_error: true,
-            };
-        }
-    };
-
-    // Check for uncommitted changes
-    let status = Command::new("git")
-        .args(["status", "--porcelain"])
-        .output();
-
-    match status {
-        Ok(output) if output.status.success() => {
-            let status_output = String::from_utf8_lossy(&output.stdout);
-            if !status_output.trim().is_empty() {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: "Error: Uncommitted or unstaged changes exist. Commit or stash them first.".to_string(),
-                    is_error: true,
-                };
-            }
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error checking status: {}", stderr),
-                is_error: true,
-            };
-        }
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error running git status: {}", e),
-                is_error: true,
-            };
-        }
-    }
-
-    // Switch to branch
-    let result = Command::new("git")
-        .args(["checkout", branch_name])
-        .output();
-
-    match result {
-        Ok(output) if output.status.success() => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Switched to branch '{}'", branch_name),
-                is_error: false,
-            }
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error switching branch: {}", stderr),
-                is_error: true,
-            }
-        }
-        Err(e) => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error running git: {}", e),
-                is_error: true,
-            }
-        }
-    }
-}
-
-/// Execute git_merge tool
-pub fn execute_merge(tool: &ToolUse, _state: &mut State) -> ToolResult {
-    let branch_name = match tool.input.get("branch").and_then(|v| v.as_str()) {
-        Some(n) => n,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Error: 'branch' parameter is required".to_string(),
-                is_error: true,
-            };
-        }
-    };
-
-    // Merge the branch
-    let result = Command::new("git")
-        .args(["merge", branch_name])
-        .output();
-
-    match result {
-        Ok(output) if output.status.success() => {
-            // Merge succeeded, delete the merged branch
-            let delete_result = Command::new("git")
-                .args(["branch", "-d", branch_name])
-                .output();
-
-            let delete_msg = match delete_result {
-                Ok(del_output) if del_output.status.success() => {
-                    format!("Deleted branch '{}'", branch_name)
+            // Heuristic-based cache invalidation for GitResult panels
+            let invalidations = super::cache_invalidation::find_invalidations(command);
+            if invalidations.is_empty() {
+                // Unknown mutating command → blanket invalidation (safe default)
+                for ctx in &mut state.context {
+                    if ctx.context_type == ContextType::GitResult {
+                        ctx.cache_deprecated = true;
+                    }
                 }
-                Ok(del_output) => {
-                    let stderr = String::from_utf8_lossy(&del_output.stderr);
-                    format!("Branch merged but could not delete: {}", stderr)
+            } else {
+                for ctx in &mut state.context {
+                    if ctx.context_type == ContextType::GitResult {
+                        if let Some(ref cmd) = ctx.result_command {
+                            if invalidations.iter().any(|re| re.is_match(cmd)) {
+                                ctx.cache_deprecated = true;
+                            }
+                        }
+                    }
+                }
+            }
+            // P6 (Git) always invalidated via .git/ file watcher — no action needed here
+
+            match result {
+                Ok(output) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    let combined = if stderr.trim().is_empty() {
+                        stdout.trim().to_string()
+                    } else if stdout.trim().is_empty() {
+                        stderr.trim().to_string()
+                    } else {
+                        format!("{}\n{}", stdout.trim(), stderr.trim())
+                    };
+                    let is_error = !output.status.success();
+                    let combined = truncate_output(&combined, MAX_RESULT_CONTENT_BYTES);
+                    ToolResult {
+                        tool_use_id: tool.id.clone(),
+                        content: if combined.is_empty() {
+                            if is_error { "Command failed with no output".to_string() }
+                            else { "Command completed successfully".to_string() }
+                        } else {
+                            combined
+                        },
+                        is_error,
+                    }
                 }
                 Err(e) => {
-                    format!("Branch merged but could not delete: {}", e)
+                    let content = if e.kind() == std::io::ErrorKind::NotFound {
+                        "git not found. Ensure git is installed and on PATH.".to_string()
+                    } else {
+                        format!("Error running git: {}", e)
+                    };
+                    ToolResult {
+                        tool_use_id: tool.id.clone(),
+                        content,
+                        is_error: true,
+                    }
                 }
-            };
-
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Merged '{}' successfully. {}", branch_name, delete_msg),
-                is_error: false,
-            }
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Merge failed: {}{}", stderr, stdout),
-                is_error: true,
-            }
-        }
-        Err(e) => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error running git merge: {}", e),
-                is_error: true,
             }
         }
     }
 }
 
-/// Get stats for staged changes before commit
-fn get_commit_stats() -> Option<(usize, usize, usize)> {
-    let output = Command::new("git")
-        .args(["diff", "--cached", "--numstat"])
-        .output()
-        .ok()?;
+/// Configure the P6 git status panel.
+/// Supports: show_diffs, show_logs, log_args, diff_base.
+pub fn execute_configure_p6(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let show_diffs = tool.input.get("show_diffs").and_then(|v| v.as_bool());
+    let show_logs = tool.input.get("show_logs").and_then(|v| v.as_bool());
+    let log_args = tool.input.get("log_args").and_then(|v| v.as_str());
+    let diff_base = tool.input.get("diff_base").and_then(|v| v.as_str());
 
-    if !output.status.success() {
-        return None;
+    let mut changes = Vec::new();
+
+    // Update show_diffs
+    if let Some(v) = show_diffs {
+        state.git_show_diffs = v;
+        changes.push(format!("show_diffs={}", v));
     }
 
-    let content = String::from_utf8_lossy(&output.stdout);
-    let mut files_changed = 0;
-    let mut insertions = 0;
-    let mut deletions = 0;
+    // Update show_logs
+    if let Some(v) = show_logs {
+        state.git_show_logs = v;
+        if v {
+            // Fetch git log content
+            let args_str = log_args.or(state.git_log_args.as_deref()).unwrap_or("-10 --oneline");
+            let args_vec: Vec<&str> = args_str.split_whitespace().collect();
 
-    for line in content.lines() {
-        let parts: Vec<&str> = line.split('\t').collect();
-        if parts.len() >= 2 {
-            files_changed += 1;
-            // Binary files show "-" for counts
-            if let Ok(add) = parts[0].parse::<usize>() {
-                insertions += add;
+            let mut cmd = Command::new("git");
+            cmd.arg("log");
+            for arg in args_vec {
+                cmd.arg(arg);
             }
-            if let Ok(del) = parts[1].parse::<usize>() {
-                deletions += del;
+            match cmd.output() {
+                Ok(output) if output.status.success() => {
+                    state.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
+                }
+                _ => {
+                    state.git_log_content = Some("Failed to fetch git log".to_string());
+                }
             }
+        } else {
+            state.git_log_content = None;
         }
+        changes.push(format!("show_logs={}", v));
     }
 
-    Some((files_changed, insertions, deletions))
-}
-
-/// Execute git_pull tool
-pub fn execute_pull(tool: &ToolUse, _state: &mut State) -> ToolResult {
-    let result = Command::new("git")
-        .args(["pull"])
-        .env("GIT_TERMINAL_PROMPT", "0") // Disable interactive prompts
-        .stdin(std::process::Stdio::null()) // No stdin
-        .output();
-
-    match result {
-        Ok(output) if output.status.success() => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: if stdout.trim().is_empty() {
-                    "Pull successful: Already up to date".to_string()
-                } else {
-                    format!("Pull successful:\n{}", stdout.trim())
-                },
-                is_error: false,
+    // Update log_args (even without toggling show_logs)
+    if let Some(args) = log_args {
+        state.git_log_args = Some(args.to_string());
+        // Re-fetch if logs are currently shown
+        if state.git_show_logs {
+            let args_vec: Vec<&str> = args.split_whitespace().collect();
+            let mut cmd = Command::new("git");
+            cmd.arg("log");
+            for arg in args_vec {
+                cmd.arg(arg);
+            }
+            match cmd.output() {
+                Ok(output) if output.status.success() => {
+                    state.git_log_content = Some(String::from_utf8_lossy(&output.stdout).to_string());
+                }
+                _ => {
+                    state.git_log_content = Some("Failed to fetch git log".to_string());
+                }
             }
         }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let error_msg = format!("{}{}", stderr.trim(), stdout.trim());
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: if error_msg.contains("Authentication") || error_msg.contains("credential") || error_msg.contains("terminal prompts disabled") {
-                    "Pull failed: Git authentication required. Please configure git credentials.".to_string()
-                } else if error_msg.contains("Could not resolve host") || error_msg.contains("unable to access") {
-                    "Pull failed: Network error or remote unreachable.".to_string()
-                } else if error_msg.is_empty() {
-                    "Pull failed: Unknown error".to_string()
-                } else {
-                    format!("Pull failed: {}", error_msg)
-                },
-                is_error: true,
-            }
-        }
-        Err(e) => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error running git pull: {}", e),
-                is_error: true,
-            }
-        }
+        changes.push(format!("log_args={}", args));
     }
-}
 
-/// Execute git_push tool
-pub fn execute_push(tool: &ToolUse, _state: &mut State) -> ToolResult {
-    let result = Command::new("git")
-        .args(["push"])
-        .env("GIT_TERMINAL_PROMPT", "0") // Disable interactive prompts
-        .stdin(std::process::Stdio::null()) // No stdin
-        .output();
-
-    match result {
-        Ok(output) if output.status.success() => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            // git push often outputs to stderr even on success
-            let output_text = if !stderr.trim().is_empty() {
-                stderr.trim().to_string()
-            } else if !stdout.trim().is_empty() {
-                stdout.trim().to_string()
-            } else {
-                "Push successful".to_string()
-            };
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Push successful:\n{}", output_text),
-                is_error: false,
-            }
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let error_msg = format!("{}{}", stderr.trim(), stdout.trim());
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: if error_msg.contains("Authentication") || error_msg.contains("credential") || error_msg.contains("terminal prompts disabled") {
-                    "Push failed: Git authentication required. Please configure git credentials.".to_string()
-                } else if error_msg.contains("Could not resolve host") || error_msg.contains("unable to access") {
-                    "Push failed: Network error or remote unreachable.".to_string()
-                } else if error_msg.contains("no upstream branch") {
-                    "Push failed: No upstream branch configured. Try: git push -u origin <branch>".to_string()
-                } else if error_msg.is_empty() {
-                    "Push failed: Unknown error".to_string()
-                } else {
-                    format!("Push failed: {}", error_msg)
-                },
-                is_error: true,
-            }
-        }
-        Err(e) => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error running git push: {}", e),
-                is_error: true,
+    // Update diff_base
+    if let Some(base) = diff_base {
+        if base.is_empty() || base == "none" || base == "null" {
+            // Clear diff base — revert to default
+            state.git_diff_base = None;
+            changes.push("diff_base=<cleared>".to_string());
+        } else {
+            // Validate the ref
+            let check = Command::new("git")
+                .args(["rev-parse", "--verify", base])
+                .output();
+            match check {
+                Ok(output) if output.status.success() => {
+                    state.git_diff_base = Some(base.to_string());
+                    changes.push(format!("diff_base={}", base));
+                }
+                _ => {
+                    return ToolResult {
+                        tool_use_id: tool.id.clone(),
+                        content: format!("Error: '{}' is not a valid git ref", base),
+                        is_error: true,
+                    };
+                }
             }
         }
     }
-}
 
-/// Execute git_fetch tool
-pub fn execute_fetch(tool: &ToolUse, _state: &mut State) -> ToolResult {
-    let result = Command::new("git")
-        .args(["fetch"])
-        .env("GIT_TERMINAL_PROMPT", "0") // Disable interactive prompts
-        .stdin(std::process::Stdio::null()) // No stdin
-        .output();
+    if changes.is_empty() {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: "No changes specified. Use show_diffs, show_logs, log_args, or diff_base parameters.".to_string(),
+            is_error: true,
+        };
+    }
 
-    match result {
-        Ok(output) if output.status.success() => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let output_text = if stdout.trim().is_empty() && stderr.trim().is_empty() {
-                "No new changes from remote".to_string()
-            } else if !stderr.trim().is_empty() {
-                stderr.trim().to_string()
-            } else {
-                stdout.trim().to_string()
-            };
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Fetch successful:\n{}", output_text),
-                is_error: false,
-            }
+    // Mark P6 as deprecated to refresh
+    for ctx in &mut state.context {
+        if ctx.context_type == ContextType::Git {
+            ctx.cache_deprecated = true;
+            break;
         }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let error_msg = format!("{}{}", stderr.trim(), stdout.trim());
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: if error_msg.contains("Authentication") || error_msg.contains("credential") || error_msg.contains("terminal prompts disabled") {
-                    "Fetch failed: Git authentication required. Please configure git credentials.".to_string()
-                } else if error_msg.contains("Could not resolve host") || error_msg.contains("unable to access") {
-                    "Fetch failed: Network error or remote unreachable.".to_string()
-                } else if error_msg.is_empty() {
-                    "Fetch failed: Unknown error".to_string()
-                } else {
-                    format!("Fetch failed: {}", error_msg)
-                },
-                is_error: true,
-            }
-        }
-        Err(e) => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Error running git fetch: {}", e),
-                is_error: true,
-            }
-        }
+    }
+
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("P6 configured: {}", changes.join(", ")),
+        is_error: false,
     }
 }

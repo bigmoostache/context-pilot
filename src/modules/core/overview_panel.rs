@@ -25,140 +25,30 @@ impl Panel for OverviewPanel {
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        // LLM should see the same overview the user sees
-        let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-        let budget = state.effective_context_budget();
-        let threshold = state.cleaning_threshold_tokens();
-        let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
-
-        let mut output = format!("Context Usage: {} / {} threshold / {} budget ({:.1}%)\n\n",
-            total_tokens, threshold, budget, usage_pct);
-
-        output.push_str("Context Elements:\n");
-        for ctx in &state.context {
-            let type_name = match ctx.context_type {
-                ContextType::System => "seed",
-                ContextType::Conversation => "chat",
-                ContextType::File => "file",
-                ContextType::Tree => "tree",
-                ContextType::Glob => "glob",
-                ContextType::Grep => "grep",
-                ContextType::Tmux => "tmux",
-                ContextType::Todo => "wip",
-                ContextType::Memory => "memories",
-                ContextType::Overview => "world",
-                ContextType::Git => "changes",
-                ContextType::Scratchpad => "scratch",
-            };
-
-            let details = match ctx.context_type {
-                ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
-                ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
-                ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
-                ContextType::Tmux => ctx.tmux_pane_id.as_deref().unwrap_or("").to_string(),
-                _ => String::new(),
-            };
-
-            if details.is_empty() {
-                if ctx.total_pages > 1 {
-                    output.push_str(&format!("  {} {} [page {}/{}]: {} tokens\n", ctx.id, type_name, ctx.current_page + 1, ctx.total_pages, ctx.token_count));
-                } else {
-                    output.push_str(&format!("  {} {}: {} tokens\n", ctx.id, type_name, ctx.token_count));
-                }
-            } else {
-                if ctx.total_pages > 1 {
-                    output.push_str(&format!("  {} {} ({}) [page {}/{}]: {} tokens\n", ctx.id, type_name, details, ctx.current_page + 1, ctx.total_pages, ctx.token_count));
-                } else {
-                    output.push_str(&format!("  {} {} ({}): {} tokens\n", ctx.id, type_name, details, ctx.token_count));
-                }
+        // Use cached content if available (set by refresh)
+        if let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::Overview) {
+            if let Some(content) = &ctx.cached_content {
+                return vec![ContextItem::new(&ctx.id, "Context Overview", content.clone(), ctx.last_refresh_ms)];
             }
         }
 
-        // Statistics
-        let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
-        let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
-        output.push_str(&format!("\nMessages: {} ({} user, {} assistant)\n",
-            state.messages.len(), user_msgs, assistant_msgs));
-
-        if !state.todos.is_empty() {
-            let done = state.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
-            output.push_str(&format!("Todos: {}/{} done\n", done, state.todos.len()));
-        }
-
-        if !state.memories.is_empty() {
-            output.push_str(&format!("Memories: {}\n", state.memories.len()));
-        }
-
-        // Available seeds (system prompts) for LLM
-        output.push_str("\nSeeds (System Prompts):\n\n");
-        output.push_str("| ID | Name | Active | Description |\n");
-        output.push_str("|-----|------|--------|-------------|\n");
-        for sys in &state.systems {
-            let active = if state.active_system_id.as_deref() == Some(&sys.id) { "✓" } else { " " };
-            output.push_str(&format!("| {} | {} | {} | {} |\n", sys.id, sys.name, active, sys.description));
-        }
-
-        // Presets table for LLM
-        let presets = crate::modules::preset::tools::list_presets_with_info();
-        if !presets.is_empty() {
-            output.push_str("\nPresets:\n\n");
-            output.push_str("| Name | Type | Description |\n");
-            output.push_str("|------|------|-------------|\n");
-            for p in &presets {
-                let ptype = if p.built_in { "built-in" } else { "custom" };
-                output.push_str(&format!("| {} | {} | {} |\n", p.name, ptype, p.description));
-            }
-        }
-
-        // Git status for LLM (as markdown table)
-        if state.git_is_repo {
-            if let Some(branch) = &state.git_branch {
-                output.push_str(&format!("\nGit Branch: {}\n", branch));
-            }
-
-            if state.git_file_changes.is_empty() {
-                output.push_str("Git Status: Working tree clean\n");
-            } else {
-                output.push_str("\nGit Changes:\n\n");
-                output.push_str("| File | + | - | Net |\n");
-                output.push_str("|------|---|---|-----|\n");
-
-                let mut total_add: i32 = 0;
-                let mut total_del: i32 = 0;
-
-                for file in &state.git_file_changes {
-                    total_add += file.additions;
-                    total_del += file.deletions;
-                    let net = file.additions - file.deletions;
-                    let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
-                    output.push_str(&format!("| {} | +{} | -{} | {} |\n",
-                        file.path, file.additions, file.deletions, net_str));
-                }
-
-                let total_net = total_add - total_del;
-                let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
-                output.push_str(&format!("| **Total** | **+{}** | **-{}** | **{}** |\n",
-                    total_add, total_del, total_net_str));
-            }
-        }
-
-        // Tools table (markdown format for LLM)
-        let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
-        let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
-        output.push_str(&format!("\nTools ({} enabled, {} disabled):\n\n", enabled_count, disabled_count));
-        output.push_str("| Category | Tool | Status | Description |\n");
-        output.push_str("|----------|------|--------|-------------|\n");
-        for tool in &state.tools {
-            let status = if tool.enabled { "✓" } else { "✗" };
-            output.push_str(&format!("| {} | {} | {} | {} |\n", tool.category.short_name(), tool.id, status, tool.short_desc));
-        }
-
-        // Find the Overview context element to get its ID and timestamp
+        // Fallback: generate fresh
+        let output = self.generate_context_content(state);
         let (id, last_refresh_ms) = state.context.iter()
             .find(|c| c.context_type == ContextType::Overview)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
             .unwrap_or(("P5", 0));
         vec![ContextItem::new(id, "Context Overview", output, last_refresh_ms)]
+    }
+
+    fn refresh(&self, state: &mut State) {
+        let content = self.generate_context_content(state);
+        let token_count = crate::state::estimate_tokens(&content);
+
+        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Overview) {
+            ctx.token_count = token_count;
+            ctx.cached_content = Some(content);
+        }
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
@@ -408,6 +298,8 @@ impl Panel for OverviewPanel {
                 ContextType::Memory => "memory",
                 ContextType::Overview => "overview",
                 ContextType::Git => "git",
+                ContextType::GitResult => "git-result",
+                ContextType::GithubResult => "github-result",
                 ContextType::Scratchpad => "scratchpad",
             };
 
@@ -419,6 +311,9 @@ impl Panel for OverviewPanel {
                     let pane = ctx.tmux_pane_id.as_deref().unwrap_or("?");
                     let desc = ctx.tmux_description.as_deref().unwrap_or("");
                     if desc.is_empty() { pane.to_string() } else { format!("{}: {}", pane, desc) }
+                }
+                ContextType::GitResult | ContextType::GithubResult => {
+                    ctx.result_command.as_deref().unwrap_or("").to_string()
                 }
                 _ => String::new(),
             };
@@ -433,13 +328,6 @@ impl Panel for OverviewPanel {
                 Span::styled(format!("{:<12}", type_name), Style::default().fg(theme::text_secondary())),
                 Span::styled(format!("{:>8}", tokens), Style::default().fg(theme::accent())),
             ];
-
-            if ctx.total_pages > 1 {
-                spans.push(Span::styled(
-                    format!("  [{}/{}]", ctx.current_page + 1, ctx.total_pages),
-                    Style::default().fg(theme::warning()),
-                ));
-            }
 
             if !details.is_empty() {
                 let max_detail_len = 40usize;
@@ -691,6 +579,7 @@ impl Panel for OverviewPanel {
                 ToolCategory::Todo => ("TODO", tool_categories::todo_desc()),
                 ToolCategory::Memory => ("MEMORY", tool_categories::memory_desc()),
                 ToolCategory::Git => ("GIT", tool_categories::git_desc()),
+                ToolCategory::Github => ("GITHUB", "GitHub API operations via gh CLI"),
                 ToolCategory::Scratchpad => ("SCRATCHPAD", tool_categories::scratchpad_desc()),
             };
 
@@ -732,5 +621,135 @@ impl Panel for OverviewPanel {
         }
 
         text
+    }
+}
+
+impl OverviewPanel {
+    fn generate_context_content(&self, state: &State) -> String {
+        let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+        let budget = state.effective_context_budget();
+        let threshold = state.cleaning_threshold_tokens();
+        let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
+
+        let mut output = format!("Context Usage: {} / {} threshold / {} budget ({:.1}%)\n\n",
+            total_tokens, threshold, budget, usage_pct);
+
+        output.push_str("Context Elements:\n");
+        for ctx in &state.context {
+            let type_name = match ctx.context_type {
+                ContextType::System => "seed",
+                ContextType::Conversation => "chat",
+                ContextType::File => "file",
+                ContextType::Tree => "tree",
+                ContextType::Glob => "glob",
+                ContextType::Grep => "grep",
+                ContextType::Tmux => "tmux",
+                ContextType::Todo => "wip",
+                ContextType::Memory => "memories",
+                ContextType::Overview => "world",
+                ContextType::Git => "changes",
+                ContextType::GitResult => "git-cmd",
+                ContextType::GithubResult => "gh-cmd",
+                ContextType::Scratchpad => "scratch",
+            };
+
+            let details = match ctx.context_type {
+                ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
+                ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
+                ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
+                ContextType::Tmux => ctx.tmux_pane_id.as_deref().unwrap_or("").to_string(),
+                ContextType::GitResult | ContextType::GithubResult => {
+                    ctx.result_command.as_deref().unwrap_or("").to_string()
+                }
+                _ => String::new(),
+            };
+
+            if details.is_empty() {
+                output.push_str(&format!("  {} {}: {} tokens\n", ctx.id, type_name, ctx.token_count));
+            } else {
+                output.push_str(&format!("  {} {} ({}): {} tokens\n", ctx.id, type_name, details, ctx.token_count));
+            }
+        }
+
+        // Statistics
+        let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
+        let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
+        output.push_str(&format!("\nMessages: {} ({} user, {} assistant)\n",
+            state.messages.len(), user_msgs, assistant_msgs));
+
+        if !state.todos.is_empty() {
+            let done = state.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
+            output.push_str(&format!("Todos: {}/{} done\n", done, state.todos.len()));
+        }
+
+        if !state.memories.is_empty() {
+            output.push_str(&format!("Memories: {}\n", state.memories.len()));
+        }
+
+        // Available seeds (system prompts) for LLM
+        output.push_str("\nSeeds (System Prompts):\n\n");
+        output.push_str("| ID | Name | Active | Description |\n");
+        output.push_str("|-----|------|--------|-------------|\n");
+        for sys in &state.systems {
+            let active = if state.active_system_id.as_deref() == Some(&sys.id) { "✓" } else { " " };
+            output.push_str(&format!("| {} | {} | {} | {} |\n", sys.id, sys.name, active, sys.description));
+        }
+
+        // Presets table for LLM
+        let presets = crate::modules::preset::tools::list_presets_with_info();
+        if !presets.is_empty() {
+            output.push_str("\nPresets:\n\n");
+            output.push_str("| Name | Type | Description |\n");
+            output.push_str("|------|------|-------------|\n");
+            for p in &presets {
+                let ptype = if p.built_in { "built-in" } else { "custom" };
+                output.push_str(&format!("| {} | {} | {} |\n", p.name, ptype, p.description));
+            }
+        }
+
+        // Git status for LLM (as markdown table)
+        if state.git_is_repo {
+            if let Some(branch) = &state.git_branch {
+                output.push_str(&format!("\nGit Branch: {}\n", branch));
+            }
+
+            if state.git_file_changes.is_empty() {
+                output.push_str("Git Status: Working tree clean\n");
+            } else {
+                output.push_str("\nGit Changes:\n\n");
+                output.push_str("| File | + | - | Net |\n");
+                output.push_str("|------|---|---|-----|\n");
+
+                let mut total_add: i32 = 0;
+                let mut total_del: i32 = 0;
+
+                for file in &state.git_file_changes {
+                    total_add += file.additions;
+                    total_del += file.deletions;
+                    let net = file.additions - file.deletions;
+                    let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
+                    output.push_str(&format!("| {} | +{} | -{} | {} |\n",
+                        file.path, file.additions, file.deletions, net_str));
+                }
+
+                let total_net = total_add - total_del;
+                let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
+                output.push_str(&format!("| **Total** | **+{}** | **-{}** | **{}** |\n",
+                    total_add, total_del, total_net_str));
+            }
+        }
+
+        // Tools table (markdown format for LLM)
+        let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
+        let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
+        output.push_str(&format!("\nTools ({} enabled, {} disabled):\n\n", enabled_count, disabled_count));
+        output.push_str("| Category | Tool | Status | Description |\n");
+        output.push_str("|----------|------|--------|-------------|\n");
+        for tool in &state.tools {
+            let status = if tool.enabled { "✓" } else { "✗" };
+            output.push_str(&format!("| {} | {} | {} | {} |\n", tool.category.short_name(), tool.id, status, tool.short_desc));
+        }
+
+        output
     }
 }

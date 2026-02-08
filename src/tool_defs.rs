@@ -149,6 +149,7 @@ pub enum ToolCategory {
     Todo,
     Memory,
     Git,
+    Github,
     Scratchpad,
 }
 
@@ -163,6 +164,7 @@ impl ToolCategory {
             ToolCategory::Todo => "Todo",
             ToolCategory::Memory => "Memory",
             ToolCategory::Git => "Git",
+            ToolCategory::Github => "GitHub",
             ToolCategory::Scratchpad => "Scratch",
         }
     }
@@ -177,6 +179,7 @@ impl ToolCategory {
             ToolCategory::Todo,
             ToolCategory::Memory,
             ToolCategory::Git,
+            ToolCategory::Github,
             ToolCategory::Scratchpad,
         ]
     }

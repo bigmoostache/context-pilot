@@ -64,6 +64,8 @@ pub enum ContextType {
     Memory,
     Overview,
     Git,
+    GitResult,
+    GithubResult,
     Scratchpad,
 }
 
@@ -87,6 +89,8 @@ impl ContextType {
             ContextType::Memory => icons::ctx_memory(),
             ContextType::Overview => icons::ctx_overview(),
             ContextType::Git => icons::ctx_git(),
+            ContextType::GitResult => icons::ctx_git(),
+            ContextType::GithubResult => icons::ctx_git(),
             ContextType::Scratchpad => icons::ctx_scratchpad(),
         }
     }
@@ -143,6 +147,12 @@ pub struct ContextElement {
     /// Description of what this tmux pane is for
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tmux_description: Option<String>,
+    /// Command string for GitResult/GithubResult panels
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_command: Option<String>,
+    /// SHA-256 hash of result_command (for dedup)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_command_hash: Option<String>,
 
     // === Caching fields (not persisted) ===
     /// Cached content for LLM context and UI rendering
@@ -387,6 +397,12 @@ pub struct PanelData {
     /// Tmux pane description
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tmux_description: Option<String>,
+    /// Command string for GitResult/GithubResult panels
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_command: Option<String>,
+    /// SHA-256 hash of result_command (for dedup)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_command_hash: Option<String>,
 }
 
 /// UIDs for important/fixed panels that a worker uses.
@@ -423,6 +439,8 @@ pub struct State {
     pub input_cursor: usize,
     pub selected_context: usize,
     pub is_streaming: bool,
+    /// Stop reason from last completed stream (e.g., "end_turn", "max_tokens", "tool_use")
+    pub last_stop_reason: Option<String>,
     pub scroll_offset: f32,
     pub user_scrolled: bool,
     /// Scroll acceleration (increases when holding scroll keys)
@@ -525,6 +543,10 @@ pub struct State {
     pub git_log_args: Option<String>,
     /// Cached git log output
     pub git_log_content: Option<String>,
+    /// Diff base ref for P6 (e.g., "HEAD~3", "main")
+    pub git_diff_base: Option<String>,
+    /// GitHub personal access token (from GITHUB_TOKEN env)
+    pub github_token: Option<String>,
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
     /// Reload pending flag (set by system_reload tool, triggers reload after tool result is saved)
@@ -562,6 +584,7 @@ impl Default for State {
             input_cursor: 0,
             selected_context: 0,
             is_streaming: false,
+            last_stop_reason: None,
             scroll_offset: 0.0,
             user_scrolled: false,
             scroll_accel: 1.0,
@@ -614,6 +637,8 @@ impl Default for State {
             git_show_logs: false,
             git_log_args: None,
             git_log_content: None,
+            git_diff_base: None,
+            github_token: None,
             // API retry
             api_retry_count: 0,
             reload_pending: false,

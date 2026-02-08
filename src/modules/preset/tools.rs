@@ -342,6 +342,8 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
             tmux_lines: panel_cfg.tmux_lines,
             tmux_last_keys: None,
             tmux_description: panel_cfg.tmux_description.clone(),
+            result_command: None,
+            result_command_hash: None,
             cached_content: None,
             cache_deprecated: true,
             last_refresh_ms: crate::core::panels::now_ms(),

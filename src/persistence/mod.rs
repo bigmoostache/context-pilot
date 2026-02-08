@@ -64,6 +64,8 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         tmux_lines: panel.tmux_lines,
         tmux_last_keys: None,
         tmux_description: panel.tmux_description.clone(),
+        result_command: panel.result_command.clone(),
+        result_command_hash: panel.result_command_hash.clone(),
         cached_content: None,
         cache_deprecated: true,  // Will be refreshed on load
         // Use saved timestamp if available, otherwise current time for new panels
@@ -164,6 +166,10 @@ fn load_state_new() -> State {
             worker_state.modules.get(module.id()).unwrap_or(&null)
         };
         module.load_module_data(data, &mut state);
+
+        // Always load worker-specific data from worker state
+        let worker_data = worker_state.modules.get(&format!("{}_worker", module.id())).unwrap_or(&null);
+        module.load_worker_data(worker_data, &mut state);
     }
 
     // If tools weren't built by core module's load_module_data (e.g., no saved data),
@@ -171,6 +177,10 @@ fn load_state_new() -> State {
     if state.tools.is_empty() {
         state.tools = crate::modules::active_tool_definitions(&state.active_modules);
     }
+
+    // Load GitHub token from environment
+    dotenvy::dotenv().ok();
+    state.github_token = std::env::var("GITHUB_TOKEN").ok();
 
     // Set the global active theme
     set_active_theme(&state.active_theme);
@@ -193,6 +203,12 @@ pub fn save_state(state: &State) {
             } else {
                 worker_modules.insert(module.id().to_string(), data);
             }
+        }
+
+        // Always save worker-specific data to worker state
+        let worker_data = module.save_worker_data(state);
+        if !worker_data.is_null() {
+            worker_modules.insert(format!("{}_worker", module.id()), worker_data);
         }
     }
 
@@ -271,6 +287,8 @@ pub fn save_state(state: &State) {
                 tmux_pane_id: ctx.tmux_pane_id.clone(),
                 tmux_lines: ctx.tmux_lines,
                 tmux_description: ctx.tmux_description.clone(),
+                result_command: ctx.result_command.clone(),
+                result_command_hash: ctx.result_command_hash.clone(),
             };
             panel::save_panel(&panel_data);
         }

@@ -107,6 +107,8 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_lines: Some(lines),
         tmux_last_keys: command.map(|s| s.to_string()),
         tmux_description: Some(description.clone()),
+        result_command: None,
+        result_command_hash: None,
         cached_content: None,
         cache_deprecated: true, // Mark as deprecated so background refresh runs
         last_refresh_ms: crate::core::panels::now_ms(),

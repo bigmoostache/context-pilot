@@ -49,6 +49,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 // Protected - cannot close
                 skipped.push(format!("{} (protected)", id));
             }
+            ContextType::GitResult | ContextType::GithubResult => {
+                let cmd = ctx.result_command.clone().unwrap_or_default();
+                state.context.remove(idx);
+                closed.push(format!("{} ({})", id, cmd));
+            }
             ContextType::File => {
                 let name = ctx.name.clone();
                 state.context.remove(idx);

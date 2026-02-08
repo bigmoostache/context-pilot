@@ -5,13 +5,16 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{hash_content, CacheRequest, CacheUpdate};
+use crate::constants::{GIT_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
 use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
+use crate::modules::{run_with_timeout, truncate_output};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use super::GIT_STATUS_REFRESH_MS;
 use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, GitChangeType, GitFileChange, State};
 use crate::ui::{theme, chars};
 
+pub(crate) struct GitResultPanel;
 pub struct GitPanel;
 
 impl GitPanel {
@@ -190,6 +193,7 @@ impl Panel for GitPanel {
         Some(CacheRequest::RefreshGitStatus {
             show_diffs: state.git_show_diffs,
             current_hash,
+            diff_base: state.git_diff_base.clone(),
         })
     }
 
@@ -255,10 +259,15 @@ impl Panel for GitPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        if let Some(branch) = &state.git_branch {
+        let base_title = if let Some(branch) = &state.git_branch {
             format!("Git ({})", branch)
         } else {
             "Git".to_string()
+        };
+        if let Some(ref diff_base) = state.git_diff_base {
+            format!("{} [vs {}]", base_title, diff_base)
+        } else {
+            base_title
         }
     }
 
@@ -283,7 +292,7 @@ impl Panel for GitPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::RefreshGitStatus { show_diffs, current_hash } = request else {
+        let CacheRequest::RefreshGitStatus { show_diffs, current_hash, diff_base } = request else {
             return None;
         };
         let _guard = crate::profile!("cache::git_status");
@@ -373,14 +382,23 @@ impl Panel for GitPanel {
 
         // Only fetch numstat if we have changes
         if !file_changes.is_empty() {
-            if let Ok(output) = Command::new("git").args(["diff", "--cached", "--numstat"]).output() {
-                if output.status.success() {
-                    parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+            if let Some(ref base) = diff_base {
+                // When diff_base is set, compare against that ref
+                if let Ok(output) = Command::new("git").args(["diff", base, "--numstat"]).output() {
+                    if output.status.success() {
+                        parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+                    }
                 }
-            }
-            if let Ok(output) = Command::new("git").args(["diff", "--numstat"]).output() {
-                if output.status.success() {
-                    parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+            } else {
+                if let Ok(output) = Command::new("git").args(["diff", "--cached", "--numstat"]).output() {
+                    if output.status.success() {
+                        parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+                    }
+                }
+                if let Ok(output) = Command::new("git").args(["diff", "--numstat"]).output() {
+                    if output.status.success() {
+                        parse_numstat_to_map(&String::from_utf8_lossy(&output.stdout), &mut file_changes);
+                    }
                 }
             }
 
@@ -441,7 +459,8 @@ impl Panel for GitPanel {
         if show_diffs && !changes.is_empty() {
             let mut diff_contents: HashMap<String, String> = HashMap::new();
 
-            if let Ok(output) = Command::new("git").args(["diff", "HEAD"]).output() {
+            let diff_ref = diff_base.as_deref().unwrap_or("HEAD");
+            if let Ok(output) = Command::new("git").args(["diff", diff_ref]).output() {
                 if output.status.success() {
                     let diff_output = String::from_utf8_lossy(&output.stdout);
                     parse_diff_by_file(&diff_output, &mut diff_contents);
@@ -792,6 +811,165 @@ impl Panel for GitPanel {
                     Span::styled(display_line, style),
                 ]));
             }
+        }
+
+        text
+    }
+}
+
+// =============================================================================
+// GitResultPanel — dynamic panel for read-only git command results
+// =============================================================================
+
+impl Panel for GitResultPanel {
+    fn needs_cache(&self) -> bool { true }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        Some(GIT_STATUS_REFRESH_MS)
+    }
+
+    fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        let command = ctx.result_command.as_ref()?;
+        Some(CacheRequest::RefreshGitResult {
+            context_id: ctx.id.clone(),
+            command: command.clone(),
+        })
+    }
+
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+        match update {
+            CacheUpdate::GitResultContent { content, token_count, is_error, .. } => {
+                ctx.cached_content = Some(content);
+                ctx.full_token_count = token_count;
+                ctx.total_pages = compute_total_pages(token_count);
+                ctx.current_page = 0;
+                if ctx.total_pages > 1 {
+                    let page_content = paginate_content(ctx.cached_content.as_deref().unwrap_or(""), ctx.current_page, ctx.total_pages);
+                    ctx.token_count = estimate_tokens(&page_content);
+                } else {
+                    ctx.token_count = token_count;
+                }
+                ctx.cache_deprecated = false;
+                ctx.last_refresh_ms = now_ms();
+                let _ = is_error; // could style differently in future
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
+        let CacheRequest::RefreshGitResult { context_id, command } = request else {
+            return None;
+        };
+
+        // Parse and execute the command with timeout
+        let args = crate::modules::git::classify::validate_git_command(&command).ok()?;
+
+        let mut cmd = std::process::Command::new("git");
+        cmd.args(&args)
+            .env("GIT_TERMINAL_PROMPT", "0");
+        let output = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
+
+        match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                let content = if stderr.trim().is_empty() {
+                    stdout.to_string()
+                } else if stdout.trim().is_empty() {
+                    stderr.to_string()
+                } else {
+                    format!("{}\n{}", stdout, stderr)
+                };
+                let is_error = !out.status.success();
+                let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
+                let token_count = estimate_tokens(&content);
+                Some(CacheUpdate::GitResultContent { context_id, content, token_count, is_error })
+            }
+            Err(e) => {
+                let content = format!("Error executing git: {}", e);
+                let token_count = estimate_tokens(&content);
+                Some(CacheUpdate::GitResultContent { context_id, content, token_count, is_error: true })
+            }
+        }
+    }
+
+    fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
+        match key.code {
+            KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
+            KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
+            KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
+            KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
+            _ => None,
+        }
+    }
+
+    fn title(&self, state: &State) -> String {
+        if let Some(ctx) = state.context.get(state.selected_context) {
+            if ctx.context_type == ContextType::GitResult {
+                if let Some(cmd) = &ctx.result_command {
+                    let short = if cmd.len() > 40 { format!("{}...", &cmd[..37]) } else { cmd.clone() };
+                    return short;
+                }
+            }
+        }
+        "Git Result".to_string()
+    }
+
+    fn context(&self, state: &State) -> Vec<ContextItem> {
+        let mut items = Vec::new();
+        for ctx in &state.context {
+            if ctx.context_type != ContextType::GitResult {
+                continue;
+            }
+            let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
+            let header = ctx.result_command.as_deref().unwrap_or("Git Result");
+            let output = paginate_content(content, ctx.current_page, ctx.total_pages);
+            items.push(ContextItem::new(&ctx.id, header, output, ctx.last_refresh_ms));
+        }
+        items
+    }
+
+    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+        let mut text: Vec<Line> = Vec::new();
+
+        // Find the selected GitResult panel
+        let ctx = state.context.get(state.selected_context)
+            .filter(|c| c.context_type == ContextType::GitResult);
+
+        let Some(ctx) = ctx else {
+            text.push(Line::from(vec![
+                Span::styled(" No git result panel", Style::default().fg(theme::text_muted())),
+            ]));
+            return text;
+        };
+
+        if let Some(content) = &ctx.cached_content {
+            // Render with diff-aware highlighting
+            for line in content.lines() {
+                let (style, display_line) = if line.starts_with('+') && !line.starts_with("+++") {
+                    (Style::default().fg(theme::success()), line.to_string())
+                } else if line.starts_with('-') && !line.starts_with("---") {
+                    (Style::default().fg(theme::error()), line.to_string())
+                } else if line.starts_with("@@") {
+                    (Style::default().fg(theme::accent()), line.to_string())
+                } else if line.starts_with("diff --git") || line.starts_with("+++") || line.starts_with("---") {
+                    (Style::default().fg(theme::text_secondary()).bold(), line.to_string())
+                } else if line.starts_with("commit ") {
+                    (Style::default().fg(theme::accent()).bold(), line.to_string())
+                } else {
+                    (Style::default().fg(theme::text()), line.to_string())
+                };
+                text.push(Line::from(vec![
+                    Span::styled(" ".to_string(), base_style),
+                    Span::styled(display_line, style),
+                ]));
+            }
+        } else {
+            text.push(Line::from(vec![
+                Span::styled(" Loading...", Style::default().fg(theme::text_muted()).italic()),
+            ]));
         }
 
         text

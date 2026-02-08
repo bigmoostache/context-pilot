@@ -183,6 +183,7 @@ impl LlmClient for GroqClient {
         let reader = BufReader::new(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
+        let mut stop_reason: Option<String> = None;
 
         // Track tool calls being built (index -> (id, name, arguments))
         let mut tool_calls: std::collections::HashMap<usize, (String, String, String)> =
@@ -246,7 +247,13 @@ impl LlmClient for GroqClient {
                     }
 
                     // Check for finish reason
-                    if choice.finish_reason.is_some() {
+                    if let Some(ref reason) = choice.finish_reason {
+                        stop_reason = Some(match reason.as_str() {
+                            "length" => "max_tokens".to_string(),
+                            "stop" => "end_turn".to_string(),
+                            "tool_calls" => "tool_use".to_string(),
+                            other => other.to_string(),
+                        });
                         // Emit any completed tool calls
                         for (_, (id, name, arguments)) in tool_calls.drain() {
                             if !id.is_empty() && !name.is_empty() {
@@ -263,6 +270,7 @@ impl LlmClient for GroqClient {
         let _ = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
+            stop_reason,
         });
         Ok(())
     }
