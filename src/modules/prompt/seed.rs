@@ -1,20 +1,35 @@
 use crate::constants::prompts;
 use crate::state::{State, SystemItem};
 
-/// Ensure the default seed exists and there's always an active seed
+/// Ensure all built-in seeds from prompts.yaml exist in state, and there's always an active seed.
 pub fn ensure_default_seed(state: &mut State) {
-    // Check if default seed (S0) exists
-    let has_default = state.systems.iter().any(|s| s.id == prompts::default_seed_id());
-
-    if !has_default {
-        // Create the default seed
-        state.systems.insert(0, SystemItem {
-            id: prompts::default_seed_id().to_string(),
-            name: prompts::default_seed_name().to_string(),
-            description: prompts::default_seed_desc().to_string(),
-            content: prompts::default_seed_content().to_string(),
-        });
+    // Ensure all seeds from prompts.yaml exist
+    for seed in prompts::seeds() {
+        let exists = state.systems.iter().any(|s| s.id == seed.id);
+        if !exists {
+            state.systems.push(SystemItem {
+                id: seed.id.clone(),
+                name: seed.name.clone(),
+                description: seed.description.clone(),
+                content: seed.content.clone(),
+            });
+        }
     }
+
+    // Sort so S0 (default) comes first, then S_ prefixed (built-in), then user-created
+    state.systems.sort_by(|a, b| {
+        let a_builtin = a.id.starts_with("S_") || a.id == prompts::default_seed_id();
+        let b_builtin = b.id.starts_with("S_") || b.id == prompts::default_seed_id();
+        match (a.id == prompts::default_seed_id(), b.id == prompts::default_seed_id()) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => match (a_builtin, b_builtin) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.id.cmp(&b.id),
+            }
+        }
+    });
 
     // Ensure there's always an active seed
     if state.active_system_id.is_none() {
@@ -23,7 +38,6 @@ pub fn ensure_default_seed(state: &mut State) {
         // Verify the active seed still exists
         let active_id = state.active_system_id.as_ref().unwrap();
         if !state.systems.iter().any(|s| &s.id == active_id) {
-            // Active seed was deleted, fall back to default
             state.active_system_id = Some(prompts::default_seed_id().to_string());
         }
     }

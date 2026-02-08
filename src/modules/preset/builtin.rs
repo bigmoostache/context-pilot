@@ -18,7 +18,6 @@ struct PresetsYaml {
 struct PresetYamlEntry {
     name: String,
     description: String,
-    #[allow(dead_code)]
     system_prompt: Option<String>,
     active_modules: Vec<String>,
     #[serde(default)]
@@ -60,7 +59,7 @@ fn builtin_preset_definitions() -> Vec<Preset> {
             description: entry.description,
             built_in: true,
             worker_state: PresetWorkerState {
-                active_system_id: None,
+                active_system_id: entry.system_prompt,
                 active_modules: entry.active_modules,
                 disabled_tools: entry.disabled_tools,
                 modules: HashMap::new(),

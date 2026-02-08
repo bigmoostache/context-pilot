@@ -22,7 +22,7 @@ presets:
 
   - name: worker
     description: "Implementation and testing mode. File editing, git, and console. No exploration or planning tools."
-    system_prompt: worker
+    system_prompt: "S_worker"
     active_modules:
       - core
       - system
@@ -47,7 +47,7 @@ presets:
 
   - name: context-cleaner
     description: "Minimal read-only mode for context management. Disables write tools."
-    system_prompt: context-cleaner
+    system_prompt: "S_context-cleaner"
     active_modules:
       - core
       - system
@@ -66,7 +66,7 @@ presets:
 
   - name: context-builder
     description: "All modules active with a clean slate. Full exploration mode."
-    system_prompt: context-builder
+    system_prompt: "S_context-builder"
     active_modules:
       - core
       - system
@@ -84,7 +84,7 @@ presets:
 
   - name: planner
     description: "Planning mode with todo and scratchpad. Disables file write and git push tools."
-    system_prompt: planner
+    system_prompt: "S_planner"
     active_modules:
       - core
       - system

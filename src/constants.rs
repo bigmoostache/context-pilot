@@ -237,11 +237,16 @@ pub mod tool_categories {
 pub mod prompts {
     use crate::config::PROMPTS;
 
-    pub fn default_seed_id() -> &'static str { &PROMPTS.default_seed.id }
-    pub fn default_seed_name() -> &'static str { &PROMPTS.default_seed.name }
-    pub fn default_seed_desc() -> &'static str { &PROMPTS.default_seed.description }
-    pub fn default_seed_content() -> &'static str { &PROMPTS.default_seed.content }
-    pub fn main_system() -> &'static str { &PROMPTS.default_seed.content }
+    fn default_seed() -> &'static crate::config::SeedEntry {
+        let id = &PROMPTS.default_seed_id;
+        PROMPTS.seeds.iter().find(|s| s.id == *id)
+            .expect("Default seed must exist in seeds list")
+    }
+
+    pub fn default_seed_id() -> &'static str { &PROMPTS.default_seed_id }
+    pub fn default_seed_content() -> &'static str { &default_seed().content }
+    pub fn main_system() -> &'static str { &default_seed().content }
+    pub fn seeds() -> &'static [crate::config::SeedEntry] { &PROMPTS.seeds }
     pub fn tldr_prompt() -> &'static str { &PROMPTS.tldr_prompt }
     pub fn tldr_min_tokens() -> usize { PROMPTS.tldr_min_tokens }
     pub fn panel_header() -> &'static str { &PROMPTS.panel.header }

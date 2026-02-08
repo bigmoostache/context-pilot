@@ -11,14 +11,15 @@ use std::sync::RwLock;
 
 #[derive(Debug, Deserialize)]
 pub struct PromptsConfig {
-    pub default_seed: DefaultSeed,
+    pub seeds: Vec<SeedEntry>,
+    pub default_seed_id: String,
     pub tldr_prompt: String,
     pub tldr_min_tokens: usize,
     pub panel: PanelPrompts,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct DefaultSeed {
+#[derive(Debug, Deserialize, Clone)]
+pub struct SeedEntry {
     pub id: String,
     pub name: String,
     pub description: String,
