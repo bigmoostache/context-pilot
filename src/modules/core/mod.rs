@@ -31,6 +31,7 @@ impl Module for CoreModule {
             "anthropic_model": state.anthropic_model,
             "grok_model": state.grok_model,
             "groq_model": state.groq_model,
+            "deepseek_model": state.deepseek_model,
             "cleaning_threshold": state.cleaning_threshold,
             "cleaning_target_proportion": state.cleaning_target_proportion,
             "context_budget": state.context_budget,
@@ -66,6 +67,11 @@ impl Module for CoreModule {
         if let Some(v) = data.get("groq_model") {
             if let Ok(m) = serde_json::from_value(v.clone()) {
                 state.groq_model = m;
+            }
+        }
+        if let Some(v) = data.get("deepseek_model") {
+            if let Ok(m) = serde_json::from_value(v.clone()) {
+                state.deepseek_model = m;
             }
         }
         if let Some(v) = data.get("cleaning_threshold").and_then(|v| v.as_f64()) {

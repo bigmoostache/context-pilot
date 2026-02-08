@@ -2,7 +2,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::actions::{parse_context_pattern, find_context_by_id, Action};
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::llms::{AnthropicModel, GrokModel, GroqModel, LlmProvider};
+use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 use crate::core::panels::get_panel;
 use crate::state::State;
 
@@ -87,20 +87,23 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         KeyCode::Char('2') => Some(Action::ConfigSelectProvider(LlmProvider::ClaudeCode)),
         KeyCode::Char('3') => Some(Action::ConfigSelectProvider(LlmProvider::Grok)),
         KeyCode::Char('4') => Some(Action::ConfigSelectProvider(LlmProvider::Groq)),
+        KeyCode::Char('5') => Some(Action::ConfigSelectProvider(LlmProvider::DeepSeek)),
         // Letter keys select model based on current provider
         KeyCode::Char('a') => match _state.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45)),
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Fast)),
             LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss120b)),
+            LlmProvider::DeepSeek => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekChat)),
         },
         KeyCode::Char('b') => match _state.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45)),
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Fast)),
             LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss20b)),
+            LlmProvider::DeepSeek => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekReasoner)),
         },
         KeyCode::Char('c') => match _state.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45)),
-            LlmProvider::Grok => Some(Action::None), // Only 2 Grok models
+            LlmProvider::Grok | LlmProvider::DeepSeek => Some(Action::None),
             LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama33_70b)),
         },
         KeyCode::Char('d') => match _state.llm_provider {

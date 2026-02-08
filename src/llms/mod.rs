@@ -4,6 +4,7 @@
 
 pub mod anthropic;
 pub mod claude_code;
+pub mod deepseek;
 pub mod grok;
 pub mod groq;
 
@@ -69,6 +70,7 @@ pub enum LlmProvider {
     ClaudeCode,
     Grok,
     Groq,
+    DeepSeek,
 }
 
 /// Available models for Anthropic
@@ -220,6 +222,43 @@ impl ModelInfo for GroqModel {
     }
 }
 
+/// Available models for DeepSeek
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DeepSeekModel {
+    #[default]
+    DeepseekChat,
+    DeepseekReasoner,
+}
+
+impl ModelInfo for DeepSeekModel {
+    fn api_name(&self) -> &'static str {
+        match self {
+            DeepSeekModel::DeepseekChat => "deepseek-chat",
+            DeepSeekModel::DeepseekReasoner => "deepseek-reasoner",
+        }
+    }
+
+    fn display_name(&self) -> &'static str {
+        match self {
+            DeepSeekModel::DeepseekChat => "DeepSeek Chat",
+            DeepSeekModel::DeepseekReasoner => "DeepSeek Reasoner",
+        }
+    }
+
+    fn context_window(&self) -> usize {
+        128_000
+    }
+
+    fn input_price_per_mtok(&self) -> f32 {
+        0.28
+    }
+
+    fn output_price_per_mtok(&self) -> f32 {
+        0.42
+    }
+}
+
 /// Configuration for an LLM request
 #[derive(Debug, Clone)]
 pub struct LlmRequest {
@@ -252,6 +291,7 @@ pub fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
         LlmProvider::ClaudeCode => Box::new(claude_code::ClaudeCodeClient::new()),
         LlmProvider::Grok => Box::new(grok::GrokClient::new()),
         LlmProvider::Groq => Box::new(groq::GroqClient::new()),
+        LlmProvider::DeepSeek => Box::new(deepseek::DeepSeekClient::new()),
     }
 }
 

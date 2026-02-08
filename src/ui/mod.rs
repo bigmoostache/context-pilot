@@ -270,7 +270,7 @@ fn truncate_op_name(name: &str, max_len: usize) -> String {
 }
 
 fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
-    use crate::llms::{AnthropicModel, GrokModel, GroqModel, LlmProvider};
+    use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 
     // Center the overlay
     let overlay_width = 56u16;
@@ -293,6 +293,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         (LlmProvider::ClaudeCode, "2", "Claude Code (OAuth)"),
         (LlmProvider::Grok, "3", "Grok (xAI)"),
         (LlmProvider::Groq, "4", "Groq"),
+        (LlmProvider::DeepSeek, "5", "DeepSeek"),
     ];
 
     for (provider, key, name) in providers {
@@ -354,6 +355,15 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
                 (GroqModel::Llama31_8b, "d"),
             ] {
                 let is_selected = state.groq_model == model;
+                render_model_line_with_info(&mut lines, is_selected, key, &model);
+            }
+        }
+        LlmProvider::DeepSeek => {
+            for (model, key) in [
+                (DeepSeekModel::DeepseekChat, "a"),
+                (DeepSeekModel::DeepseekReasoner, "b"),
+            ] {
+                let is_selected = state.deepseek_model == model;
                 render_model_line_with_info(&mut lines, is_selected, key, &model);
             }
         }
@@ -501,7 +511,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     // Help text
     lines.push(Line::from(vec![
         Span::styled("  ", Style::default()),
-        Span::styled("1-4", Style::default().fg(theme::warning())),
+        Span::styled("1-5", Style::default().fg(theme::warning())),
         Span::styled(" provider  ", Style::default().fg(theme::text_muted())),
         Span::styled("a-d", Style::default().fg(theme::warning())),
         Span::styled(" model  ", Style::default().fg(theme::text_muted())),

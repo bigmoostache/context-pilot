@@ -1,6 +1,6 @@
-//! Groq API implementation.
+//! DeepSeek API implementation.
 //!
-//! Groq uses an OpenAI-compatible API format.
+//! DeepSeek uses an OpenAI-compatible API format.
 
 use std::env;
 use std::io::{BufRead, BufReader};
@@ -17,23 +17,23 @@ use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::ToolDefinition;
 use crate::tools::ToolUse;
 
-const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
+const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
-/// Groq client
-pub struct GroqClient {
+/// DeepSeek client
+pub struct DeepSeekClient {
     api_key: Option<String>,
 }
 
-impl GroqClient {
+impl DeepSeekClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
         Self {
-            api_key: env::var("GROQ_API_KEY").ok(),
+            api_key: env::var("DEEPSEEK_API_KEY").ok(),
         }
     }
 }
 
-impl Default for GroqClient {
+impl Default for DeepSeekClient {
     fn default() -> Self {
         Self::new()
     }
@@ -41,41 +41,57 @@ impl Default for GroqClient {
 
 // OpenAI-compatible message format
 #[derive(Debug, Serialize)]
-struct GroqMessage {
+struct DsMessage {
     role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<String>,
+    /// Required on all assistant messages when using deepseek-reasoner.
+    /// Set to empty string for historical messages where we don't have the original reasoning.
     #[serde(skip_serializing_if = "Option::is_none")]
-    tool_calls: Option<Vec<GroqToolCall>>,
+    reasoning_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<DsToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GroqToolCall {
+struct DsToolCall {
     id: String,
     #[serde(rename = "type")]
     call_type: String,
-    function: GroqFunction,
+    function: DsFunction,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GroqFunction {
+struct DsFunction {
     name: String,
     arguments: String,
 }
 
 #[derive(Debug, Serialize)]
-struct GroqRequest {
+struct DsTool {
+    #[serde(rename = "type")]
+    tool_type: String,
+    function: DsFunctionDef,
+}
+
+#[derive(Debug, Serialize)]
+struct DsFunctionDef {
+    name: String,
+    description: String,
+    parameters: Value,
+}
+
+#[derive(Debug, Serialize)]
+struct DsRequest {
     model: String,
-    messages: Vec<GroqMessage>,
+    messages: Vec<DsMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    tools: Vec<Value>,  // Can be function tools or built-in tools
+    tools: Vec<DsTool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
-    max_completion_tokens: u32,
+    max_tokens: u32,
     stream: bool,
 }
 
@@ -116,12 +132,12 @@ struct StreamUsage {
     completion_tokens: Option<usize>,
 }
 
-impl LlmClient for GroqClient {
+impl LlmClient for DeepSeekClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
         let api_key = self
             .api_key
             .clone()
-            .ok_or_else(|| "GROQ_API_KEY not set".to_string())?;
+            .ok_or_else(|| "DEEPSEEK_API_KEY not set".to_string())?;
 
         let client = Client::new();
 
@@ -131,57 +147,52 @@ impl LlmClient for GroqClient {
             .unwrap_or_default();
 
         // Build messages in OpenAI format
-        let mut groq_messages = messages_to_groq(
+        let mut ds_messages = messages_to_ds(
             &request.messages,
             &request.context_items,
             &request.system_prompt,
             &request.extra_context,
-            &request.model,
             &pending_tool_ids,
+            &request.model,
         );
 
         // Add tool results if present
         if let Some(results) = &request.tool_results {
             for result in results {
-                groq_messages.push(GroqMessage {
+                ds_messages.push(DsMessage {
                     role: "tool".to_string(),
                     content: Some(result.content.clone()),
+                    reasoning_content: None,
                     tool_calls: None,
                     tool_call_id: Some(result.tool_use_id.clone()),
-                    name: None,
                 });
             }
         }
 
-        // Convert tools to Groq format (includes built-in tools for GPT-OSS models)
-        let groq_tools = tools_to_groq(&request.tools, &request.model);
+        // Convert tools to OpenAI format
+        let ds_tools = tools_to_ds(&request.tools);
 
         // Set tool_choice to "auto" when tools are available
-        let tool_choice = if groq_tools.is_empty() {
+        let tool_choice = if ds_tools.is_empty() {
             None
         } else {
             Some("auto".to_string())
         };
 
-        let api_request = GroqRequest {
+        let api_request = DsRequest {
             model: request.model.clone(),
-            messages: groq_messages,
-            tools: groq_tools,
+            messages: ds_messages,
+            tools: ds_tools,
             tool_choice,
-            max_completion_tokens: MAX_RESPONSE_TOKENS,
+            max_tokens: MAX_RESPONSE_TOKENS,
             stream: true,
         };
 
         // Dump last request for debugging
-        {
-            let dir = ".context-pilot/last_requests";
-            let _ = std::fs::create_dir_all(dir);
-            let path = format!("{}/{}_groq_last_request.json", dir, request.worker_id);
-            let _ = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
-        }
+        dump_last_request(&request.worker_id, &api_request);
 
         let response = client
-            .post(GROQ_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&api_request)
@@ -297,7 +308,7 @@ impl LlmClient for GroqClient {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some("GROQ_API_KEY not set".to_string()),
+                    error: Some("DEEPSEEK_API_KEY not set".to_string()),
                 }
             }
         };
@@ -306,12 +317,12 @@ impl LlmClient for GroqClient {
 
         // Test 1: Basic auth
         let auth_result = client
-            .post(GROQ_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
-                "max_completion_tokens": 10,
+                "max_tokens": 10,
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
             .send();
@@ -333,12 +344,12 @@ impl LlmClient for GroqClient {
 
         // Test 2: Streaming
         let stream_result = client
-            .post(GROQ_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
-                "max_completion_tokens": 10,
+                "max_tokens": 10,
                 "stream": true,
                 "messages": [{"role": "user", "content": "Say ok"}]
             }))
@@ -348,12 +359,12 @@ impl LlmClient for GroqClient {
 
         // Test 3: Tools
         let tools_result = client
-            .post(GROQ_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
-                "max_completion_tokens": 50,
+                "max_tokens": 50,
                 "tools": [{
                     "type": "function",
                     "function": {
@@ -381,34 +392,33 @@ impl LlmClient for GroqClient {
     }
 }
 
-/// Convert internal messages to Groq/OpenAI format
-/// Context items are injected as fake tool call/result pairs at the start
-fn messages_to_groq(
+/// Convert internal messages to DeepSeek/OpenAI format
+fn messages_to_ds(
     messages: &[Message],
     context_items: &[ContextItem],
     system_prompt: &Option<String>,
     extra_context: &Option<String>,
-    model: &str,
     pending_tool_result_ids: &[String],
-) -> Vec<GroqMessage> {
-    let mut groq_messages: Vec<GroqMessage> = Vec::new();
+    model: &str,
+) -> Vec<DsMessage> {
+    let mut ds_messages: Vec<DsMessage> = Vec::new();
+    let is_reasoner = model == "deepseek-reasoner";
+
+    // Helper: reasoning_content for assistant messages (required for deepseek-reasoner)
+    let rc = || -> Option<String> {
+        if is_reasoner { Some(String::new()) } else { None }
+    };
 
     // Add system message
-    let mut system_content = system_prompt
+    let system_content = system_prompt
         .clone()
         .unwrap_or_else(|| prompts::main_system().to_string());
-
-    // For GPT-OSS models, add info about built-in tools
-    if model.starts_with("openai/gpt-oss") {
-        system_content.push_str("\n\nYou have access to built-in tools: browser_search (for web searches) and code_interpreter (for running code). Use browser_search when the user asks to search the web or look up current information.");
-    }
-
-    groq_messages.push(GroqMessage {
+    ds_messages.push(DsMessage {
         role: "system".to_string(),
         content: Some(system_content),
+        reasoning_content: None,
         tool_calls: None,
         tool_call_id: None,
-        name: None,
     });
 
     // Inject context panels as fake tool call/result pairs (P2+ only, sorted by timestamp)
@@ -425,67 +435,67 @@ fn messages_to_groq(
             };
 
             // Assistant message with tool_call
-            groq_messages.push(GroqMessage {
+            ds_messages.push(DsMessage {
                 role: "assistant".to_string(),
                 content: Some(text),
-                tool_calls: Some(vec![GroqToolCall {
+                reasoning_content: rc(),
+                tool_calls: Some(vec![DsToolCall {
                     id: format!("panel_{}", panel.panel_id),
                     call_type: "function".to_string(),
-                    function: GroqFunction {
+                    function: DsFunction {
                         name: "dynamic_panel".to_string(),
                         arguments: format!(r#"{{"id":"{}"}}"#, panel.panel_id),
                     },
                 }]),
                 tool_call_id: None,
-                name: None,
             });
 
             // Tool result message
-            groq_messages.push(GroqMessage {
+            ds_messages.push(DsMessage {
                 role: "tool".to_string(),
                 content: Some(panel.content.clone()),
+                reasoning_content: None,
                 tool_calls: None,
                 tool_call_id: Some(format!("panel_{}", panel.panel_id)),
-                name: None,
             });
         }
 
         // Add footer after all panels
         let footer = panel_footer_text(messages, current_ms);
-        groq_messages.push(GroqMessage {
+        ds_messages.push(DsMessage {
             role: "assistant".to_string(),
             content: Some(footer),
-            tool_calls: Some(vec![GroqToolCall {
+            reasoning_content: rc(),
+            tool_calls: Some(vec![DsToolCall {
                 id: "panel_footer".to_string(),
                 call_type: "function".to_string(),
-                function: GroqFunction {
+                function: DsFunction {
                     name: "dynamic_panel".to_string(),
                     arguments: r#"{"action":"end_panels"}"#.to_string(),
                 },
             }]),
             tool_call_id: None,
-            name: None,
         });
-        groq_messages.push(GroqMessage {
+        ds_messages.push(DsMessage {
             role: "tool".to_string(),
             content: Some(crate::constants::prompts::panel_footer_ack().to_string()),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: Some("panel_footer".to_string()),
-            name: None,
         });
     }
 
     // Add extra context if present (for cleaner mode)
     if let Some(ctx) = extra_context {
-        groq_messages.push(GroqMessage {
+        ds_messages.push(DsMessage {
             role: "user".to_string(),
             content: Some(format!(
                 "Please clean up the context to reduce token usage:\n\n{}",
                 ctx
             )),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: None,
-            name: None,
         });
     }
 
@@ -524,12 +534,12 @@ fn messages_to_groq(
         if msg.message_type == MessageType::ToolResult {
             for result in &msg.tool_results {
                 if included_tool_use_ids.contains(&result.tool_use_id) {
-                    groq_messages.push(GroqMessage {
+                    ds_messages.push(DsMessage {
                         role: "tool".to_string(),
                         content: Some(format!("[{}]:\n{}", msg.id, result.content)),
+                        reasoning_content: None,
                         tool_calls: None,
                         tool_call_id: Some(result.tool_use_id.clone()),
-                        name: None,
                     });
                 }
             }
@@ -538,14 +548,14 @@ fn messages_to_groq(
 
         // Handle tool calls — only include if they have matching results
         if msg.message_type == MessageType::ToolCall {
-            let tool_calls: Vec<GroqToolCall> = msg
+            let tool_calls: Vec<DsToolCall> = msg
                 .tool_uses
                 .iter()
                 .filter(|tu| included_tool_use_ids.contains(&tu.id))
-                .map(|tu| GroqToolCall {
+                .map(|tu| DsToolCall {
                     id: tu.id.clone(),
                     call_type: "function".to_string(),
-                    function: GroqFunction {
+                    function: DsFunction {
                         name: tu.name.clone(),
                         arguments: serde_json::to_string(&tu.input).unwrap_or_default(),
                     },
@@ -553,12 +563,12 @@ fn messages_to_groq(
                 .collect();
 
             if !tool_calls.is_empty() {
-                groq_messages.push(GroqMessage {
+                ds_messages.push(DsMessage {
                     role: "assistant".to_string(),
                     content: None,
+                    reasoning_content: rc(),
                     tool_calls: Some(tool_calls),
                     tool_call_id: None,
-                    name: None,
                 });
             }
             continue;
@@ -571,44 +581,43 @@ fn messages_to_groq(
         };
 
         if !message_content.is_empty() {
-            // Use [ID]:\n format (newline after colon)
             let prefixed_content = format!("[{}]:\n{}", msg.id, message_content);
+            // reasoning_content is only needed on assistant messages for deepseek-reasoner
+            let msg_rc = if msg.role == "assistant" { rc() } else { None };
 
-            groq_messages.push(GroqMessage {
+            ds_messages.push(DsMessage {
                 role: msg.role.clone(),
                 content: Some(prefixed_content),
+                reasoning_content: msg_rc,
                 tool_calls: None,
                 tool_call_id: None,
-                name: None,
             });
         }
     }
 
-    groq_messages
+    ds_messages
 }
 
-/// Convert tool definitions to Groq/OpenAI format
-/// Convert tool definitions to Groq format
-/// For GPT-OSS models, also adds built-in tools (browser_search, code_interpreter)
-fn tools_to_groq(tools: &[ToolDefinition], model: &str) -> Vec<Value> {
-    let mut groq_tools: Vec<Value> = tools
+/// Dump the outgoing API request to disk for debugging.
+fn dump_last_request(worker_id: &str, api_request: &DsRequest) {
+    let dir = ".context-pilot/last_requests";
+    let _ = std::fs::create_dir_all(dir);
+    let path = format!("{}/{}_deepseek_last_request.json", dir, worker_id);
+    let _ = std::fs::write(path, serde_json::to_string_pretty(api_request).unwrap_or_default());
+}
+
+/// Convert tool definitions to DeepSeek/OpenAI format
+fn tools_to_ds(tools: &[ToolDefinition]) -> Vec<DsTool> {
+    tools
         .iter()
         .filter(|t| t.enabled)
-        .map(|t| serde_json::json!({
-            "type": "function",
-            "function": {
-                "name": t.id,
-                "description": t.description,
-                "parameters": t.to_json_schema(),
-            }
-        }))
-        .collect();
-
-    // Add built-in tools for GPT-OSS models
-    if model.starts_with("openai/gpt-oss") {
-        groq_tools.push(serde_json::json!({"type": "browser_search"}));
-        groq_tools.push(serde_json::json!({"type": "code_interpreter"}));
-    }
-
-    groq_tools
+        .map(|t| DsTool {
+            tool_type: "function".to_string(),
+            function: DsFunctionDef {
+                name: t.id.clone(),
+                description: t.description.clone(),
+                parameters: t.to_json_schema(),
+            },
+        })
+        .collect()
 }

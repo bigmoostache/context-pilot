@@ -137,12 +137,18 @@ impl LlmClient for GrokClient {
 
         let client = Client::new();
 
+        // Collect pending tool result IDs so the message builder includes their tool calls
+        let pending_tool_ids: Vec<String> = request.tool_results.as_ref()
+            .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
+            .unwrap_or_default();
+
         // Build messages in OpenAI format
         let mut grok_messages = messages_to_grok(
             &request.messages,
             &request.context_items,
             &request.system_prompt,
             &request.extra_context,
+            &pending_tool_ids,
         );
 
         // Add tool results if present
@@ -175,6 +181,14 @@ impl LlmClient for GrokClient {
             max_tokens: MAX_RESPONSE_TOKENS,
             stream: true,
         };
+
+        // Dump last request for debugging
+        {
+            let dir = ".context-pilot/last_requests";
+            let _ = std::fs::create_dir_all(dir);
+            let path = format!("{}/{}_grok_last_request.json", dir, request.worker_id);
+            let _ = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
+        }
 
         let response = client
             .post(GROK_API_ENDPOINT)
@@ -384,6 +398,7 @@ fn messages_to_grok(
     context_items: &[ContextItem],
     system_prompt: &Option<String>,
     extra_context: &Option<String>,
+    pending_tool_result_ids: &[String],
 ) -> Vec<GrokMessage> {
     let mut grok_messages: Vec<GrokMessage> = Vec::new();
 
@@ -471,6 +486,28 @@ fn messages_to_grok(
         });
     }
 
+    // First pass: collect tool_use IDs that have matching results.
+    // Tool calls without results (e.g. truncated by max_tokens) are excluded
+    // to avoid the "insufficient tool messages" API error.
+    // Seed with pending tool result IDs (from current tool loop, not yet in messages).
+    let mut included_tool_use_ids: std::collections::HashSet<String> =
+        pending_tool_result_ids.iter().cloned().collect();
+    for (idx, msg) in messages.iter().enumerate() {
+        if msg.status == MessageStatus::Deleted || msg.message_type != MessageType::ToolCall {
+            continue;
+        }
+        let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
+        let has_result = messages[idx + 1..]
+            .iter()
+            .filter(|m| m.status != MessageStatus::Deleted && m.message_type == MessageType::ToolResult)
+            .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
+        if has_result {
+            for id in tool_use_ids {
+                included_tool_use_ids.insert(id.to_string());
+            }
+        }
+    }
+
     for msg in messages.iter() {
         if msg.status == MessageStatus::Deleted {
             continue;
@@ -480,24 +517,27 @@ fn messages_to_grok(
             continue;
         }
 
-        // Handle tool results
+        // Handle tool results — only include if the tool_use was included
         if msg.message_type == MessageType::ToolResult {
             for result in &msg.tool_results {
-                grok_messages.push(GrokMessage {
-                    role: "tool".to_string(),
-                    content: Some(format!("[{}]:\n{}", msg.id, result.content)),
-                    tool_calls: None,
-                    tool_call_id: Some(result.tool_use_id.clone()),
-                });
+                if included_tool_use_ids.contains(&result.tool_use_id) {
+                    grok_messages.push(GrokMessage {
+                        role: "tool".to_string(),
+                        content: Some(format!("[{}]:\n{}", msg.id, result.content)),
+                        tool_calls: None,
+                        tool_call_id: Some(result.tool_use_id.clone()),
+                    });
+                }
             }
             continue;
         }
 
-        // Handle tool calls
+        // Handle tool calls — only include if they have matching results
         if msg.message_type == MessageType::ToolCall {
             let tool_calls: Vec<GrokToolCall> = msg
                 .tool_uses
                 .iter()
+                .filter(|tu| included_tool_use_ids.contains(&tu.id))
                 .map(|tu| GrokToolCall {
                     id: tu.id.clone(),
                     call_type: "function".to_string(),
@@ -508,12 +548,14 @@ fn messages_to_grok(
                 })
                 .collect();
 
-            grok_messages.push(GrokMessage {
-                role: "assistant".to_string(),
-                content: None,
-                tool_calls: Some(tool_calls),
-                tool_call_id: None,
-            });
+            if !tool_calls.is_empty() {
+                grok_messages.push(GrokMessage {
+                    role: "assistant".to_string(),
+                    content: None,
+                    tool_calls: Some(tool_calls),
+                    tool_call_id: None,
+                });
+            }
             continue;
         }
 

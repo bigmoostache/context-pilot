@@ -136,6 +136,14 @@ impl LlmClient for AnthropicClient {
             stream: true,
         };
 
+        // Dump last request for debugging
+        {
+            let dir = ".context-pilot/last_requests";
+            let _ = std::fs::create_dir_all(dir);
+            let path = format!("{}/{}_anthropic_last_request.json", dir, request.worker_id);
+            let _ = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
+        }
+
         let response = client
             .post(API_ENDPOINT)
             .header("x-api-key", &api_key)
