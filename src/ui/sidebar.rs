@@ -185,6 +185,15 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
             ));
         }
         lines.push(Line::from(stats_spans));
+        lines.push(Line::from(vec![
+            Span::styled(" ", base_style),
+            Span::styled(chars::ARROW_UP, Style::default().fg(theme::success())),
+            Span::styled("hit ", Style::default().fg(theme::text_muted())),
+            Span::styled(chars::CROSS, Style::default().fg(theme::warning())),
+            Span::styled("miss ", Style::default().fg(theme::text_muted())),
+            Span::styled(chars::ARROW_DOWN, Style::default().fg(theme::accent_dim())),
+            Span::styled("out", Style::default().fg(theme::text_muted())),
+        ]));
     }
 
     let paragraph = Paragraph::new(lines)
