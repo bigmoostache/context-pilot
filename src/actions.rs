@@ -299,6 +299,10 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.is_streaming = true;
             state.last_stop_reason = None;
             state.streaming_estimated_tokens = 0;
+            // Reset per-turn token counters
+            state.last_cache_hit_tokens = 0;
+            state.last_cache_miss_tokens = 0;
+            state.last_output_tokens = 0;
             ActionResult::StartStream
         }
         Action::ClearConversation => {
@@ -411,6 +415,11 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StreamDone { _input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason } => {
             state.is_streaming = false;
             state.last_stop_reason = stop_reason.clone();
+
+            // Accumulate per-turn stats (reset at InputSubmit)
+            state.last_cache_hit_tokens += cache_hit_tokens;
+            state.last_cache_miss_tokens += cache_miss_tokens;
+            state.last_output_tokens += output_tokens;
 
             // Accumulate token stats
             state.cache_hit_tokens += cache_hit_tokens;

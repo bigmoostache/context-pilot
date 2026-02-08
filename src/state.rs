@@ -519,6 +519,12 @@ pub struct State {
     pub cache_miss_tokens: usize,
     /// Accumulated output tokens across all API calls (persisted)
     pub total_output_tokens: usize,
+    /// Last stream cache hit tokens (runtime-only)
+    pub last_cache_hit_tokens: usize,
+    /// Last stream cache miss tokens (runtime-only)
+    pub last_cache_miss_tokens: usize,
+    /// Last stream output tokens (runtime-only)
+    pub last_output_tokens: usize,
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     pub cleaning_threshold: f32,
     /// Cleaning target as proportion of threshold (0.0 - 1.0)
@@ -633,6 +639,9 @@ impl Default for State {
             cache_hit_tokens: 0,
             cache_miss_tokens: 0,
             total_output_tokens: 0,
+            last_cache_hit_tokens: 0,
+            last_cache_miss_tokens: 0,
+            last_output_tokens: 0,
             cleaning_threshold: 0.70,
             cleaning_target_proportion: 0.70,
             context_budget: None, // Use model's full context window

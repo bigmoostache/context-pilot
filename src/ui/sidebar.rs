@@ -161,38 +161,36 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     }
     lines.push(Line::from(bar_spans));
 
-    // Token stats line (cache hit / cache miss / output) — only when any value is non-zero
+    // Token stats (cache hit / cache miss / output) — only when any value is non-zero
     if state.cache_hit_tokens > 0 || state.cache_miss_tokens > 0 || state.total_output_tokens > 0 {
-        let mut stats_spans = vec![Span::styled(" ", base_style)];
-        if state.cache_hit_tokens > 0 {
-            stats_spans.push(Span::styled(
-                format!("{}{}", chars::ARROW_UP, format_number(state.cache_hit_tokens)),
-                Style::default().fg(theme::success()),
-            ));
-            stats_spans.push(Span::styled("  ", base_style));
+        // Helper: build a stats line with aligned columns
+        // Layout: " {label} ↑ {hit:>6} ✗ {miss:>6} ↓ {out:>6}"
+        let stats_line = |label: &str, hit: usize, miss: usize, out: usize| -> Line<'static> {
+            Line::from(vec![
+                Span::styled(format!(" {:>4} ", label), Style::default().fg(theme::text_muted())),
+                Span::styled(format!("{} {:>5}", chars::ARROW_UP, format_number(hit)), Style::default().fg(theme::success())),
+                Span::styled(" ", base_style),
+                Span::styled(format!("{} {:>5}", chars::CROSS, format_number(miss)), Style::default().fg(theme::warning())),
+                Span::styled(" ", base_style),
+                Span::styled(format!("{} {:>5}", chars::ARROW_DOWN, format_number(out)), Style::default().fg(theme::accent_dim())),
+            ])
+        };
+
+        lines.push(stats_line("tot", state.cache_hit_tokens, state.cache_miss_tokens, state.total_output_tokens));
+
+        if state.last_output_tokens > 0 || state.last_cache_hit_tokens > 0 || state.last_cache_miss_tokens > 0 {
+            lines.push(stats_line("last", state.last_cache_hit_tokens, state.last_cache_miss_tokens, state.last_output_tokens));
         }
-        if state.cache_miss_tokens > 0 {
-            stats_spans.push(Span::styled(
-                format!("{}{}", chars::CROSS, format_number(state.cache_miss_tokens)),
-                Style::default().fg(theme::warning()),
-            ));
-            stats_spans.push(Span::styled("  ", base_style));
-        }
-        if state.total_output_tokens > 0 {
-            stats_spans.push(Span::styled(
-                format!("{}{}", chars::ARROW_DOWN, format_number(state.total_output_tokens)),
-                Style::default().fg(theme::accent_dim()),
-            ));
-        }
-        lines.push(Line::from(stats_spans));
+
+        // Legend
         lines.push(Line::from(vec![
-            Span::styled(" ", base_style),
+            Span::styled("       ", base_style),
             Span::styled(chars::ARROW_UP, Style::default().fg(theme::success())),
-            Span::styled("hit ", Style::default().fg(theme::text_muted())),
+            Span::styled(" hit  ", Style::default().fg(theme::text_muted())),
             Span::styled(chars::CROSS, Style::default().fg(theme::warning())),
-            Span::styled("miss ", Style::default().fg(theme::text_muted())),
+            Span::styled(" miss ", Style::default().fg(theme::text_muted())),
             Span::styled(chars::ARROW_DOWN, Style::default().fg(theme::accent_dim())),
-            Span::styled("out", Style::default().fg(theme::text_muted())),
+            Span::styled(" out", Style::default().fg(theme::text_muted())),
         ]));
     }
 
