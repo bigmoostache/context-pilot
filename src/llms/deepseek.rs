@@ -130,6 +130,8 @@ struct StreamResponse {
 struct StreamUsage {
     prompt_tokens: Option<usize>,
     completion_tokens: Option<usize>,
+    prompt_cache_hit_tokens: Option<usize>,
+    prompt_cache_miss_tokens: Option<usize>,
 }
 
 impl LlmClient for DeepSeekClient {
@@ -208,6 +210,8 @@ impl LlmClient for DeepSeekClient {
         let reader = BufReader::new(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
+        let mut cache_hit_tokens = 0;
+        let mut cache_miss_tokens = 0;
         let mut stop_reason: Option<String> = None;
 
         // Track tool calls being built (index -> (id, name, arguments))
@@ -234,6 +238,12 @@ impl LlmClient for DeepSeekClient {
                     }
                     if let Some(out) = usage.completion_tokens {
                         output_tokens = out;
+                    }
+                    if let Some(hit) = usage.prompt_cache_hit_tokens {
+                        cache_hit_tokens = hit;
+                    }
+                    if let Some(miss) = usage.prompt_cache_miss_tokens {
+                        cache_miss_tokens = miss;
                     }
                 }
 
@@ -295,8 +305,8 @@ impl LlmClient for DeepSeekClient {
         let _ = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
-            cache_hit_tokens: 0,
-            cache_miss_tokens: 0,
+            cache_hit_tokens,
+            cache_miss_tokens,
             stop_reason,
         });
         Ok(())
