@@ -115,6 +115,19 @@ fn is_api_command(args: &[String]) -> bool {
 
 /// Background polling loop.
 /// Wakes every `GH_WATCHER_TICK_SECS` and polls watches whose interval has elapsed.
+///
+/// # Why this sends CacheUpdate directly instead of setting cache_deprecated
+///
+/// The normal cache invalidation pattern is two-phase: mark a panel dirty
+/// (`cache_deprecated = true`), then let the cache pipeline re-fetch data.
+/// This watcher shortcuts that by sending `CacheUpdate::GithubResultContent`
+/// directly through `cache_tx`.
+///
+/// This is intentional: both polling methods (ETag-based and hash-based)
+/// inherently produce the new content as a byproduct of change detection.
+/// Re-running the same `gh` command through the cache pipeline would be a
+/// redundant second fetch. Since detection = fetching here, we send the
+/// data we already have straight to `apply_cache_update`.
 fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<CacheUpdate>) {
     loop {
         thread::sleep(std::time::Duration::from_secs(GH_WATCHER_TICK_SECS));
