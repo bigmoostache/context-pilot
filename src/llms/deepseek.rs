@@ -1,6 +1,6 @@
-//! xAI Grok API implementation.
+//! DeepSeek API implementation.
 //!
-//! Grok uses an OpenAI-compatible API format.
+//! DeepSeek uses an OpenAI-compatible API format.
 
 use std::env;
 use std::io::{BufRead, BufReader};
@@ -17,23 +17,23 @@ use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::ToolDefinition;
 use crate::tools::ToolUse;
 
-const GROK_API_ENDPOINT: &str = "https://api.x.ai/v1/chat/completions";
+const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
-/// xAI Grok client
-pub struct GrokClient {
+/// DeepSeek client
+pub struct DeepSeekClient {
     api_key: Option<String>,
 }
 
-impl GrokClient {
+impl DeepSeekClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
         Self {
-            api_key: env::var("XAI_API_KEY").ok(),
+            api_key: env::var("DEEPSEEK_API_KEY").ok(),
         }
     }
 }
 
-impl Default for GrokClient {
+impl Default for DeepSeekClient {
     fn default() -> Self {
         Self::new()
     }
@@ -41,50 +41,50 @@ impl Default for GrokClient {
 
 // OpenAI-compatible message format
 #[derive(Debug, Serialize)]
-struct GrokMessage {
+struct DsMessage {
     role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    tool_calls: Option<Vec<GrokToolCall>>,
+    tool_calls: Option<Vec<DsToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GrokToolCall {
+struct DsToolCall {
     id: String,
     #[serde(rename = "type")]
     call_type: String,
-    function: GrokFunction,
+    function: DsFunction,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GrokFunction {
+struct DsFunction {
     name: String,
     arguments: String,
 }
 
 #[derive(Debug, Serialize)]
-struct GrokTool {
+struct DsTool {
     #[serde(rename = "type")]
     tool_type: String,
-    function: GrokFunctionDef,
+    function: DsFunctionDef,
 }
 
 #[derive(Debug, Serialize)]
-struct GrokFunctionDef {
+struct DsFunctionDef {
     name: String,
     description: String,
     parameters: Value,
 }
 
 #[derive(Debug, Serialize)]
-struct GrokRequest {
+struct DsRequest {
     model: String,
-    messages: Vec<GrokMessage>,
+    messages: Vec<DsMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    tools: Vec<GrokTool>,
+    tools: Vec<DsTool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
     max_tokens: u32,
@@ -128,17 +128,17 @@ struct StreamUsage {
     completion_tokens: Option<usize>,
 }
 
-impl LlmClient for GrokClient {
+impl LlmClient for DeepSeekClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
         let api_key = self
             .api_key
             .clone()
-            .ok_or_else(|| "XAI_API_KEY not set".to_string())?;
+            .ok_or_else(|| "DEEPSEEK_API_KEY not set".to_string())?;
 
         let client = Client::new();
 
         // Build messages in OpenAI format
-        let mut grok_messages = messages_to_grok(
+        let mut ds_messages = messages_to_ds(
             &request.messages,
             &request.context_items,
             &request.system_prompt,
@@ -148,7 +148,7 @@ impl LlmClient for GrokClient {
         // Add tool results if present
         if let Some(results) = &request.tool_results {
             for result in results {
-                grok_messages.push(GrokMessage {
+                ds_messages.push(DsMessage {
                     role: "tool".to_string(),
                     content: Some(result.content.clone()),
                     tool_calls: None,
@@ -158,26 +158,26 @@ impl LlmClient for GrokClient {
         }
 
         // Convert tools to OpenAI format
-        let grok_tools = tools_to_grok(&request.tools);
+        let ds_tools = tools_to_ds(&request.tools);
 
         // Set tool_choice to "auto" when tools are available
-        let tool_choice = if grok_tools.is_empty() {
+        let tool_choice = if ds_tools.is_empty() {
             None
         } else {
             Some("auto".to_string())
         };
 
-        let api_request = GrokRequest {
+        let api_request = DsRequest {
             model: request.model.clone(),
-            messages: grok_messages,
-            tools: grok_tools,
+            messages: ds_messages,
+            tools: ds_tools,
             tool_choice,
             max_tokens: MAX_RESPONSE_TOKENS,
             stream: true,
         };
 
         let response = client
-            .post(GROK_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&api_request)
@@ -293,7 +293,7 @@ impl LlmClient for GrokClient {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some("XAI_API_KEY not set".to_string()),
+                    error: Some("DEEPSEEK_API_KEY not set".to_string()),
                 }
             }
         };
@@ -302,7 +302,7 @@ impl LlmClient for GrokClient {
 
         // Test 1: Basic auth
         let auth_result = client
-            .post(GROK_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
@@ -329,7 +329,7 @@ impl LlmClient for GrokClient {
 
         // Test 2: Streaming
         let stream_result = client
-            .post(GROK_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
@@ -344,7 +344,7 @@ impl LlmClient for GrokClient {
 
         // Test 3: Tools
         let tools_result = client
-            .post(GROK_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
@@ -377,21 +377,20 @@ impl LlmClient for GrokClient {
     }
 }
 
-/// Convert internal messages to Grok/OpenAI format
-/// Context items are injected as fake tool call/result pairs at the start
-fn messages_to_grok(
+/// Convert internal messages to DeepSeek/OpenAI format
+fn messages_to_ds(
     messages: &[Message],
     context_items: &[ContextItem],
     system_prompt: &Option<String>,
     extra_context: &Option<String>,
-) -> Vec<GrokMessage> {
-    let mut grok_messages: Vec<GrokMessage> = Vec::new();
+) -> Vec<DsMessage> {
+    let mut ds_messages: Vec<DsMessage> = Vec::new();
 
     // Add system message
     let system_content = system_prompt
         .clone()
         .unwrap_or_else(|| prompts::main_system().to_string());
-    grok_messages.push(GrokMessage {
+    ds_messages.push(DsMessage {
         role: "system".to_string(),
         content: Some(system_content),
         tool_calls: None,
@@ -412,13 +411,13 @@ fn messages_to_grok(
             };
 
             // Assistant message with tool_call
-            grok_messages.push(GrokMessage {
+            ds_messages.push(DsMessage {
                 role: "assistant".to_string(),
                 content: Some(text),
-                tool_calls: Some(vec![GrokToolCall {
+                tool_calls: Some(vec![DsToolCall {
                     id: format!("panel_{}", panel.panel_id),
                     call_type: "function".to_string(),
-                    function: GrokFunction {
+                    function: DsFunction {
                         name: "dynamic_panel".to_string(),
                         arguments: format!(r#"{{"id":"{}"}}"#, panel.panel_id),
                     },
@@ -427,7 +426,7 @@ fn messages_to_grok(
             });
 
             // Tool result message
-            grok_messages.push(GrokMessage {
+            ds_messages.push(DsMessage {
                 role: "tool".to_string(),
                 content: Some(panel.content.clone()),
                 tool_calls: None,
@@ -437,20 +436,20 @@ fn messages_to_grok(
 
         // Add footer after all panels
         let footer = panel_footer_text(messages, current_ms);
-        grok_messages.push(GrokMessage {
+        ds_messages.push(DsMessage {
             role: "assistant".to_string(),
             content: Some(footer),
-            tool_calls: Some(vec![GrokToolCall {
+            tool_calls: Some(vec![DsToolCall {
                 id: "panel_footer".to_string(),
                 call_type: "function".to_string(),
-                function: GrokFunction {
+                function: DsFunction {
                     name: "dynamic_panel".to_string(),
                     arguments: r#"{"action":"end_panels"}"#.to_string(),
                 },
             }]),
             tool_call_id: None,
         });
-        grok_messages.push(GrokMessage {
+        ds_messages.push(DsMessage {
             role: "tool".to_string(),
             content: Some(crate::constants::prompts::panel_footer_ack().to_string()),
             tool_calls: None,
@@ -460,7 +459,7 @@ fn messages_to_grok(
 
     // Add extra context if present (for cleaner mode)
     if let Some(ctx) = extra_context {
-        grok_messages.push(GrokMessage {
+        ds_messages.push(DsMessage {
             role: "user".to_string(),
             content: Some(format!(
                 "Please clean up the context to reduce token usage:\n\n{}",
@@ -504,7 +503,7 @@ fn messages_to_grok(
         if msg.message_type == MessageType::ToolResult {
             for result in &msg.tool_results {
                 if included_tool_use_ids.contains(&result.tool_use_id) {
-                    grok_messages.push(GrokMessage {
+                    ds_messages.push(DsMessage {
                         role: "tool".to_string(),
                         content: Some(format!("[{}]:\n{}", msg.id, result.content)),
                         tool_calls: None,
@@ -517,14 +516,14 @@ fn messages_to_grok(
 
         // Handle tool calls — only include if they have matching results
         if msg.message_type == MessageType::ToolCall {
-            let tool_calls: Vec<GrokToolCall> = msg
+            let tool_calls: Vec<DsToolCall> = msg
                 .tool_uses
                 .iter()
                 .filter(|tu| included_tool_use_ids.contains(&tu.id))
-                .map(|tu| GrokToolCall {
+                .map(|tu| DsToolCall {
                     id: tu.id.clone(),
                     call_type: "function".to_string(),
-                    function: GrokFunction {
+                    function: DsFunction {
                         name: tu.name.clone(),
                         arguments: serde_json::to_string(&tu.input).unwrap_or_default(),
                     },
@@ -532,7 +531,7 @@ fn messages_to_grok(
                 .collect();
 
             if !tool_calls.is_empty() {
-                grok_messages.push(GrokMessage {
+                ds_messages.push(DsMessage {
                     role: "assistant".to_string(),
                     content: None,
                     tool_calls: Some(tool_calls),
@@ -549,10 +548,9 @@ fn messages_to_grok(
         };
 
         if !message_content.is_empty() {
-            // Use [ID]:\n format (newline after colon)
             let prefixed_content = format!("[{}]:\n{}", msg.id, message_content);
 
-            grok_messages.push(GrokMessage {
+            ds_messages.push(DsMessage {
                 role: msg.role.clone(),
                 content: Some(prefixed_content),
                 tool_calls: None,
@@ -561,17 +559,17 @@ fn messages_to_grok(
         }
     }
 
-    grok_messages
+    ds_messages
 }
 
-/// Convert tool definitions to Grok/OpenAI format
-fn tools_to_grok(tools: &[ToolDefinition]) -> Vec<GrokTool> {
+/// Convert tool definitions to DeepSeek/OpenAI format
+fn tools_to_ds(tools: &[ToolDefinition]) -> Vec<DsTool> {
     tools
         .iter()
         .filter(|t| t.enabled)
-        .map(|t| GrokTool {
+        .map(|t| DsTool {
             tool_type: "function".to_string(),
-            function: GrokFunctionDef {
+            function: DsFunctionDef {
                 name: t.id.clone(),
                 description: t.description.clone(),
                 parameters: t.to_json_schema(),

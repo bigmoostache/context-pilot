@@ -85,6 +85,7 @@ pub enum Action {
     ConfigSelectAnthropicModel(crate::llms::AnthropicModel),
     ConfigSelectGrokModel(crate::llms::GrokModel),
     ConfigSelectGroqModel(crate::llms::GroqModel),
+    ConfigSelectDeepSeekModel(crate::llms::DeepSeekModel),
     ConfigSelectNextBar,
     ConfigSelectPrevBar,
     ConfigIncreaseSelectedBar,
@@ -538,6 +539,13 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ConfigSelectGroqModel(model) => {
             state.groq_model = model;
+            state.api_check_in_progress = true;
+            state.api_check_result = None;
+            state.dirty = true;
+            ActionResult::StartApiCheck
+        }
+        Action::ConfigSelectDeepSeekModel(model) => {
+            state.deepseek_model = model;
             state.api_check_in_progress = true;
             state.api_check_result = None;
             state.dirty = true;

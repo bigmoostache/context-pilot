@@ -511,6 +511,8 @@ pub struct State {
     pub grok_model: crate::llms::GrokModel,
     /// Selected Groq model
     pub groq_model: crate::llms::GroqModel,
+    /// Selected DeepSeek model
+    pub deepseek_model: crate::llms::DeepSeekModel,
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     pub cleaning_threshold: f32,
     /// Cleaning target as proportion of threshold (0.0 - 1.0)
@@ -621,6 +623,7 @@ impl Default for State {
             anthropic_model: crate::llms::AnthropicModel::default(),
             grok_model: crate::llms::GrokModel::default(),
             groq_model: crate::llms::GroqModel::default(),
+            deepseek_model: crate::llms::DeepSeekModel::default(),
             cleaning_threshold: 0.70,
             cleaning_target_proportion: 0.70,
             context_budget: None, // Use model's full context window
@@ -680,6 +683,7 @@ impl State {
             }
             crate::llms::LlmProvider::Grok => self.grok_model.api_name().to_string(),
             crate::llms::LlmProvider::Groq => self.groq_model.api_name().to_string(),
+            crate::llms::LlmProvider::DeepSeek => self.deepseek_model.api_name().to_string(),
         }
     }
 
@@ -696,6 +700,7 @@ impl State {
             }
             crate::llms::LlmProvider::Grok => self.grok_model.context_window(),
             crate::llms::LlmProvider::Groq => self.groq_model.context_window(),
+            crate::llms::LlmProvider::DeepSeek => self.deepseek_model.context_window(),
         }
     }
 
