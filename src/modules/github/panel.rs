@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
 use crate::cache::{CacheRequest, CacheUpdate};
-use crate::constants::{GH_CMD_TIMEOUT_SECS, GH_RESULT_REFRESH_MS, MAX_RESULT_CONTENT_BYTES};
+use crate::constants::{GH_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
 use crate::core::panels::{now_ms, paginate_content, ContextItem, Panel};
 use crate::modules::{run_with_timeout, truncate_output};
 use crate::actions::Action;
@@ -16,7 +16,7 @@ impl Panel for GithubResultPanel {
     fn needs_cache(&self) -> bool { true }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
-        Some(GH_RESULT_REFRESH_MS)
+        None // GhWatcher handles periodic refresh
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {

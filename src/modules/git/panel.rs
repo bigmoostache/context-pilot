@@ -824,6 +824,10 @@ impl Panel for GitPanel {
 impl Panel for GitResultPanel {
     fn needs_cache(&self) -> bool { true }
 
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        Some(GIT_STATUS_REFRESH_MS)
+    }
+
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
         let command = ctx.result_command.as_ref()?;
         Some(CacheRequest::RefreshGitResult {

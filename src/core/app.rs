@@ -19,6 +19,7 @@ use crate::tools::{execute_tool, perform_reload, ToolResult, ToolUse};
 use crate::typewriter::TypewriterBuffer;
 use crate::ui;
 use crate::watcher::{FileWatcher, WatchEvent};
+use crate::gh_watcher::GhWatcher;
 
 use super::context::prepare_stream_context;
 use super::init::get_active_seed_content;
@@ -30,6 +31,7 @@ pub struct App {
     pending_tools: Vec<ToolUse>,
     cache_tx: Sender<CacheUpdate>,
     file_watcher: Option<FileWatcher>,
+    gh_watcher: GhWatcher,
     /// Tracks which file paths are being watched
     watched_file_paths: std::collections::HashSet<String>,
     /// Tracks which directory paths are being watched (for tree)
@@ -55,6 +57,7 @@ pub struct App {
 impl App {
     pub fn new(state: State, cache_tx: Sender<CacheUpdate>, resume_stream: bool) -> Self {
         let file_watcher = FileWatcher::new().ok();
+        let gh_watcher = GhWatcher::new(cache_tx.clone());
 
         Self {
             state,
@@ -63,6 +66,7 @@ impl App {
             pending_tools: Vec::new(),
             cache_tx,
             file_watcher,
+            gh_watcher,
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
             watched_git_paths: std::collections::HashSet::new(),
@@ -87,6 +91,7 @@ impl App {
     ) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
         self.setup_file_watchers();
+        self.sync_gh_watches();
         self.schedule_initial_cache_refreshes();
 
         // Claim ownership immediately
@@ -159,6 +164,7 @@ impl App {
             self.process_tldr_results(&tldr_rx);
             self.process_cache_updates(&cache_rx);
             self.process_watcher_events();
+            self.sync_gh_watches();
             self.check_timer_based_deprecation();
             self.handle_tool_execution(&tx, &tldr_tx, &cache_rx, terminal);
             self.finalize_stream(&tldr_tx);
@@ -564,6 +570,19 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Sync GhWatcher with current GithubResult panels
+    fn sync_gh_watches(&self) {
+        let token = match &self.state.github_token {
+            Some(t) => t.clone(),
+            None => return,
+        };
+        let panels: Vec<(String, String, String)> = self.state.context.iter()
+            .filter(|c| c.context_type == ContextType::GithubResult)
+            .filter_map(|c| c.result_command.as_ref().map(|cmd| (c.id.clone(), cmd.clone(), token.clone())))
+            .collect();
+        self.gh_watcher.sync_watches(&panels);
     }
 
     /// Schedule initial cache refreshes for all context elements

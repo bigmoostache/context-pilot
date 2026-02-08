@@ -19,6 +19,7 @@ mod tools;
 mod typewriter;
 mod ui;
 mod watcher;
+mod gh_watcher;
 
 use std::io;
 use std::sync::mpsc;

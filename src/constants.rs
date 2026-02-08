@@ -133,9 +133,6 @@ pub const PANEL_PAGE_TOKENS: usize = 25_000;
 /// Background session name for tmux operations
 pub const TMUX_BG_SESSION: &str = "context-pilot-bg";
 
-/// Refresh interval for GitHub result panels (milliseconds)
-pub const GH_RESULT_REFRESH_MS: u64 = 120_000;
-
 /// Maximum size for command output cached in result panels (bytes)
 pub const MAX_RESULT_CONTENT_BYTES: usize = 1_000_000; // 1 MB
 
