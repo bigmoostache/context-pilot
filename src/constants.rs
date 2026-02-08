@@ -117,6 +117,19 @@ pub const DEFAULT_WORKER_ID: &str = "main_worker";
 pub const PRESETS_DIR: &str = "presets";
 
 // =============================================================================
+// PANEL SIZE LIMITS
+// =============================================================================
+
+/// Hard cap: refuse to load any panel content larger than this (bytes)
+pub const PANEL_MAX_LOAD_BYTES: usize = 5 * 1024 * 1024; // 5 MB
+
+/// Soft cap: paginate panel content exceeding this token count
+pub const PANEL_MAX_TOKENS: usize = 10_000;
+
+/// Tokens per page when paginating
+pub const PANEL_PAGE_TOKENS: usize = 10_000;
+
+// =============================================================================
 // TMUX
 // =============================================================================
 
