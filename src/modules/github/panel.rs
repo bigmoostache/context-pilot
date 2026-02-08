@@ -16,7 +16,7 @@ impl Panel for GithubResultPanel {
     fn needs_cache(&self) -> bool { true }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
-        Some(120_000) // 120 seconds — conservative to avoid GitHub rate limits
+        None // GhWatcher handles periodic refresh via ETag/hash polling
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
@@ -148,10 +148,38 @@ impl Panel for GithubResultPanel {
 
         if let Some(content) = &ctx.cached_content {
             for line in content.lines() {
-                text.push(Line::from(vec![
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled(line.to_string(), Style::default().fg(theme::text())),
-                ]));
+                // Replace tabs with aligned spacing for readable output
+                if line.contains('\t') {
+                    let parts: Vec<&str> = line.split('\t').collect();
+                    let mut spans = vec![Span::styled(" ".to_string(), base_style)];
+                    for (i, part) in parts.iter().enumerate() {
+                        let style = match i {
+                            0 => Style::default().fg(theme::accent()), // ID / number
+                            1 => {
+                                // State field (OPEN/CLOSED/MERGED)
+                                let color = match part.trim() {
+                                    "OPEN" => theme::success(),
+                                    "CLOSED" => theme::error(),
+                                    "MERGED" => theme::accent(),
+                                    _ => theme::text_secondary(),
+                                };
+                                Style::default().fg(color)
+                            },
+                            2 => Style::default().fg(theme::text()), // Title
+                            _ => Style::default().fg(theme::text_muted()), // Labels, dates, etc.
+                        };
+                        if i > 0 {
+                            spans.push(Span::styled("  ", base_style)); // double-space separator
+                        }
+                        spans.push(Span::styled(part.to_string(), style));
+                    }
+                    text.push(Line::from(spans));
+                } else {
+                    text.push(Line::from(vec![
+                        Span::styled(" ".to_string(), base_style),
+                        Span::styled(line.to_string(), Style::default().fg(theme::text())),
+                    ]));
+                }
             }
         } else {
             text.push(Line::from(vec![

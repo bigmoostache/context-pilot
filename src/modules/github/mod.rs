@@ -1,3 +1,4 @@
+pub mod cache_invalidation;
 pub mod classify;
 mod panel;
 mod tools;

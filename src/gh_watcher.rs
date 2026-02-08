@@ -99,7 +99,7 @@ impl GhWatcher {
                 etag: None,
                 last_output_hash: None,
                 poll_interval_secs: GH_DEFAULT_POLL_INTERVAL_SECS,
-                last_poll_ms: now_ms(), // Don't poll immediately; initial load uses the cache system
+                last_poll_ms: 0, // Poll immediately on first sync; initial content comes from cache system but we want fast change detection
             });
         }
     }

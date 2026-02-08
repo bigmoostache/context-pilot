@@ -118,9 +118,20 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 .env("NO_COLOR", "1");
             let result = run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS);
 
-            // Mark all GithubResult + P6 panels as deprecated
+            // Invalidate affected panels using heuristics
+            let invalidations = super::cache_invalidation::find_invalidations(command);
             for ctx in &mut state.context {
-                if ctx.context_type == ContextType::GithubResult || ctx.context_type == ContextType::Git {
+                if ctx.context_type == ContextType::GithubResult {
+                    if let Some(ref cmd) = ctx.result_command {
+                        if invalidations.iter().any(|re| re.is_match(cmd)) {
+                            ctx.cache_deprecated = true;
+                        }
+                    }
+                }
+            }
+            // Always invalidate Git status (PRs/merges can affect it)
+            for ctx in &mut state.context {
+                if ctx.context_type == ContextType::Git {
                     ctx.cache_deprecated = true;
                 }
             }
