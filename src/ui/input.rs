@@ -69,6 +69,19 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     ));
     spans.push(Span::styled(" ", base_style));
 
+    // Stop reason from last stream (highlight max_tokens as warning)
+    if !state.is_streaming {
+        if let Some(ref reason) = state.last_stop_reason {
+            let (label, style) = if reason == "max_tokens" {
+                ("MAX_TOKENS".to_string(), Style::default().fg(theme::bg_base()).bg(theme::error()).bold())
+            } else {
+                (reason.to_uppercase(), Style::default().fg(theme::text()).bg(theme::bg_elevated()))
+            };
+            spans.push(Span::styled(format!(" {} ", label), style));
+            spans.push(Span::styled(" ", base_style));
+        }
+    }
+
     // Git branch (if available)
     if let Some(branch) = &state.git_branch {
         spans.push(Span::styled(

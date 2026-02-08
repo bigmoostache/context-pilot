@@ -1,2 +1,0 @@
-test file for cache invalidation
-stash test

@@ -439,6 +439,8 @@ pub struct State {
     pub input_cursor: usize,
     pub selected_context: usize,
     pub is_streaming: bool,
+    /// Stop reason from last completed stream (e.g., "end_turn", "max_tokens", "tool_use")
+    pub last_stop_reason: Option<String>,
     pub scroll_offset: f32,
     pub user_scrolled: bool,
     /// Scroll acceleration (increases when holding scroll keys)
@@ -582,6 +584,7 @@ impl Default for State {
             input_cursor: 0,
             selected_context: 0,
             is_streaming: false,
+            last_stop_reason: None,
             scroll_offset: 0.0,
             user_scrolled: false,
             scroll_accel: 1.0,

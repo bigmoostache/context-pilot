@@ -257,6 +257,7 @@ struct StreamDelta {
     delta_type: Option<String>,
     text: Option<String>,
     partial_json: Option<String>,
+    stop_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -561,6 +562,7 @@ impl LlmClient for ClaudeCodeClient {
         let mut input_tokens = 0;
         let mut output_tokens = 0;
         let mut current_tool: Option<(String, String, String)> = None;
+        let mut stop_reason: Option<String> = None;
 
         for line in reader.lines() {
             let line = line.map_err(|e| format!("Read error: {}", e))?;
@@ -614,6 +616,11 @@ impl LlmClient for ClaudeCodeClient {
                         }
                     }
                     "message_delta" => {
+                        if let Some(ref delta) = event.delta {
+                            if let Some(ref reason) = delta.stop_reason {
+                                stop_reason = Some(reason.clone());
+                            }
+                        }
                         if let Some(usage) = event.usage {
                             if let Some(inp) = usage.input_tokens {
                                 input_tokens = inp;
@@ -632,6 +639,7 @@ impl LlmClient for ClaudeCodeClient {
         let _ = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
+            stop_reason,
         });
         Ok(())
     }
