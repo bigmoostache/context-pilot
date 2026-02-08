@@ -1,5 +1,6 @@
 pub mod types;
 pub mod classify;
+pub mod cache_invalidation;
 mod panel;
 pub(crate) mod tools;
 

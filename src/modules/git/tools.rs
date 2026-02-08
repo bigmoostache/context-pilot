@@ -93,12 +93,27 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                 .env("GIT_TERMINAL_PROMPT", "0");
             let result = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
-            // Mark P6 + all GitResult panels as deprecated
-            for ctx in &mut state.context {
-                if ctx.context_type == ContextType::Git || ctx.context_type == ContextType::GitResult {
-                    ctx.cache_deprecated = true;
+            // Heuristic-based cache invalidation for GitResult panels
+            let invalidations = super::cache_invalidation::find_invalidations(command);
+            if invalidations.is_empty() {
+                // Unknown mutating command → blanket invalidation (safe default)
+                for ctx in &mut state.context {
+                    if ctx.context_type == ContextType::GitResult {
+                        ctx.cache_deprecated = true;
+                    }
+                }
+            } else {
+                for ctx in &mut state.context {
+                    if ctx.context_type == ContextType::GitResult {
+                        if let Some(ref cmd) = ctx.result_command {
+                            if invalidations.iter().any(|re| re.is_match(cmd)) {
+                                ctx.cache_deprecated = true;
+                            }
+                        }
+                    }
                 }
             }
+            // P6 (Git) always invalidated via .git/ file watcher — no action needed here
 
             match result {
                 Ok(output) => {
