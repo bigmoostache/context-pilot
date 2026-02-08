@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
-use crate::constants::{prompts, MAX_RESPONSE_TOKENS};
+use crate::constants::prompts;
 use crate::core::panels::{ContextItem, now_ms};
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::ToolDefinition;
@@ -186,7 +186,7 @@ impl LlmClient for DeepSeekClient {
             messages: ds_messages,
             tools: ds_tools,
             tool_choice,
-            max_tokens: MAX_RESPONSE_TOKENS,
+            max_tokens: if request.model == "deepseek-reasoner" { 16384 } else { 8192 },
             stream: true,
         };
 
