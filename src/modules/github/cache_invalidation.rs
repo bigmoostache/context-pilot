@@ -51,13 +51,17 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
             &[
                 r"^gh\s+issue\s+list",
                 r"^gh\s+issue\s+view\s+\2\b",  // backreference to issue number
+                r"^gh\s+issue\s+status",
             ],
         ),
 
-        // gh issue create → invalidate all issue lists
+        // gh issue create → invalidate all issue lists + issue status
         InvalidationRule::new(
             r"^gh\s+issue\s+create",
-            &[r"^gh\s+issue\s+list"],
+            &[
+                r"^gh\s+issue\s+list",
+                r"^gh\s+issue\s+status",
+            ],
         ),
 
         // gh issue comment <number> → invalidate issue view for that number
@@ -86,19 +90,23 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
         // =====================================================================
 
         // gh pr close/reopen/edit/merge <number>
-        // → invalidate: pr list, pr view <same number>
+        // → invalidate: pr list, pr view <same number>, pr status
         InvalidationRule::new(
             r"^gh\s+pr\s+(close|reopen|edit|merge)\s+(\d+)",
             &[
                 r"^gh\s+pr\s+list",
                 r"^gh\s+pr\s+view\s+\2\b",
+                r"^gh\s+pr\s+status",
             ],
         ),
 
-        // gh pr create → invalidate all pr lists
+        // gh pr create → invalidate all pr lists + pr status
         InvalidationRule::new(
             r"^gh\s+pr\s+create",
-            &[r"^gh\s+pr\s+list"],
+            &[
+                r"^gh\s+pr\s+list",
+                r"^gh\s+pr\s+status",
+            ],
         ),
 
         // gh pr review <number> → invalidate pr view
@@ -113,12 +121,13 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
             &[r"^gh\s+pr\s+view\s+\1\b"],
         ),
 
-        // gh pr ready/draft <number> → invalidate pr list + pr view
+        // gh pr ready/draft <number> → invalidate pr list + pr view + pr status
         InvalidationRule::new(
             r"^gh\s+pr\s+(ready|draft)\s+(\d+)",
             &[
                 r"^gh\s+pr\s+list",
                 r"^gh\s+pr\s+view\s+\2\b",
+                r"^gh\s+pr\s+status",
             ],
         ),
 
@@ -253,5 +262,56 @@ mod tests {
         let invalidations = find_invalidations("gh label create bug --color FF0000");
         assert!(invalidations.iter().any(|re| re.is_match("gh label list")));
         assert!(invalidations.iter().any(|re| re.is_match("gh issue list")));
+    }
+
+    #[test]
+    fn test_issue_close_invalidates_status() {
+        let invalidations = find_invalidations("gh issue close 42");
+        assert!(invalidations.iter().any(|re| re.is_match("gh issue status")));
+    }
+
+    #[test]
+    fn test_pr_close_invalidates_status() {
+        let invalidations = find_invalidations("gh pr close 20");
+        assert!(invalidations.iter().any(|re| re.is_match("gh pr status")));
+        assert!(invalidations.iter().any(|re| re.is_match("gh pr list")));
+        assert!(invalidations.iter().any(|re| re.is_match("gh pr view 20")));
+    }
+
+    #[test]
+    fn test_pr_create_invalidates_list_and_status() {
+        let invalidations = find_invalidations("gh pr create --title \"test\" --base main");
+        assert!(invalidations.iter().any(|re| re.is_match("gh pr list")));
+        assert!(invalidations.iter().any(|re| re.is_match("gh pr status")));
+    }
+
+    #[test]
+    fn test_issue_comment_only_invalidates_view() {
+        let invalidations = find_invalidations("gh issue comment 21 --body \"test\"");
+        assert!(invalidations.iter().any(|re| re.is_match("gh issue view 21")));
+        // Should NOT invalidate issue list
+        assert!(!invalidations.iter().any(|re| re.is_match("gh issue list")));
+    }
+
+    #[test]
+    fn test_issue_edit_invalidates_list_view_and_status() {
+        let invalidations = find_invalidations("gh issue edit 21 --title \"new title\"");
+        assert!(invalidations.iter().any(|re| re.is_match("gh issue list")));
+        assert!(invalidations.iter().any(|re| re.is_match("gh issue view 21")));
+        assert!(invalidations.iter().any(|re| re.is_match("gh issue status")));
+    }
+
+    #[test]
+    fn test_api_post_invalidates_all_api_panels() {
+        let invalidations = find_invalidations("gh api /repos/owner/repo/issues -X POST");
+        assert!(invalidations.iter().any(|re| re.is_match("gh api /repos/owner/repo/issues")));
+        assert!(invalidations.iter().any(|re| re.is_match("gh api /repos/owner/repo")));
+    }
+
+    #[test]
+    fn test_release_create_invalidates_release_panels() {
+        let invalidations = find_invalidations("gh release create v1.0.0 --title \"Release 1.0\"");
+        assert!(invalidations.iter().any(|re| re.is_match("gh release list")));
+        assert!(invalidations.iter().any(|re| re.is_match("gh release view v1.0.0")));
     }
 }
