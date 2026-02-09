@@ -1,5 +1,5 @@
 use crate::persistence::{delete_message, save_message};
-use crate::state::{estimate_tokens, ContextElement, ContextType, Message, MessageStatus, MessageType, State};
+use crate::state::{estimate_tokens, ContextType, Message, MessageStatus, MessageType, State};
 
 use super::helpers::{parse_context_pattern, find_context_by_id};
 use super::ActionResult;

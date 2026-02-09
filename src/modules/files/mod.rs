@@ -14,7 +14,7 @@ pub struct FilesModule;
 impl Module for FilesModule {
     fn id(&self) -> &'static str { "files" }
     fn name(&self) -> &'static str { "Files" }
-    fn description(&self) -> &'static str { "File open, edit, and create tools" }
+    fn description(&self) -> &'static str { "File open, edit, write, and create tools" }
     fn is_core(&self) -> bool { true }
     fn is_global(&self) -> bool { true }
 
@@ -48,7 +48,7 @@ impl Module for FilesModule {
                 id: "file_edit".to_string(),
                 name: "Edit File".to_string(),
                 short_desc: "Modify file content".to_string(),
-                description: "Edits a file by replacing exact text. IMPORTANT: 1) Use file_open FIRST to see current content. 2) old_string must be EXACT text from file (copy from context). 3) To append, use the last line as old_string and include it + new content in new_string.".to_string(),
+                description: "Edits a file by replacing exact text. PREFERRED over file_write for any modification — only use file_write to create new files or completely replace all content. IMPORTANT: 1) Use file_open FIRST to see current content. 2) old_string must be EXACT text from file (copy from context). 3) To append, use the last line as old_string and include it + new content in new_string.".to_string(),
                 params: vec![
                     ToolParam::new("file_path", ParamType::String)
                         .desc("Absolute path to the file to edit")
@@ -61,6 +61,22 @@ impl Module for FilesModule {
                         .required(),
                     ToolParam::new("replace_all", ParamType::Boolean)
                         .desc("Replace all occurrences (default: false)"),
+                ],
+                enabled: true,
+                category: ToolCategory::File,
+            },
+            ToolDefinition {
+                id: "file_write".to_string(),
+                name: "Write File".to_string(),
+                short_desc: "Create or overwrite file".to_string(),
+                description: "Writes complete contents to a file, creating it if it doesn't exist or replacing all content if it does. Use ONLY for creating new files or completely replacing file content. For targeted edits (changing specific sections, appending, inserting), ALWAYS prefer file_edit instead — it is safer and more precise.".to_string(),
+                params: vec![
+                    ToolParam::new("file_path", ParamType::String)
+                        .desc("Path to the file to write")
+                        .required(),
+                    ToolParam::new("contents", ParamType::String)
+                        .desc("Complete file contents to write")
+                        .required(),
                 ],
                 enabled: true,
                 category: ToolCategory::File,
@@ -111,6 +127,7 @@ impl Module for FilesModule {
         match tool.name.as_str() {
             "file_open" => Some(self::tools::file::execute_open(tool, state)),
             "file_edit" => Some(self::tools::edit_file::execute_edit(tool, state)),
+            "file_write" => Some(self::tools::write::execute(tool, state)),
             "file_create" => Some(self::tools::edit_file::execute_create(tool, state)),
             "file_batch_create" => Some(self::tools::create::execute(tool, state)),
             _ => None,
