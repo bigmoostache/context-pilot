@@ -166,20 +166,72 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
     // Token stats (cache hit / cache miss / output) — only when any value is non-zero
     if state.cache_hit_tokens > 0 || state.cache_miss_tokens > 0 || state.total_output_tokens > 0 {
-        // Helper: build a stats line with aligned columns
-        // Format: "  {label}  ↑ {count:>5}  ✗ {count:>5}  ↓ {count:>5}"
+        // Get current model pricing
+        let hit_price = state.cache_hit_price_per_mtok();
+        let miss_price = state.cache_miss_price_per_mtok();
+        let out_price = state.output_price_per_mtok();
+
+        // Helper: format cost in dollars with appropriate precision
+        let format_cost = |tokens: usize, price_per_mtok: f32| -> String {
+            let cost = crate::state::State::token_cost(tokens, price_per_mtok);
+            if cost < 0.001 {
+                format!("")
+            } else if cost < 0.01 {
+                format!("{:.3}", cost)
+            } else if cost < 1.0 {
+                format!("{:.2}", cost)
+            } else {
+                format!("{:.1}", cost)
+            }
+        };
+
+        // Helper: build a stats line with aligned columns + intercalated costs
+        // Format: "  {label}  ↑ {count} {$cost}  ✗ {count} {$cost}  ↓ {count} {$cost}"
         let stats_line = |label: &str, hit: usize, miss: usize, out: usize| -> Line<'static> {
-            Line::from(vec![
-                Span::styled(format!("  {:>4}  ", label), Style::default().fg(theme::text_muted())),
-                Span::styled(format!("{} {:>5}", chars::ARROW_UP, format_number(hit)), Style::default().fg(theme::success())),
-                Span::styled("  ", base_style),
-                Span::styled(format!("{} {:>5}", chars::CROSS, format_number(miss)), Style::default().fg(theme::warning())),
-                Span::styled("  ", base_style),
-                Span::styled(format!("{} {:>5}", chars::ARROW_DOWN, format_number(out)), Style::default().fg(theme::accent_dim())),
-            ])
+            let hit_cost = format_cost(hit, hit_price);
+            let miss_cost = format_cost(miss, miss_price);
+            let out_cost = format_cost(out, out_price);
+
+            let mut spans = vec![
+                Span::styled(format!("  {:>4} ", label), Style::default().fg(theme::text_muted())),
+                Span::styled(format!("{}{:>5}", chars::ARROW_UP, format_number(hit)), Style::default().fg(theme::success())),
+            ];
+            if !hit_cost.is_empty() {
+                spans.push(Span::styled(format!(" ${}", hit_cost), Style::default().fg(theme::text_muted())));
+            }
+            spans.push(Span::styled(" ", base_style));
+            spans.push(Span::styled(format!("{}{:>5}", chars::CROSS, format_number(miss)), Style::default().fg(theme::warning())));
+            if !miss_cost.is_empty() {
+                spans.push(Span::styled(format!(" ${}", miss_cost), Style::default().fg(theme::text_muted())));
+            }
+            spans.push(Span::styled(" ", base_style));
+            spans.push(Span::styled(format!("{}{:>5}", chars::ARROW_DOWN, format_number(out)), Style::default().fg(theme::accent_dim())));
+            if !out_cost.is_empty() {
+                spans.push(Span::styled(format!(" ${}", out_cost), Style::default().fg(theme::text_muted())));
+            }
+
+            Line::from(spans)
         };
 
         lines.push(stats_line("tot", state.cache_hit_tokens, state.cache_miss_tokens, state.total_output_tokens));
+
+        // Show total cost
+        let total_cost = crate::state::State::token_cost(state.cache_hit_tokens, hit_price)
+            + crate::state::State::token_cost(state.cache_miss_tokens, miss_price)
+            + crate::state::State::token_cost(state.total_output_tokens, out_price);
+        if total_cost >= 0.001 {
+            let cost_str = if total_cost < 0.01 {
+                format!("${:.3}", total_cost)
+            } else if total_cost < 1.0 {
+                format!("${:.2}", total_cost)
+            } else {
+                format!("${:.1}", total_cost)
+            };
+            lines.push(Line::from(vec![
+                Span::styled("        ", base_style),
+                Span::styled(format!("total: {}", cost_str), Style::default().fg(theme::text_muted())),
+            ]));
+        }
 
         if state.stream_output_tokens > 0 || state.stream_cache_hit_tokens > 0 || state.stream_cache_miss_tokens > 0 {
             lines.push(stats_line("strm", state.stream_cache_hit_tokens, state.stream_cache_miss_tokens, state.stream_output_tokens));

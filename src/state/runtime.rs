@@ -327,4 +327,45 @@ impl State {
     pub fn cleaning_target_tokens(&self) -> usize {
         (self.effective_context_budget() as f32 * self.cleaning_target()) as usize
     }
+
+    /// Get cache hit price per million tokens for the current model
+    pub fn cache_hit_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            crate::llms::LlmProvider::Anthropic | crate::llms::LlmProvider::ClaudeCode => {
+                self.anthropic_model.cache_hit_price_per_mtok()
+            }
+            crate::llms::LlmProvider::Grok => self.grok_model.cache_hit_price_per_mtok(),
+            crate::llms::LlmProvider::Groq => self.groq_model.cache_hit_price_per_mtok(),
+            crate::llms::LlmProvider::DeepSeek => self.deepseek_model.cache_hit_price_per_mtok(),
+        }
+    }
+
+    /// Get cache miss price per million tokens for the current model
+    pub fn cache_miss_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            crate::llms::LlmProvider::Anthropic | crate::llms::LlmProvider::ClaudeCode => {
+                self.anthropic_model.cache_miss_price_per_mtok()
+            }
+            crate::llms::LlmProvider::Grok => self.grok_model.cache_miss_price_per_mtok(),
+            crate::llms::LlmProvider::Groq => self.groq_model.cache_miss_price_per_mtok(),
+            crate::llms::LlmProvider::DeepSeek => self.deepseek_model.cache_miss_price_per_mtok(),
+        }
+    }
+
+    /// Get output price per million tokens for the current model
+    pub fn output_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            crate::llms::LlmProvider::Anthropic | crate::llms::LlmProvider::ClaudeCode => {
+                self.anthropic_model.output_price_per_mtok()
+            }
+            crate::llms::LlmProvider::Grok => self.grok_model.output_price_per_mtok(),
+            crate::llms::LlmProvider::Groq => self.groq_model.output_price_per_mtok(),
+            crate::llms::LlmProvider::DeepSeek => self.deepseek_model.output_price_per_mtok(),
+        }
+    }
+
+    /// Calculate cost in USD for a given token count and price per MTok
+    pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
+        tokens as f64 * price_per_mtok as f64 / 1_000_000.0
+    }
 }

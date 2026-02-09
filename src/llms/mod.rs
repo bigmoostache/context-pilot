@@ -54,10 +54,14 @@ pub trait ModelInfo {
     fn display_name(&self) -> &'static str;
     /// Maximum context window in tokens
     fn context_window(&self) -> usize;
-    /// Input price per million tokens in USD
+    /// Input price per million tokens in USD (used for cache miss / uncached input)
     fn input_price_per_mtok(&self) -> f32;
     /// Output price per million tokens in USD
     fn output_price_per_mtok(&self) -> f32;
+    /// Cache hit price per million tokens in USD (default: same as input)
+    fn cache_hit_price_per_mtok(&self) -> f32 { self.input_price_per_mtok() * 0.1 }
+    /// Cache write/miss price per million tokens in USD (default: 1.25x input)
+    fn cache_miss_price_per_mtok(&self) -> f32 { self.input_price_per_mtok() * 1.25 }
 }
 
 /// Available LLM providers
@@ -117,6 +121,22 @@ impl ModelInfo for AnthropicModel {
             AnthropicModel::ClaudeOpus45 => 25.0,
             AnthropicModel::ClaudeSonnet45 => 15.0,
             AnthropicModel::ClaudeHaiku45 => 5.0,
+        }
+    }
+
+    fn cache_hit_price_per_mtok(&self) -> f32 {
+        match self {
+            AnthropicModel::ClaudeOpus45 => 0.50,
+            AnthropicModel::ClaudeSonnet45 => 0.30,
+            AnthropicModel::ClaudeHaiku45 => 0.10,
+        }
+    }
+
+    fn cache_miss_price_per_mtok(&self) -> f32 {
+        match self {
+            AnthropicModel::ClaudeOpus45 => 6.25,
+            AnthropicModel::ClaudeSonnet45 => 3.75,
+            AnthropicModel::ClaudeHaiku45 => 1.25,
         }
     }
 }
@@ -256,6 +276,14 @@ impl ModelInfo for DeepSeekModel {
 
     fn output_price_per_mtok(&self) -> f32 {
         0.42
+    }
+
+    fn cache_hit_price_per_mtok(&self) -> f32 {
+        0.028
+    }
+
+    fn cache_miss_price_per_mtok(&self) -> f32 {
+        0.28
     }
 }
 
