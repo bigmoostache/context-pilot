@@ -1,21 +1,18 @@
 //! DeepSeek API implementation.
 //!
 //! DeepSeek uses an OpenAI-compatible API format.
+//! Message building is delegated to the shared `openai_compat` module,
+//! with a thin wrapper to add `reasoning_content` for deepseek-reasoner.
 
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde::Serialize;
 
-use super::{LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
-use crate::constants::prompts;
-use crate::core::panels::{ContextItem, now_ms};
-use crate::state::{Message, MessageStatus, MessageType};
-use crate::tool_defs::ToolDefinition;
-use crate::tools::ToolUse;
+use super::openai_compat::{self, OaiMessage, BuildOptions, ToolCallAccumulator};
+use super::{LlmClient, LlmRequest, StreamEvent};
 
 const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
@@ -39,48 +36,41 @@ impl Default for DeepSeekClient {
     }
 }
 
-// OpenAI-compatible message format
+// ───────────────────────────────────────────────────────────────────
+// DeepSeek-specific message type (adds reasoning_content field)
+// ───────────────────────────────────────────────────────────────────
+
+/// DeepSeek message — wraps the shared OaiMessage but adds `reasoning_content`
+/// which is required for deepseek-reasoner model on assistant messages.
 #[derive(Debug, Serialize)]
 struct DsMessage {
     role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<String>,
-    /// Required on all assistant messages when using deepseek-reasoner.
-    /// Set to empty string for historical messages where we don't have the original reasoning.
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    tool_calls: Option<Vec<DsToolCall>>,
+    tool_calls: Option<Vec<openai_compat::OaiToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct DsToolCall {
-    id: String,
-    #[serde(rename = "type")]
-    call_type: String,
-    function: DsFunction,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct DsFunction {
-    name: String,
-    arguments: String,
-}
-
-#[derive(Debug, Serialize)]
-struct DsTool {
-    #[serde(rename = "type")]
-    tool_type: String,
-    function: DsFunctionDef,
-}
-
-#[derive(Debug, Serialize)]
-struct DsFunctionDef {
-    name: String,
-    description: String,
-    parameters: Value,
+impl DsMessage {
+    /// Convert from shared OaiMessage, adding reasoning_content for assistant messages.
+    fn from_oai(msg: OaiMessage, is_reasoner: bool) -> Self {
+        let reasoning_content = if is_reasoner && msg.role == "assistant" {
+            Some(String::new())
+        } else {
+            None
+        };
+        Self {
+            role: msg.role,
+            content: msg.content,
+            reasoning_content,
+            tool_calls: msg.tool_calls,
+            tool_call_id: msg.tool_call_id,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -88,50 +78,11 @@ struct DsRequest {
     model: String,
     messages: Vec<DsMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    tools: Vec<DsTool>,
+    tools: Vec<openai_compat::OaiTool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
     max_tokens: u32,
     stream: bool,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamChoice {
-    delta: Option<StreamDelta>,
-    finish_reason: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamDelta {
-    content: Option<String>,
-    tool_calls: Option<Vec<StreamToolCall>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamToolCall {
-    index: Option<usize>,
-    id: Option<String>,
-    function: Option<StreamFunction>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamFunction {
-    name: Option<String>,
-    arguments: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamResponse {
-    choices: Vec<StreamChoice>,
-    usage: Option<StreamUsage>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamUsage {
-    prompt_tokens: Option<usize>,
-    completion_tokens: Option<usize>,
-    prompt_cache_hit_tokens: Option<usize>,
-    prompt_cache_miss_tokens: Option<usize>,
 }
 
 impl LlmClient for DeepSeekClient {
@@ -142,21 +93,30 @@ impl LlmClient for DeepSeekClient {
             .ok_or_else(|| "DEEPSEEK_API_KEY not set".to_string())?;
 
         let client = Client::new();
+        let is_reasoner = request.model == "deepseek-reasoner";
 
-        // Collect pending tool result IDs so the message builder includes their tool calls
+        // Collect pending tool result IDs
         let pending_tool_ids: Vec<String> = request.tool_results.as_ref()
             .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
             .unwrap_or_default();
 
-        // Build messages in OpenAI format
-        let mut ds_messages = messages_to_ds(
+        // Build messages using shared builder
+        let oai_messages = openai_compat::build_messages(
             &request.messages,
             &request.context_items,
-            &request.system_prompt,
-            &request.extra_context,
-            &pending_tool_ids,
-            &request.model,
+            &BuildOptions {
+                system_prompt: request.system_prompt.clone(),
+                system_suffix: None,
+                extra_context: request.extra_context.clone(),
+                pending_tool_result_ids: pending_tool_ids,
+            },
         );
+
+        // Convert to DeepSeek format (adds reasoning_content for assistant messages)
+        let mut ds_messages: Vec<DsMessage> = oai_messages
+            .into_iter()
+            .map(|m| DsMessage::from_oai(m, is_reasoner))
+            .collect();
 
         // Add tool results if present
         if let Some(results) = &request.tool_results {
@@ -171,27 +131,19 @@ impl LlmClient for DeepSeekClient {
             }
         }
 
-        // Convert tools to OpenAI format
-        let ds_tools = tools_to_ds(&request.tools);
-
-        // Set tool_choice to "auto" when tools are available
-        let tool_choice = if ds_tools.is_empty() {
-            None
-        } else {
-            Some("auto".to_string())
-        };
+        let tools = openai_compat::tools_to_oai(&request.tools);
+        let tool_choice = if tools.is_empty() { None } else { Some("auto".to_string()) };
 
         let api_request = DsRequest {
             model: request.model.clone(),
             messages: ds_messages,
-            tools: ds_tools,
+            tools,
             tool_choice,
-            max_tokens: if request.model == "deepseek-reasoner" { 16384 } else { 8192 },
+            max_tokens: if is_reasoner { 16384 } else { 8192 },
             stream: true,
         };
 
-        // Dump last request for debugging
-        dump_last_request(&request.worker_id, &api_request);
+        openai_compat::dump_request(&request.worker_id, "deepseek", &api_request);
 
         let response = client
             .post(DEEPSEEK_API_ENDPOINT)
@@ -207,95 +159,44 @@ impl LlmClient for DeepSeekClient {
             return Err(format!("API error {}: {}", status, body));
         }
 
+        // Stream SSE using shared helpers
         let reader = BufReader::new(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
         let mut cache_hit_tokens = 0;
         let mut cache_miss_tokens = 0;
         let mut stop_reason: Option<String> = None;
-
-        // Track tool calls being built (index -> (id, name, arguments))
-        let mut tool_calls: std::collections::HashMap<usize, (String, String, String)> =
-            std::collections::HashMap::new();
+        let mut tool_acc = ToolCallAccumulator::new();
 
         for line in reader.lines() {
             let line = line.map_err(|e| format!("Read error: {}", e))?;
 
-            if !line.starts_with("data: ") {
-                continue;
-            }
-
-            let json_str = &line[6..];
-            if json_str == "[DONE]" {
-                break;
-            }
-
-            if let Ok(resp) = serde_json::from_str::<StreamResponse>(json_str) {
-                // Handle usage info
+            if let Some(resp) = openai_compat::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
-                    if let Some(inp) = usage.prompt_tokens {
-                        input_tokens = inp;
-                    }
-                    if let Some(out) = usage.completion_tokens {
-                        output_tokens = out;
-                    }
-                    if let Some(hit) = usage.prompt_cache_hit_tokens {
-                        cache_hit_tokens = hit;
-                    }
-                    if let Some(miss) = usage.prompt_cache_miss_tokens {
-                        cache_miss_tokens = miss;
-                    }
+                    if let Some(inp) = usage.prompt_tokens { input_tokens = inp; }
+                    if let Some(out) = usage.completion_tokens { output_tokens = out; }
+                    // DeepSeek-specific cache fields
+                    if let Some(hit) = usage.prompt_cache_hit_tokens { cache_hit_tokens = hit; }
+                    if let Some(miss) = usage.prompt_cache_miss_tokens { cache_miss_tokens = miss; }
                 }
 
                 for choice in resp.choices {
                     if let Some(delta) = choice.delta {
-                        // Handle text content
                         if let Some(content) = delta.content {
                             if !content.is_empty() {
                                 let _ = tx.send(StreamEvent::Chunk(content));
                             }
                         }
-
-                        // Handle tool calls
                         if let Some(calls) = delta.tool_calls {
-                            for call in calls {
-                                let idx = call.index.unwrap_or(0);
-
-                                // Initialize or update tool call
-                                let entry = tool_calls.entry(idx).or_insert_with(|| {
-                                    (String::new(), String::new(), String::new())
-                                });
-
-                                if let Some(id) = call.id {
-                                    entry.0 = id;
-                                }
-                                if let Some(func) = call.function {
-                                    if let Some(name) = func.name {
-                                        entry.1 = name;
-                                    }
-                                    if let Some(args) = func.arguments {
-                                        entry.2.push_str(&args);
-                                    }
-                                }
+                            for call in &calls {
+                                tool_acc.feed(call);
                             }
                         }
                     }
-
-                    // Check for finish reason
                     if let Some(ref reason) = choice.finish_reason {
-                        stop_reason = Some(match reason.as_str() {
-                            "length" => "max_tokens".to_string(),
-                            "stop" => "end_turn".to_string(),
-                            "tool_calls" => "tool_use".to_string(),
-                            other => other.to_string(),
-                        });
-                        // Emit any completed tool calls
-                        for (_, (id, name, arguments)) in tool_calls.drain() {
-                            if !id.is_empty() && !name.is_empty() {
-                                let input: Value = serde_json::from_str(&arguments)
-                                    .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                                let _ = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
-                            }
+                        stop_reason = Some(openai_compat::normalize_stop_reason(reason));
+                        for tool_use in tool_acc.drain() {
+                            let _ = tx.send(StreamEvent::ToolUse(tool_use));
                         }
                     }
                 }
@@ -402,234 +303,4 @@ impl LlmClient for DeepSeekClient {
             error: None,
         }
     }
-}
-
-/// Convert internal messages to DeepSeek/OpenAI format
-fn messages_to_ds(
-    messages: &[Message],
-    context_items: &[ContextItem],
-    system_prompt: &Option<String>,
-    extra_context: &Option<String>,
-    pending_tool_result_ids: &[String],
-    model: &str,
-) -> Vec<DsMessage> {
-    let mut ds_messages: Vec<DsMessage> = Vec::new();
-    let is_reasoner = model == "deepseek-reasoner";
-
-    // Helper: reasoning_content for assistant messages (required for deepseek-reasoner)
-    let rc = || -> Option<String> {
-        if is_reasoner { Some(String::new()) } else { None }
-    };
-
-    // Add system message
-    let system_content = system_prompt
-        .clone()
-        .unwrap_or_else(|| prompts::main_system().to_string());
-    ds_messages.push(DsMessage {
-        role: "system".to_string(),
-        content: Some(system_content),
-        reasoning_content: None,
-        tool_calls: None,
-        tool_call_id: None,
-    });
-
-    // Inject context panels as fake tool call/result pairs (P2+ only, sorted by timestamp)
-    let fake_panels = prepare_panel_messages(context_items);
-    let current_ms = now_ms();
-
-    if !fake_panels.is_empty() {
-        for (idx, panel) in fake_panels.iter().enumerate() {
-            let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
-            let text = if idx == 0 {
-                format!("{}\n\n{}", panel_header_text(), timestamp_text)
-            } else {
-                timestamp_text
-            };
-
-            // Assistant message with tool_call
-            ds_messages.push(DsMessage {
-                role: "assistant".to_string(),
-                content: Some(text),
-                reasoning_content: rc(),
-                tool_calls: Some(vec![DsToolCall {
-                    id: format!("panel_{}", panel.panel_id),
-                    call_type: "function".to_string(),
-                    function: DsFunction {
-                        name: "dynamic_panel".to_string(),
-                        arguments: format!(r#"{{"id":"{}"}}"#, panel.panel_id),
-                    },
-                }]),
-                tool_call_id: None,
-            });
-
-            // Tool result message
-            ds_messages.push(DsMessage {
-                role: "tool".to_string(),
-                content: Some(panel.content.clone()),
-                reasoning_content: None,
-                tool_calls: None,
-                tool_call_id: Some(format!("panel_{}", panel.panel_id)),
-            });
-        }
-
-        // Add footer after all panels
-        let footer = panel_footer_text(messages, current_ms);
-        ds_messages.push(DsMessage {
-            role: "assistant".to_string(),
-            content: Some(footer),
-            reasoning_content: rc(),
-            tool_calls: Some(vec![DsToolCall {
-                id: "panel_footer".to_string(),
-                call_type: "function".to_string(),
-                function: DsFunction {
-                    name: "dynamic_panel".to_string(),
-                    arguments: r#"{"action":"end_panels"}"#.to_string(),
-                },
-            }]),
-            tool_call_id: None,
-        });
-        ds_messages.push(DsMessage {
-            role: "tool".to_string(),
-            content: Some(crate::constants::prompts::panel_footer_ack().to_string()),
-            reasoning_content: None,
-            tool_calls: None,
-            tool_call_id: Some("panel_footer".to_string()),
-        });
-    }
-
-    // Add extra context if present (for cleaner mode)
-    if let Some(ctx) = extra_context {
-        ds_messages.push(DsMessage {
-            role: "user".to_string(),
-            content: Some(format!(
-                "Please clean up the context to reduce token usage:\n\n{}",
-                ctx
-            )),
-            reasoning_content: None,
-            tool_calls: None,
-            tool_call_id: None,
-        });
-    }
-
-    // First pass: collect tool_use IDs that have matching results.
-    // Tool calls without results (e.g. truncated by max_tokens) are excluded
-    // to avoid the "insufficient tool messages" API error.
-    // Seed with pending tool result IDs (from current tool loop, not yet in messages).
-    let mut included_tool_use_ids: std::collections::HashSet<String> =
-        pending_tool_result_ids.iter().cloned().collect();
-    for (idx, msg) in messages.iter().enumerate() {
-        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached || msg.message_type != MessageType::ToolCall {
-            continue;
-        }
-        let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
-        let has_result = messages[idx + 1..]
-            .iter()
-            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached && m.message_type == MessageType::ToolResult)
-            .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
-        if has_result {
-            for id in tool_use_ids {
-                included_tool_use_ids.insert(id.to_string());
-            }
-        }
-    }
-
-    for msg in messages.iter() {
-        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
-            continue;
-        }
-
-        if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
-            continue;
-        }
-
-        // Handle tool results — only include if the tool_use was included
-        if msg.message_type == MessageType::ToolResult {
-            for result in &msg.tool_results {
-                if included_tool_use_ids.contains(&result.tool_use_id) {
-                    ds_messages.push(DsMessage {
-                        role: "tool".to_string(),
-                        content: Some(format!("[{}]:\n{}", msg.id, result.content)),
-                        reasoning_content: None,
-                        tool_calls: None,
-                        tool_call_id: Some(result.tool_use_id.clone()),
-                    });
-                }
-            }
-            continue;
-        }
-
-        // Handle tool calls — only include if they have matching results
-        if msg.message_type == MessageType::ToolCall {
-            let tool_calls: Vec<DsToolCall> = msg
-                .tool_uses
-                .iter()
-                .filter(|tu| included_tool_use_ids.contains(&tu.id))
-                .map(|tu| DsToolCall {
-                    id: tu.id.clone(),
-                    call_type: "function".to_string(),
-                    function: DsFunction {
-                        name: tu.name.clone(),
-                        arguments: serde_json::to_string(&tu.input).unwrap_or_default(),
-                    },
-                })
-                .collect();
-
-            if !tool_calls.is_empty() {
-                ds_messages.push(DsMessage {
-                    role: "assistant".to_string(),
-                    content: None,
-                    reasoning_content: rc(),
-                    tool_calls: Some(tool_calls),
-                    tool_call_id: None,
-                });
-            }
-            continue;
-        }
-
-        // Regular text message
-        let message_content = match msg.status {
-            MessageStatus::Summarized => msg.tl_dr.as_ref().unwrap_or(&msg.content).clone(),
-            _ => msg.content.clone(),
-        };
-
-        if !message_content.is_empty() {
-            let prefixed_content = format!("[{}]:\n{}", msg.id, message_content);
-            // reasoning_content is only needed on assistant messages for deepseek-reasoner
-            let msg_rc = if msg.role == "assistant" { rc() } else { None };
-
-            ds_messages.push(DsMessage {
-                role: msg.role.clone(),
-                content: Some(prefixed_content),
-                reasoning_content: msg_rc,
-                tool_calls: None,
-                tool_call_id: None,
-            });
-        }
-    }
-
-    ds_messages
-}
-
-/// Dump the outgoing API request to disk for debugging.
-fn dump_last_request(worker_id: &str, api_request: &DsRequest) {
-    let dir = ".context-pilot/last_requests";
-    let _ = std::fs::create_dir_all(dir);
-    let path = format!("{}/{}_deepseek_last_request.json", dir, worker_id);
-    let _ = std::fs::write(path, serde_json::to_string_pretty(api_request).unwrap_or_default());
-}
-
-/// Convert tool definitions to DeepSeek/OpenAI format
-fn tools_to_ds(tools: &[ToolDefinition]) -> Vec<DsTool> {
-    tools
-        .iter()
-        .filter(|t| t.enabled)
-        .map(|t| DsTool {
-            tool_type: "function".to_string(),
-            function: DsFunctionDef {
-                name: t.id.clone(),
-                description: t.description.clone(),
-                parameters: t.to_json_schema(),
-            },
-        })
-        .collect()
 }

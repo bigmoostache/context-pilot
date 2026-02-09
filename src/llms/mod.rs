@@ -7,6 +7,7 @@ pub mod claude_code;
 pub mod deepseek;
 pub mod grok;
 pub mod groq;
+pub mod openai_compat;
 
 use std::sync::mpsc::Sender;
 

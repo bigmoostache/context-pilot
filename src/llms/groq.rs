@@ -1,21 +1,20 @@
 //! Groq API implementation.
 //!
 //! Groq uses an OpenAI-compatible API format.
+//! Message building is delegated to the shared `openai_compat` module.
 
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 
-use super::{LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
-use crate::constants::{prompts, MAX_RESPONSE_TOKENS};
-use crate::core::panels::{ContextItem, now_ms};
-use crate::state::{Message, MessageStatus, MessageType};
+use super::openai_compat::{self, OaiMessage, BuildOptions, ToolCallAccumulator};
+use super::{LlmClient, LlmRequest, StreamEvent};
+use crate::constants::MAX_RESPONSE_TOKENS;
 use crate::tool_defs::ToolDefinition;
-use crate::tools::ToolUse;
 
 const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -39,81 +38,16 @@ impl Default for GroqClient {
     }
 }
 
-// OpenAI-compatible message format
-#[derive(Debug, Serialize)]
-struct GroqMessage {
-    role: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    content: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tool_calls: Option<Vec<GroqToolCall>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tool_call_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct GroqToolCall {
-    id: String,
-    #[serde(rename = "type")]
-    call_type: String,
-    function: GroqFunction,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct GroqFunction {
-    name: String,
-    arguments: String,
-}
-
 #[derive(Debug, Serialize)]
 struct GroqRequest {
     model: String,
-    messages: Vec<GroqMessage>,
+    messages: Vec<OaiMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    tools: Vec<Value>,  // Can be function tools or built-in tools
+    tools: Vec<Value>,  // Can be function tools or built-in tools (browser_search, code_interpreter)
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
     max_completion_tokens: u32,
     stream: bool,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamChoice {
-    delta: Option<StreamDelta>,
-    finish_reason: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamDelta {
-    content: Option<String>,
-    tool_calls: Option<Vec<StreamToolCall>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamToolCall {
-    index: Option<usize>,
-    id: Option<String>,
-    function: Option<StreamFunction>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamFunction {
-    name: Option<String>,
-    arguments: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamResponse {
-    choices: Vec<StreamChoice>,
-    usage: Option<StreamUsage>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StreamUsage {
-    prompt_tokens: Option<usize>,
-    completion_tokens: Option<usize>,
 }
 
 impl LlmClient for GroqClient {
@@ -125,60 +59,55 @@ impl LlmClient for GroqClient {
 
         let client = Client::new();
 
-        // Collect pending tool result IDs so the message builder includes their tool calls
+        // Collect pending tool result IDs
         let pending_tool_ids: Vec<String> = request.tool_results.as_ref()
             .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
             .unwrap_or_default();
 
-        // Build messages in OpenAI format
-        let mut groq_messages = messages_to_groq(
+        // GPT-OSS models get extra info about built-in tools
+        let system_suffix = if request.model.starts_with("openai/gpt-oss") {
+            Some("You have access to built-in tools: browser_search (for web searches) and code_interpreter (for running code). Use browser_search when the user asks to search the web or look up current information.".to_string())
+        } else {
+            None
+        };
+
+        // Build messages using shared builder
+        let mut messages = openai_compat::build_messages(
             &request.messages,
             &request.context_items,
-            &request.system_prompt,
-            &request.extra_context,
-            &request.model,
-            &pending_tool_ids,
+            &BuildOptions {
+                system_prompt: request.system_prompt.clone(),
+                system_suffix,
+                extra_context: request.extra_context.clone(),
+                pending_tool_result_ids: pending_tool_ids,
+            },
         );
 
         // Add tool results if present
         if let Some(results) = &request.tool_results {
             for result in results {
-                groq_messages.push(GroqMessage {
+                messages.push(OaiMessage {
                     role: "tool".to_string(),
                     content: Some(result.content.clone()),
                     tool_calls: None,
                     tool_call_id: Some(result.tool_use_id.clone()),
-                    name: None,
                 });
             }
         }
 
-        // Convert tools to Groq format (includes built-in tools for GPT-OSS models)
-        let groq_tools = tools_to_groq(&request.tools, &request.model);
-
-        // Set tool_choice to "auto" when tools are available
-        let tool_choice = if groq_tools.is_empty() {
-            None
-        } else {
-            Some("auto".to_string())
-        };
+        let tools = tools_to_groq(&request.tools, &request.model);
+        let tool_choice = if tools.is_empty() { None } else { Some("auto".to_string()) };
 
         let api_request = GroqRequest {
             model: request.model.clone(),
-            messages: groq_messages,
-            tools: groq_tools,
+            messages,
+            tools,
             tool_choice,
             max_completion_tokens: MAX_RESPONSE_TOKENS,
             stream: true,
         };
 
-        // Dump last request for debugging
-        {
-            let dir = ".context-pilot/last_requests";
-            let _ = std::fs::create_dir_all(dir);
-            let path = format!("{}/{}_groq_last_request.json", dir, request.worker_id);
-            let _ = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
-        }
+        openai_compat::dump_request(&request.worker_id, "groq", &api_request);
 
         let response = client
             .post(GROQ_API_ENDPOINT)
@@ -194,87 +123,39 @@ impl LlmClient for GroqClient {
             return Err(format!("API error {}: {}", status, body));
         }
 
+        // Stream SSE using shared helpers
         let reader = BufReader::new(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
         let mut stop_reason: Option<String> = None;
-
-        // Track tool calls being built (index -> (id, name, arguments))
-        let mut tool_calls: std::collections::HashMap<usize, (String, String, String)> =
-            std::collections::HashMap::new();
+        let mut tool_acc = ToolCallAccumulator::new();
 
         for line in reader.lines() {
             let line = line.map_err(|e| format!("Read error: {}", e))?;
 
-            if !line.starts_with("data: ") {
-                continue;
-            }
-
-            let json_str = &line[6..];
-            if json_str == "[DONE]" {
-                break;
-            }
-
-            if let Ok(resp) = serde_json::from_str::<StreamResponse>(json_str) {
-                // Handle usage info
+            if let Some(resp) = openai_compat::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
-                    if let Some(inp) = usage.prompt_tokens {
-                        input_tokens = inp;
-                    }
-                    if let Some(out) = usage.completion_tokens {
-                        output_tokens = out;
-                    }
+                    if let Some(inp) = usage.prompt_tokens { input_tokens = inp; }
+                    if let Some(out) = usage.completion_tokens { output_tokens = out; }
                 }
 
                 for choice in resp.choices {
                     if let Some(delta) = choice.delta {
-                        // Handle text content
                         if let Some(content) = delta.content {
                             if !content.is_empty() {
                                 let _ = tx.send(StreamEvent::Chunk(content));
                             }
                         }
-
-                        // Handle tool calls
                         if let Some(calls) = delta.tool_calls {
-                            for call in calls {
-                                let idx = call.index.unwrap_or(0);
-
-                                // Initialize or update tool call
-                                let entry = tool_calls.entry(idx).or_insert_with(|| {
-                                    (String::new(), String::new(), String::new())
-                                });
-
-                                if let Some(id) = call.id {
-                                    entry.0 = id;
-                                }
-                                if let Some(func) = call.function {
-                                    if let Some(name) = func.name {
-                                        entry.1 = name;
-                                    }
-                                    if let Some(args) = func.arguments {
-                                        entry.2.push_str(&args);
-                                    }
-                                }
+                            for call in &calls {
+                                tool_acc.feed(call);
                             }
                         }
                     }
-
-                    // Check for finish reason
                     if let Some(ref reason) = choice.finish_reason {
-                        stop_reason = Some(match reason.as_str() {
-                            "length" => "max_tokens".to_string(),
-                            "stop" => "end_turn".to_string(),
-                            "tool_calls" => "tool_use".to_string(),
-                            other => other.to_string(),
-                        });
-                        // Emit any completed tool calls
-                        for (_, (id, name, arguments)) in tool_calls.drain() {
-                            if !id.is_empty() && !name.is_empty() {
-                                let input: Value = serde_json::from_str(&arguments)
-                                    .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                                let _ = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
-                            }
+                        stop_reason = Some(openai_compat::normalize_stop_reason(reason));
+                        for tool_use in tool_acc.drain() {
+                            let _ = tx.send(StreamEvent::ToolUse(tool_use));
                         }
                     }
                 }
@@ -383,215 +264,8 @@ impl LlmClient for GroqClient {
     }
 }
 
-/// Convert internal messages to Groq/OpenAI format
-/// Context items are injected as fake tool call/result pairs at the start
-fn messages_to_groq(
-    messages: &[Message],
-    context_items: &[ContextItem],
-    system_prompt: &Option<String>,
-    extra_context: &Option<String>,
-    model: &str,
-    pending_tool_result_ids: &[String],
-) -> Vec<GroqMessage> {
-    let mut groq_messages: Vec<GroqMessage> = Vec::new();
-
-    // Add system message
-    let mut system_content = system_prompt
-        .clone()
-        .unwrap_or_else(|| prompts::main_system().to_string());
-
-    // For GPT-OSS models, add info about built-in tools
-    if model.starts_with("openai/gpt-oss") {
-        system_content.push_str("\n\nYou have access to built-in tools: browser_search (for web searches) and code_interpreter (for running code). Use browser_search when the user asks to search the web or look up current information.");
-    }
-
-    groq_messages.push(GroqMessage {
-        role: "system".to_string(),
-        content: Some(system_content),
-        tool_calls: None,
-        tool_call_id: None,
-        name: None,
-    });
-
-    // Inject context panels as fake tool call/result pairs (P2+ only, sorted by timestamp)
-    let fake_panels = prepare_panel_messages(context_items);
-    let current_ms = now_ms();
-
-    if !fake_panels.is_empty() {
-        for (idx, panel) in fake_panels.iter().enumerate() {
-            let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
-            let text = if idx == 0 {
-                format!("{}\n\n{}", panel_header_text(), timestamp_text)
-            } else {
-                timestamp_text
-            };
-
-            // Assistant message with tool_call
-            groq_messages.push(GroqMessage {
-                role: "assistant".to_string(),
-                content: Some(text),
-                tool_calls: Some(vec![GroqToolCall {
-                    id: format!("panel_{}", panel.panel_id),
-                    call_type: "function".to_string(),
-                    function: GroqFunction {
-                        name: "dynamic_panel".to_string(),
-                        arguments: format!(r#"{{"id":"{}"}}"#, panel.panel_id),
-                    },
-                }]),
-                tool_call_id: None,
-                name: None,
-            });
-
-            // Tool result message
-            groq_messages.push(GroqMessage {
-                role: "tool".to_string(),
-                content: Some(panel.content.clone()),
-                tool_calls: None,
-                tool_call_id: Some(format!("panel_{}", panel.panel_id)),
-                name: None,
-            });
-        }
-
-        // Add footer after all panels
-        let footer = panel_footer_text(messages, current_ms);
-        groq_messages.push(GroqMessage {
-            role: "assistant".to_string(),
-            content: Some(footer),
-            tool_calls: Some(vec![GroqToolCall {
-                id: "panel_footer".to_string(),
-                call_type: "function".to_string(),
-                function: GroqFunction {
-                    name: "dynamic_panel".to_string(),
-                    arguments: r#"{"action":"end_panels"}"#.to_string(),
-                },
-            }]),
-            tool_call_id: None,
-            name: None,
-        });
-        groq_messages.push(GroqMessage {
-            role: "tool".to_string(),
-            content: Some(crate::constants::prompts::panel_footer_ack().to_string()),
-            tool_calls: None,
-            tool_call_id: Some("panel_footer".to_string()),
-            name: None,
-        });
-    }
-
-    // Add extra context if present (for cleaner mode)
-    if let Some(ctx) = extra_context {
-        groq_messages.push(GroqMessage {
-            role: "user".to_string(),
-            content: Some(format!(
-                "Please clean up the context to reduce token usage:\n\n{}",
-                ctx
-            )),
-            tool_calls: None,
-            tool_call_id: None,
-            name: None,
-        });
-    }
-
-    // First pass: collect tool_use IDs that have matching results.
-    // Tool calls without results (e.g. truncated by max_tokens) are excluded
-    // to avoid the "insufficient tool messages" API error.
-    // Seed with pending tool result IDs (from current tool loop, not yet in messages).
-    let mut included_tool_use_ids: std::collections::HashSet<String> =
-        pending_tool_result_ids.iter().cloned().collect();
-    for (idx, msg) in messages.iter().enumerate() {
-        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached || msg.message_type != MessageType::ToolCall {
-            continue;
-        }
-        let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
-        let has_result = messages[idx + 1..]
-            .iter()
-            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached && m.message_type == MessageType::ToolResult)
-            .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
-        if has_result {
-            for id in tool_use_ids {
-                included_tool_use_ids.insert(id.to_string());
-            }
-        }
-    }
-
-    for msg in messages.iter() {
-        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
-            continue;
-        }
-
-        if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
-            continue;
-        }
-
-        // Handle tool results — only include if the tool_use was included
-        if msg.message_type == MessageType::ToolResult {
-            for result in &msg.tool_results {
-                if included_tool_use_ids.contains(&result.tool_use_id) {
-                    groq_messages.push(GroqMessage {
-                        role: "tool".to_string(),
-                        content: Some(format!("[{}]:\n{}", msg.id, result.content)),
-                        tool_calls: None,
-                        tool_call_id: Some(result.tool_use_id.clone()),
-                        name: None,
-                    });
-                }
-            }
-            continue;
-        }
-
-        // Handle tool calls — only include if they have matching results
-        if msg.message_type == MessageType::ToolCall {
-            let tool_calls: Vec<GroqToolCall> = msg
-                .tool_uses
-                .iter()
-                .filter(|tu| included_tool_use_ids.contains(&tu.id))
-                .map(|tu| GroqToolCall {
-                    id: tu.id.clone(),
-                    call_type: "function".to_string(),
-                    function: GroqFunction {
-                        name: tu.name.clone(),
-                        arguments: serde_json::to_string(&tu.input).unwrap_or_default(),
-                    },
-                })
-                .collect();
-
-            if !tool_calls.is_empty() {
-                groq_messages.push(GroqMessage {
-                    role: "assistant".to_string(),
-                    content: None,
-                    tool_calls: Some(tool_calls),
-                    tool_call_id: None,
-                    name: None,
-                });
-            }
-            continue;
-        }
-
-        // Regular text message
-        let message_content = match msg.status {
-            MessageStatus::Summarized => msg.tl_dr.as_ref().unwrap_or(&msg.content).clone(),
-            _ => msg.content.clone(),
-        };
-
-        if !message_content.is_empty() {
-            // Use [ID]:\n format (newline after colon)
-            let prefixed_content = format!("[{}]:\n{}", msg.id, message_content);
-
-            groq_messages.push(GroqMessage {
-                role: msg.role.clone(),
-                content: Some(prefixed_content),
-                tool_calls: None,
-                tool_call_id: None,
-                name: None,
-            });
-        }
-    }
-
-    groq_messages
-}
-
-/// Convert tool definitions to Groq/OpenAI format
-/// Convert tool definitions to Groq format
-/// For GPT-OSS models, also adds built-in tools (browser_search, code_interpreter)
+/// Convert tool definitions to Groq format.
+/// For GPT-OSS models, also adds built-in tools (browser_search, code_interpreter).
 fn tools_to_groq(tools: &[ToolDefinition], model: &str) -> Vec<Value> {
     let mut groq_tools: Vec<Value> = tools
         .iter()
