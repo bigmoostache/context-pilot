@@ -5,6 +5,7 @@ use ratatui::{
 
 use crate::llms::{LlmProvider, ModelInfo};
 use crate::state::State;
+use crate::modules::git::types::GitChangeType;
 use super::{theme, spinner};
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
@@ -88,6 +89,52 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(
             format!(" {} ", branch),
             Style::default().fg(Color::White).bg(Color::Blue)
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
+    // Git change stats (if there are any changes)
+    if !state.git_file_changes.is_empty() {
+        // Calculate line change statistics
+        let mut total_additions = 0;
+        let mut total_deletions = 0;
+        let mut untracked_count = 0;
+        let mut modified_count = 0;
+        let mut deleted_count = 0;
+
+        for file in &state.git_file_changes {
+            total_additions += file.additions;
+            total_deletions += file.deletions;
+            match file.change_type {
+                GitChangeType::Untracked => untracked_count += 1,
+                GitChangeType::Modified => modified_count += 1,
+                GitChangeType::Deleted => deleted_count += 1,
+                GitChangeType::Added => modified_count += 1, // Added files count as modified for UI
+                GitChangeType::Renamed => modified_count += 1, // Renamed files count as modified
+            }
+        }
+
+        let net_change = total_additions - total_deletions;
+        
+        // Card 1: Line changes (additions/deletions/net)
+        let line_change_text = if net_change >= 0 {
+            format!(" +{} -{} +{} ", total_additions, total_deletions, net_change)
+        } else {
+            format!(" +{} -{} {} ", total_additions, total_deletions, net_change)
+        };
+        
+        spans.push(Span::styled(
+            line_change_text,
+            Style::default().fg(Color::White).bg(Color::Green)
+        ));
+        spans.push(Span::styled(" ", base_style));
+
+        // Card 2: File changes (U/M/D)
+        let file_change_text = format!(" U{} M{} D{} ", untracked_count, modified_count, deleted_count);
+        
+        spans.push(Span::styled(
+            file_change_text,
+            Style::default().fg(Color::White).bg(Color::Yellow)
         ));
         spans.push(Span::styled(" ", base_style));
     }
