@@ -408,12 +408,15 @@ impl App {
 
         // Accumulate token stats from intermediate stream before discarding pending_done
         if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = self.pending_done {
+            self.state.tick_cache_hit_tokens = cache_hit_tokens;
+            self.state.tick_cache_miss_tokens = cache_miss_tokens;
+            self.state.tick_output_tokens = output_tokens;
+            self.state.stream_cache_hit_tokens += cache_hit_tokens;
+            self.state.stream_cache_miss_tokens += cache_miss_tokens;
+            self.state.stream_output_tokens += output_tokens;
             self.state.cache_hit_tokens += cache_hit_tokens;
             self.state.cache_miss_tokens += cache_miss_tokens;
             self.state.total_output_tokens += output_tokens;
-            self.state.last_cache_hit_tokens += cache_hit_tokens;
-            self.state.last_cache_miss_tokens += cache_miss_tokens;
-            self.state.last_output_tokens += output_tokens;
         }
 
         save_state(&self.state);

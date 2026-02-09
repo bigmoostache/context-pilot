@@ -299,10 +299,13 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.is_streaming = true;
             state.last_stop_reason = None;
             state.streaming_estimated_tokens = 0;
-            // Reset per-turn token counters
-            state.last_cache_hit_tokens = 0;
-            state.last_cache_miss_tokens = 0;
-            state.last_output_tokens = 0;
+            // Reset per-stream and per-tick token counters
+            state.stream_cache_hit_tokens = 0;
+            state.stream_cache_miss_tokens = 0;
+            state.stream_output_tokens = 0;
+            state.tick_cache_hit_tokens = 0;
+            state.tick_cache_miss_tokens = 0;
+            state.tick_output_tokens = 0;
             ActionResult::StartStream
         }
         Action::ClearConversation => {
@@ -416,12 +419,17 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.is_streaming = false;
             state.last_stop_reason = stop_reason.clone();
 
-            // Accumulate per-turn stats (reset at InputSubmit)
-            state.last_cache_hit_tokens += cache_hit_tokens;
-            state.last_cache_miss_tokens += cache_miss_tokens;
-            state.last_output_tokens += output_tokens;
+            // Set tick stats (this tick only)
+            state.tick_cache_hit_tokens = cache_hit_tokens;
+            state.tick_cache_miss_tokens = cache_miss_tokens;
+            state.tick_output_tokens = output_tokens;
 
-            // Accumulate token stats
+            // Accumulate per-stream stats (reset at InputSubmit)
+            state.stream_cache_hit_tokens += cache_hit_tokens;
+            state.stream_cache_miss_tokens += cache_miss_tokens;
+            state.stream_output_tokens += output_tokens;
+
+            // Accumulate total stats
             state.cache_hit_tokens += cache_hit_tokens;
             state.cache_miss_tokens += cache_miss_tokens;
             state.total_output_tokens += output_tokens;

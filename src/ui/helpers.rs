@@ -25,7 +25,7 @@ pub fn format_number(n: usize) -> String {
     } else if n >= 1_000 {
         format!("{:.1}K", n as f64 / 1_000.0)
     } else {
-        format!("{:>4}", n)  // Right-align numbers < 1000 to 4 chars
+        n.to_string()
     }
 }
 

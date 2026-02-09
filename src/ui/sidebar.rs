@@ -166,9 +166,8 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
     // Token stats (cache hit / cache miss / output) — only when any value is non-zero
     if state.cache_hit_tokens > 0 || state.cache_miss_tokens > 0 || state.total_output_tokens > 0 {
-        // Helper: build a stats line with perfectly aligned columns
+        // Helper: build a stats line with aligned columns
         // Format: "  {label}  ↑ {count:>5}  ✗ {count:>5}  ↓ {count:>5}"
-        // Where count is 5 chars total: 4 chars number + 1 char unit (K/M) or space
         let stats_line = |label: &str, hit: usize, miss: usize, out: usize| -> Line<'static> {
             Line::from(vec![
                 Span::styled(format!("  {:>4}  ", label), Style::default().fg(theme::text_muted())),
@@ -182,22 +181,25 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
         lines.push(stats_line("tot", state.cache_hit_tokens, state.cache_miss_tokens, state.total_output_tokens));
 
-        if state.last_output_tokens > 0 || state.last_cache_hit_tokens > 0 || state.last_cache_miss_tokens > 0 {
-            lines.push(stats_line("last", state.last_cache_hit_tokens, state.last_cache_miss_tokens, state.last_output_tokens));
+        if state.stream_output_tokens > 0 || state.stream_cache_hit_tokens > 0 || state.stream_cache_miss_tokens > 0 {
+            lines.push(stats_line("strm", state.stream_cache_hit_tokens, state.stream_cache_miss_tokens, state.stream_output_tokens));
         }
 
-        // Legend - perfectly aligned with stats columns including separators
-        // Format: "        ↑ hit   ✗ miss  ↓ out  "
+        if state.tick_output_tokens > 0 || state.tick_cache_hit_tokens > 0 || state.tick_cache_miss_tokens > 0 {
+            lines.push(stats_line("tick", state.tick_cache_hit_tokens, state.tick_cache_miss_tokens, state.tick_output_tokens));
+        }
+
+        // Legend
         lines.push(Line::from(vec![
-            Span::styled("        ", base_style),  // 8 spaces to align with "  {label}  " (2+4+2=8)
+            Span::styled("        ", base_style),
             Span::styled(chars::ARROW_UP, Style::default().fg(theme::success())),
-            Span::styled(" hit  ", Style::default().fg(theme::text_muted())),  // " hit" + 2 spaces = 6 chars
-            Span::styled("  ", base_style),  // Separator (2 spaces)
+            Span::styled(" hit  ", Style::default().fg(theme::text_muted())),
+            Span::styled("  ", base_style),
             Span::styled(chars::CROSS, Style::default().fg(theme::warning())),
-            Span::styled(" miss ", Style::default().fg(theme::text_muted())),  // " miss" + 1 space = 6 chars
-            Span::styled("  ", base_style),  // Separator (2 spaces)
+            Span::styled(" miss ", Style::default().fg(theme::text_muted())),
+            Span::styled("  ", base_style),
             Span::styled(chars::ARROW_DOWN, Style::default().fg(theme::accent_dim())),
-            Span::styled(" out  ", Style::default().fg(theme::text_muted())),  // " out" + 2 spaces = 6 chars
+            Span::styled(" out  ", Style::default().fg(theme::text_muted())),
         ]));
     }
 
