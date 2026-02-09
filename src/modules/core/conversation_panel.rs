@@ -8,18 +8,20 @@ use ratatui::{
 
 use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
-use crate::constants::icons;
 use crate::state::{
-    hash_values, ContextType, FullContentCache, Message, MessageRenderCache, InputRenderCache,
+    hash_values, ContextType, FullContentCache, MessageRenderCache, InputRenderCache,
     MessageStatus, MessageType, State,
 };
-use crate::ui::{theme, helpers::wrap_text, markdown::*};
+use crate::ui::theme;
+
+use super::conversation_list::{self, ListAction};
+use super::conversation_render;
 
 pub struct ConversationPanel;
 
 impl ConversationPanel {
     /// Compute hash for message cache invalidation
-    fn compute_message_hash(msg: &Message, viewport_width: u16, dev_mode: bool) -> u64 {
+    fn compute_message_hash(msg: &crate::state::Message, viewport_width: u16, dev_mode: bool) -> u64 {
         // Include all fields that affect rendering
         let status_num = match msg.status {
             MessageStatus::Full => 0u8,
@@ -43,336 +45,6 @@ impl ConversationPanel {
     /// Compute hash for input cache invalidation
     fn compute_input_hash(input: &str, cursor: usize, viewport_width: u16) -> u64 {
         hash_values(&[input, &format!("{}{}", cursor, viewport_width)])
-    }
-
-    /// Render a single message to lines (without caching logic)
-    pub(crate) fn render_message(
-        msg: &Message,
-        viewport_width: u16,
-        base_style: Style,
-        is_streaming_this: bool,
-        dev_mode: bool,
-    ) -> Vec<Line<'static>> {
-        let mut lines: Vec<Line<'static>> = Vec::new();
-        let padded_id = format!("{:<4}", msg.id);
-
-        // Handle tool call messages
-        if msg.message_type == MessageType::ToolCall {
-            for tool_use in &msg.tool_uses {
-                let params: Vec<String> = tool_use.input.as_object()
-                    .map(|obj| {
-                        obj.iter().map(|(k, v)| {
-                            let val = match v {
-                                serde_json::Value::String(s) => {
-                                    if s.len() > 30 { format!("\"{}...\"", &s[..s.floor_char_boundary(27)]) } else { format!("\"{}\"", s) }
-                                }
-                                _ => v.to_string(),
-                            };
-                            format!("{}={}", k, val)
-                        }).collect()
-                    })
-                    .unwrap_or_default();
-
-                let params_str = if params.is_empty() {
-                    String::new()
-                } else {
-                    format!(" {}", params.join(" "))
-                };
-
-                lines.push(Line::from(vec![
-                    Span::styled(icons::msg_tool_call(), Style::default().fg(theme::success())),
-                    Span::styled(padded_id.clone(), Style::default().fg(theme::success()).bold()),
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled(tool_use.name.clone(), Style::default().fg(theme::text())),
-                    Span::styled(params_str, Style::default().fg(theme::text_muted())),
-                ]));
-            }
-            lines.push(Line::from(""));
-            return lines;
-        }
-
-        // Handle tool result messages
-        if msg.message_type == MessageType::ToolResult {
-            for result in &msg.tool_results {
-                let (status_icon, status_color) = if result.is_error {
-                    (icons::msg_error(), theme::warning())
-                } else {
-                    (icons::msg_tool_result(), theme::success())
-                };
-
-                let prefix_width = 8;
-                let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
-
-                let mut is_first = true;
-                for line in result.content.lines() {
-                    if line.is_empty() {
-                        lines.push(Line::from(vec![
-                            Span::styled(" ".repeat(prefix_width), base_style),
-                        ]));
-                        continue;
-                    }
-
-                    let wrapped = wrap_text(line, wrap_width);
-                    for wrapped_line in wrapped {
-                        if is_first {
-                            lines.push(Line::from(vec![
-                                Span::styled(status_icon.clone(), Style::default().fg(status_color)),
-                                Span::styled(padded_id.clone(), Style::default().fg(status_color).bold()),
-                                Span::styled(" ".to_string(), base_style),
-                                Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
-                            ]));
-                            is_first = false;
-                        } else {
-                            lines.push(Line::from(vec![
-                                Span::styled(" ".repeat(prefix_width), base_style),
-                                Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
-                            ]));
-                        }
-                    }
-                }
-            }
-            lines.push(Line::from(""));
-            return lines;
-        }
-
-        // Regular text message
-        let (role_icon, role_color) = if msg.role == "user" {
-            (icons::msg_user(), theme::user())
-        } else {
-            (icons::msg_assistant(), theme::assistant())
-        };
-
-        let status_icon = match msg.status {
-            MessageStatus::Full => icons::status_full(),
-            MessageStatus::Summarized => icons::status_summarized(),
-            MessageStatus::Deleted | MessageStatus::Detached => icons::status_deleted(),
-        };
-
-        let content = match msg.status {
-            MessageStatus::Summarized => msg.tl_dr.as_deref().unwrap_or(&msg.content),
-            _ => &msg.content,
-        };
-
-        let prefix = format!("{}{}{}", role_icon, padded_id, status_icon);
-        let prefix_width = prefix.chars().count();
-        let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
-
-        if content.trim().is_empty() {
-            if msg.role == "assistant" && is_streaming_this {
-                lines.push(Line::from(vec![
-                    Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                    Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                    Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled("...".to_string(), Style::default().fg(theme::text_muted()).italic()),
-                ]));
-            } else {
-                lines.push(Line::from(vec![
-                    Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                    Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                    Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
-                ]));
-            }
-        } else {
-            let mut is_first_line = true;
-            let is_assistant = msg.role == "assistant";
-            let content_lines: Vec<&str> = content.lines().collect();
-            let mut i = 0;
-
-            while i < content_lines.len() {
-                let line = content_lines[i];
-
-                if line.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::styled(" ".repeat(prefix_width), base_style),
-                    ]));
-                    i += 1;
-                    continue;
-                }
-
-                if is_assistant {
-                    // Check for markdown table
-                    if line.trim().starts_with('|') && line.trim().ends_with('|') {
-                        let mut table_lines: Vec<&str> = vec![line];
-                        let mut j = i + 1;
-                        while j < content_lines.len() {
-                            let next = content_lines[j].trim();
-                            if next.starts_with('|') && next.ends_with('|') {
-                                table_lines.push(content_lines[j]);
-                                j += 1;
-                            } else {
-                                break;
-                            }
-                        }
-
-                        let table_spans = render_markdown_table(&table_lines, base_style);
-                        for (idx, row_spans) in table_spans.into_iter().enumerate() {
-                            if is_first_line && idx == 0 {
-                                let mut line_spans = vec![
-                                    Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                                    Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                                    Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
-                                    Span::styled(" ".to_string(), base_style),
-                                ];
-                                line_spans.extend(row_spans);
-                                lines.push(Line::from(line_spans));
-                                is_first_line = false;
-                            } else {
-                                let mut line_spans = vec![
-                                    Span::styled(" ".repeat(prefix_width), base_style),
-                                ];
-                                line_spans.extend(row_spans);
-                                lines.push(Line::from(line_spans));
-                            }
-                        }
-
-                        i = j;
-                        continue;
-                    }
-
-                    // Regular markdown line - pre-wrap then parse
-                    let wrapped = wrap_text(line, wrap_width);
-                    for wrapped_line in &wrapped {
-                        let md_spans = parse_markdown_line(wrapped_line, base_style);
-
-                        if is_first_line {
-                            let mut line_spans = vec![
-                                Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                                Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                                Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
-                                Span::styled(" ".to_string(), base_style),
-                            ];
-                            line_spans.extend(md_spans);
-                            lines.push(Line::from(line_spans));
-                            is_first_line = false;
-                        } else {
-                            let mut line_spans = vec![
-                                Span::styled(" ".repeat(prefix_width), base_style),
-                            ];
-                            line_spans.extend(md_spans);
-                            lines.push(Line::from(line_spans));
-                        }
-                    }
-                } else {
-                    // User message - wrap without markdown
-                    let wrapped = wrap_text(line, wrap_width);
-
-                    for line_text in wrapped.iter() {
-                        if is_first_line {
-                            lines.push(Line::from(vec![
-                                Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                                Span::styled(padded_id.clone(), Style::default().fg(role_color).bold()),
-                                Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
-                                Span::styled(" ".to_string(), base_style),
-                                Span::styled(line_text.clone(), Style::default().fg(theme::text())),
-                            ]));
-                            is_first_line = false;
-                        } else {
-                            lines.push(Line::from(vec![
-                                Span::styled(" ".repeat(prefix_width), base_style),
-                                Span::styled(line_text.clone(), Style::default().fg(theme::text())),
-                            ]));
-                        }
-                    }
-                }
-                i += 1;
-            }
-        }
-
-        if msg.status == MessageStatus::Summarized {
-            lines.push(Line::from(vec![
-                Span::styled(" ".repeat(prefix_width), base_style),
-                Span::styled(" TL;DR ".to_string(), Style::default().fg(theme::bg_base()).bg(theme::warning())),
-            ]));
-        }
-
-        // Dev mode: show token counts
-        if dev_mode && msg.role == "assistant" && (msg.input_tokens > 0 || msg.content_token_count > 0) {
-            lines.push(Line::from(vec![
-                Span::styled(" ".repeat(prefix_width), base_style),
-                Span::styled(
-                    format!("[in:{} out:{}]", msg.input_tokens, msg.content_token_count),
-                    Style::default().fg(theme::text_muted()).italic()
-                ),
-            ]));
-        }
-
-        lines.push(Line::from(""));
-        lines
-    }
-
-    /// Render input area to lines
-    fn render_input(input: &str, cursor: usize, viewport_width: u16, base_style: Style) -> Vec<Line<'static>> {
-        let mut lines: Vec<Line<'static>> = Vec::new();
-        let role_icon = icons::msg_user();
-        let role_color = theme::user();
-        let prefix_width = 8;
-        let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
-        let cursor_char = "▎";
-
-        // Insert cursor character at cursor position
-        let input_with_cursor = if cursor >= input.len() {
-            format!("{}{}", input, cursor_char)
-        } else {
-            format!("{}{}{}", &input[..cursor], cursor_char, &input[cursor..])
-        };
-
-        if input.is_empty() {
-            lines.push(Line::from(vec![
-                Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                Span::styled("... ", Style::default().fg(role_color).dim()),
-                Span::styled(" ", base_style),
-                Span::styled(cursor_char, Style::default().fg(theme::accent())),
-            ]));
-        } else {
-            let mut is_first_line = true;
-            for line in input_with_cursor.lines() {
-                if line.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::styled(" ".repeat(prefix_width), base_style),
-                    ]));
-                    continue;
-                }
-
-                let wrapped = wrap_text(line, wrap_width);
-                for line_text in wrapped.iter() {
-                    let spans = if line_text.contains(cursor_char) {
-                        let parts: Vec<&str> = line_text.splitn(2, cursor_char).collect();
-                        vec![
-                            Span::styled(parts.get(0).unwrap_or(&"").to_string(), Style::default().fg(theme::text())),
-                            Span::styled(cursor_char, Style::default().fg(theme::accent()).bold()),
-                            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(theme::text())),
-                        ]
-                    } else {
-                        vec![Span::styled(line_text.clone(), Style::default().fg(theme::text()))]
-                    };
-
-                    if is_first_line {
-                        let mut line_spans = vec![
-                            Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                            Span::styled("... ", Style::default().fg(role_color).dim()),
-                            Span::styled(" ".to_string(), base_style),
-                        ];
-                        line_spans.extend(spans);
-                        lines.push(Line::from(line_spans));
-                        is_first_line = false;
-                    } else {
-                        let mut line_spans = vec![
-                            Span::styled(" ".repeat(prefix_width), base_style),
-                        ];
-                        line_spans.extend(spans);
-                        lines.push(Line::from(line_spans));
-                    }
-                }
-            }
-            if input_with_cursor.ends_with('\n') {
-                lines.push(Line::from(vec![
-                    Span::styled(" ".repeat(prefix_width), base_style),
-                ]));
-            }
-        }
-        lines.push(Line::from(""));
-        lines
     }
 
     /// Compute a hash of all content that affects rendering
@@ -457,7 +129,7 @@ impl ConversationPanel {
 
                     // Render each frozen message with full formatting
                     for msg in msgs {
-                        let lines = Self::render_message(msg, viewport_width, base_style, false, state.dev_mode);
+                        let lines = conversation_render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
                         text.extend(lines);
                     }
 
@@ -512,7 +184,7 @@ impl ConversationPanel {
                 }
 
                 // Cache miss - render message
-                let lines = Self::render_message(msg, viewport_width, base_style, is_streaming_this, state.dev_mode);
+                let lines = conversation_render::render_message(msg, viewport_width, base_style, is_streaming_this, state.dev_mode);
 
                 // Store in per-message cache (but not for streaming message)
                 if !is_streaming_this {
@@ -536,7 +208,7 @@ impl ConversationPanel {
                 text.extend(cached.lines.iter().cloned());
             } else {
                 // Cache miss
-                let input_lines = Self::render_input(&state.input, state.input_cursor, viewport_width, base_style);
+                let input_lines = conversation_render::render_input(&state.input, state.input_cursor, viewport_width, base_style);
                 state.input_cache = Some(InputRenderCache {
                     lines: Rc::new(input_lines.clone()),
                     input_hash,
@@ -546,7 +218,7 @@ impl ConversationPanel {
             }
         } else {
             // No cache
-            let input_lines = Self::render_input(&state.input, state.input_cursor, viewport_width, base_style);
+            let input_lines = conversation_render::render_input(&state.input, state.input_cursor, viewport_width, base_style);
             state.input_cache = Some(InputRenderCache {
                 lines: Rc::new(input_lines.clone()),
                 input_hash,
@@ -568,113 +240,6 @@ impl ConversationPanel {
 
         text
     }
-}
-
-/// Actions for list continuation behavior
-enum ListAction {
-    Continue(String),  // Insert list continuation (e.g., "\n- " or "\n2. ")
-    RemoveItem,        // Remove empty list item but keep the newline
-}
-
-/// Increment alphabetical list marker: a->b, z->aa, A->B, Z->AA
-fn next_alpha_marker(marker: &str) -> String {
-    let chars: Vec<char> = marker.chars().collect();
-    let is_upper = chars[0].is_ascii_uppercase();
-    let base = if is_upper { b'A' } else { b'a' };
-
-    // Convert to number (a=0, b=1, ..., z=25, aa=26, ab=27, ...)
-    let mut num: usize = 0;
-    for c in &chars {
-        num = num * 26 + (c.to_ascii_lowercase() as usize - b'a' as usize);
-    }
-    num += 1; // Increment
-
-    // Convert back to letters
-    let mut result = String::new();
-    let mut n = num;
-    loop {
-        result.insert(0, (base + (n % 26) as u8) as char);
-        n /= 26;
-        if n == 0 { break; }
-        n -= 1; // Adjust for 1-based (a=1, not a=0 for multi-char)
-    }
-    result
-}
-
-/// Detect list context and return appropriate action
-/// - On non-empty list item: continue the list
-/// - On empty list item (just "- " or "1. "): remove it, keep newline
-/// - On empty line or non-list: None (send message)
-fn detect_list_action(input: &str) -> Option<ListAction> {
-    // Get the current line - handle trailing newline specially
-    // (lines() doesn't return empty trailing lines)
-    let current_line = if input.ends_with('\n') {
-        "" // Cursor is on a new empty line
-    } else {
-        input.lines().last().unwrap_or("")
-    };
-    let trimmed = current_line.trim_start();
-
-    // Completely empty line - send the message
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    // Check for EMPTY list items (just the prefix with nothing after)
-    // Unordered: exactly "- " or "* "
-    if trimmed == "- " || trimmed == "* " {
-        return Some(ListAction::RemoveItem);
-    }
-
-    // Ordered (numeric or alphabetic): exactly "X. " with nothing after
-    if let Some(dot_pos) = trimmed.find(". ") {
-        let marker = &trimmed[..dot_pos];
-        let after = &trimmed[dot_pos + 2..];
-        if after.is_empty() {
-            // Check if it's a valid marker (numeric or alphabetic)
-            let is_numeric = marker.chars().all(|c| c.is_ascii_digit());
-            let is_alpha = marker.len() == 1
-                && marker.chars().all(|c| c.is_ascii_alphabetic())
-                && (marker.chars().all(|c| c.is_ascii_lowercase())
-                    || marker.chars().all(|c| c.is_ascii_uppercase()));
-            if is_numeric || is_alpha {
-                return Some(ListAction::RemoveItem);
-            }
-        }
-    }
-
-    // Check for NON-EMPTY list items - continue the list
-    // Unordered list: "- text" or "* text"
-    if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-        let prefix = &trimmed[..2];
-        let indent = current_line.len() - trimmed.len();
-        return Some(ListAction::Continue(format!("\n{}{}", " ".repeat(indent), prefix)));
-    }
-
-    // Ordered list: "1. text", "a. text", "A. text", etc.
-    if let Some(dot_pos) = trimmed.find(". ") {
-        let marker = &trimmed[..dot_pos];
-        let indent = current_line.len() - trimmed.len();
-
-        // Numeric: 1, 2, 3, ...
-        if marker.chars().all(|c| c.is_ascii_digit()) {
-            if let Ok(num) = marker.parse::<usize>() {
-                return Some(ListAction::Continue(format!("\n{}{}. ", " ".repeat(indent), num + 1)));
-            }
-        }
-
-        // Alphabetic: a, b, c, ... or A, B, C, ... (single char only)
-        if marker.len() == 1 && marker.chars().all(|c| c.is_ascii_alphabetic()) {
-            let all_lower = marker.chars().all(|c| c.is_ascii_lowercase());
-            let all_upper = marker.chars().all(|c| c.is_ascii_uppercase());
-            if all_lower || all_upper {
-                let next = next_alpha_marker(marker);
-                return Some(ListAction::Continue(format!("\n{}{}. ", " ".repeat(indent), next)));
-            }
-        }
-    }
-
-    None // Not a list line, send the message
 }
 
 impl Panel for ConversationPanel {
@@ -717,7 +282,7 @@ impl Panel for ConversationPanel {
                     Some(Action::InputSubmit)
                 } else {
                     // Check for list continuation, otherwise add newline
-                    match detect_list_action(&state.input) {
+                    match conversation_list::detect_list_action(&state.input) {
                         Some(ListAction::Continue(text)) => Some(Action::InsertText(text)),
                         Some(ListAction::RemoveItem) => Some(Action::RemoveListItem),
                         None => Some(Action::InputChar('\n')),

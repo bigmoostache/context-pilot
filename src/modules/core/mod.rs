@@ -1,6 +1,8 @@
 pub mod conversation;
 mod conversation_history_panel;
+mod conversation_list;
 mod conversation_panel;
+pub(crate) mod conversation_render;
 mod overview_panel;
 mod tools;
 
