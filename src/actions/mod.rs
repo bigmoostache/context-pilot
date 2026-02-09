@@ -191,6 +191,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 cached_content: None,
                 history_messages: None,
                 cache_deprecated: false,
+                cache_in_flight: false,
                 last_refresh_ms: crate::core::panels::now_ms(),
                 content_hash: None,
                 tmux_last_lines_hash: None,

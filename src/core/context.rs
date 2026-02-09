@@ -230,6 +230,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
             cached_content: Some(content),
             history_messages: Some(history_msgs),
             cache_deprecated: false,
+            cache_in_flight: false,
             last_refresh_ms: chunk_timestamp,
             content_hash: None,
             tmux_last_lines_hash: None,

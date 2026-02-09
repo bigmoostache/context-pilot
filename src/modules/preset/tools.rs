@@ -347,6 +347,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
             cached_content: None,
             history_messages: None,
             cache_deprecated: true,
+            cache_in_flight: false,
             last_refresh_ms: crate::core::panels::now_ms(),
             content_hash: None,
             tmux_last_lines_hash: None,

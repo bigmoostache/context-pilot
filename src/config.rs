@@ -3,7 +3,6 @@ use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
-use std::sync::RwLock;
 
 // ============================================================================
 // Prompts Configuration
@@ -174,27 +173,34 @@ pub fn get_theme(theme_id: &str) -> &'static Theme {
 }
 
 // ============================================================================
-// Active Theme (Global State)
+// Active Theme (Global State — cached atomic pointer for zero-cost access)
 // ============================================================================
 
-lazy_static! {
-    /// Global active theme ID - updated when state changes
-    static ref ACTIVE_THEME: RwLock<String> = RwLock::new(DEFAULT_THEME.to_string());
-}
+use std::sync::atomic::{AtomicPtr, Ordering};
+
+/// Cached pointer to the active theme. Updated by set_active_theme().
+/// Points into the static THEMES lazy_static, so the reference is always valid.
+static CACHED_THEME: AtomicPtr<Theme> = AtomicPtr::new(std::ptr::null_mut());
 
 /// Set the active theme ID (call when state is loaded or theme changes)
 pub fn set_active_theme(theme_id: &str) {
-    if let Ok(mut theme) = ACTIVE_THEME.write() {
-        *theme = theme_id.to_string();
-    }
+    let theme: &'static Theme = get_theme(theme_id);
+    CACHED_THEME.store(theme as *const Theme as *mut Theme, Ordering::Release);
 }
 
-/// Get the currently active theme
+/// Get the currently active theme (single atomic load — no locking, no allocation)
 pub fn active_theme() -> &'static Theme {
-    let theme_id = ACTIVE_THEME.read()
-        .map(|t| t.clone())
-        .unwrap_or_else(|_| DEFAULT_THEME.to_string());
-    get_theme(&theme_id)
+    let ptr = CACHED_THEME.load(Ordering::Acquire);
+    if !ptr.is_null() {
+        // SAFETY: ptr was set from a &'static Theme reference stored in lazy_static THEMES.
+        // The Theme data is never mutated or freed after initialization.
+        unsafe { &*ptr }
+    } else {
+        // First call before set_active_theme — initialize from default
+        let theme = get_theme(DEFAULT_THEME);
+        CACHED_THEME.store(theme as *const Theme as *mut Theme, Ordering::Release);
+        theme
+    }
 }
 
 // ============================================================================

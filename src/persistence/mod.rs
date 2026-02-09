@@ -69,6 +69,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         cached_content: None,
         history_messages: None,
         cache_deprecated: true,  // Will be refreshed on load
+        cache_in_flight: false,
         // Use saved timestamp if available, otherwise current time for new panels
         last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::core::panels::now_ms() },
         content_hash: None,

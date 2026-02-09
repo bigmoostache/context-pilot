@@ -68,6 +68,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         cached_content: None, // Background will populate
         history_messages: None,
         cache_deprecated: true, // Trigger background refresh
+        cache_in_flight: false,
         last_refresh_ms: crate::core::panels::now_ms(),
         content_hash: None,
         tmux_last_lines_hash: None,

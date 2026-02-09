@@ -112,6 +112,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
         cached_content: None,
         history_messages: None,
         cache_deprecated: true, // Mark as deprecated so background refresh runs
+        cache_in_flight: false,
         last_refresh_ms: crate::core::panels::now_ms(),
         content_hash: None,
         tmux_last_lines_hash: None,

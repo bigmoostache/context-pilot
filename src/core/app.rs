@@ -46,6 +46,10 @@ pub struct App {
     pending_retry_error: Option<String>,
     /// Last render time for throttling
     last_render_ms: u64,
+    /// Last spinner animation update time
+    last_spinner_ms: u64,
+    /// Last gh watcher sync time
+    last_gh_sync_ms: u64,
     /// Channel for API check results
     api_check_rx: Option<Receiver<crate::llms::ApiCheckResult>>,
     /// Whether to auto-start streaming on first loop iteration
@@ -74,6 +78,8 @@ impl App {
             last_ownership_check_ms: now_ms(),
             pending_retry_error: None,
             last_render_ms: 0,
+            last_spinner_ms: 0,
+            last_gh_sync_ms: 0,
             api_check_rx: None,
             resume_stream,
             command_palette: CommandPalette::new(),
@@ -164,7 +170,11 @@ impl App {
             self.process_tldr_results(&tldr_rx);
             self.process_cache_updates(&cache_rx);
             self.process_watcher_events();
-            self.sync_gh_watches();
+            // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
+            if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
+                self.last_gh_sync_ms = current_ms;
+                self.sync_gh_watches();
+            }
             self.check_timer_based_deprecation();
             self.handle_tool_execution(&tx, &tldr_tx, &cache_rx, terminal);
             self.finalize_stream(&tldr_tx);
@@ -192,8 +202,13 @@ impl App {
                 self.last_render_ms = current_ms;
             }
 
-            // Wait for next event (with timeout to keep checking background channels)
-            let _ = event::poll(Duration::from_millis(EVENT_POLL_MS))?;
+            // Adaptive poll: sleep longer when idle, shorter when actively streaming
+            let poll_ms = if self.state.is_streaming || self.state.dirty {
+                EVENT_POLL_MS // 8ms — responsive during streaming/active updates
+            } else {
+                50 // 50ms when idle — still responsive for typing, much less CPU
+            };
+            let _ = event::poll(Duration::from_millis(poll_ms))?;
         }
 
         Ok(())
@@ -601,11 +616,14 @@ impl App {
     }
 
     /// Schedule initial cache refreshes for all context elements
-    fn schedule_initial_cache_refreshes(&self) {
-        for ctx in &self.state.context {
+    fn schedule_initial_cache_refreshes(&mut self) {
+        for i in 0..self.state.context.len() {
+            let ctx = &self.state.context[i];
             let panel = crate::core::panels::get_panel(ctx.context_type);
-            if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+            let request = panel.build_cache_request(ctx, &self.state);
+            if let Some(request) = request {
                 process_cache_request(request, self.cache_tx.clone());
+                self.state.context[i].cache_in_flight = true;
             }
         }
     }
@@ -634,6 +652,11 @@ impl App {
             // Remove ctx from vec to get &mut ContextElement and &mut State simultaneously
             let mut ctx = state.context.remove(idx);
             let changed = panel.apply_cache_update(update, &mut ctx, state);
+            ctx.cache_in_flight = false;
+            // Always mark refresh time so timer-based scheduling knows when we last checked,
+            // even if content was unchanged. Without this, stale last_refresh_ms causes
+            // the timer to fire continuously (every 100ms instead of every interval).
+            ctx.last_refresh_ms = now_ms();
             state.context.insert(idx, ctx);
 
             if changed {
@@ -660,11 +683,13 @@ impl App {
                     // Check if this is a .git/ file change (HEAD, index)
                     let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
                     if is_git_event {
-                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                        // Git events: only mark deprecated, don't spawn immediately.
+                        // The timer-based check will handle refresh at the proper interval,
+                        // preventing the feedback loop (git status → .git/index → watcher → repeat).
+                        for ctx in self.state.context.iter_mut() {
                             if ctx.context_type == ContextType::GitResult || ctx.context_type == ContextType::Git {
                                 ctx.cache_deprecated = true;
                                 self.state.dirty = true;
-                                refresh_indices.push(i);
                             }
                         }
                     } else {
@@ -682,11 +707,11 @@ impl App {
                     // Check if this is a .git/ directory change
                     let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
                     if is_git_event {
-                        for (i, ctx) in self.state.context.iter_mut().enumerate() {
+                        // Git events: only mark deprecated (same as FileChanged above)
+                        for ctx in self.state.context.iter_mut() {
                             if ctx.context_type == ContextType::GitResult || ctx.context_type == ContextType::Git {
                                 ctx.cache_deprecated = true;
                                 self.state.dirty = true;
-                                refresh_indices.push(i);
                             }
                         }
                     } else {
@@ -702,12 +727,17 @@ impl App {
             }
         }
 
-        // Second pass: build and send requests
+        // Second pass: build and send requests (deduplicated, skip in-flight)
+        refresh_indices.sort_unstable();
+        refresh_indices.dedup();
         for i in refresh_indices {
+            if self.state.context[i].cache_in_flight { continue; }
             let ctx = &self.state.context[i];
             let panel = crate::core::panels::get_panel(ctx.context_type);
-            if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+            let request = panel.build_cache_request(ctx, &self.state);
+            if let Some(request) = request {
                 process_cache_request(request, self.cache_tx.clone());
+                self.state.context[i].cache_in_flight = true;
             }
         }
 
@@ -732,18 +762,27 @@ impl App {
         self.last_timer_check_ms = current_ms;
 
         // Immutable pass: collect requests and file watcher setup needs
-        let mut requests: Vec<(CacheRequest, Option<String>)> = Vec::new();
+        let mut requests: Vec<(usize, CacheRequest, Option<String>)> = Vec::new();
 
-        for ctx in &self.state.context {
+        for (i, ctx) in self.state.context.iter().enumerate() {
+            if ctx.cache_in_flight { continue; }
+
             let needs_initial = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
             let explicitly_deprecated = ctx.cache_deprecated;
 
             let panel = crate::core::panels::get_panel(ctx.context_type);
-            let timer_refresh = panel.cache_refresh_interval_ms()
+            let interval_elapsed = panel.cache_refresh_interval_ms()
                 .map(|interval| current_ms.saturating_sub(ctx.last_refresh_ms) >= interval)
-                .unwrap_or(false);
+                .unwrap_or(true); // No interval = always eligible
 
-            if needs_initial || explicitly_deprecated || timer_refresh {
+            let has_interval = panel.cache_refresh_interval_ms().is_some();
+
+            // needs_initial: always refresh newly created panels immediately
+            // interval_elapsed: scheduled refresh — respects interval even when cache_deprecated,
+            //   preventing the feedback loop: git status → .git/index change → watcher → refresh → ...
+            // deprecated w/o interval: File/Tree panels — refresh immediately when watcher triggers
+            // Note: cache_deprecated still affects build_cache_request (forces full refresh vs hash check)
+            if needs_initial || interval_elapsed || (explicitly_deprecated && !has_interval) {
                 if let Some(request) = panel.build_cache_request(ctx, &self.state) {
                     // For new File contexts, we also need to set up a watcher
                     let watcher_path = if needs_initial && ctx.context_type == ContextType::File {
@@ -751,13 +790,13 @@ impl App {
                     } else {
                         None
                     };
-                    requests.push((request, watcher_path));
+                    requests.push((i, request, watcher_path));
                 }
             }
         }
 
-        // Mutable pass: set up watchers and send requests
-        for (request, watcher_path) in requests {
+        // Mutable pass: set up watchers, send requests, mark in-flight
+        for (i, request, watcher_path) in requests {
             if let Some(path) = watcher_path {
                 if let Some(watcher) = &mut self.file_watcher {
                     if !self.watched_file_paths.contains(&path) {
@@ -768,11 +807,18 @@ impl App {
                 }
             }
             process_cache_request(request, self.cache_tx.clone());
+            self.state.context[i].cache_in_flight = true;
         }
     }
 
-    /// Update spinner animation frame if there's active loading/streaming
+    /// Update spinner animation frame if there's active loading/streaming.
+    /// Throttled to 10fps (100ms) to avoid unnecessary re-renders.
     fn update_spinner_animation(&mut self) {
+        let now = now_ms();
+        if now.saturating_sub(self.last_spinner_ms) < 100 {
+            return;
+        }
+
         // Check if there's any active operation that needs spinner animation
         let has_active_spinner = self.state.is_streaming
             || self.state.pending_tldrs > 0
@@ -782,6 +828,7 @@ impl App {
             });
 
         if has_active_spinner {
+            self.last_spinner_ms = now;
             // Increment spinner frame (wraps around automatically with u64)
             self.state.spinner_frame = self.state.spinner_frame.wrapping_add(1);
             // Mark dirty to trigger re-render with new spinner frame

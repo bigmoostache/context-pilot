@@ -318,7 +318,7 @@ impl Panel for GitPanel {
 
         // Get status first for change detection
         let status_output = Command::new("git")
-            .args(["status", "--porcelain", "-uall"])
+            .args(["status", "--porcelain"])
             .output()
             .ok()
             .filter(|o| o.status.success())

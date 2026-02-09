@@ -118,6 +118,9 @@ pub struct ContextElement {
     /// Cache is deprecated - source data changed, needs regeneration
     #[serde(skip)]
     pub cache_deprecated: bool,
+    /// A cache request is already in-flight for this element (prevents duplicate spawning)
+    #[serde(skip)]
+    pub cache_in_flight: bool,
     /// Last time this element was refreshed (for timer-based deprecation)
     #[serde(skip)]
     pub last_refresh_ms: u64,
