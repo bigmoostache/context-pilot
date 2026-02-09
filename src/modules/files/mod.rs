@@ -81,45 +81,8 @@ impl Module for FilesModule {
                 enabled: true,
                 category: ToolCategory::File,
             },
-            ToolDefinition {
-                id: "file_create".to_string(),
-                name: "Create File".to_string(),
-                short_desc: "Create new file".to_string(),
-                description: "Creates a NEW file. Fails if file exists - use file_edit to modify existing files.".to_string(),
-                params: vec![
-                    ToolParam::new("path", ParamType::String)
-                        .desc("Path for the new file")
-                        .required(),
-                    ToolParam::new("content", ParamType::String)
-                        .desc("Content to write to the file")
-                        .required(),
-                ],
-                enabled: true,
-                category: ToolCategory::File,
-            },
-            ToolDefinition {
-                id: "file_batch_create".to_string(),
-                name: "Batch Create".to_string(),
-                short_desc: "Create files/folders".to_string(),
-                description: "Creates multiple files and/or folders in one call. Fails for items that already exist. Parent directories are created automatically.".to_string(),
-                params: vec![
-                    ToolParam::new("items", ParamType::Array(Box::new(ParamType::Object(vec![
-                        ToolParam::new("type", ParamType::String)
-                            .desc("Item type: 'file' or 'folder'")
-                            .enum_vals(&["file", "folder"])
-                            .required(),
-                        ToolParam::new("path", ParamType::String)
-                            .desc("Path to create")
-                            .required(),
-                        ToolParam::new("content", ParamType::String)
-                            .desc("File content (only for type='file', optional)"),
-                    ]))))
-                        .desc("Array of items to create")
-                        .required(),
-                ],
-                enabled: true,
-                category: ToolCategory::File,
-            },
+
+
         ]
     }
 
@@ -128,8 +91,8 @@ impl Module for FilesModule {
             "file_open" => Some(self::tools::file::execute_open(tool, state)),
             "file_edit" => Some(self::tools::edit_file::execute_edit(tool, state)),
             "file_write" => Some(self::tools::write::execute(tool, state)),
-            "file_create" => Some(self::tools::edit_file::execute_create(tool, state)),
-            "file_batch_create" => Some(self::tools::create::execute(tool, state)),
+
+
             _ => None,
         }
     }

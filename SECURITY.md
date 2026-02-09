@@ -72,7 +72,7 @@ The tmux tools execute commands in terminal panes. Be aware that:
 The AI can read and write files in your project directory:
 
 - `file_open` - Reads file contents
-- `file_edit` / `file_create` - Modifies or creates files
+- `file_edit` / `file_write` - Modifies or creates files
 - Review all file modifications before committing
 
 ### Network Access

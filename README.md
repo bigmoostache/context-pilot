@@ -66,7 +66,7 @@ Tracks every token in real-time. When things get heavy, it summarizes old messag
 |----------|-------|-------------|
 | **Context** | `context_close`, `context_message_status`, `system_reload`, `tool_manage`, `module_toggle`, `panel_goto_page` | Manage what's in the AI's working memory |
 | **System Prompts** | `system_create`, `system_edit`, `system_delete`, `system_load` | Create and switch between AI personalities |
-| **Files** | `file_open`, `file_edit`, `file_write`, `file_create`, `file_batch_create` | Full file system access with syntax highlighting |
+| **Files** | `file_open`, `file_edit`, `file_write` | Full file system access with syntax highlighting |
 | **Search** | `file_glob`, `file_grep` | Find files by pattern, search contents with regex |
 | **Tree** | `tree_filter`, `tree_toggle`, `tree_describe` | Directory exploration with persistent annotations |
 | **Git** | `git_execute`, `git_configure_p6` | Full git CLI with smart cache invalidation |

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::tools::{ToolResult, ToolUse};
-use crate::state::{estimate_tokens, ContextElement, ContextType, State};
+use crate::state::{estimate_tokens, ContextType, State};
 
 /// Normalize a string for matching: trim trailing whitespace per line, normalize line endings
 fn normalize_for_match(s: &str) -> String {
@@ -246,110 +246,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
-pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let path = match tool.input.get("path").and_then(|v| v.as_str()) {
-        Some(p) => p,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'path' parameter".to_string(),
-                is_error: true,
-            }
-        }
-    };
 
-    // Accept both "contents" and "content" (LLMs sometimes use either)
-    let contents = match tool.input.get("contents").or_else(|| tool.input.get("content")).and_then(|v| v.as_str()) {
-        Some(c) => c,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'content' parameter".to_string(),
-                is_error: true,
-            }
-        }
-    };
-
-    // Check if file already exists
-    if Path::new(path).exists() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("File '{}' already exists. Use edit_file to modify it.", path),
-            is_error: true,
-        };
-    }
-
-    // Create parent directories if needed
-    if let Some(parent) = Path::new(path).parent() {
-        if !parent.as_os_str().is_empty() {
-            if let Err(e) = fs::create_dir_all(parent) {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Failed to create directory '{}': {}", parent.display(), e),
-                    is_error: true,
-                };
-            }
-        }
-    }
-
-    // Write the file
-    if let Err(e) = fs::write(path, contents) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Failed to create file '{}': {}", path, e),
-            is_error: true,
-        };
-    }
-
-    // Generate context ID (fills gaps)
-    let context_id = state.next_available_context_id();
-    let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid += 1;
-
-    let file_name = Path::new(path)
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.to_string());
-
-    let token_count = estimate_tokens(contents);
-
-    state.context.push(ContextElement {
-        id: context_id.clone(),
-        uid: Some(uid),
-        context_type: ContextType::File,
-        name: file_name,
-        token_count,
-        file_path: Some(path.to_string()),
-        file_hash: None,
-        glob_pattern: None,
-        glob_path: None,
-        grep_pattern: None,
-        grep_path: None,
-        grep_file_pattern: None,
-        tmux_pane_id: None,
-        tmux_lines: None,
-        tmux_last_keys: None,
-        tmux_description: None,
-        result_command: None,
-        result_command_hash: None,
-        cached_content: Some(contents.to_string()),
-        history_messages: None,
-        cache_deprecated: true,
-        cache_in_flight: false,
-        last_refresh_ms: crate::core::panels::now_ms(),
-        content_hash: None,
-        tmux_last_lines_hash: None,
-        current_page: 0,
-        total_pages: 1,
-        full_token_count: 0,
-    });
-
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Created '{}' as {} ({} tokens)", path, context_id, token_count),
-        is_error: false,
-    }
-}
 
 #[cfg(test)]
 mod tests {
