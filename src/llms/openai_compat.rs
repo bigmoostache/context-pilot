@@ -256,7 +256,10 @@ pub fn build_messages(
             continue;
         }
 
-        // Tool calls — only include if they have matching results
+        // Tool calls — only include if they have matching results.
+        // Merge into the last assistant message if possible, so consecutive
+        // tool calls from the same turn become one assistant message with
+        // multiple tool_calls (required by OpenAI-compat APIs).
         if msg.message_type == MessageType::ToolCall {
             let calls: Vec<OaiToolCall> = msg
                 .tool_uses
@@ -273,12 +276,22 @@ pub fn build_messages(
                 .collect();
 
             if !calls.is_empty() {
-                out.push(OaiMessage {
-                    role: "assistant".to_string(),
-                    content: None,
-                    tool_calls: Some(calls),
-                    tool_call_id: None,
+                // Try to merge into the last assistant message so consecutive
+                // tool calls become one assistant message (required by OpenAI APIs)
+                let should_merge = out.last().map_or(false, |last| {
+                    last.role == "assistant" && last.tool_calls.is_some()
                 });
+
+                if should_merge {
+                    out.last_mut().unwrap().tool_calls.as_mut().unwrap().extend(calls);
+                } else {
+                    out.push(OaiMessage {
+                        role: "assistant".to_string(),
+                        content: None,
+                        tool_calls: Some(calls),
+                        tool_call_id: None,
+                    });
+                }
             }
             continue;
         }
