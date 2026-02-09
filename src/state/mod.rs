@@ -17,7 +17,7 @@ pub mod runtime;
 
 pub use context::{ContextType, ContextElement, estimate_tokens, compute_total_pages};
 pub use message::{MessageType, MessageStatus, Message, ToolUseRecord, ToolResultRecord};
-pub use config::{SharedConfig, WorkerState, PanelData, ImportantPanelUids};
+pub use config::{SharedConfig, WorkerState, PanelData};
 pub use render_cache::{MessageRenderCache, InputRenderCache, FullContentCache, hash_values};
 pub use runtime::State;
 
@@ -26,5 +26,5 @@ pub use crate::modules::todo::types::{TodoStatus, TodoItem};
 pub use crate::modules::memory::types::{MemoryImportance, MemoryItem};
 pub use crate::modules::prompt::types::SystemItem;
 pub use crate::modules::scratchpad::types::ScratchpadCell;
-pub use crate::modules::tree::types::{TreeFileDescription, DEFAULT_TREE_FILTER};
+pub use crate::modules::tree::types::TreeFileDescription;
 pub use crate::modules::git::types::{GitFileChange, GitChangeType};
