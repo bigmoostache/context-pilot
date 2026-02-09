@@ -83,11 +83,13 @@ fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
 }
 
 fn render_perf_overlay(frame: &mut Frame, area: Rect) {
+    use crate::ui::helpers::{Cell, render_table};
+
     let snapshot = PERF.snapshot();
 
     // Overlay dimensions
-    let overlay_width = 54u16;
-    let overlay_height = 18u16;
+    let overlay_width = 62u16;
+    let overlay_height = 28u16;
 
     // Position in top-right
     let x = area.width.saturating_sub(overlay_width + 2);
@@ -131,30 +133,24 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
     // Sparkline
     lines.push(Line::from(""));
     lines.push(render_sparkline(&snapshot.frame_times_ms));
+    lines.push(Line::from(""));
 
-    // Separator
-    lines.push(Line::from(vec![
-        Span::styled(format!(" {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
-    ]));
-
-    // Operation table header
-    lines.push(Line::from(vec![
-        Span::styled(" ", Style::default()),
-        Span::styled(format!("{:<26}", "Operation"), Style::default().fg(theme::text_secondary())),
-        Span::styled(format!("{:>10}", "Mean"), Style::default().fg(theme::text_secondary())),
-        Span::styled(format!("{:>10}", "Std"), Style::default().fg(theme::text_secondary())),
-    ]));
-
-    // Calculate total for percentage (use total time for hotspot detection)
+    // Operation table using render_table
     let total_time: f64 = snapshot.ops.iter().map(|o| o.total_ms).sum();
 
-    // Top operations
-    for op in snapshot.ops.iter().take(5) {
+    let header = [
+        Cell::new("Operation", Style::default()),
+        Cell::right("Mean", Style::default()),
+        Cell::right("Std", Style::default()),
+        Cell::right("Cumul", Style::default()),
+    ];
+
+    let rows: Vec<Vec<Cell>> = snapshot.ops.iter().take(10).map(|op| {
         let pct = if total_time > 0.0 { op.total_ms / total_time * 100.0 } else { 0.0 };
         let is_hotspot = pct > 30.0;
 
-        let name = truncate_op_name(op.name, 25);
-        let marker = if is_hotspot { "!" } else { " " };
+        let name = truncate_op_name(op.name, 24);
+        let name_str = if is_hotspot { format!("! {}", name) } else { format!("  {}", name) };
 
         let name_style = if is_hotspot {
             Style::default().fg(theme::warning()).bold()
@@ -162,9 +158,7 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
             Style::default().fg(theme::text())
         };
 
-        // Color mean based on frame time budget
         let mean_color = frame_time_color(op.mean_ms);
-        // Color std based on variability (high std = orange/red)
         let std_color = if op.std_ms < 1.0 {
             theme::success()
         } else if op.std_ms < 5.0 {
@@ -173,18 +167,23 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
             theme::error()
         };
 
-        lines.push(Line::from(vec![
-            Span::styled(marker, Style::default().fg(theme::warning())),
-            Span::styled(format!("{:<26}", name), name_style),
-            Span::styled(format!("{:>9.2}ms", op.mean_ms), Style::default().fg(mean_color)),
-            Span::styled(format!("{:>9.2}ms", op.std_ms), Style::default().fg(std_color)),
-        ]));
-    }
+        let cumul_str = if op.total_ms >= 1000.0 {
+            format!("{:.1}s", op.total_ms / 1000.0)
+        } else {
+            format!("{:.0}ms", op.total_ms)
+        };
+
+        vec![
+            Cell::new(name_str, name_style),
+            Cell::right(format!("{:.2}ms", op.mean_ms), Style::default().fg(mean_color)),
+            Cell::right(format!("{:.2}ms", op.std_ms), Style::default().fg(std_color)),
+            Cell::right(cumul_str, Style::default().fg(theme::text_muted())),
+        ]
+    }).collect();
+
+    lines.extend(render_table(&header, &rows, None, 1));
 
     // Footer
-    lines.push(Line::from(vec![
-        Span::styled(format!(" {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
-    ]));
     lines.push(Line::from(vec![
         Span::styled(" F12", Style::default().fg(theme::accent())),
         Span::styled(" toggle  ", Style::default().fg(theme::text_muted())),

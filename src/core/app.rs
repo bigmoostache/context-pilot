@@ -310,6 +310,7 @@ impl App {
         if !self.state.is_streaming || self.pending_done.is_none() || !self.typewriter.pending_chars.is_empty() || self.pending_tools.is_empty() {
             return;
         }
+        let _guard = crate::profile!("app::tool_exec");
 
         self.state.dirty = true;
         let tools = std::mem::take(&mut self.pending_tools);
@@ -640,6 +641,7 @@ impl App {
 
     /// Static version of process_cache_updates for use in wait module
     fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpdate>) {
+        let _guard = crate::profile!("app::cache_updates");
         while let Ok(update) = cache_rx.try_recv() {
             let context_type = update.context_type();
             let panel = crate::core::panels::get_panel(context_type);
@@ -672,6 +674,7 @@ impl App {
 
     /// Process file watcher events
     fn process_watcher_events(&mut self) {
+        let _guard = crate::profile!("app::watcher_events");
         // Collect events (immutable borrow on file_watcher released after this block)
         let events = {
             let Some(watcher) = &self.file_watcher else { return };
@@ -772,6 +775,7 @@ impl App {
         if current_ms.saturating_sub(self.last_timer_check_ms) < 100 {
             return;
         }
+        let _guard = crate::profile!("app::timer_deprecation");
         self.last_timer_check_ms = current_ms;
 
         // Immutable pass: collect requests and file watcher setup needs

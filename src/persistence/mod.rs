@@ -192,6 +192,7 @@ fn load_state_new() -> State {
 
 /// Save state using new multi-file format
 pub fn save_state(state: &State) {
+    let _guard = crate::profile!("persist::save_state");
     let dir = PathBuf::from(STORE_DIR);
     fs::create_dir_all(&dir).ok();
 
