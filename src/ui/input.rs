@@ -116,26 +116,32 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
 
         let net_change = total_additions - total_deletions;
         
-        // Card 1: Line changes (additions/deletions/net)
-        let line_change_text = if net_change >= 0 {
-            format!(" +{} -{} +{} ", total_additions, total_deletions, net_change)
+        // Card 1: Line changes (additions/deletions/net) with industry standard colors
+        // Format: "+11 -13 -2" (additions green, deletions red, net with appropriate color)
+        // Add line change card with individual color spans
+        // +{additions} (green) -{deletions} (red) {net} (green for positive, red for negative)
+        let (net_prefix, net_value) = if net_change >= 0 {
+            ("+", net_change)
         } else {
-            format!(" +{} -{} {} ", total_additions, total_deletions, net_change)
+            ("", net_change)
         };
         
-        spans.push(Span::styled(
-            line_change_text,
-            Style::default().fg(Color::White).bg(Color::Green)
-        ));
+        spans.push(Span::styled(" +", Style::default().fg(theme::success())));
+        spans.push(Span::styled(format!("{} ", total_additions), Style::default().fg(theme::success()).bold()));
+        spans.push(Span::styled("-", Style::default().fg(theme::error())));
+        spans.push(Span::styled(format!("{} ", total_deletions), Style::default().fg(theme::error()).bold()));
+        spans.push(Span::styled(net_prefix, Style::default().fg(if net_change >= 0 { theme::success() } else { theme::error() })));
+        spans.push(Span::styled(format!("{} ", net_value.abs()), Style::default().fg(if net_change >= 0 { theme::success() } else { theme::error() }).bold()));
         spans.push(Span::styled(" ", base_style));
 
-        // Card 2: File changes (U/M/D)
-        let file_change_text = format!(" U{} M{} D{} ", untracked_count, modified_count, deleted_count);
-        
-        spans.push(Span::styled(
-            file_change_text,
-            Style::default().fg(Color::White).bg(Color::Yellow)
-        ));
+        // Card 2: File changes (U/M/D) with industry standard colors
+        // Format: "U0 M9 D0" (untracked green, modified orange, deleted red)
+        spans.push(Span::styled("U", Style::default().fg(theme::success())));
+        spans.push(Span::styled(format!("{} ", untracked_count), Style::default().fg(theme::success()).bold()));
+        spans.push(Span::styled("M", Style::default().fg(theme::warning())));
+        spans.push(Span::styled(format!("{} ", modified_count), Style::default().fg(theme::warning()).bold()));
+        spans.push(Span::styled("D", Style::default().fg(theme::error())));
+        spans.push(Span::styled(format!("{} ", deleted_count), Style::default().fg(theme::error()).bold()));
         spans.push(Span::styled(" ", base_style));
     }
 
