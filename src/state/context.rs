@@ -22,6 +22,7 @@ pub enum ContextType {
     Library,
     Skill,
     ConversationHistory,
+    Spine,
 }
 
 impl ContextType {
@@ -50,6 +51,7 @@ impl ContextType {
             ContextType::Library => icons::ctx_library(),
             ContextType::Skill => icons::ctx_skill(),
             ContextType::ConversationHistory => icons::ctx_conversation(),
+            ContextType::Spine => icons::ctx_spine(),
         }
     }
 

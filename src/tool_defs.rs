@@ -151,6 +151,7 @@ pub enum ToolCategory {
     Git,
     Github,
     Scratchpad,
+    Spine,
 }
 
 impl ToolCategory {
@@ -166,6 +167,7 @@ impl ToolCategory {
             ToolCategory::Git => "Git",
             ToolCategory::Github => "GitHub",
             ToolCategory::Scratchpad => "Scratch",
+            ToolCategory::Spine => "Spine",
         }
     }
 
@@ -181,6 +183,7 @@ impl ToolCategory {
             ToolCategory::Git,
             ToolCategory::Github,
             ToolCategory::Scratchpad,
+            ToolCategory::Spine,
         ]
     }
 }

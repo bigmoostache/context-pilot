@@ -214,6 +214,7 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
             ContextType::Library => "library",
             ContextType::Skill => "skill",
             ContextType::ConversationHistory => "chat-history",
+            ContextType::Spine => "spine",
         };
 
         let details = match ctx.context_type {
@@ -509,6 +510,7 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
             ToolCategory::Git => ("GIT", tool_categories::git_desc()),
             ToolCategory::Github => ("GITHUB", "GitHub API operations via gh CLI"),
             ToolCategory::Scratchpad => ("SCRATCHPAD", tool_categories::scratchpad_desc()),
+            ToolCategory::Spine => ("SPINE", "Auto-continuation and stream control"),
         };
 
         text.push(Line::from(vec![

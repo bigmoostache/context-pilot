@@ -10,6 +10,7 @@ use crate::modules::todo::types::TodoItem;
 use crate::modules::memory::types::MemoryItem;
 use crate::modules::prompt::types::{PromptItem, PromptType};
 use crate::modules::scratchpad::types::ScratchpadCell;
+use crate::modules::spine::types::{Notification, SpineConfig};
 use crate::modules::tree::types::{TreeFileDescription, DEFAULT_TREE_FILTER};
 use crate::modules::git::types::GitFileChange;
 use crate::tool_defs::ToolDefinition;
@@ -75,6 +76,12 @@ pub struct State {
     pub scratchpad_cells: Vec<ScratchpadCell>,
     /// Next scratchpad cell ID (C1, C2, ...)
     pub next_scratchpad_id: usize,
+    /// Spine notifications
+    pub notifications: Vec<Notification>,
+    /// Next notification ID (N1, N2, ...)
+    pub next_notification_id: usize,
+    /// Spine module configuration (per-worker)
+    pub spine_config: SpineConfig,
     /// Tool definitions with enabled state
     pub tools: Vec<ToolDefinition>,
     /// Active module IDs
@@ -219,6 +226,9 @@ impl Default for State {
             library_preview: None,
             scratchpad_cells: vec![],
             next_scratchpad_id: 1,
+            notifications: vec![],
+            next_notification_id: 1,
+            spine_config: SpineConfig::default(),
             active_modules: crate::modules::default_active_modules(),
             tools: crate::modules::active_tool_definitions(&crate::modules::default_active_modules()),
             dirty: true, // Start dirty to ensure initial render

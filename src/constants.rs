@@ -231,6 +231,7 @@ pub mod icons {
     pub fn ctx_scratchpad() -> String { normalize_icon(&active_theme().context.scratchpad) }
     pub fn ctx_library() -> String { normalize_icon(&active_theme().context.library) }
     pub fn ctx_skill() -> String { normalize_icon(&active_theme().context.skill) }
+    pub fn ctx_spine() -> String { normalize_icon(&active_theme().context.spine) }
 
     // Message status (normalized to 2 cells)
     pub fn status_full() -> String { normalize_icon(&active_theme().status.full) }

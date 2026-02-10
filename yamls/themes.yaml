@@ -27,6 +27,7 @@ themes:
       scratchpad: "🪶"
       library: "📚"
       skill: "⚡"
+      spine: "🦴"
     status:
       full: ""
       summarized: "◐"
@@ -76,6 +77,7 @@ themes:
       scratchpad: "📝"
       library: "📚"
       skill: "🧩"
+      spine: "⚙️"
     status:
       full: ""
       summarized: "◐"
@@ -125,6 +127,7 @@ themes:
       scratchpad: "📟"
       library: "🗄️"
       skill: "🔌"
+      spine: "🧠"
     status:
       full: ""
       summarized: "◐"
@@ -174,6 +177,7 @@ themes:
       scratchpad: "🍁"
       library: "📖"
       skill: "🌿"
+      spine: "🌲"
     status:
       full: ""
       summarized: "◐"
@@ -223,6 +227,7 @@ themes:
       scratchpad: "🌴"
       library: "🗺️"
       skill: "🧭"
+      spine: "🐙"
     status:
       full: ""
       summarized: "◐"
@@ -272,6 +277,7 @@ themes:
       scratchpad: "📡"
       library: "🛸"
       skill: "⚡"
+      spine: "🧬"
     status:
       full: ""
       summarized: "◐"

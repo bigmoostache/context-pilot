@@ -8,6 +8,7 @@ pub mod memory;
 pub mod preset;
 pub mod scratchpad;
 pub mod prompt;
+pub mod spine;
 pub mod tmux;
 pub mod todo;
 pub mod tree;
@@ -114,6 +115,7 @@ const FIXED_PANEL_ORDER: &[ContextType] = &[
     ContextType::Git,          // P6
     ContextType::Scratchpad,   // P7
     ContextType::Library,      // P8
+    ContextType::Spine,        // P9
 ];
 
 /// Collect all fixed panel defaults in canonical P0-P7 order.
@@ -196,6 +198,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(memory::MemoryModule),
         Box::new(scratchpad::ScratchpadModule),
         Box::new(preset::PresetModule),
+        Box::new(spine::SpineModule),
     ]
 }
 

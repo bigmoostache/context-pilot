@@ -97,7 +97,11 @@ pub struct ContextIcons {
     pub scratchpad: String,
     pub library: String,
     pub skill: String,
+    #[serde(default = "default_spine_icon")]
+    pub spine: String,
 }
+
+fn default_spine_icon() -> String { "⚡".to_string() }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct StatusIcons {
