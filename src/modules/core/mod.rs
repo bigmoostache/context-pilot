@@ -53,6 +53,15 @@ impl Module for CoreModule {
             state.active_modules = arr.iter()
                 .filter_map(|v| v.as_str().map(String::from))
                 .collect();
+            // Auto-add newly introduced modules that aren't in the persisted config.
+            // This handles the case where a new module is added to the codebase but
+            // the user's config.json was written before it existed.
+            let all_defaults = crate::modules::default_active_modules();
+            for module_id in &all_defaults {
+                if !state.active_modules.contains(module_id) {
+                    state.active_modules.insert(module_id.clone());
+                }
+            }
         }
         if let Some(v) = data.get("dev_mode").and_then(|v| v.as_bool()) {
             state.dev_mode = v;
