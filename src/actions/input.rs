@@ -1,6 +1,6 @@
 use crate::modules::spine::types::NotificationType;
 use crate::persistence::{delete_message, save_message};
-use crate::state::{estimate_tokens, ContextType, Message, MessageStatus, MessageType, PromptItem, State};
+use crate::state::{estimate_tokens, ContextType, Message, PromptItem, State};
 
 use super::helpers::{parse_context_pattern, find_context_by_id};
 use super::ActionResult;
@@ -42,21 +42,7 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
         content.clone()
     };
 
-    let user_msg = Message {
-        id: user_id,
-        uid: Some(user_uid),
-        role: "user".to_string(),
-        message_type: MessageType::TextMessage,
-        content,
-        content_token_count: user_token_estimate,
-        tl_dr: None,
-        tl_dr_token_count: 0,
-        status: MessageStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: Vec::new(),
-        input_tokens: 0,
-        timestamp_ms: crate::core::panels::now_ms(),
-    };
+    let user_msg = Message::new_user(user_id, user_uid, content, user_token_estimate);
     save_message(&user_msg);
 
     // Add user message tokens to Conversation context and update timestamp

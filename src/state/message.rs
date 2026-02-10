@@ -73,3 +73,43 @@ pub struct Message {
     #[serde(default)]
     pub timestamp_ms: u64,
 }
+
+impl Message {
+    /// Create a new user text message with the given ID, UID, and content.
+    pub fn new_user(id: String, uid: String, content: String, token_count: usize) -> Self {
+        Self {
+            id,
+            uid: Some(uid),
+            role: "user".to_string(),
+            message_type: MessageType::TextMessage,
+            content,
+            content_token_count: token_count,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: crate::core::panels::now_ms(),
+        }
+    }
+
+    /// Create an empty assistant message ready for streaming.
+    pub fn new_assistant(id: String, uid: String) -> Self {
+        Self {
+            id,
+            uid: Some(uid),
+            role: "assistant".to_string(),
+            message_type: MessageType::TextMessage,
+            content: String::new(),
+            content_token_count: 0,
+            tl_dr: None,
+            tl_dr_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: crate::core::panels::now_ms(),
+        }
+    }
+}

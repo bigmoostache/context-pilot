@@ -34,8 +34,8 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
 
     // Check if any auto-continuation wants to fire
     let continuations = all_continuations();
-    let mut triggered = None;
-    for cont in &continuations {
+    let mut triggered: Option<&dyn super::continuation::AutoContinuation> = None;
+    for &cont in continuations {
         if cont.should_continue(state) {
             triggered = Some(cont);
             break;
@@ -50,21 +50,31 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
 
     // Something wants to continue — check guard rails
     let guard_rails = all_guard_rails();
-    for guard in &guard_rails {
+    for &guard in guard_rails {
         if guard.should_block(state) {
             let reason = guard.block_reason(state);
-            // Create a notification about the block
-            let notif_id = format!("N{}", state.next_notification_id);
-            state.next_notification_id += 1;
-            state.notifications.push(Notification {
-                id: notif_id,
-                notification_type: NotificationType::Custom,
-                source: format!("guard_rail:{}", guard.name()),
-                processed: false,
-                timestamp_ms: now_ms(),
-                content: format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
+            // Only create a block notification if one doesn't already exist
+            // for this guard rail. Without this check, every main loop tick
+            // (8-50ms) would create a new notification when blocked.
+            let source_tag = format!("guard_rail:{}", guard.name());
+            let already_notified = state.notifications.iter().any(|n| {
+                !n.processed
+                    && n.notification_type == NotificationType::Custom
+                    && n.source == source_tag
             });
-            state.touch_panel(ContextType::Spine);
+            if !already_notified {
+                let notif_id = format!("N{}", state.next_notification_id);
+                state.next_notification_id += 1;
+                state.notifications.push(Notification {
+                    id: notif_id,
+                    notification_type: NotificationType::Custom,
+                    source: source_tag,
+                    processed: false,
+                    timestamp_ms: now_ms(),
+                    content: format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
+                });
+                state.touch_panel(ContextType::Spine);
+            }
             return SpineDecision::Blocked(reason);
         }
     }
@@ -89,114 +99,31 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
 ///
 /// Returns true if a stream should be started (caller should call start_streaming).
 pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool {
-    use crate::persistence::save_message;
-    use crate::state::{Message, MessageStatus, MessageType, estimate_tokens};
-
     // Note: UserMessage notifications are marked as processed in
     // prepare_stream_context() — every context rebuild counts as "seen".
     // No need to do it here; it will happen when the stream context is built.
 
     match action {
         ContinuationAction::SyntheticMessage(content) => {
-            let user_token_estimate = estimate_tokens(&content);
-
-            // Create synthetic user message
-            let user_id = format!("U{}", state.next_user_id);
-            let user_uid = format!("UID_{}_U", state.global_next_uid);
-            state.next_user_id += 1;
-            state.global_next_uid += 1;
-
-            let user_msg = Message {
-                id: user_id,
-                uid: Some(user_uid),
-                role: "user".to_string(),
-                message_type: MessageType::TextMessage,
-                content,
-                content_token_count: user_token_estimate,
-                tl_dr: None,
-                tl_dr_token_count: 0,
-                status: MessageStatus::Full,
-                tool_uses: Vec::new(),
-                tool_results: Vec::new(),
-                input_tokens: 0,
-                timestamp_ms: now_ms(),
-            };
-            save_message(&user_msg);
-
-            // Update conversation token count
-            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
-                ctx.token_count += user_token_estimate;
-                ctx.last_refresh_ms = now_ms();
-            }
-
-            state.messages.push(user_msg);
-
-            // Create empty assistant message for streaming into
-            let assistant_id = format!("A{}", state.next_assistant_id);
-            let assistant_uid = format!("UID_{}_A", state.global_next_uid);
-            state.next_assistant_id += 1;
-            state.global_next_uid += 1;
-
-            let assistant_msg = Message {
-                id: assistant_id,
-                uid: Some(assistant_uid),
-                role: "assistant".to_string(),
-                message_type: MessageType::TextMessage,
-                content: String::new(),
-                content_token_count: 0,
-                tl_dr: None,
-                tl_dr_token_count: 0,
-                status: MessageStatus::Full,
-                tool_uses: Vec::new(),
-                tool_results: Vec::new(),
-                input_tokens: 0,
-                timestamp_ms: now_ms(),
-            };
-            state.messages.push(assistant_msg);
-
-            // Set streaming state
-            state.is_streaming = true;
-            state.last_stop_reason = None;
-            state.streaming_estimated_tokens = 0;
-            // Reset per-tick counters (but keep per-stream accumulators since this is auto-continue)
-            state.tick_cache_hit_tokens = 0;
-            state.tick_cache_miss_tokens = 0;
-            state.tick_output_tokens = 0;
-
+            state.push_user_message(content);
+            state.push_empty_assistant();
+            state.begin_streaming();
             true
         }
         ContinuationAction::Relaunch => {
-            // Create empty assistant message for streaming into
-            let assistant_id = format!("A{}", state.next_assistant_id);
-            let assistant_uid = format!("UID_{}_A", state.global_next_uid);
-            state.next_assistant_id += 1;
-            state.global_next_uid += 1;
+            // Relaunch expects the conversation to already end with a user
+            // message.  If it doesn't (defensive), fall back to a tiny
+            // synthetic user message so the API always sees alternating roles.
+            let last_role = state.messages.iter().rev()
+                .find(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
+                .map(|m| m.role.as_str());
 
-            let assistant_msg = Message {
-                id: assistant_id,
-                uid: Some(assistant_uid),
-                role: "assistant".to_string(),
-                message_type: MessageType::TextMessage,
-                content: String::new(),
-                content_token_count: 0,
-                tl_dr: None,
-                tl_dr_token_count: 0,
-                status: MessageStatus::Full,
-                tool_uses: Vec::new(),
-                tool_results: Vec::new(),
-                input_tokens: 0,
-                timestamp_ms: now_ms(),
-            };
-            state.messages.push(assistant_msg);
+            if last_role != Some("user") {
+                state.push_user_message("/* Continue */".to_string());
+            }
 
-            // Set streaming state
-            state.is_streaming = true;
-            state.last_stop_reason = None;
-            state.streaming_estimated_tokens = 0;
-            state.tick_cache_hit_tokens = 0;
-            state.tick_cache_miss_tokens = 0;
-            state.tick_output_tokens = 0;
-
+            state.push_empty_assistant();
+            state.begin_streaming();
             true
         }
     }

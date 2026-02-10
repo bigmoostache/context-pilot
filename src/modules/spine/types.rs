@@ -94,7 +94,6 @@ fn default_true() -> bool { true }
 
 impl Notification {
     /// Create a new notification with the given fields
-    #[allow(dead_code)]
     pub fn new(
         id: String,
         notification_type: NotificationType,

@@ -24,14 +24,15 @@ pub trait GuardRailStopLogic: Send + Sync {
 /// Collect all registered guard rail implementations.
 ///
 /// All guard rails are checked — if ANY blocks, continuation is prevented.
-pub fn all_guard_rails() -> Vec<Box<dyn GuardRailStopLogic>> {
-    vec![
-        Box::new(MaxOutputTokensGuard),
-        Box::new(MaxCostGuard),
-        Box::new(MaxDurationGuard),
-        Box::new(MaxMessagesGuard),
-        Box::new(MaxAutoRetriesGuard),
-    ]
+pub fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
+    static GUARD_RAILS: &[&dyn GuardRailStopLogic] = &[
+        &MaxOutputTokensGuard,
+        &MaxCostGuard,
+        &MaxDurationGuard,
+        &MaxMessagesGuard,
+        &MaxAutoRetriesGuard,
+    ];
+    GUARD_RAILS
 }
 
 // ============================================================================

@@ -11,9 +11,9 @@ use super::types::ContinuationAction;
 /// The spine module holds a `Vec<Box<dyn AutoContinuation>>` and evaluates
 /// them in order after each stream completes. The first one that returns
 /// `should_continue() == true` wins.
-#[allow(dead_code)]
 pub trait AutoContinuation: Send + Sync {
     /// Human-readable name for logging/debugging
+    #[allow(dead_code)]
     fn name(&self) -> &str;
 
     /// Check if this continuation should fire given current state.
@@ -31,12 +31,13 @@ pub trait AutoContinuation: Send + Sync {
 /// 1. NotificationsContinuation (always check unprocessed notifs first)
 /// 2. MaxTokensContinuation (continue truncated output)
 /// 3. TodosAutomaticContinuation (continue until todos done)
-pub fn all_continuations() -> Vec<Box<dyn AutoContinuation>> {
-    vec![
-        Box::new(NotificationsContinuation),
-        Box::new(MaxTokensContinuation),
-        Box::new(TodosAutomaticContinuation),
-    ]
+pub fn all_continuations() -> &'static [&'static dyn AutoContinuation] {
+    static CONTINUATIONS: &[&dyn AutoContinuation] = &[
+        &NotificationsContinuation,
+        &MaxTokensContinuation,
+        &TodosAutomaticContinuation,
+    ];
+    CONTINUATIONS
 }
 
 // ============================================================================
