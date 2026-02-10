@@ -1,6 +1,7 @@
 pub mod types;
 pub mod continuation;
 pub mod guard_rail;
+pub mod engine;
 mod panel;
 pub(crate) mod tools;
 
