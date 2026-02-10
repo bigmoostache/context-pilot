@@ -57,15 +57,29 @@ impl AutoContinuation for NotificationsContinuation {
     fn build_continuation(&self, state: &State) -> ContinuationAction {
         let unprocessed = state.unprocessed_notifications();
 
-        // If ALL unprocessed notifications are UserMessage, just relaunch —
-        // the user's message is already in the conversation, no need for a
-        // synthetic "you have notifications" wrapper message.
+        // If ALL unprocessed notifications are UserMessage, the user's actual
+        // message is already in the conversation history.
         let all_user_messages = unprocessed.iter().all(|n| {
             n.notification_type == super::types::NotificationType::UserMessage
         });
 
         if all_user_messages {
-            return ContinuationAction::Relaunch;
+            // Check if the last non-empty message is already a user message.
+            // If so, we can just Relaunch (no synthetic message needed).
+            // If the last message is an assistant message (missed-message during
+            // streaming scenario), we need a synthetic user message because APIs
+            // require the conversation to end with a user message.
+            let last_role = state.messages.iter().rev()
+                .find(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
+                .map(|m| m.role.as_str());
+
+            if last_role == Some("user") {
+                return ContinuationAction::Relaunch;
+            } else {
+                return ContinuationAction::SyntheticMessage(
+                    "/* A user message was submitted while you were streaming. It has been inserted into the conversation above. Please review and respond to it. */".to_string()
+                );
+            }
         }
 
         // Non-UserMessage notifications exist — build a synthetic message

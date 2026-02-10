@@ -1,5 +1,4 @@
-use crate::core::panels::now_ms;
-use crate::modules::spine::types::{Notification, NotificationType};
+use crate::modules::spine::types::NotificationType;
 use crate::persistence::{delete_message, save_message};
 use crate::state::{estimate_tokens, ContextType, Message, MessageStatus, MessageType, PromptItem, State};
 
@@ -118,17 +117,11 @@ pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
 /// This is the primary trigger for starting a stream — the spine engine
 /// will detect the unprocessed notification and launch streaming.
 fn create_user_notification(state: &mut State, user_id: &str, content_preview: &str) {
-    let notif_id = format!("N{}", state.next_notification_id);
-    state.next_notification_id += 1;
-    state.notifications.push(Notification {
-        id: notif_id,
-        notification_type: NotificationType::UserMessage,
-        source: user_id.to_string(),
-        processed: false,
-        timestamp_ms: now_ms(),
-        content: content_preview.to_string(),
-    });
-    state.touch_panel(ContextType::Spine);
+    state.create_notification(
+        NotificationType::UserMessage,
+        user_id.to_string(),
+        content_preview.to_string(),
+    );
 }
 
 /// Replace /command-name tokens in input with command content.
