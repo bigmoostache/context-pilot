@@ -39,48 +39,69 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
         .and_then(|v| v.as_u64())
         .unwrap_or(50) as usize;
 
-    let command = tool.input.get("command")
+    let requested_pane_id = tool.input.get("pane_id")
         .and_then(|v| v.as_str());
 
-    // Ensure background session exists
-    if let Err(e) = ensure_bg_session() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: e,
-            is_error: true,
-        };
-    }
-
-    // Create a new window in the background session
-    let output = Command::new("tmux")
-        .args(["new-window", "-t", TMUX_BG_SESSION, "-d", "-P", "-F", "#{pane_id}"])
-        .output();
-
-    let pane_id = match output {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).trim().to_string()
+    // Determine the pane ID: use existing pane if provided, otherwise create a new one
+    let pane_id = if let Some(pid) = requested_pane_id {
+        // Verify the pane exists
+        let check = Command::new("tmux")
+            .args(["display-message", "-t", pid, "-p", "#{pane_id}"])
+            .output();
+        match check {
+            Ok(out) if out.status.success() => {
+                String::from_utf8_lossy(&out.stdout).trim().to_string()
+            }
+            _ => {
+                return ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Pane '{}' not found. Check tmux pane IDs.", pid),
+                    is_error: true,
+                };
+            }
         }
-        Ok(out) => {
+    } else {
+        // No pane_id provided — create a new one in the background session
+        if let Err(e) = ensure_bg_session() {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Failed to create tmux pane: {}", String::from_utf8_lossy(&out.stderr)),
+                content: e,
                 is_error: true,
             };
         }
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Failed to run tmux command: {}", e),
-                is_error: true,
-            };
+
+        let output = Command::new("tmux")
+            .args(["new-window", "-t", TMUX_BG_SESSION, "-d", "-P", "-F", "#{pane_id}"])
+            .output();
+
+        match output {
+            Ok(out) if out.status.success() => {
+                String::from_utf8_lossy(&out.stdout).trim().to_string()
+            }
+            Ok(out) => {
+                return ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Failed to create tmux pane: {}", String::from_utf8_lossy(&out.stderr)),
+                    is_error: true,
+                };
+            }
+            Err(e) => {
+                return ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Failed to run tmux command: {}", e),
+                    is_error: true,
+                };
+            }
         }
     };
 
-    // Run initial command if provided
-    if let Some(cmd) = command {
-        let _ = Command::new("tmux")
-            .args(["send-keys", "-t", &pane_id, cmd, "Enter"])
-            .output();
+    // Check if this pane is already being monitored
+    if state.context.iter().any(|c| c.tmux_pane_id.as_deref() == Some(&pane_id)) {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Pane {} is already being monitored", pane_id),
+            is_error: true,
+        };
     }
 
     // Generate context ID (fills gaps) and UID
@@ -105,7 +126,7 @@ pub fn execute_create_pane(tool: &ToolUse, state: &mut State) -> ToolResult {
         grep_file_pattern: None,
         tmux_pane_id: Some(pane_id.clone()),
         tmux_lines: Some(lines),
-        tmux_last_keys: command.map(|s| s.to_string()),
+        tmux_last_keys: None,
         tmux_description: Some(description.clone()),
         result_command: None,
         result_command_hash: None,

@@ -56,6 +56,7 @@ impl Panel for TmuxPanel {
         Some(CacheRequest::RefreshTmux {
             context_id: ctx.id.clone(),
             pane_id: pane_id.clone(),
+            lines: ctx.tmux_lines,
             current_content_hash: ctx.tmux_last_lines_hash.clone(),
         })
     }
@@ -84,11 +85,12 @@ impl Panel for TmuxPanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::RefreshTmux { context_id, pane_id, current_content_hash } = request else {
+        let CacheRequest::RefreshTmux { context_id, pane_id, lines, current_content_hash } = request else {
             return None;
         };
+        let start_line = format!("-{}", lines.unwrap_or(50));
         let output = Command::new("tmux")
-            .args(["capture-pane", "-p", "-t", &pane_id])
+            .args(["capture-pane", "-p", "-S", &start_line, "-t", &pane_id])
             .output()
             .ok()?;
         if !output.status.success() {

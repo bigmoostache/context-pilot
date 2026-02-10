@@ -229,8 +229,8 @@ pub mod icons {
     pub fn ctx_tmux() -> String { normalize_icon(&active_theme().context.tmux) }
     pub fn ctx_git() -> String { normalize_icon(&active_theme().context.git) }
     pub fn ctx_scratchpad() -> String { normalize_icon(&active_theme().context.scratchpad) }
-    pub fn ctx_library() -> String { normalize_icon("📚") }
-    pub fn ctx_skill() -> String { normalize_icon("⚡") }
+    pub fn ctx_library() -> String { normalize_icon(&active_theme().context.library) }
+    pub fn ctx_skill() -> String { normalize_icon(&active_theme().context.skill) }
 
     // Message status (normalized to 2 cells)
     pub fn status_full() -> String { normalize_icon(&active_theme().status.full) }

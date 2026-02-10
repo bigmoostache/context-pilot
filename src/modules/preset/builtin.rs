@@ -62,6 +62,7 @@ fn builtin_preset_definitions() -> Vec<Preset> {
                 active_agent_id: entry.system_prompt,
                 active_modules: entry.active_modules,
                 disabled_tools: entry.disabled_tools,
+                loaded_skill_ids: vec![],
                 modules: HashMap::new(),
                 dynamic_panels: vec![],
             },

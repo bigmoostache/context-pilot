@@ -334,6 +334,8 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
 
 /// Build spans for a single input line, with cursor and command highlighting.
 fn build_input_spans(line_text: &str, cursor_char: &str, command_ids: &[String]) -> Vec<Span<'static>> {
+    let mut spans: Vec<Span<'static>> = Vec::new();
+
     // Strip cursor char to get the "clean" text for analysis
     let clean_line = line_text.replace(cursor_char, "");
     let trimmed = clean_line.trim_start();
@@ -354,21 +356,16 @@ fn build_input_spans(line_text: &str, cursor_char: &str, command_ids: &[String])
         (0, false)
     };
 
-    // Build spans with proper coloring
-    let mut spans: Vec<Span<'static>> = Vec::new();
-
     if is_command {
-        // We need to split line_text into: command part (accent) and rest (normal)
-        // But cursor_char may be embedded anywhere, so walk through carefully
-        let mut chars_consumed = 0; // chars consumed in clean_line
+        // Split the line into command part (accent color) and rest (normal text)
         let mut cmd_part = String::new();
         let mut rest_part = String::new();
+        let mut chars_consumed: usize = 0;
         let mut in_cmd = true;
 
         for ch in line_text.chars() {
-            let ch_str: String = ch.to_string();
-            if ch_str == cursor_char {
-                // Cursor char doesn't count toward clean position
+            // Skip cursor char for counting purposes
+            if ch.to_string() == cursor_char {
                 if in_cmd {
                     cmd_part.push(ch);
                 } else {

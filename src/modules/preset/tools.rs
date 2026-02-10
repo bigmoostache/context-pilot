@@ -134,6 +134,7 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
             tmux_pane_id: ctx.tmux_pane_id.clone(),
             tmux_lines: ctx.tmux_lines,
             tmux_description: ctx.tmux_description.clone(),
+            skill_prompt_id: ctx.skill_prompt_id.clone(),
         })
         .collect();
 
@@ -145,6 +146,7 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
             active_agent_id: state.active_agent_id.clone(),
             active_modules,
             disabled_tools,
+            loaded_skill_ids: state.loaded_skill_ids.clone(),
             modules: module_data,
             dynamic_panels,
         },
@@ -344,7 +346,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
             tmux_description: panel_cfg.tmux_description.clone(),
             result_command: None,
             result_command_hash: None,
-            skill_prompt_id: None,
+            skill_prompt_id: panel_cfg.skill_prompt_id.clone(),
             cached_content: None,
             history_messages: None,
             cache_deprecated: true,
@@ -356,6 +358,23 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
             total_pages: 1,
             full_token_count: 0,
         });
+    }
+
+    // 6b. Restore loaded_skill_ids (filter to skills that still exist)
+    state.loaded_skill_ids = ws.loaded_skill_ids.iter()
+        .filter(|id| state.skills.iter().any(|s| &s.id == *id))
+        .cloned()
+        .collect();
+
+    // 6c. Populate cached_content for restored skill panels
+    for ctx in &mut state.context {
+        if ctx.context_type == crate::state::ContextType::Skill {
+            if let Some(ref skill_id) = ctx.skill_prompt_id {
+                if let Some(skill) = state.skills.iter().find(|s| s.id == *skill_id) {
+                    ctx.cached_content = Some(skill.content.clone());
+                }
+            }
+        }
     }
 
     // 7. Ensure default fixed panels exist for newly activated modules

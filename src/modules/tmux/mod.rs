@@ -39,8 +39,7 @@ impl Module for TmuxModule {
                 description: "Creates a console context element to monitor terminal output.".to_string(),
                 params: vec![
                     ToolParam::new("pane_id", ParamType::String)
-                        .desc("Console pane ID (e.g., %0, %1)")
-                        .required(),
+                        .desc("Console pane ID (e.g., %0, %1). Omit to auto-create a new pane."),
                     ToolParam::new("lines", ParamType::Integer)
                         .desc("Number of lines to capture")
                         .default_val("50"),

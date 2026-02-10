@@ -95,6 +95,8 @@ pub struct ContextIcons {
     pub tmux: String,
     pub git: String,
     pub scratchpad: String,
+    pub library: String,
+    pub skill: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -24,6 +24,9 @@ pub struct PresetWorkerState {
     /// Per-worker module data (keyed by module ID)
     #[serde(default)]
     pub modules: HashMap<String, serde_json::Value>,
+    /// Which skill IDs are loaded
+    #[serde(default)]
+    pub loaded_skill_ids: Vec<String>,
     /// Dynamic panel configurations
     #[serde(default)]
     pub dynamic_panels: Vec<PresetPanelConfig>,
@@ -52,4 +55,6 @@ pub struct PresetPanelConfig {
     pub tmux_lines: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tmux_description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill_prompt_id: Option<String>,
 }

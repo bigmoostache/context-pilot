@@ -111,6 +111,7 @@ pub enum CacheRequest {
     RefreshTmux {
         context_id: String,
         pane_id: String,
+        lines: Option<usize>,
         current_content_hash: Option<String>,
     },
     /// Refresh git status

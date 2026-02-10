@@ -25,6 +25,8 @@ themes:
       tmux: "💻"
       git: "🐙"
       scratchpad: "🪶"
+      library: "📚"
+      skill: "⚡"
     status:
       full: ""
       summarized: "◐"
@@ -72,6 +74,8 @@ themes:
       tmux: "🖥️"
       git: "📦"
       scratchpad: "📝"
+      library: "📚"
+      skill: "🧩"
     status:
       full: ""
       summarized: "◐"
@@ -119,6 +123,8 @@ themes:
       tmux: "🖲️"
       git: "🧬"
       scratchpad: "📟"
+      library: "🗄️"
+      skill: "🔌"
     status:
       full: ""
       summarized: "◐"
@@ -166,6 +172,8 @@ themes:
       tmux: "🪵"
       git: "🦎"
       scratchpad: "🍁"
+      library: "📖"
+      skill: "🌿"
     status:
       full: ""
       summarized: "◐"
@@ -213,6 +221,8 @@ themes:
       tmux: "🚢"
       git: "🐋"
       scratchpad: "🌴"
+      library: "🗺️"
+      skill: "🧭"
     status:
       full: ""
       summarized: "◐"
@@ -260,6 +270,8 @@ themes:
       tmux: "🚀"
       git: "🌑"
       scratchpad: "📡"
+      library: "🛸"
+      skill: "⚡"
     status:
       full: ""
       summarized: "◐"
