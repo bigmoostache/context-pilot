@@ -392,6 +392,7 @@ impl State {
 
     /// Create a new notification and add it to the notification list.
     /// Returns the notification ID.
+    #[allow(dead_code)]
     pub fn create_notification(
         &mut self,
         notification_type: crate::modules::spine::types::NotificationType,
@@ -413,6 +414,7 @@ impl State {
     }
 
     /// Mark a notification as processed by ID. Returns true if found.
+    #[allow(dead_code)]
     pub fn mark_notification_processed(&mut self, id: &str) -> bool {
         if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
             n.processed = true;
@@ -434,6 +436,7 @@ impl State {
     }
 
     /// Mark all UserMessage notifications as processed (called when a new stream starts)
+    #[allow(dead_code)]
     pub fn mark_user_message_notifications_processed(&mut self) {
         let mut changed = false;
         for n in &mut self.notifications {

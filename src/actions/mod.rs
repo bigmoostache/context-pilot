@@ -60,6 +60,7 @@ pub enum Action {
 
 pub enum ActionResult {
     Nothing,
+    #[allow(dead_code)]
     StartStream,
     StopStream,
     StartApiCheck,
