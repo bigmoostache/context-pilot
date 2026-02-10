@@ -106,10 +106,16 @@ impl App {
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
-            // Set input and trigger submit to start streaming
-            self.state.input = "/* automatic post-reload message */".to_string();
-            self.state.input_cursor = self.state.input.len();
-            self.handle_action(Action::InputSubmit, &tx, &tldr_tx);
+            // Create a notification so the spine engine picks it up and resumes streaming.
+            // No synthetic user message needed — the conversation already has the tool
+            // result from system_reload, and the LLM should continue from there.
+            use crate::modules::spine::types::NotificationType;
+            self.state.create_notification(
+                NotificationType::UserMessage,
+                "reload_resume".to_string(),
+                "Resuming after TUI reload".to_string(),
+            );
+            save_state(&self.state);
         }
 
         loop {

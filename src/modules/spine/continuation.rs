@@ -11,6 +11,7 @@ use super::types::ContinuationAction;
 /// The spine module holds a `Vec<Box<dyn AutoContinuation>>` and evaluates
 /// them in order after each stream completes. The first one that returns
 /// `should_continue() == true` wins.
+#[allow(dead_code)]
 pub trait AutoContinuation: Send + Sync {
     /// Human-readable name for logging/debugging
     fn name(&self) -> &str;

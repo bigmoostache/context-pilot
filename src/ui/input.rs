@@ -179,8 +179,13 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         } else {
             (normalize_icon("🔄"), theme::text_muted())
         };
+        let label = if state.spine_config.continue_until_todos_done {
+            "Auto-continue"
+        } else {
+            "No Auto-continue"
+        };
         spans.push(Span::styled(
-            format!(" {}Auto-continue ", icon),
+            format!(" {}{} ", icon, label),
             Style::default().fg(theme::bg_base()).bg(bg_color).bold()
         ));
         spans.push(Span::styled(" ", base_style));
