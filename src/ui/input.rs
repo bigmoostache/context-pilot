@@ -171,16 +171,16 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
-    // Todo auto-continuation status card (always visible)
+    // Auto-continuation status card (always visible)
     {
         use crate::config::normalize_icon;
         let (icon, bg_color) = if state.spine_config.continue_until_todos_done {
-            (normalize_icon("✓"), theme::success())
+            (normalize_icon("🔁"), theme::warning())
         } else {
-            (normalize_icon("✗"), theme::text_muted())
+            (normalize_icon("🔄"), theme::text_muted())
         };
         spans.push(Span::styled(
-            format!(" {} Todos ", icon),
+            format!(" {}Auto-continue ", icon),
             Style::default().fg(theme::bg_base()).bg(bg_color).bold()
         ));
         spans.push(Span::styled(" ", base_style));

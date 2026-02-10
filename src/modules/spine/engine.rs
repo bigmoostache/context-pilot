@@ -71,7 +71,6 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
 
     // All guard rails passed — fire the continuation
     let action = cont.build_continuation(state);
-    let cont_name = cont.name().to_string();
 
     // Update tracking state
     state.spine_config.auto_continuation_count += 1;
