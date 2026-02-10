@@ -111,7 +111,7 @@ impl App {
             // result from system_reload, and the LLM should continue from there.
             use crate::modules::spine::types::NotificationType;
             self.state.create_notification(
-                NotificationType::UserMessage,
+                NotificationType::ReloadResume,
                 "reload_resume".to_string(),
                 "Resuming after TUI reload".to_string(),
             );

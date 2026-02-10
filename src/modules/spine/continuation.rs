@@ -56,45 +56,56 @@ impl AutoContinuation for NotificationsContinuation {
     }
 
     fn build_continuation(&self, state: &State) -> ContinuationAction {
+        use super::types::NotificationType;
         let unprocessed = state.unprocessed_notifications();
 
-        // If ALL unprocessed notifications are UserMessage, the user's actual
-        // message is already in the conversation history.
-        let all_user_messages = unprocessed.iter().all(|n| {
-            n.notification_type == super::types::NotificationType::UserMessage
+        // If ALL unprocessed notifications are "transparent" types (UserMessage
+        // or ReloadResume), no synthetic explanation is needed — just relaunch.
+        let all_transparent = unprocessed.iter().all(|n| {
+            matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume)
         });
 
-        if all_user_messages {
-            // Check if the last non-empty message is already a user message.
-            // If so, we can just Relaunch (no synthetic message needed).
-            // If the last message is an assistant message (missed-message during
-            // streaming scenario), we need a synthetic user message because APIs
-            // require the conversation to end with a user message.
-            let last_role = state.messages.iter().rev()
-                .find(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
-                .map(|m| m.role.as_str());
+        if all_transparent {
+            // Check if any are UserMessage (vs pure ReloadResume).
+            let has_user_message = unprocessed.iter().any(|n| {
+                n.notification_type == NotificationType::UserMessage
+            });
 
-            if last_role == Some("user") {
-                return ContinuationAction::Relaunch;
+            if has_user_message {
+                // User sent a message — check if conversation already ends with
+                // a user message. If so, Relaunch. If not (missed-message during
+                // streaming), we need a synthetic user message because APIs require
+                // the conversation to end with a user message.
+                let last_role = state.messages.iter().rev()
+                    .find(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
+                    .map(|m| m.role.as_str());
+
+                if last_role == Some("user") {
+                    return ContinuationAction::Relaunch;
+                } else {
+                    return ContinuationAction::SyntheticMessage(
+                        "/* A user message was submitted while you were streaming. It has been inserted into the conversation above. Please review and respond to it. */".to_string()
+                    );
+                }
             } else {
-                return ContinuationAction::SyntheticMessage(
-                    "/* A user message was submitted while you were streaming. It has been inserted into the conversation above. Please review and respond to it. */".to_string()
-                );
+                // Pure ReloadResume — just relaunch, the conversation already
+                // has the tool result from system_reload.
+                return ContinuationAction::Relaunch;
             }
         }
 
-        // Non-UserMessage notifications exist — build a synthetic message
+        // Non-transparent notifications exist — build a synthetic message
         // so the LLM knows WHY it was relaunched (e.g., max_tokens, todos).
-        let non_user: Vec<_> = unprocessed.iter()
-            .filter(|n| n.notification_type != super::types::NotificationType::UserMessage)
+        let explain: Vec<_> = unprocessed.iter()
+            .filter(|n| !matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume))
             .collect();
         let mut parts = Vec::new();
-        for n in &non_user {
+        for n in &explain {
             parts.push(format!("[{}] {} — {}", n.id, n.notification_type.label(), n.content));
         }
         let msg = format!(
             "/* Auto-continuation: {} notification(s):\n{}\nPlease address these. */",
-            non_user.len(),
+            explain.len(),
             parts.join("\n")
         );
         ContinuationAction::SyntheticMessage(msg)

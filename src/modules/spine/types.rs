@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub enum NotificationType {
     /// User sent a message
     UserMessage,
+    /// TUI was reloaded and needs to resume streaming
+    ReloadResume,
     /// Todos remain incomplete (pending/in_progress)
     TodoIncomplete,
     /// Stream stopped due to max_tokens (output was truncated)
@@ -18,6 +20,7 @@ impl NotificationType {
     pub fn label(&self) -> &'static str {
         match self {
             NotificationType::UserMessage => "User Message",
+            NotificationType::ReloadResume => "Reload Resume",
             NotificationType::TodoIncomplete => "Todo Incomplete",
             NotificationType::MaxTokensTruncated => "Max Tokens Truncated",
             NotificationType::Custom => "Custom",
