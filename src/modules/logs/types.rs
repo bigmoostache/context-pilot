@@ -20,4 +20,13 @@ impl LogEntry {
             content,
         }
     }
+
+    /// Create a log entry with an explicit timestamp (ms since UNIX epoch).
+    pub fn with_timestamp(id: String, content: String, timestamp_ms: u64) -> Self {
+        Self {
+            id,
+            timestamp_ms,
+            content,
+        }
+    }
 }

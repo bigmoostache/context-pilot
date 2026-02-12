@@ -62,7 +62,7 @@ impl Module for LogsModule {
                 id: "close_conversation_history".to_string(),
                 name: "Close Conversation History".to_string(),
                 short_desc: "Close a conversation history panel with logs/memories".to_string(),
-                description: "Closes a conversation history panel. Before closing, creates log entries and memory items to preserve important information. Everything in the history panel will be lost after closing.".to_string(),
+                description: "Closes a conversation history panel. Before closing, creates log entries and memory items to preserve important information. Everything in the history panel will be lost after closing.\n\nIMPORTANT: Before calling this tool, carefully review ALL human messages in the panel. Extract and preserve:\n- **Logs**: Short, atomic entries for mid-conversation context — decisions made, actions taken, bugs found, user preferences expressed, task context. Logs are medium-lifecycle: they maintain conversation flow across reloads.\n- **Memories**: Longer-lived knowledge that matters beyond this session — architecture decisions, user preferences, project conventions, important discoveries. Memories persist across conversations.\n\nEvery substantive piece of information from human messages should be captured in either a log or a memory. When in doubt, preserve it. Log timestamps are set to the panel's last message time, not the current time.".to_string(),
                 params: vec![
                     ToolParam::new("id", ParamType::String)
                         .desc("ID of the conversation history panel to close (e.g., 'P12')")
@@ -114,11 +114,18 @@ impl Module for LogsModule {
     }
 }
 
-/// Helper: allocate a log ID and push a log entry
+/// Helper: allocate a log ID and push a log entry (timestamped now)
 fn push_log(state: &mut State, content: String) {
     let id = format!("L{}", state.next_log_id);
     state.next_log_id += 1;
     state.logs.push(LogEntry::new(id, content));
+}
+
+/// Helper: allocate a log ID and push a log entry with an explicit timestamp
+fn push_log_with_timestamp(state: &mut State, content: String, timestamp_ms: u64) {
+    let id = format!("L{}", state.next_log_id);
+    state.next_log_id += 1;
+    state.logs.push(LogEntry::with_timestamp(id, content, timestamp_ms));
 }
 
 /// Helper: mark logs panel cache as deprecated
@@ -207,7 +214,16 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         }
     }
 
-    // 2. Validate that logs are provided (at least one non-empty entry)
+    // 2. Extract the last message timestamp from the panel
+    let panel_idx = panel_idx.unwrap();
+    let last_msg_timestamp = state.context[panel_idx]
+        .history_messages
+        .as_ref()
+        .and_then(|msgs| msgs.last())
+        .map(|msg| msg.timestamp_ms)
+        .unwrap_or(0); // fallback to 0 means LogEntry::new will be used instead
+
+    // 3. Validate that logs are provided (at least one non-empty entry)
     let logs_array = tool.input.get("logs").and_then(|v| v.as_array());
     let has_logs = logs_array
         .map(|arr| arr.iter().any(|e| {
@@ -225,13 +241,17 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
 
     let mut output_parts = Vec::new();
 
-    // 3. Create log entries
+    // 4. Create log entries (using panel's last message timestamp)
     if let Some(logs_array) = logs_array {
         let mut log_count = 0;
         for log_obj in logs_array {
             if let Some(content) = log_obj.get("content").and_then(|v| v.as_str()) {
                 if !content.is_empty() {
-                    push_log(state, content.to_string());
+                    if last_msg_timestamp > 0 {
+                        push_log_with_timestamp(state, content.to_string(), last_msg_timestamp);
+                    } else {
+                        push_log(state, content.to_string());
+                    }
                     log_count += 1;
                 }
             }
@@ -242,7 +262,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         }
     }
 
-    // 3. Create memory items
+    // 5. Create memory items
     if let Some(memories_array) = tool.input.get("memories").and_then(|v| v.as_array()) {
         let mut mem_count = 0;
         for mem_obj in memories_array {
@@ -297,7 +317,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         }
     }
 
-    // 4. Close the conversation history panel
+    // 6. Close the conversation history panel
     let panel_name = state.context.iter()
         .find(|c| c.id == panel_id)
         .map(|c| c.name.clone())
