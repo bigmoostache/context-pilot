@@ -132,6 +132,15 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut not_found: Vec<String> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
 
+    // Collect all IDs being deleted in this batch to validate no orphans are created
+    let delete_ids: std::collections::HashSet<String> = updates.iter()
+        .filter(|u| {
+            u.get("delete").and_then(|v| v.as_bool()).unwrap_or(false)
+                || u.get("status").and_then(|v| v.as_str()) == Some("deleted")
+        })
+        .filter_map(|u| u.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .collect();
+
     for update_value in updates {
         let id = match update_value.get("id").and_then(|v| v.as_str()) {
             Some(i) => i,
@@ -146,6 +155,32 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             || update_value.get("status").and_then(|v| v.as_str()) == Some("deleted");
 
         if should_delete {
+            // Check that all children are also being deleted in this batch
+            fn collect_descendants(id: &str, todos: &[TodoItem]) -> Vec<String> {
+                let mut desc = Vec::new();
+                for t in todos {
+                    if t.parent_id.as_deref() == Some(id) {
+                        desc.push(t.id.clone());
+                        desc.extend(collect_descendants(&t.id, todos));
+                    }
+                }
+                desc
+            }
+
+            let descendants = collect_descendants(id, &state.todos);
+            let orphans: Vec<&String> = descendants.iter()
+                .filter(|d| !delete_ids.contains(d.as_str()))
+                .collect();
+
+            if !orphans.is_empty() {
+                errors.push(format!(
+                    "{}: cannot delete — children {} would be orphaned. Delete them too, or delete all at once.",
+                    id,
+                    orphans.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                ));
+                continue;
+            }
+
             let initial_len = state.todos.len();
             state.todos.retain(|t| t.id != id);
             if state.todos.len() < initial_len {
