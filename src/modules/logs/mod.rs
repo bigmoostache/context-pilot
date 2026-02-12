@@ -332,8 +332,10 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
                     state.next_memory_id += 1;
                     state.memories.push(crate::state::MemoryItem {
                         id,
-                        content: content.to_string(),
+                        tl_dr: content.to_string(),
+                        contents: String::new(),
                         importance: importance_level,
+                        labels: vec![],
                     });
                     mem_count += 1;
                 }

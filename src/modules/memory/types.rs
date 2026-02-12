@@ -37,9 +37,17 @@ impl MemoryImportance {
 pub struct MemoryItem {
     /// Memory ID (M1, M2, ...)
     pub id: String,
-    /// Memory content
-    pub content: String,
+    /// Short summary (one-liner shown when memory is closed)
+    /// Migrates from old `content` field via serde alias.
+    #[serde(alias = "content")]
+    pub tl_dr: String,
+    /// Full contents (shown only when memory is open)
+    #[serde(default)]
+    pub contents: String,
     /// Importance level
     #[serde(default)]
     pub importance: MemoryImportance,
+    /// Freeform labels for categorization
+    #[serde(default)]
+    pub labels: Vec<String>,
 }

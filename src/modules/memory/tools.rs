@@ -38,13 +38,20 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             .and_then(MemoryImportance::from_str)
             .unwrap_or(MemoryImportance::Medium);
 
+        let labels: Vec<String> = memory_value.get("labels")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
         let id = format!("M{}", state.next_memory_id);
         state.next_memory_id += 1;
 
         state.memories.push(MemoryItem {
             id: id.clone(),
-            content: content.clone(),
+            tl_dr: content.clone(),
+            contents: String::new(),
             importance,
+            labels,
         });
 
         let preview = if content.len() > 40 {
@@ -59,7 +66,6 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if !created.is_empty() {
         output.push_str(&format!("Created {} memory(s):\n{}", created.len(), created.join("\n")));
-        // Update Memory panel timestamp
         state.touch_panel(crate::state::ContextType::Memory);
     }
 
@@ -112,17 +118,17 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         // Check for deletion
-        if let Some(importance_str) = update_value.get("importance").and_then(|v| v.as_str()) {
-            if importance_str == "deleted" {
-                let initial_len = state.memories.len();
-                state.memories.retain(|m| m.id != id);
-                if state.memories.len() < initial_len {
-                    deleted.push(id.to_string());
-                } else {
-                    not_found.push(id.to_string());
-                }
-                continue;
+        if update_value.get("delete").and_then(|v| v.as_bool()).unwrap_or(false) {
+            let initial_len = state.memories.len();
+            state.memories.retain(|m| m.id != id);
+            // Also remove from open_memory_ids
+            state.open_memory_ids.retain(|mid| mid != id);
+            if state.memories.len() < initial_len {
+                deleted.push(id.to_string());
+            } else {
+                not_found.push(id.to_string());
             }
+            continue;
         }
 
         // Find and update the memory
@@ -133,7 +139,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let mut changes = Vec::new();
 
                 if let Some(content) = update_value.get("content").and_then(|v| v.as_str()) {
-                    m.content = content.to_string();
+                    m.tl_dr = content.to_string();
                     changes.push("content");
                 }
 
@@ -141,6 +147,26 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                     if let Some(importance) = MemoryImportance::from_str(importance_str) {
                         m.importance = importance;
                         changes.push("importance");
+                    }
+                }
+
+                if let Some(labels_arr) = update_value.get("labels").and_then(|v| v.as_array()) {
+                    m.labels = labels_arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect();
+                    changes.push("labels");
+                }
+
+                // Handle open/close toggle
+                if let Some(open) = update_value.get("open").and_then(|v| v.as_bool()) {
+                    if open {
+                        if !state.open_memory_ids.contains(&id.to_string()) {
+                            state.open_memory_ids.push(id.to_string());
+                            changes.push("opened");
+                        }
+                    } else {
+                        state.open_memory_ids.retain(|mid| mid != id);
+                        changes.push("closed");
                     }
                 }
 

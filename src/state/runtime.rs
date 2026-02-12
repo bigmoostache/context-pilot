@@ -61,6 +61,8 @@ pub struct State {
     pub memories: Vec<MemoryItem>,
     /// Next memory ID (M1, M2, ...)
     pub next_memory_id: usize,
+    /// IDs of memories whose full contents are shown (per-worker)
+    pub open_memory_ids: Vec<String>,
     /// Agent prompt items
     pub agents: Vec<PromptItem>,
     /// Active agent ID (None = default)
@@ -223,6 +225,7 @@ impl Default for State {
             next_todo_id: 1,
             memories: vec![],
             next_memory_id: 1,
+            open_memory_ids: vec![],
             agents: vec![],
             active_agent_id: None,
             skills: vec![],

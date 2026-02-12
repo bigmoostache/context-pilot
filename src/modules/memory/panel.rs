@@ -10,7 +10,8 @@ use crate::ui::theme;
 pub struct MemoryPanel;
 
 impl MemoryPanel {
-    /// Format memories for LLM context
+    /// Format memories for LLM context.
+    /// Open memories show full contents; closed memories show only tl_dr + labels.
     fn format_memories_for_context(state: &State) -> String {
         if state.memories.is_empty() {
             return "No memories".to_string();
@@ -30,7 +31,22 @@ impl MemoryPanel {
 
         let mut output = String::new();
         for memory in sorted {
-            output.push_str(&format!("[{}] {} ({})\n", memory.id, memory.content, memory.importance.as_str()));
+            let is_open = state.open_memory_ids.contains(&memory.id);
+            let labels_str = if memory.labels.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", memory.labels.join(", "))
+            };
+
+            if is_open && !memory.contents.is_empty() {
+                // Open: show tl_dr + labels + full contents
+                output.push_str(&format!("[{}] {} ({}){}\n{}\n\n",
+                    memory.id, memory.tl_dr, memory.importance.as_str(), labels_str, memory.contents));
+            } else {
+                // Closed: show only tl_dr + importance + labels
+                output.push_str(&format!("[{}] {} ({}){}\n",
+                    memory.id, memory.tl_dr, memory.importance.as_str(), labels_str));
+            }
         }
 
         output.trim_end().to_string()
@@ -66,7 +82,6 @@ impl Panel for MemoryPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_memories_for_context(state);
-        // Find the Memory context element to get its ID and timestamp
         let (id, last_refresh_ms) = state.context.iter()
             .find(|c| c.context_type == ContextType::Memory)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
@@ -95,6 +110,8 @@ impl Panel for MemoryPanel {
             });
 
             for memory in sorted_memories {
+                let is_open = state.open_memory_ids.contains(&memory.id);
+
                 let importance_color = match memory.importance {
                     MemoryImportance::Critical => theme::warning(),
                     MemoryImportance::High => theme::accent(),
@@ -109,13 +126,41 @@ impl Panel for MemoryPanel {
                     MemoryImportance::Low => "   ",
                 };
 
-                text.push(Line::from(vec![
+                // Header line: importance badge + id + tl_dr
+                let mut header_spans = vec![
                     Span::styled(" ".to_string(), base_style),
                     Span::styled(importance_badge.to_string(), Style::default().fg(importance_color).bold()),
                     Span::styled(memory.id.clone(), Style::default().fg(theme::accent_dim())),
                     Span::styled(" ".to_string(), base_style),
-                    Span::styled(memory.content.clone(), Style::default().fg(theme::text())),
-                ]));
+                    Span::styled(memory.tl_dr.clone(), Style::default().fg(theme::text())),
+                ];
+
+                // Add labels inline if present
+                if !memory.labels.is_empty() {
+                    header_spans.push(Span::styled(" ".to_string(), base_style));
+                    for (i, label) in memory.labels.iter().enumerate() {
+                        if i > 0 {
+                            header_spans.push(Span::styled(" ".to_string(), base_style));
+                        }
+                        header_spans.push(Span::styled(
+                            format!("[{}]", label),
+                            Style::default().fg(theme::accent_dim()),
+                        ));
+                    }
+                }
+
+                text.push(Line::from(header_spans));
+
+                // If open and has contents, show them indented
+                if is_open && !memory.contents.is_empty() {
+                    for line in memory.contents.lines() {
+                        text.push(Line::from(vec![
+                            Span::styled("       ".to_string(), base_style), // indent under badge+id
+                            Span::styled(line.to_string(), Style::default().fg(theme::text_secondary())),
+                        ]));
+                    }
+                    text.push(Line::from("")); // Blank line after open memory contents
+                }
             }
         }
 
