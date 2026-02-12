@@ -293,6 +293,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
             // Use max() so multiple send_keys in one batch don't shorten each other's wait.
             let new_deadline = crate::core::panels::now_ms() + TMUX_SEND_DELAY_MS;
             state.tool_sleep_until_ms = state.tool_sleep_until_ms.max(new_deadline);
+            state.tool_sleep_needs_tmux_refresh = true;
 
             // Update last_keys on the context element
             let context_id = if let Some(ctx) = state.context.iter_mut()

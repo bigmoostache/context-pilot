@@ -62,6 +62,8 @@ pub struct App {
     deferred_tool_sleep_until_ms: u64,
     /// Whether we're in a deferred sleep state (waiting for timer before continuing tool pipeline)
     deferred_tool_sleeping: bool,
+    /// Whether to refresh tmux panels when deferred sleep expires (set by send_keys)
+    deferred_sleep_needs_tmux_refresh: bool,
     /// Background persistence writer — offloads file I/O to a dedicated thread
     writer: PersistenceWriter,
 }
@@ -94,6 +96,7 @@ impl App {
             wait_started_ms: 0,
             deferred_tool_sleep_until_ms: 0,
             deferred_tool_sleeping: false,
+            deferred_sleep_needs_tmux_refresh: false,
             writer: PersistenceWriter::new(),
         }
     }
@@ -470,7 +473,9 @@ impl App {
             // Defer everything — main loop will check timer and continue
             self.deferred_tool_sleeping = true;
             self.deferred_tool_sleep_until_ms = self.state.tool_sleep_until_ms;
+            self.deferred_sleep_needs_tmux_refresh = self.state.tool_sleep_needs_tmux_refresh;
             self.state.tool_sleep_until_ms = 0; // Clear from state (App owns it now)
+            self.state.tool_sleep_needs_tmux_refresh = false;
             return;
         }
 
@@ -530,43 +535,44 @@ impl App {
             return; // Still sleeping — keep processing input normally
         }
 
-        // Timer expired — mark all tmux panels as deprecated so cache refreshes them
-        for ctx in &mut self.state.context {
-            if ctx.context_type == ContextType::Tmux {
-                ctx.cache_deprecated = true;
-            }
-        }
+        let needs_tmux = self.deferred_sleep_needs_tmux_refresh;
         self.deferred_tool_sleeping = false;
         self.deferred_tool_sleep_until_ms = 0;
+        self.deferred_sleep_needs_tmux_refresh = false;
         self.state.dirty = true;
 
-        // Now go through the normal panel-wait pipeline
-        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
-        // Also trigger tmux panel refreshes through the cache system
-        for ctx in &self.state.context {
-            if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated && !ctx.cache_in_flight {
-                let panel = crate::core::panels::get_panel(ctx.context_type);
-                if let Some(request) = panel.build_cache_request(ctx, &self.state) {
-                    crate::cache::process_cache_request(request, self.cache_tx.clone());
+        if needs_tmux {
+            // send_keys: deprecate tmux panels and wait for refresh
+            for ctx in &mut self.state.context {
+                if ctx.context_type == ContextType::Tmux {
+                    ctx.cache_deprecated = true;
                 }
             }
-        }
-        // Mark tmux panels as in-flight
-        for ctx in &mut self.state.context {
-            if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated {
-                ctx.cache_in_flight = true;
+            // Trigger tmux panel refreshes
+            for ctx in &self.state.context {
+                if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated && !ctx.cache_in_flight {
+                    let panel = crate::core::panels::get_panel(ctx.context_type);
+                    if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+                        crate::cache::process_cache_request(request, self.cache_tx.clone());
+                    }
+                }
             }
-        }
+            for ctx in &mut self.state.context {
+                if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated {
+                    ctx.cache_in_flight = true;
+                }
+            }
+            // Also check file panels
+            super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
 
-        // Check if any panels (file or tmux) need to load
-        let has_dirty = self.state.context.iter().any(|c| {
-            (c.context_type == ContextType::File || c.context_type == ContextType::Tmux) && c.cache_deprecated
-        });
-
-        if has_dirty {
-            self.state.waiting_for_panels = true;
-            self.wait_started_ms = now_ms();
+            if super::wait::has_dirty_panels(&self.state) {
+                self.state.waiting_for_panels = true;
+                self.wait_started_ms = now_ms();
+            } else {
+                self.continue_streaming(tx);
+            }
         } else {
+            // Pure sleep (console_sleep): just continue, no refresh needed
             self.continue_streaming(tx);
         }
     }
