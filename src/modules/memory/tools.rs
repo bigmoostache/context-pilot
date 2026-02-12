@@ -1,5 +1,18 @@
 use crate::tools::{ToolResult, ToolUse};
-use crate::state::{MemoryImportance, MemoryItem, State};
+use crate::state::{MemoryImportance, MemoryItem, State, estimate_tokens};
+use crate::constants::MEMORY_TLDR_MAX_TOKENS;
+
+fn validate_tldr(text: &str) -> Result<(), String> {
+    let tokens = estimate_tokens(text);
+    if tokens > MEMORY_TLDR_MAX_TOKENS {
+        Err(format!(
+            "tl_dr too long: ~{} tokens (max {}). Keep it to a short one-liner; put details in 'contents' instead.",
+            tokens, MEMORY_TLDR_MAX_TOKENS
+        ))
+    } else {
+        Ok(())
+    }
+}
 
 pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let memories = match tool.input.get("memories").and_then(|v| v.as_array()) {
@@ -33,6 +46,11 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         };
 
+        if let Err(e) = validate_tldr(&content) {
+            errors.push(format!("Memory '{}...': {}", &content[..content.len().min(30)], e));
+            continue;
+        }
+
         let importance = memory_value.get("importance")
             .and_then(|v| v.as_str())
             .and_then(MemoryImportance::from_str)
@@ -43,13 +61,18 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default();
 
+        let contents = memory_value.get("contents")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
         let id = format!("M{}", state.next_memory_id);
         state.next_memory_id += 1;
 
         state.memories.push(MemoryItem {
             id: id.clone(),
             tl_dr: content.clone(),
-            contents: String::new(),
+            contents,
             importance,
             labels,
         });
@@ -139,8 +162,17 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let mut changes = Vec::new();
 
                 if let Some(content) = update_value.get("content").and_then(|v| v.as_str()) {
+                    if let Err(e) = validate_tldr(content) {
+                        errors.push(format!("{}: {}", id, e));
+                        continue;
+                    }
                     m.tl_dr = content.to_string();
                     changes.push("content");
+                }
+
+                if let Some(contents) = update_value.get("contents").and_then(|v| v.as_str()) {
+                    m.contents = contents.to_string();
+                    changes.push("contents");
                 }
 
                 if let Some(importance_str) = update_value.get("importance").and_then(|v| v.as_str()) {

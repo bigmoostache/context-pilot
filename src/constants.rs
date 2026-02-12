@@ -24,6 +24,9 @@ pub const API_VERSION: &str = "2023-06-01";
 /// Average characters per token for token estimation
 pub const CHARS_PER_TOKEN: f32 = 3.3;
 
+/// Maximum token length for memory tl_dr field (enforced on create/update)
+pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
+
 /// Number of oldest active messages to carve off into a ConversationHistory panel.
 pub const DETACH_CHUNK_MESSAGES: usize = 25;
 

@@ -71,6 +71,8 @@ impl Module for MemoryModule {
                         ToolParam::new("content", ParamType::String)
                             .desc("Memory content")
                             .required(),
+                        ToolParam::new("contents", ParamType::String)
+                            .desc("Rich body text (visible when memory is opened)"),
                         ToolParam::new("importance", ParamType::String)
                             .desc("Importance level")
                             .enum_vals(&["low", "medium", "high", "critical"]),
@@ -95,6 +97,8 @@ impl Module for MemoryModule {
                             .required(),
                         ToolParam::new("content", ParamType::String)
                             .desc("New content"),
+                        ToolParam::new("contents", ParamType::String)
+                            .desc("New rich body text (visible when memory is opened)"),
                         ToolParam::new("importance", ParamType::String)
                             .desc("New importance level")
                             .enum_vals(&["low", "medium", "high", "critical"]),

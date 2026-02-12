@@ -3,9 +3,10 @@ pub mod types;
 
 use crate::core::panels::Panel;
 use crate::modules::Module;
-use crate::state::{ContextType, State};
+use crate::state::{ContextType, State, estimate_tokens};
 use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
 use crate::tools::{ToolResult, ToolUse};
+use crate::constants::MEMORY_TLDR_MAX_TOKENS;
 
 use types::LogEntry;
 
@@ -247,6 +248,19 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         for mem_obj in memories_array {
             if let Some(content) = mem_obj.get("content").and_then(|v| v.as_str()) {
                 if !content.is_empty() {
+                    // Validate tl_dr length
+                    let tokens = estimate_tokens(content);
+                    if tokens > MEMORY_TLDR_MAX_TOKENS {
+                        return ToolResult {
+                            tool_use_id: tool.id.clone(),
+                            content: format!(
+                                "Memory content too long for tl_dr: ~{} tokens (max {}). Keep it short.",
+                                tokens, MEMORY_TLDR_MAX_TOKENS
+                            ),
+                            is_error: true,
+                        };
+                    }
+
                     let importance = mem_obj
                         .get("importance")
                         .and_then(|v| v.as_str())
