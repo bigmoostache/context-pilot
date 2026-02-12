@@ -45,7 +45,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let ctx = &state.context[idx];
 
         match ctx.context_type {
-            ContextType::System | ContextType::Tree | ContextType::Conversation | ContextType::Todo | ContextType::Memory | ContextType::Overview | ContextType::Git | ContextType::Scratchpad | ContextType::Library | ContextType::Spine => {
+            ContextType::System | ContextType::Tree | ContextType::Conversation | ContextType::Todo | ContextType::Memory | ContextType::Overview | ContextType::Git | ContextType::Scratchpad | ContextType::Library | ContextType::Spine | ContextType::Logs => {
                 // Protected - cannot close
                 skipped.push(format!("{} (protected)", id));
             }
@@ -59,9 +59,8 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 closed.push(format!("{} (skill: {})", id, name));
             }
             ContextType::ConversationHistory => {
-                let name = ctx.name.clone();
-                state.context.remove(idx);
-                closed.push(format!("{} ({})", id, name));
+                // Redirect to close_conversation_history tool
+                skipped.push(format!("{} — Cannot close conversation history with context_close. Use close_conversation_history instead, which lets you create logs and memories to preserve important information before closing.", id));
             }
             ContextType::GitResult | ContextType::GithubResult => {
                 let cmd = ctx.result_command.clone().unwrap_or_default();

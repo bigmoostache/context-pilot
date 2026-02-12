@@ -439,10 +439,9 @@ fn messages_to_api(
 
         if msg.message_type == MessageType::ToolResult {
             for result in &msg.tool_results {
-                let prefixed_content = format!("[{}]:\n{}", msg.id, result.content);
                 content_blocks.push(ContentBlock::ToolResult {
                     tool_use_id: result.tool_use_id.clone(),
-                    content: prefixed_content,
+                    content: result.content.clone(),
                 });
             }
 
@@ -498,9 +497,7 @@ fn messages_to_api(
             };
 
             if !message_content.is_empty() {
-                // Use [ID]:\n format (newline after colon)
-                let prefixed_content = format!("[{}]:\n{}", msg.id, message_content);
-                content_blocks.push(ContentBlock::Text { text: prefixed_content });
+                content_blocks.push(ContentBlock::Text { text: message_content });
             }
 
             let is_last = idx == messages.len().saturating_sub(1);

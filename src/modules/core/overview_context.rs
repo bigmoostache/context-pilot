@@ -32,6 +32,7 @@ pub fn generate_context_content(state: &State) -> String {
             ContextType::Skill => "skill",
             ContextType::ConversationHistory => "history",
             ContextType::Spine => "spine",
+            ContextType::Logs => "logs",
         };
 
         let details = match ctx.context_type {

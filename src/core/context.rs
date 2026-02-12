@@ -115,8 +115,7 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
             MessageType::ToolCall => {
                 for tu in &msg.tool_uses {
                     output += &format!(
-                        "[{}]: tool_call {}({})\n",
-                        msg.id,
+                        "tool_call {}({})\n",
                         tu.name,
                         serde_json::to_string(&tu.input).unwrap_or_default()
                     );
@@ -124,7 +123,7 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
             }
             MessageType::ToolResult => {
                 for tr in &msg.tool_results {
-                    output += &format!("[{}]:\n{}\n", msg.id, tr.content);
+                    output += &format!("{}\n", tr.content);
                 }
             }
             MessageType::TextMessage => {
@@ -135,7 +134,7 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
                     _ => &msg.content,
                 };
                 if !content.is_empty() {
-                    output += &format!("[{}]:\n{}\n", msg.id, content);
+                    output += &format!("[{}]: {}\n", msg.role, content);
                 }
             }
         }
@@ -188,14 +187,14 @@ pub fn detach_conversation_chunks(state: &mut State) {
         }
 
         // 4. Collect message IDs for the chunk name
-        let first_id = state.messages[..boundary].iter()
+        let first_timestamp = state.messages[..boundary].iter()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| m.id.clone())
-            .unwrap_or_default();
-        let last_id = state.messages[..boundary].iter().rev()
+            .map(|m| m.timestamp_ms)
+            .unwrap_or(0);
+        let last_timestamp = state.messages[..boundary].iter().rev()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| m.id.clone())
-            .unwrap_or_default();
+            .map(|m| m.timestamp_ms)
+            .unwrap_or(0);
 
         // 5. Collect Message objects for UI rendering + format chunk content for LLM
         let history_msgs: Vec<Message> = state.messages[..boundary].iter()
@@ -218,11 +217,27 @@ pub fn detach_conversation_chunks(state: &mut State) {
         let panel_id = state.next_available_context_id();
         let token_count = estimate_tokens(&content);
         let total_pages = compute_total_pages(token_count);
-        let chunk_name = format!("Chat [{}–{}]", first_id, last_id);
+        let chunk_name = {
+            // Format timestamps as short time strings (HH:MM)
+            fn ms_to_short_time(ms: u64) -> String {
+                let secs = ms / 1000;
+                let hours = (secs % 86400) / 3600;
+                let minutes = (secs % 3600) / 60;
+                format!("{:02}:{:02}", hours, minutes)
+            }
+            if first_timestamp > 0 && last_timestamp > 0 {
+                format!("Chat {}–{}", ms_to_short_time(first_timestamp), ms_to_short_time(last_timestamp))
+            } else {
+                format!("Chat ({})", active_seen)
+            }
+        };
+
+        let panel_uid = format!("UID_{}_P", state.global_next_uid);
+        state.global_next_uid += 1;
 
         state.context.push(ContextElement {
             id: panel_id,
-            uid: None,
+            uid: Some(panel_uid),
             context_type: ContextType::ConversationHistory,
             name: chunk_name,
             token_count,

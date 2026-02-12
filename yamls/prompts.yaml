@@ -14,6 +14,6 @@ panel:
 
     {message_timestamps}
     Current datetime: {current_datetime}
-  footer_msg_line: "  - [{id}] {role}: {iso_time} ({time_delta})"
+  footer_msg_line: "  - {role}: {iso_time} ({time_delta})"
   footer_msg_header: "Last message datetimes:"
   footer_ack: "Panel display complete. Proceeding with conversation."

@@ -215,6 +215,7 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
             ContextType::Skill => "skill",
             ContextType::ConversationHistory => "chat-history",
             ContextType::Spine => "spine",
+            ContextType::Logs => "logs",
         };
 
         let details = match ctx.context_type {

@@ -524,7 +524,6 @@ pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
                 "just now".to_string()
             };
             let line = prompts::panel_footer_msg_line()
-                .replace("{id}", &msg.id)
                 .replace("{role}", &msg.role)
                 .replace("{iso_time}", &iso_time)
                 .replace("{time_delta}", &time_delta);

@@ -424,7 +424,7 @@ impl LlmClient for ClaudeCodeClient {
                         serde_json::json!({
                             "type": "tool_result",
                             "tool_use_id": r.tool_use_id,
-                            "content": format!("[{}]:\n{}", msg.id, r.content)
+                            "content": r.content
                         })
                     }).collect();
 
@@ -478,13 +478,10 @@ impl LlmClient for ClaudeCodeClient {
             };
 
             if !message_content.is_empty() {
-                // Use [ID]:\n format (newline after colon)
-                let prefixed = format!("[{}]:\n{}", msg.id, message_content);
-
                 // Use simple string content like Python example
                 json_messages.push(serde_json::json!({
                     "role": msg.role,
-                    "content": prefixed
+                    "content": message_content
                 }));
             }
 
