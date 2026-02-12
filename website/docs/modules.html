@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modules — Context Pilot Docs</title>
+    <meta name="description" content="All Context Pilot modules: files, git, github, console, todo, memory, scratchpad, and more.">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="docs-header">
+        <div class="docs-header-inner">
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <button class="docs-mobile-toggle" onclick="toggleSidebar()">☰</button>
+                <a href="../index.html" class="docs-logo">
+                    <span class="docs-logo-icon">⎈</span>
+                    <span>Context Pilot</span>
+                    <span class="docs-logo-sep">/</span>
+                    <span class="docs-logo-docs">Docs</span>
+                </a>
+            </div>
+            <div class="docs-header-links">
+                <a href="../index.html">Home</a>
+                <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="docs-overlay" onclick="toggleSidebar()"></div>
+
+    <div class="docs-layout">
+        <nav class="docs-sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Getting Started</div>
+                <a href="index.html" class="sidebar-link">Overview</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Core</div>
+                <a href="context.html" class="sidebar-link">Context System</a>
+                <a href="modules.html" class="sidebar-link active">Modules</a>
+                <a href="modules.html#core" class="sidebar-link sub">Core</a>
+                <a href="modules.html#files" class="sidebar-link sub">Files</a>
+                <a href="modules.html#tree" class="sidebar-link sub">Tree</a>
+                <a href="modules.html#git" class="sidebar-link sub">Git</a>
+                <a href="modules.html#github" class="sidebar-link sub">GitHub</a>
+                <a href="modules.html#tmux" class="sidebar-link sub">Console (tmux)</a>
+                <a href="modules.html#todo" class="sidebar-link sub">Todo</a>
+                <a href="modules.html#memory" class="sidebar-link sub">Memory</a>
+                <a href="modules.html#scratchpad" class="sidebar-link sub">Scratchpad</a>
+                <a href="modules.html#spine" class="sidebar-link sub">Spine</a>
+                <a href="tools.html" class="sidebar-link">Tool Reference</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Customization</div>
+                <a href="agents.html" class="sidebar-link">Agents & Skills</a>
+                <a href="configuration.html" class="sidebar-link">Configuration</a>
+                <a href="keyboard.html" class="sidebar-link">Keyboard Shortcuts</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Advanced</div>
+                <a href="advanced.html" class="sidebar-link">Autonomous Mode</a>
+            </div>
+        </nav>
+
+        <main class="docs-content">
+            <h1><span class="gradient-text">Modules</span></h1>
+            <p class="page-subtitle">Each module is an independent package of tools and panels. Activate what you need, deactivate what you don't.</p>
+
+            <h2>Module System</h2>
+            <p>Modules are the building blocks of Context Pilot. Each provides <strong>tools</strong> (actions the AI can take) and <strong>panels</strong> (context the AI can see). Modules can be activated or deactivated with <code>module_toggle</code>.</p>
+
+            <table>
+                <thead><tr><th>Property</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><strong>Core</strong></td><td>Cannot be deactivated (Core, Prompt, Preset, Spine, Logs)</td></tr>
+                    <tr><td><strong>Global</strong></td><td>Data persists across workers (Memory, Tree, Prompt, Preset)</td></tr>
+                    <tr><td><strong>Dependencies</strong></td><td>Some modules depend on others (GitHub → Git)</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="core">Core</h2>
+            <p>The <strong>Core</strong> module provides the fundamental infrastructure. It owns the Chat panel (P1) and Overview panel (P5), plus essential management tools.</p>
+            <table>
+                <thead><tr><th>Panel</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>P1</code> Chat</td><td>Current conversation messages</td></tr>
+                    <tr><td><code>P5</code> Overview</td><td>Context usage stats, tool list, configuration summary</td></tr>
+                </tbody>
+            </table>
+            <p><strong>Tools:</strong> <code>context_close</code>, <code>system_reload</code>, <code>tool_manage</code>, <code>module_toggle</code>, <code>panel_goto_page</code></p>
+
+            <h2 id="files">Files</h2>
+            <p>Open, edit, and create files. File panels show content with line numbers and syntax highlighting. Files auto-refresh when changed on disk.</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>file_open</code></td><td>Open a file as a context panel</td></tr>
+                    <tr><td><code>file_edit</code></td><td>Replace exact text in a file (search-and-replace)</td></tr>
+                    <tr><td><code>file_write</code></td><td>Create or completely overwrite a file</td></tr>
+                </tbody>
+            </table>
+
+            <div class="info-box tip">
+                <div class="info-label">Best Practice</div>
+                <p>Always use <code>file_open</code> before <code>file_edit</code>. The edit tool requires exact text matching — you need to see the current content first.</p>
+            </div>
+
+            <h2 id="tree">Tree</h2>
+            <p>Directory tree with gitignore-style filtering, file/folder descriptions, and open/close folder control. The Tree is a <strong>global</strong> module — descriptions persist across workers.</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>tree_filter</code></td><td>Set gitignore-style patterns to hide files/folders</td></tr>
+                    <tr><td><code>tree_toggle</code></td><td>Open or close folders in the tree view</td></tr>
+                    <tr><td><code>tree_describe</code></td><td>Add descriptions to files/folders (shown in tree + marked stale on change)</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="git">Git</h2>
+            <p>Full git integration. The Git panel (P6) shows branch, status, and optionally diffs and log. Read-only commands create auto-refreshing result panels; mutating commands execute directly.</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>git_execute</code></td><td>Run any git command (read-only creates panel, mutating runs directly)</td></tr>
+                    <tr><td><code>git_configure_p6</code></td><td>Toggle diff/log display in P6, set diff base ref</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Command classification</h3>
+            <p>Git commands are automatically classified as <strong>read-only</strong> (log, diff, show, status, blame) or <strong>mutating</strong> (commit, push, merge, rebase). Read-only commands create dynamic GitResult panels that auto-refresh. Mutating commands trigger intelligent cache invalidation of affected panels.</p>
+
+            <div class="info-box note">
+                <div class="info-label">Shell operators blocked</div>
+                <p>Pipe (<code>|</code>), semicolon (<code>;</code>), and <code>&&</code> are rejected for safety. Each git command runs as a single operation.</p>
+            </div>
+
+            <h2 id="github">GitHub</h2>
+            <p>GitHub CLI (<code>gh</code>) integration. Requires <code>GITHUB_TOKEN</code> environment variable. <strong>Depends on the Git module.</strong></p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>gh_execute</code></td><td>Run any gh command (same read-only/mutating classification as git)</td></tr>
+                </tbody>
+            </table>
+            <p>GitHub result panels auto-refresh every ~120 seconds using ETag-based conditional requests to minimize API usage.</p>
+
+            <h2 id="tmux">Console (tmux)</h2>
+            <p>Monitor terminal output in real-time. Create console panels attached to tmux panes — the AI sees what's on screen and can send keystrokes.</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>console_create</code></td><td>Create a new console panel (auto-creates tmux pane or attaches to existing)</td></tr>
+                    <tr><td><code>console_edit</code></td><td>Update description or line count for a console</td></tr>
+                    <tr><td><code>console_send_keys</code></td><td>Send keystrokes to a tmux pane</td></tr>
+                    <tr><td><code>console_sleep</code></td><td>Non-blocking pause (1 second) for waiting on output</td></tr>
+                </tbody>
+            </table>
+
+            <div class="info-box warn">
+                <div class="info-label">Guard rail</div>
+                <p><code>console_send_keys</code> rejects <code>git</code> and <code>gh</code> commands — use the dedicated <code>git_execute</code> and <code>gh_execute</code> tools instead.</p>
+            </div>
+
+            <h2 id="todo">Todo</h2>
+            <p>Hierarchical task management. Create nested todo items, track status, and let the AI work through them autonomously with the Spine module.</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>todo_create</code></td><td>Create one or more todos (supports nesting via parent_id)</td></tr>
+                    <tr><td><code>todo_update</code></td><td>Update status, name, description, parent, or delete</td></tr>
+                    <tr><td><code>todo_move</code></td><td>Reorder a todo in the list</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Status flow</h3>
+            <p>Todos have three statuses: <strong>pending</strong> (○), <strong>in_progress</strong> (◐), and <strong>done</strong> (●). Setting a child to in_progress auto-propagates to parents. Setting a parent to done requires all children to be done first.</p>
+
+            <h2 id="memory">Memory</h2>
+            <p>Persistent notes that survive across conversations. A <strong>global</strong> module — memories are shared across workers. Each memory has a short summary (tl;dr), optional rich content, importance level, and labels.</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>memory_create</code></td><td>Create a memory with tl;dr, optional contents, importance, labels</td></tr>
+                    <tr><td><code>memory_update</code></td><td>Update, open/close (show/hide contents), or delete a memory</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Memory display</h3>
+            <p>Closed memories show as a compact table (ID, summary, importance, labels). Open memories expand to show full YAML-style detail with rich content.</p>
+
+            <h2 id="scratchpad">Scratchpad</h2>
+            <p>Temporary cells for working notes, code snippets, or intermediate data. Unlike memories, scratchpad cells are per-worker and not meant for long-term storage.</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>scratchpad_create_cell</code></td><td>Create a new cell with title and content</td></tr>
+                    <tr><td><code>scratchpad_edit_cell</code></td><td>Update a cell's title or content</td></tr>
+                    <tr><td><code>scratchpad_wipe</code></td><td>Delete specific cells or all cells</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="spine">Spine</h2>
+            <p>Central nervous system for autonomous operation. Manages notifications, auto-continuation, and guard rails. See <a href="advanced.html">Autonomous Mode</a> for detailed documentation.</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>notification_mark_processed</code></td><td>Mark a notification as handled</td></tr>
+                    <tr><td><code>spine_configure</code></td><td>Configure auto-continuation and guard rail limits</td></tr>
+                </tbody>
+            </table>
+
+            <h2>Additional Modules</h2>
+
+            <h3>Glob & Grep</h3>
+            <p>File search tools that create auto-refreshing result panels:</p>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>file_glob</code></td><td>Find files matching a glob pattern (e.g., <code>**/*.rs</code>)</td></tr>
+                    <tr><td><code>file_grep</code></td><td>Search file contents with regex. Results show file:line context</td></tr>
+                </tbody>
+            </table>
+            <p>Both refresh every ~30 seconds and respect gitignore patterns.</p>
+
+            <h3>Logs</h3>
+            <p>Timestamped event log (P10). The AI creates log entries to record decisions, actions, and events. Also provides <code>close_conversation_history</code> for cleaning up old conversation panels while preserving important information.</p>
+
+            <h3>Prompt</h3>
+            <p>The Prompt module manages agents, skills, and commands. It owns the System panel (P0) and Library panel (P8). See <a href="agents.html">Agents & Skills</a>.</p>
+
+            <h3>Preset</h3>
+            <p>Manages named configuration snapshots. See <a href="agents.html#presets">Presets</a>.</p>
+
+            <div class="page-nav">
+                <a href="context.html">
+                    <span class="nav-label">Previous</span>
+                    <span class="nav-title">← Context System</span>
+                </a>
+                <a href="tools.html" class="next">
+                    <span class="nav-label">Next</span>
+                    <span class="nav-title">Tool Reference →</span>
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    function toggleSidebar() {
+        document.querySelector('.docs-sidebar').classList.toggle('open');
+        document.querySelector('.docs-overlay').classList.toggle('open');
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation — Context Pilot</title>
+    <meta name="description" content="Context Pilot documentation. Learn to control your AI's context window with surgical precision.">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="docs-header">
+        <div class="docs-header-inner">
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <button class="docs-mobile-toggle" onclick="toggleSidebar()">☰</button>
+                <a href="../index.html" class="docs-logo">
+                    <span class="docs-logo-icon">⎈</span>
+                    <span>Context Pilot</span>
+                    <span class="docs-logo-sep">/</span>
+                    <span class="docs-logo-docs">Docs</span>
+                </a>
+            </div>
+            <div class="docs-header-links">
+                <a href="../index.html">Home</a>
+                <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="docs-overlay" onclick="toggleSidebar()"></div>
+
+    <div class="docs-layout">
+        <nav class="docs-sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Getting Started</div>
+                <a href="index.html" class="sidebar-link active">Overview</a>
+                <a href="index.html#installation" class="sidebar-link sub">Installation</a>
+                <a href="index.html#quickstart" class="sidebar-link sub">Quickstart</a>
+                <a href="index.html#concepts" class="sidebar-link sub">Core Concepts</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Core</div>
+                <a href="context.html" class="sidebar-link">Context System</a>
+                <a href="modules.html" class="sidebar-link">Modules</a>
+                <a href="tools.html" class="sidebar-link">Tool Reference</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Customization</div>
+                <a href="agents.html" class="sidebar-link">Agents & Skills</a>
+                <a href="configuration.html" class="sidebar-link">Configuration</a>
+                <a href="keyboard.html" class="sidebar-link">Keyboard Shortcuts</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Advanced</div>
+                <a href="advanced.html" class="sidebar-link">Autonomous Mode</a>
+            </div>
+        </nav>
+
+        <main class="docs-content">
+            <h1>Context Pilot <span class="gradient-text">Documentation</span></h1>
+            <p class="page-subtitle">
+                Everything you need to master Context Pilot — from installation to autonomous multi-hour coding sessions.
+            </p>
+
+            <h2 id="what">What is Context Pilot?</h2>
+            <p>Context Pilot is an <strong>AI-native terminal IDE</strong> built in Rust. It gives you full, transparent control over what your AI assistant sees — every file, diff, search result, and note is a <strong>context panel</strong> with a visible token count.</p>
+            <p>Unlike tools that hide context management behind abstractions, Context Pilot makes it the primary interface. You see exactly what the AI sees. You decide what stays and what goes.</p>
+
+            <div class="info-box tip">
+                <div class="info-label">Key Insight</div>
+                <p>The quality of AI output is directly proportional to the quality of its context. Context Pilot gives you the instruments to tune that context precisely.</p>
+            </div>
+
+            <h2 id="installation">Installation</h2>
+
+            <h3>Prerequisites</h3>
+            <ul>
+                <li><strong>Rust toolchain</strong> — install via <a href="https://rustup.rs">rustup.rs</a></li>
+                <li><strong>tmux</strong> — required for console integration (<code>apt install tmux</code> or <code>brew install tmux</code>)</li>
+                <li><strong>An API key</strong> from a supported LLM provider (Anthropic, OpenAI, DeepSeek, Grok, Groq)</li>
+            </ul>
+
+            <h3>Build from source</h3>
+            <pre><code>git clone https://github.com/bigmoostache/context-pilot.git
+cd context-pilot
+cargo build --release</code></pre>
+
+            <p>The binary will be at <code>target/release/tui</code>. You can copy it to your PATH or create an alias.</p>
+
+            <h3>Configure your API key</h3>
+            <pre><code># Create .env in the directory where you'll run Context Pilot
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env
+
+# Or set as environment variable
+export ANTHROPIC_API_KEY=sk-ant-...</code></pre>
+
+            <div class="info-box note">
+                <div class="info-label">Multiple Providers</div>
+                <p>You can configure multiple providers simultaneously. See <a href="configuration.html">Configuration</a> for all supported environment variables.</p>
+            </div>
+
+            <h2 id="quickstart">Quickstart</h2>
+
+            <h3>Launch</h3>
+            <pre><code># Navigate to your project
+cd your-project
+
+# Launch inside tmux (required for console features)
+tmux new-session context-pilot
+
+# Or if already in tmux
+context-pilot</code></pre>
+
+            <h3>Your first interaction</h3>
+            <p>When Context Pilot starts, you'll see the sidebar on the left listing <strong>context panels</strong> (P0–P10 are built-in), and the main conversation area on the right. Just start typing and press <kbd>Enter</kbd> to send.</p>
+            <p>The AI can see everything listed in the sidebar. It can open files, run commands, search code — all through <strong>tools</strong> that create new context panels.</p>
+
+            <h3>Essential workflow</h3>
+            <ol>
+                <li><strong>Ask the AI to explore</strong> — it will open files, grep for patterns, check git status</li>
+                <li><strong>Watch context grow</strong> — new panels appear in the sidebar with token counts</li>
+                <li><strong>Close what you don't need</strong> — select a panel and press <kbd>d</kbd> to close it</li>
+                <li><strong>Stay under budget</strong> — the token bar shows usage against your budget</li>
+            </ol>
+
+            <h2 id="concepts">Core Concepts</h2>
+
+            <h3>Context Panels</h3>
+            <p>Everything the AI sees is a <strong>panel</strong>. Panels have IDs (P0, P1, P7, P12…), a type, and a token count. Fixed panels (P0–P10) are always present. Dynamic panels are created by tools and can be closed.</p>
+
+            <table>
+                <thead>
+                    <tr><th>Panel</th><th>Type</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>P0</code></td><td>System</td><td>Active agent (system prompt)</td></tr>
+                    <tr><td><code>P1</code></td><td>Chat</td><td>Current conversation</td></tr>
+                    <tr><td><code>P2</code></td><td>Tree</td><td>Directory structure</td></tr>
+                    <tr><td><code>P3</code></td><td>Todos</td><td>Task tracking</td></tr>
+                    <tr><td><code>P4</code></td><td>Memories</td><td>Persistent notes</td></tr>
+                    <tr><td><code>P5</code></td><td>Overview</td><td>Context usage &amp; stats</td></tr>
+                    <tr><td><code>P6</code></td><td>Git</td><td>Branch, status, diffs</td></tr>
+                    <tr><td><code>P7</code></td><td>Scratchpad</td><td>Temporary cells</td></tr>
+                    <tr><td><code>P8</code></td><td>Library</td><td>Agents, skills, commands</td></tr>
+                    <tr><td><code>P9</code></td><td>Spine</td><td>Notifications &amp; auto-continuation</td></tr>
+                    <tr><td><code>P10</code></td><td>Logs</td><td>Timestamped event log</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Modules</h3>
+            <p>Modules are independent packages of functionality. Each module provides its own <strong>tools</strong> (things the AI can do) and <strong>panels</strong> (things the AI can see). You can activate or deactivate modules to control what's available. See <a href="modules.html">Modules</a> for the full list.</p>
+
+            <h3>Tools</h3>
+            <p>Tools are actions the AI can take — opening files, running git commands, creating todos. Tools are grouped by module and can be individually enabled or disabled. See <a href="tools.html">Tool Reference</a> for complete documentation.</p>
+
+            <h3>Agents &amp; Skills</h3>
+            <p><strong>Agents</strong> are system prompts that define the AI's behavior. <strong>Skills</strong> are knowledge documents loaded as context panels. <strong>Commands</strong> are text shortcuts expanded inline. See <a href="agents.html">Agents &amp; Skills</a>.</p>
+
+            <h3>Presets</h3>
+            <p>Presets snapshot your entire configuration — active agent, modules, disabled tools, panel state — into a named profile you can load instantly. Built-in presets include <em>Worker</em>, <em>Planner</em>, <em>Context Builder</em>, and <em>Context Cleaner</em>.</p>
+
+            <div class="page-nav">
+                <div></div>
+                <a href="context.html" class="next">
+                    <span class="nav-label">Next</span>
+                    <span class="nav-title">Context System →</span>
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    function toggleSidebar() {
+        document.querySelector('.docs-sidebar').classList.toggle('open');
+        document.querySelector('.docs-overlay').classList.toggle('open');
+    }
+    </script>
+</body>
+</html>

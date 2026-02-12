@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Reference — Context Pilot Docs</title>
+    <meta name="description" content="Complete tool reference for Context Pilot. Every tool, every parameter, every module.">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="docs-header">
+        <div class="docs-header-inner">
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <button class="docs-mobile-toggle" onclick="toggleSidebar()">☰</button>
+                <a href="../index.html" class="docs-logo">
+                    <span class="docs-logo-icon">⎈</span>
+                    <span>Context Pilot</span>
+                    <span class="docs-logo-sep">/</span>
+                    <span class="docs-logo-docs">Docs</span>
+                </a>
+            </div>
+            <div class="docs-header-links">
+                <a href="../index.html">Home</a>
+                <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="docs-overlay" onclick="toggleSidebar()"></div>
+
+    <div class="docs-layout">
+        <nav class="docs-sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Getting Started</div>
+                <a href="index.html" class="sidebar-link">Overview</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Core</div>
+                <a href="context.html" class="sidebar-link">Context System</a>
+                <a href="modules.html" class="sidebar-link">Modules</a>
+                <a href="tools.html" class="sidebar-link active">Tool Reference</a>
+                <a href="tools.html#context" class="sidebar-link sub">Context</a>
+                <a href="tools.html#file" class="sidebar-link sub">File</a>
+                <a href="tools.html#tree" class="sidebar-link sub">Tree</a>
+                <a href="tools.html#git" class="sidebar-link sub">Git</a>
+                <a href="tools.html#github" class="sidebar-link sub">GitHub</a>
+                <a href="tools.html#console" class="sidebar-link sub">Console</a>
+                <a href="tools.html#todo" class="sidebar-link sub">Todo</a>
+                <a href="tools.html#memory" class="sidebar-link sub">Memory</a>
+                <a href="tools.html#agent" class="sidebar-link sub">Agent / Skill / Command</a>
+                <a href="tools.html#spine" class="sidebar-link sub">Spine</a>
+                <a href="tools.html#system" class="sidebar-link sub">System</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Customization</div>
+                <a href="agents.html" class="sidebar-link">Agents & Skills</a>
+                <a href="configuration.html" class="sidebar-link">Configuration</a>
+                <a href="keyboard.html" class="sidebar-link">Keyboard Shortcuts</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Advanced</div>
+                <a href="advanced.html" class="sidebar-link">Autonomous Mode</a>
+            </div>
+        </nav>
+
+        <main class="docs-content">
+            <h1><span class="gradient-text">Tool</span> Reference</h1>
+            <p class="page-subtitle">Every tool available to the AI, organized by category. Tools can be individually enabled/disabled with <code>tool_manage</code>.</p>
+
+            <h2 id="context">Context Management</h2>
+
+            <h3><code>context_close</code></h3>
+            <p>Closes dynamic context panels by their IDs. Cannot close fixed panels (P0–P10).</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>ids</code></td><td>string[]</td><td>✓</td><td>Panel IDs to close (e.g., ["P12", "P15"])</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>log_create</code></h3>
+            <p>Creates timestamped log entries for recording decisions, actions, or events.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>entries</code></td><td>object[]</td><td>✓</td><td>Array of <code>{content: string}</code></td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>close_conversation_history</code></h3>
+            <p>Closes a ConversationHistory panel, optionally creating logs and memories to preserve important information.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>id</code></td><td>string</td><td>✓</td><td>Panel ID of the history panel</td></tr>
+                    <tr><td><code>logs</code></td><td>object[]</td><td></td><td>Log entries to create</td></tr>
+                    <tr><td><code>memories</code></td><td>object[]</td><td></td><td>Memory items to create</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="file">File Operations</h2>
+
+            <h3><code>file_open</code></h3>
+            <p>Opens a file and adds it to context. Always use this before <code>file_edit</code>.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>path</code></td><td>string</td><td>✓</td><td>Path to the file</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>file_edit</code></h3>
+            <p>Edits a file by replacing exact text. Preferred over <code>file_write</code> for modifications.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>file_path</code></td><td>string</td><td>✓</td><td>Absolute path to file</td></tr>
+                    <tr><td><code>old_string</code></td><td>string</td><td>✓</td><td>Exact text to find and replace</td></tr>
+                    <tr><td><code>new_string</code></td><td>string</td><td>✓</td><td>Replacement text</td></tr>
+                    <tr><td><code>replace_all</code></td><td>boolean</td><td></td><td>Replace all occurrences (default: false)</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>file_write</code></h3>
+            <p>Creates a new file or completely replaces all content. Use <code>file_edit</code> for targeted changes.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>file_path</code></td><td>string</td><td>✓</td><td>Path to the file</td></tr>
+                    <tr><td><code>contents</code></td><td>string</td><td>✓</td><td>Complete file contents</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>file_glob</code></h3>
+            <p>Searches for files matching a glob pattern. Creates an auto-refreshing panel.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>pattern</code></td><td>string</td><td>✓</td><td>Glob pattern (e.g., <code>**/*.rs</code>)</td></tr>
+                    <tr><td><code>path</code></td><td>string</td><td></td><td>Base path to search from</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>file_grep</code></h3>
+            <p>Searches file contents for a regex pattern. Creates an auto-refreshing panel.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>pattern</code></td><td>string</td><td>✓</td><td>Regex pattern</td></tr>
+                    <tr><td><code>path</code></td><td>string</td><td></td><td>Base path to search from</td></tr>
+                    <tr><td><code>file_pattern</code></td><td>string</td><td></td><td>Glob filter for files (e.g., <code>*.rs</code>)</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="tree">Tree</h2>
+
+            <h3><code>tree_filter</code></h3>
+            <p>Edits the gitignore-style filter for the directory tree view.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>filter</code></td><td>string</td><td>✓</td><td>Gitignore-style patterns, one per line</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>tree_toggle</code></h3>
+            <p>Opens or closes folders in the directory tree.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>paths</code></td><td>string[]</td><td>✓</td><td>Folder paths to toggle</td></tr>
+                    <tr><td><code>action</code></td><td>string</td><td></td><td><code>open</code>, <code>close</code>, or <code>toggle</code></td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>tree_describe</code></h3>
+            <p>Adds or updates descriptions for files and folders. Descriptions appear in the tree and are marked stale when files change.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>descriptions</code></td><td>object[]</td><td>✓</td><td>Array of <code>{path, description, delete?}</code></td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="git">Git</h2>
+
+            <h3><code>git_execute</code></h3>
+            <p>Executes a git command. Read-only commands create auto-refreshing panels; mutating commands run directly.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>command</code></td><td>string</td><td>✓</td><td>Full git command (e.g., <code>git log --oneline -10</code>)</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>git_configure_p6</code></h3>
+            <p>Configures the P6 git status panel.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>show_diffs</code></td><td>boolean</td><td></td><td>Show full diff content</td></tr>
+                    <tr><td><code>show_logs</code></td><td>boolean</td><td></td><td>Show recent commit history</td></tr>
+                    <tr><td><code>log_args</code></td><td>string</td><td></td><td>Custom git log arguments</td></tr>
+                    <tr><td><code>diff_base</code></td><td>string</td><td></td><td>Git ref to diff against (empty to clear)</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="github">GitHub</h2>
+
+            <h3><code>gh_execute</code></h3>
+            <p>Executes a GitHub CLI command. Requires <code>GITHUB_TOKEN</code>.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>command</code></td><td>string</td><td>✓</td><td>Full gh command (e.g., <code>gh pr list</code>)</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="console">Console (tmux)</h2>
+
+            <h3><code>console_create</code></h3>
+            <p>Creates a console context panel to monitor terminal output.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>pane_id</code></td><td>string</td><td></td><td>Existing tmux pane ID (omit to auto-create)</td></tr>
+                    <tr><td><code>description</code></td><td>string</td><td></td><td>Description of what this console is for</td></tr>
+                    <tr><td><code>lines</code></td><td>integer</td><td></td><td>Number of lines to capture</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>console_edit</code></h3>
+            <p>Updates an existing console's configuration.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>context_id</code></td><td>string</td><td>✓</td><td>Console panel ID (e.g., P7)</td></tr>
+                    <tr><td><code>description</code></td><td>string</td><td></td><td>New description</td></tr>
+                    <tr><td><code>lines</code></td><td>integer</td><td></td><td>Number of lines to capture</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>console_send_keys</code></h3>
+            <p>Sends keystrokes to a console pane. Enter is sent automatically after the keys.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>context_id</code></td><td>string</td><td>✓</td><td>Console panel ID</td></tr>
+                    <tr><td><code>keys</code></td><td>string</td><td>✓</td><td>Keys to send (e.g., <code>ls -la</code> or <code>C-c</code>)</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>console_sleep</code></h3>
+            <p>Non-blocking 1-second pause. UI remains responsive during the wait.</p>
+
+            <h2 id="todo">Todo</h2>
+
+            <h3><code>todo_create</code></h3>
+            <p>Creates one or more todo items. Supports nesting via <code>parent_id</code>.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>todos</code></td><td>object[]</td><td>✓</td><td>Array of <code>{name, description?, parent_id?}</code></td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>todo_update</code></h3>
+            <p>Updates existing todos: status, name, description, parent, or delete.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>updates</code></td><td>object[]</td><td>✓</td><td>Array of <code>{id, status?, name?, description?, parent_id?, delete?}</code></td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>todo_move</code></h3>
+            <p>Moves a todo to a new position in the list.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>id</code></td><td>string</td><td>✓</td><td>Todo ID to move</td></tr>
+                    <tr><td><code>after_id</code></td><td>string</td><td></td><td>Place after this ID (null = move to top)</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="memory">Memory</h2>
+
+            <h3><code>memory_create</code></h3>
+            <p>Creates persistent memory items.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>memories</code></td><td>object[]</td><td>✓</td><td>Array of <code>{content, contents?, importance?, labels?}</code></td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>memory_update</code></h3>
+            <p>Updates or deletes existing memory items.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>updates</code></td><td>object[]</td><td>✓</td><td>Array of <code>{id, content?, contents?, importance?, labels?, open?, delete?}</code></td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="scratch">Scratchpad</h2>
+
+            <h3><code>scratchpad_create_cell</code></h3>
+            <p>Creates a new scratchpad cell.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>cell_title</code></td><td>string</td><td>✓</td><td>Cell title</td></tr>
+                    <tr><td><code>cell_contents</code></td><td>string</td><td>✓</td><td>Cell content</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>scratchpad_edit_cell</code></h3>
+            <p>Edits an existing scratchpad cell.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>cell_id</code></td><td>string</td><td>✓</td><td>Cell ID (e.g., C1)</td></tr>
+                    <tr><td><code>cell_title</code></td><td>string</td><td></td><td>New title</td></tr>
+                    <tr><td><code>cell_contents</code></td><td>string</td><td></td><td>New content</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>scratchpad_wipe</code></h3>
+            <p>Deletes scratchpad cells. Empty array deletes all.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>cell_ids</code></td><td>string[]</td><td>✓</td><td>Cell IDs to delete (empty = all)</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="agent">Agent, Skill & Command</h2>
+
+            <h3>Agent tools</h3>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>agent_create</code></td><td>Create a new agent with name and system prompt content</td></tr>
+                    <tr><td><code>agent_edit</code></td><td>Edit an existing agent (name, description, content)</td></tr>
+                    <tr><td><code>agent_delete</code></td><td>Delete a custom agent (built-ins protected)</td></tr>
+                    <tr><td><code>agent_load</code></td><td>Activate an agent (empty ID reverts to default)</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Skill tools</h3>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>skill_create</code></td><td>Create a new skill document</td></tr>
+                    <tr><td><code>skill_edit</code></td><td>Edit a skill (updates live panel if loaded)</td></tr>
+                    <tr><td><code>skill_delete</code></td><td>Delete a skill (unloads first if loaded)</td></tr>
+                    <tr><td><code>skill_load</code></td><td>Load a skill as a context panel</td></tr>
+                    <tr><td><code>skill_unload</code></td><td>Remove a skill from context</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Command tools</h3>
+            <table>
+                <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>command_create</code></td><td>Create a new inline command (/name → expansion)</td></tr>
+                    <tr><td><code>command_edit</code></td><td>Edit a command's content</td></tr>
+                    <tr><td><code>command_delete</code></td><td>Delete a command (built-ins protected)</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="spine">Spine</h2>
+
+            <h3><code>notification_mark_processed</code></h3>
+            <p>Marks a notification as processed.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>id</code></td><td>string</td><td>✓</td><td>Notification ID (e.g., N1)</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>spine_configure</code></h3>
+            <p>Configures auto-continuation and guard rails. All parameters optional.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>max_tokens_auto_continue</code></td><td>boolean</td><td>Auto-continue on truncation (default: true)</td></tr>
+                    <tr><td><code>continue_until_todos_done</code></td><td>boolean</td><td>Keep going until all todos done (default: false)</td></tr>
+                    <tr><td><code>max_auto_retries</code></td><td>integer?</td><td>Max consecutive auto-continuations (null to disable)</td></tr>
+                    <tr><td><code>max_cost</code></td><td>number?</td><td>Max cost in USD (null to disable)</td></tr>
+                    <tr><td><code>max_duration_secs</code></td><td>integer?</td><td>Max autonomous duration in seconds</td></tr>
+                    <tr><td><code>max_messages</code></td><td>integer?</td><td>Max conversation messages</td></tr>
+                    <tr><td><code>max_output_tokens</code></td><td>integer?</td><td>Max total output tokens</td></tr>
+                    <tr><td><code>reset_counters</code></td><td>boolean</td><td>Reset runtime counters</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="system">System</h2>
+
+            <h3><code>system_reload</code></h3>
+            <p>Reloads the TUI application. State is preserved. Use after modifying source code and rebuilding.</p>
+
+            <h3><code>tool_manage</code></h3>
+            <p>Enables or disables tools. The <code>tool_manage</code> tool itself cannot be disabled.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>changes</code></td><td>object[]</td><td>✓</td><td>Array of <code>{tool, action}</code> where action is "enable" or "disable"</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>module_toggle</code></h3>
+            <p>Activates or deactivates modules. Core modules cannot be deactivated.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>changes</code></td><td>object[]</td><td>✓</td><td>Array of <code>{module, action}</code> where action is "activate" or "deactivate"</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>preset_snapshot_myself</code></h3>
+            <p>Saves current configuration as a named preset.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>name</code></td><td>string</td><td>✓</td><td>Preset name (alphanumeric + hyphens)</td></tr>
+                    <tr><td><code>description</code></td><td>string</td><td>✓</td><td>What this preset is for</td></tr>
+                    <tr><td><code>replace</code></td><td>string</td><td></td><td>Name of existing preset to overwrite</td></tr>
+                </tbody>
+            </table>
+
+            <h3><code>preset_load</code></h3>
+            <p>Loads a named preset, replacing current configuration.</p>
+            <table>
+                <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>name</code></td><td>string</td><td>✓</td><td>Preset name to load</td></tr>
+                </tbody>
+            </table>
+
+            <div class="page-nav">
+                <a href="modules.html">
+                    <span class="nav-label">Previous</span>
+                    <span class="nav-title">← Modules</span>
+                </a>
+                <a href="agents.html" class="next">
+                    <span class="nav-label">Next</span>
+                    <span class="nav-title">Agents & Skills →</span>
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    function toggleSidebar() {
+        document.querySelector('.docs-sidebar').classList.toggle('open');
+        document.querySelector('.docs-overlay').classList.toggle('open');
+    }
+    </script>
+</body>
+</html>

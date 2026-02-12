@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Mode — Context Pilot Docs</title>
+    <meta name="description" content="Spine module, auto-continuation, guard rails, and autonomous operation in Context Pilot.">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="docs-header">
+        <div class="docs-header-inner">
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <button class="docs-mobile-toggle" onclick="toggleSidebar()">☰</button>
+                <a href="../index.html" class="docs-logo">
+                    <span class="docs-logo-icon">⎈</span>
+                    <span>Context Pilot</span>
+                    <span class="docs-logo-sep">/</span>
+                    <span class="docs-logo-docs">Docs</span>
+                </a>
+            </div>
+            <div class="docs-header-links">
+                <a href="../index.html">Home</a>
+                <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="docs-overlay" onclick="toggleSidebar()"></div>
+
+    <div class="docs-layout">
+        <nav class="docs-sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Getting Started</div>
+                <a href="index.html" class="sidebar-link">Overview</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Core</div>
+                <a href="context.html" class="sidebar-link">Context System</a>
+                <a href="modules.html" class="sidebar-link">Modules</a>
+                <a href="tools.html" class="sidebar-link">Tool Reference</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Customization</div>
+                <a href="agents.html" class="sidebar-link">Agents & Skills</a>
+                <a href="configuration.html" class="sidebar-link">Configuration</a>
+                <a href="keyboard.html" class="sidebar-link">Keyboard Shortcuts</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Advanced</div>
+                <a href="advanced.html" class="sidebar-link active">Autonomous Mode</a>
+                <a href="advanced.html#spine" class="sidebar-link sub">The Spine</a>
+                <a href="advanced.html#notifications" class="sidebar-link sub">Notifications</a>
+                <a href="advanced.html#continuations" class="sidebar-link sub">Auto-Continuation</a>
+                <a href="advanced.html#guardrails" class="sidebar-link sub">Guard Rails</a>
+            </div>
+        </nav>
+
+        <main class="docs-content">
+            <h1><span class="gradient-text">Autonomous</span> Mode</h1>
+            <p class="page-subtitle">The Spine module enables the AI to work through complex tasks independently — with guard rails to keep it safe.</p>
+
+            <h2 id="spine">The Spine</h2>
+            <p>The <strong>Spine</strong> is Context Pilot's central nervous system. It manages notifications, auto-continuation logic, and guard rails. It's the module that makes autonomous multi-step operation possible.</p>
+            <p>The Spine panel (P9) shows:</p>
+            <ul>
+                <li>Unprocessed notifications (things that need the AI's attention)</li>
+                <li>Recently processed notifications (for context)</li>
+                <li>Current spine configuration (auto-continuation settings + guard rail limits)</li>
+            </ul>
+
+            <h2 id="notifications">Notifications</h2>
+            <p>Notifications are events that may require the AI's attention. They appear in the Spine panel and can trigger auto-continuation.</p>
+
+            <h3>Notification types</h3>
+            <table>
+                <thead><tr><th>Type</th><th>Trigger</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><strong>UserMessage</strong></td><td>You send a message</td><td>A new human message arrived</td></tr>
+                    <tr><td><strong>ReloadResume</strong></td><td>TUI restart</td><td>The application restarted and may need to resume work</td></tr>
+                    <tr><td><strong>TodoIncomplete</strong></td><td>Todos remaining</td><td>There are still incomplete todo items</td></tr>
+                    <tr><td><strong>MaxTokensTruncated</strong></td><td>Output hit max_tokens</td><td>The AI's response was cut off by the token limit</td></tr>
+                    <tr><td><strong>Custom</strong></td><td>Various</td><td>Module-specific notifications</td></tr>
+                </tbody>
+            </table>
+
+            <p>Mark notifications as processed with <code>notification_mark_processed</code>.</p>
+
+            <h2 id="continuations">Auto-Continuation</h2>
+            <p>Auto-continuation automatically sends follow-up messages to the AI when certain conditions are met. This enables the AI to work through multi-step tasks without human intervention.</p>
+
+            <h3>Continuation triggers</h3>
+            <p>Three built-in continuation strategies, evaluated in priority order:</p>
+
+            <h4>1. Notifications continuation</h4>
+            <p>If there are unprocessed notifications after the AI finishes responding, a synthetic message is injected prompting the AI to address them. This handles user messages that arrive during streaming, reload resumptions, etc.</p>
+
+            <h4>2. Max tokens continuation</h4>
+            <p>If the AI's response was truncated (hit max_tokens), the stream is automatically relaunched so the AI can finish its thought. Enabled by default via <code>max_tokens_auto_continue</code>.</p>
+
+            <h4>3. Todos continuation</h4>
+            <p>If <code>continue_until_todos_done</code> is enabled and there are incomplete todos, a synthetic message is injected listing the remaining tasks and asking the AI to continue. This is the primary mechanism for autonomous operation.</p>
+
+            <div class="info-box warn">
+                <div class="info-label">Important</div>
+                <p>Always set guard rails before enabling <code>continue_until_todos_done</code>. Without limits, the AI will keep going until all todos are done — which could mean many API calls and significant cost.</p>
+            </div>
+
+            <h3>Configuration</h3>
+            <pre><code># Enable todo-based auto-continuation with guard rails
+spine_configure(
+    continue_until_todos_done: true,
+    max_auto_retries: 40,
+    max_cost: 5.0
+)</code></pre>
+
+            <table>
+                <thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>max_tokens_auto_continue</code></td><td><code>true</code></td><td>Auto-continue when output truncated</td></tr>
+                    <tr><td><code>continue_until_todos_done</code></td><td><code>false</code></td><td>Keep going until all todos are done</td></tr>
+                    <tr><td><code>reset_counters</code></td><td>—</td><td>Reset runtime counters (continuation count, duration timer)</td></tr>
+                </tbody>
+            </table>
+
+            <h2 id="guardrails">Guard Rails</h2>
+            <p>Guard rails are safety limits that <strong>block</strong> auto-continuation when exceeded. They prevent runaway autonomous operation. All guard rails are optional — set to <code>null</code> to disable.</p>
+
+            <table>
+                <thead><tr><th>Guard Rail</th><th>Default</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>max_auto_retries</code></td><td>40</td><td>Max consecutive auto-continuations without human input</td></tr>
+                    <tr><td><code>max_cost</code></td><td><code>null</code></td><td>Max cost in USD before blocking</td></tr>
+                    <tr><td><code>max_duration_secs</code></td><td><code>null</code></td><td>Max autonomous duration in seconds</td></tr>
+                    <tr><td><code>max_messages</code></td><td><code>null</code></td><td>Max conversation messages before blocking</td></tr>
+                    <tr><td><code>max_output_tokens</code></td><td><code>null</code></td><td>Max total output tokens before blocking</td></tr>
+                </tbody>
+            </table>
+
+            <p>When a guard rail triggers, the Spine blocks auto-continuation and a notification appears. The AI will stop and wait for human input. Send any message (or reset counters) to resume.</p>
+
+            <h3>Recommended configurations</h3>
+
+            <h4>Quick autonomous task</h4>
+            <pre><code>spine_configure(
+    continue_until_todos_done: true,
+    max_auto_retries: 20,
+    max_cost: 2.0
+)</code></pre>
+
+            <h4>Long autonomous session</h4>
+            <pre><code>spine_configure(
+    continue_until_todos_done: true,
+    max_auto_retries: 100,
+    max_cost: 10.0,
+    max_duration_secs: 3600
+)</code></pre>
+
+            <h4>Disable all auto-continuation</h4>
+            <pre><code>spine_configure(
+    continue_until_todos_done: false,
+    max_tokens_auto_continue: false
+)</code></pre>
+
+            <h2>Autonomous Workflow</h2>
+            <p>The typical pattern for autonomous operation:</p>
+            <ol>
+                <li><strong>Create todos</strong> — break your task into clear, actionable items</li>
+                <li><strong>Set guard rails</strong> — configure cost/retry limits</li>
+                <li><strong>Enable continuation</strong> — <code>continue_until_todos_done: true</code></li>
+                <li><strong>Watch</strong> — the AI works through todos, checking them off as it goes</li>
+                <li><strong>Intervene</strong> — press <kbd>Escape</kbd> to stop streaming, or send a message to redirect</li>
+            </ol>
+
+            <div class="info-box tip">
+                <div class="info-label">Tip</div>
+                <p>The Spine panel (P9) shows the current <code>auto_continuation_count</code> — how many times the AI has auto-continued. This resets when you send a message.</p>
+            </div>
+
+            <div class="page-nav">
+                <a href="keyboard.html">
+                    <span class="nav-label">Previous</span>
+                    <span class="nav-title">← Keyboard Shortcuts</span>
+                </a>
+                <div></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    function toggleSidebar() {
+        document.querySelector('.docs-sidebar').classList.toggle('open');
+        document.querySelector('.docs-overlay').classList.toggle('open');
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context System — Context Pilot Docs</title>
+    <meta name="description" content="How Context Pilot's panel system works — tokens, budgets, fixed vs dynamic panels, and context management.">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="docs-header">
+        <div class="docs-header-inner">
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <button class="docs-mobile-toggle" onclick="toggleSidebar()">☰</button>
+                <a href="../index.html" class="docs-logo">
+                    <span class="docs-logo-icon">⎈</span>
+                    <span>Context Pilot</span>
+                    <span class="docs-logo-sep">/</span>
+                    <span class="docs-logo-docs">Docs</span>
+                </a>
+            </div>
+            <div class="docs-header-links">
+                <a href="../index.html">Home</a>
+                <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="docs-overlay" onclick="toggleSidebar()"></div>
+
+    <div class="docs-layout">
+        <nav class="docs-sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Getting Started</div>
+                <a href="index.html" class="sidebar-link">Overview</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Core</div>
+                <a href="context.html" class="sidebar-link active">Context System</a>
+                <a href="context.html#panels" class="sidebar-link sub">Panels</a>
+                <a href="context.html#tokens" class="sidebar-link sub">Token Budget</a>
+                <a href="context.html#lifecycle" class="sidebar-link sub">Panel Lifecycle</a>
+                <a href="context.html#conversation" class="sidebar-link sub">Conversation History</a>
+                <a href="modules.html" class="sidebar-link">Modules</a>
+                <a href="tools.html" class="sidebar-link">Tool Reference</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Customization</div>
+                <a href="agents.html" class="sidebar-link">Agents & Skills</a>
+                <a href="configuration.html" class="sidebar-link">Configuration</a>
+                <a href="keyboard.html" class="sidebar-link">Keyboard Shortcuts</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Advanced</div>
+                <a href="advanced.html" class="sidebar-link">Autonomous Mode</a>
+            </div>
+        </nav>
+
+        <main class="docs-content">
+            <h1>The <span class="gradient-text">Context System</span></h1>
+            <p class="page-subtitle">
+                Everything the AI sees is a panel. Panels have tokens. Tokens cost money. You're in control.
+            </p>
+
+            <h2 id="panels">Panels</h2>
+            <p>A <strong>panel</strong> is a discrete unit of context. Every piece of information the AI can see — files, git diffs, search results, todos, memories — is a panel with a unique ID and a measured token count.</p>
+            <p>The sidebar shows all active panels with their token counts. The AI receives every panel as a structured context block in its prompt.</p>
+
+            <h3>Fixed Panels (P0–P10)</h3>
+            <p>Fixed panels are always present. They can't be closed. They represent the core infrastructure of your session:</p>
+
+            <table>
+                <thead>
+                    <tr><th>ID</th><th>Name</th><th>Module</th><th>Purpose</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>P0</code></td><td>System</td><td>Prompt</td><td>Active agent's system prompt — defines AI behavior</td></tr>
+                    <tr><td><code>P1</code></td><td>Chat</td><td>Core</td><td>Current conversation messages</td></tr>
+                    <tr><td><code>P2</code></td><td>Tree</td><td>Tree</td><td>Directory structure with descriptions and filters</td></tr>
+                    <tr><td><code>P3</code></td><td>Todos</td><td>Todo</td><td>Hierarchical task list with status tracking</td></tr>
+                    <tr><td><code>P4</code></td><td>Memories</td><td>Memory</td><td>Persistent notes across conversations</td></tr>
+                    <tr><td><code>P5</code></td><td>Overview</td><td>Core</td><td>Context usage stats, tools list, configuration summary</td></tr>
+                    <tr><td><code>P6</code></td><td>Git</td><td>Git</td><td>Branch, status, optional diffs and log</td></tr>
+                    <tr><td><code>P7</code></td><td>Scratchpad</td><td>Scratchpad</td><td>Temporary cells for working notes</td></tr>
+                    <tr><td><code>P8</code></td><td>Library</td><td>Prompt</td><td>Available agents, skills, and commands</td></tr>
+                    <tr><td><code>P9</code></td><td>Spine</td><td>Spine</td><td>Notifications and auto-continuation config</td></tr>
+                    <tr><td><code>P10</code></td><td>Logs</td><td>Logs</td><td>Timestamped event log for session history</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Dynamic Panels (P11+)</h3>
+            <p>Dynamic panels are created by tools during the conversation. When the AI opens a file, runs a git command, or searches code, it creates a dynamic panel. You can close these with <kbd>d</kbd> or the AI can close them with the <code>context_close</code> tool.</p>
+            <p>Dynamic panel types include:</p>
+            <ul>
+                <li><strong>File</strong> — opened source files with syntax highlighting</li>
+                <li><strong>GitResult</strong> — output from <code>git log</code>, <code>git diff</code>, etc.</li>
+                <li><strong>GithubResult</strong> — output from <code>gh pr list</code>, <code>gh issue view</code>, etc.</li>
+                <li><strong>Glob</strong> — file search results from <code>file_glob</code></li>
+                <li><strong>Grep</strong> — content search results from <code>file_grep</code></li>
+                <li><strong>Tmux</strong> — live terminal output from console panes</li>
+                <li><strong>Skill</strong> — loaded skill documents</li>
+                <li><strong>ConversationHistory</strong> — detached chunks of old conversation</li>
+            </ul>
+
+            <div class="info-box tip">
+                <div class="info-label">Pro Tip</div>
+                <p>Dynamic panels auto-refresh in the background. File panels detect changes on disk. Git/GitHub panels re-run their commands periodically. You always see current data.</p>
+            </div>
+
+            <h2 id="tokens">Token Budget</h2>
+            <p>Every panel has a token count — an estimate of how many tokens it contributes to the AI's context window. The sidebar shows the <strong>token bar</strong>: total usage against your configured budget.</p>
+
+            <h3>Budget vs Threshold</h3>
+            <p>Two numbers matter:</p>
+            <ul>
+                <li><strong>Budget</strong> (default: 200K) — the hard maximum context the model supports</li>
+                <li><strong>Threshold</strong> (default: 140K) — a soft limit where automatic conversation cleanup kicks in</li>
+            </ul>
+            <p>When total context exceeds the threshold, old conversation messages are automatically detached into ConversationHistory panels and summarized to reduce token count. This keeps your context budget healthy while preserving history.</p>
+
+            <h3>Adjusting the budget</h3>
+            <p>Press <kbd>Ctrl+N</kbd> to open the config overlay. Use the arrow keys to adjust:</p>
+            <ul>
+                <li><strong>Context budget</strong> — total token limit</li>
+                <li><strong>Cleaning threshold</strong> — when to start compacting conversation</li>
+                <li><strong>Target proportion</strong> — how aggressively to compact (lower = more aggressive)</li>
+            </ul>
+
+            <h3>Token estimation</h3>
+            <p>Token counts are <em>estimates</em> based on character-to-token ratios (roughly 3.5 characters per token for English). Exact counts depend on the model's tokenizer. The estimates are intentionally conservative.</p>
+
+            <h2 id="lifecycle">Panel Lifecycle</h2>
+
+            <h3>Creation</h3>
+            <p>Panels are created by tools. When you ask the AI to "open src/main.rs", it calls <code>file_open</code>, which creates a File panel. The panel starts in a "cache deprecated" state — its content loads in the background without blocking the UI.</p>
+
+            <h3>Background refresh</h3>
+            <p>Most dynamic panels refresh automatically:</p>
+            <table>
+                <thead>
+                    <tr><th>Panel Type</th><th>Refresh Interval</th><th>Trigger</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>File</td><td>On file change</td><td>File system watcher (notify-rs)</td></tr>
+                    <tr><td>Tmux</td><td>~1 second</td><td>Timer-based capture</td></tr>
+                    <tr><td>GitResult</td><td>On relevant git operations</td><td>Cache invalidation rules</td></tr>
+                    <tr><td>GithubResult</td><td>~120 seconds</td><td>ETag-based polling</td></tr>
+                    <tr><td>Glob / Grep</td><td>~30 seconds</td><td>Timer-based re-scan</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Pagination</h3>
+            <p>Large panels are automatically paginated. File panels paginate at a configurable max size. The AI sees a page count indicator and can navigate pages with the <code>panel_goto_page</code> tool.</p>
+
+            <h3>Closing</h3>
+            <p>Dynamic panels can be closed by:</p>
+            <ul>
+                <li>Pressing <kbd>d</kbd> while the panel is selected in the sidebar</li>
+                <li>The AI calling <code>context_close</code> with the panel ID</li>
+                <li>Loading a preset (which resets all dynamic panels)</li>
+            </ul>
+            <p>ConversationHistory panels have a special close flow via <code>close_conversation_history</code>, which preserves important information as logs and memories before discarding the content.</p>
+
+            <h2 id="conversation">Conversation History</h2>
+
+            <h3>Automatic detachment</h3>
+            <p>When the conversation grows beyond the cleaning threshold, Context Pilot automatically <strong>detaches</strong> older messages into ConversationHistory panels. These panels appear in the sidebar and are still visible to the AI, but the original messages are replaced with TL;DR summaries to save tokens.</p>
+
+            <h3>Manual management</h3>
+            <p>You can manually close ConversationHistory panels when they're no longer relevant. Use <code>close_conversation_history</code> to extract key information into logs and memories before closing — this is the recommended pattern for preserving context across long sessions.</p>
+
+            <div class="info-box warn">
+                <div class="info-label">Warning</div>
+                <p>When a ConversationHistory panel is closed, its messages are permanently lost. Always extract important information into logs or memories first.</p>
+            </div>
+
+            <h3>Message statuses</h3>
+            <table>
+                <thead>
+                    <tr><th>Status</th><th>Meaning</th><th>Token Impact</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Full</strong></td><td>Complete message in context</td><td>Full token count</td></tr>
+                    <tr><td><strong>Summarized</strong></td><td>Replaced with TL;DR</td><td>Reduced (~10-20%)</td></tr>
+                    <tr><td><strong>Detached</strong></td><td>Moved to ConversationHistory panel</td><td>Near zero in chat</td></tr>
+                    <tr><td><strong>Deleted</strong></td><td>Marked for removal</td><td>Zero</td></tr>
+                </tbody>
+            </table>
+
+            <div class="page-nav">
+                <a href="index.html">
+                    <span class="nav-label">Previous</span>
+                    <span class="nav-title">← Overview</span>
+                </a>
+                <a href="modules.html" class="next">
+                    <span class="nav-label">Next</span>
+                    <span class="nav-title">Modules →</span>
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    function toggleSidebar() {
+        document.querySelector('.docs-sidebar').classList.toggle('open');
+        document.querySelector('.docs-overlay').classList.toggle('open');
+    }
+    </script>
+</body>
+</html>
