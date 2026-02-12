@@ -767,8 +767,13 @@ impl App {
         let _guard = crate::profile!("app::timer_deprecation");
         self.last_timer_check_ms = current_ms;
 
+        // Ensure all File panels have active watchers, even if their cache was
+        // populated via wait_for_panels (which bypasses the needs_initial path).
+        // Without this, files opened during tool execution are never watched.
+        self.ensure_file_watchers();
+
         // Immutable pass: collect requests and file watcher setup needs
-        let mut requests: Vec<(usize, CacheRequest, Option<String>)> = Vec::new();
+        let mut requests: Vec<(usize, CacheRequest)> = Vec::new();
 
         for (i, ctx) in self.state.context.iter().enumerate() {
             if ctx.cache_in_flight { continue; }
@@ -802,30 +807,35 @@ impl App {
             // Note: cache_deprecated still affects build_cache_request (forces full refresh vs hash check)
             if needs_initial || interval_elapsed || (explicitly_deprecated && !has_interval) {
                 if let Some(request) = panel.build_cache_request(ctx, &self.state) {
-                    // For new File contexts, we also need to set up a watcher
-                    let watcher_path = if needs_initial && ctx.context_type == ContextType::File {
-                        ctx.file_path.clone()
-                    } else {
-                        None
-                    };
-                    requests.push((i, request, watcher_path));
+                    requests.push((i, request));
                 }
             }
         }
 
-        // Mutable pass: set up watchers, send requests, mark in-flight
-        for (i, request, watcher_path) in requests {
-            if let Some(path) = watcher_path {
-                if let Some(watcher) = &mut self.file_watcher {
-                    if !self.watched_file_paths.contains(&path) {
-                        if watcher.watch_file(&path).is_ok() {
-                            self.watched_file_paths.insert(path);
+        // Mutable pass: send requests, mark in-flight
+        for (i, request) in requests {
+            process_cache_request(request, self.cache_tx.clone());
+            self.state.context[i].cache_in_flight = true;
+        }
+    }
+
+    /// Ensure all File context panels have an active file watcher registered.
+    /// This is called every timer tick to catch panels whose cache was populated
+    /// via wait_for_panels (during tool execution) before the normal needs_initial
+    /// watcher registration path could run.
+    fn ensure_file_watchers(&mut self) {
+        let Some(watcher) = &mut self.file_watcher else { return };
+
+        for ctx in &self.state.context {
+            if ctx.context_type == ContextType::File {
+                if let Some(path) = &ctx.file_path {
+                    if !self.watched_file_paths.contains(path) {
+                        if watcher.watch_file(path).is_ok() {
+                            self.watched_file_paths.insert(path.clone());
                         }
                     }
                 }
             }
-            process_cache_request(request, self.cache_tx.clone());
-            self.state.context[i].cache_in_flight = true;
         }
     }
 
