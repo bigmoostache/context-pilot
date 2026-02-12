@@ -179,6 +179,8 @@ pub struct State {
     pub reload_pending: bool,
     /// Waiting for file panels to load before continuing stream
     pub waiting_for_panels: bool,
+    /// Sleep timer: if nonzero, tool pipeline should wait until this timestamp (ms) before proceeding
+    pub tool_sleep_until_ms: u64,
 
     // === Render Cache (runtime-only) ===
     /// Last viewport width (for pre-wrapping text)
@@ -287,6 +289,7 @@ impl Default for State {
             api_retry_count: 0,
             reload_pending: false,
             waiting_for_panels: false,
+            tool_sleep_until_ms: 0,
             // Render cache
             last_viewport_width: 0,
             message_cache: HashMap::new(),

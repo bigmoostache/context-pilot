@@ -58,6 +58,10 @@ pub struct App {
     pub command_palette: CommandPalette,
     /// Timestamp (ms) when wait_for_panels started (for timeout)
     wait_started_ms: u64,
+    /// Deferred tool results waiting for sleep timer to expire
+    deferred_tool_sleep_until_ms: u64,
+    /// Whether we're in a deferred sleep state (waiting for timer before continuing tool pipeline)
+    deferred_tool_sleeping: bool,
 }
 
 impl App {
@@ -86,6 +90,8 @@ impl App {
             resume_stream,
             command_palette: CommandPalette::new(),
             wait_started_ms: 0,
+            deferred_tool_sleep_until_ms: 0,
+            deferred_tool_sleeping: false,
         }
     }
 
@@ -181,6 +187,8 @@ impl App {
             self.process_watcher_events();
             // Check if we're waiting for panels and they're ready (non-blocking)
             self.check_waiting_for_panels(&tx);
+            // Check if deferred sleep timer has expired (non-blocking)
+            self.check_deferred_sleep(&tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
@@ -449,6 +457,15 @@ impl App {
 
         save_state(&self.state);
 
+        // Check if any tool requested a sleep (e.g., console_sleep)
+        if self.state.tool_sleep_until_ms > 0 {
+            // Defer everything — main loop will check timer and continue
+            self.deferred_tool_sleeping = true;
+            self.deferred_tool_sleep_until_ms = self.state.tool_sleep_until_ms;
+            self.state.tool_sleep_until_ms = 0; // Clear from state (App owns it now)
+            return;
+        }
+
         // Trigger background cache refresh for dirty file panels (non-blocking)
         super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
 
@@ -483,12 +500,65 @@ impl App {
             return;
         }
 
-        let panels_ready = !super::wait::has_dirty_file_panels(&self.state);
+        let panels_ready = !super::wait::has_dirty_panels(&self.state);
         let timed_out = now_ms().saturating_sub(self.wait_started_ms) >= 5_000;
 
         if panels_ready || timed_out {
             self.state.waiting_for_panels = false;
             self.state.dirty = true;
+            self.continue_streaming(tx);
+        }
+    }
+
+    /// Non-blocking check: if a tool requested a sleep (e.g., console_sleep),
+    /// wait for the timer to expire, then deprecate tmux panels and continue
+    /// through the normal wait_for_panels → continue_streaming pipeline.
+    fn check_deferred_sleep(&mut self, tx: &Sender<StreamEvent>) {
+        if !self.deferred_tool_sleeping {
+            return;
+        }
+
+        if now_ms() < self.deferred_tool_sleep_until_ms {
+            return; // Still sleeping — keep processing input normally
+        }
+
+        // Timer expired — mark all tmux panels as deprecated so cache refreshes them
+        for ctx in &mut self.state.context {
+            if ctx.context_type == ContextType::Tmux {
+                ctx.cache_deprecated = true;
+            }
+        }
+        self.deferred_tool_sleeping = false;
+        self.deferred_tool_sleep_until_ms = 0;
+        self.state.dirty = true;
+
+        // Now go through the normal panel-wait pipeline
+        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        // Also trigger tmux panel refreshes through the cache system
+        for ctx in &self.state.context {
+            if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated && !ctx.cache_in_flight {
+                let panel = crate::core::panels::get_panel(ctx.context_type);
+                if let Some(request) = panel.build_cache_request(ctx, &self.state) {
+                    crate::cache::process_cache_request(request, self.cache_tx.clone());
+                }
+            }
+        }
+        // Mark tmux panels as in-flight
+        for ctx in &mut self.state.context {
+            if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated {
+                ctx.cache_in_flight = true;
+            }
+        }
+
+        // Check if any panels (file or tmux) need to load
+        let has_dirty = self.state.context.iter().any(|c| {
+            (c.context_type == ContextType::File || c.context_type == ContextType::Tmux) && c.cache_deprecated
+        });
+
+        if has_dirty {
+            self.state.waiting_for_panels = true;
+            self.wait_started_ms = now_ms();
+        } else {
             self.continue_streaming(tx);
         }
     }
