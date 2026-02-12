@@ -56,22 +56,7 @@ impl Module for LogsModule {
                 enabled: true,
                 category: ToolCategory::Context,
             },
-            ToolDefinition {
-                id: "log_delete".to_string(),
-                name: "Delete Logs".to_string(),
-                short_desc: "Delete log entries by ID".to_string(),
-                description: "Deletes log entries by their IDs. Before deleting, consider whether any information should be preserved — create new memories or more compact log entries FIRST to avoid losing important context. Only delete logs that are truly obsolete or superseded.".to_string(),
-                params: vec![
-                    ToolParam::new("reason", ParamType::String)
-                        .desc("Justification for why these logs can be safely deleted")
-                        .required(),
-                    ToolParam::new("ids", ParamType::Array(Box::new(ParamType::String)))
-                        .desc("Log entry IDs to delete (e.g., ['L1', 'L3'])")
-                        .required(),
-                ],
-                enabled: true,
-                category: ToolCategory::Context,
-            },
+
             ToolDefinition {
                 id: "close_conversation_history".to_string(),
                 name: "Close Conversation History".to_string(),
@@ -106,7 +91,7 @@ impl Module for LogsModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "log_create" => Some(execute_log_create(tool, state)),
-            "log_delete" => Some(execute_log_delete(tool, state)),
+
             "close_conversation_history" => Some(execute_close_conversation_history(tool, state)),
             _ => None,
         }
@@ -185,61 +170,7 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
-fn execute_log_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _reason = match tool.input.get("reason").and_then(|v| v.as_str()) {
-        Some(r) if !r.is_empty() => r,
-        _ => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'reason' parameter".to_string(),
-                is_error: true,
-            };
-        }
-    };
 
-    let ids = match tool.input.get("ids").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing required 'ids' array".to_string(),
-                is_error: true,
-            };
-        }
-    };
-
-    if ids.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Empty 'ids' array".to_string(),
-            is_error: true,
-        };
-    }
-
-    let id_strings: Vec<String> = ids.iter()
-        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-        .collect();
-
-    let before = state.logs.len();
-    state.logs.retain(|entry| !id_strings.contains(&entry.id));
-    let deleted = before - state.logs.len();
-
-    if deleted > 0 {
-        deprecate_logs_cache(state);
-    }
-
-    let not_found = id_strings.len() - deleted;
-    let mut output = format!("Deleted {} log(s)", deleted);
-    if not_found > 0 {
-        output += &format!(", {} ID(s) not found", not_found);
-    }
-
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: output,
-        is_error: false,
-    }
-}
 
 fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
     // 1. Validate the panel ID

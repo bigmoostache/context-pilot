@@ -5,47 +5,107 @@ use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::state::{estimate_tokens, ContextType, State, MemoryImportance};
-use crate::ui::theme;
+use crate::ui::{theme, helpers::{render_table, Cell}};
 
 pub struct MemoryPanel;
 
 impl MemoryPanel {
     /// Format memories for LLM context.
-    /// Open memories show full contents; closed memories show only tl_dr + labels.
+    /// Closed memories: table with ID, tl_dr, importance, labels.
+    /// Open memories: YAML-formatted complete information.
     fn format_memories_for_context(state: &State) -> String {
         if state.memories.is_empty() {
             return "No memories".to_string();
         }
 
-        // Sort by importance (critical first, then high, medium, low)
+        // Sort by importance (critical first)
         let mut sorted: Vec<_> = state.memories.iter().collect();
-        sorted.sort_by(|a, b| {
-            let importance_order = |i: &MemoryImportance| match i {
-                MemoryImportance::Critical => 0,
-                MemoryImportance::High => 1,
-                MemoryImportance::Medium => 2,
-                MemoryImportance::Low => 3,
-            };
-            importance_order(&a.importance).cmp(&importance_order(&b.importance))
+        sorted.sort_by_key(|m| match m.importance {
+            MemoryImportance::Critical => 0,
+            MemoryImportance::High => 1,
+            MemoryImportance::Medium => 2,
+            MemoryImportance::Low => 3,
         });
 
-        let mut output = String::new();
-        for memory in sorted {
-            let is_open = state.open_memory_ids.contains(&memory.id);
-            let labels_str = if memory.labels.is_empty() {
-                String::new()
-            } else {
-                format!(" [{}]", memory.labels.join(", "))
-            };
+        let closed: Vec<_> = sorted.iter()
+            .filter(|m| !state.open_memory_ids.contains(&m.id))
+            .collect();
+        let open: Vec<_> = sorted.iter()
+            .filter(|m| state.open_memory_ids.contains(&m.id))
+            .collect();
 
-            if is_open && !memory.contents.is_empty() {
-                // Open: show tl_dr + labels + full contents
-                output.push_str(&format!("[{}] {} ({}){}\n{}\n\n",
-                    memory.id, memory.tl_dr, memory.importance.as_str(), labels_str, memory.contents));
-            } else {
-                // Closed: show only tl_dr + importance + labels
-                output.push_str(&format!("[{}] {} ({}){}\n",
-                    memory.id, memory.tl_dr, memory.importance.as_str(), labels_str));
+        let mut output = String::new();
+
+        // Closed memories as table
+        if !closed.is_empty() {
+            // Compute column widths
+            let headers = ["ID", "Summary", "Importance", "Labels"];
+            let rows: Vec<[String; 4]> = closed.iter().map(|m| {
+                let labels = if m.labels.is_empty() {
+                    String::new()
+                } else {
+                    m.labels.join(", ")
+                };
+                [
+                    m.id.clone(),
+                    m.tl_dr.clone(),
+                    m.importance.as_str().to_string(),
+                    labels,
+                ]
+            }).collect();
+
+            let mut widths = headers.map(|h| h.len());
+            for row in &rows {
+                for (i, cell) in row.iter().enumerate() {
+                    widths[i] = widths[i].max(cell.len());
+                }
+            }
+
+            // Header
+            output.push_str(&format!(
+                "{:<w0$} │ {:<w1$} │ {:<w2$} │ {:<w3$}\n",
+                headers[0], headers[1], headers[2], headers[3],
+                w0 = widths[0], w1 = widths[1], w2 = widths[2], w3 = widths[3],
+            ));
+            // Separator
+            output.push_str(&format!(
+                "{}─┼─{}─┼─{}─┼─{}\n",
+                "─".repeat(widths[0]),
+                "─".repeat(widths[1]),
+                "─".repeat(widths[2]),
+                "─".repeat(widths[3]),
+            ));
+            // Rows
+            for row in &rows {
+                output.push_str(&format!(
+                    "{:<w0$} │ {:<w1$} │ {:<w2$} │ {:<w3$}\n",
+                    row[0], row[1], row[2], row[3],
+                    w0 = widths[0], w1 = widths[1], w2 = widths[2], w3 = widths[3],
+                ));
+            }
+        }
+
+        // Open memories as YAML
+        if !open.is_empty() {
+            if !closed.is_empty() {
+                output.push('\n');
+            }
+            for (i, memory) in open.iter().enumerate() {
+                if i > 0 {
+                    output.push('\n');
+                }
+                output.push_str(&format!("{}:\n", memory.id));
+                output.push_str(&format!("  tl_dr: {}\n", memory.tl_dr));
+                output.push_str(&format!("  importance: {}\n", memory.importance.as_str()));
+                if !memory.labels.is_empty() {
+                    output.push_str(&format!("  labels: [{}]\n", memory.labels.join(", ")));
+                }
+                if !memory.contents.is_empty() {
+                    output.push_str("  contents: |\n");
+                    for line in memory.contents.lines() {
+                        output.push_str(&format!("    {}\n", line));
+                    }
+                }
             }
         }
 
@@ -94,23 +154,76 @@ impl Panel for MemoryPanel {
 
         if state.memories.is_empty() {
             text.push(Line::from(vec![
-                Span::styled(" ".to_string(), base_style),
-                Span::styled("No memories".to_string(), Style::default().fg(theme::text_muted()).italic()),
+                Span::styled(" ", base_style),
+                Span::styled("No memories", Style::default().fg(theme::text_muted()).italic()),
             ]));
-        } else {
-            let mut sorted_memories: Vec<_> = state.memories.iter().collect();
-            sorted_memories.sort_by(|a, b| {
-                let importance_order = |i: &MemoryImportance| match i {
-                    MemoryImportance::Critical => 0,
-                    MemoryImportance::High => 1,
-                    MemoryImportance::Medium => 2,
-                    MemoryImportance::Low => 3,
-                };
-                importance_order(&a.importance).cmp(&importance_order(&b.importance))
-            });
+            return text;
+        }
 
-            for memory in sorted_memories {
-                let is_open = state.open_memory_ids.contains(&memory.id);
+        // Sort by importance (critical first)
+        let mut sorted: Vec<_> = state.memories.iter().collect();
+        sorted.sort_by_key(|m| match m.importance {
+            MemoryImportance::Critical => 0,
+            MemoryImportance::High => 1,
+            MemoryImportance::Medium => 2,
+            MemoryImportance::Low => 3,
+        });
+
+        let closed: Vec<_> = sorted.iter()
+            .filter(|m| !state.open_memory_ids.contains(&m.id))
+            .collect();
+        let open: Vec<_> = sorted.iter()
+            .filter(|m| state.open_memory_ids.contains(&m.id))
+            .collect();
+
+        // Closed memories as table
+        if !closed.is_empty() {
+            let header = [
+                Cell::new("ID", Style::default()),
+                Cell::new("Summary", Style::default()),
+                Cell::new("Importance", Style::default()),
+                Cell::new("Labels", Style::default()),
+            ];
+
+            let rows: Vec<Vec<Cell>> = closed.iter().map(|memory| {
+                let importance_color = match memory.importance {
+                    MemoryImportance::Critical => theme::warning(),
+                    MemoryImportance::High => theme::accent(),
+                    MemoryImportance::Medium => theme::text_secondary(),
+                    MemoryImportance::Low => theme::text_muted(),
+                };
+
+                let labels = if memory.labels.is_empty() {
+                    String::new()
+                } else {
+                    memory.labels.join(", ")
+                };
+
+                vec![
+                    Cell::new(&memory.id, Style::default().fg(theme::accent_dim())),
+                    Cell::new(&memory.tl_dr, Style::default().fg(theme::text())),
+                    Cell::new(memory.importance.as_str(), Style::default().fg(importance_color)),
+                    Cell::new(labels, Style::default().fg(theme::text_muted())),
+                ]
+            }).collect();
+
+            text.extend(render_table(&header, &rows, None, 1));
+        }
+
+        // Open memories as YAML
+        if !open.is_empty() {
+            if !closed.is_empty() {
+                text.push(Line::from(""));
+            }
+
+            let key_style = Style::default().fg(theme::accent_dim());
+            let val_style = Style::default().fg(theme::text());
+            let muted_style = Style::default().fg(theme::text_secondary());
+
+            for (i, memory) in open.iter().enumerate() {
+                if i > 0 {
+                    text.push(Line::from(""));
+                }
 
                 let importance_color = match memory.importance {
                     MemoryImportance::Critical => theme::warning(),
@@ -119,47 +232,47 @@ impl Panel for MemoryPanel {
                     MemoryImportance::Low => theme::text_muted(),
                 };
 
-                let importance_badge = match memory.importance {
-                    MemoryImportance::Critical => "!!!",
-                    MemoryImportance::High => "!! ",
-                    MemoryImportance::Medium => "!  ",
-                    MemoryImportance::Low => "   ",
-                };
+                // ID header
+                text.push(Line::from(vec![
+                    Span::styled(" ", base_style),
+                    Span::styled(format!("{}:", memory.id), Style::default().fg(theme::accent()).bold()),
+                ]));
 
-                // Header line: importance badge + id + tl_dr
-                let mut header_spans = vec![
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled(importance_badge.to_string(), Style::default().fg(importance_color).bold()),
-                    Span::styled(memory.id.clone(), Style::default().fg(theme::accent_dim())),
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled(memory.tl_dr.clone(), Style::default().fg(theme::text())),
-                ];
+                // tl_dr
+                text.push(Line::from(vec![
+                    Span::styled("   ", base_style),
+                    Span::styled("tl_dr: ", key_style),
+                    Span::styled(memory.tl_dr.clone(), val_style),
+                ]));
 
-                // Add labels inline if present
+                // importance
+                text.push(Line::from(vec![
+                    Span::styled("   ", base_style),
+                    Span::styled("importance: ", key_style),
+                    Span::styled(memory.importance.as_str(), Style::default().fg(importance_color)),
+                ]));
+
+                // labels
                 if !memory.labels.is_empty() {
-                    header_spans.push(Span::styled(" ".to_string(), base_style));
-                    for (i, label) in memory.labels.iter().enumerate() {
-                        if i > 0 {
-                            header_spans.push(Span::styled(" ".to_string(), base_style));
-                        }
-                        header_spans.push(Span::styled(
-                            format!("[{}]", label),
-                            Style::default().fg(theme::accent_dim()),
-                        ));
-                    }
+                    text.push(Line::from(vec![
+                        Span::styled("   ", base_style),
+                        Span::styled("labels: ", key_style),
+                        Span::styled(format!("[{}]", memory.labels.join(", ")), muted_style),
+                    ]));
                 }
 
-                text.push(Line::from(header_spans));
-
-                // If open and has contents, show them indented
-                if is_open && !memory.contents.is_empty() {
+                // contents
+                if !memory.contents.is_empty() {
+                    text.push(Line::from(vec![
+                        Span::styled("   ", base_style),
+                        Span::styled("contents: |", key_style),
+                    ]));
                     for line in memory.contents.lines() {
                         text.push(Line::from(vec![
-                            Span::styled("       ".to_string(), base_style), // indent under badge+id
-                            Span::styled(line.to_string(), Style::default().fg(theme::text_secondary())),
+                            Span::styled("     ", base_style),
+                            Span::styled(line.to_string(), muted_style),
                         ]));
                     }
-                    text.push(Line::from("")); // Blank line after open memory contents
                 }
             }
         }
