@@ -26,6 +26,7 @@ use std::sync::mpsc;
 
 use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    event::{EnableBracketedPaste, DisableBracketedPaste},
     ExecutableCommand,
 };
 use ratatui::prelude::*;
@@ -43,6 +44,7 @@ fn main() -> io::Result<()> {
 
     enable_raw_mode()?;
     io::stdout().execute(EnterAlternateScreen)?;
+    io::stdout().execute(EnableBracketedPaste)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut state = load_state();
@@ -68,6 +70,7 @@ fn main() -> io::Result<()> {
 
     // Cleanup
     disable_raw_mode()?;
+    io::stdout().execute(DisableBracketedPaste)?;
     io::stdout().execute(LeaveAlternateScreen)?;
     Ok(())
 }

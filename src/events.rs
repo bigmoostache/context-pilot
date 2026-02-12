@@ -73,6 +73,8 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
             };
             Some(action)
         }
+        // Bracketed paste: insert entire pasted text as-is, no per-character processing
+        Event::Paste(text) => Some(Action::InsertText(text.clone())),
         _ => Some(Action::None),
     }
 }
