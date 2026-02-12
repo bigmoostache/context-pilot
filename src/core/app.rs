@@ -333,6 +333,10 @@ impl App {
         if !self.state.is_streaming || self.pending_done.is_none() || !self.typewriter.pending_chars.is_empty() || self.pending_tools.is_empty() {
             return;
         }
+        // Don't process new tools while waiting for panels or deferred sleep
+        if self.state.waiting_for_panels || self.deferred_tool_sleeping {
+            return;
+        }
         let _guard = crate::profile!("app::tool_exec");
 
         self.state.dirty = true;
@@ -569,6 +573,12 @@ impl App {
 
     fn finalize_stream(&mut self, tldr_tx: &Sender<TlDrResult>) {
         if !self.state.is_streaming {
+            return;
+        }
+        // Don't finalize while waiting for panels or deferred sleep —
+        // pending_done is still Some from the intermediate stream, and
+        // continue_streaming will clear it when the deferred state resolves.
+        if self.state.waiting_for_panels || self.deferred_tool_sleeping {
             return;
         }
 
