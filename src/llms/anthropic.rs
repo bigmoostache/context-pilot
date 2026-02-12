@@ -5,6 +5,7 @@ use std::io::{BufRead, BufReader};
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
+use secrecy::{ExposeSecret, SecretBox};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -17,14 +18,14 @@ use crate::tools::ToolUse;
 
 /// Anthropic Claude client
 pub struct AnthropicClient {
-    api_key: Option<String>,
+    api_key: Option<SecretBox<String>>,
 }
 
 impl AnthropicClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
         Self {
-            api_key: env::var("ANTHROPIC_API_KEY").ok(),
+            api_key: env::var("ANTHROPIC_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))),
         }
     }
 }
@@ -83,7 +84,7 @@ impl LlmClient for AnthropicClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
         let api_key = self
             .api_key
-            .clone()
+            .as_ref()
             .ok_or_else(|| "ANTHROPIC_API_KEY not set".to_string())?;
 
         let client = Client::new();
@@ -146,7 +147,7 @@ impl LlmClient for AnthropicClient {
 
         let response = client
             .post(API_ENDPOINT)
-            .header("x-api-key", &api_key)
+            .header("x-api-key", api_key.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("content-type", "application/json")
             .json(&api_request)
@@ -248,8 +249,8 @@ impl LlmClient for AnthropicClient {
     }
 
     fn check_api(&self, model: &str) -> super::ApiCheckResult {
-        let api_key = match &self.api_key {
-            Some(k) => k.clone(),
+        let api_key = match self.api_key.as_ref() {
+            Some(k) => k,
             None => {
                 return super::ApiCheckResult {
                     auth_ok: false,
@@ -265,7 +266,7 @@ impl LlmClient for AnthropicClient {
         // Test 1: Basic auth
         let auth_result = client
             .post(API_ENDPOINT)
-            .header("x-api-key", &api_key)
+            .header("x-api-key", api_key.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("content-type", "application/json")
             .json(&serde_json::json!({
@@ -293,7 +294,7 @@ impl LlmClient for AnthropicClient {
         // Test 2: Streaming
         let stream_result = client
             .post(API_ENDPOINT)
-            .header("x-api-key", &api_key)
+            .header("x-api-key", api_key.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("content-type", "application/json")
             .json(&serde_json::json!({
@@ -309,7 +310,7 @@ impl LlmClient for AnthropicClient {
         // Test 3: Tools
         let tools_result = client
             .post(API_ENDPOINT)
-            .header("x-api-key", &api_key)
+            .header("x-api-key", api_key.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("content-type", "application/json")
             .json(&serde_json::json!({

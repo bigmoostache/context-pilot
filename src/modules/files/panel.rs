@@ -142,7 +142,7 @@ impl Panel for FilePanel {
         let highlighted = if !file_path.is_empty() {
             highlight_file(&file_path, &content)
         } else {
-            Vec::new()
+            std::sync::Arc::new(Vec::new())
         };
 
         let mut text: Vec<Line> = Vec::new();
@@ -165,7 +165,7 @@ impl Panel for FilePanel {
                 ];
 
                 for (color, text) in spans {
-                    line_spans.push(Span::styled(text.clone(), Style::default().fg(*color)));
+                    line_spans.push(Span::styled(text.to_string(), Style::default().fg(*color)));
                 }
 
                 text.push(Line::from(line_spans));

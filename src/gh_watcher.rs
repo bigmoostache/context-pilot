@@ -12,6 +12,7 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
+use secrecy::{ExposeSecret, SecretBox};
 use sha2::{Sha256, Digest};
 
 use crate::cache::CacheUpdate;
@@ -30,7 +31,7 @@ const GH_DEFAULT_POLL_INTERVAL_SECS: u64 = 60;
 /// Per-panel watch state
 struct GhWatch {
     context_id: String,
-    github_token: String,
+    github_token: Arc<SecretBox<String>>,
     /// Pre-parsed args (excludes "gh" prefix)
     args: Vec<String>,
     /// true if args[0] == "api" && no --jq/--template flags
@@ -71,7 +72,7 @@ impl GhWatcher {
     /// Args: `(context_id, command, github_token)`.
     /// Adds missing watches, removes stale ones, preserves etag/hash/interval state on existing.
     pub fn sync_watches(&self, panels: &[(String, String, String)]) {
-        let mut watches = self.watches.lock().unwrap();
+        let mut watches = self.watches.lock().expect("gh_watcher watches lock poisoned");
 
         // Remove watches for panels that no longer exist
         let active_ids: std::collections::HashSet<&str> =
@@ -91,9 +92,10 @@ impl GhWatcher {
 
             let is_api_command = is_api_command(&args);
 
+            let token = Arc::new(SecretBox::new(Box::new(github_token.clone())));
             watches.insert(context_id.clone(), GhWatch {
                 context_id: context_id.clone(),
-                github_token: github_token.clone(),
+                github_token: token,
                 args,
                 is_api_command,
                 etag: None,
@@ -135,14 +137,14 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
         let current_ms = now_ms();
 
         // Snapshot only watches that are due for polling
-        let due: Vec<(String, Vec<String>, String, bool, Option<String>, Option<String>)> = {
-            let watches = watches.lock().unwrap();
+        let due: Vec<(String, Vec<String>, Arc<SecretBox<String>>, bool, Option<String>, Option<String>)> = {
+            let watches = watches.lock().expect("gh_watcher watches lock poisoned");
             watches.values()
                 .filter(|w| current_ms.saturating_sub(w.last_poll_ms) >= w.poll_interval_secs * 1000)
                 .map(|w| (
                     w.context_id.clone(),
                     w.args.clone(),
-                    w.github_token.clone(),
+                    Arc::clone(&w.github_token),
                     w.is_api_command,
                     w.etag.clone(),
                     w.last_output_hash.clone(),
@@ -151,12 +153,13 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
         };
 
         for (context_id, args, github_token, is_api, etag, last_hash) in due {
+            let token_str = github_token.expose_secret();
             if is_api {
-                let outcome = poll_api_command(&args, &github_token, etag.as_deref());
+                let outcome = poll_api_command(&args, token_str, etag.as_deref());
 
                 // Update watch state: always update last_poll_ms and poll_interval
                 {
-                    let mut watches = watches.lock().unwrap();
+                    let mut watches = watches.lock().expect("gh_watcher watches lock poisoned");
                     if let Some(watch) = watches.get_mut(&context_id) {
                         watch.last_poll_ms = now_ms();
                         if let Some(interval) = outcome.poll_interval {
@@ -169,7 +172,7 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
                 }
 
                 if let Some((_, body)) = outcome.content {
-                    let body = redact_token(&body, &github_token);
+                    let body = redact_token(&body, token_str);
                     let body = truncate_output(&body, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&body);
 
@@ -181,11 +184,11 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
                     });
                 }
             } else {
-                let result = poll_cli_command(&args, &github_token, last_hash.as_deref());
+                let result = poll_cli_command(&args, token_str, last_hash.as_deref());
 
                 // Update watch state
                 {
-                    let mut watches = watches.lock().unwrap();
+                    let mut watches = watches.lock().expect("gh_watcher watches lock poisoned");
                     if let Some(watch) = watches.get_mut(&context_id) {
                         watch.last_poll_ms = now_ms();
                         if let Some((ref new_hash, _)) = result {
@@ -195,7 +198,7 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
                 }
 
                 if let Some((_, content)) = result {
-                    let content = redact_token(&content, &github_token);
+                    let content = redact_token(&content, token_str);
                     let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&content);
 

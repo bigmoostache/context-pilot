@@ -1,5 +1,6 @@
 //! YAML configuration loader for prompts, icons, and UI strings.
-use lazy_static::lazy_static;
+use std::sync::LazyLock;
+
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -9,10 +10,7 @@ use std::collections::HashMap;
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct PromptsConfig {
-    pub seeds: Vec<SeedEntry>,
-    pub default_seed_id: String,
     pub tldr_prompt: String,
     pub tldr_min_tokens: usize,
     pub panel: PanelPrompts,
@@ -174,12 +172,10 @@ fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
 // Global Configuration (Lazy Static — embedded at compile time)
 // ============================================================================
 
-lazy_static! {
-    pub static ref PROMPTS: PromptsConfig = parse_yaml("prompts.yaml", include_str!("../yamls/prompts.yaml"));
-    pub static ref LIBRARY: LibraryConfig = parse_yaml("library.yaml", include_str!("../yamls/library.yaml"));
-    pub static ref UI: UiConfig = parse_yaml("ui.yaml", include_str!("../yamls/ui.yaml"));
-    pub static ref THEMES: ThemesConfig = parse_yaml("themes.yaml", include_str!("../yamls/themes.yaml"));
-}
+pub static PROMPTS: LazyLock<PromptsConfig> = LazyLock::new(|| parse_yaml("prompts.yaml", include_str!("../yamls/prompts.yaml")));
+pub static LIBRARY: LazyLock<LibraryConfig> = LazyLock::new(|| parse_yaml("library.yaml", include_str!("../yamls/library.yaml")));
+pub static UI: LazyLock<UiConfig> = LazyLock::new(|| parse_yaml("ui.yaml", include_str!("../yamls/ui.yaml")));
+pub static THEMES: LazyLock<ThemesConfig> = LazyLock::new(|| parse_yaml("themes.yaml", include_str!("../yamls/themes.yaml")));
 
 /// Get a theme by ID, falling back to default if not found
 pub fn get_theme(theme_id: &str) -> &'static Theme {
@@ -195,7 +191,7 @@ pub fn get_theme(theme_id: &str) -> &'static Theme {
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 /// Cached pointer to the active theme. Updated by set_active_theme().
-/// Points into the static THEMES lazy_static, so the reference is always valid.
+/// Points into the static THEMES LazyLock, so the reference is always valid.
 static CACHED_THEME: AtomicPtr<Theme> = AtomicPtr::new(std::ptr::null_mut());
 
 /// Set the active theme ID (call when state is loaded or theme changes)
@@ -208,7 +204,7 @@ pub fn set_active_theme(theme_id: &str) {
 pub fn active_theme() -> &'static Theme {
     let ptr = CACHED_THEME.load(Ordering::Acquire);
     if !ptr.is_null() {
-        // SAFETY: ptr was set from a &'static Theme reference stored in lazy_static THEMES.
+        // SAFETY: ptr was set from a &'static Theme reference stored in LazyLock THEMES.
         // The Theme data is never mutated or freed after initialization.
         unsafe { &*ptr }
     } else {

@@ -219,8 +219,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
             '`' => {
                 // Inline code
                 if !current.is_empty() {
-                    spans.push(Span::styled(current.clone(), Style::default().fg(theme::text())));
-                    current.clear();
+                    spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
                 }
 
                 let mut code = String::new();
@@ -244,8 +243,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                     chars.next(); // consume second */_
 
                     if !current.is_empty() {
-                        spans.push(Span::styled(current.clone(), Style::default().fg(theme::text())));
-                        current.clear();
+                        spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
                     }
 
                     // Bold text
@@ -266,8 +264,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 } else {
                     // Italic text - look for closing marker
                     if !current.is_empty() {
-                        spans.push(Span::styled(current.clone(), Style::default().fg(theme::text())));
-                        current.clear();
+                        spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
                     }
 
                     let mut italic_text = String::new();
@@ -314,8 +311,7 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
 
                     // Display link text in accent color
                     if !current.is_empty() {
-                        spans.push(Span::styled(current.clone(), Style::default().fg(theme::text())));
-                        current.clear();
+                        spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
                     }
                     spans.push(Span::styled(link_text, Style::default().fg(theme::accent()).underlined()));
                 } else {

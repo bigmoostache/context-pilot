@@ -283,7 +283,11 @@ pub fn build_messages(
                 });
 
                 if should_merge {
-                    out.last_mut().unwrap().tool_calls.as_mut().unwrap().extend(calls);
+                    if let Some(last) = out.last_mut() {
+                        if let Some(ref mut existing_calls) = last.tool_calls {
+                            existing_calls.extend(calls);
+                        }
+                    }
                 } else {
                     out.push(OaiMessage {
                         role: "assistant".to_string(),

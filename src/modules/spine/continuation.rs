@@ -12,10 +12,6 @@ use super::types::ContinuationAction;
 /// them in order after each stream completes. The first one that returns
 /// `should_continue() == true` wins.
 pub trait AutoContinuation: Send + Sync {
-    /// Human-readable name for logging/debugging
-    #[allow(dead_code)]
-    fn name(&self) -> &str;
-
     /// Check if this continuation should fire given current state.
     /// Called after a stream ends (not during streaming).
     fn should_continue(&self, state: &State) -> bool;
@@ -50,8 +46,6 @@ pub fn all_continuations() -> &'static [&'static dyn AutoContinuation] {
 pub struct NotificationsContinuation;
 
 impl AutoContinuation for NotificationsContinuation {
-    fn name(&self) -> &str { "NotificationsContinuation" }
-
     fn should_continue(&self, state: &State) -> bool {
         state.has_unprocessed_notifications()
     }
@@ -124,8 +118,6 @@ impl AutoContinuation for NotificationsContinuation {
 pub struct MaxTokensContinuation;
 
 impl AutoContinuation for MaxTokensContinuation {
-    fn name(&self) -> &str { "MaxTokensContinuation" }
-
     fn should_continue(&self, state: &State) -> bool {
         state.spine_config.max_tokens_auto_continue
             && state.last_stop_reason.as_deref() == Some("max_tokens")
@@ -148,8 +140,6 @@ impl AutoContinuation for MaxTokensContinuation {
 pub struct TodosAutomaticContinuation;
 
 impl AutoContinuation for TodosAutomaticContinuation {
-    fn name(&self) -> &str { "TodosAutomaticContinuation" }
-
     fn should_continue(&self, state: &State) -> bool {
         state.spine_config.continue_until_todos_done
             && state.has_incomplete_todos()

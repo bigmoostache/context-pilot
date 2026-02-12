@@ -506,26 +506,6 @@ impl App {
         // Any action triggers a re-render
         self.state.dirty = true;
         match apply_action(&mut self.state, action) {
-            ActionResult::StartStream => {
-                self.typewriter.reset();
-                self.pending_tools.clear();
-                // Generate TL;DR for user message
-                if self.state.messages.len() >= 2 {
-                    let user_msg = &self.state.messages[self.state.messages.len() - 2];
-                    if user_msg.role == "user" && user_msg.tl_dr.is_none() {
-                        self.state.pending_tldrs += 1;
-                        generate_tldr(user_msg.id.clone(), user_msg.content.clone(), tldr_tx.clone());
-                    }
-                }
-                let ctx = prepare_stream_context(&mut self.state, false);
-                let system_prompt = get_active_agent_content(&self.state);
-                start_streaming(
-                    self.state.llm_provider,
-                    self.state.current_model(),
-                    ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
-                );
-                save_state(&self.state);
-            }
             ActionResult::StopStream => {
                 self.typewriter.reset();
                 self.pending_done = None;

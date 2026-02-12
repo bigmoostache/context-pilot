@@ -8,6 +8,7 @@ use std::io::{BufRead, BufReader};
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
+use secrecy::{ExposeSecret, SecretBox};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -20,14 +21,14 @@ const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions
 
 /// Groq client
 pub struct GroqClient {
-    api_key: Option<String>,
+    api_key: Option<SecretBox<String>>,
 }
 
 impl GroqClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
         Self {
-            api_key: env::var("GROQ_API_KEY").ok(),
+            api_key: env::var("GROQ_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))),
         }
     }
 }
@@ -54,7 +55,7 @@ impl LlmClient for GroqClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
         let api_key = self
             .api_key
-            .clone()
+            .as_ref()
             .ok_or_else(|| "GROQ_API_KEY not set".to_string())?;
 
         let client = Client::new();
@@ -111,7 +112,7 @@ impl LlmClient for GroqClient {
 
         let response = client
             .post(GROQ_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&api_request)
             .send()
@@ -173,8 +174,8 @@ impl LlmClient for GroqClient {
     }
 
     fn check_api(&self, model: &str) -> super::ApiCheckResult {
-        let api_key = match &self.api_key {
-            Some(k) => k.clone(),
+        let api_key = match self.api_key.as_ref() {
+            Some(k) => k,
             None => {
                 return super::ApiCheckResult {
                     auth_ok: false,
@@ -190,7 +191,7 @@ impl LlmClient for GroqClient {
         // Test 1: Basic auth
         let auth_result = client
             .post(GROQ_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
@@ -217,7 +218,7 @@ impl LlmClient for GroqClient {
         // Test 2: Streaming
         let stream_result = client
             .post(GROQ_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
@@ -232,7 +233,7 @@ impl LlmClient for GroqClient {
         // Test 3: Tools
         let tools_result = client
             .post(GROQ_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,

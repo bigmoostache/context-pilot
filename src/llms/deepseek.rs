@@ -9,6 +9,7 @@ use std::io::{BufRead, BufReader};
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
+use secrecy::{ExposeSecret, SecretBox};
 use serde::Serialize;
 
 use super::openai_compat::{self, OaiMessage, BuildOptions, ToolCallAccumulator};
@@ -18,14 +19,14 @@ const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
 /// DeepSeek client
 pub struct DeepSeekClient {
-    api_key: Option<String>,
+    api_key: Option<SecretBox<String>>,
 }
 
 impl DeepSeekClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
         Self {
-            api_key: env::var("DEEPSEEK_API_KEY").ok(),
+            api_key: env::var("DEEPSEEK_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))),
         }
     }
 }
@@ -89,7 +90,7 @@ impl LlmClient for DeepSeekClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
         let api_key = self
             .api_key
-            .clone()
+            .as_ref()
             .ok_or_else(|| "DEEPSEEK_API_KEY not set".to_string())?;
 
         let client = Client::new();
@@ -147,7 +148,7 @@ impl LlmClient for DeepSeekClient {
 
         let response = client
             .post(DEEPSEEK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&api_request)
             .send()
@@ -214,8 +215,8 @@ impl LlmClient for DeepSeekClient {
     }
 
     fn check_api(&self, model: &str) -> super::ApiCheckResult {
-        let api_key = match &self.api_key {
-            Some(k) => k.clone(),
+        let api_key = match self.api_key.as_ref() {
+            Some(k) => k,
             None => {
                 return super::ApiCheckResult {
                     auth_ok: false,
@@ -231,7 +232,7 @@ impl LlmClient for DeepSeekClient {
         // Test 1: Basic auth
         let auth_result = client
             .post(DEEPSEEK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
@@ -258,7 +259,7 @@ impl LlmClient for DeepSeekClient {
         // Test 2: Streaming
         let stream_result = client
             .post(DEEPSEEK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
@@ -273,7 +274,7 @@ impl LlmClient for DeepSeekClient {
         // Test 3: Tools
         let tools_result = client
             .post(DEEPSEEK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,

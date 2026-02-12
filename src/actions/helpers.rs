@@ -1,6 +1,11 @@
+use std::sync::LazyLock;
+
 use regex::Regex;
 
 use crate::state::State;
+
+static RE_ID_PREFIX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\[A\d+\]:\s*)+").expect("invalid RE_ID_PREFIX regex"));
+static RE_ID_MULTILINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^\[A\d+\]:\s*").expect("invalid RE_ID_MULTILINE regex"));
 
 /// Remove LLM's mistaken ID prefixes like "[A84]: " from responses
 pub fn clean_llm_id_prefix(content: &str) -> String {
@@ -8,12 +13,10 @@ pub fn clean_llm_id_prefix(content: &str) -> String {
     let trimmed = content.trim_start();
 
     // Pattern: one or more [A##]: or [A###]: at the start, with optional whitespace between
-    let re = Regex::new(r"^(\[A\d+\]:\s*)+").unwrap();
-    let cleaned = re.replace(trimmed, "").to_string();
+    let cleaned = RE_ID_PREFIX.replace(trimmed, "").to_string();
 
     // Also clean any [Axx]: that appears at the start of lines (multiline responses)
-    let re_multiline = Regex::new(r"(?m)^\[A\d+\]:\s*").unwrap();
-    let result = re_multiline.replace_all(&cleaned, "").to_string();
+    let result = RE_ID_MULTILINE.replace_all(&cleaned, "").to_string();
 
     // Strip leading/trailing whitespace and newlines after cleaning
     result.trim().to_string()

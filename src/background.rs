@@ -40,7 +40,7 @@ pub fn generate_tldr(message_id: String, content: String, tx: Sender<TlDrResult>
             log("Using content directly (short message)");
             let result = tx.send(TlDrResult {
                 message_id,
-                tl_dr: content.clone(),
+                tl_dr: content,
                 token_count,
             });
             log(&format!("Send result: {:?}", result.is_ok()));
@@ -69,10 +69,11 @@ pub fn generate_tldr(message_id: String, content: String, tx: Sender<TlDrResult>
                 } else {
                     truncated
                 };
+                let token_count = estimate_tokens(&truncated);
                 let result = tx.send(TlDrResult {
                     message_id,
-                    tl_dr: truncated.clone(),
-                    token_count: estimate_tokens(&truncated),
+                    tl_dr: truncated,
+                    token_count,
                 });
                 log(&format!("Fallback send result: {:?}", result.is_ok()));
             }

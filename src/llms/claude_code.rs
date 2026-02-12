@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
+use secrecy::{ExposeSecret, SecretBox};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -132,7 +133,7 @@ fn ensure_message_alternation(messages: &mut Vec<Value>) {
         } else {
             // Same content type — safe to merge
             let new_blocks = content_to_blocks(msg["content"].clone());
-            if let Some(arr) = result.last_mut().unwrap()["content"].as_array_mut() {
+            if let Some(arr) = result.last_mut().and_then(|last| last["content"].as_array_mut()) {
                 arr.extend(new_blocks);
             }
         }
@@ -184,16 +185,16 @@ fn dump_last_request(worker_id: &str, api_request: &Value) {
 
 /// Claude Code OAuth client
 pub struct ClaudeCodeClient {
-    access_token: Option<String>,
+    access_token: Option<SecretBox<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct CredentialsFile {
     #[serde(rename = "claudeAiOauth")]
     claude_ai_oauth: OAuthCredentials,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct OAuthCredentials {
     #[serde(rename = "accessToken")]
     access_token: String,
@@ -207,7 +208,7 @@ impl ClaudeCodeClient {
         Self { access_token }
     }
 
-    fn load_oauth_token() -> Option<String> {
+    fn load_oauth_token() -> Option<SecretBox<String>> {
         let home = env::var("HOME").ok()?;
         let home_path = PathBuf::from(&home);
 
@@ -233,7 +234,7 @@ impl ClaudeCodeClient {
             return None; // Token expired
         }
 
-        Some(creds.claude_ai_oauth.access_token)
+        Some(SecretBox::new(Box::new(creds.claude_ai_oauth.access_token)))
     }
 }
 
@@ -287,7 +288,7 @@ impl LlmClient for ClaudeCodeClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
         let access_token = self
             .access_token
-            .clone()
+            .as_ref()
             .ok_or_else(|| "Claude Code OAuth token not found or expired. Run 'claude login'".to_string())?;
 
         let client = Client::new();
@@ -557,7 +558,7 @@ impl LlmClient for ClaudeCodeClient {
         let response = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", access_token))
+            .header("authorization", format!("Bearer {}", access_token.expose_secret()))
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -687,8 +688,8 @@ impl LlmClient for ClaudeCodeClient {
     }
 
     fn check_api(&self, model: &str) -> ApiCheckResult {
-        let access_token = match &self.access_token {
-            Some(t) => t.clone(),
+        let access_token = match self.access_token.as_ref() {
+            Some(t) => t.expose_secret(),
             None => {
                 return ApiCheckResult {
                     auth_ok: false,
@@ -885,7 +886,7 @@ mod tests {
         let response = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "application/json")
-            .header("authorization", format!("Bearer {}", token))
+            .header("authorization", format!("Bearer {}", token.expose_secret()))
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -962,7 +963,7 @@ mod tests {
         let response = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", token))
+            .header("authorization", format!("Bearer {}", token.expose_secret()))
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")

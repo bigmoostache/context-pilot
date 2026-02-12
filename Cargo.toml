@@ -15,8 +15,8 @@ ignore = "0.4"
 globset = "0.4"
 regex = "1.10"
 unicode-width = "0.2"
-lazy_static = "1.4"
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "default-themes", "regex-onig"] }
 sha2 = "0.10"
+secrecy = { version = "0.10", features = ["serde"] }
 notify = "6.1"
 chrono = "0.4"

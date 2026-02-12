@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, LazyLock};
 
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{Style, ThemeSet};
@@ -9,11 +9,9 @@ use syntect::util::LinesWithEndings;
 
 use ratatui::style::Color;
 
-lazy_static::lazy_static! {
-    static ref SYNTAX_SET: SyntaxSet = SyntaxSet::load_defaults_newlines();
-    static ref THEME_SET: ThemeSet = ThemeSet::load_defaults();
-    static ref HIGHLIGHT_CACHE: Arc<Mutex<HashMap<String, Vec<Vec<(Color, String)>>>>> = Arc::new(Mutex::new(HashMap::new()));
-}
+static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
+static THEME_SET: LazyLock<ThemeSet> = LazyLock::new(ThemeSet::load_defaults);
+static HIGHLIGHT_CACHE: LazyLock<Mutex<HashMap<String, Arc<Vec<Vec<(Color, String)>>>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Convert syntect color to ratatui color
 fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {
@@ -22,26 +20,26 @@ fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {
 
 /// Get syntax-highlighted spans for a file
 /// Returns Vec of lines, where each line is Vec of (color, text) pairs
-pub fn highlight_file(path: &str, content: &str) -> Vec<Vec<(Color, String)>> {
+pub fn highlight_file(path: &str, content: &str) -> Arc<Vec<Vec<(Color, String)>>> {
     // Check cache first (keyed by path + content hash for simplicity)
     let cache_key = format!("{}:{}", path, content.len());
     {
-        let cache = HIGHLIGHT_CACHE.lock().unwrap();
+        let cache = HIGHLIGHT_CACHE.lock().expect("highlight cache lock poisoned");
         if let Some(cached) = cache.get(&cache_key) {
-            return cached.clone();
+            return Arc::clone(cached);
         }
     }
 
-    let result = do_highlight(path, content);
+    let result = Arc::new(do_highlight(path, content));
 
     // Store in cache
     {
-        let mut cache = HIGHLIGHT_CACHE.lock().unwrap();
+        let mut cache = HIGHLIGHT_CACHE.lock().expect("highlight cache lock poisoned");
         // Limit cache size
         if cache.len() > 50 {
             cache.clear();
         }
-        cache.insert(cache_key, result.clone());
+        cache.insert(cache_key, Arc::clone(&result));
     }
 
     result

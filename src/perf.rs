@@ -4,7 +4,7 @@
 //! Toggle with F12.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::RwLock;
 use std::time::Instant;
 
@@ -85,6 +85,13 @@ impl Default for OpStats {
     }
 }
 
+/// Frame and system stats state (accessed only from the render thread)
+struct FrameState {
+    frame_start: Option<Instant>,
+    last_cpu_measure: (Instant, u64),
+    last_stats_refresh: Instant,
+}
+
 /// Global performance metrics collector
 pub struct PerfMetrics {
     /// Whether performance monitoring is enabled
@@ -93,18 +100,14 @@ pub struct PerfMetrics {
     ops: RwLock<HashMap<&'static str, OpStats>>,
     /// Frame time ring buffer (microseconds)
     frame_times: RwLock<RingBuffer<u64>>,
-    /// Frame start time
-    frame_start: RwLock<Option<Instant>>,
+    /// Frame and system stats state (single lock replaces 3 separate RwLocks)
+    frame_state: RwLock<FrameState>,
     /// Total frames counted
     pub frame_count: AtomicU64,
-    /// Last CPU measurement time and ticks
-    last_cpu_measure: RwLock<(Instant, u64)>,
-    /// Last stats refresh time
-    last_stats_refresh: RwLock<Instant>,
-    /// CPU usage percentage (0-100)
-    cpu_usage: RwLock<f32>,
+    /// CPU usage percentage (0-100), stored as f32 bits
+    cpu_usage: AtomicU32,
     /// Memory usage in bytes
-    memory_bytes: RwLock<u64>,
+    memory_bytes: AtomicU64,
 }
 
 impl Default for PerfMetrics {
@@ -115,12 +118,14 @@ impl Default for PerfMetrics {
             enabled: AtomicBool::new(false),
             ops: RwLock::new(HashMap::new()),
             frame_times: RwLock::new(RingBuffer::default()),
-            frame_start: RwLock::new(None),
+            frame_state: RwLock::new(FrameState {
+                frame_start: None,
+                last_cpu_measure: (Instant::now(), cpu_ticks),
+                last_stats_refresh: Instant::now(),
+            }),
             frame_count: AtomicU64::new(0),
-            last_cpu_measure: RwLock::new((Instant::now(), cpu_ticks)),
-            last_stats_refresh: RwLock::new(Instant::now()),
-            cpu_usage: RwLock::new(0.0),
-            memory_bytes: RwLock::new(mem_bytes),
+            cpu_usage: AtomicU32::new(0),
+            memory_bytes: AtomicU64::new(mem_bytes),
         }
     }
 }
@@ -131,28 +136,22 @@ fn read_proc_stat() -> Option<(u64, u64)> {
     // Format: pid (comm) state ... utime stime ...
     // Fields 14 and 15 (0-indexed: 13, 14) are utime and stime
     let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
-    let parts: Vec<&str> = stat.split_whitespace().collect();
-    if parts.len() < 15 {
-        return None;
-    }
-    let utime: u64 = parts[13].parse().ok()?;
-    let stime: u64 = parts[14].parse().ok()?;
+    let mut fields = stat.split_whitespace();
+    let utime: u64 = fields.nth(13)?.parse().ok()?;
+    let stime: u64 = fields.next()?.parse().ok()?;
     let cpu_ticks = utime + stime;
     
     // Read memory from /proc/self/statm (in pages)
     // First field is total program size, second is RSS
     let statm = std::fs::read_to_string("/proc/self/statm").ok()?;
-    let mem_parts: Vec<&str> = statm.split_whitespace().collect();
-    let rss_pages: u64 = mem_parts.get(1)?.parse().ok()?;
+    let rss_pages: u64 = statm.split_whitespace().nth(1)?.parse().ok()?;
     let page_size = 4096u64; // Standard page size
     let mem_bytes = rss_pages * page_size;
     
     Some((cpu_ticks, mem_bytes))
 }
 
-lazy_static::lazy_static! {
-    pub static ref PERF: PerfMetrics = PerfMetrics::default();
-}
+pub static PERF: std::sync::LazyLock<PerfMetrics> = std::sync::LazyLock::new(PerfMetrics::default);
 
 impl PerfMetrics {
     /// Record operation timing
@@ -161,7 +160,7 @@ impl PerfMetrics {
             return;
         }
 
-        let mut ops = self.ops.write().unwrap();
+        let mut ops = self.ops.write().expect("perf ops lock poisoned");
         let stats = ops.entry(name).or_default();
         stats.count.fetch_add(1, Ordering::Relaxed);
         stats.total_us.fetch_add(duration_us, Ordering::Relaxed);
@@ -176,7 +175,7 @@ impl PerfMetrics {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-        *self.frame_start.write().unwrap() = Some(Instant::now());
+        self.frame_state.write().expect("perf frame_state lock poisoned").frame_start = Some(Instant::now());
     }
 
     /// End frame and record frame time
@@ -184,51 +183,51 @@ impl PerfMetrics {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-        if let Some(start) = self.frame_start.read().unwrap().as_ref() {
+        if let Some(start) = self.frame_state.read().expect("perf frame_state lock poisoned").frame_start {
             let frame_time = start.elapsed().as_micros() as u64;
-            self.frame_times.write().unwrap().push(frame_time);
+            self.frame_times.write().expect("perf frame_times lock poisoned").push(frame_time);
             self.frame_count.fetch_add(1, Ordering::Relaxed);
         }
 
         // Check if stats need refresh (time-based, not frame-based)
         use crate::constants::PERF_STATS_REFRESH_MS;
-        let last_refresh = *self.last_stats_refresh.read().unwrap();
+        let last_refresh = self.frame_state.read().expect("perf frame_state lock poisoned").last_stats_refresh;
         if last_refresh.elapsed().as_millis() >= PERF_STATS_REFRESH_MS as u128 {
             self.refresh_system_stats();
-            *self.last_stats_refresh.write().unwrap() = Instant::now();
+            self.frame_state.write().expect("perf frame_state lock poisoned").last_stats_refresh = Instant::now();
         }
     }
 
     /// Refresh CPU and memory stats
     fn refresh_system_stats(&self) {
         if let Some((cpu_ticks, mem_bytes)) = read_proc_stat() {
-            let mut last = self.last_cpu_measure.write().unwrap();
+            let mut state = self.frame_state.write().expect("perf frame_state lock poisoned");
             let now = Instant::now();
-            let elapsed = now.duration_since(last.0).as_secs_f32();
+            let elapsed = now.duration_since(state.last_cpu_measure.0).as_secs_f32();
             
             if elapsed > 0.0 {
-                let tick_delta = cpu_ticks.saturating_sub(last.1);
+                let tick_delta = cpu_ticks.saturating_sub(state.last_cpu_measure.1);
                 // Convert ticks to seconds (usually 100 ticks/sec on Linux)
                 let cpu_seconds = tick_delta as f32 / 100.0;
                 // CPU percentage = (cpu_time / wall_time) * 100
                 let cpu_pct = (cpu_seconds / elapsed) * 100.0;
-                *self.cpu_usage.write().unwrap() = cpu_pct;
+                self.cpu_usage.store(cpu_pct.to_bits(), Ordering::Relaxed);
             }
             
-            *last = (now, cpu_ticks);
-            *self.memory_bytes.write().unwrap() = mem_bytes;
+            state.last_cpu_measure = (now, cpu_ticks);
+            self.memory_bytes.store(mem_bytes, Ordering::Relaxed);
         }
     }
 
     /// Get snapshot of metrics for display
     pub fn snapshot(&self) -> PerfSnapshot {
-        let ops = self.ops.read().unwrap();
-        let frame_times = self.frame_times.read().unwrap();
+        let ops = self.ops.read().expect("perf ops lock poisoned");
+        let frame_times = self.frame_times.read().expect("perf frame_times lock poisoned");
 
         let mut op_snapshots: Vec<OpSnapshot> = ops
             .iter()
             .map(|(name, stats)| {
-                let samples = stats.samples.read().unwrap();
+                let samples = stats.samples.read().expect("perf samples lock poisoned");
                 let recent = samples.recent(SAMPLE_RING_SIZE);
                 let count = recent.len();
 
@@ -275,21 +274,22 @@ impl PerfMetrics {
         } else {
             frame_samples.iter().sum::<f64>() / frame_samples.len() as f64
         };
+        let frame_max_ms = frame_samples.iter().cloned().fold(0.0, f64::max);
 
         PerfSnapshot {
             ops: op_snapshots,
-            frame_times_ms: frame_samples.clone(),
+            frame_times_ms: frame_samples,
             frame_avg_ms,
-            frame_max_ms: frame_samples.iter().cloned().fold(0.0, f64::max),
-            cpu_usage: *self.cpu_usage.read().unwrap(),
-            memory_mb: *self.memory_bytes.read().unwrap() as f64 / (1024.0 * 1024.0),
+            frame_max_ms,
+            cpu_usage: f32::from_bits(self.cpu_usage.load(Ordering::Relaxed)),
+            memory_mb: self.memory_bytes.load(Ordering::Relaxed) as f64 / (1024.0 * 1024.0),
         }
     }
 
     /// Reset all metrics
     pub fn reset(&self) {
-        *self.ops.write().unwrap() = HashMap::new();
-        *self.frame_times.write().unwrap() = RingBuffer::default();
+        *self.ops.write().expect("perf ops lock poisoned") = HashMap::new();
+        *self.frame_times.write().expect("perf frame_times lock poisoned") = RingBuffer::default();
         self.frame_count.store(0, Ordering::Relaxed);
     }
 
