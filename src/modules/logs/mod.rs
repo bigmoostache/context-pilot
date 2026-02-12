@@ -275,10 +275,26 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         }
     }
 
+    // 2. Validate that logs are provided (at least one non-empty entry)
+    let logs_array = tool.input.get("logs").and_then(|v| v.as_array());
+    let has_logs = logs_array
+        .map(|arr| arr.iter().any(|e| {
+            e.get("content").and_then(|v| v.as_str()).map_or(false, |s| !s.is_empty())
+        }))
+        .unwrap_or(false);
+
+    if !has_logs {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: "Cannot close conversation history without at least one log entry. Provide 'logs' with meaningful entries to preserve context before closing.".to_string(),
+            is_error: true,
+        };
+    }
+
     let mut output_parts = Vec::new();
 
-    // 2. Create log entries
-    if let Some(logs_array) = tool.input.get("logs").and_then(|v| v.as_array()) {
+    // 3. Create log entries
+    if let Some(logs_array) = logs_array {
         let mut log_count = 0;
         for log_obj in logs_array {
             if let Some(content) = log_obj.get("content").and_then(|v| v.as_str()) {
