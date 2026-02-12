@@ -4,6 +4,7 @@ pub mod git;
 pub mod github;
 pub mod glob;
 pub mod grep;
+pub mod logs;
 pub mod memory;
 pub mod preset;
 pub mod scratchpad;
@@ -116,6 +117,7 @@ const FIXED_PANEL_ORDER: &[ContextType] = &[
     ContextType::Scratchpad,   // P7
     ContextType::Library,      // P8
     ContextType::Spine,        // P9
+    ContextType::Logs,         // P10
 ];
 
 /// Collect all fixed panel defaults in canonical P0-P7 order.
@@ -199,6 +201,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(scratchpad::ScratchpadModule),
         Box::new(preset::PresetModule),
         Box::new(spine::SpineModule),
+        Box::new(logs::LogsModule),
     ]
 }
 

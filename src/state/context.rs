@@ -23,6 +23,7 @@ pub enum ContextType {
     Skill,
     ConversationHistory,
     Spine,
+    Logs,
 }
 
 impl ContextType {
@@ -52,6 +53,7 @@ impl ContextType {
             ContextType::Skill => icons::ctx_skill(),
             ContextType::ConversationHistory => icons::ctx_conversation(),
             ContextType::Spine => icons::ctx_spine(),
+            ContextType::Logs => icons::ctx_memory(), // Reuse memory icon for logs
         }
     }
 

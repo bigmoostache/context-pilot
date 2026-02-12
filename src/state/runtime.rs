@@ -10,6 +10,7 @@ use crate::modules::todo::types::TodoItem;
 use crate::modules::memory::types::MemoryItem;
 use crate::modules::prompt::types::{PromptItem, PromptType};
 use crate::modules::scratchpad::types::ScratchpadCell;
+use crate::modules::logs::types::LogEntry;
 use crate::modules::spine::types::{Notification, SpineConfig};
 use crate::modules::tree::types::{TreeFileDescription, DEFAULT_TREE_FILTER};
 use crate::modules::git::types::GitFileChange;
@@ -76,6 +77,10 @@ pub struct State {
     pub scratchpad_cells: Vec<ScratchpadCell>,
     /// Next scratchpad cell ID (C1, C2, ...)
     pub next_scratchpad_id: usize,
+    /// Log entries (timestamped short notes)
+    pub logs: Vec<LogEntry>,
+    /// Next log entry ID (L1, L2, ...)
+    pub next_log_id: usize,
     /// Spine notifications
     pub notifications: Vec<Notification>,
     /// Next notification ID (N1, N2, ...)
@@ -226,6 +231,8 @@ impl Default for State {
             library_preview: None,
             scratchpad_cells: vec![],
             next_scratchpad_id: 1,
+            logs: vec![],
+            next_log_id: 1,
             notifications: vec![],
             next_notification_id: 1,
             spine_config: SpineConfig::default(),

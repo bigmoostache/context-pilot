@@ -109,7 +109,63 @@ fn load_state_new() -> State {
     // Load dynamic panels from panel_uid_to_local_id (P8+)
     let mut dynamic_panels: Vec<(String, ContextElement)> = worker_state.panel_uid_to_local_id.iter()
         .filter_map(|(uid, local_id)| {
-            panel::load_panel(uid).map(|p| (local_id.clone(), panel_to_context(&p, local_id)))
+            panel::load_panel(uid).map(|p| {
+                let mut elem = panel_to_context(&p, local_id);
+
+                // For ConversationHistory panels, load history messages and rebuild cached content
+                if p.panel_type == ContextType::ConversationHistory && !p.message_uids.is_empty() {
+                    let msgs: Vec<Message> = p.message_uids.iter()
+                        .filter_map(|uid| load_message(uid))
+                        .collect();
+                    if !msgs.is_empty() {
+                        // Rebuild cached_content using format_chunk_content logic
+                        let mut content = String::new();
+                        for msg in &msgs {
+                            use crate::state::{MessageStatus, MessageType};
+                            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
+                                continue;
+                            }
+                            match msg.message_type {
+                                MessageType::ToolCall => {
+                                    for tu in &msg.tool_uses {
+                                        content += &format!(
+                                            "tool_call {}({})\n",
+                                            tu.name,
+                                            serde_json::to_string(&tu.input).unwrap_or_default()
+                                        );
+                                    }
+                                }
+                                MessageType::ToolResult => {
+                                    for tr in &msg.tool_results {
+                                        content += &format!("{}\n", tr.content);
+                                    }
+                                }
+                                MessageType::TextMessage => {
+                                    let text = match msg.status {
+                                        MessageStatus::Summarized => {
+                                            msg.tl_dr.as_deref().unwrap_or(&msg.content)
+                                        }
+                                        _ => &msg.content,
+                                    };
+                                    if !text.is_empty() {
+                                        content += &format!("[{}]: {}\n", msg.role, text);
+                                    }
+                                }
+                            }
+                        }
+                        let token_count = crate::state::estimate_tokens(&content);
+                        let total_pages = crate::state::compute_total_pages(token_count);
+                        elem.cached_content = Some(content);
+                        elem.history_messages = Some(msgs);
+                        elem.token_count = token_count;
+                        elem.total_pages = total_pages;
+                        elem.full_token_count = token_count;
+                        elem.cache_deprecated = false;
+                    }
+                }
+
+                (local_id.clone(), elem)
+            })
         })
         .collect();
     // Sort by local ID to maintain order
@@ -279,11 +335,21 @@ pub fn save_state(state: &State) {
                 name: ctx.name.clone(),
                 token_count: ctx.token_count,
                 last_refresh_ms: ctx.last_refresh_ms,
-                // Conversation panel gets message_uids
+                // Conversation panel gets message_uids from state.messages
+                // ConversationHistory panels get message_uids from history_messages
                 message_uids: if ctx.context_type == ContextType::Conversation {
                     state.messages.iter()
                         .map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone()))
                         .collect()
+                } else if ctx.context_type == ContextType::ConversationHistory {
+                    if let Some(ref msgs) = ctx.history_messages {
+                        // Ensure each history message has a UID and is persisted
+                        msgs.iter()
+                            .map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone()))
+                            .collect()
+                    } else {
+                        vec![]
+                    }
                 } else {
                     vec![]
                 },
@@ -301,6 +367,18 @@ pub fn save_state(state: &State) {
                 skill_prompt_id: ctx.skill_prompt_id.clone(),
             };
             panel::save_panel(&panel_data);
+        }
+    }
+
+    // Save history messages for ConversationHistory panels
+    // These messages were removed from state.messages during detachment but need to persist.
+    for ctx in &state.context {
+        if ctx.context_type == ContextType::ConversationHistory {
+            if let Some(ref msgs) = ctx.history_messages {
+                for msg in msgs {
+                    save_message(msg);
+                }
+            }
         }
     }
 
