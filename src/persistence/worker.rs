@@ -22,12 +22,4 @@ pub fn load_worker(worker_id: &str) -> Option<WorkerState> {
     serde_json::from_str(&json).ok()
 }
 
-/// Save worker state to states/{worker_id}.json
-pub fn save_worker(worker: &WorkerState) {
-    let dir = states_dir();
-    fs::create_dir_all(&dir).ok();
-    let path = worker_path(&worker.worker_id);
-    if let Ok(json) = serde_json::to_string_pretty(worker) {
-        fs::write(path, json).ok();
-    }
-}
+

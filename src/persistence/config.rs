@@ -24,12 +24,4 @@ pub fn load_config() -> Option<SharedConfig> {
     serde_json::from_str(&json).ok()
 }
 
-/// Save shared configuration to config.json
-pub fn save_config(config: &SharedConfig) {
-    let dir = PathBuf::from(STORE_DIR);
-    fs::create_dir_all(&dir).ok();
-    let path = config_path();
-    if let Ok(json) = serde_json::to_string_pretty(config) {
-        fs::write(path, json).ok();
-    }
-}
+
