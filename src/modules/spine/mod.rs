@@ -23,8 +23,27 @@ impl Module for SpineModule {
     fn description(&self) -> &'static str { "Unified auto-continuation and stream control" }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
+        // Prune old processed notifications: keep all unprocessed + latest 10 processed
+        let mut to_save: Vec<_> = state.notifications.iter()
+            .filter(|n| !n.processed)
+            .cloned()
+            .collect();
+        let mut processed: Vec<_> = state.notifications.iter()
+            .filter(|n| n.processed)
+            .cloned()
+            .collect();
+        // Keep only the latest 10 processed (they're in chronological order)
+        if processed.len() > 10 {
+            processed = processed.split_off(processed.len() - 10);
+        }
+        to_save.extend(processed);
+        // Sort by ID number to maintain order
+        to_save.sort_by_key(|n| {
+            n.id.trim_start_matches('N').parse::<usize>().unwrap_or(0)
+        });
+
         json!({
-            "notifications": state.notifications,
+            "notifications": to_save,
             "next_notification_id": state.next_notification_id,
             "spine_config": state.spine_config,
         })
@@ -44,6 +63,8 @@ impl Module for SpineModule {
                 state.spine_config = v;
             }
         }
+        // Prune stale processed notifications on load too
+        prune_notifications(&mut state.notifications);
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
@@ -112,4 +133,24 @@ impl Module for SpineModule {
             _ => None,
         }
     }
+}
+
+/// Prune processed notifications: keep all unprocessed + latest 10 processed.
+fn prune_notifications(notifications: &mut Vec<super::spine::types::Notification>) {
+    let processed_count = notifications.iter().filter(|n| n.processed).count();
+    if processed_count <= 10 {
+        return;
+    }
+    // Find the cutoff: we want to keep only the latest 10 processed.
+    // Notifications are in chronological order, so we drop the oldest processed ones.
+    let mut processed_seen = 0;
+    let drop_count = processed_count - 10;
+    notifications.retain(|n| {
+        if n.processed {
+            processed_seen += 1;
+            processed_seen > drop_count
+        } else {
+            true
+        }
+    });
 }

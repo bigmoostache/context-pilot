@@ -522,11 +522,13 @@ impl State {
         }
     }
 
-    /// Mark all UserMessage notifications as processed (called when a new stream starts)
+    /// Mark all "transparent" notifications (UserMessage, ReloadResume) as processed.
+    /// Called when a new stream starts — the LLM sees them via rebuilt context.
     pub fn mark_user_message_notifications_processed(&mut self) {
+        use crate::modules::spine::types::NotificationType;
         let mut changed = false;
         for n in &mut self.notifications {
-            if !n.processed && n.notification_type == crate::modules::spine::types::NotificationType::UserMessage {
+            if !n.processed && matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume) {
                 n.processed = true;
                 changed = true;
             }

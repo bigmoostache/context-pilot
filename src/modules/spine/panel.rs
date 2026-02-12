@@ -11,6 +11,15 @@ use super::types::NotificationType;
 
 pub struct SpinePanel;
 
+/// Format a millisecond timestamp as HH:MM:SS
+fn format_timestamp(ms: u64) -> String {
+    let secs = ms / 1000;
+    let hours = (secs % 86400) / 3600;
+    let minutes = (secs % 3600) / 60;
+    let seconds = secs % 60;
+    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+}
+
 impl SpinePanel {
     /// Format notifications for LLM context
     fn format_notifications_for_context(state: &State) -> String {
@@ -24,10 +33,10 @@ impl SpinePanel {
         let mut output = String::new();
 
         if !unprocessed.is_empty() {
-            output.push_str("=== Unprocessed Notifications ===\n");
             for n in &unprocessed {
-                output.push_str(&format!("[{}] {} — {} (source: {})\n",
-                    n.id, n.notification_type.label(), n.content, n.source));
+                let ts = format_timestamp(n.timestamp_ms);
+                output.push_str(&format!("[{}] {} {} — {}\n",
+                    n.id, ts, n.notification_type.label(), n.content));
             }
         } else {
             output.push_str("No unprocessed notifications.\n");
@@ -36,13 +45,14 @@ impl SpinePanel {
         if !recent_processed.is_empty() {
             output.push_str("\n=== Recent Processed ===\n");
             for n in &recent_processed {
-                output.push_str(&format!("[{}] {} — {}\n",
-                    n.id, n.notification_type.label(), n.content));
+                let ts = format_timestamp(n.timestamp_ms);
+                output.push_str(&format!("[{}] {} {} — {}\n",
+                    n.id, ts, n.notification_type.label(), n.content));
             }
         }
 
         // Show spine config summary
-        output.push_str(&format!("\n=== Spine Config ===\n"));
+        output.push_str("\n=== Spine Config ===\n");
         output.push_str(&format!("max_tokens_auto_continue: {}\n", state.spine_config.max_tokens_auto_continue));
         output.push_str(&format!("continue_until_todos_done: {}\n", state.spine_config.continue_until_todos_done));
         output.push_str(&format!("auto_continuation_count: {}\n", state.spine_config.auto_continuation_count));
@@ -90,38 +100,40 @@ impl Panel for SpinePanel {
         vec![ContextItem::new(id, "Spine", content, last_refresh_ms)]
     }
 
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+    fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         let mut lines: Vec<Line> = Vec::new();
 
         // === Unprocessed Notifications ===
         let unprocessed: Vec<_> = state.notifications.iter().filter(|n| !n.processed).collect();
 
-        lines.push(Line::from(vec![
-            Span::styled(" ▸ ", Style::default().fg(theme::accent()).bold()),
-            Span::styled("Unprocessed Notifications", Style::default().fg(theme::text()).bold()),
-            Span::styled(format!(" ({})", unprocessed.len()), Style::default().fg(theme::text_muted())),
-        ]));
-
         if unprocessed.is_empty() {
             lines.push(Line::from(vec![
-                Span::styled("   ", base_style),
-                Span::styled("None", Style::default().fg(theme::text_muted()).italic()),
+                Span::styled(
+                    "No unprocessed notifications".to_string(),
+                    Style::default().fg(theme::text_muted()).italic(),
+                ),
             ]));
         } else {
             for n in &unprocessed {
-                let type_color = match n.notification_type {
-                    NotificationType::UserMessage => theme::user(),
-                    NotificationType::MaxTokensTruncated => theme::warning(),
-                    NotificationType::TodoIncomplete => theme::accent(),
-                    NotificationType::Custom => theme::text_secondary(),
-                    NotificationType::ReloadResume => theme::text_muted(),
-                };
+                let type_color = notification_type_color(&n.notification_type);
+                let ts = format_timestamp(n.timestamp_ms);
                 lines.push(Line::from(vec![
-                    Span::styled("   ", base_style),
-                    Span::styled(format!("{}", n.id), Style::default().fg(theme::accent_dim())),
-                    Span::styled(" ", base_style),
-                    Span::styled(n.notification_type.label().to_string(), Style::default().fg(type_color).bold()),
-                    Span::styled(format!(" — {}", n.content), Style::default().fg(theme::text())),
+                    Span::styled(
+                        format!("{} ", n.id),
+                        Style::default().fg(type_color).bold(),
+                    ),
+                    Span::styled(
+                        format!("{} ", ts),
+                        Style::default().fg(theme::text_muted()),
+                    ),
+                    Span::styled(
+                        format!("{}", n.notification_type.label()),
+                        Style::default().fg(type_color),
+                    ),
+                    Span::styled(
+                        format!(" — {}", truncate_content(&n.content, 80)),
+                        Style::default().fg(theme::text()),
+                    ),
                 ]));
             }
         }
@@ -135,25 +147,34 @@ impl Panel for SpinePanel {
             .take(10)
             .collect();
 
-        lines.push(Line::from(vec![
-            Span::styled(" ▸ ", Style::default().fg(theme::text_muted())),
-            Span::styled("Recent Processed", Style::default().fg(theme::text_secondary())),
-            Span::styled(format!(" ({})", recent_processed.len()), Style::default().fg(theme::text_muted())),
-        ]));
-
-        if recent_processed.is_empty() {
+        if !recent_processed.is_empty() {
             lines.push(Line::from(vec![
-                Span::styled("   ", base_style),
-                Span::styled("None", Style::default().fg(theme::text_muted()).italic()),
+                Span::styled(
+                    format!("Processed ({})", recent_processed.len()),
+                    Style::default().fg(theme::text_muted()),
+                ),
             ]));
-        } else {
+
             for n in &recent_processed {
+                let type_color = notification_type_color(&n.notification_type);
+                let ts = format_timestamp(n.timestamp_ms);
                 lines.push(Line::from(vec![
-                    Span::styled("   ", base_style),
-                    Span::styled(format!("{}", n.id), Style::default().fg(theme::text_muted())),
-                    Span::styled(" ", base_style),
-                    Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::text_muted())),
-                    Span::styled(format!(" — {}", n.content), Style::default().fg(theme::text_muted())),
+                    Span::styled(
+                        format!("{} ", n.id),
+                        Style::default().fg(type_color),
+                    ),
+                    Span::styled(
+                        format!("{} ", ts),
+                        Style::default().fg(theme::text_muted()),
+                    ),
+                    Span::styled(
+                        format!("{}", n.notification_type.label()),
+                        Style::default().fg(theme::text_muted()),
+                    ),
+                    Span::styled(
+                        format!(" — {}", truncate_content(&n.content, 60)),
+                        Style::default().fg(theme::text_muted()),
+                    ),
                 ]));
             }
         }
@@ -162,8 +183,10 @@ impl Panel for SpinePanel {
 
         // === Config Summary ===
         lines.push(Line::from(vec![
-            Span::styled(" ▸ ", Style::default().fg(theme::text_muted())),
-            Span::styled("Config", Style::default().fg(theme::text_secondary())),
+            Span::styled(
+                "Config".to_string(),
+                Style::default().fg(theme::text_secondary()),
+            ),
         ]));
 
         let config_items = vec![
@@ -174,13 +197,35 @@ impl Panel for SpinePanel {
 
         for (key, val) in config_items {
             lines.push(Line::from(vec![
-                Span::styled("   ", base_style),
-                Span::styled(key.to_string(), Style::default().fg(theme::text_muted())),
-                Span::styled(": ", Style::default().fg(theme::text_muted())),
+                Span::styled(
+                    format!("  {}", key),
+                    Style::default().fg(theme::text_muted()),
+                ),
+                Span::styled(": ".to_string(), Style::default().fg(theme::text_muted())),
                 Span::styled(val, Style::default().fg(theme::text())),
             ]));
         }
 
         lines
+    }
+}
+
+fn notification_type_color(nt: &NotificationType) -> Color {
+    match nt {
+        NotificationType::UserMessage => theme::user(),
+        NotificationType::MaxTokensTruncated => theme::warning(),
+        NotificationType::TodoIncomplete => theme::accent(),
+        NotificationType::ReloadResume => theme::text_secondary(),
+        NotificationType::Custom => theme::text_secondary(),
+    }
+}
+
+/// Truncate content for display, appending "..." if truncated
+fn truncate_content(s: &str, max_chars: usize) -> String {
+    let first_line = s.lines().next().unwrap_or(s);
+    if first_line.len() > max_chars {
+        format!("{}...", &first_line[..max_chars])
+    } else {
+        first_line.to_string()
     }
 }
