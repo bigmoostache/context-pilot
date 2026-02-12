@@ -287,37 +287,19 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     match output {
         Ok(out) if out.status.success() => {
-            // Wait for command output to appear
-            std::thread::sleep(std::time::Duration::from_millis(TMUX_SEND_DELAY_MS));
+            // Set a timer for deferred tmux capture (non-blocking).
+            // The main loop will wait for this timer before continuing the stream,
+            // ensuring the LLM sees fresh tmux panel content.
+            // Use max() so multiple send_keys in one batch don't shorten each other's wait.
+            let new_deadline = crate::core::panels::now_ms() + TMUX_SEND_DELAY_MS;
+            state.tool_sleep_until_ms = state.tool_sleep_until_ms.max(new_deadline);
 
-            // Find the context element for this pane and synchronously capture fresh content
+            // Update last_keys on the context element
             let context_id = if let Some(ctx) = state.context.iter_mut()
                 .find(|c| c.tmux_pane_id.as_deref() == Some(pane_id.as_str()))
             {
                 ctx.tmux_last_keys = Some(keys.to_string());
-                let ctx_id = ctx.id.clone();
-                let lines = ctx.tmux_lines.unwrap_or(50);
-
-                // Synchronously capture pane content
-                let start_line = format!("-{}", lines);
-                if let Ok(capture) = Command::new("tmux")
-                    .args(["capture-pane", "-p", "-S", &start_line, "-t", &pane_id])
-                    .output()
-                {
-                    if capture.status.success() {
-                        let content = String::from_utf8_lossy(&capture.stdout).to_string();
-                        let new_hash = crate::cache::hash_content(&content);
-                        ctx.token_count = crate::state::estimate_tokens(&content);
-                        ctx.total_pages = crate::state::compute_total_pages(ctx.token_count);
-                        ctx.current_page = 0;
-                        ctx.tmux_last_lines_hash = Some(new_hash.clone());
-                        ctx.cached_content = Some(content.clone());
-                        ctx.cache_deprecated = false;
-                        crate::core::panels::update_if_changed(ctx, &content);
-                    }
-                }
-
-                Some(ctx_id)
+                Some(ctx.id.clone())
             } else {
                 None
             };
@@ -354,7 +336,8 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// The main event loop checks the timer and refreshes tmux panels when it expires.
 pub fn execute_sleep(tool: &ToolUse, state: &mut State) -> ToolResult {
     let sleep_ms = SLEEP_DURATION_SECS * 1000;
-    state.tool_sleep_until_ms = crate::core::panels::now_ms() + sleep_ms;
+    let new_deadline = crate::core::panels::now_ms() + sleep_ms;
+    state.tool_sleep_until_ms = state.tool_sleep_until_ms.max(new_deadline);
 
     ToolResult {
         tool_use_id: tool.id.clone(),
