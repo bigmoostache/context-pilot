@@ -56,6 +56,8 @@ pub struct App {
     resume_stream: bool,
     /// Command palette state
     pub command_palette: CommandPalette,
+    /// Timestamp (ms) when wait_for_panels started (for timeout)
+    wait_started_ms: u64,
 }
 
 impl App {
@@ -83,6 +85,7 @@ impl App {
             api_check_rx: None,
             resume_stream,
             command_palette: CommandPalette::new(),
+            wait_started_ms: 0,
         }
     }
 
@@ -176,13 +179,15 @@ impl App {
             self.process_tldr_results(&tldr_rx);
             self.process_cache_updates(&cache_rx);
             self.process_watcher_events();
+            // Check if we're waiting for panels and they're ready (non-blocking)
+            self.check_waiting_for_panels(&tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
                 self.sync_gh_watches();
             }
             self.check_timer_based_deprecation();
-            self.handle_tool_execution(&tx, &tldr_tx, &cache_rx, terminal);
+            self.handle_tool_execution(&tx, &tldr_tx);
             self.finalize_stream(&tldr_tx);
             self.check_spine(&tx, &tldr_tx);
             self.process_api_check_results();
@@ -313,7 +318,7 @@ impl App {
         }
     }
 
-    fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>, cache_rx: &Receiver<CacheUpdate>, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
+    fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
         if !self.state.is_streaming || self.pending_done.is_none() || !self.typewriter.pending_chars.is_empty() || self.pending_tools.is_empty() {
             return;
         }
@@ -444,12 +449,22 @@ impl App {
 
         save_state(&self.state);
 
-        // Wait for any dirty file panels to be loaded before continuing
-        super::wait::wait_for_panels(&mut self.state, cache_rx, &self.cache_tx, terminal, |state, rx| {
-            Self::process_cache_updates_static(state, rx);
-        });
+        // Trigger background cache refresh for dirty file panels (non-blocking)
+        super::wait::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
 
-        // Continue streaming
+        // Check if we need to wait for panels before continuing stream
+        if super::wait::has_dirty_file_panels(&self.state) {
+            // Set waiting flag — main loop will check and continue streaming when ready
+            self.state.waiting_for_panels = true;
+            self.wait_started_ms = now_ms();
+        } else {
+            // No dirty panels — continue streaming immediately
+            self.continue_streaming(tx);
+        }
+    }
+
+    /// Continue streaming after tool execution (called when panels are ready).
+    fn continue_streaming(&mut self, tx: &Sender<StreamEvent>) {
         let ctx = prepare_stream_context(&mut self.state, true);
         let system_prompt = get_active_agent_content(&self.state);
         self.typewriter.reset();
@@ -459,6 +474,23 @@ impl App {
             self.state.current_model(),
             ctx.messages, ctx.context_items, ctx.tools, None, system_prompt.clone(), Some(system_prompt), DEFAULT_WORKER_ID.to_string(), tx.clone(),
         );
+    }
+
+    /// Non-blocking check: if we're waiting for file panels to load,
+    /// check if they're ready (or timed out) and continue streaming.
+    fn check_waiting_for_panels(&mut self, tx: &Sender<StreamEvent>) {
+        if !self.state.waiting_for_panels {
+            return;
+        }
+
+        let panels_ready = !super::wait::has_dirty_file_panels(&self.state);
+        let timed_out = now_ms().saturating_sub(self.wait_started_ms) >= 5_000;
+
+        if panels_ready || timed_out {
+            self.state.waiting_for_panels = false;
+            self.state.dirty = true;
+            self.continue_streaming(tx);
+        }
     }
 
     fn finalize_stream(&mut self, tldr_tx: &Sender<TlDrResult>) {
