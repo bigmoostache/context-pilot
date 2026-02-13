@@ -81,6 +81,8 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,
+        panel_cache_hit: false,
+        panel_total_cost: panel.panel_total_cost.unwrap_or(0.0),
     }
 }
 
@@ -385,6 +387,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
                 result_command_hash: ctx.result_command_hash.clone(),
                 skill_prompt_id: ctx.skill_prompt_id.clone(),
                 content_hash: ctx.content_hash.clone(),
+                panel_total_cost: if ctx.panel_total_cost > 0.0 { Some(ctx.panel_total_cost) } else { None },
             };
             if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
                 writes.push(WriteOp {

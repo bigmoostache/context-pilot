@@ -51,10 +51,13 @@ pub fn generate_context_content(state: &State) -> String {
             _ => String::new(),
         };
 
+        let hit_miss = if ctx.panel_cache_hit { "✓" } else { "✗" };
+        let cost = format!("${:.2}", ctx.panel_total_cost);
+
         if details.is_empty() {
-            output.push_str(&format!("  {} {}: {} tokens\n", ctx.id, type_name, ctx.token_count));
+            output.push_str(&format!("  {} {}: {} tokens {} {}\n", ctx.id, type_name, ctx.token_count, cost, hit_miss));
         } else {
-            output.push_str(&format!("  {} {} ({}): {} tokens\n", ctx.id, type_name, details, ctx.token_count));
+            output.push_str(&format!("  {} {} ({}): {} tokens {} {}\n", ctx.id, type_name, details, ctx.token_count, cost, hit_miss));
         }
     }
 

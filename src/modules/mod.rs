@@ -182,6 +182,8 @@ pub fn make_default_context_element(
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,
+        panel_cache_hit: false,
+        panel_total_cost: 0.0,
     }
 }
 

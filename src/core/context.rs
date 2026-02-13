@@ -1,4 +1,5 @@
 use crate::core::panels::{collect_all_context, now_ms, refresh_all_panels, ContextItem};
+use crate::cache::hash_content;
 use crate::constants::{DETACH_CHUNK_MIN_MESSAGES, DETACH_CHUNK_MIN_TOKENS, DETACH_KEEP_MIN_MESSAGES, DETACH_KEEP_MIN_TOKENS};
 use crate::state::{
     compute_total_pages, estimate_tokens, ContextElement, ContextType,
@@ -38,7 +39,58 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
     refresh_all_panels(state);
 
     // Collect all context items from panels
-    let context_items = collect_all_context(state);
+    let mut context_items = collect_all_context(state);
+
+    // Sort panels by last_refresh_ms ascending (oldest first, newest closest
+    // to conversation). This ordering determines prompt caching: the LLM
+    // provider sees panels in this order, and Anthropic-style prefix caching
+    // means earlier panels are more likely to be cache hits.
+    context_items.sort_by_key(|item| item.last_refresh_ms);
+
+    // === Panel cache cost tracking ===
+    // Hash each panel's content (what the LLM literally sees), build an ordered
+    // hash list, compare to previous tick's list via prefix matching, and
+    // accumulate per-panel costs based on cache hit/miss pricing.
+    {
+        // Build hash list from panel content (excluding "chat" which is conversation)
+        let panel_hashes: Vec<(String, String, usize)> = context_items.iter()
+            .filter(|item| item.id != "chat")
+            .map(|item| {
+                let h = hash_content(&item.content);
+                (item.id.clone(), h, estimate_tokens(&item.content))
+            })
+            .collect();
+
+        let new_hash_list: Vec<String> = panel_hashes.iter()
+            .map(|(_, h, _)| h.clone())
+            .collect();
+
+        // Find max prefix match index
+        let prev = &state.previous_panel_hash_list;
+        let prefix_len = new_hash_list.iter()
+            .zip(prev.iter())
+            .take_while(|(a, b)| a == b)
+            .count();
+
+        // Get pricing from current model
+        let hit_price = state.cache_hit_price_per_mtok();
+        let miss_price = state.cache_miss_price_per_mtok();
+
+        // Update each panel's cache hit status and accumulate cost
+        for (i, (panel_id, _, token_count)) in panel_hashes.iter().enumerate() {
+            let is_hit = i < prefix_len;
+            let price = if is_hit { hit_price } else { miss_price };
+            let cost = *token_count as f64 * price as f64 / 1_000_000.0;
+
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.id == *panel_id) {
+                ctx.panel_cache_hit = is_hit;
+                ctx.panel_total_cost += cost;
+            }
+        }
+
+        // Store hash list for next tick
+        state.previous_panel_hash_list = new_hash_list;
+    }
 
     // Dynamically enable/disable panel_goto_page based on whether any panel is paginated
     let has_paginated = state.context.iter().any(|c| c.total_pages > 1);
@@ -290,6 +342,8 @@ pub fn detach_conversation_chunks(state: &mut State) {
             current_page: 0,
             total_pages,
             full_token_count: token_count,
+            panel_cache_hit: false,
+            panel_total_cost: 0.0,
         });
 
         // 8. Remove detached messages from state and disk

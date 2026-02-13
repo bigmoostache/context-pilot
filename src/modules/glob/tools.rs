@@ -73,6 +73,8 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,
+        panel_cache_hit: false,
+        panel_total_cost: 0.0,
     });
 
     ToolResult {

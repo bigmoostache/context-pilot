@@ -154,6 +154,9 @@ pub struct PanelData {
     /// Content hash for change detection across reloads
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_hash: Option<String>,
+    /// Accumulated panel cost in USD (never resets)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub panel_total_cost: Option<f64>,
 }
 
 /// UIDs for important/fixed panels that a worker uses.

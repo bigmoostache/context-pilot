@@ -28,6 +28,20 @@ impl Module for CoreModule {
     fn is_core(&self) -> bool { true }
     fn is_global(&self) -> bool { true }
 
+    fn save_worker_data(&self, state: &State) -> serde_json::Value {
+        json!({
+            "previous_panel_hash_list": state.previous_panel_hash_list,
+        })
+    }
+
+    fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
+        if let Some(arr) = data.get("previous_panel_hash_list").and_then(|v| v.as_array()) {
+            state.previous_panel_hash_list = arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect();
+        }
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         json!({
             "active_modules": state.active_modules.iter().collect::<Vec<_>>(),

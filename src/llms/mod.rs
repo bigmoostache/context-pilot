@@ -542,18 +542,15 @@ pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
 
 /// Prepare context items for injection as fake tool call/result pairs.
 /// - Filters out Conversation (id="chat") — it's sent as actual messages, not a panel
-/// - Sorts by last_refresh_ms ascending (oldest first, so newest is closest to conversation)
+/// - Items are assumed to be pre-sorted by last_refresh_ms (done in prepare_stream_context)
 /// - Returns FakePanelMessage structs that providers can convert to their format
 pub fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMessage> {
     // Filter out Conversation panel (id="chat") — it's the live message feed, not a context panel
-    let mut filtered: Vec<&ContextItem> = context_items
+    let filtered: Vec<&ContextItem> = context_items
         .iter()
         .filter(|item| !item.content.is_empty())
         .filter(|item| item.id != "chat")
         .collect();
-
-    // Sort by last_refresh_ms ascending (oldest first)
-    filtered.sort_by_key(|item| item.last_refresh_ms);
 
     filtered
         .into_iter()

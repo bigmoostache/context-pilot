@@ -153,6 +153,12 @@ pub struct ContextElement {
     /// Full content token count (before pagination). token_count reflects current page.
     #[serde(skip)]
     pub full_token_count: usize,
+    /// Whether this panel was a cache hit on the last LLM tick (prefix match)
+    #[serde(skip)]
+    pub panel_cache_hit: bool,
+    /// Accumulated cost of this panel across all ticks ($USD). Never resets.
+    #[serde(skip)]
+    pub panel_total_cost: f64,
 }
 
 /// Estimate tokens from text (uses CHARS_PER_TOKEN constant)

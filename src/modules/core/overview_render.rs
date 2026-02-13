@@ -192,6 +192,8 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
         Cell::new("ID", Style::default()),
         Cell::new("Type", Style::default()),
         Cell::right("Tokens", Style::default()),
+        Cell::right("Cost", Style::default()),
+        Cell::new("Hit", Style::default()),
         Cell::new("Refreshed", Style::default()),
         Cell::new("Details", Style::default()),
     ];
@@ -258,10 +260,19 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
         let icon = ctx.context_type.icon();
         let id_with_icon = format!("{}{}", icon, ctx.id);
 
+        let cost_str = format!("${:.2}", ctx.panel_total_cost);
+        let (hit_str, hit_color) = if ctx.panel_cache_hit {
+            ("\u{2713}", theme::success())
+        } else {
+            ("\u{2717}", theme::error())
+        };
+
         vec![
             Cell::new(id_with_icon, Style::default().fg(theme::accent_dim())),
             Cell::new(type_name, Style::default().fg(theme::text_secondary())),
             Cell::right(format_number(ctx.token_count), Style::default().fg(theme::accent())),
+            Cell::right(cost_str, Style::default().fg(theme::text_muted())),
+            Cell::new(hit_str, Style::default().fg(hit_color)),
             Cell::new(refreshed, Style::default().fg(theme::text_muted())),
             Cell::new(truncated_details, Style::default().fg(theme::text_muted())),
         ]
