@@ -94,6 +94,13 @@ fn load_state_new() -> State {
     let mut context: Vec<ContextElement> = Vec::new();
     let important = &worker_state.important_panel_uids;
 
+    // Load Conversation panel (special: not in FIXED_PANEL_ORDER, uses id "chat")
+    if let Some(uid) = important.get(&ContextType::Conversation) {
+        if let Some(panel_data) = panel::load_panel(uid) {
+            context.push(panel_to_context(&panel_data, "chat"));
+        }
+    }
+
     // Load fixed panels in canonical order (P0-P7) from module registry
     let defaults = crate::modules::all_fixed_panel_defaults();
     for (pos, (_, _, ct, name, cache_deprecated)) in defaults.iter().enumerate() {
@@ -306,16 +313,18 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     // Build important_panel_uids
     let mut important_uids: HashMap<ContextType, String> = HashMap::new();
     for ctx in &state.context {
-        if ctx.context_type.is_fixed() && ctx.context_type != ContextType::System && ctx.context_type != ContextType::Library {
+        let dominated = (ctx.context_type.is_fixed() || ctx.context_type == ContextType::Conversation)
+            && ctx.context_type != ContextType::System && ctx.context_type != ContextType::Library;
+        if dominated {
             if let Some(uid) = &ctx.uid {
                 important_uids.insert(ctx.context_type, uid.clone());
             }
         }
     }
 
-    // Build panel_uid_to_local_id
+    // Build panel_uid_to_local_id (dynamic panels only — excludes fixed and Conversation)
     let panel_uid_to_local_id: HashMap<String, String> = state.context.iter()
-        .filter(|c| c.uid.is_some() && !c.context_type.is_fixed())
+        .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type != ContextType::Conversation)
         .filter_map(|c| c.uid.as_ref().map(|uid| (uid.clone(), c.id.clone())))
         .collect();
 

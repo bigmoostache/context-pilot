@@ -111,9 +111,24 @@ pub fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
         .with_keywords(vec!["settings", "options", "preferences", "provider", "model"])
     );
 
-    // Panel navigation commands (P0, P1, P2, ...)
+    // Conversation entry (special: no Px ID, always first in panels)
+    if let Some(conv) = state.context.iter().find(|c| c.context_type == crate::state::ContextType::Conversation) {
+        let icon = conv.context_type.icon();
+        commands.push(
+            PaletteCommand::new(
+                &conv.id,
+                format!("{} Conversation", icon),
+                "Go to conversation",
+            )
+            .with_keywords(vec!["conversation", "chat", "messages", "panel", "go", "navigate"])
+        );
+    }
+
+    // Panel navigation commands (P1, P2, ...)
     // Sort by P-number for consistent ordering
-    let mut sorted_contexts: Vec<_> = state.context.iter().collect();
+    let mut sorted_contexts: Vec<_> = state.context.iter()
+        .filter(|c| c.context_type != crate::state::ContextType::Conversation)
+        .collect();
     sorted_contexts.sort_by(|a, b| {
         let id_a = a.id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
         let id_b = b.id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);

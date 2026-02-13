@@ -1076,10 +1076,12 @@ impl App {
                             return None; // Won't reach here, but needed for type system
                         }
                         "config" => return Some(Action::ToggleConfigView),
-                        _ if id.starts_with('P') => {
-                            return Some(Action::SelectContextById(id));
+                        _ => {
+                            // Navigate to any context panel (P-prefixed or special IDs like "chat")
+                            if self.state.context.iter().any(|c| c.id == id) {
+                                return Some(Action::SelectContextById(id));
+                            }
                         }
-                        _ => {}
                     }
                 }
                 Some(Action::None)

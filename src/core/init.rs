@@ -46,8 +46,11 @@ pub fn ensure_default_contexts(state: &mut State) {
         state.context.insert(insert_pos, elem);
     }
 
+    // Assign UID to Conversation (needed for panels/ storage — it holds message_uids)
+    assign_panel_uid(state, ContextType::Conversation);
+
     // Assign UIDs to all existing fixed panels (needed for panels/ storage)
-    // System, Library, and Conversation panels don't need UIDs
+    // Library panels don't need UIDs (rendered from in-memory state)
     for (_, _, ct, _, _) in &defaults {
         if *ct != ContextType::Library && state.context.iter().any(|c| c.context_type == *ct) {
             assign_panel_uid(state, *ct);
