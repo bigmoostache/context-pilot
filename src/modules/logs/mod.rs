@@ -274,11 +274,18 @@ fn push_log_with_timestamp(state: &mut State, content: String, timestamp_ms: u64
     state.logs.push(LogEntry::with_timestamp(id, content, timestamp_ms));
 }
 
-/// Helper: mark logs panel cache as deprecated
-fn deprecate_logs_cache(state: &mut State) {
+/// Helper: touch logs panel to update last_refresh_ms and recalculate token count.
+/// The Logs panel renders live from state.logs (no background cache), so
+/// cache_deprecated is meaningless for it. Instead we bump refresh time
+/// for correct LLM panel ordering and update token_count for sidebar display.
+fn touch_logs_panel(state: &mut State) {
+    let content = panel::LogsPanel::format_logs_tree(state);
+    let token_count = estimate_tokens(&content);
+    let now = crate::core::panels::now_ms();
     for ctx in &mut state.context {
         if ctx.context_type == ContextType::Logs {
-            ctx.cache_deprecated = true;
+            ctx.token_count = token_count;
+            ctx.last_refresh_ms = now;
         }
     }
 }
@@ -314,7 +321,7 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if count > 0 {
-        deprecate_logs_cache(state);
+        touch_logs_panel(state);
     }
 
     ToolResult {
@@ -557,7 +564,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         }
         if log_count > 0 {
             output_parts.push(format!("Created {} log(s)", log_count));
-            deprecate_logs_cache(state);
+            touch_logs_panel(state);
         }
     }
 
