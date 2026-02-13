@@ -62,13 +62,14 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         let indicator_color = if is_selected { theme::accent() } else { theme::bg_base() };
         let name_color = if is_selected { theme::accent() } else { theme::text_secondary() };
         let icon = crate::state::ContextType::Conversation.icon();
+        let conv_tokens = format_number(state.context[conv_idx].token_count);
 
         lines.push(Line::from(vec![
             Span::styled(format!(" {}", indicator), Style::default().fg(indicator_color)),
             Span::styled(format!(" {:>width$} ", "", width = id_width), Style::default().fg(theme::text_muted())),
             Span::styled(icon, Style::default().fg(if is_selected { theme::accent() } else { theme::text_muted() })),
             Span::styled(format!("{:<18}", "Conversation"), Style::default().fg(name_color)),
-            Span::styled(format!("{:>6}", ""), base_style),
+            Span::styled(format!("{:>6}", conv_tokens), Style::default().fg(theme::accent_dim())),
             Span::styled(" ", base_style),
         ]));
     }
