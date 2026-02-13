@@ -76,7 +76,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         // Use saved timestamp if available, otherwise current time for new panels
         last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::core::panels::now_ms() },
         last_polled_ms: 0,
-        content_hash: None,
+        content_hash: panel.content_hash.clone(),
         tmux_last_lines_hash: None,
         current_page: 0,
         total_pages: 1,
@@ -384,6 +384,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
                 result_command: ctx.result_command.clone(),
                 result_command_hash: ctx.result_command_hash.clone(),
                 skill_prompt_id: ctx.skill_prompt_id.clone(),
+                content_hash: ctx.content_hash.clone(),
             };
             if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
                 writes.push(WriteOp {

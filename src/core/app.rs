@@ -762,6 +762,15 @@ impl App {
     fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpdate>) {
         let _guard = crate::profile!("app::cache_updates");
         while let Ok(update) = cache_rx.try_recv() {
+            // Handle Unchanged early — just clear in_flight, no panel dispatch needed
+            if let CacheUpdate::Unchanged { ref context_id } = update {
+                if let Some(ctx) = state.context.iter_mut().find(|c| c.id == *context_id) {
+                    ctx.cache_in_flight = false;
+                    ctx.last_polled_ms = now_ms();
+                }
+                continue;
+            }
+
             let context_type = update.context_type();
             let panel = crate::core::panels::get_panel(context_type);
 
@@ -790,9 +799,10 @@ impl App {
             }
             state.context.insert(idx, ctx);
 
-            if changed {
-                state.dirty = true;
-            }
+            // Always mark dirty — even unchanged updates may have populated
+            // cached_content from None (initial load after reload), which
+            // needs a repaint to clear "Loading..." in the UI.
+            state.dirty = true;
         }
     }
 

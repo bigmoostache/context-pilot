@@ -2,7 +2,7 @@ mod panel;
 pub(crate) mod tools;
 
 /// Deprecation timer for tmux panels (milliseconds)
-pub const TMUX_DEPRECATION_MS: u64 = 1_000; // 1 second (check hash of last 2 lines)
+pub const TMUX_DEPRECATION_MS: u64 = 100; // 100ms — capture-pane is a cheap kernel pipe read
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};

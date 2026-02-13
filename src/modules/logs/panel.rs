@@ -14,7 +14,7 @@ impl LogsPanel {
     /// Build the text representation used for both LLM context and UI content.
     /// Shows tree structure: top-level logs, summaries with collapse/expand,
     /// and indented children when expanded.
-    fn format_logs_tree(state: &State) -> String {
+    pub fn format_logs_tree(state: &State) -> String {
         if state.logs.is_empty() {
             return "No logs".to_string();
         }

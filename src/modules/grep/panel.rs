@@ -51,15 +51,16 @@ impl Panel for GrepPanel {
             return false;
         };
         ctx.cache_deprecated = false;
-        // Check if content actually changed before updating
+        // Always update cached content (needed after reload when cached_content is None)
+        ctx.cached_content = Some(content.clone());
+        ctx.token_count = token_count;
+        ctx.total_pages = compute_total_pages(token_count);
+        ctx.current_page = 0;
+        // Only report "changed" when content hash differs
         let new_hash = crate::cache::hash_content(&content);
         if ctx.content_hash.as_deref() == Some(&new_hash) {
             return false;
         }
-        ctx.cached_content = Some(content);
-        ctx.token_count = token_count;
-        ctx.total_pages = compute_total_pages(token_count);
-        ctx.current_page = 0;
         ctx.content_hash = Some(new_hash);
         true
     }

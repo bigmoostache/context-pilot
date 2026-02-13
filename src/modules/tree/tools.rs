@@ -305,24 +305,6 @@ fn normalize_path(path: &Path) -> String {
     }
 }
 
-/// Count children of a directory (respecting gitignore filter)
-fn count_children(dir: &Path, gitignore: &Option<ignore::gitignore::Gitignore>) -> usize {
-    let Ok(entries) = fs::read_dir(dir) else { return 0 };
-
-    entries
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            let path = e.path();
-            let is_dir = path.is_dir();
-            if let Some(gi) = gitignore {
-                !gi.matched(&path, is_dir).is_ignore()
-            } else {
-                true
-            }
-        })
-        .count()
-}
-
 fn build_tree_new(
     dir: &Path,
     dir_path_str: &str,
@@ -377,7 +359,6 @@ fn build_tree_new(
 
         if is_dir {
             let is_open = open_set.contains(&entry_path);
-            let child_count = count_children(&entry.path(), gitignore);
 
             // Check for folder description
             let folder_desc = desc_map.get(&entry_path).map(|d| &d.description);
@@ -398,20 +379,13 @@ fn build_tree_new(
                     output,
                 );
             } else {
-                // Closed folder - show child count and description if any
-                let children_text = if child_count == 1 { "1 child" } else { &format!("{} children", child_count) };
                 if let Some(desc) = folder_desc {
-                    output.push_str(&format!("{}{}{}/ ({}) - {}\n", prefix, connector, name_str, children_text, desc));
+                    output.push_str(&format!("{}{}{}/ - {}\n", prefix, connector, name_str, desc));
                 } else {
-                    output.push_str(&format!("{}{}{}/ ({})\n", prefix, connector, name_str, children_text));
+                    output.push_str(&format!("{}{}{}/\n", prefix, connector, name_str));
                 }
             }
         } else {
-            // File - show description if available
-            let size_str = entry.metadata()
-                .map(|m| format_file_size(m.len()))
-                .unwrap_or_default();
-
             if let Some(desc) = desc_map.get(&entry_path) {
                 // Check if description is stale
                 let current_hash = compute_file_hash(&entry.path()).unwrap_or_default();
@@ -419,22 +393,13 @@ fn build_tree_new(
 
                 let stale_marker = if is_stale { " [!]" } else { "" };
                 output.push_str(&format!(
-                    "{}{}{} {}{} - {}\n",
-                    prefix, connector, name_str, size_str, stale_marker, desc.description
+                    "{}{}{}{} - {}\n",
+                    prefix, connector, name_str, stale_marker, desc.description
                 ));
             } else {
-                output.push_str(&format!("{}{}{} {}\n", prefix, connector, name_str, size_str));
+                output.push_str(&format!("{}{}{}\n", prefix, connector, name_str));
             }
         }
     }
 }
 
-fn format_file_size(bytes: u64) -> String {
-    if bytes >= 1_000_000 {
-        format!("{}M", bytes / 1_000_000)
-    } else if bytes >= 1_000 {
-        format!("{}K", bytes / 1_000)
-    } else {
-        format!("{}B", bytes)
-    }
-}

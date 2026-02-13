@@ -151,6 +151,9 @@ pub struct PanelData {
     /// Skill prompt ID (for Skill panels)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill_prompt_id: Option<String>,
+    /// Content hash for change detection across reloads
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_hash: Option<String>,
 }
 
 /// UIDs for important/fixed panels that a worker uses.
