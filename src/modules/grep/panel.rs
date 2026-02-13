@@ -50,13 +50,18 @@ impl Panel for GrepPanel {
         let CacheUpdate::GrepContent { content, token_count, .. } = update else {
             return false;
         };
+        ctx.cache_deprecated = false;
+        // Check if content actually changed before updating
+        let new_hash = crate::cache::hash_content(&content);
+        if ctx.content_hash.as_deref() == Some(&new_hash) {
+            return false;
+        }
         ctx.cached_content = Some(content);
         ctx.token_count = token_count;
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
-        ctx.cache_deprecated = false;
-        let content_ref = ctx.cached_content.clone().unwrap_or_default();
-        update_if_changed(ctx, &content_ref);
+        ctx.content_hash = Some(new_hash);
+        ctx.last_refresh_ms = crate::core::panels::now_ms();
         true
     }
 
