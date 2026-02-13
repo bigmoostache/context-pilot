@@ -142,6 +142,7 @@ pub struct TodosAutomaticContinuation;
 impl AutoContinuation for TodosAutomaticContinuation {
     fn should_continue(&self, state: &State) -> bool {
         state.spine_config.continue_until_todos_done
+            && !state.spine_config.user_stopped
             && state.has_incomplete_todos()
     }
 

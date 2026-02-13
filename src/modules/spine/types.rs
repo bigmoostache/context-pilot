@@ -81,6 +81,11 @@ pub struct SpineConfig {
     #[serde(default)]
     pub max_auto_retries: Option<usize>,
 
+    /// User explicitly stopped streaming (Esc). Pauses auto-continuation
+    /// without disabling it. Cleared when user sends a new message.
+    #[serde(default)]
+    pub user_stopped: bool,
+
     // === Runtime tracking (persisted for guard rails) ===
     /// Count of consecutive auto-continuations without human input
     #[serde(default)]
@@ -121,6 +126,7 @@ impl Default for SpineConfig {
             max_duration_secs: None,
             max_messages: None,
             max_auto_retries: None,
+            user_stopped: false,
             auto_continuation_count: 0,
             autonomous_start_ms: None,
         }
