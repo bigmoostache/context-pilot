@@ -61,6 +61,7 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     // Any human input resets auto-continuation counters — human is back in the loop
     state.spine_config.auto_continuation_count = 0;
     state.spine_config.autonomous_start_ms = None;
+    state.spine_config.user_stopped = false;
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends

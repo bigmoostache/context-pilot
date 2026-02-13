@@ -16,9 +16,16 @@ fn assign_panel_uid(state: &mut State, context_type: ContextType) {
 
 /// Ensure all default context elements exist with correct IDs.
 /// Uses the module registry to determine which fixed panels to create.
-/// P0 = Seed (System), P1 = Chat (Conversation), P2 = Tree, P3 = WIP (Todo),
-/// P4 = Memories, P5 = World (Overview), P6 = Changes (Git), P7 = Scratch (Scratchpad)
+/// Conversation is special: it's always created but not numbered (no Px ID in sidebar).
+/// P1 = Todo, P2 = Library, P3 = Overview, P4 = Tree, P5 = Memory,
+/// P6 = Spine, P7 = Logs, P8 = Git, P9 = Scratchpad
 pub fn ensure_default_contexts(state: &mut State) {
+    // Ensure Conversation exists (special: no numbered Px, always first in context list)
+    if !state.context.iter().any(|c| c.context_type == ContextType::Conversation) {
+        let elem = modules::make_default_context_element("chat", ContextType::Conversation, "Chat", true);
+        state.context.insert(0, elem);
+    }
+
     let defaults = modules::all_fixed_panel_defaults();
 
     for (pos, (module_id, is_core, ct, name, cache_deprecated)) in defaults.iter().enumerate() {
@@ -32,15 +39,17 @@ pub fn ensure_default_contexts(state: &mut State) {
             continue;
         }
 
-        let id = format!("P{}", pos);
+        // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
+        let id = format!("P{}", pos + 1);
+        let insert_pos = (pos + 1).min(state.context.len()); // +1 to account for Conversation at index 0
         let elem = modules::make_default_context_element(&id, *ct, name, *cache_deprecated);
-        state.context.insert(pos.min(state.context.len()), elem);
+        state.context.insert(insert_pos, elem);
     }
 
     // Assign UIDs to all existing fixed panels (needed for panels/ storage)
-    // System and Library panels don't need UIDs (they're never stored as separate panel files)
+    // System, Library, and Conversation panels don't need UIDs
     for (_, _, ct, _, _) in &defaults {
-        if *ct != ContextType::System && *ct != ContextType::Library && state.context.iter().any(|c| c.context_type == *ct) {
+        if *ct != ContextType::Library && state.context.iter().any(|c| c.context_type == *ct) {
             assign_panel_uid(state, *ct);
         }
     }

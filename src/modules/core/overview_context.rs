@@ -12,7 +12,12 @@ pub fn generate_context_content(state: &State) -> String {
         total_tokens, threshold, budget, usage_pct);
 
     output.push_str("Context Elements:\n");
-    for ctx in &state.context {
+
+    // Sort by last_refresh_ms ascending (oldest first = same order LLM sees them)
+    let mut sorted_contexts: Vec<&crate::state::ContextElement> = state.context.iter().collect();
+    sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
+
+    for ctx in &sorted_contexts {
         let type_name = match ctx.context_type {
             ContextType::System => "seed",
             ContextType::Conversation => "chat",

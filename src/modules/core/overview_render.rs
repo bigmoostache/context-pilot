@@ -192,10 +192,17 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
         Cell::new("ID", Style::default()),
         Cell::new("Type", Style::default()),
         Cell::right("Tokens", Style::default()),
+        Cell::new("Refreshed", Style::default()),
         Cell::new("Details", Style::default()),
     ];
 
-    let rows: Vec<Vec<Cell>> = state.context.iter().map(|ctx| {
+    // Sort by last_refresh_ms ascending (oldest first = same order LLM sees them)
+    let mut sorted_contexts: Vec<&crate::state::ContextElement> = state.context.iter().collect();
+    sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
+
+    let now_ms = crate::core::panels::now_ms();
+
+    let rows: Vec<Vec<Cell>> = sorted_contexts.iter().map(|ctx| {
         let type_name = match ctx.context_type {
             ContextType::System => "system",
             ContextType::Conversation => "conversation",
@@ -233,10 +240,19 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
             _ => String::new(),
         };
 
-        let truncated_details = if details.len() > 40 {
-            format!("{}...", &details[..details.floor_char_boundary(37)])
+        let truncated_details = if details.len() > 30 {
+            format!("{}...", &details[..details.floor_char_boundary(27)])
         } else {
             details
+        };
+
+        // Format refresh time as relative
+        let refreshed = if ctx.last_refresh_ms < 1577836800000 {
+            "—".to_string()
+        } else if now_ms > ctx.last_refresh_ms {
+            crate::ui::helpers::format_time_ago(now_ms - ctx.last_refresh_ms)
+        } else {
+            "now".to_string()
         };
 
         let icon = ctx.context_type.icon();
@@ -246,6 +262,7 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
             Cell::new(id_with_icon, Style::default().fg(theme::accent_dim())),
             Cell::new(type_name, Style::default().fg(theme::text_secondary())),
             Cell::right(format_number(ctx.token_count), Style::default().fg(theme::accent())),
+            Cell::new(refreshed, Style::default().fg(theme::text_muted())),
             Cell::new(truncated_details, Style::default().fg(theme::text_muted())),
         ]
     }).collect();

@@ -27,11 +27,17 @@ pub const CHARS_PER_TOKEN: f32 = 3.3;
 /// Maximum token length for memory tl_dr field (enforced on create/update)
 pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
 
-/// Number of oldest active messages to carve off into a ConversationHistory panel.
-pub const DETACH_CHUNK_MESSAGES: usize = 50;
+/// Minimum active messages in a chunk before it can be detached.
+pub const DETACH_CHUNK_MIN_MESSAGES: usize = 25;
+
+/// Minimum token count in a chunk before it can be detached.
+pub const DETACH_CHUNK_MIN_TOKENS: usize = 5_000;
 
 /// Minimum messages to keep in the live conversation after detachment.
-pub const DETACH_KEEP_MESSAGES: usize = 20;
+pub const DETACH_KEEP_MIN_MESSAGES: usize = 25;
+
+/// Minimum tokens to keep in the live conversation after detachment.
+pub const DETACH_KEEP_MIN_TOKENS: usize = 7_500;
 
 // =============================================================================
 // SCROLLING

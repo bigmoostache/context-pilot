@@ -1,5 +1,5 @@
 use crate::core::panels::{collect_all_context, now_ms, refresh_all_panels, ContextItem};
-use crate::constants::{DETACH_CHUNK_MESSAGES, DETACH_KEEP_MESSAGES};
+use crate::constants::{DETACH_CHUNK_MIN_MESSAGES, DETACH_CHUNK_MIN_TOKENS, DETACH_KEEP_MIN_MESSAGES, DETACH_KEEP_MIN_TOKENS};
 use crate::state::{
     compute_total_pages, estimate_tokens, ContextElement, ContextType,
     Message, MessageStatus, MessageType, State,
@@ -143,22 +143,37 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
 }
 
 /// Detach oldest conversation messages into frozen ConversationHistory panels
-/// when the active message count exceeds DETACH_CHUNK_MESSAGES + DETACH_KEEP_MESSAGES.
+/// when the active conversation exceeds thresholds.
+///
+/// All four constraints must be met to detach:
+/// 1. Chunk has >= DETACH_CHUNK_MIN_MESSAGES active messages
+/// 2. Chunk has >= DETACH_CHUNK_MIN_TOKENS estimated tokens
+/// 3. Remaining tip keeps >= DETACH_KEEP_MIN_MESSAGES active messages
+/// 4. Remaining tip keeps >= DETACH_KEEP_MIN_TOKENS estimated tokens
 pub fn detach_conversation_chunks(state: &mut State) {
     loop {
-        // 1. Count active (non-Deleted, non-Detached) messages
+        // 1. Count active (non-Deleted, non-Detached) messages and total tokens
         let active_count = state.messages.iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .count();
+        let total_tokens: usize = state.messages.iter()
+            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .map(|m| estimate_tokens(&m.content))
+            .sum();
 
-        // 2. If within limits, nothing to detach
-        if active_count <= DETACH_CHUNK_MESSAGES + DETACH_KEEP_MESSAGES {
+        // 2. Quick check: if we can't possibly satisfy both chunk minimums
+        //    while leaving enough in the tip, bail early.
+        if active_count < DETACH_CHUNK_MIN_MESSAGES + DETACH_KEEP_MIN_MESSAGES {
+            break;
+        }
+        if total_tokens < DETACH_CHUNK_MIN_TOKENS + DETACH_KEEP_MIN_TOKENS {
             break;
         }
 
-        // 3. Walk from oldest, count DETACH_CHUNK_MESSAGES active messages,
-        //    then snap forward to the nearest turn boundary.
+        // 3. Walk from oldest, tracking both message count and token count.
+        //    Only consider a boundary once BOTH chunk minimums are reached.
         let mut active_seen = 0usize;
+        let mut tokens_seen = 0usize;
         let mut boundary = None;
 
         for (idx, msg) in state.messages.iter().enumerate() {
@@ -166,8 +181,12 @@ pub fn detach_conversation_chunks(state: &mut State) {
                 continue;
             }
             active_seen += 1;
+            tokens_seen += estimate_tokens(&msg.content);
 
-            if active_seen >= DETACH_CHUNK_MESSAGES && is_turn_boundary(&state.messages, idx) {
+            if active_seen >= DETACH_CHUNK_MIN_MESSAGES
+                && tokens_seen >= DETACH_CHUNK_MIN_TOKENS
+                && is_turn_boundary(&state.messages, idx)
+            {
                 boundary = Some(idx + 1); // exclusive end
                 break;
             }
@@ -178,11 +197,16 @@ pub fn detach_conversation_chunks(state: &mut State) {
             _ => break, // No valid boundary found, bail
         };
 
-        // 3b. Safety check: ensure enough active messages remain after detachment
+        // 4. Verify the remaining tip satisfies both keep minimums
         let remaining_active = state.messages[boundary..].iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .count();
-        if remaining_active < DETACH_KEEP_MESSAGES {
+        let remaining_tokens: usize = state.messages[boundary..].iter()
+            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .map(|m| estimate_tokens(&m.content))
+            .sum();
+
+        if remaining_active < DETACH_KEEP_MIN_MESSAGES || remaining_tokens < DETACH_KEEP_MIN_TOKENS {
             break;
         }
 

@@ -92,7 +92,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
             .unwrap_or(agent_id.as_str());
         spans.push(Span::styled(
             format!(" 🤖 {} ", agent_name),
-            Style::default().fg(theme::bg_base()).bg(theme::accent()).bold()
+            Style::default().fg(Color::White).bg(Color::Rgb(130, 80, 200)).bold()
         ));
         spans.push(Span::styled(" ", base_style));
     }

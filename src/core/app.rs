@@ -632,6 +632,14 @@ impl App {
                 self.typewriter.reset();
                 self.pending_done = None;
                 self.pending_tools.clear();
+                // Pause auto-continuation when user explicitly cancels streaming.
+                // Without this, the spine would immediately relaunch a new stream
+                // (e.g., due to continue_until_todos_done), making the system
+                // uncontrollable — the user can never stop it with Esc. (#44)
+                // We set user_stopped instead of disabling continue_until_todos_done,
+                // so auto-continuation resumes when the user sends a new message.
+                self.state.spine_config.user_stopped = true;
+                self.state.touch_panel(ContextType::Spine);
                 if let Some(msg) = self.state.messages.last() {
                     if msg.role == "assistant" {
                         self.save_message_async(msg);

@@ -49,10 +49,29 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         id_a.cmp(&id_b)
     });
 
-    // Separate fixed (P0-P6) and dynamic (P7+) contexts
+    // Separate fixed (P1-P9) and dynamic (P10+) contexts, skipping Conversation (it's the chat feed, not a numbered panel)
     let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
         .into_iter()
+        .filter(|&i| state.context[i].context_type != crate::state::ContextType::Conversation)
         .partition(|&i| state.context[i].context_type.is_fixed());
+
+    // Render Conversation entry (special: no Px ID, highlights when selected)
+    if let Some(conv_idx) = state.context.iter().position(|c| c.context_type == crate::state::ContextType::Conversation) {
+        let is_selected = conv_idx == state.selected_context;
+        let indicator = if is_selected { chars::ARROW_RIGHT } else { " " };
+        let indicator_color = if is_selected { theme::accent() } else { theme::bg_base() };
+        let name_color = if is_selected { theme::accent() } else { theme::text_secondary() };
+        let icon = crate::state::ContextType::Conversation.icon();
+
+        lines.push(Line::from(vec![
+            Span::styled(format!(" {}", indicator), Style::default().fg(indicator_color)),
+            Span::styled(format!(" {:>width$} ", "", width = id_width), Style::default().fg(theme::text_muted())),
+            Span::styled(icon, Style::default().fg(if is_selected { theme::accent() } else { theme::text_muted() })),
+            Span::styled(format!("{:<18}", "Conversation"), Style::default().fg(name_color)),
+            Span::styled(format!("{:>6}", ""), base_style),
+            Span::styled(" ", base_style),
+        ]));
+    }
 
     // Render fixed contexts (always visible)
     for &i in &fixed_indices {

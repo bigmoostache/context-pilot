@@ -128,7 +128,6 @@ impl Module for CoreModule {
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
         vec![
-            ContextType::Conversation,
             ContextType::Overview,
         ]
     }
@@ -139,7 +138,6 @@ impl Module for CoreModule {
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
         vec![
-            (ContextType::Conversation, "Chat", true),
             (ContextType::Overview, "World", false),
         ]
     }

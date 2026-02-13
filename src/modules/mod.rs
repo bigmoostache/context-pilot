@@ -104,20 +104,20 @@ pub trait Module: Send + Sync {
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> { vec![] }
 }
 
-/// Canonical order of fixed panels (P0-P7).
+/// Canonical order of fixed panels.
 /// This defines the sidebar position and ID assignment for each fixed panel.
+/// Conversation is NOT included — it's the live chat feed, not a numbered panel.
+/// System (Seed) is NOT included — agent prompt is injected as system message.
 const FIXED_PANEL_ORDER: &[ContextType] = &[
-    ContextType::System,       // P0
-    ContextType::Conversation, // P1
-    ContextType::Tree,         // P2
-    ContextType::Todo,         // P3
-    ContextType::Memory,       // P4
-    ContextType::Overview,     // P5
-    ContextType::Git,          // P6
-    ContextType::Scratchpad,   // P7
-    ContextType::Library,      // P8
-    ContextType::Spine,        // P9
-    ContextType::Logs,         // P10
+    ContextType::Todo,         // P1
+    ContextType::Library,      // P2
+    ContextType::Overview,     // P3
+    ContextType::Tree,         // P4
+    ContextType::Memory,       // P5
+    ContextType::Spine,        // P6
+    ContextType::Logs,         // P7
+    ContextType::Git,          // P8
+    ContextType::Scratchpad,   // P9
 ];
 
 /// Collect all fixed panel defaults in canonical P0-P7 order.

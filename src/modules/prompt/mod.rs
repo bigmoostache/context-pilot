@@ -1,7 +1,6 @@
 pub mod types;
 pub mod seed;
 pub mod storage;
-mod panel;
 mod library_panel;
 mod skill_panel;
 mod tools;
@@ -13,7 +12,6 @@ use crate::state::{ContextType, State};
 use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
 use crate::tools::{ToolUse, ToolResult};
 
-use self::panel::PromptPanel;
 use self::library_panel::LibraryPanel;
 use self::skill_panel::SkillPanel;
 use super::Module;
@@ -58,12 +56,11 @@ impl Module for PromptModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::System, ContextType::Library]
+        vec![ContextType::Library]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
         vec![
-            (ContextType::System, "Seed", false),
             (ContextType::Library, "Library", false),
         ]
     }
@@ -74,7 +71,6 @@ impl Module for PromptModule {
 
     fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
         match context_type {
-            ContextType::System => Some(Box::new(PromptPanel)),
             ContextType::Library => Some(Box::new(LibraryPanel)),
             ContextType::Skill => Some(Box::new(SkillPanel)),
             _ => None,
