@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter Pitches — Context Pilot Campaign</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        function copyText(btn, id) {
+            const el = document.getElementById(id);
+            navigator.clipboard.writeText(el.innerText.trim());
+            btn.textContent = '✓ Copied';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        }
+    </script>
+</head>
+<body>
+    <nav class="campaign-nav">
+        <div class="container">
+            <a href="index.html" class="logo">← Campaign</a>
+            <div class="nav-links">
+                <a href="hackernews.html">HN</a>
+                <a href="reddit.html">Reddit</a>
+                <a href="twitter.html">Twitter</a>
+                <a href="blog.html">Blog</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>📬 <span class="gradient-text">Newsletters</span></h1>
+            <p class="subtitle">Pitch emails for Rust and AI/dev newsletters. Short, respectful, to the point.</p>
+        </div>
+
+        <!-- TWiR -->
+        <div class="post-section" id="twir">
+            <div class="post-meta">
+                <span class="platform-badge badge-newsletter">THIS WEEK IN RUST</span>
+                <span style="color: var(--text-dim);">Submit: <a href="https://github.com/rust-lang/this-week-in-rust" target="_blank">github.com/rust-lang/this-week-in-rust</a></span>
+            </div>
+
+            <h2 class="post-title">This Week in Rust</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                TWiR accepts submissions via PR to their repo. Add to the "Crate of the Week" or "Call for Participation" sections.
+            </p>
+
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'twir-pitch')">Copy</button>
+                <span class="label">Submission text</span>
+                <div id="twir-pitch">[Context Pilot](https://github.com/bigmoostache/context-pilot) — A Rust TUI (ratatui + crossterm) AI coding assistant where the AI can see and manage its own context window. 15K lines, 14 modules, 47 tools, 5 LLM providers. AGPL-3.0.</div>
+            </div>
+
+            <div class="tip-box">
+                <strong>📌 How to submit:</strong> Open a PR on the <a href="https://github.com/rust-lang/this-week-in-rust">this-week-in-rust</a> repo adding Context Pilot to the draft for the current week. Or suggest it as "Crate of the Week" in the weekly Reddit thread.
+            </div>
+        </div>
+
+        <!-- Generic newsletter pitch -->
+        <div class="post-section">
+            <div class="post-meta">
+                <span class="platform-badge badge-newsletter">GENERIC PITCH</span>
+                <span style="color: var(--text-dim);">For any dev/AI newsletter</span>
+            </div>
+
+            <h2 class="post-title">Short Pitch Email</h2>
+
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'email-pitch')">Copy</button>
+                <span class="label">Email template</span>
+                <div id="email-pitch">Subject: Open source TUI where the AI manages its own context window
+
+Hi,
+
+I built Context Pilot — a terminal-based AI coding assistant in Rust where the AI can see and manage its own context window.
+
+The core idea: every file, search result, and terminal pane the AI accesses is a visible panel with a live token count. The AI sees its own memory as a sidebar and actively manages it — opening what it needs, closing what it doesn't, taking notes, archiving old conversations.
+
+In one test, it explored 90+ files in a 15K-line codebase and ended at 14% context usage.
+
+- GitHub: https://github.com/bigmoostache/context-pilot
+- Website: https://bigmoostache.github.io/context-pilot/
+- ~15K lines of Rust, 47 tools, 5 LLM providers, AGPL-3.0
+
+Thought it might be a good fit for your newsletter. Happy to provide more details.
+
+Thanks!</div>
+            </div>
+        </div>
+
+        <!-- Awesome lists -->
+        <div class="post-section">
+            <div class="post-meta">
+                <span class="platform-badge badge-newsletter">AWESOME LISTS</span>
+            </div>
+
+            <h2 class="post-title">Awesome List Submissions</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Submit PRs to these curated lists. Each is a permanent backlink + discovery channel.
+            </p>
+
+            <div class="copy-block">
+                <span class="label">Target lists</span>
+                <div>• <a href="https://github.com/rust-unofficial/awesome-rust">awesome-rust</a> — under "Applications > Utilities" or "Applications > Text Processing"
+• <a href="https://github.com/rothgar/awesome-tuis">awesome-tuis</a> — under "Development" or "Productivity"
+• <a href="https://github.com/agarrharr/awesome-cli-apps">awesome-cli-apps</a> — under "Development > AI"
+• <a href="https://github.com/f/awesome-chatgpt-prompts">awesome-chatgpt-prompts</a> — reference if relevant</div>
+            </div>
+
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'awesome-entry')">Copy</button>
+                <span class="label">PR description for awesome lists</span>
+                <div id="awesome-entry">- [Context Pilot](https://github.com/bigmoostache/context-pilot) — TUI AI coding assistant where the AI manages its own context window. Rust, ratatui, 47 tools, 5 LLM providers.</div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="campaign-footer">
+        <div class="container">
+            <a href="index.html">← Back to campaign</a> · <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+        </div>
+    </footer>
+</body>
+</html>

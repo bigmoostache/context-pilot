@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hacker News Post — Context Pilot Campaign</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        function copyText(btn, id) {
+            const el = document.getElementById(id);
+            navigator.clipboard.writeText(el.innerText.trim());
+            btn.textContent = '✓ Copied';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        }
+    </script>
+</head>
+<body>
+    <nav class="campaign-nav">
+        <div class="container">
+            <a href="index.html" class="logo">← Campaign</a>
+            <div class="nav-links">
+                <a href="reddit.html">Reddit</a>
+                <a href="twitter.html">Twitter</a>
+                <a href="blog.html">Blog</a>
+                <a href="newsletters.html">Newsletters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>🟧 <span class="gradient-text">Hacker News</span></h1>
+            <p class="subtitle">Show HN post. Title + first comment. Optimized for technical depth and authenticity.</p>
+        </div>
+
+        <!-- TITLE -->
+        <div class="post-section">
+            <div class="post-meta">
+                <span class="platform-badge badge-hn">SHOW HN</span>
+                <span style="color: var(--text-dim);">Submit to: <a href="https://news.ycombinator.com/submit" target="_blank">news.ycombinator.com/submit</a></span>
+            </div>
+
+            <h2 class="post-title">Title</h2>
+
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'hn-title')">Copy</button>
+                <span class="label">Post title (80 char limit)</span>
+                <span id="hn-title">Show HN: Context Pilot – A TUI where the AI sees and manages its own context window</span>
+            </div>
+
+            <div class="tip-box">
+                <strong>URL field:</strong> <code>https://github.com/bigmoostache/context-pilot</code><br/>
+                Leave the text field empty — HN only allows URL or text, not both. Your first comment is the text.
+            </div>
+        </div>
+
+        <!-- FIRST COMMENT -->
+        <div class="post-section">
+            <h2 class="post-title">First Comment</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Post this immediately after submitting. This is where you tell the story. 
+                HN readers will read this before clicking the link.
+            </p>
+
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'hn-comment')">Copy</button>
+                <span class="label">First comment</span>
+                <div id="hn-comment">Hey HN. I built a terminal-based AI coding assistant in Rust where the AI can see — and manage — its own context window.
+
+The core problem: every AI coding tool treats context as invisible. You paste code, the AI forgets it, you paste it again. The context fills up and nobody knows what got pushed out. Context Pilot makes context a first-class, visible thing.
+
+How it works: everything the AI touches is a "panel" with a live token count in a sidebar. Files, search results, terminal panes, git status, memories — all panels. The AI sees the sidebar, knows its budget (e.g., 8,231 / 200K tokens), and actively manages what's in it. It opens what it needs, closes what it doesn't, takes notes on what it read, and when the conversation gets long, it archives old messages to make room.
+
+The result that surprised me: I pointed it at its own 15K-line codebase and asked it to explore everything. It opened 90+ files across the session, annotated every one with descriptions in the directory tree, and ended at 14% context usage. It read everything, understood it, documented it, and freed the space — without me telling it to. It just could see it needed to.
+
+Technical details:
+- Rust, ~15K lines, ratatui + crossterm
+- 14 modules, each providing tools + panels (files, git, github, grep, tmux, memory, todos, etc.)
+- 47 tools total — the AI picks which to use
+- 5 LLM providers: Anthropic, Claude Code (OAuth), DeepSeek, Grok, Groq
+- SHA-256 change detection, inotify file watching, background refresh
+- Autonomous mode with configurable guard rails (token caps, cost caps, duration limits)
+- Full tmux integration — terminal panes as context panels
+- AGPL-3.0
+
+What it's NOT: it's not an IDE plugin, not a web app, not a wrapper around ChatGPT. It's a standalone terminal application. You run it in a project directory, it creates a .context-pilot/ folder for state, and you talk to it. Think of it as a senior developer sitting in your terminal who never loses track of what they've read.
+
+This is v0.1 — I've been using it daily for my own development and it's genuinely changed how I work. It built its own PR system, reviewed its own code, and even wrote the README. Happy to answer any questions about the architecture.</div>
+            </div>
+
+            <div class="tip-box">
+                <strong>⚡ Timing:</strong> Post between 8-9 AM EST on a Tuesday or Wednesday. 
+                This is when HN has peak traffic and the best chance of hitting the front page.
+            </div>
+        </div>
+
+        <!-- ALTERNATIVE TITLES -->
+        <div class="post-section">
+            <h2 class="post-title">Alternative Titles</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                If the first title doesn't land, you can resubmit with a different angle. 
+                HN allows resubmission if a post didn't get traction.
+            </p>
+
+            <div class="copy-block">
+                <span class="label">Option B — emphasize the result</span>
+                <span id="hn-title-b">Show HN: My AI explored 90 files and ended at 14% context – because it can see its own brain</span>
+            </div>
+
+            <div class="copy-block">
+                <span class="label">Option C — emphasize the tech</span>
+                <span id="hn-title-c">Show HN: Context Pilot – Rust TUI with 47 tools where the AI manages its own memory</span>
+            </div>
+
+            <div class="copy-block">
+                <span class="label">Option D — provocative</span>
+                <span id="hn-title-d">Show HN: What if your AI coding assistant could see its own context window?</span>
+            </div>
+        </div>
+
+        <!-- ENGAGEMENT -->
+        <div class="post-section">
+            <h2 class="post-title">Handling Comments</h2>
+
+            <div class="copy-block">
+                <span class="label">If someone asks "how is this different from Cursor/Copilot/Aider?"</span>
+                <div>The key difference is context visibility. In Cursor/Copilot, the context window is a black box — the tool decides what the AI sees, and neither you nor the AI know what's in it. In Context Pilot, every piece of context is a visible panel with a token count. The AI can see its own sidebar, know it's at 8K/200K tokens, decide that a file it opened 10 minutes ago is no longer relevant, and close it. It's the difference between a developer with a messy desk who can't find anything, and one who actively organizes their workspace.
+
+Aider is closer in spirit (terminal-based, direct), but it still treats context as implicit. You add files to the chat, and they stay there. Context Pilot's panels are dynamic — the AI creates and destroys them as it works.</div>
+            </div>
+
+            <div class="copy-block">
+                <span class="label">If someone asks "why not just use a bigger context window?"</span>
+                <div>Bigger windows help, but they don't solve the core problem. A 1M token window with 500K of stale context is worse than a 200K window where every token is relevant. The issue isn't capacity — it's curation. When the AI can see its own context, it naturally curates. It closes files it's done with, archives old conversation chunks, takes notes instead of keeping raw data. The result is that it uses context more efficiently, not just more of it.</div>
+            </div>
+
+            <div class="copy-block">
+                <span class="label">If someone asks about the AGPL license</span>
+                <div>AGPL because I want contributions to come back to the project. If you're using it as a local dev tool (which is the intended use case), AGPL doesn't affect you at all — it only triggers if you're distributing or running it as a service. For commercial/enterprise use cases where AGPL is a concern, I'm open to dual licensing. Open an issue and we can talk.</div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="campaign-footer">
+        <div class="container">
+            <a href="index.html">← Back to campaign</a> · <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+        </div>
+    </footer>
+</body>
+</html>

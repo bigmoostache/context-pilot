@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Posts — Context Pilot Campaign</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        function copyText(btn, id) {
+            const el = document.getElementById(id);
+            navigator.clipboard.writeText(el.innerText.trim());
+            btn.textContent = '✓ Copied';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        }
+    </script>
+</head>
+<body>
+    <nav class="campaign-nav">
+        <div class="container">
+            <a href="index.html" class="logo">← Campaign</a>
+            <div class="nav-links">
+                <a href="hackernews.html">HN</a>
+                <a href="twitter.html">Twitter</a>
+                <a href="blog.html">Blog</a>
+                <a href="newsletters.html">Newsletters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>🔴 <span class="gradient-text">Reddit</span></h1>
+            <p class="subtitle">5 subreddit-specific posts. Each tuned for its community's values, tone, and interests.</p>
+        </div>
+
+        <!-- ========== r/rust ========== -->
+        <div class="post-section" id="rust">
+            <div class="post-meta">
+                <span class="platform-badge badge-reddit">r/rust</span>
+                <span class="subreddit">~310K members · Technical, crate-focused, appreciates quality Rust</span>
+            </div>
+
+            <h2 class="post-title">Title</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'rust-title')">Copy</button>
+                <span class="label">Post title</span>
+                <span id="rust-title">I built a TUI AI coding assistant in Rust where the AI manages its own context window — 15K lines, ratatui + crossterm, 14 modules</span>
+            </div>
+
+            <h2 class="post-title">Body</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'rust-body')">Copy</button>
+                <span class="label">Post body (markdown)</span>
+                <div id="rust-body">Hey r/rust! I've been working on [Context Pilot](https://github.com/bigmoostache/context-pilot), a terminal-based AI coding assistant where the AI can see — and actively manage — its own context window.
+
+## What it is
+
+A ratatui + crossterm TUI application (~15K lines) where every piece of information the AI accesses is a **panel** with a live token count. The AI sees a sidebar with all its open context, knows its token budget, and decides what to keep and what to close. Files, grep results, terminal panes, git status, memories — everything is a panel.
+
+## Architecture
+
+- **14 modules** — each provides tools + panels: core, files, git, github, glob, grep, logs, memory, preset, prompt, scratchpad, spine, tmux, todo, tree
+- **47 tools** — the AI picks which to use based on the task
+- **5 LLM providers** — Anthropic (direct), Claude Code (OAuth), DeepSeek, Grok, Groq
+- **SHA-256 change detection** — panels auto-refresh when underlying content changes
+- **inotify file watching** — open files update in real-time
+- **Background refresh** — panels refresh asynchronously without blocking the UI
+- **Conversation detachment** — old messages archived to browsable history panels based on message count + token count thresholds
+
+## Rust-specific things I'm proud of
+
+- The module system uses trait objects (`Box<dyn Module>`) with a registry pattern for tool dispatch. Each module declares its tools, panel types, dependencies, and persistence needs.
+- Panel content is cached with SHA-256 hashes — the LLM context is only rebuilt when something actually changes, not every tick.
+- The tmux integration captures pane output as context panels, so the AI can watch build output, test results, and interactive sessions.
+- YAML configs are embedded at compile time via `include_str!` + `LazyLock` — no runtime config file loading.
+- The event loop runs at 120Hz (8ms ticks) with a performance overlay (F12) showing per-operation timing.
+
+## The result that surprised me
+
+I pointed it at its own codebase and asked it to explore everything. Over the session, it opened 90+ files, annotated every one with descriptions in the directory tree, and ended at **14% context usage** (28K / 200K tokens). It read the entire codebase, understood the architecture, documented it, and freed the space — because it could see its own budget and managed it autonomously.
+
+[Full writeup of that session](https://github.com/bigmoostache/context-pilot/blob/master/docs/retex.md)
+
+## Links
+
+- **GitHub**: https://github.com/bigmoostache/context-pilot
+- **Website**: https://bigmoostache.github.io/context-pilot/
+- **License**: AGPL-3.0
+
+This is v0.1 — I'd love feedback on the architecture, the Rust patterns, anything. Happy to answer questions about the implementation.</div>
+            </div>
+
+            <div class="tip-box">
+                <strong>🦀 r/rust likes:</strong> Technical depth, architecture decisions, performance details, crate choices. 
+                They'll ask about error handling, async patterns, and why you chose ratatui over other TUI crates. Be ready.
+            </div>
+        </div>
+
+        <!-- ========== r/LocalLLaMA ========== -->
+        <div class="post-section" id="localllama">
+            <div class="post-meta">
+                <span class="platform-badge badge-reddit">r/LocalLLaMA</span>
+                <span class="subreddit">~730K members · LLM enthusiasts, model comparison, provider flexibility</span>
+            </div>
+
+            <h2 class="post-title">Title</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'llama-title')">Copy</button>
+                <span class="label">Post title</span>
+                <span id="llama-title">Built an AI coding TUI that lets the AI see and manage its own context window — supports Anthropic, DeepSeek, Groq, Grok, and Claude Code</span>
+            </div>
+
+            <h2 class="post-title">Body</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'llama-body')">Copy</button>
+                <span class="label">Post body (markdown)</span>
+                <div id="llama-body">I built [Context Pilot](https://github.com/bigmoostache/context-pilot), a terminal-based AI coding assistant with a twist: the AI can see its own context window and actively manages what's in it.
+
+## The context problem
+
+Every AI coding tool I've used has the same issue: the context window is a black box. You don't know what's in it, the AI doesn't know what's in it, and when it fills up, things silently get dropped. You end up re-pasting code, re-explaining context, fighting the invisible limit.
+
+Context Pilot makes context visible. Every file, search result, terminal output, and memory is a **panel** with a live token count. The AI sees a sidebar showing everything in its context and the total budget (e.g., "8,231 / 200K tokens"). It opens panels when it needs information and closes them when it's done.
+
+## Multi-provider support
+
+Currently supports 5 providers — easy to switch between them:
+
+- **Anthropic** — direct API (Claude Sonnet 3.5/3.6, Haiku)
+- **Claude Code** — OAuth flow (no API key needed, uses your Claude subscription)
+- **DeepSeek** — DeepSeek Chat and Coder
+- **Groq** — fast inference (Llama, Mixtral, Gemma)
+- **Grok** — xAI's models
+
+Adding new providers is straightforward — it's an OpenAI-compatible format under the hood (DeepSeek, Grok, and Groq all share the same adapter). If your preferred model has an OpenAI-compatible API, it's probably a ~100-line addition.
+
+## What makes it interesting for this community
+
+1. **Context efficiency** — The AI naturally uses less context because it closes panels it doesn't need. In one test, it explored 90+ files and ended at 14% context usage. This matters a lot for smaller models with limited context windows.
+
+2. **Provider flexibility** — Swap models mid-conversation. Use Groq for fast iteration, switch to Claude for complex reasoning. The context is provider-agnostic.
+
+3. **Tool use as a first-class feature** — 47 tools (file ops, git, github, terminal, memory, todos, etc.). The AI decides which to use. Models with strong tool-use capabilities shine here.
+
+4. **Local-first** — Everything runs in your terminal. State is stored locally in `.context-pilot/`. No cloud, no telemetry, no accounts (except for the LLM API keys).
+
+## Links
+
+- **GitHub**: https://github.com/bigmoostache/context-pilot
+- **Website**: https://bigmoostache.github.io/context-pilot/
+
+I'd love to hear which models/providers you'd want to see added. Ollama/local model support is on the roadmap.</div>
+            </div>
+
+            <div class="tip-box">
+                <strong>🦙 r/LocalLLaMA cares about:</strong> Provider flexibility, local model support, context efficiency for smaller models. 
+                They'll ask about Ollama support and how well it works with smaller models. The honest answer: tool-use quality varies a lot by model.
+            </div>
+        </div>
+
+        <!-- ========== r/programming ========== -->
+        <div class="post-section" id="programming">
+            <div class="post-meta">
+                <span class="platform-badge badge-reddit">r/programming</span>
+                <span class="subreddit">~6.4M members · Broad audience, values novelty, skeptical of AI hype</span>
+            </div>
+
+            <h2 class="post-title">Title</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'prog-title')">Copy</button>
+                <span class="label">Post title</span>
+                <span id="prog-title">Context Pilot: A TUI coding assistant where the AI can see and manage its own context window</span>
+            </div>
+
+            <h2 class="post-title">Body</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'prog-body')">Copy</button>
+                <span class="label">Post body (markdown)</span>
+                <div id="prog-body">I built [Context Pilot](https://github.com/bigmoostache/context-pilot), a terminal-based AI coding assistant in Rust with a different approach to the context problem.
+
+## The problem with AI context
+
+Every AI coding tool I've tried treats the context window as invisible infrastructure. Cursor, Copilot, Aider — they all decide what the AI sees behind the scenes. When the context fills up, content gets silently truncated. Neither you nor the AI knows what's in the window or what got pushed out.
+
+This leads to the frustrating loop: paste code → AI forgets → paste again → AI gets confused → start over.
+
+## A different approach
+
+In Context Pilot, every piece of context is a **panel** — a visible element with a live token count in a sidebar. Open files, search results, terminal panes, git status, memories, todos — all panels. The AI sees the sidebar, knows its budget (e.g., 8,231 / 200K tokens), and actively manages it.
+
+When the AI opens a file to read it, the file becomes a panel. When it's done, it closes the panel. When the conversation grows long, old messages get archived into browsable history panels. The AI can also take notes (persistent memories) so it can close raw data and keep just the insights.
+
+## What happened when I tested it
+
+I pointed it at its own 15,000-line Rust codebase and asked it to explore everything. Over the session:
+
+- It opened 90+ files
+- Annotated every one with descriptions in the directory tree
+- Closed files after reading them to free context space
+- Ended at **14% context usage** (28K / 200K tokens)
+
+It read the entire codebase, documented it, and kept its context clean — without me managing anything. It could see it was at 4% usage after closing files, so it kept going. ([Full writeup](https://github.com/bigmoostache/context-pilot/blob/master/docs/retex.md))
+
+## Technical details
+
+- Rust, ~15K lines, ratatui + crossterm
+- 14 modules providing 47 tools (file ops, git, github CLI, grep, tmux terminals, memory, todos, etc.)
+- 5 LLM providers: Anthropic, Claude Code (OAuth), DeepSeek, Grok, Groq
+- SHA-256 content hashing for change detection
+- inotify file watching
+- Autonomous mode with guard rails (token limits, cost caps, duration limits)
+
+https://github.com/bigmoostache/context-pilot</div>
+            </div>
+
+            <div class="tip-box">
+                <strong>💻 r/programming is skeptical.</strong> Don't oversell. Let the architecture speak. 
+                They respect the engineering but will push back on AI hype. The "14% context" result is your strongest evidence.
+            </div>
+        </div>
+
+        <!-- ========== r/commandline ========== -->
+        <div class="post-section" id="commandline">
+            <div class="post-meta">
+                <span class="platform-badge badge-reddit">r/commandline</span>
+                <span class="subreddit">~380K members · CLI tools, terminal workflows, TUI appreciation</span>
+            </div>
+
+            <h2 class="post-title">Title</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'cli-title')">Copy</button>
+                <span class="label">Post title</span>
+                <span id="cli-title">Context Pilot — a Rust TUI for AI-assisted coding with full tmux integration, git, file ops, and a visible context sidebar</span>
+            </div>
+
+            <h2 class="post-title">Body</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'cli-body')">Copy</button>
+                <span class="label">Post body (markdown)</span>
+                <div id="cli-body">I built [Context Pilot](https://github.com/bigmoostache/context-pilot), a TUI AI coding assistant that lives entirely in the terminal.
+
+## What it looks like
+
+A split-pane TUI (ratatui + crossterm): sidebar on the left showing all context panels with token counts, main panel on the right showing whatever you're looking at. Think of it as a terminal workspace where the AI is a participant, not just a chat window.
+
+## Terminal-native features
+
+- **Full tmux integration** — create terminal panes from within the tool. The AI can start builds, watch test output, interact with REPLs, and read the terminal content as context panels.
+- **Git built-in** — `git status`, `diff`, `log`, `commit`, `push` — all from within the TUI. Smart cache invalidation: mutating git commands auto-refresh affected panels.
+- **GitHub CLI** — `gh pr create`, `gh issue view`, etc. Results appear as live panels that auto-refresh.
+- **File ops** — open, edit (surgical text replacement), write, glob, grep. Files are panels with syntax highlighting.
+- **Directory tree** — filterable (gitignore-style), annotatable. The AI can describe files/folders and the descriptions persist.
+
+## The context twist
+
+Everything above is a context panel. The AI sees a sidebar showing all of it with token counts. It knows its budget and manages it — opening things it needs, closing things it doesn't. No manual context management.
+
+## Install
+
+```
+git clone https://github.com/bigmoostache/context-pilot.git
+cd context-pilot
+cargo build --release
+./run.sh  # supervisor script, handles reloads
+```
+
+Needs: Rust 1.83+, tmux, and at least one API key (Anthropic, DeepSeek, Groq, or xAI).
+
+## Links
+
+- **GitHub**: https://github.com/bigmoostache/context-pilot
+- **Website**: https://bigmoostache.github.io/context-pilot/
+
+~15K lines of Rust, AGPL-3.0. Would love feedback from fellow terminal dwellers.</div>
+            </div>
+
+            <div class="tip-box">
+                <strong>⌨️ r/commandline loves:</strong> Terminal-native tools, tmux integration, clean TUI design. 
+                Lead with the terminal experience, not the AI. Show the TUI, mention tmux early. Screenshots/GIFs are essential here.
+            </div>
+        </div>
+
+        <!-- ========== r/ChatGPTCoding ========== -->
+        <div class="post-section" id="chatgptcoding">
+            <div class="post-meta">
+                <span class="platform-badge badge-reddit">r/ChatGPTCoding</span>
+                <span class="subreddit">~150K members · Practical AI coding, tool comparison, workflow tips</span>
+            </div>
+
+            <h2 class="post-title">Title</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'cgpt-title')">Copy</button>
+                <span class="label">Post title</span>
+                <span id="cgpt-title">I built a coding assistant where the AI can see its own context window — it explored 90 files and ended at 14% usage</span>
+            </div>
+
+            <h2 class="post-title">Body</h2>
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'cgpt-body')">Copy</button>
+                <span class="label">Post body (markdown)</span>
+                <div id="cgpt-body">You know the loop: paste code into the AI, it forgets three messages later, paste it again, context fills up, start a new conversation. I got tired of it and built something different.
+
+[Context Pilot](https://github.com/bigmoostache/context-pilot) is a terminal-based AI coding assistant where the AI can **see its own context window** — and actively manage it.
+
+## How it works
+
+Everything the AI accesses becomes a "panel" with a live token count in a sidebar:
+
+- Open a file → panel (with token count)
+- Run a grep search → panel
+- Check git status → panel
+- Start a terminal session → panel
+- Take a note → panel
+
+The AI sees the sidebar and knows exactly how much context it's using. When it's done with a file, it closes the panel. When the conversation gets long, old messages get archived. It takes notes (persistent memories) so it can discard raw data and keep insights.
+
+## The result
+
+I pointed it at its own 15,000-line codebase and told it to explore everything. Over the session:
+
+- Opened 90+ files
+- Read and annotated every one
+- Closed files after understanding them
+- **Ended at 14% context usage**
+
+It explored the entire codebase and still had 86% of its context budget free. No manual management, no "you're running out of context" warnings, no re-pasting. It just managed itself.
+
+## What it has
+
+- 47 tools: file editing, git, GitHub CLI, terminal (tmux), grep, todos, memories, etc.
+- 5 providers: Anthropic, Claude Code, DeepSeek, Grok, Groq
+- Autonomous mode with safety limits (token caps, cost caps, time limits)
+- Works in any terminal — it's a Rust TUI, not a web app
+
+## vs. Cursor / Copilot / Aider
+
+The big difference: in those tools, the context window is invisible. The tool decides what the AI sees, and nobody knows what's in it. In Context Pilot, every byte of context is visible, with a token count. The AI manages it like a developer manages their workspace — keeping what's relevant, closing what's not.
+
+**GitHub**: https://github.com/bigmoostache/context-pilot
+
+Free and open source (AGPL-3.0). Try it out, I'd love to hear how it compares to your current workflow.</div>
+            </div>
+
+            <div class="tip-box">
+                <strong>🤖 r/ChatGPTCoding wants:</strong> Practical results, tool comparisons, workflow improvements. 
+                Lead with the frustration they all share (context loss), show the result (14%), compare to tools they know. Less technical, more experiential.
+            </div>
+        </div>
+    </div>
+
+    <footer class="campaign-footer">
+        <div class="container">
+            <a href="index.html">← Back to campaign</a> · <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+        </div>
+    </footer>
+</body>
+</html>

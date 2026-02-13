@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitter Thread — Context Pilot Campaign</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        function copyText(btn, id) {
+            const el = document.getElementById(id);
+            navigator.clipboard.writeText(el.innerText.trim());
+            btn.textContent = '✓ Copied';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        }
+        function copyThread() {
+            const tweets = document.querySelectorAll('.tweet-text');
+            let text = '';
+            tweets.forEach((t, i) => {
+                text += (i + 1) + '/ ' + t.innerText.trim() + '\n\n';
+            });
+            navigator.clipboard.writeText(text.trim());
+            const btn = document.getElementById('copy-thread-btn');
+            btn.textContent = '✓ Copied all';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copy entire thread'; btn.classList.remove('copied'); }, 2000);
+        }
+    </script>
+</head>
+<body>
+    <nav class="campaign-nav">
+        <div class="container">
+            <a href="index.html" class="logo">← Campaign</a>
+            <div class="nav-links">
+                <a href="hackernews.html">HN</a>
+                <a href="reddit.html">Reddit</a>
+                <a href="blog.html">Blog</a>
+                <a href="newsletters.html">Newsletters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>𝕏 <span class="gradient-text">Twitter / X</span></h1>
+            <p class="subtitle">7-tweet thread. Each tweet under 280 chars. Optimized for hooks, visuals, and engagement.</p>
+        </div>
+
+        <div class="post-section">
+            <div class="post-meta">
+                <span class="platform-badge badge-twitter">THREAD</span>
+                <button class="copy-btn" id="copy-thread-btn" onclick="copyThread()" style="position:relative; top:0; right:0;">Copy entire thread</button>
+            </div>
+
+            <div class="tip-box" style="margin-bottom: 2rem;">
+                <strong>📸 Screenshot spots marked with 🖼️.</strong> These tweets need a visual — 
+                a screenshot or GIF of the TUI. Tweets with images get 2-3x more engagement.
+            </div>
+
+            <div class="tweet-thread">
+                <div class="tweet">
+                    <div class="tweet-number">1/7 — THE HOOK</div>
+                    <div class="tweet-text">Every AI coding tool has the same problem: the AI can't see its own context window.
+
+It doesn't know what it's read, what it's forgotten, or how much room it has left.
+
+So I built one where it can. 🧵</div>
+                </div>
+
+                <div class="tweet">
+                    <div class="tweet-number">2/7 — THE PROBLEM</div>
+                    <div class="tweet-text">You know the loop:
+
+→ Paste code
+→ AI forgets it 3 messages later
+→ Paste it again
+→ Context fills up
+→ Start over
+
+The context window is invisible. Nobody — not you, not the AI — knows what's in it.
+
+Context Pilot makes it visible.</div>
+                </div>
+
+                <div class="tweet">
+                    <div class="tweet-number">3/7 — HOW IT WORKS 🖼️</div>
+                    <div class="tweet-text">Everything the AI touches is a "panel" with a live token count:
+
+📄 Open file → panel
+🔍 Grep search → panel
+💻 Terminal pane → panel
+📝 Memory note → panel
+
+The AI sees a sidebar with ALL its context + a budget bar.
+
+It opens what it needs. Closes what it doesn't.</div>
+                </div>
+
+                <div class="tweet">
+                    <div class="tweet-number">4/7 — THE RESULT 🖼️</div>
+                    <div class="tweet-text">I pointed it at its own 15,000-line Rust codebase.
+
+It opened 90+ files, annotated every one, and closed them after reading.
+
+Final context usage: 14%.
+
+It explored the entire codebase and still had 86% of its budget free. No manual management.</div>
+                </div>
+
+                <div class="tweet">
+                    <div class="tweet-number">5/7 — WHAT IT CAN DO</div>
+                    <div class="tweet-text">47 tools:
+• File editing (surgical, not overwrite)
+• Full git + GitHub CLI
+• tmux terminal panes as context
+• Persistent memories across sessions
+• Autonomous mode with safety limits
+
+5 LLM providers: Anthropic, Claude Code, DeepSeek, Grok, Groq</div>
+                </div>
+
+                <div class="tweet">
+                    <div class="tweet-number">6/7 — THE DIFFERENTIATOR</div>
+                    <div class="tweet-text">Cursor, Copilot, Aider — the context window is a black box.
+
+Context Pilot: every byte of context is visible. The AI manages it like a developer manages their desk.
+
+Keep what's relevant. Close what's not. Take notes. Archive old conversations.
+
+That's the whole idea.</div>
+                </div>
+
+                <div class="tweet">
+                    <div class="tweet-number">7/7 — THE ASK</div>
+                    <div class="tweet-text">Context Pilot is free, open source (AGPL-3.0), written in Rust.
+
+~15K lines. Single binary. Runs in your terminal.
+
+⭐ GitHub: github.com/bigmoostache/context-pilot
+🌐 Website: bigmoostache.github.io/context-pilot/
+
+If you've ever lost context mid-session, give it a try.
+
+<span class="hashtag">#rust</span> <span class="hashtag">#ai</span> <span class="hashtag">#devtools</span> <span class="hashtag">#buildinpublic</span> <span class="hashtag">#opensource</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STANDALONE TWEETS -->
+        <div class="post-section">
+            <h2 class="post-title">Standalone Tweets</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Use these as follow-up tweets in the days after the thread. Each stands alone.
+            </p>
+
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'tweet-solo-1')">Copy</button>
+                <span class="label">Standalone — the stat</span>
+                <div id="tweet-solo-1">My AI coding assistant explored 90 files in a single session and ended at 14% context usage.
+
+How? It can see its own context window. It knows what it's read, what it's forgotten, and how much room it has left.
+
+It just... manages itself.
+
+github.com/bigmoostache/context-pilot</div>
+            </div>
+
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'tweet-solo-2')">Copy</button>
+                <span class="label">Standalone — the insight</span>
+                <div id="tweet-solo-2">Hot take: a 200K context window where every token is relevant beats a 1M window full of stale data.
+
+The problem isn't context *size*. It's context *curation*.
+
+Built a coding TUI where the AI curates its own context: github.com/bigmoostache/context-pilot</div>
+            </div>
+
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'tweet-solo-3')">Copy</button>
+                <span class="label">Standalone — meta/funny</span>
+                <div id="tweet-solo-3">My AI coding assistant just reviewed its own source code, found a bug in its own context management, and opened a PR to fix it.
+
+We might be in the endgame.
+
+github.com/bigmoostache/context-pilot</div>
+            </div>
+        </div>
+
+        <div class="tip-box">
+            <strong>⚡ Best time to tweet:</strong> 8-10 AM EST on weekdays. 
+            Quote-tweet the thread with a single compelling screenshot after 2-3 hours for a second wave of engagement.
+        </div>
+    </div>
+
+    <footer class="campaign-footer">
+        <div class="container">
+            <a href="index.html">← Back to campaign</a> · <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog Article — Context Pilot Campaign</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        function copyText(btn, id) {
+            const el = document.getElementById(id);
+            navigator.clipboard.writeText(el.innerText.trim());
+            btn.textContent = '✓ Copied';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        }
+    </script>
+</head>
+<body>
+    <nav class="campaign-nav">
+        <div class="container">
+            <a href="index.html" class="logo">← Campaign</a>
+            <div class="nav-links">
+                <a href="hackernews.html">HN</a>
+                <a href="reddit.html">Reddit</a>
+                <a href="twitter.html">Twitter</a>
+                <a href="newsletters.html">Newsletters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>📝 <span class="gradient-text">Blog Article</span></h1>
+            <p class="subtitle">Draft for dev.to / Hashnode / Medium. Will be heavily reworked before publishing.</p>
+        </div>
+
+        <div class="post-section">
+            <div class="post-meta">
+                <span class="platform-badge badge-blog">DEV.TO</span>
+                <span class="platform-badge badge-blog">HASHNODE</span>
+                <span class="platform-badge badge-blog">MEDIUM</span>
+            </div>
+
+            <div class="copy-block">
+                <button class="copy-btn" onclick="copyText(this, 'blog-content')">Copy</button>
+                <span class="label">Draft — needs rework</span>
+                <div id="blog-content">---
+title: I built an AI coding assistant that manages its own brain
+published: false
+tags: rust, ai, devtools, opensource
+---
+
+# I built an AI coding assistant that manages its own brain
+
+Every AI coding tool has the same blind spot: the context window is invisible. The AI doesn't know what it's read, what it's forgotten, or how much room it has left. You end up re-pasting code and fighting an invisible limit.
+
+I built [Context Pilot](https://github.com/bigmoostache/context-pilot) to fix this. It's a Rust TUI where every piece of context is a visible panel with a live token count. The AI sees its own memory as a sidebar and actively manages it.
+
+## The result
+
+I pointed it at its own 15K-line codebase. It opened 90+ files, annotated every one, closed them after reading, and ended at 14% context usage. It read everything and still had 86% of its budget free.
+
+## How
+
+47 tools. 14 modules. 5 LLM providers. Full git, GitHub CLI, tmux terminal integration. Persistent memories, todos, scratchpad. Autonomous mode with guard rails.
+
+The AI opens what it needs, closes what it doesn't, takes notes, and archives old conversations. No manual context management.
+
+**GitHub**: https://github.com/bigmoostache/context-pilot
+
+AGPL-3.0. ~15K lines of Rust. Try it out.</div>
+            </div>
+
+            <div class="tip-box">
+                <strong>📌 This is a placeholder draft.</strong> The full article should expand the <a href="https://github.com/bigmoostache/context-pilot/blob/master/docs/retex.md">retex.md</a> writeup into a narrative with screenshots, architecture diagrams, and the story of building it.
+            </div>
+        </div>
+    </div>
+
+    <footer class="campaign-footer">
+        <div class="container">
+            <a href="index.html">← Back to campaign</a> · <a href="https://github.com/bigmoostache/context-pilot">GitHub</a>
+        </div>
+    </footer>
+</body>
+</html>
