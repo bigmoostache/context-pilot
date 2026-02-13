@@ -8,3 +8,4 @@ test_lorem.txt
 .context-pilot-backup
 .claude/
 test.md
+report/code-audit.md
