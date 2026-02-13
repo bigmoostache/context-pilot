@@ -285,7 +285,6 @@ pub fn detach_conversation_chunks(state: &mut State) {
             cache_in_flight: false,
             last_refresh_ms: chunk_timestamp,
             last_polled_ms: 0,
-            last_polled_ms: 0,
             content_hash: None,
             tmux_last_lines_hash: None,
             current_page: 0,
