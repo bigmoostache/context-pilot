@@ -99,7 +99,7 @@ impl Panel for TmuxPanel {
         let content = String::from_utf8_lossy(&output.stdout).to_string();
         let new_hash = hash_content(&content);
         if current_content_hash.as_ref() == Some(&new_hash) {
-            return None;
+            return Some(CacheUpdate::Unchanged { context_id });
         }
         let token_count = estimate_tokens(&content);
         Some(CacheUpdate::TmuxContent {

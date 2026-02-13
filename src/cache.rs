@@ -76,6 +76,10 @@ pub enum CacheUpdate {
         token_count: usize,
         is_error: bool,
     },
+    /// Content unchanged — clear cache_in_flight without updating content
+    Unchanged {
+        context_id: String,
+    },
 }
 
 /// Request for background cache operations
@@ -166,6 +170,7 @@ impl CacheUpdate {
             CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged => ContextType::Git,
             CacheUpdate::GitResultContent { .. } => ContextType::GitResult,
             CacheUpdate::GithubResultContent { .. } => ContextType::GithubResult,
+            CacheUpdate::Unchanged { .. } => ContextType::File, // Type doesn't matter — matched by context_id
         }
     }
 
@@ -181,6 +186,7 @@ impl CacheUpdate {
             CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged => None,
             CacheUpdate::GitResultContent { context_id, .. } => Some(context_id),
             CacheUpdate::GithubResultContent { context_id, .. } => Some(context_id),
+            CacheUpdate::Unchanged { context_id } => Some(context_id),
         }
     }
 }

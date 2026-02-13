@@ -95,7 +95,7 @@ impl Panel for FilePanel {
         let content = fs::read_to_string(&path).ok()?;
         let new_hash = hash_content(&content);
         if current_hash.as_ref() == Some(&new_hash) {
-            return None;
+            return Some(CacheUpdate::Unchanged { context_id });
         }
         let token_count = estimate_tokens(&content);
         Some(CacheUpdate::FileContent {
