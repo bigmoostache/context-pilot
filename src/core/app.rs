@@ -779,10 +779,15 @@ impl App {
             let mut ctx = state.context.remove(idx);
             let changed = panel.apply_cache_update(update, &mut ctx, state);
             ctx.cache_in_flight = false;
-            // Always mark refresh time so timer-based scheduling knows when we last checked,
-            // even if content was unchanged. Without this, stale last_refresh_ms causes
+            // Always mark poll time so timer-based scheduling knows when we last checked,
+            // even if content was unchanged. Without this, stale last_polled_ms causes
             // the timer to fire continuously (every 100ms instead of every interval).
-            ctx.last_refresh_ms = now_ms();
+            ctx.last_polled_ms = now_ms();
+            // Only bump last_refresh_ms when content actually changed — this drives
+            // the "refreshed X ago" display and LLM context freshness sorting.
+            if changed {
+                ctx.last_refresh_ms = now_ms();
+            }
             state.context.insert(idx, ctx);
 
             if changed {
@@ -923,7 +928,7 @@ impl App {
                 || ctx.context_type == ContextType::Tmux;
             let interval_elapsed = if interval_eligible {
                 panel.cache_refresh_interval_ms()
-                    .map(|interval| current_ms.saturating_sub(ctx.last_refresh_ms) >= interval)
+                    .map(|interval| current_ms.saturating_sub(ctx.last_polled_ms) >= interval)
                     .unwrap_or(true) // No interval = always eligible
             } else {
                 false

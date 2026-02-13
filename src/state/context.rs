@@ -132,9 +132,12 @@ pub struct ContextElement {
     /// A cache request is already in-flight for this element (prevents duplicate spawning)
     #[serde(skip)]
     pub cache_in_flight: bool,
-    /// Last time this element was refreshed (for timer-based deprecation)
+    /// Last time this element was refreshed (content actually changed — for display "refreshed X ago")
     #[serde(skip)]
     pub last_refresh_ms: u64,
+    /// Last time this element was polled for updates (for timer-based scheduling, even if unchanged)
+    #[serde(skip)]
+    pub last_polled_ms: u64,
     /// Hash of cached content (for change detection to avoid unnecessary timestamp bumps)
     #[serde(skip)]
     pub content_hash: Option<String>,
