@@ -67,9 +67,10 @@ pub fn perform_reload(state: &mut State) {
                         let _ = fs::write(config_path, updated);
                     }
                 }
-                Err(_) => {
+                Err(e) => {
                     // If JSON parsing fails, fall back to string replacement
                     // This maintains backwards compatibility with malformed configs
+                    eprintln!("Warning: Config file is not valid JSON ({}), using fallback string replacement. Consider fixing the config file.", e);
                     let updated = if json.contains("\"reload_requested\":") {
                         json.replace("\"reload_requested\": false", "\"reload_requested\": true")
                             .replace("\"reload_requested\":false", "\"reload_requested\":true")

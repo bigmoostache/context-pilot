@@ -227,12 +227,14 @@ pub fn active_theme() -> &'static Theme {
         }
     } else {
         // Standard theme from THEME_ORDER (idx is 1-based)
+        // Debug assertion helps catch bugs during development
+        // In release builds, we have unwrap_or_else fallback below for safety
         debug_assert!(idx > 0 && idx <= THEME_ORDER.len(), 
             "Invalid theme index: {}. THEME_ORDER has {} entries.", idx, THEME_ORDER.len());
         
         let theme_id = THEME_ORDER.get(idx - 1).unwrap_or_else(|| {
             // This should never happen if set_active_theme is used correctly
-            // Fall back to default theme to prevent panic
+            // Fall back to default theme to prevent panic in release builds
             &DEFAULT_THEME
         });
         get_theme(theme_id)
