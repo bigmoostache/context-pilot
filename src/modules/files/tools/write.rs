@@ -106,11 +106,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         });
 
         // Invalidate tree cache
-        for ctx in &mut state.context {
-            if ctx.context_type == ContextType::Tree {
-                ctx.cache_deprecated = true;
-            }
-        }
+        crate::core::panels::mark_panels_dirty(state, ContextType::Tree);
     }
 
     let action = if is_new { "Created" } else { "Wrote" };

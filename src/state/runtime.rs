@@ -313,7 +313,9 @@ impl State {
     pub fn touch_panel(&mut self, context_type: ContextType) {
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == context_type) {
             ctx.last_refresh_ms = crate::core::panels::now_ms();
+            ctx.cache_deprecated = true;
         }
+        self.dirty = true;
     }
 
     /// Find the first available context ID (fills gaps instead of always incrementing)

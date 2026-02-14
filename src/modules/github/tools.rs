@@ -116,11 +116,7 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
                         }
             }
             // Always invalidate Git status (PRs/merges can affect it)
-            for ctx in &mut state.context {
-                if ctx.context_type == ContextType::Git {
-                    ctx.cache_deprecated = true;
-                }
-            }
+            crate::core::panels::mark_panels_dirty(state, ContextType::Git);
 
             match result {
                 Ok(output) => {

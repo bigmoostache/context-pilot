@@ -50,6 +50,17 @@ pub fn update_if_changed(ctx: &mut crate::state::ContextElement, content: &str) 
     true
 }
 
+/// Mark all panels of a given context type as cache-deprecated (dirty).
+/// Also sets `state.dirty = true` so the UI re-renders.
+pub fn mark_panels_dirty(state: &mut crate::state::State, context_type: crate::state::ContextType) {
+    for ctx in &mut state.context {
+        if ctx.context_type == context_type {
+            ctx.cache_deprecated = true;
+        }
+    }
+    state.dirty = true;
+}
+
 /// Paginate content for LLM context output.
 /// Returns the original content unchanged when total_pages <= 1.
 /// Otherwise slices by approximate token offset, snaps to line boundaries,

@@ -608,11 +608,7 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         if mem_count > 0 {
             output_parts.push(format!("Created {} memory(ies)", mem_count));
             // Deprecate the memory panel cache
-            for ctx in &mut state.context {
-                if ctx.context_type == ContextType::Memory {
-                    ctx.cache_deprecated = true;
-                }
-            }
+            crate::core::panels::mark_panels_dirty(state, ContextType::Memory);
         }
     }
 

@@ -112,11 +112,7 @@ pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
             let invalidations = super::cache_invalidation::find_invalidations(command);
             if invalidations.is_empty() {
                 // Unknown mutating command → blanket invalidation (safe default)
-                for ctx in &mut state.context {
-                    if ctx.context_type == ContextType::GitResult {
-                        ctx.cache_deprecated = true;
-                    }
-                }
+                crate::core::panels::mark_panels_dirty(state, ContextType::GitResult);
             } else {
                 for ctx in &mut state.context {
                     if ctx.context_type == ContextType::GitResult
@@ -271,12 +267,7 @@ pub fn execute_configure_p6(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Mark P6 as deprecated to refresh
-    for ctx in &mut state.context {
-        if ctx.context_type == ContextType::Git {
-            ctx.cache_deprecated = true;
-            break;
-        }
-    }
+    crate::core::panels::mark_panels_dirty(state, ContextType::Git);
 
     ToolResult {
         tool_use_id: tool.id.clone(),

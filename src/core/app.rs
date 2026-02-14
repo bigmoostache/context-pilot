@@ -12,7 +12,7 @@ use crate::cache::{process_cache_request, CacheRequest, CacheUpdate};
 use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
 use crate::events::handle_event;
 use crate::help::CommandPalette;
-use crate::core::panels::now_ms;
+use crate::core::panels::{now_ms, mark_panels_dirty};
 use crate::persistence::{check_ownership, save_state, build_save_batch, build_message_op, PersistenceWriter};
 use crate::state::{ContextType, Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord};
 use crate::tools::{execute_tool, perform_reload, ToolResult, ToolUse};
@@ -539,11 +539,7 @@ impl App {
 
         if needs_tmux {
             // send_keys: deprecate tmux panels and wait for refresh
-            for ctx in &mut self.state.context {
-                if ctx.context_type == ContextType::Tmux {
-                    ctx.cache_deprecated = true;
-                }
-            }
+            crate::core::panels::mark_panels_dirty(&mut self.state, ContextType::Tmux);
             // Trigger tmux panel refreshes
             for ctx in &self.state.context {
                 if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated && !ctx.cache_in_flight {
@@ -811,20 +807,16 @@ impl App {
                         // Git events: only mark deprecated, don't spawn immediately.
                         // The timer-based check will handle refresh at the proper interval,
                         // preventing the feedback loop (git status → .git/index → watcher → repeat).
-                        for ctx in self.state.context.iter_mut() {
-                            if ctx.context_type == ContextType::GitResult || ctx.context_type == ContextType::Git {
-                                ctx.cache_deprecated = true;
-                                self.state.dirty = true;
-                            }
-                        }
+                        mark_panels_dirty(&mut self.state, ContextType::Git);
+                        mark_panels_dirty(&mut self.state, ContextType::GitResult);
                     } else {
                         for (i, ctx) in self.state.context.iter_mut().enumerate() {
                             if ctx.context_type == ContextType::File && ctx.file_path.as_deref() == Some(path.as_str()) {
                                 ctx.cache_deprecated = true;
-                                self.state.dirty = true;
                                 refresh_indices.push(i);
                             }
                         }
+                        self.state.dirty = true;
                     }
                     rewatch_paths.push(path.clone());
                 }
@@ -833,20 +825,16 @@ impl App {
                     let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
                     if is_git_event {
                         // Git events: only mark deprecated (same as FileChanged above)
-                        for ctx in self.state.context.iter_mut() {
-                            if ctx.context_type == ContextType::GitResult || ctx.context_type == ContextType::Git {
-                                ctx.cache_deprecated = true;
-                                self.state.dirty = true;
-                            }
-                        }
+                        mark_panels_dirty(&mut self.state, ContextType::Git);
+                        mark_panels_dirty(&mut self.state, ContextType::GitResult);
                     } else {
                         for (i, ctx) in self.state.context.iter_mut().enumerate() {
                             if ctx.context_type == ContextType::Tree {
                                 ctx.cache_deprecated = true;
-                                self.state.dirty = true;
                                 refresh_indices.push(i);
                             }
                         }
+                        self.state.dirty = true;
                     }
                 }
             }

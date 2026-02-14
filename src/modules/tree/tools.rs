@@ -10,11 +10,7 @@ use crate::state::{ContextType, State, TreeFileDescription};
 
 /// Mark tree context cache as deprecated (needs refresh)
 fn invalidate_tree_cache(state: &mut State) {
-    for ctx in &mut state.context {
-        if ctx.context_type == ContextType::Tree {
-            ctx.cache_deprecated = true;
-        }
-    }
+    crate::core::panels::mark_panels_dirty(state, ContextType::Tree);
 }
 
 /// Generate tree string without mutating state (for read-only rendering)
