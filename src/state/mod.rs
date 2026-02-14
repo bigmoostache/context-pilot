@@ -16,7 +16,7 @@ pub mod runtime;
 // All existing `use crate::state::X` imports continue to work.
 
 pub use context::{ContextType, ContextElement, estimate_tokens, compute_total_pages};
-pub use message::{MessageType, MessageStatus, Message, ToolUseRecord, ToolResultRecord};
+pub use message::{MessageType, MessageStatus, Message, ToolUseRecord, ToolResultRecord, format_messages_to_chunk};
 pub use config::{SharedConfig, WorkerState, PanelData};
 pub use render_cache::{MessageRenderCache, InputRenderCache, FullContentCache, hash_values};
 pub use runtime::State;

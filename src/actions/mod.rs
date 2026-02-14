@@ -77,6 +77,42 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::InputChar(c) => {
             state.input.insert(state.input_cursor, c);
             state.input_cursor += c.len_utf8();
+
+            // After typing a space, check if preceding text is a /command
+            if c == ' ' && !state.commands.is_empty() {
+                // Find start of current "word" — scan back past the space we just inserted
+                let before_space = state.input_cursor - 1; // position of the space
+                let bytes = state.input.as_bytes();
+                let mut word_start = before_space;
+                // Scan backwards to find word boundary (newline, space, or sentinel \x00)
+                while word_start > 0 {
+                    let prev_byte = bytes[word_start - 1];
+                    if prev_byte == b'\n' || prev_byte == b' ' || prev_byte == 0 {
+                        break;
+                    }
+                    word_start -= 1;
+                }
+                let word = &state.input[word_start..before_space];
+                if let Some(cmd_name) = word.strip_prefix('/') {
+                    if let Some(cmd) = state.commands.iter().find(|c| c.id == cmd_name) {
+                        let content = cmd.content.clone();
+                        let label = cmd_name.to_string();
+                        let idx = state.paste_buffers.len();
+                        state.paste_buffers.push(content);
+                        state.paste_buffer_labels.push(Some(label.clone()));
+                        let sentinel = format!("\x00{}\x00", idx);
+                        // Replace /command<space> with sentinel
+                        state.input = format!(
+                            "{}{}{}",
+                            &state.input[..word_start],
+                            sentinel,
+                            &state.input[state.input_cursor..],
+                        );
+                        state.input_cursor = word_start + sentinel.len();
+                    }
+                }
+            }
+
             ActionResult::Nothing
         }
         Action::InsertText(text) => {
@@ -88,6 +124,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             // Store in paste buffers and insert sentinel marker at cursor
             let idx = state.paste_buffers.len();
             state.paste_buffers.push(text);
+            state.paste_buffer_labels.push(None);
             let sentinel = format!("\x00{}\x00", idx);
             state.input.insert_str(state.input_cursor, &sentinel);
             state.input_cursor += sentinel.len();

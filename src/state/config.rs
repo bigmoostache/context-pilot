@@ -8,11 +8,18 @@ use super::context::ContextType;
 // MULTI-WORKER STATE STRUCTS
 // =============================================================================
 
+/// Current schema version for SharedConfig and WorkerState.
+/// Increment when making breaking changes to the persistence format.
+pub const SCHEMA_VERSION: u32 = 1;
+
 /// Shared configuration (config.json)
 /// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharedConfig {
     // === Infrastructure ===
+    /// Schema version for forward/backward compatibility
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     /// Flag to request reload (checked by run.sh supervisor)
     #[serde(default)]
     pub reload_requested: bool,
@@ -40,6 +47,7 @@ pub struct SharedConfig {
 impl Default for SharedConfig {
     fn default() -> Self {
         Self {
+            schema_version: SCHEMA_VERSION,
             reload_requested: false,
             active_theme: crate::config::DEFAULT_THEME.to_string(),
             owner_pid: None,
@@ -55,6 +63,9 @@ impl Default for SharedConfig {
 /// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerState {
+    /// Schema version for forward/backward compatibility
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     /// Worker identifier
     pub worker_id: String,
 
@@ -82,6 +93,7 @@ pub struct WorkerState {
 impl Default for WorkerState {
     fn default() -> Self {
         Self {
+            schema_version: SCHEMA_VERSION,
             worker_id: crate::constants::DEFAULT_WORKER_ID.to_string(),
             important_panel_uids: HashMap::new(),
             panel_uid_to_local_id: HashMap::new(),
@@ -162,6 +174,10 @@ pub struct PanelData {
 /// UIDs for important/fixed panels that a worker uses.
 /// Maps ContextType to panel UID string.
 pub type ImportantPanelUids = HashMap<ContextType, String>;
+
+fn default_schema_version() -> u32 {
+    1
+}
 
 fn default_theme() -> String {
     crate::config::DEFAULT_THEME.to_string()

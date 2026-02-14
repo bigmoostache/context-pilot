@@ -24,7 +24,7 @@ pub fn highlight_file(path: &str, content: &str) -> Arc<Vec<Vec<(Color, String)>
     // Check cache first (keyed by path + content hash for simplicity)
     let cache_key = format!("{}:{}", path, content.len());
     {
-        let cache = HIGHLIGHT_CACHE.lock().expect("highlight cache lock poisoned");
+        let cache = HIGHLIGHT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(cached) = cache.get(&cache_key) {
             return Arc::clone(cached);
         }
@@ -34,7 +34,7 @@ pub fn highlight_file(path: &str, content: &str) -> Arc<Vec<Vec<(Color, String)>
 
     // Store in cache
     {
-        let mut cache = HIGHLIGHT_CACHE.lock().expect("highlight cache lock poisoned");
+        let mut cache = HIGHLIGHT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         // Limit cache size
         if cache.len() > 50 {
             cache.clear();

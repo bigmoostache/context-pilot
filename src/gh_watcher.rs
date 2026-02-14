@@ -72,7 +72,7 @@ impl GhWatcher {
     /// Args: `(context_id, command, github_token)`.
     /// Adds missing watches, removes stale ones, preserves etag/hash/interval state on existing.
     pub fn sync_watches(&self, panels: &[(String, String, String)]) {
-        let mut watches = self.watches.lock().expect("gh_watcher watches lock poisoned");
+        let mut watches = self.watches.lock().unwrap_or_else(|e| e.into_inner());
 
         // Remove watches for panels that no longer exist
         let active_ids: std::collections::HashSet<&str> =
@@ -138,7 +138,7 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
 
         // Snapshot only watches that are due for polling
         let due: Vec<(String, Vec<String>, Arc<SecretBox<String>>, bool, Option<String>, Option<String>)> = {
-            let watches = watches.lock().expect("gh_watcher watches lock poisoned");
+            let watches = watches.lock().unwrap_or_else(|e| e.into_inner());
             watches.values()
                 .filter(|w| current_ms.saturating_sub(w.last_poll_ms) >= w.poll_interval_secs * 1000)
                 .map(|w| (
@@ -159,7 +159,7 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
 
                 // Update watch state: always update last_poll_ms and poll_interval
                 {
-                    let mut watches = watches.lock().expect("gh_watcher watches lock poisoned");
+                    let mut watches = watches.lock().unwrap_or_else(|e| e.into_inner());
                     if let Some(watch) = watches.get_mut(&context_id) {
                         watch.last_poll_ms = now_ms();
                         if let Some(interval) = outcome.poll_interval {
@@ -188,7 +188,7 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
 
                 // Update watch state
                 {
-                    let mut watches = watches.lock().expect("gh_watcher watches lock poisoned");
+                    let mut watches = watches.lock().unwrap_or_else(|e| e.into_inner());
                     if let Some(watch) = watches.get_mut(&context_id) {
                         watch.last_poll_ms = now_ms();
                         if let Some((ref new_hash, _)) = result {

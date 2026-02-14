@@ -130,41 +130,7 @@ fn load_state_new() -> State {
                         .filter_map(|uid| load_message(uid))
                         .collect();
                     if !msgs.is_empty() {
-                        // Rebuild cached_content using format_chunk_content logic
-                        let mut content = String::new();
-                        for msg in &msgs {
-                            use crate::state::{MessageStatus, MessageType};
-                            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
-                                continue;
-                            }
-                            match msg.message_type {
-                                MessageType::ToolCall => {
-                                    for tu in &msg.tool_uses {
-                                        content += &format!(
-                                            "tool_call {}({})\n",
-                                            tu.name,
-                                            serde_json::to_string(&tu.input).unwrap_or_default()
-                                        );
-                                    }
-                                }
-                                MessageType::ToolResult => {
-                                    for tr in &msg.tool_results {
-                                        content += &format!("{}\n", tr.content);
-                                    }
-                                }
-                                MessageType::TextMessage => {
-                                    let text = match msg.status {
-                                        MessageStatus::Summarized => {
-                                            msg.tl_dr.as_deref().unwrap_or(&msg.content)
-                                        }
-                                        _ => &msg.content,
-                                    };
-                                    if !text.is_empty() {
-                                        content += &format!("[{}]: {}\n", msg.role, text);
-                                    }
-                                }
-                            }
-                        }
+                        let content = crate::state::format_messages_to_chunk(&msgs);
                         let token_count = crate::state::estimate_tokens(&content);
                         let total_pages = crate::state::compute_total_pages(token_count);
                         elem.cached_content = Some(content);
@@ -295,6 +261,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
 
     // SharedConfig
     let shared_config = SharedConfig {
+        schema_version: crate::state::config::SCHEMA_VERSION,
         reload_requested: false,
         active_theme: state.active_theme.clone(),
         owner_pid: Some(current_pid()),
@@ -333,6 +300,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
 
     // WorkerState
     let worker_state = WorkerState {
+        schema_version: crate::state::config::SCHEMA_VERSION,
         worker_id: DEFAULT_WORKER_ID.to_string(),
         important_panel_uids: important_uids,
         panel_uid_to_local_id,
@@ -452,16 +420,27 @@ pub fn save_state(state: &State) {
     let batch = build_save_batch(state);
     // Execute synchronously
     for dir in &batch.ensure_dirs {
-        let _ = fs::create_dir_all(dir);
+        if let Err(e) = fs::create_dir_all(dir) {
+            eprintln!("[persistence] failed to create dir {}: {}", dir.display(), e);
+        }
     }
     for op in &batch.writes {
         if let Some(parent) = op.path.parent() {
-            let _ = fs::create_dir_all(parent);
+            if let Err(e) = fs::create_dir_all(parent) {
+                eprintln!("[persistence] failed to create dir {}: {}", parent.display(), e);
+                continue;
+            }
         }
-        let _ = fs::write(&op.path, &op.content);
+        if let Err(e) = fs::write(&op.path, &op.content) {
+            eprintln!("[persistence] failed to write {}: {}", op.path.display(), e);
+        }
     }
     for op in &batch.deletes {
-        let _ = fs::remove_file(&op.path);
+        if let Err(e) = fs::remove_file(&op.path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                eprintln!("[persistence] failed to delete {}: {}", op.path.display(), e);
+            }
+        }
     }
 }
 

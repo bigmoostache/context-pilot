@@ -29,6 +29,7 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
     state.input.clear();
     state.input_cursor = 0;
     state.paste_buffers.clear();
+    state.paste_buffer_labels.clear();
     let user_token_estimate = estimate_tokens(&content);
 
     // Assign user display ID and UID

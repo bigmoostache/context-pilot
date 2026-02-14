@@ -155,43 +155,9 @@ fn is_turn_boundary(messages: &[Message], idx: usize) -> bool {
     false
 }
 
-/// Format a range of messages into a text chunk for the ConversationHistory panel.
-/// Uses the same `[ID]:\ncontent` format the LLM sees in conversation messages.
+/// Format a range of messages into a text chunk (delegates to shared function).
 fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> String {
-    let mut output = String::new();
-    for msg in &messages[start..end] {
-        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
-            continue;
-        }
-        match msg.message_type {
-            MessageType::ToolCall => {
-                for tu in &msg.tool_uses {
-                    output += &format!(
-                        "tool_call {}({})\n",
-                        tu.name,
-                        serde_json::to_string(&tu.input).unwrap_or_default()
-                    );
-                }
-            }
-            MessageType::ToolResult => {
-                for tr in &msg.tool_results {
-                    output += &format!("{}\n", tr.content);
-                }
-            }
-            MessageType::TextMessage => {
-                let content = match msg.status {
-                    MessageStatus::Summarized => {
-                        msg.tl_dr.as_deref().unwrap_or(&msg.content)
-                    }
-                    _ => &msg.content,
-                };
-                if !content.is_empty() {
-                    output += &format!("[{}]: {}\n", msg.role, content);
-                }
-            }
-        }
-    }
-    output
+    crate::state::format_messages_to_chunk(&messages[start..end])
 }
 
 /// Detach oldest conversation messages into frozen ConversationHistory panels

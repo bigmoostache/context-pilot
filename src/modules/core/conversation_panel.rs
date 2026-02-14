@@ -208,7 +208,7 @@ impl ConversationPanel {
                 text.extend(cached.lines.iter().cloned());
             } else {
                 // Cache miss
-                let input_lines = conversation_render::render_input(&state.input, state.input_cursor, viewport_width, base_style, &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(), &state.paste_buffers);
+                let input_lines = conversation_render::render_input(&state.input, state.input_cursor, viewport_width, base_style, &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(), &state.paste_buffers, &state.paste_buffer_labels);
                 state.input_cache = Some(InputRenderCache {
                     lines: Rc::new(input_lines.clone()),
                     input_hash,
@@ -218,7 +218,7 @@ impl ConversationPanel {
             }
         } else {
             // No cache
-            let input_lines = conversation_render::render_input(&state.input, state.input_cursor, viewport_width, base_style, &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(), &state.paste_buffers);
+            let input_lines = conversation_render::render_input(&state.input, state.input_cursor, viewport_width, base_style, &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(), &state.paste_buffers, &state.paste_buffer_labels);
             state.input_cache = Some(InputRenderCache {
                 lines: Rc::new(input_lines.clone()),
                 input_hash,

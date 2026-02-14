@@ -263,7 +263,7 @@ const PASTE_PLACEHOLDER_END: char = '\u{E001}';
 
 /// Pre-process input string: replace sentinel markers with display placeholders,
 /// adjusting cursor position accordingly. Returns (display_string, adjusted_cursor).
-fn expand_paste_sentinels(input: &str, cursor: usize, paste_buffers: &[String]) -> (String, usize) {
+fn expand_paste_sentinels(input: &str, cursor: usize, paste_buffers: &[String], paste_buffer_labels: &[Option<String>]) -> (String, usize) {
     if !input.contains(SENTINEL_CHAR) {
         return (input.to_string(), cursor);
     }
@@ -292,7 +292,12 @@ fn expand_paste_sentinels(input: &str, cursor: usize, paste_buffers: &[String]) 
                     let (token_count, line_count) = paste_buffers.get(idx)
                         .map(|s| (crate::state::estimate_tokens(s), s.lines().count().max(1)))
                         .unwrap_or((0, 0));
-                    let placeholder = format!("{}📋 Paste #{} ({} lines, {} tok){}", PASTE_PLACEHOLDER_START, idx + 1, line_count, token_count, PASTE_PLACEHOLDER_END);
+                    let label = paste_buffer_labels.get(idx).and_then(|l| l.as_ref());
+                    let placeholder = if let Some(cmd_name) = label {
+                        format!("{}⚡/{} ({} lines, {} tok){}", PASTE_PLACEHOLDER_START, cmd_name, line_count, token_count, PASTE_PLACEHOLDER_END)
+                    } else {
+                        format!("{}📋 Paste #{} ({} lines, {} tok){}", PASTE_PLACEHOLDER_START, idx + 1, line_count, token_count, PASTE_PLACEHOLDER_END)
+                    };
                     let placeholder_len = placeholder.len();
 
                     // Adjust cursor if it's after this sentinel
@@ -326,7 +331,7 @@ fn expand_paste_sentinels(input: &str, cursor: usize, paste_buffers: &[String]) 
 }
 
 /// Render input area to lines
-pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base_style: Style, command_ids: &[String], paste_buffers: &[String]) -> Vec<Line<'static>> {
+pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base_style: Style, command_ids: &[String], paste_buffers: &[String], paste_buffer_labels: &[Option<String>]) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let role_icon = icons::msg_user();
     let role_color = theme::user();
@@ -335,7 +340,7 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
     let cursor_char = "\u{258e}";
 
     // Pre-process: expand paste sentinels to display placeholders
-    let (display_input, display_cursor) = expand_paste_sentinels(input, cursor, paste_buffers);
+    let (display_input, display_cursor) = expand_paste_sentinels(input, cursor, paste_buffers, paste_buffer_labels);
     let input = &display_input;
     let cursor = display_cursor;
 

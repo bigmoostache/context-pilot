@@ -113,3 +113,44 @@ impl Message {
         }
     }
 }
+
+/// Format a slice of messages into a text chunk for ConversationHistory panels.
+/// Skips Deleted/Detached messages. Uses the same format the LLM sees:
+/// tool calls as `tool_call name(json)`, tool results as raw content,
+/// and text messages as `[role]: content`.
+pub fn format_messages_to_chunk(messages: &[Message]) -> String {
+    let mut output = String::new();
+    for msg in messages {
+        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
+            continue;
+        }
+        match msg.message_type {
+            MessageType::ToolCall => {
+                for tu in &msg.tool_uses {
+                    output += &format!(
+                        "tool_call {}({})\n",
+                        tu.name,
+                        serde_json::to_string(&tu.input).unwrap_or_default()
+                    );
+                }
+            }
+            MessageType::ToolResult => {
+                for tr in &msg.tool_results {
+                    output += &format!("{}\n", tr.content);
+                }
+            }
+            MessageType::TextMessage => {
+                let content = match msg.status {
+                    MessageStatus::Summarized => {
+                        msg.tl_dr.as_deref().unwrap_or(&msg.content)
+                    }
+                    _ => &msg.content,
+                };
+                if !content.is_empty() {
+                    output += &format!("[{}]: {}\n", msg.role, content);
+                }
+            }
+        }
+    }
+    output
+}
