@@ -77,12 +77,12 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     // Render fixed contexts (always visible)
     for &i in &fixed_indices {
         let ctx = &state.context[i];
-        render_context_line(&mut lines, ctx, i, state, id_width, &spin, base_style);
+        render_context_line(&mut lines, ctx, i, state, id_width, spin, base_style);
     }
 
     // Calculate pagination for dynamic contexts
     let total_dynamic = dynamic_indices.len();
-    let total_pages = if total_dynamic == 0 { 1 } else { (total_dynamic + MAX_DYNAMIC_PER_PAGE - 1) / MAX_DYNAMIC_PER_PAGE };
+    let total_pages = if total_dynamic == 0 { 1 } else { total_dynamic.div_ceil(MAX_DYNAMIC_PER_PAGE) };
 
     // Determine current page based on selected context
     let current_page = if let Some(selected_pos) = dynamic_indices.iter().position(|&i| i == state.selected_context) {
@@ -105,7 +105,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         // Render dynamic contexts for current page
         for &i in &page_indices {
             let ctx = &state.context[i];
-            render_context_line(&mut lines, ctx, i, state, id_width, &spin, base_style);
+            render_context_line(&mut lines, ctx, i, state, id_width, spin, base_style);
         }
 
         // Page indicator (only if more than one page)
@@ -207,9 +207,9 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
         // Build table rows: each row has [label, ↑hit, ✗miss, ↓out]
         // We interleave counts rows and costs rows
-        let hit_icon = format!("{}", chars::ARROW_UP);
-        let miss_icon = format!("{}", chars::CROSS);
-        let out_icon = format!("{}", chars::ARROW_DOWN);
+        let hit_icon = chars::ARROW_UP.to_string();
+        let miss_icon = chars::CROSS.to_string();
+        let out_icon = chars::ARROW_DOWN.to_string();
 
         let header = [
             Cell::new("", Style::default()),
@@ -283,8 +283,6 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         if total_cost >= 0.001 {
             let total_str = if total_cost < 0.01 {
                 format!("${:.3}", total_cost)
-            } else if total_cost < 1.0 {
-                format!("${:.2}", total_cost)
             } else {
                 format!("${:.2}", total_cost)
             };

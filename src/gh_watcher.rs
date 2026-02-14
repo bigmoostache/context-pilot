@@ -28,6 +28,9 @@ const GH_WATCHER_TICK_SECS: u64 = 5;
 /// GitHub's typical X-Poll-Interval is 60s; we use the same default.
 const GH_DEFAULT_POLL_INTERVAL_SECS: u64 = 60;
 
+/// Snapshot of a due watch for polling (context_id, args, token, is_api, etag, last_hash)
+type DueWatch = (String, Vec<String>, Arc<SecretBox<String>>, bool, Option<String>, Option<String>);
+
 /// Per-panel watch state
 struct GhWatch {
     context_id: String,
@@ -137,7 +140,7 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
         let current_ms = now_ms();
 
         // Snapshot only watches that are due for polling
-        let due: Vec<(String, Vec<String>, Arc<SecretBox<String>>, bool, Option<String>, Option<String>)> = {
+        let due: Vec<DueWatch> = {
             let watches = watches.lock().unwrap_or_else(|e| e.into_inner());
             watches.values()
                 .filter(|w| current_ms.saturating_sub(w.last_poll_ms) >= w.poll_interval_secs * 1000)
