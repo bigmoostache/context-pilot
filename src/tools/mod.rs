@@ -54,16 +54,33 @@ pub fn perform_reload(state: &mut State) {
     // Read config, set reload_requested to true, and save
     match fs::read_to_string(config_path) {
         Ok(json) => {
-            // Simple string replacement to set reload_requested: true
-            let updated = if json.contains("\"reload_requested\":") {
-                json.replace("\"reload_requested\": false", "\"reload_requested\": true")
-                    .replace("\"reload_requested\":false", "\"reload_requested\":true")
-            } else {
-                // Add the field before the final }
-                json.trim_end().trim_end_matches('}').to_string()
-                    + ",\n  \"reload_requested\": true\n}"
-            };
-            let _ = fs::write(config_path, updated);
+            // Parse JSON, update field, and serialize back
+            match serde_json::from_str::<Value>(&json) {
+                Ok(mut config) => {
+                    // Set reload_requested to true
+                    if let Some(obj) = config.as_object_mut() {
+                        obj.insert("reload_requested".to_string(), Value::Bool(true));
+                    }
+                    
+                    // Write back with pretty formatting
+                    if let Ok(updated) = serde_json::to_string_pretty(&config) {
+                        let _ = fs::write(config_path, updated);
+                    }
+                }
+                Err(e) => {
+                    // If JSON parsing fails, fall back to string replacement
+                    // This maintains backwards compatibility with malformed configs
+                    eprintln!("Warning: Config file is not valid JSON ({}), using fallback string replacement. Consider fixing the config file.", e);
+                    let updated = if json.contains("\"reload_requested\":") {
+                        json.replace("\"reload_requested\": false", "\"reload_requested\": true")
+                            .replace("\"reload_requested\":false", "\"reload_requested\":true")
+                    } else {
+                        json.trim_end().trim_end_matches('}').to_string()
+                            + ",\n  \"reload_requested\": true\n}"
+                    };
+                    let _ = fs::write(config_path, updated);
+                }
+            }
         }
         Err(_) => {
             // If we can't read config, just try to reload anyway
