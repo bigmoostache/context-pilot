@@ -16,6 +16,35 @@ pub use helpers::{clean_llm_id_prefix, parse_context_pattern, find_context_by_id
 use crate::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::state::{ContextElement, ContextType, State};
 
+/// If cursor is inside a paste sentinel (\x00{idx}\x00), eject it to after the sentinel.
+fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
+    let bytes = input.as_bytes();
+    if cursor == 0 || cursor >= bytes.len() {
+        return cursor;
+    }
+    // Scan backwards from cursor to see if we hit \x00 before any non-digit
+    let mut scan = cursor;
+    while scan > 0 {
+        let b = bytes[scan - 1];
+        if b == 0 {
+            // Found opening \x00 — we're inside a sentinel. Find the closing \x00.
+            let mut end = cursor;
+            while end < bytes.len() && bytes[end] != 0 {
+                end += 1;
+            }
+            if end < bytes.len() && bytes[end] == 0 {
+                return end + 1; // after closing \x00
+            }
+            return cursor;
+        } else if b.is_ascii_digit() {
+            scan -= 1;
+        } else {
+            break; // Not inside a sentinel
+        }
+    }
+    cursor
+}
+
 #[derive(Debug, Clone)]
 pub enum Action {
     InputChar(char),
@@ -103,12 +132,12 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                         let sentinel = format!("\x00{}\x00", idx);
                         // Replace /command<space> with sentinel
                         state.input = format!(
-                            "{}{}{}",
+                            "{}{}\n{}",
                             &state.input[..word_start],
                             sentinel,
                             &state.input[state.input_cursor..],
                         );
-                        state.input_cursor = word_start + sentinel.len();
+                        state.input_cursor = word_start + sentinel.len() + 1;
                     }
                 }
             }
@@ -213,6 +242,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                         .unwrap_or(0);
                     state.input_cursor = word_start;
                 }
+                state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
             }
             ActionResult::Nothing
         }
@@ -223,6 +253,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 let remaining = &after[skip_word..];
                 let skip_space = remaining.find(|c: char| !c.is_whitespace()).unwrap_or(remaining.len());
                 state.input_cursor += skip_word + skip_space;
+                state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
             }
             ActionResult::Nothing
         }
@@ -254,11 +285,13 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::CursorHome => {
             let before_cursor = &state.input[..state.input_cursor];
             state.input_cursor = before_cursor.rfind('\n').map(|i| i + 1).unwrap_or(0);
+            state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
             ActionResult::Nothing
         }
         Action::CursorEnd => {
             let after_cursor = &state.input[state.input_cursor..];
             state.input_cursor += after_cursor.find('\n').unwrap_or(after_cursor.len());
+            state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
             ActionResult::Nothing
         }
 
