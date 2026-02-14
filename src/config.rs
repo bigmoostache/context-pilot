@@ -185,33 +185,50 @@ pub fn get_theme(theme_id: &str) -> &'static Theme {
 }
 
 // ============================================================================
-// Active Theme (Global State — cached atomic pointer for zero-cost access)
+// Active Theme (Global State — thread-safe cached theme ID)
 // ============================================================================
 
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-/// Cached pointer to the active theme. Updated by set_active_theme().
-/// Points into the static THEMES LazyLock, so the reference is always valid.
-static CACHED_THEME: AtomicPtr<Theme> = AtomicPtr::new(std::ptr::null_mut());
+/// Cached theme ID stored as an index into THEME_ORDER
+/// 0 = uninitialized, 1 = first theme (dnd), etc.
+static CACHED_THEME_INDEX: AtomicUsize = AtomicUsize::new(0);
+
+/// Fallback storage for custom theme IDs not in THEME_ORDER
+static CUSTOM_THEME_ID: OnceLock<String> = OnceLock::new();
 
 /// Set the active theme ID (call when state is loaded or theme changes)
+/// Thread-safe without unsafe code
 pub fn set_active_theme(theme_id: &str) {
-    let theme: &'static Theme = get_theme(theme_id);
-    CACHED_THEME.store(theme as *const Theme as *mut Theme, Ordering::Release);
+    // Try to find theme in THEME_ORDER for fast indexing
+    if let Some(idx) = THEME_ORDER.iter().position(|&id| id == theme_id) {
+        CACHED_THEME_INDEX.store(idx + 1, Ordering::Release);
+    } else {
+        // Custom theme not in THEME_ORDER - store in fallback
+        let _ = CUSTOM_THEME_ID.set(theme_id.to_string());
+        CACHED_THEME_INDEX.store(usize::MAX, Ordering::Release);
+    }
 }
 
-/// Get the currently active theme (single atomic load — no locking, no allocation)
+/// Get the currently active theme (lock-free for standard themes)
 pub fn active_theme() -> &'static Theme {
-    let ptr = CACHED_THEME.load(Ordering::Acquire);
-    if !ptr.is_null() {
-        // SAFETY: ptr was set from a &'static Theme reference stored in LazyLock THEMES.
-        // The Theme data is never mutated or freed after initialization.
-        unsafe { &*ptr }
+    let idx = CACHED_THEME_INDEX.load(Ordering::Acquire);
+    
+    if idx == 0 {
+        // Not initialized yet - use default
+        get_theme(DEFAULT_THEME)
+    } else if idx == usize::MAX {
+        // Custom theme
+        if let Some(theme_id) = CUSTOM_THEME_ID.get() {
+            get_theme(theme_id)
+        } else {
+            get_theme(DEFAULT_THEME)
+        }
     } else {
-        // First call before set_active_theme — initialize from default
-        let theme = get_theme(DEFAULT_THEME);
-        CACHED_THEME.store(theme as *const Theme as *mut Theme, Ordering::Release);
-        theme
+        // Standard theme from THEME_ORDER
+        let theme_id = THEME_ORDER.get(idx - 1).unwrap_or(&DEFAULT_THEME);
+        get_theme(theme_id)
     }
 }
 
