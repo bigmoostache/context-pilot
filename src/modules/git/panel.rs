@@ -232,7 +232,8 @@ impl Panel for GitPanel {
                 true
             }
             CacheUpdate::GitStatusUnchanged => {
-                false // No actual content change — don't bump timestamp
+                ctx.cache_deprecated = false;
+                false // No actual content change
             }
             _ => false,
         }

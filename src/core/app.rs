@@ -66,6 +66,10 @@ pub struct App {
     deferred_sleep_needs_tmux_refresh: bool,
     /// Background persistence writer — offloads file I/O to a dedicated thread
     writer: PersistenceWriter,
+    /// Last poll time per panel ID — tracks when we last submitted a cache request
+    /// for timer-based panels (Tmux, Git, GitResult, GithubResult, Glob, Grep).
+    /// Separate from ContextElement.last_refresh_ms which tracks actual content changes.
+    last_poll_ms: std::collections::HashMap<String, u64>,
 }
 
 impl App {
@@ -98,6 +102,7 @@ impl App {
             deferred_tool_sleeping: false,
             deferred_sleep_needs_tmux_refresh: false,
             writer: PersistenceWriter::new(),
+            last_poll_ms: std::collections::HashMap::new(),
         }
     }
 
@@ -752,7 +757,7 @@ impl App {
             if let CacheUpdate::Unchanged { ref context_id } = update {
                 if let Some(ctx) = state.context.iter_mut().find(|c| c.id == *context_id) {
                     ctx.cache_in_flight = false;
-                    ctx.last_refresh_ms = now_ms();
+                    ctx.cache_deprecated = false;
                 }
                 continue;
             }
@@ -763,9 +768,9 @@ impl App {
                 let Some(idx) = idx else { continue };
                 let mut ctx = state.context.remove(idx);
                 let panel = crate::core::panels::get_panel(ctx.context_type);
+                // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
                 let _changed = panel.apply_cache_update(update, &mut ctx, state);
                 ctx.cache_in_flight = false;
-                ctx.last_refresh_ms = now_ms();
                 state.context.insert(idx, ctx);
                 state.dirty = true;
                 continue;
@@ -777,9 +782,9 @@ impl App {
             let Some(idx) = idx else { continue };
             let mut ctx = state.context.remove(idx);
             let panel = crate::core::panels::get_panel(ctx.context_type);
+            // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
             let _changed = panel.apply_cache_update(update, &mut ctx, state);
             ctx.cache_in_flight = false;
-            ctx.last_refresh_ms = now_ms();
             state.context.insert(idx, ctx);
             state.dirty = true;
         }
@@ -883,54 +888,48 @@ impl App {
         let _guard = crate::profile!("app::timer_deprecation");
         self.last_timer_check_ms = current_ms;
 
-        // Ensure all File panels have active watchers, even if their cache was
-        // populated via wait_for_panels (which bypasses the needs_initial path).
-        // Without this, files opened during tool execution are never watched.
+        // Ensure all File panels have active watchers
         self.ensure_file_watchers();
 
-        // Immutable pass: collect requests and file watcher setup needs
         let mut requests: Vec<(usize, CacheRequest)> = Vec::new();
 
         for (i, ctx) in self.state.context.iter().enumerate() {
             if ctx.cache_in_flight { continue; }
 
-            let needs_initial = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
-            let explicitly_deprecated = ctx.cache_deprecated;
-
             let panel = crate::core::panels::get_panel(ctx.context_type);
 
-            // Timer-based interval refresh: for fixed panels (P0-P7), the currently
-            // selected panel, AND tmux panels (always, since capture is lightweight).
-            // Other dynamic panels that aren't selected don't need continuous background
-            // polling — they'll refresh when selected or when a watcher event marks them
-            // deprecated.
-            let interval_eligible = ctx.context_type.is_fixed()
-                || i == self.state.selected_context
-                || ctx.context_type == ContextType::Tmux;
-            let interval_elapsed = if interval_eligible {
-                panel.cache_refresh_interval_ms()
-                    .map(|interval| current_ms.saturating_sub(ctx.last_refresh_ms) >= interval)
-                    .unwrap_or(true) // No interval = always eligible
-            } else {
-                false
-            };
-
-            let has_interval = panel.cache_refresh_interval_ms().is_some();
-
-            // needs_initial: always refresh newly created panels immediately
-            // interval_elapsed: scheduled refresh — only for fixed + selected panels
-            // deprecated w/o interval: File/Tree panels — refresh immediately when watcher triggers
-            // Note: cache_deprecated still affects build_cache_request (forces full refresh vs hash check)
-            if (needs_initial || interval_elapsed || (explicitly_deprecated && !has_interval))
-                && let Some(request) = panel.build_cache_request(ctx, &self.state) {
-                    requests.push((i, request));
+            // Case 1: Initial load — panel has no content yet
+            if ctx.cached_content.is_none() && ctx.context_type.needs_cache() {
+                if let Some(req) = panel.build_cache_request(ctx, &self.state) {
+                    requests.push((i, req));
                 }
+                continue;
+            }
+
+            // Case 2: Explicitly dirty (watcher event, tool, self-invalidation)
+            // ALL dirty panels refresh regardless of selection — no UI-gating.
+            if ctx.cache_deprecated {
+                if let Some(req) = panel.build_cache_request(ctx, &self.state) {
+                    requests.push((i, req));
+                }
+                continue;
+            }
+
+            // Case 3: Timer-based polling (Tmux, Git, GitResult, GithubResult, Glob, Grep)
+            if let Some(interval) = panel.cache_refresh_interval_ms() {
+                let last = self.last_poll_ms.get(&ctx.id).copied().unwrap_or(0);
+                if current_ms.saturating_sub(last) >= interval
+                    && let Some(req) = panel.build_cache_request(ctx, &self.state) {
+                        requests.push((i, req));
+                    }
+            }
         }
 
-        // Mutable pass: send requests, mark in-flight
+        // Mutable pass: send requests, mark in-flight, update poll timestamps
         for (i, request) in requests {
             process_cache_request(request, self.cache_tx.clone());
             self.state.context[i].cache_in_flight = true;
+            self.last_poll_ms.insert(self.state.context[i].id.clone(), current_ms);
         }
     }
 
