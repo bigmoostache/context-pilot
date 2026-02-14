@@ -5,6 +5,7 @@
 pub mod anthropic;
 pub mod claude_code;
 pub mod deepseek;
+pub mod error;
 pub mod grok;
 pub mod groq;
 pub mod openai_compat;
@@ -307,7 +308,7 @@ pub struct LlmRequest {
 /// Trait for LLM providers
 pub trait LlmClient: Send + Sync {
     /// Start a streaming response
-    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String>;
+    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), error::LlmError>;
 
     /// Check API connectivity: auth, streaming, and tool calling
     fn check_api(&self, model: &str) -> ApiCheckResult;
@@ -366,7 +367,7 @@ pub fn start_streaming(
         };
 
         if let Err(e) = client.stream(request, tx.clone()) {
-            let _ = tx.send(StreamEvent::Error(e));
+            let _ = tx.send(StreamEvent::Error(e.to_string()));
         }
     });
 }

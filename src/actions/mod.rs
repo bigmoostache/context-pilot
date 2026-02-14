@@ -107,8 +107,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.input.insert(state.input_cursor, c);
             state.input_cursor += c.len_utf8();
 
-            // After typing a space, check if preceding text is a /command
-            if c == ' ' && !state.commands.is_empty() {
+            // After typing a space or newline, check if preceding text is a /command
+            if (c == ' ' || c == '\n') && !state.commands.is_empty() {
                 // Find start of current "word" — scan back past the space we just inserted
                 let before_space = state.input_cursor - 1; // position of the space
                 let bytes = state.input.as_bytes();

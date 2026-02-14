@@ -198,3 +198,52 @@ pub fn compute_total_pages(token_count: usize) -> usize {
     let max = crate::constants::PANEL_PAGE_TOKENS;
     if token_count <= max { 1 } else { (token_count + max - 1) / max }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
+
+    #[test]
+    fn estimate_tokens_empty() {
+        assert_eq!(estimate_tokens(""), 0);
+    }
+
+    #[test]
+    fn estimate_tokens_short_text() {
+        let text = "hello world";
+        let expected = (text.len() as f32 / CHARS_PER_TOKEN).ceil() as usize;
+        assert_eq!(estimate_tokens(text), expected);
+    }
+
+    #[test]
+    fn estimate_tokens_single_char() {
+        // 1 char / 3.3 = 0.303... → ceil = 1
+        assert_eq!(estimate_tokens("a"), 1);
+    }
+
+    #[test]
+    fn compute_total_pages_zero() {
+        assert_eq!(compute_total_pages(0), 1);
+    }
+
+    #[test]
+    fn compute_total_pages_at_threshold() {
+        assert_eq!(compute_total_pages(PANEL_PAGE_TOKENS), 1);
+    }
+
+    #[test]
+    fn compute_total_pages_above_threshold() {
+        assert_eq!(compute_total_pages(PANEL_PAGE_TOKENS + 1), 2);
+    }
+
+    #[test]
+    fn compute_total_pages_double() {
+        assert_eq!(compute_total_pages(PANEL_PAGE_TOKENS * 2), 2);
+    }
+
+    #[test]
+    fn compute_total_pages_double_plus_one() {
+        assert_eq!(compute_total_pages(PANEL_PAGE_TOKENS * 2 + 1), 3);
+    }
+}

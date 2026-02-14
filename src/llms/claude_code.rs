@@ -15,6 +15,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
+use super::error::LlmError;
 use crate::constants::{library, API_VERSION, MAX_RESPONSE_TOKENS};
 use crate::core::panels::now_ms;
 use crate::state::{MessageStatus, MessageType};
@@ -285,11 +286,11 @@ struct StreamUsage {
 }
 
 impl LlmClient for ClaudeCodeClient {
-    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
+    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let access_token = self
             .access_token
             .as_ref()
-            .ok_or_else(|| "Claude Code OAuth token not found or expired. Run 'claude login'".to_string())?;
+            .ok_or_else(|| LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into()))?;
 
         let client = Client::new();
 
@@ -570,13 +571,12 @@ impl LlmClient for ClaudeCodeClient {
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
             .json(&api_request)
-            .send()
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .send()?;
 
         if !response.status().is_success() {
-            let status = response.status();
+            let status = response.status().as_u16();
             let body = response.text().unwrap_or_default();
-            return Err(format!("API error {}: {}", status, body));
+            return Err(LlmError::Api { status, body });
         }
 
         let reader = BufReader::new(response);
@@ -588,7 +588,7 @@ impl LlmClient for ClaudeCodeClient {
         let mut stop_reason: Option<String> = None;
 
         for line in reader.lines() {
-            let line = line.map_err(|e| format!("Read error: {}", e))?;
+            let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
 
             if !line.starts_with("data: ") {
                 continue;

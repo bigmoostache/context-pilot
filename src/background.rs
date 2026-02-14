@@ -6,6 +6,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::constants::{MODEL_TLDR, MAX_TLDR_TOKENS, API_ENDPOINT, API_VERSION, prompts};
+use crate::llms::error::LlmError;
 use crate::state::estimate_tokens;
 
 /// Simple debug logging to file
@@ -82,10 +83,10 @@ pub fn generate_tldr(message_id: String, content: String, tx: Sender<TlDrResult>
 }
 
 /// Call LLM to summarize content
-fn summarize_content(content: &str) -> Result<String, String> {
+fn summarize_content(content: &str) -> Result<String, LlmError> {
     dotenvy::dotenv().ok();
     let api_key = env::var("ANTHROPIC_API_KEY")
-        .map_err(|_| "ANTHROPIC_API_KEY not set".to_string())?;
+        .map_err(|_| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
 
     let client = Client::new();
 
@@ -129,20 +130,21 @@ fn summarize_content(content: &str) -> Result<String, String> {
         .header("anthropic-version", API_VERSION)
         .header("content-type", "application/json")
         .json(&request)
-        .send()
-        .map_err(|e| format!("Request failed: {}", e))?;
+        .send()?;
 
     if !response.status().is_success() {
-        return Err(format!("API error: {}", response.status()));
+        let status = response.status().as_u16();
+        let body = response.text().unwrap_or_default();
+        return Err(LlmError::Api { status, body });
     }
 
     let result: SummaryResponse = response
         .json()
-        .map_err(|e| format!("Parse error: {}", e))?;
+        .map_err(|e| LlmError::Parse(e.to_string()))?;
 
     result
         .content
         .first()
         .and_then(|c| c.text.clone())
-        .ok_or_else(|| "No content in response".to_string())
+        .ok_or_else(|| LlmError::Parse("No content in response".into()))
 }

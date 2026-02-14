@@ -114,6 +114,98 @@ impl Message {
     }
 }
 
+#[cfg(test)]
+pub mod test_helpers {
+    use super::*;
+
+    /// Builder for constructing test messages with sensible defaults.
+    /// Auto-increments IDs per role prefix (U1, A1, T1, R1).
+    pub struct MessageBuilder {
+        msg: Message,
+    }
+
+    impl MessageBuilder {
+        fn base(id: String, role: &str, message_type: MessageType) -> Self {
+            Self {
+                msg: Message {
+                    id,
+                    uid: None,
+                    role: role.to_string(),
+                    message_type,
+                    content: String::new(),
+                    content_token_count: 0,
+                    tl_dr: None,
+                    tl_dr_token_count: 0,
+                    status: MessageStatus::Full,
+                    tool_uses: Vec::new(),
+                    tool_results: Vec::new(),
+                    input_tokens: 0,
+                    timestamp_ms: 0,
+                },
+            }
+        }
+
+        pub fn user(content: &str) -> Self {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static COUNTER: AtomicUsize = AtomicUsize::new(1);
+            let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let mut b = Self::base(format!("U{}", n), "user", MessageType::TextMessage);
+            b.msg.content = content.to_string();
+            b
+        }
+
+        pub fn assistant(content: &str) -> Self {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static COUNTER: AtomicUsize = AtomicUsize::new(1);
+            let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let mut b = Self::base(format!("A{}", n), "assistant", MessageType::TextMessage);
+            b.msg.content = content.to_string();
+            b
+        }
+
+        pub fn tool_call(name: &str, input: serde_json::Value) -> Self {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static COUNTER: AtomicUsize = AtomicUsize::new(1);
+            let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let id = format!("T{}", n);
+            let mut b = Self::base(id.clone(), "assistant", MessageType::ToolCall);
+            b.msg.tool_uses.push(ToolUseRecord {
+                id,
+                name: name.to_string(),
+                input,
+            });
+            b
+        }
+
+        pub fn tool_result(tool_use_id: &str, content: &str) -> Self {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static COUNTER: AtomicUsize = AtomicUsize::new(1);
+            let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let mut b = Self::base(format!("R{}", n), "user", MessageType::ToolResult);
+            b.msg.tool_results.push(ToolResultRecord {
+                tool_use_id: tool_use_id.to_string(),
+                content: content.to_string(),
+                is_error: false,
+            });
+            b
+        }
+
+        pub fn status(mut self, s: MessageStatus) -> Self {
+            self.msg.status = s;
+            self
+        }
+
+        pub fn tl_dr(mut self, summary: &str) -> Self {
+            self.msg.tl_dr = Some(summary.to_string());
+            self
+        }
+
+        pub fn build(self) -> Message {
+            self.msg
+        }
+    }
+}
+
 /// Format a slice of messages into a text chunk for ConversationHistory panels.
 /// Skips Deleted/Detached messages. Uses the same format the LLM sees:
 /// tool calls as `tool_call name(json)`, tool results as raw content,
@@ -153,4 +245,71 @@ pub fn format_messages_to_chunk(messages: &[Message]) -> String {
         }
     }
     output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_helpers::MessageBuilder;
+
+    #[test]
+    fn format_empty_messages() {
+        assert_eq!(format_messages_to_chunk(&[]), "");
+    }
+
+    #[test]
+    fn format_user_and_assistant() {
+        let msgs = vec![
+            MessageBuilder::user("hello").build(),
+            MessageBuilder::assistant("world").build(),
+        ];
+        let chunk = format_messages_to_chunk(&msgs);
+        assert!(chunk.contains("[user]: hello\n"));
+        assert!(chunk.contains("[assistant]: world\n"));
+    }
+
+    #[test]
+    fn format_skips_deleted_and_detached() {
+        let msgs = vec![
+            MessageBuilder::user("visible").build(),
+            MessageBuilder::user("deleted").status(MessageStatus::Deleted).build(),
+            MessageBuilder::user("detached").status(MessageStatus::Detached).build(),
+        ];
+        let chunk = format_messages_to_chunk(&msgs);
+        assert!(chunk.contains("visible"));
+        assert!(!chunk.contains("deleted"));
+        assert!(!chunk.contains("detached"));
+    }
+
+    #[test]
+    fn format_summarized_uses_tldr() {
+        let msgs = vec![
+            MessageBuilder::assistant("long content")
+                .status(MessageStatus::Summarized)
+                .tl_dr("short")
+                .build(),
+        ];
+        let chunk = format_messages_to_chunk(&msgs);
+        assert!(chunk.contains("[assistant]: short\n"));
+        assert!(!chunk.contains("long content"));
+    }
+
+    #[test]
+    fn format_tool_call() {
+        let msgs = vec![
+            MessageBuilder::tool_call("read_file", serde_json::json!({"path": "foo.rs"})).build(),
+        ];
+        let chunk = format_messages_to_chunk(&msgs);
+        assert!(chunk.contains("tool_call read_file("));
+        assert!(chunk.contains("foo.rs"));
+    }
+
+    #[test]
+    fn format_tool_result() {
+        let msgs = vec![
+            MessageBuilder::tool_result("T1", "file contents here").build(),
+        ];
+        let chunk = format_messages_to_chunk(&msgs);
+        assert!(chunk.contains("file contents here\n"));
+    }
 }

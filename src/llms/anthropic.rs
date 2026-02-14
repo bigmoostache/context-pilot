@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
+use super::error::LlmError;
 use crate::constants::{library, API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS};
 use crate::core::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
@@ -81,11 +82,11 @@ struct StreamUsage {
 }
 
 impl LlmClient for AnthropicClient {
-    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), String> {
+    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let api_key = self
             .api_key
             .as_ref()
-            .ok_or_else(|| "ANTHROPIC_API_KEY not set".to_string())?;
+            .ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
 
         let client = Client::new();
 
@@ -151,13 +152,12 @@ impl LlmClient for AnthropicClient {
             .header("anthropic-version", API_VERSION)
             .header("content-type", "application/json")
             .json(&api_request)
-            .send()
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .send()?;
 
         if !response.status().is_success() {
-            let status = response.status();
+            let status = response.status().as_u16();
             let body = response.text().unwrap_or_default();
-            return Err(format!("API error {}: {}", status, body));
+            return Err(LlmError::Api { status, body });
         }
 
         let reader = BufReader::new(response);
@@ -167,7 +167,7 @@ impl LlmClient for AnthropicClient {
         let mut stop_reason: Option<String> = None;
 
         for line in reader.lines() {
-            let line = line.map_err(|e| format!("Read error: {}", e))?;
+            let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
 
             if !line.starts_with("data: ") {
                 continue;

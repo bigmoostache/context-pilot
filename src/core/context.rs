@@ -323,3 +323,80 @@ pub fn detach_conversation_chunks(state: &mut State) {
         // Loop to check if remaining messages still exceed threshold
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::message::test_helpers::MessageBuilder;
+
+    #[test]
+    fn turn_boundary_assistant_text() {
+        let msgs = vec![
+            MessageBuilder::user("hi").build(),
+            MessageBuilder::assistant("hello").build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0)); // user msg — not a boundary
+        assert!(is_turn_boundary(&msgs, 1)); // assistant text — boundary
+    }
+
+    #[test]
+    fn turn_boundary_tool_call_not_boundary() {
+        let msgs = vec![
+            MessageBuilder::tool_call("read_file", serde_json::json!({})).build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0));
+    }
+
+    #[test]
+    fn turn_boundary_tool_result_then_user() {
+        let msgs = vec![
+            MessageBuilder::tool_result("T1", "ok").build(),
+            MessageBuilder::user("next question").build(),
+        ];
+        assert!(is_turn_boundary(&msgs, 0)); // tool result + next user = boundary
+    }
+
+    #[test]
+    fn turn_boundary_tool_result_then_tool_call() {
+        let msgs = vec![
+            MessageBuilder::tool_result("T1", "ok").build(),
+            MessageBuilder::tool_call("write_file", serde_json::json!({})).build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0)); // next is tool call, not user — not a boundary
+    }
+
+    #[test]
+    fn turn_boundary_tool_result_last_message() {
+        let msgs = vec![
+            MessageBuilder::tool_result("T1", "ok").build(),
+        ];
+        assert!(is_turn_boundary(&msgs, 0)); // last message — boundary
+    }
+
+    #[test]
+    fn turn_boundary_deleted_not_boundary() {
+        let msgs = vec![
+            MessageBuilder::assistant("deleted").status(MessageStatus::Deleted).build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0));
+    }
+
+    #[test]
+    fn turn_boundary_detached_not_boundary() {
+        let msgs = vec![
+            MessageBuilder::assistant("detached").status(MessageStatus::Detached).build(),
+        ];
+        assert!(!is_turn_boundary(&msgs, 0));
+    }
+
+    #[test]
+    fn turn_boundary_tool_result_skips_deleted_next() {
+        // tool_result, then deleted, then user — should still be boundary
+        let msgs = vec![
+            MessageBuilder::tool_result("T1", "ok").build(),
+            MessageBuilder::user("ignored").status(MessageStatus::Deleted).build(),
+            MessageBuilder::user("real next").build(),
+        ];
+        assert!(is_turn_boundary(&msgs, 0));
+    }
+}
