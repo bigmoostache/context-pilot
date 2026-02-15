@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::constants::{icons, CHARS_PER_TOKEN};
+use crate::constants::{CHARS_PER_TOKEN, icons};
 
 /// Pre-computed set of fixed context types (avoids heap allocations on every call)
 static FIXED_TYPES: LazyLock<HashSet<ContextType>> = LazyLock::new(|| {
@@ -22,9 +22,10 @@ static CACHE_TYPES: LazyLock<HashSet<ContextType>> = LazyLock::new(|| {
     for module in crate::modules::all_modules() {
         for ct in module.fixed_panel_types().into_iter().chain(module.dynamic_panel_types()) {
             if let Some(panel) = module.create_panel(ct)
-                && panel.needs_cache() {
-                    set.insert(ct);
-                }
+                && panel.needs_cache()
+            {
+                set.insert(ct);
+            }
         }
     }
     set
@@ -105,9 +106,6 @@ pub struct ContextElement {
     /// File path (for File context type)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_path: Option<String>,
-    /// File content hash (for change detection - not persisted)
-    #[serde(skip)]
-    pub file_hash: Option<String>,
     /// Glob pattern (for Glob context type)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub glob_pattern: Option<String>,
@@ -138,9 +136,6 @@ pub struct ContextElement {
     /// Command string for GitResult/GithubResult panels
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result_command: Option<String>,
-    /// SHA-256 hash of result_command (for dedup)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub result_command_hash: Option<String>,
     /// Skill prompt ID (links to PromptItem.id for Skill panels)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill_prompt_id: Option<String>,
@@ -161,15 +156,12 @@ pub struct ContextElement {
     /// Last time this element was refreshed (content actually changed — for display "refreshed X ago")
     #[serde(skip)]
     pub last_refresh_ms: u64,
-    /// Last time this element was polled for updates (for timer-based scheduling, even if unchanged)
-    #[serde(skip)]
-    pub last_polled_ms: u64,
     /// Hash of cached content (for change detection to avoid unnecessary timestamp bumps)
     #[serde(skip)]
     pub content_hash: Option<String>,
-    /// Hash of tmux last 2 lines (for change detection)
+    /// Source data hash for background-thread early-exit optimization (not persisted)
     #[serde(skip)]
-    pub tmux_last_lines_hash: Option<String>,
+    pub source_hash: Option<String>,
     /// Current page (0-indexed) for LLM context pagination
     #[serde(skip)]
     pub current_page: usize,

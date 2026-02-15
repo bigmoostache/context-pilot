@@ -2,7 +2,7 @@ use ratatui::prelude::*;
 
 use crate::constants::icons;
 use crate::state::{Message, MessageStatus, MessageType};
-use crate::ui::{theme, helpers::wrap_text, markdown::*};
+use crate::ui::{helpers::wrap_text, markdown::*, theme};
 
 /// Render a single message to lines (without caching logic)
 pub(crate) fn render_message(
@@ -17,25 +17,29 @@ pub(crate) fn render_message(
     // Handle tool call messages
     if msg.message_type == MessageType::ToolCall {
         for tool_use in &msg.tool_uses {
-            let params: Vec<String> = tool_use.input.as_object()
+            let params: Vec<String> = tool_use
+                .input
+                .as_object()
                 .map(|obj| {
-                    obj.iter().map(|(k, v)| {
-                        let val = match v {
-                            serde_json::Value::String(s) => {
-                                if s.len() > 30 { format!("\"{}...\"", &s[..s.floor_char_boundary(27)]) } else { format!("\"{}\"", s) }
-                            }
-                            _ => v.to_string(),
-                        };
-                        format!("{}={}", k, val)
-                    }).collect()
+                    obj.iter()
+                        .map(|(k, v)| {
+                            let val = match v {
+                                serde_json::Value::String(s) => {
+                                    if s.len() > 30 {
+                                        format!("\"{}...\"", &s[..s.floor_char_boundary(27)])
+                                    } else {
+                                        format!("\"{}\"", s)
+                                    }
+                                }
+                                _ => v.to_string(),
+                            };
+                            format!("{}={}", k, val)
+                        })
+                        .collect()
                 })
                 .unwrap_or_default();
 
-            let params_str = if params.is_empty() {
-                String::new()
-            } else {
-                format!(" {}", params.join(" "))
-            };
+            let params_str = if params.is_empty() { String::new() } else { format!(" {}", params.join(" ")) };
 
             lines.push(Line::from(vec![
                 Span::styled(icons::msg_tool_call(), Style::default().fg(theme::success())),
@@ -63,9 +67,7 @@ pub(crate) fn render_message(
             let mut is_first = true;
             for line in result.content.lines() {
                 if line.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::styled(" ".repeat(prefix_width), base_style),
-                    ]));
+                    lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
                     continue;
                 }
 
@@ -137,9 +139,7 @@ pub(crate) fn render_message(
             let line = content_lines[i];
 
             if line.is_empty() {
-                lines.push(Line::from(vec![
-                    Span::styled(" ".repeat(prefix_width), base_style),
-                ]));
+                lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
                 i += 1;
                 continue;
             }
@@ -171,9 +171,7 @@ pub(crate) fn render_message(
                             lines.push(Line::from(line_spans));
                             is_first_line = false;
                         } else {
-                            let mut line_spans = vec![
-                                Span::styled(" ".repeat(prefix_width), base_style),
-                            ];
+                            let mut line_spans = vec![Span::styled(" ".repeat(prefix_width), base_style)];
                             line_spans.extend(row_spans);
                             lines.push(Line::from(line_spans));
                         }
@@ -198,9 +196,7 @@ pub(crate) fn render_message(
                         lines.push(Line::from(line_spans));
                         is_first_line = false;
                     } else {
-                        let mut line_spans = vec![
-                            Span::styled(" ".repeat(prefix_width), base_style),
-                        ];
+                        let mut line_spans = vec![Span::styled(" ".repeat(prefix_width), base_style)];
                         line_spans.extend(md_spans);
                         lines.push(Line::from(line_spans));
                     }
@@ -243,7 +239,7 @@ pub(crate) fn render_message(
             Span::styled(" ".repeat(prefix_width), base_style),
             Span::styled(
                 format!("[in:{} out:{}]", msg.input_tokens, msg.content_token_count),
-                Style::default().fg(theme::text_muted()).italic()
+                Style::default().fg(theme::text_muted()).italic(),
             ),
         ]));
     }
@@ -263,7 +259,12 @@ const PASTE_PLACEHOLDER_END: char = '\u{E001}';
 
 /// Pre-process input string: replace sentinel markers with display placeholders,
 /// adjusting cursor position accordingly. Returns (display_string, adjusted_cursor).
-fn expand_paste_sentinels(input: &str, cursor: usize, paste_buffers: &[String], paste_buffer_labels: &[Option<String>]) -> (String, usize) {
+fn expand_paste_sentinels(
+    input: &str,
+    cursor: usize,
+    paste_buffers: &[String],
+    paste_buffer_labels: &[Option<String>],
+) -> (String, usize) {
     if !input.contains(SENTINEL_CHAR) {
         return (input.to_string(), cursor);
     }
@@ -296,10 +297,18 @@ fn expand_paste_sentinels(input: &str, cursor: usize, paste_buffers: &[String], 
                         format!("{}⚡/{}\n{}{}", PASTE_PLACEHOLDER_START, cmd_name, content, PASTE_PLACEHOLDER_END)
                     } else {
                         // Paste: show line/token stats
-                        let (token_count, line_count) = paste_buffers.get(idx)
+                        let (token_count, line_count) = paste_buffers
+                            .get(idx)
                             .map(|s| (crate::state::estimate_tokens(s), s.lines().count().max(1)))
                             .unwrap_or((0, 0));
-                        format!("{}📋 Paste #{} ({} lines, {} tok){}", PASTE_PLACEHOLDER_START, idx + 1, line_count, token_count, PASTE_PLACEHOLDER_END)
+                        format!(
+                            "{}📋 Paste #{} ({} lines, {} tok){}",
+                            PASTE_PLACEHOLDER_START,
+                            idx + 1,
+                            line_count,
+                            token_count,
+                            PASTE_PLACEHOLDER_END
+                        )
                     };
                     let placeholder = &display_text;
                     let placeholder_len = placeholder.len();
@@ -335,7 +344,15 @@ fn expand_paste_sentinels(input: &str, cursor: usize, paste_buffers: &[String], 
 }
 
 /// Render input area to lines
-pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base_style: Style, command_ids: &[String], paste_buffers: &[String], paste_buffer_labels: &[Option<String>]) -> Vec<Line<'static>> {
+pub(super) fn render_input(
+    input: &str,
+    cursor: usize,
+    viewport_width: u16,
+    base_style: Style,
+    command_ids: &[String],
+    paste_buffers: &[String],
+    paste_buffer_labels: &[Option<String>],
+) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let role_icon = icons::msg_user();
     let role_color = theme::user();
@@ -371,9 +388,7 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
         let mut in_paste_block = false;
         for line in input_with_cursor.lines() {
             if line.is_empty() {
-                lines.push(Line::from(vec![
-                    Span::styled(" ".repeat(prefix_width), base_style),
-                ]));
+                lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
                 continue;
             }
 
@@ -382,7 +397,9 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
                 // Check if this line enters or exits a paste placeholder block
                 let has_start = line_text.contains(PASTE_PLACEHOLDER_START);
                 let has_end = line_text.contains(PASTE_PLACEHOLDER_END);
-                if has_start { in_paste_block = true; }
+                if has_start {
+                    in_paste_block = true;
+                }
 
                 let mut spans = if in_paste_block {
                     // Inside a paste/command block — render entire line in accent, strip markers
@@ -401,7 +418,9 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
                     build_input_spans(line_text, cursor_char, command_ids)
                 };
 
-                if has_end { in_paste_block = false; }
+                if has_end {
+                    in_paste_block = false;
+                }
 
                 // Add command hints if this line segment contains the cursor and starts with /
                 if line_text.contains(cursor_char) && !in_paste_block {
@@ -420,30 +439,23 @@ pub(super) fn render_input(input: &str, cursor: usize, viewport_width: u16, base
                     lines.push(Line::from(line_spans));
                     is_first_line = false;
                 } else {
-                    let mut line_spans = vec![
-                        Span::styled(" ".repeat(prefix_width), base_style),
-                    ];
+                    let mut line_spans = vec![Span::styled(" ".repeat(prefix_width), base_style)];
                     line_spans.extend(spans);
                     lines.push(Line::from(line_spans));
                 }
             }
         }
         if input_with_cursor.ends_with('\n') {
-            lines.push(Line::from(vec![
-                Span::styled(" ".repeat(prefix_width), base_style),
-            ]));
+            lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
         }
     }
 
     // Show hint when next Enter will send
     let at_end = original_cursor >= original_input.len();
-    let ends_with_empty_line = original_input.ends_with('\n')
-        || original_input.lines().last().map(|l| l.trim().is_empty()).unwrap_or(false);
+    let ends_with_empty_line =
+        original_input.ends_with('\n') || original_input.lines().last().map(|l| l.trim().is_empty()).unwrap_or(false);
     if !original_input.is_empty() && at_end && ends_with_empty_line {
-        lines.push(Line::from(Span::styled(
-            "  ↵ Enter to send",
-            Style::default().fg(theme::text_muted()),
-        )));
+        lines.push(Line::from(Span::styled("  ↵ Enter to send", Style::default().fg(theme::text_muted()))));
     }
 
     lines.push(Line::from(""));
@@ -466,16 +478,10 @@ fn build_input_spans(line_text: &str, cursor_char: &str, command_ids: &[String])
                 // Render as colored placeholder — check if cursor is inside
                 if text.contains(cursor_char) {
                     let clean = text.replace(cursor_char, "");
-                    spans.push(Span::styled(
-                        clean,
-                        Style::default().fg(theme::bg_base()).bg(theme::accent()),
-                    ));
+                    spans.push(Span::styled(clean, Style::default().fg(theme::bg_base()).bg(theme::accent())));
                     spans.push(Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()));
                 } else {
-                    spans.push(Span::styled(
-                        text,
-                        Style::default().fg(theme::bg_base()).bg(theme::accent()),
-                    ));
+                    spans.push(Span::styled(text, Style::default().fg(theme::bg_base()).bg(theme::accent())));
                 }
             }
         }
@@ -573,7 +579,12 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
         }
 
         // Split cmd_part and rest_part by cursor_char for cursor rendering
-        fn push_with_cursor(spans: &mut Vec<Span<'static>>, text: &str, cursor_char: &str, color: ratatui::style::Color) {
+        fn push_with_cursor(
+            spans: &mut Vec<Span<'static>>,
+            text: &str,
+            cursor_char: &str,
+            color: ratatui::style::Color,
+        ) {
             if text.contains(cursor_char) {
                 let parts: Vec<&str> = text.splitn(2, cursor_char).collect();
                 if !parts[0].is_empty() {

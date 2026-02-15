@@ -1,10 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::SCROLL_ARROW_AMOUNT;
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::core::panels::{ContextItem, Panel};
+use crate::state::{ContextType, State, estimate_tokens};
 use crate::ui::theme;
 
 pub struct ScratchpadPanel;
@@ -55,7 +55,9 @@ impl Panel for ScratchpadPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_cells_for_context(state);
         // Find the Scratchpad context element to get its ID and timestamp
-        let (id, last_refresh_ms) = state.context.iter()
+        let (id, last_refresh_ms) = state
+            .context
+            .iter()
             .find(|c| c.context_type == ContextType::Scratchpad)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
             .unwrap_or(("P7", 0));
@@ -72,7 +74,10 @@ impl Panel for ScratchpadPanel {
             ]));
             text.push(Line::from(vec![
                 Span::styled(" ".to_string(), base_style),
-                Span::styled("Use scratchpad_create_cell to add notes".to_string(), Style::default().fg(theme::text_muted())),
+                Span::styled(
+                    "Use scratchpad_create_cell to add notes".to_string(),
+                    Style::default().fg(theme::text_muted()),
+                ),
             ]));
         } else {
             for cell in &state.scratchpad_cells {
@@ -98,7 +103,10 @@ impl Panel for ScratchpadPanel {
                 if total_lines > 5 {
                     text.push(Line::from(vec![
                         Span::styled("   ".to_string(), base_style),
-                        Span::styled(format!("... ({} more lines)", total_lines - 5), Style::default().fg(theme::text_muted()).italic()),
+                        Span::styled(
+                            format!("... ({} more lines)", total_lines - 5),
+                            Style::default().fg(theme::text_muted()).italic(),
+                        ),
                     ]));
                 }
 

@@ -16,28 +16,13 @@ pub struct LogEntry {
 
 impl LogEntry {
     pub fn new(id: String, content: String) -> Self {
-        let timestamp_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
-        Self {
-            id,
-            timestamp_ms,
-            content,
-            parent_id: None,
-            children_ids: vec![],
-        }
+        let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
+        Self { id, timestamp_ms, content, parent_id: None, children_ids: vec![] }
     }
 
     /// Create a log entry with an explicit timestamp (ms since UNIX epoch).
     pub fn with_timestamp(id: String, content: String, timestamp_ms: u64) -> Self {
-        Self {
-            id,
-            timestamp_ms,
-            content,
-            parent_id: None,
-            children_ids: vec![],
-        }
+        Self { id, timestamp_ms, content, parent_id: None, children_ids: vec![] }
     }
 
     /// Whether this log is a summary (has children).

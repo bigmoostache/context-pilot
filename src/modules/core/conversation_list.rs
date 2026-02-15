@@ -1,7 +1,7 @@
 /// Actions for list continuation behavior
 pub(super) enum ListAction {
-    Continue(String),  // Insert list continuation (e.g., "\n- " or "\n2. ")
-    RemoveItem,        // Remove empty list item but keep the newline
+    Continue(String), // Insert list continuation (e.g., "\n- " or "\n2. ")
+    RemoveItem,       // Remove empty list item but keep the newline
 }
 
 /// Increment alphabetical list marker: a->b, z->aa, A->B, Z->AA
@@ -23,7 +23,9 @@ fn next_alpha_marker(marker: &str) -> String {
     loop {
         result.insert(0, (base + (n % 26) as u8) as char);
         n /= 26;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         n -= 1; // Adjust for 1-based (a=1, not a=0 for multi-char)
     }
     result
@@ -63,8 +65,7 @@ pub(super) fn detect_list_action(input: &str) -> Option<ListAction> {
             let is_numeric = marker.chars().all(|c| c.is_ascii_digit());
             let is_alpha = marker.len() == 1
                 && marker.chars().all(|c| c.is_ascii_alphabetic())
-                && (marker.chars().all(|c| c.is_ascii_lowercase())
-                    || marker.chars().all(|c| c.is_ascii_uppercase()));
+                && (marker.chars().all(|c| c.is_ascii_lowercase()) || marker.chars().all(|c| c.is_ascii_uppercase()));
             if is_numeric || is_alpha {
                 return Some(ListAction::RemoveItem);
             }
@@ -86,9 +87,10 @@ pub(super) fn detect_list_action(input: &str) -> Option<ListAction> {
 
         // Numeric: 1, 2, 3, ...
         if marker.chars().all(|c| c.is_ascii_digit())
-            && let Ok(num) = marker.parse::<usize>() {
-                return Some(ListAction::Continue(format!("\n{}{}. ", " ".repeat(indent), num + 1)));
-            }
+            && let Ok(num) = marker.parse::<usize>()
+        {
+            return Some(ListAction::Continue(format!("\n{}{}. ", " ".repeat(indent), num + 1)));
+        }
 
         // Alphabetic: a, b, c, ... or A, B, C, ... (single char only)
         if marker.len() == 1 && marker.chars().all(|c| c.is_ascii_alphabetic()) {

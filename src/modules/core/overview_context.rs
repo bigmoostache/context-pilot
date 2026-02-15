@@ -8,8 +8,10 @@ pub fn generate_context_content(state: &State) -> String {
     let threshold = state.cleaning_threshold_tokens();
     let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
 
-    let mut output = format!("Context Usage: {} / {} threshold / {} budget ({:.1}%)\n\n",
-        total_tokens, threshold, budget, usage_pct);
+    let mut output = format!(
+        "Context Usage: {} / {} threshold / {} budget ({:.1}%)\n\n",
+        total_tokens, threshold, budget, usage_pct
+    );
 
     output.push_str("Context Elements:\n");
 
@@ -57,15 +59,22 @@ pub fn generate_context_content(state: &State) -> String {
         if details.is_empty() {
             output.push_str(&format!("  {} {}: {} tokens {} {}\n", ctx.id, type_name, ctx.token_count, cost, hit_miss));
         } else {
-            output.push_str(&format!("  {} {} ({}): {} tokens {} {}\n", ctx.id, type_name, details, ctx.token_count, cost, hit_miss));
+            output.push_str(&format!(
+                "  {} {} ({}): {} tokens {} {}\n",
+                ctx.id, type_name, details, ctx.token_count, cost, hit_miss
+            ));
         }
     }
 
     // Statistics
     let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
     let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
-    output.push_str(&format!("\nMessages: {} ({} user, {} assistant)\n",
-        state.messages.len(), user_msgs, assistant_msgs));
+    output.push_str(&format!(
+        "\nMessages: {} ({} user, {} assistant)\n",
+        state.messages.len(),
+        user_msgs,
+        assistant_msgs
+    ));
 
     if !state.todos.is_empty() {
         let done = state.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
@@ -109,14 +118,18 @@ pub fn generate_context_content(state: &State) -> String {
                 total_del += file.deletions;
                 let net = file.additions - file.deletions;
                 let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
-                output.push_str(&format!("| {} | +{} | -{} | {} |\n",
-                    file.path, file.additions, file.deletions, net_str));
+                output.push_str(&format!(
+                    "| {} | +{} | -{} | {} |\n",
+                    file.path, file.additions, file.deletions, net_str
+                ));
             }
 
             let total_net = total_add - total_del;
             let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
-            output.push_str(&format!("| **Total** | **+{}** | **-{}** | **{}** |\n",
-                total_add, total_del, total_net_str));
+            output.push_str(&format!(
+                "| **Total** | **+{}** | **-{}** | **{}** |\n",
+                total_add, total_del, total_net_str
+            ));
         }
     }
 
@@ -128,7 +141,13 @@ pub fn generate_context_content(state: &State) -> String {
     output.push_str("|----------|------|--------|-------------|\n");
     for tool in &state.tools {
         let status = if tool.enabled { "✓" } else { "✗" };
-        output.push_str(&format!("| {} | {} | {} | {} |\n", tool.category.short_name(), tool.id, status, tool.short_desc));
+        output.push_str(&format!(
+            "| {} | {} | {} | {} |\n",
+            tool.category.short_name(),
+            tool.id,
+            status,
+            tool.short_desc
+        ));
     }
 
     output

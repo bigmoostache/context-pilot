@@ -7,8 +7,8 @@ pub mod grep;
 pub mod logs;
 pub mod memory;
 pub mod preset;
-pub mod scratchpad;
 pub mod prompt;
+pub mod scratchpad;
 pub mod spine;
 pub mod tmux;
 pub mod todo;
@@ -20,8 +20,8 @@ use std::time::Duration;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 /// Run a Command with a timeout. Returns TimedOut error if the command exceeds the limit.
 pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<Output> {
@@ -33,10 +33,9 @@ pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<
     });
     match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
         Ok(result) => result,
-        Err(_) => Err(std::io::Error::new(
-            std::io::ErrorKind::TimedOut,
-            format!("Command timed out after {}s", timeout_secs),
-        )),
+        Err(_) => {
+            Err(std::io::Error::new(std::io::ErrorKind::TimedOut, format!("Command timed out after {}s", timeout_secs)))
+        }
     }
 }
 
@@ -63,17 +62,25 @@ pub trait Module: Send + Sync {
     /// Short description
     fn description(&self) -> &'static str;
     /// IDs of modules this one depends on
-    fn dependencies(&self) -> &[&'static str] { &[] }
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
     /// Core modules cannot be deactivated
-    fn is_core(&self) -> bool { false }
+    fn is_core(&self) -> bool {
+        false
+    }
 
     /// Whether this module's data is global (config.json) or per-worker (worker.json)
-    fn is_global(&self) -> bool { false }
+    fn is_global(&self) -> bool {
+        false
+    }
 
     /// Serialize this module's data from State into a JSON value for persistence.
     /// Returns Value::Null if this module has no data to persist.
     /// Stored in SharedConfig (if is_global) or WorkerState (if !is_global).
-    fn save_module_data(&self, _state: &State) -> serde_json::Value { serde_json::Value::Null }
+    fn save_module_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
 
     /// Deserialize this module's data from a JSON value and apply it to State.
     /// Data comes from SharedConfig (if is_global) or WorkerState (if !is_global).
@@ -81,7 +88,9 @@ pub trait Module: Send + Sync {
 
     /// Serialize worker-specific data for modules that are global but also need per-worker state.
     /// Returns Value::Null if no worker-specific data. Always stored in WorkerState.
-    fn save_worker_data(&self, _state: &State) -> serde_json::Value { serde_json::Value::Null }
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
 
     /// Deserialize worker-specific data. Always loaded from WorkerState.
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
@@ -95,13 +104,19 @@ pub trait Module: Send + Sync {
     fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>>;
 
     /// Fixed panel types owned by this module (P0-P7)
-    fn fixed_panel_types(&self) -> Vec<ContextType> { vec![] }
+    fn fixed_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
     /// Dynamic panel types this module can create (File, Glob, Grep, Tmux)
-    fn dynamic_panel_types(&self) -> Vec<ContextType> { vec![] }
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
 
     /// Default settings for fixed panels: (context_type, display_name, cache_deprecated).
     /// Used by ensure_default_contexts to create missing panels generically.
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> { vec![] }
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![]
+    }
 }
 
 /// Canonical order of fixed panels.
@@ -109,15 +124,15 @@ pub trait Module: Send + Sync {
 /// Conversation is NOT included — it's the live chat feed, not a numbered panel.
 /// System (Seed) is NOT included — agent prompt is injected as system message.
 const FIXED_PANEL_ORDER: &[ContextType] = &[
-    ContextType::Todo,         // P1
-    ContextType::Library,      // P2
-    ContextType::Overview,     // P3
-    ContextType::Tree,         // P4
-    ContextType::Memory,       // P5
-    ContextType::Spine,        // P6
-    ContextType::Logs,         // P7
-    ContextType::Git,          // P8
-    ContextType::Scratchpad,   // P9
+    ContextType::Todo,       // P1
+    ContextType::Library,    // P2
+    ContextType::Overview,   // P3
+    ContextType::Tree,       // P4
+    ContextType::Memory,     // P5
+    ContextType::Spine,      // P6
+    ContextType::Logs,       // P7
+    ContextType::Git,        // P8
+    ContextType::Scratchpad, // P9
 ];
 
 /// Collect all fixed panel defaults in canonical P0-P7 order.
@@ -125,8 +140,7 @@ const FIXED_PANEL_ORDER: &[ContextType] = &[
 pub fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'static str, bool)> {
     // Build a lookup from context_type to module defaults
     let modules = all_modules();
-    let mut lookup: std::collections::HashMap<ContextType, (&str, bool, &str, bool)> =
-        std::collections::HashMap::new();
+    let mut lookup: std::collections::HashMap<ContextType, (&str, bool, &str, bool)> = std::collections::HashMap::new();
     for module in &modules {
         for (ct, name, cache_dep) in module.fixed_panel_defaults() {
             lookup.insert(ct, (module.id(), module.is_core(), name, cache_dep));
@@ -136,11 +150,7 @@ pub fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'sta
     // Return in canonical order
     FIXED_PANEL_ORDER
         .iter()
-        .filter_map(|ct| {
-            lookup.get(ct).map(|(mid, is_core, name, cache_dep)| {
-                (*mid, *is_core, *ct, *name, *cache_dep)
-            })
-        })
+        .filter_map(|ct| lookup.get(ct).map(|(mid, is_core, name, cache_dep)| (*mid, *is_core, *ct, *name, *cache_dep)))
         .collect()
 }
 
@@ -158,7 +168,6 @@ pub fn make_default_context_element(
         name: name.to_string(),
         token_count: 0,
         file_path: None,
-        file_hash: None,
         glob_pattern: None,
         glob_path: None,
         grep_pattern: None,
@@ -169,16 +178,14 @@ pub fn make_default_context_element(
         tmux_last_keys: None,
         tmux_description: None,
         result_command: None,
-        result_command_hash: None,
         skill_prompt_id: None,
         cached_content: None,
         history_messages: None,
         cache_deprecated,
         cache_in_flight: false,
         last_refresh_ms: crate::core::panels::now_ms(),
-        last_polled_ms: 0,
         content_hash: None,
-        tmux_last_lines_hash: None,
+        source_hash: None,
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,
@@ -215,11 +222,7 @@ pub fn default_active_modules() -> HashSet<String> {
 
 /// Collect tool definitions from all active modules.
 pub fn active_tool_definitions(active_modules: &HashSet<String>) -> Vec<ToolDefinition> {
-    all_modules()
-        .into_iter()
-        .filter(|m| active_modules.contains(m.id()))
-        .flat_map(|m| m.tool_definitions())
-        .collect()
+    all_modules().into_iter().filter(|m| active_modules.contains(m.id())).flat_map(|m| m.tool_definitions()).collect()
 }
 
 /// Dispatch a tool call to the appropriate active module.
@@ -231,16 +234,13 @@ pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet
 
     for module in all_modules() {
         if active_modules.contains(module.id())
-            && let Some(result) = module.execute_tool(tool, state) {
-                return result;
-            }
+            && let Some(result) = module.execute_tool(tool, state)
+        {
+            return result;
+        }
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Unknown tool: {}", tool.name),
-        is_error: true,
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: format!("Unknown tool: {}", tool.name), is_error: true }
 }
 
 /// Create a panel for the given context type by asking all modules.
@@ -260,10 +260,7 @@ pub fn validate_dependencies(active: &HashSet<String>) {
         if active.contains(module.id()) {
             for dep in module.dependencies() {
                 if !active.contains(*dep) {
-                    panic!(
-                        "Module '{}' depends on '{}', but '{}' is not active",
-                        module.id(), dep, dep
-                    );
+                    panic!("Module '{}' depends on '{}', but '{}' is not active", module.id(), dep, dep);
                 }
             }
         }
@@ -282,13 +279,9 @@ pub fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result<(), St
 
     // Check if any other active module depends on this one
     for module in all_modules() {
-        if module.id() != id && active.contains(module.id())
-            && module.dependencies().contains(&id) {
-                return Err(format!(
-                    "Cannot deactivate '{}': required by '{}'",
-                    id, module.id()
-                ));
-            }
+        if module.id() != id && active.contains(module.id()) && module.dependencies().contains(&id) {
+            return Err(format!("Cannot deactivate '{}': required by '{}'", id, module.id()));
+        }
     }
 
     Ok(())
@@ -374,7 +367,9 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                     state.active_modules.insert(module_id.to_string());
                     // Rebuild tools list
                     rebuild_tools(state);
-                    let module = all_mods.iter().find(|m| m.id() == module_id)
+                    let module = all_mods
+                        .iter()
+                        .find(|m| m.id() == module_id)
                         .expect("module_id was validated against known_ids but not found");
                     successes.push(format!("activated '{}' ({})", module.name(), module.description()));
                 }
@@ -386,15 +381,16 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                     match check_can_deactivate(module_id, &state.active_modules) {
                         Ok(()) => {
                             // Find panel types to remove
-                            let module = all_mods.iter().find(|m| m.id() == module_id)
+                            let module = all_mods
+                                .iter()
+                                .find(|m| m.id() == module_id)
                                 .expect("module_id was validated against known_ids but not found");
                             let fixed_types = module.fixed_panel_types();
                             let dynamic_types = module.dynamic_panel_types();
 
                             // Remove panels owned by this module
                             state.context.retain(|ctx| {
-                                !fixed_types.contains(&ctx.context_type)
-                                    && !dynamic_types.contains(&ctx.context_type)
+                                !fixed_types.contains(&ctx.context_type) && !dynamic_types.contains(&ctx.context_type)
                             });
 
                             state.active_modules.remove(module_id);
@@ -411,7 +407,8 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
             _ => {
                 failures.push(format!(
                     "Change {}: invalid action '{}' (use 'activate' or 'deactivate')",
-                    i + 1, action
+                    i + 1,
+                    action
                 ));
             }
         }
@@ -478,12 +475,7 @@ mod tests {
 /// Rebuild the tools list from active modules and preserved disabled_tools.
 fn rebuild_tools(state: &mut State) {
     // Preserve currently disabled tool IDs
-    let disabled: HashSet<String> = state
-        .tools
-        .iter()
-        .filter(|t| !t.enabled)
-        .map(|t| t.id.clone())
-        .collect();
+    let disabled: HashSet<String> = state.tools.iter().filter(|t| !t.enabled).map(|t| t.id.clone()).collect();
 
     // Get fresh tool definitions from active modules
     let mut tools = active_tool_definitions(&state.active_modules);

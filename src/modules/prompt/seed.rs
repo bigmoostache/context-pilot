@@ -17,16 +17,14 @@ pub fn ensure_default_agent(state: &mut State) {
 
     // Sort: default first, then built-in, then user-created
     let default_id = library::default_agent_id();
-    agents.sort_by(|a, b| {
-        match (a.id == default_id, b.id == default_id) {
+    agents.sort_by(|a, b| match (a.id == default_id, b.id == default_id) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => match (a.is_builtin, b.is_builtin) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
-            _ => match (a.is_builtin, b.is_builtin) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a.id.cmp(&b.id),
-            }
-        }
+            _ => a.id.cmp(&b.id),
+        },
     });
 
     state.agents = agents;
@@ -47,12 +45,10 @@ pub fn ensure_default_agent(state: &mut State) {
 /// Get the active agent's content (system prompt)
 pub fn get_active_agent_content(state: &State) -> String {
     if let Some(active_id) = &state.active_agent_id
-        && let Some(agent) = state.agents.iter().find(|s| &s.id == active_id) {
-            return agent.content.clone();
-        }
+        && let Some(agent) = state.agents.iter().find(|s| &s.id == active_id)
+    {
+        return agent.content.clone();
+    }
     // Fallback to default
-    library::agents().first()
-        .map(|a| a.content.clone())
-        .unwrap_or_default()
+    library::agents().first().map(|a| a.content.clone()).unwrap_or_default()
 }
-

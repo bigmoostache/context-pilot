@@ -12,8 +12,8 @@ use serde_json::json;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use self::conversation_panel::ConversationPanel;
 use self::overview_panel::OverviewPanel;
@@ -22,11 +22,21 @@ use super::Module;
 pub struct CoreModule;
 
 impl Module for CoreModule {
-    fn id(&self) -> &'static str { "core" }
-    fn name(&self) -> &'static str { "Core" }
-    fn description(&self) -> &'static str { "Essential context and system tools" }
-    fn is_core(&self) -> bool { true }
-    fn is_global(&self) -> bool { true }
+    fn id(&self) -> &'static str {
+        "core"
+    }
+    fn name(&self) -> &'static str {
+        "Core"
+    }
+    fn description(&self) -> &'static str {
+        "Essential context and system tools"
+    }
+    fn is_core(&self) -> bool {
+        true
+    }
+    fn is_global(&self) -> bool {
+        true
+    }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         json!({
@@ -36,9 +46,7 @@ impl Module for CoreModule {
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("previous_panel_hash_list").and_then(|v| v.as_array()) {
-            state.previous_panel_hash_list = arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect();
+            state.previous_panel_hash_list = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
         }
     }
 
@@ -64,9 +72,7 @@ impl Module for CoreModule {
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("active_modules").and_then(|v| v.as_array()) {
-            state.active_modules = arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect();
+            state.active_modules = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
             // Auto-add newly introduced modules that aren't in the persisted config.
             // This handles the case where a new module is added to the codebase but
             // the user's config.json was written before it existed.
@@ -81,25 +87,30 @@ impl Module for CoreModule {
             state.dev_mode = v;
         }
         if let Some(v) = data.get("llm_provider")
-            && let Ok(p) = serde_json::from_value(v.clone()) {
-                state.llm_provider = p;
-            }
+            && let Ok(p) = serde_json::from_value(v.clone())
+        {
+            state.llm_provider = p;
+        }
         if let Some(v) = data.get("anthropic_model")
-            && let Ok(m) = serde_json::from_value(v.clone()) {
-                state.anthropic_model = m;
-            }
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.anthropic_model = m;
+        }
         if let Some(v) = data.get("grok_model")
-            && let Ok(m) = serde_json::from_value(v.clone()) {
-                state.grok_model = m;
-            }
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.grok_model = m;
+        }
         if let Some(v) = data.get("groq_model")
-            && let Ok(m) = serde_json::from_value(v.clone()) {
-                state.groq_model = m;
-            }
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.groq_model = m;
+        }
         if let Some(v) = data.get("deepseek_model")
-            && let Ok(m) = serde_json::from_value(v.clone()) {
-                state.deepseek_model = m;
-            }
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.deepseek_model = m;
+        }
         if let Some(v) = data.get("cleaning_threshold").and_then(|v| v.as_f64()) {
             state.cleaning_threshold = v as f32;
         }
@@ -122,9 +133,7 @@ impl Module for CoreModule {
             state.total_output_tokens = v as usize;
         }
         if let Some(arr) = data.get("disabled_tools").and_then(|v| v.as_array()) {
-            let disabled: Vec<String> = arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect();
+            let disabled: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
             // Build tools from active_modules (must be loaded already) and apply disabled state
             state.tools = crate::modules::active_tool_definitions(&state.active_modules);
             for tool in &mut state.tools {
@@ -136,9 +145,7 @@ impl Module for CoreModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![
-            ContextType::Overview,
-        ]
+        vec![ContextType::Overview]
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
@@ -146,18 +153,14 @@ impl Module for CoreModule {
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![
-            (ContextType::Overview, "World", false),
-        ]
+        vec![(ContextType::Overview, "World", false)]
     }
 
     fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
         match context_type {
             ContextType::Conversation => Some(Box::new(ConversationPanel)),
             ContextType::Overview => Some(Box::new(OverviewPanel)),
-            ContextType::ConversationHistory => Some(Box::new(
-                conversation_history_panel::ConversationHistoryPanel,
-            )),
+            ContextType::ConversationHistory => Some(Box::new(conversation_history_panel::ConversationHistoryPanel)),
             _ => None,
         }
     }
@@ -219,14 +222,12 @@ impl Module for CoreModule {
             id: "panel_goto_page".to_string(),
             name: "Go To Page".to_string(),
             short_desc: "Navigate paginated panel".to_string(),
-            description: "Navigates to a specific page of a paginated panel. Only available when a panel has more than one page.".to_string(),
+            description:
+                "Navigates to a specific page of a paginated panel. Only available when a panel has more than one page."
+                    .to_string(),
             params: vec![
-                ToolParam::new("panel_id", ParamType::String)
-                    .desc("Panel ID (e.g., P8)")
-                    .required(),
-                ToolParam::new("page", ParamType::Integer)
-                    .desc("Page number (1-indexed)")
-                    .required(),
+                ToolParam::new("panel_id", ParamType::String).desc("Panel ID (e.g., P8)").required(),
+                ToolParam::new("page", ParamType::Integer).desc("Page number (1-indexed)").required(),
             ],
             enabled: false,
             category: ToolCategory::Context,

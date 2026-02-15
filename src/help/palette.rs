@@ -6,7 +6,7 @@ use ratatui::{
 use crate::state::State;
 use crate::ui::theme;
 
-use super::commands::{get_available_commands, PaletteCommand};
+use super::commands::{PaletteCommand, get_available_commands};
 
 /// State for the command palette
 #[derive(Debug, Clone, Default)]
@@ -89,11 +89,7 @@ impl CommandPalette {
     pub fn backspace(&mut self, state: &State) {
         if self.cursor > 0 {
             // Find the previous character boundary
-            let prev_boundary = self.query[..self.cursor]
-                .char_indices()
-                .last()
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+            let prev_boundary = self.query[..self.cursor].char_indices().last().map(|(i, _)| i).unwrap_or(0);
             self.query.remove(prev_boundary);
             self.cursor = prev_boundary;
             self.selected = 0;
@@ -113,11 +109,7 @@ impl CommandPalette {
     /// Move cursor left
     pub fn cursor_left(&mut self) {
         if self.cursor > 0 {
-            let prev_boundary = self.query[..self.cursor]
-                .char_indices()
-                .last()
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+            let prev_boundary = self.query[..self.cursor].char_indices().last().map(|(i, _)| i).unwrap_or(0);
             self.cursor = prev_boundary;
         }
     }
@@ -137,11 +129,7 @@ impl CommandPalette {
     /// Move selection up
     pub fn select_prev(&mut self) {
         if !self.filtered_commands.is_empty() {
-            self.selected = if self.selected == 0 {
-                self.filtered_commands.len() - 1
-            } else {
-                self.selected - 1
-            };
+            self.selected = if self.selected == 0 { self.filtered_commands.len() - 1 } else { self.selected - 1 };
         }
     }
 
@@ -177,8 +165,7 @@ impl CommandPalette {
         frame.render_widget(Clear, palette_area);
 
         // Background fill
-        let bg_block = Block::default()
-            .style(Style::default().bg(theme::bg_surface()));
+        let bg_block = Block::default().style(Style::default().bg(theme::bg_surface()));
         frame.render_widget(bg_block, palette_area);
 
         // Split area: input line + results + bottom border
@@ -201,7 +188,7 @@ impl CommandPalette {
                 Span::styled("Type to search...", Style::default().fg(theme::text_muted())),
                 Span::styled(
                     format!("{:>width$}", esc_hint, width = available_width + esc_hint.len() - 17),
-                    Style::default().fg(theme::text_muted())
+                    Style::default().fg(theme::text_muted()),
                 ),
             ]
         } else {
@@ -215,21 +202,16 @@ impl CommandPalette {
                 Span::styled(after.to_string(), Style::default().fg(theme::text())),
                 Span::styled(
                     format!("{:>width$}", esc_hint, width = padding + esc_hint.len()),
-                    Style::default().fg(theme::text_muted())
+                    Style::default().fg(theme::text_muted()),
                 ),
             ]
         };
 
-        let input_line = Paragraph::new(Line::from(input_display))
-            .style(Style::default().bg(theme::bg_surface()));
+        let input_line = Paragraph::new(Line::from(input_display)).style(Style::default().bg(theme::bg_surface()));
         frame.render_widget(input_line, chunks[0]);
 
         // Render filtered results
-        let visible_start = if self.selected >= max_visible_items {
-            self.selected - max_visible_items + 1
-        } else {
-            0
-        };
+        let visible_start = if self.selected >= max_visible_items { self.selected - max_visible_items + 1 } else { 0 };
 
         let mut result_lines = Vec::new();
         for (i, cmd) in self.filtered_commands.iter().enumerate().skip(visible_start).take(max_visible_items) {
@@ -254,31 +236,29 @@ impl CommandPalette {
                 Span::styled(prefix, style),
                 Span::styled(&cmd.label, style),
                 Span::styled(format!("  {}", cmd.description), desc_style),
-                Span::styled(" ".repeat(padding), if is_selected {
-                    Style::default().bg(theme::bg_elevated())
-                } else {
-                    Style::default().bg(theme::bg_surface())
-                }),
+                Span::styled(
+                    " ".repeat(padding),
+                    if is_selected {
+                        Style::default().bg(theme::bg_elevated())
+                    } else {
+                        Style::default().bg(theme::bg_surface())
+                    },
+                ),
             ]));
         }
 
         if result_lines.is_empty() {
-            result_lines.push(Line::from(Span::styled(
-                "   No matching commands",
-                Style::default().fg(theme::text_muted()),
-            )));
+            result_lines
+                .push(Line::from(Span::styled("   No matching commands", Style::default().fg(theme::text_muted()))));
         }
 
-        let results = Paragraph::new(result_lines)
-            .style(Style::default().bg(theme::bg_surface()));
+        let results = Paragraph::new(result_lines).style(Style::default().bg(theme::bg_surface()));
         frame.render_widget(results, chunks[1]);
 
         // Bottom border
         let border_line = "─".repeat(width as usize);
-        let border = Paragraph::new(Line::from(Span::styled(
-            border_line,
-            Style::default().fg(theme::border()),
-        ))).style(Style::default().bg(theme::bg_surface()));
+        let border = Paragraph::new(Line::from(Span::styled(border_line, Style::default().fg(theme::border()))))
+            .style(Style::default().bg(theme::bg_surface()));
         frame.render_widget(border, chunks[2]);
     }
 }

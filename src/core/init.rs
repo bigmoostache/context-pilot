@@ -1,5 +1,5 @@
-use crate::state::{ContextType, State};
 use crate::modules;
+use crate::state::{ContextType, State};
 
 // Re-export agent/seed functions from prompt module
 pub use crate::modules::prompt::seed::{ensure_default_agent, get_active_agent_content};
@@ -7,10 +7,11 @@ pub use crate::modules::prompt::seed::{ensure_default_agent, get_active_agent_co
 /// Assign a UID to a panel if it doesn't have one
 fn assign_panel_uid(state: &mut State, context_type: ContextType) {
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == context_type)
-        && ctx.uid.is_none() {
-            ctx.uid = Some(format!("UID_{}_P", state.global_next_uid));
-            state.global_next_uid += 1;
-        }
+        && ctx.uid.is_none()
+    {
+        ctx.uid = Some(format!("UID_{}_P", state.global_next_uid));
+        state.global_next_uid += 1;
+    }
 }
 
 /// Ensure all default context elements exist with correct IDs.

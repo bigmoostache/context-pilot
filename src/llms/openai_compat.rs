@@ -71,10 +71,7 @@ pub struct OaiFunctionDef {
 ///
 /// `pending_tool_result_ids` are IDs from the current tool loop that haven't
 /// been persisted as messages yet but will be sent as separate tool results.
-pub fn collect_included_tool_ids(
-    messages: &[Message],
-    pending_tool_result_ids: &[String],
-) -> HashSet<String> {
+pub fn collect_included_tool_ids(messages: &[Message], pending_tool_result_ids: &[String]) -> HashSet<String> {
     let mut included: HashSet<String> = pending_tool_result_ids.iter().cloned().collect();
 
     for (idx, msg) in messages.iter().enumerate() {
@@ -94,11 +91,7 @@ pub fn collect_included_tool_ids(
                     && m.status != MessageStatus::Detached
                     && m.message_type == MessageType::ToolResult
             })
-            .any(|m| {
-                m.tool_results
-                    .iter()
-                    .any(|r| tool_use_ids.contains(&r.tool_use_id.as_str()))
-            });
+            .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
 
         if has_result {
             for id in tool_use_ids {
@@ -138,10 +131,7 @@ pub fn build_messages(
     let mut out: Vec<OaiMessage> = Vec::new();
 
     // ── System message ──────────────────────────────────────────
-    let mut system_content = opts
-        .system_prompt
-        .clone()
-        .unwrap_or_else(|| library::default_agent_content().to_string());
+    let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_string());
 
     if let Some(ref suffix) = opts.system_suffix {
         system_content.push_str("\n\n");
@@ -162,11 +152,7 @@ pub fn build_messages(
     if !fake_panels.is_empty() {
         for (idx, panel) in fake_panels.iter().enumerate() {
             let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
-            let text = if idx == 0 {
-                format!("{}\n\n{}", panel_header_text(), timestamp_text)
-            } else {
-                timestamp_text
-            };
+            let text = if idx == 0 { format!("{}\n\n{}", panel_header_text(), timestamp_text) } else { timestamp_text };
 
             // Assistant message with tool_call
             out.push(OaiMessage {
@@ -219,18 +205,14 @@ pub fn build_messages(
     if let Some(ref ctx) = opts.extra_context {
         out.push(OaiMessage {
             role: "user".to_string(),
-            content: Some(format!(
-                "Please clean up the context to reduce token usage:\n\n{}",
-                ctx
-            )),
+            content: Some(format!("Please clean up the context to reduce token usage:\n\n{}", ctx)),
             tool_calls: None,
             tool_call_id: None,
         });
     }
 
     // ── Tool pairing ────────────────────────────────────────────
-    let included_tool_ids =
-        collect_included_tool_ids(messages, &opts.pending_tool_result_ids);
+    let included_tool_ids = collect_included_tool_ids(messages, &opts.pending_tool_result_ids);
 
     // ── Conversation messages ───────────────────────────────────
     for msg in messages.iter() {
@@ -278,15 +260,14 @@ pub fn build_messages(
             if !calls.is_empty() {
                 // Try to merge into the last assistant message so consecutive
                 // tool calls become one assistant message (required by OpenAI APIs)
-                let should_merge = out.last().is_some_and(|last| {
-                    last.role == "assistant" && last.tool_calls.is_some()
-                });
+                let should_merge = out.last().is_some_and(|last| last.role == "assistant" && last.tool_calls.is_some());
 
                 if should_merge {
                     if let Some(last) = out.last_mut()
-                        && let Some(ref mut existing_calls) = last.tool_calls {
-                            existing_calls.extend(calls);
-                        }
+                        && let Some(ref mut existing_calls) = last.tool_calls
+                    {
+                        existing_calls.extend(calls);
+                    }
                 } else {
                     out.push(OaiMessage {
                         role: "assistant".to_string(),
@@ -419,10 +400,7 @@ impl ToolCallAccumulator {
     /// Feed a streaming tool call delta.
     pub fn feed(&mut self, call: &StreamToolCall) {
         let idx = call.index.unwrap_or(0);
-        let entry = self
-            .calls
-            .entry(idx)
-            .or_insert_with(|| (String::new(), String::new(), String::new()));
+        let entry = self.calls.entry(idx).or_insert_with(|| (String::new(), String::new(), String::new()));
 
         if let Some(ref id) = call.id {
             entry.0 = id.clone();
@@ -445,8 +423,8 @@ impl ToolCallAccumulator {
                 if id.is_empty() || name.is_empty() {
                     return None;
                 }
-                let input: Value = serde_json::from_str(&arguments)
-                    .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
+                let input: Value =
+                    serde_json::from_str(&arguments).unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
                 Some(crate::tools::ToolUse { id, name, input })
             })
             .collect()
@@ -462,8 +440,5 @@ pub fn dump_request<T: Serialize>(worker_id: &str, provider: &str, request: &T) 
     let dir = ".context-pilot/last_requests";
     let _ = std::fs::create_dir_all(dir);
     let path = format!("{}/{}_{}_last_request.json", dir, worker_id, provider);
-    let _ = std::fs::write(
-        path,
-        serde_json::to_string_pretty(request).unwrap_or_default(),
-    );
+    let _ = std::fs::write(path, serde_json::to_string_pretty(request).unwrap_or_default());
 }

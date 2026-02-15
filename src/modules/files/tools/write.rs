@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::Path;
 
+use crate::state::{ContextElement, ContextType, State, estimate_tokens};
 use crate::tools::{ToolResult, ToolUse};
-use crate::state::{estimate_tokens, ContextElement, ContextType, State};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let path_str = match tool.input.get("file_path").and_then(|v| v.as_str()) {
@@ -12,7 +12,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: file_path".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -23,7 +23,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: contents".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -32,14 +32,16 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Create parent directories if needed
     if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty() && !parent.exists()
-            && let Err(e) = fs::create_dir_all(parent) {
-                return ToolResult {
-                    tool_use_id: tool.id.clone(),
-                    content: format!("Failed to create directory '{}': {}", parent.display(), e),
-                    is_error: true,
-                };
-            }
+        && !parent.as_os_str().is_empty()
+        && !parent.exists()
+        && let Err(e) = fs::create_dir_all(parent)
+    {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Failed to create directory '{}': {}", parent.display(), e),
+            is_error: true,
+        };
+    }
 
     // Write the file
     if let Err(e) = fs::write(path, contents) {
@@ -54,9 +56,10 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let line_count = contents.lines().count();
 
     // Check if file is already open in context
-    let already_open = state.context.iter_mut().find(|c| {
-        c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str)
-    });
+    let already_open = state
+        .context
+        .iter_mut()
+        .find(|c| c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str));
 
     if let Some(ctx) = already_open {
         // Update existing context element
@@ -68,10 +71,8 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let uid = format!("UID_{}_P", state.global_next_uid);
         state.global_next_uid += 1;
 
-        let file_name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| path_str.to_string());
+        let file_name =
+            path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path_str.to_string());
 
         state.context.push(ContextElement {
             id: context_id,
@@ -80,7 +81,6 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             name: file_name,
             token_count,
             file_path: Some(path_str.to_string()),
-            file_hash: None,
             glob_pattern: None,
             glob_path: None,
             grep_pattern: None,
@@ -91,16 +91,14 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             tmux_last_keys: None,
             tmux_description: None,
             result_command: None,
-            result_command_hash: None,
             skill_prompt_id: None,
             cached_content: Some(contents.to_string()),
             history_messages: None,
             cache_deprecated: true,
             cache_in_flight: false,
             last_refresh_ms: crate::core::panels::now_ms(),
-            last_polled_ms: 0,
             content_hash: None,
-            tmux_last_lines_hash: None,
+            source_hash: None,
             current_page: 0,
             total_pages: 1,
             full_token_count: 0,
@@ -109,11 +107,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         });
 
         // Invalidate tree cache
-        for ctx in &mut state.context {
-            if ctx.context_type == ContextType::Tree {
-                ctx.cache_deprecated = true;
-            }
-        }
+        crate::core::panels::mark_panels_dirty(state, ContextType::Tree);
     }
 
     let action = if is_new { "Created" } else { "Wrote" };

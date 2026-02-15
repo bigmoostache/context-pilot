@@ -1,9 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
+use crate::core::panels::{ContextItem, Panel};
 use crate::state::{ContextType, State};
 
 use super::overview_render;
@@ -28,13 +28,16 @@ impl Panel for OverviewPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Use cached content if available (set by refresh)
         if let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::Overview)
-            && let Some(content) = &ctx.cached_content {
-                return vec![ContextItem::new(&ctx.id, "Context Overview", content.clone(), ctx.last_refresh_ms)];
-            }
+            && let Some(content) = &ctx.cached_content
+        {
+            return vec![ContextItem::new(&ctx.id, "Context Overview", content.clone(), ctx.last_refresh_ms)];
+        }
 
         // Fallback: generate fresh
         let output = self.generate_context_content(state);
-        let (id, last_refresh_ms) = state.context.iter()
+        let (id, last_refresh_ms) = state
+            .context
+            .iter()
             .find(|c| c.context_type == ContextType::Overview)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
             .unwrap_or(("P5", 0));

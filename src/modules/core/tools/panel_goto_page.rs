@@ -1,6 +1,6 @@
 use crate::core::panels::paginate_content;
+use crate::state::{State, estimate_tokens};
 use crate::tools::{ToolResult, ToolUse};
-use crate::state::{estimate_tokens, State};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = match tool.input.get("panel_id").and_then(|v| v.as_str()) {
@@ -48,10 +48,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     if page < 1 || page as usize > ctx.total_pages {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!(
-                "Page {} out of range for panel '{}' (valid: 1-{})",
-                page, panel_id, ctx.total_pages
-            ),
+            content: format!("Page {} out of range for panel '{}' (valid: 1-{})", page, panel_id, ctx.total_pages),
             is_error: true,
         };
     }
@@ -66,10 +63,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!(
-            "Panel '{}' now showing page {}/{}",
-            panel_id, page, ctx.total_pages
-        ),
+        content: format!("Panel '{}' now showing page {}/{}", panel_id, page, ctx.total_pages),
         is_error: false,
     }
 }

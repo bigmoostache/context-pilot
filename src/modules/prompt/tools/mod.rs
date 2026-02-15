@@ -1,9 +1,9 @@
 pub mod agent;
-pub mod skill;
 pub mod command;
+pub mod skill;
 
-use crate::tools::{ToolUse, ToolResult};
 use crate::state::State;
+use crate::tools::{ToolResult, ToolUse};
 
 pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     match tool.name.as_str() {

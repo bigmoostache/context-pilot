@@ -18,13 +18,11 @@ pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
     let already_processed = state.notifications.iter().find(|n| n.id == id).map(|n| n.processed);
 
     match already_processed {
-        Some(true) => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Notification {} is already processed", id),
-                is_error: false,
-            }
-        }
+        Some(true) => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Notification {} is already processed", id),
+            is_error: false,
+        },
         Some(false) => {
             state.mark_notification_processed(id);
             ToolResult {
@@ -33,13 +31,11 @@ pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
                 is_error: false,
             }
         }
-        None => {
-            ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Notification '{}' not found", id),
-                is_error: true,
-            }
-        }
+        None => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Notification '{}' not found", id),
+            is_error: true,
+        },
     }
 }
 
@@ -127,7 +123,10 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     } else {
         ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!("Spine configured:\n{}", changes.iter().map(|c| format!("  • {}", c)).collect::<Vec<_>>().join("\n")),
+            content: format!(
+                "Spine configured:\n{}",
+                changes.iter().map(|c| format!("  • {}", c)).collect::<Vec<_>>().join("\n")
+            ),
             is_error: false,
         }
     }

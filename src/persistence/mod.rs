@@ -6,24 +6,24 @@
 //! - PanelData (panels/{uid}.json) - Dynamic panel metadata
 //! - Messages (messages/{uid}.yaml) - Conversation messages
 pub mod config;
-pub mod worker;
-pub mod panel;
 pub mod message;
+pub mod panel;
+pub mod worker;
 pub mod writer;
 
 // Re-export commonly used functions
-pub use message::{load_message, save_message, delete_message};
 pub use config::current_pid;
-pub use writer::{PersistenceWriter, WriteBatch, WriteOp, DeleteOp};
+pub use message::{delete_message, load_message, save_message};
+pub use writer::{DeleteOp, PersistenceWriter, WriteBatch, WriteOp};
 
+use chrono::Local;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::collections::HashMap;
-use chrono::Local;
 
 use crate::config::set_active_theme;
-use crate::constants::{STORE_DIR, CONFIG_FILE, DEFAULT_WORKER_ID};
-use crate::state::{SharedConfig, WorkerState, PanelData, Message, State, ContextType, ContextElement};
+use crate::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
+use crate::state::{ContextElement, ContextType, Message, PanelData, SharedConfig, State, WorkerState};
 
 /// Errors directory name
 const ERRORS_DIR: &str = "errors";
@@ -55,7 +55,6 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         name: panel.name.clone(),
         token_count: panel.token_count,
         file_path: panel.file_path.clone(),
-        file_hash: None,
         glob_pattern: panel.glob_pattern.clone(),
         glob_path: panel.glob_path.clone(),
         grep_pattern: panel.grep_pattern.clone(),
@@ -66,17 +65,15 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
         tmux_last_keys: None,
         tmux_description: panel.tmux_description.clone(),
         result_command: panel.result_command.clone(),
-        result_command_hash: panel.result_command_hash.clone(),
         skill_prompt_id: panel.skill_prompt_id.clone(),
         cached_content: None,
         history_messages: None,
-        cache_deprecated: true,  // Will be refreshed on load
+        cache_deprecated: true, // Will be refreshed on load
         cache_in_flight: false,
         // Use saved timestamp if available, otherwise current time for new panels
         last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::core::panels::now_ms() },
-        last_polled_ms: 0,
         content_hash: panel.content_hash.clone(),
-        tmux_last_lines_hash: None,
+        source_hash: None,
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,
@@ -98,9 +95,10 @@ fn load_state_new() -> State {
 
     // Load Conversation panel (special: not in FIXED_PANEL_ORDER, uses id "chat")
     if let Some(uid) = important.get(&ContextType::Conversation)
-        && let Some(panel_data) = panel::load_panel(uid) {
-            context.push(panel_to_context(&panel_data, "chat"));
-        }
+        && let Some(panel_data) = panel::load_panel(uid)
+    {
+        context.push(panel_to_context(&panel_data, "chat"));
+    }
 
     // Load fixed panels in canonical order (P0-P7) from module registry
     let defaults = crate::modules::all_fixed_panel_defaults();
@@ -110,22 +108,23 @@ fn load_state_new() -> State {
             // System panel is not stored in panels/ - comes from systems[]
             context.push(crate::modules::make_default_context_element(&id, *ct, name, *cache_deprecated));
         } else if let Some(uid) = important.get(ct)
-            && let Some(panel_data) = panel::load_panel(uid) {
-                context.push(panel_to_context(&panel_data, &id));
-            }
+            && let Some(panel_data) = panel::load_panel(uid)
+        {
+            context.push(panel_to_context(&panel_data, &id));
+        }
     }
 
     // Load dynamic panels from panel_uid_to_local_id (P8+)
-    let mut dynamic_panels: Vec<(String, ContextElement)> = worker_state.panel_uid_to_local_id.iter()
+    let mut dynamic_panels: Vec<(String, ContextElement)> = worker_state
+        .panel_uid_to_local_id
+        .iter()
         .filter_map(|(uid, local_id)| {
             panel::load_panel(uid).map(|p| {
                 let mut elem = panel_to_context(&p, local_id);
 
                 // For ConversationHistory panels, load history messages and rebuild cached content
                 if p.panel_type == ContextType::ConversationHistory && !p.message_uids.is_empty() {
-                    let msgs: Vec<Message> = p.message_uids.iter()
-                        .filter_map(|uid| load_message(uid))
-                        .collect();
+                    let msgs: Vec<Message> = p.message_uids.iter().filter_map(|uid| load_message(uid)).collect();
                     if !msgs.is_empty() {
                         let content = crate::state::format_messages_to_chunk(&msgs);
                         let token_count = crate::state::estimate_tokens(&content);
@@ -154,23 +153,24 @@ fn load_state_new() -> State {
     }
 
     // Load messages from the conversation panel
-    let message_uids: Vec<String> = important.get(&ContextType::Conversation)
+    let message_uids: Vec<String> = important
+        .get(&ContextType::Conversation)
         .and_then(|uid| panel::load_panel(uid))
         .map(|p| p.message_uids)
         .unwrap_or_default();
 
-    let messages: Vec<Message> = message_uids.iter()
-        .filter_map(|uid| load_message(uid))
-        .collect();
+    let messages: Vec<Message> = message_uids.iter().filter_map(|uid| load_message(uid)).collect();
 
     // Calculate display ID counters from loaded messages
-    let next_user_id = messages.iter()
+    let next_user_id = messages
+        .iter()
         .filter(|m| m.id.starts_with('U'))
         .filter_map(|m| m.id[1..].parse::<usize>().ok())
         .max()
         .map(|n| n + 1)
         .unwrap_or(1);
-    let next_assistant_id = messages.iter()
+    let next_assistant_id = messages
+        .iter()
         .filter(|m| m.id.starts_with('A'))
         .filter_map(|m| m.id[1..].parse::<usize>().ok())
         .max()
@@ -268,10 +268,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
         modules: global_modules,
     };
     if let Ok(json) = serde_json::to_string_pretty(&shared_config) {
-        writes.push(WriteOp {
-            path: dir.join(CONFIG_FILE),
-            content: json.into_bytes(),
-        });
+        writes.push(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() });
     }
 
     // Chunked log files (global, shared across workers)
@@ -281,15 +278,17 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     let mut important_uids: HashMap<ContextType, String> = HashMap::new();
     for ctx in &state.context {
         let dominated = (ctx.context_type.is_fixed() || ctx.context_type == ContextType::Conversation)
-            && ctx.context_type != ContextType::System && ctx.context_type != ContextType::Library;
-        if dominated
-            && let Some(uid) = &ctx.uid {
-                important_uids.insert(ctx.context_type, uid.clone());
-            }
+            && ctx.context_type != ContextType::System
+            && ctx.context_type != ContextType::Library;
+        if dominated && let Some(uid) = &ctx.uid {
+            important_uids.insert(ctx.context_type, uid.clone());
+        }
     }
 
     // Build panel_uid_to_local_id (dynamic panels only — excludes fixed and Conversation)
-    let panel_uid_to_local_id: HashMap<String, String> = state.context.iter()
+    let panel_uid_to_local_id: HashMap<String, String> = state
+        .context
+        .iter()
         .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type != ContextType::Conversation)
         .filter_map(|c| c.uid.as_ref().map(|uid| (uid.clone(), c.id.clone())))
         .collect();
@@ -328,11 +327,10 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
                 token_count: ctx.token_count,
                 last_refresh_ms: ctx.last_refresh_ms,
                 message_uids: if ctx.context_type == ContextType::Conversation {
-                    state.messages.iter()
-                        .map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone()))
-                        .collect()
+                    state.messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
                 } else if ctx.context_type == ContextType::ConversationHistory {
-                    ctx.history_messages.as_ref()
+                    ctx.history_messages
+                        .as_ref()
                         .map(|msgs| msgs.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect())
                         .unwrap_or_default()
                 } else {
@@ -348,16 +346,12 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
                 tmux_lines: ctx.tmux_lines,
                 tmux_description: ctx.tmux_description.clone(),
                 result_command: ctx.result_command.clone(),
-                result_command_hash: ctx.result_command_hash.clone(),
                 skill_prompt_id: ctx.skill_prompt_id.clone(),
                 content_hash: ctx.content_hash.clone(),
                 panel_total_cost: if ctx.panel_total_cost > 0.0 { Some(ctx.panel_total_cost) } else { None },
             };
             if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
-                writes.push(WriteOp {
-                    path: panels_dir.join(format!("{}.json", uid)),
-                    content: json.into_bytes(),
-                });
+                writes.push(WriteOp { path: panels_dir.join(format!("{}.json", uid)), content: json.into_bytes() });
             }
         }
     }
@@ -366,17 +360,18 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     let messages_dir = dir.join(crate::constants::MESSAGES_DIR);
     for ctx in &state.context {
         if ctx.context_type == ContextType::ConversationHistory
-            && let Some(ref msgs) = ctx.history_messages {
-                for msg in msgs {
-                    let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
-                    if let Ok(yaml) = serde_yaml::to_string(msg) {
-                        writes.push(WriteOp {
-                            path: messages_dir.join(format!("{}.yaml", file_id)),
-                            content: yaml.into_bytes(),
-                        });
-                    }
+            && let Some(ref msgs) = ctx.history_messages
+        {
+            for msg in msgs {
+                let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
+                if let Ok(yaml) = serde_yaml::to_string(msg) {
+                    writes.push(WriteOp {
+                        path: messages_dir.join(format!("{}.yaml", file_id)),
+                        content: yaml.into_bytes(),
+                    });
                 }
             }
+        }
     }
 
     // Orphan panel deletion
@@ -387,9 +382,10 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
                 continue;
             }
             if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                && !known_uids.contains(stem) {
-                    deletes.push(DeleteOp { path });
-                }
+                && !known_uids.contains(stem)
+            {
+                deletes.push(DeleteOp { path });
+            }
         }
     }
 
@@ -401,10 +397,7 @@ pub fn build_message_op(msg: &Message) -> WriteOp {
     let dir = PathBuf::from(STORE_DIR).join(crate::constants::MESSAGES_DIR);
     let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
     let yaml = serde_yaml::to_string(msg).unwrap_or_default();
-    WriteOp {
-        path: dir.join(format!("{}.yaml", file_id)),
-        content: yaml.into_bytes(),
-    }
+    WriteOp { path: dir.join(format!("{}.yaml", file_id)), content: yaml.into_bytes() }
 }
 
 /// Save state synchronously (blocking I/O on calling thread).
@@ -420,19 +413,21 @@ pub fn save_state(state: &State) {
     }
     for op in &batch.writes {
         if let Some(parent) = op.path.parent()
-            && let Err(e) = fs::create_dir_all(parent) {
-                eprintln!("[persistence] failed to create dir {}: {}", parent.display(), e);
-                continue;
-            }
+            && let Err(e) = fs::create_dir_all(parent)
+        {
+            eprintln!("[persistence] failed to create dir {}: {}", parent.display(), e);
+            continue;
+        }
         if let Err(e) = fs::write(&op.path, &op.content) {
             eprintln!("[persistence] failed to write {}: {}", op.path.display(), e);
         }
     }
     for op in &batch.deletes {
         if let Err(e) = fs::remove_file(&op.path)
-            && e.kind() != std::io::ErrorKind::NotFound {
-                eprintln!("[persistence] failed to delete {}: {}", op.path.display(), e);
-            }
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            eprintln!("[persistence] failed to delete {}: {}", op.path.display(), e);
+        }
     }
 }
 
@@ -440,9 +435,10 @@ pub fn save_state(state: &State) {
 /// Returns false if another process has claimed ownership
 pub fn check_ownership() -> bool {
     if let Some(cfg) = config::load_config()
-        && let Some(owner) = cfg.owner_pid {
-            return owner == current_pid();
-        }
+        && let Some(owner) = cfg.owner_pid
+    {
+        return owner == current_pid();
+    }
     // If we can't read the file or there's no owner, assume we're still the owner
     true
 }

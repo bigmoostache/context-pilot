@@ -25,13 +25,8 @@ pub trait GuardRailStopLogic: Send + Sync {
 ///
 /// All guard rails are checked — if ANY blocks, continuation is prevented.
 pub fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
-    static GUARD_RAILS: &[&dyn GuardRailStopLogic] = &[
-        &MaxOutputTokensGuard,
-        &MaxCostGuard,
-        &MaxDurationGuard,
-        &MaxMessagesGuard,
-        &MaxAutoRetriesGuard,
-    ];
+    static GUARD_RAILS: &[&dyn GuardRailStopLogic] =
+        &[&MaxOutputTokensGuard, &MaxCostGuard, &MaxDurationGuard, &MaxMessagesGuard, &MaxAutoRetriesGuard];
     GUARD_RAILS
 }
 
@@ -43,14 +38,12 @@ pub fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
 pub struct MaxOutputTokensGuard;
 
 impl GuardRailStopLogic for MaxOutputTokensGuard {
-    fn name(&self) -> &str { "MaxOutputTokens" }
+    fn name(&self) -> &str {
+        "MaxOutputTokens"
+    }
 
     fn should_block(&self, state: &State) -> bool {
-        if let Some(max) = state.spine_config.max_output_tokens {
-            state.total_output_tokens >= max
-        } else {
-            false
-        }
+        if let Some(max) = state.spine_config.max_output_tokens { state.total_output_tokens >= max } else { false }
     }
 
     fn block_reason(&self, state: &State) -> String {
@@ -70,7 +63,9 @@ impl GuardRailStopLogic for MaxOutputTokensGuard {
 pub struct MaxCostGuard;
 
 impl GuardRailStopLogic for MaxCostGuard {
-    fn name(&self) -> &str { "MaxCost" }
+    fn name(&self) -> &str {
+        "MaxCost"
+    }
 
     fn should_block(&self, state: &State) -> bool {
         if let Some(max_cost) = state.spine_config.max_cost {
@@ -83,11 +78,7 @@ impl GuardRailStopLogic for MaxCostGuard {
 
     fn block_reason(&self, state: &State) -> String {
         let current_cost = Self::calculate_cost(state);
-        format!(
-            "Cost limit reached: ${:.4} / ${:.4}",
-            current_cost,
-            state.spine_config.max_cost.unwrap_or(0.0)
-        )
+        format!("Cost limit reached: ${:.4} / ${:.4}", current_cost, state.spine_config.max_cost.unwrap_or(0.0))
     }
 }
 
@@ -109,13 +100,14 @@ impl MaxCostGuard {
 pub struct MaxDurationGuard;
 
 impl GuardRailStopLogic for MaxDurationGuard {
-    fn name(&self) -> &str { "MaxDuration" }
+    fn name(&self) -> &str {
+        "MaxDuration"
+    }
 
     fn should_block(&self, state: &State) -> bool {
-        if let (Some(max_secs), Some(start_ms)) = (
-            state.spine_config.max_duration_secs,
-            state.spine_config.autonomous_start_ms,
-        ) {
+        if let (Some(max_secs), Some(start_ms)) =
+            (state.spine_config.max_duration_secs, state.spine_config.autonomous_start_ms)
+        {
             let elapsed_ms = crate::core::panels::now_ms().saturating_sub(start_ms);
             let elapsed_secs = elapsed_ms / 1000;
             elapsed_secs >= max_secs
@@ -125,14 +117,12 @@ impl GuardRailStopLogic for MaxDurationGuard {
     }
 
     fn block_reason(&self, state: &State) -> String {
-        let elapsed_secs = state.spine_config.autonomous_start_ms
+        let elapsed_secs = state
+            .spine_config
+            .autonomous_start_ms
             .map(|start| crate::core::panels::now_ms().saturating_sub(start) / 1000)
             .unwrap_or(0);
-        format!(
-            "Duration limit reached: {}s / {}s",
-            elapsed_secs,
-            state.spine_config.max_duration_secs.unwrap_or(0)
-        )
+        format!("Duration limit reached: {}s / {}s", elapsed_secs, state.spine_config.max_duration_secs.unwrap_or(0))
     }
 }
 
@@ -144,14 +134,12 @@ impl GuardRailStopLogic for MaxDurationGuard {
 pub struct MaxMessagesGuard;
 
 impl GuardRailStopLogic for MaxMessagesGuard {
-    fn name(&self) -> &str { "MaxMessages" }
+    fn name(&self) -> &str {
+        "MaxMessages"
+    }
 
     fn should_block(&self, state: &State) -> bool {
-        if let Some(max) = state.spine_config.max_messages {
-            state.messages.len() >= max
-        } else {
-            false
-        }
+        if let Some(max) = state.spine_config.max_messages { state.messages.len() >= max } else { false }
     }
 
     fn block_reason(&self, state: &State) -> String {
@@ -173,7 +161,9 @@ impl GuardRailStopLogic for MaxMessagesGuard {
 pub struct MaxAutoRetriesGuard;
 
 impl GuardRailStopLogic for MaxAutoRetriesGuard {
-    fn name(&self) -> &str { "MaxAutoRetries" }
+    fn name(&self) -> &str {
+        "MaxAutoRetries"
+    }
 
     fn should_block(&self, state: &State) -> bool {
         if let Some(max) = state.spine_config.max_auto_retries {

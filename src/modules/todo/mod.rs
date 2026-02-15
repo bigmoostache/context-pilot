@@ -1,13 +1,13 @@
-pub mod types;
 mod panel;
 pub(crate) mod tools;
+pub mod types;
 
 use serde_json::json;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use self::panel::TodoPanel;
 use super::Module;
@@ -15,9 +15,15 @@ use super::Module;
 pub struct TodoModule;
 
 impl Module for TodoModule {
-    fn id(&self) -> &'static str { "todo" }
-    fn name(&self) -> &'static str { "Todo" }
-    fn description(&self) -> &'static str { "Task management with hierarchical todos" }
+    fn id(&self) -> &'static str {
+        "todo"
+    }
+    fn name(&self) -> &'static str {
+        "Todo"
+    }
+    fn description(&self) -> &'static str {
+        "Task management with hierarchical todos"
+    }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         json!({
@@ -28,9 +34,10 @@ impl Module for TodoModule {
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("todos")
-            && let Ok(v) = serde_json::from_value(arr.clone()) {
-                state.todos = v;
-            }
+            && let Ok(v) = serde_json::from_value(arr.clone())
+        {
+            state.todos = v;
+        }
         if let Some(v) = data.get("next_todo_id").and_then(|v| v.as_u64()) {
             state.next_todo_id = v as usize;
         }

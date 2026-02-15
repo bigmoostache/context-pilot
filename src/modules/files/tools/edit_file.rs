@@ -1,16 +1,12 @@
 use std::fs;
 use std::path::Path;
 
+use crate::state::{ContextType, State, estimate_tokens};
 use crate::tools::{ToolResult, ToolUse};
-use crate::state::{estimate_tokens, ContextType, State};
 
 /// Normalize a string for matching: trim trailing whitespace per line, normalize line endings
 fn normalize_for_match(s: &str) -> String {
-    s.replace("\r\n", "\n")
-        .lines()
-        .map(|l| l.trim_end())
-        .collect::<Vec<_>>()
-        .join("\n")
+    s.replace("\r\n", "\n").lines().map(|l| l.trim_end()).collect::<Vec<_>>().join("\n")
 }
 
 /// Find the best match for `needle` in `haystack` using normalized comparison.
@@ -34,10 +30,7 @@ fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Option<&'a str>
     }
 
     let haystack_lines: Vec<&str> = haystack.lines().collect();
-    let haystack_lines_normalized: Vec<String> = haystack_lines
-        .iter()
-        .map(|l| l.trim_end().to_string())
-        .collect();
+    let haystack_lines_normalized: Vec<String> = haystack_lines.iter().map(|l| l.trim_end().to_string()).collect();
 
     // Try to find needle_lines sequence in haystack_lines_normalized
     'outer: for start_idx in 0..haystack_lines.len() {
@@ -80,30 +73,21 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
         let norm_line = line.trim_end();
 
         // Simple similarity: count matching characters
-        let score = first_needle_line
-            .chars()
-            .zip(norm_line.chars())
-            .filter(|(a, b)| a == b)
-            .count();
+        let score = first_needle_line.chars().zip(norm_line.chars()).filter(|(a, b)| a == b).count();
 
         // Also check if it contains the trimmed needle line
-        let contains_score = if norm_line.contains(first_needle_line.trim()) {
-            first_needle_line.len()
-        } else {
-            0
-        };
+        let contains_score = if norm_line.contains(first_needle_line.trim()) { first_needle_line.len() } else { 0 };
 
         let total_score = score.max(contains_score);
 
-        if total_score > 0
-            && (best_match.is_none() || total_score > best_match.as_ref().unwrap().1) {
-                let preview = if norm_line.len() > 60 {
-                    format!("{}...", &norm_line[..norm_line.floor_char_boundary(60)])
-                } else {
-                    norm_line.to_string()
-                };
-                best_match = Some((idx + 1, total_score, preview));
-            }
+        if total_score > 0 && (best_match.is_none() || total_score > best_match.as_ref().unwrap().1) {
+            let preview = if norm_line.len() > 60 {
+                format!("{}...", &norm_line[..norm_line.floor_char_boundary(60)])
+            } else {
+                norm_line.to_string()
+            };
+            best_match = Some((idx + 1, total_score, preview));
+        }
     }
 
     best_match.map(|(line, _, preview)| (line, preview))
@@ -118,7 +102,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: file_path".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -130,7 +114,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: old_string".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -142,19 +126,16 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing required parameter: new_string".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
     // Get replace_all (optional, default false)
-    let replace_all = tool.input.get("replace_all")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let replace_all = tool.input.get("replace_all").and_then(|v| v.as_bool()).unwrap_or(false);
 
     // Check if file is open in context
-    let is_open = state.context.iter().any(|c| {
-        c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str)
-    });
+    let is_open =
+        state.context.iter().any(|c| c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str));
 
     if !is_open {
         return ToolResult {
@@ -174,7 +155,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Failed to read file: {}", e),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -223,9 +204,11 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Update the context element's token count
-    if let Some(ctx) = state.context.iter_mut().find(|c| {
-        c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str)
-    }) {
+    if let Some(ctx) = state
+        .context
+        .iter_mut()
+        .find(|c| c.context_type == ContextType::File && c.file_path.as_deref() == Some(path_str))
+    {
         ctx.token_count = estimate_tokens(&content);
     }
 
@@ -238,14 +221,8 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         format!("Edited '{}': ~{} lines changed", path_str, lines_changed)
     };
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: result_msg,
-        is_error: false,
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: result_msg, is_error: false }
 }
-
-
 
 #[cfg(test)]
 mod tests {

@@ -112,16 +112,20 @@ pub fn classify_git(args: &[String]) -> CommandClass {
 
     match subcmd {
         // Always read-only
-        "log" | "diff" | "show" | "status" | "blame" | "rev-parse" | "rev-list"
-        | "ls-tree" | "ls-files" | "ls-remote" | "cat-file" | "for-each-ref"
-        | "describe" | "shortlog" | "count-objects" | "fsck" | "check-ignore"
-        | "check-attr" | "name-rev" | "grep" | "reflog" | "archive"
-        | "format-patch" => CommandClass::ReadOnly,
+        "log" | "diff" | "show" | "status" | "blame" | "rev-parse" | "rev-list" | "ls-tree" | "ls-files"
+        | "ls-remote" | "cat-file" | "for-each-ref" | "describe" | "shortlog" | "count-objects" | "fsck"
+        | "check-ignore" | "check-attr" | "name-rev" | "grep" | "reflog" | "archive" | "format-patch" => {
+            CommandClass::ReadOnly
+        }
 
         // Context-dependent commands
         "branch" => {
             // branch with no args or list flags → RO
-            if rest.is_empty() || rest.iter().any(|a| matches!(*a, "-l" | "--list" | "-a" | "--all" | "-r" | "--remotes" | "-v" | "--verbose" | "-vv")) {
+            if rest.is_empty()
+                || rest.iter().any(|a| {
+                    matches!(*a, "-l" | "--list" | "-a" | "--all" | "-r" | "--remotes" | "-v" | "--verbose" | "-vv")
+                })
+            {
                 CommandClass::ReadOnly
             } else {
                 CommandClass::Mutating
@@ -198,30 +202,22 @@ pub fn classify_git(args: &[String]) -> CommandClass {
         }
 
         // Additional context-dependent commands
-        "sparse-checkout" => {
-            match rest.first() {
-                Some(&"list") => CommandClass::ReadOnly,
-                _ => CommandClass::Mutating,
-            }
-        }
-        "lfs" => {
-            match rest.first() {
-                Some(&"ls-files") | Some(&"status") | Some(&"env") | Some(&"logs") => CommandClass::ReadOnly,
-                _ => CommandClass::Mutating,
-            }
-        }
-        "bisect" => {
-            match rest.first() {
-                Some(&"log") | Some(&"visualize") => CommandClass::ReadOnly,
-                _ => CommandClass::Mutating,
-            }
-        }
-        "bundle" => {
-            match rest.first() {
-                Some(&"verify") | Some(&"list-heads") => CommandClass::ReadOnly,
-                _ => CommandClass::Mutating,
-            }
-        }
+        "sparse-checkout" => match rest.first() {
+            Some(&"list") => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+        "lfs" => match rest.first() {
+            Some(&"ls-files") | Some(&"status") | Some(&"env") | Some(&"logs") => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+        "bisect" => match rest.first() {
+            Some(&"log") | Some(&"visualize") => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+        "bundle" => match rest.first() {
+            Some(&"verify") | Some(&"list-heads") => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
         "apply" => {
             if rest.iter().any(|a| matches!(*a, "--stat" | "--check")) {
                 CommandClass::ReadOnly
@@ -231,11 +227,7 @@ pub fn classify_git(args: &[String]) -> CommandClass {
         }
         "symbolic-ref" => {
             // Query (no set action) = ReadOnly; with --short or single arg
-            if rest.len() <= 1 || rest.contains(&"--short") {
-                CommandClass::ReadOnly
-            } else {
-                CommandClass::Mutating
-            }
+            if rest.len() <= 1 || rest.contains(&"--short") { CommandClass::ReadOnly } else { CommandClass::Mutating }
         }
         "hash-object" => {
             if rest.contains(&"-w") {
@@ -246,11 +238,9 @@ pub fn classify_git(args: &[String]) -> CommandClass {
         }
 
         // Always mutating
-        "commit" | "push" | "pull" | "fetch" | "merge" | "rebase" | "cherry-pick"
-        | "revert" | "reset" | "checkout" | "switch" | "add" | "rm" | "mv"
-        | "restore" | "clean" | "init" | "clone" | "am" | "gc" | "prune"
-        | "repack" | "update-index" | "filter-branch" | "filter-repo"
-        | "replace" | "maintenance" => {
+        "commit" | "push" | "pull" | "fetch" | "merge" | "rebase" | "cherry-pick" | "revert" | "reset" | "checkout"
+        | "switch" | "add" | "rm" | "mv" | "restore" | "clean" | "init" | "clone" | "am" | "gc" | "prune"
+        | "repack" | "update-index" | "filter-branch" | "filter-repo" | "replace" | "maintenance" => {
             CommandClass::Mutating
         }
 

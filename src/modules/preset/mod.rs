@@ -1,23 +1,33 @@
-pub mod types;
 pub mod builtin;
 pub(crate) mod tools;
+pub mod types;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use super::Module;
 
 pub struct PresetModule;
 
 impl Module for PresetModule {
-    fn id(&self) -> &'static str { "preset" }
-    fn name(&self) -> &'static str { "Preset" }
-    fn description(&self) -> &'static str { "Save and load named worker configuration presets" }
+    fn id(&self) -> &'static str {
+        "preset"
+    }
+    fn name(&self) -> &'static str {
+        "Preset"
+    }
+    fn description(&self) -> &'static str {
+        "Save and load named worker configuration presets"
+    }
 
-    fn is_core(&self) -> bool { true }
-    fn is_global(&self) -> bool { true }
+    fn is_core(&self) -> bool {
+        true
+    }
+    fn is_global(&self) -> bool {
+        true
+    }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         vec![
@@ -28,7 +38,8 @@ impl Module for PresetModule {
                 description: "Saves the current worker configuration as a named preset. \
                     Captures: active system prompt, active modules, disabled tools, \
                     per-worker module data (todos, scratchpad, git settings), and dynamic panels. \
-                    Does NOT capture messages or global config.".to_string(),
+                    Does NOT capture messages or global config."
+                    .to_string(),
                 params: vec![
                     ToolParam::new("name", ParamType::String)
                         .desc("Preset name (alphanumeric and hyphens only, e.g., 'my-preset')")
@@ -36,8 +47,9 @@ impl Module for PresetModule {
                     ToolParam::new("description", ParamType::String)
                         .desc("Description of what this preset is for")
                         .required(),
-                    ToolParam::new("replace", ParamType::String)
-                        .desc("Name of existing preset to overwrite. Required if a preset with this name already exists."),
+                    ToolParam::new("replace", ParamType::String).desc(
+                        "Name of existing preset to overwrite. Required if a preset with this name already exists.",
+                    ),
                 ],
                 enabled: true,
                 category: ToolCategory::System,
@@ -49,12 +61,9 @@ impl Module for PresetModule {
                 description: "Loads a named preset, replacing the current worker configuration. \
                     Replaces: active system prompt, active modules, disabled tools, \
                     per-worker module data, and dynamic panels. \
-                    Messages and conversation history are preserved.".to_string(),
-                params: vec![
-                    ToolParam::new("name", ParamType::String)
-                        .desc("Name of the preset to load")
-                        .required(),
-                ],
+                    Messages and conversation history are preserved."
+                    .to_string(),
+                params: vec![ToolParam::new("name", ParamType::String).desc("Name of the preset to load").required()],
                 enabled: true,
                 category: ToolCategory::System,
             },

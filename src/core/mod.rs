@@ -5,4 +5,4 @@ pub mod panels;
 mod wait;
 
 pub use app::App;
-pub use init::{ensure_default_contexts, ensure_default_agent};
+pub use init::{ensure_default_agent, ensure_default_contexts};

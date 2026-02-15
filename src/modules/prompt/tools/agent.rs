@@ -1,8 +1,8 @@
-use crate::tools::{ToolResult, ToolUse};
 use crate::constants::library;
-use crate::state::{ContextType, State};
 use crate::modules::prompt::storage;
 use crate::modules::prompt::types::{PromptItem, PromptType};
+use crate::state::{ContextType, State};
+use crate::tools::{ToolResult, ToolUse};
 
 pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let name = tool.input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -148,13 +148,14 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Cannot delete built-in agents
     if let Some(agent) = state.agents.iter().find(|a| a.id == id)
-        && agent.is_builtin {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Cannot delete built-in agent '{}'", id),
-                is_error: true,
-            };
-        }
+        && agent.is_builtin
+    {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Cannot delete built-in agent '{}'", id),
+            is_error: true,
+        };
+    }
 
     let idx = match state.agents.iter().position(|a| a.id == id) {
         Some(i) => i,
@@ -214,14 +215,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::System);
     state.touch_panel(ContextType::Library);
 
-    let name = state.agents.iter()
-        .find(|a| a.id == id)
-        .map(|a| a.name.as_str())
-        .unwrap_or("unknown");
+    let name = state.agents.iter().find(|a| a.id == id).map(|a| a.name.as_str()).unwrap_or("unknown");
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Loaded agent '{}' ({})", name, id),
-        is_error: false,
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: format!("Loaded agent '{}' ({})", name, id), is_error: false }
 }

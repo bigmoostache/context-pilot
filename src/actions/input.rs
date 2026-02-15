@@ -1,9 +1,9 @@
 use crate::modules::spine::types::NotificationType;
 use crate::persistence::{delete_message, save_message};
-use crate::state::{estimate_tokens, ContextType, Message, PromptItem, State};
+use crate::state::{ContextType, Message, PromptItem, State, estimate_tokens};
 
-use super::helpers::{parse_context_pattern, find_context_by_id};
 use super::ActionResult;
+use super::helpers::{find_context_by_id, parse_context_pattern};
 
 /// Handle InputSubmit action — context switching, message creation, stream start
 pub fn handle_input_submit(state: &mut State) -> ActionResult {
@@ -13,14 +13,15 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
 
     // Context switching is always allowed, even during streaming
     if let Some(id) = parse_context_pattern(&state.input)
-        && let Some(index) = find_context_by_id(state, &id) {
-            state.selected_context = index;
-            state.scroll_offset = 0.0;
-            state.user_scrolled = false;
-            state.input.clear();
-            state.input_cursor = 0;
-            return ActionResult::Nothing;
-        }
+        && let Some(index) = find_context_by_id(state, &id)
+    {
+        state.selected_context = index;
+        state.scroll_offset = 0.0;
+        state.user_scrolled = false;
+        state.input.clear();
+        state.input_cursor = 0;
+        return ActionResult::Nothing;
+    }
 
     let content = replace_commands(&state.input, &state.commands);
     // Expand paste sentinels: replace \x00{idx}\x00 with actual paste buffer content
@@ -107,11 +108,7 @@ pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
 /// This is the primary trigger for starting a stream — the spine engine
 /// will detect the unprocessed notification and launch streaming.
 fn create_user_notification(state: &mut State, user_id: &str, content_preview: &str) {
-    state.create_notification(
-        NotificationType::UserMessage,
-        user_id.to_string(),
-        content_preview.to_string(),
-    );
+    state.create_notification(NotificationType::UserMessage, user_id.to_string(), content_preview.to_string());
 }
 
 /// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.
@@ -168,7 +165,8 @@ fn replace_commands(input: &str, commands: &[PromptItem]) -> String {
         return input.to_string();
     }
 
-    input.lines()
+    input
+        .lines()
         .map(|line| {
             let trimmed = line.trim_start();
             if !trimmed.starts_with('/') {

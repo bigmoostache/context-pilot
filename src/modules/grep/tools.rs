@@ -4,8 +4,8 @@ use std::io::{BufRead, BufReader};
 use ignore::WalkBuilder;
 use regex::Regex;
 
-use crate::tools::{ToolResult, ToolUse};
 use crate::state::{ContextElement, ContextType, State};
+use crate::tools::{ToolResult, ToolUse};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let pattern = match tool.input.get("pattern").and_then(|v| v.as_str()) {
@@ -15,7 +15,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'pattern' parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -28,13 +28,9 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    let path = tool.input.get("path")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+    let path = tool.input.get("path").and_then(|v| v.as_str()).map(|s| s.to_string());
 
-    let file_pattern = tool.input.get("file_pattern")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+    let file_pattern = tool.input.get("file_pattern").and_then(|v| v.as_str()).map(|s| s.to_string());
 
     let search_path = path.as_deref().unwrap_or(".").to_string();
 
@@ -53,7 +49,6 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         name,
         token_count: 0, // Will be updated by cache
         file_path: None,
-        file_hash: None,
         glob_pattern: None,
         glob_path: None,
         grep_pattern: Some(pattern.to_string()),
@@ -64,16 +59,14 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_last_keys: None,
         tmux_description: None,
         result_command: None,
-        result_command_hash: None,
         skill_prompt_id: None,
         cached_content: None, // Background will populate
         history_messages: None,
         cache_deprecated: true, // Trigger background refresh
         cache_in_flight: false,
         last_refresh_ms: crate::core::panels::now_ms(),
-        last_polled_ms: 0,
         content_hash: None,
-        tmux_last_lines_hash: None,
+        source_hash: None,
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,
@@ -98,20 +91,12 @@ pub fn compute_grep_results(pattern: &str, search_path: &str, file_pattern: Opti
     };
 
     // Optional glob filter for files
-    let file_matcher = file_pattern.and_then(|p| {
-        globset::GlobBuilder::new(p)
-            .literal_separator(true)
-            .build()
-            .ok()
-            .map(|g| g.compile_matcher())
-    });
+    let file_matcher = file_pattern
+        .and_then(|p| globset::GlobBuilder::new(p).literal_separator(true).build().ok().map(|g| g.compile_matcher()));
 
     let mut matches: Vec<String> = Vec::new();
 
-    let walker = WalkBuilder::new(search_path)
-        .hidden(false)
-        .git_ignore(true)
-        .build();
+    let walker = WalkBuilder::new(search_path).hidden(false).git_ignore(true).build();
 
     for entry in walker.flatten() {
         let path = entry.path();
@@ -123,9 +108,10 @@ pub fn compute_grep_results(pattern: &str, search_path: &str, file_pattern: Opti
 
         // Apply file pattern filter if specified
         if let Some(ref matcher) = file_matcher
-            && !matcher.is_match(relative) {
-                continue;
-            }
+            && !matcher.is_match(relative)
+        {
+            continue;
+        }
 
         // Try to read the file
         let file = match fs::File::open(path) {
@@ -142,11 +128,8 @@ pub fn compute_grep_results(pattern: &str, search_path: &str, file_pattern: Opti
             };
 
             if regex.is_match(&line) {
-                let line_display = if line.len() > 200 {
-                    format!("{}...", &line[..line.floor_char_boundary(197)])
-                } else {
-                    line
-                };
+                let line_display =
+                    if line.len() > 200 { format!("{}...", &line[..line.floor_char_boundary(197)]) } else { line };
                 matches.push(format!("{}:{}:{}", relative.display(), line_num + 1, line_display));
 
                 // Limit matches per file to avoid explosion
@@ -161,11 +144,7 @@ pub fn compute_grep_results(pattern: &str, search_path: &str, file_pattern: Opti
 
     let count = matches.len();
 
-    let output = if matches.is_empty() {
-        "No matches found".to_string()
-    } else {
-        matches.join("\n")
-    };
+    let output = if matches.is_empty() { "No matches found".to_string() } else { matches.join("\n") };
 
     (output, count)
 }

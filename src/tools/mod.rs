@@ -41,10 +41,13 @@ pub fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Perform the actual TUI reload (called from app.rs after tool result is saved)
 pub fn perform_reload(state: &mut State) {
+    use crate::persistence::save_state;
+    use crossterm::{
+        execute,
+        terminal::{LeaveAlternateScreen, disable_raw_mode},
+    };
     use std::fs;
     use std::io::stdout;
-    use crossterm::{execute, terminal::{disable_raw_mode, LeaveAlternateScreen}};
-    use crate::persistence::save_state;
 
     let config_path = ".context-pilot/config.json";
 
@@ -60,8 +63,7 @@ pub fn perform_reload(state: &mut State) {
                     .replace("\"reload_requested\":false", "\"reload_requested\":true")
             } else {
                 // Add the field before the final }
-                json.trim_end().trim_end_matches('}').to_string()
-                    + ",\n  \"reload_requested\": true\n}"
+                json.trim_end().trim_end_matches('}').to_string() + ",\n  \"reload_requested\": true\n}"
             };
             let _ = fs::write(config_path, updated);
         }

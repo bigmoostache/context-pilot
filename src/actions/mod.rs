@@ -5,13 +5,13 @@
 //! - `streaming` — Stream append/done/error handling
 //! - `config` — Configuration bar and theme controls
 
+pub mod config;
 pub mod helpers;
 pub mod input;
 pub mod streaming;
-pub mod config;
 
 // Re-export helpers for external use
-pub use helpers::{clean_llm_id_prefix, parse_context_pattern, find_context_by_id};
+pub use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern};
 
 use crate::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::state::{ContextElement, ContextType, State};
@@ -56,7 +56,7 @@ pub enum Action {
     CursorWordLeft,
     CursorWordRight,
     DeleteWordLeft,
-    RemoveListItem,  // Remove empty list item, keep newline
+    RemoveListItem, // Remove empty list item, keep newline
     CursorHome,
     CursorEnd,
     ClearConversation,
@@ -64,12 +64,21 @@ pub enum Action {
     SelectNextContext,
     SelectPrevContext,
     AppendChars(String),
-    StreamDone { _input_tokens: usize, output_tokens: usize, cache_hit_tokens: usize, cache_miss_tokens: usize, stop_reason: Option<String> },
+    StreamDone {
+        _input_tokens: usize,
+        output_tokens: usize,
+        cache_hit_tokens: usize,
+        cache_miss_tokens: usize,
+        stop_reason: Option<String>,
+    },
     StreamError(String),
     ScrollUp(f32),
     ScrollDown(f32),
     StopStreaming,
-    TmuxSendKeys { pane_id: String, keys: String },
+    TmuxSendKeys {
+        pane_id: String,
+        keys: String,
+    },
     TogglePerfMonitor,
     ToggleConfigView,
     ConfigSelectProvider(crate::llms::LlmProvider),
@@ -123,22 +132,19 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 }
                 let word = &state.input[word_start..before_space];
                 if let Some(cmd_name) = word.strip_prefix('/')
-                    && let Some(cmd) = state.commands.iter().find(|c| c.id == cmd_name) {
-                        let content = cmd.content.clone();
-                        let label = cmd_name.to_string();
-                        let idx = state.paste_buffers.len();
-                        state.paste_buffers.push(content);
-                        state.paste_buffer_labels.push(Some(label.clone()));
-                        let sentinel = format!("\x00{}\x00", idx);
-                        // Replace /command<space> with sentinel
-                        state.input = format!(
-                            "{}{}\n{}",
-                            &state.input[..word_start],
-                            sentinel,
-                            &state.input[state.input_cursor..],
-                        );
-                        state.input_cursor = word_start + sentinel.len() + 1;
-                    }
+                    && let Some(cmd) = state.commands.iter().find(|c| c.id == cmd_name)
+                {
+                    let content = cmd.content.clone();
+                    let label = cmd_name.to_string();
+                    let idx = state.paste_buffers.len();
+                    state.paste_buffers.push(content);
+                    state.paste_buffer_labels.push(Some(label.clone()));
+                    let sentinel = format!("\x00{}\x00", idx);
+                    // Replace /command<space> with sentinel
+                    state.input =
+                        format!("{}{}\n{}", &state.input[..word_start], sentinel, &state.input[state.input_cursor..],);
+                    state.input_cursor = word_start + sentinel.len() + 1;
+                }
             }
 
             ActionResult::Nothing
@@ -171,11 +177,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     }
                     if bytes[scan] == 0 {
                         // Remove the entire sentinel from scan..cursor
-                        state.input = format!(
-                            "{}{}",
-                            &state.input[..scan],
-                            &state.input[state.input_cursor..]
-                        );
+                        state.input = format!("{}{}", &state.input[..scan], &state.input[state.input_cursor..]);
                         state.input_cursor = scan;
                     }
                 } else if state.input_cursor >= 2 && bytes[state.input_cursor - 1].is_ascii_digit() {
@@ -194,29 +196,17 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                         if end < bytes.len() && bytes[end] == 0 {
                             end += 1; // include closing \x00
                         }
-                        state.input = format!(
-                            "{}{}",
-                            &state.input[..scan],
-                            &state.input[end..]
-                        );
+                        state.input = format!("{}{}", &state.input[..scan], &state.input[end..]);
                         state.input_cursor = scan;
                     } else {
                         // Not a sentinel — normal backspace
-                        let prev = state.input[..state.input_cursor]
-                            .char_indices()
-                            .last()
-                            .map(|(i, _)| i)
-                            .unwrap_or(0);
+                        let prev = state.input[..state.input_cursor].char_indices().last().map(|(i, _)| i).unwrap_or(0);
                         state.input.remove(prev);
                         state.input_cursor = prev;
                     }
                 } else {
                     // Normal backspace — remove one character
-                    let prev = state.input[..state.input_cursor]
-                        .char_indices()
-                        .last()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
+                    let prev = state.input[..state.input_cursor].char_indices().last().map(|(i, _)| i).unwrap_or(0);
                     state.input.remove(prev);
                     state.input_cursor = prev;
                 }
@@ -236,9 +226,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 if trimmed.is_empty() {
                     state.input_cursor = 0;
                 } else {
-                    let word_start = trimmed.rfind(|c: char| c.is_whitespace())
-                        .map(|i| i + 1)
-                        .unwrap_or(0);
+                    let word_start = trimmed.rfind(|c: char| c.is_whitespace()).map(|i| i + 1).unwrap_or(0);
                     state.input_cursor = word_start;
                 }
                 state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
@@ -263,9 +251,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 let word_start = if trimmed.is_empty() {
                     0
                 } else {
-                    trimmed.rfind(|c: char| c.is_whitespace())
-                        .map(|i| i + 1)
-                        .unwrap_or(0)
+                    trimmed.rfind(|c: char| c.is_whitespace()).map(|i| i + 1).unwrap_or(0)
                 };
                 state.input = format!("{}{}", &state.input[..word_start], &state.input[state.input_cursor..]);
                 state.input_cursor = word_start;
@@ -307,7 +293,6 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 name: format!("Conv {}", state.context.len()),
                 token_count: 0,
                 file_path: None,
-                file_hash: None,
                 glob_pattern: None,
                 glob_path: None,
                 grep_pattern: None,
@@ -318,16 +303,14 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 tmux_last_keys: None,
                 tmux_description: None,
                 result_command: None,
-                result_command_hash: None,
                 skill_prompt_id: None,
                 cached_content: None,
                 history_messages: None,
                 cache_deprecated: false,
                 cache_in_flight: false,
                 last_refresh_ms: crate::core::panels::now_ms(),
-                last_polled_ms: 0,
                 content_hash: None,
-                tmux_last_lines_hash: None,
+                source_hash: None,
                 current_page: 0,
                 total_pages: 1,
                 full_token_count: 0,
@@ -340,8 +323,16 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             if !state.context.is_empty() {
                 let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
                 sorted_indices.sort_by(|&a, &b| {
-                    let id_a = state.context[a].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
-                    let id_b = state.context[b].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+                    let id_a = state.context[a]
+                        .id
+                        .strip_prefix('P')
+                        .and_then(|n| n.parse::<usize>().ok())
+                        .unwrap_or(usize::MAX);
+                    let id_b = state.context[b]
+                        .id
+                        .strip_prefix('P')
+                        .and_then(|n| n.parse::<usize>().ok())
+                        .unwrap_or(usize::MAX);
                     id_a.cmp(&id_b)
                 });
                 let current_pos = sorted_indices.iter().position(|&i| i == state.selected_context).unwrap_or(0);
@@ -356,16 +347,20 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             if !state.context.is_empty() {
                 let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
                 sorted_indices.sort_by(|&a, &b| {
-                    let id_a = state.context[a].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
-                    let id_b = state.context[b].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+                    let id_a = state.context[a]
+                        .id
+                        .strip_prefix('P')
+                        .and_then(|n| n.parse::<usize>().ok())
+                        .unwrap_or(usize::MAX);
+                    let id_b = state.context[b]
+                        .id
+                        .strip_prefix('P')
+                        .and_then(|n| n.parse::<usize>().ok())
+                        .unwrap_or(usize::MAX);
                     id_a.cmp(&id_b)
                 });
                 let current_pos = sorted_indices.iter().position(|&i| i == state.selected_context).unwrap_or(0);
-                let prev_pos = if current_pos == 0 {
-                    sorted_indices.len() - 1
-                } else {
-                    current_pos - 1
-                };
+                let prev_pos = if current_pos == 0 { sorted_indices.len() - 1 } else { current_pos - 1 };
                 state.selected_context = sorted_indices[prev_pos];
                 state.scroll_offset = 0.0;
                 state.user_scrolled = false;
@@ -376,7 +371,14 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         // === Streaming (delegated) ===
         Action::AppendChars(text) => streaming::handle_append_chars(state, &text),
         Action::StreamDone { _input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason } => {
-            streaming::handle_stream_done(state, _input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason)
+            streaming::handle_stream_done(
+                state,
+                _input_tokens,
+                output_tokens,
+                cache_hit_tokens,
+                cache_miss_tokens,
+                stop_reason,
+            )
         }
         Action::StreamError(e) => streaming::handle_stream_error(state, &e),
 
@@ -401,9 +403,11 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 }
                 state.streaming_estimated_tokens = 0;
                 if let Some(msg) = state.messages.last_mut()
-                    && msg.role == "assistant" && !msg.content.is_empty() {
-                        msg.content.push_str("\n[Stopped]");
-                    }
+                    && msg.role == "assistant"
+                    && !msg.content.is_empty()
+                {
+                    msg.content.push_str("\n[Stopped]");
+                }
                 ActionResult::StopStream
             } else {
                 ActionResult::Nothing
@@ -411,12 +415,8 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::TmuxSendKeys { pane_id, keys } => {
             use std::process::Command;
-            let _ = Command::new("tmux")
-                .args(["send-keys", "-t", &pane_id, &keys])
-                .output();
-            if let Some(ctx) = state.context.iter_mut()
-                .find(|c| c.tmux_pane_id.as_ref() == Some(&pane_id))
-            {
+            let _ = Command::new("tmux").args(["send-keys", "-t", &pane_id, &keys]).output();
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.tmux_pane_id.as_ref() == Some(&pane_id)) {
                 ctx.tmux_last_keys = Some(keys);
                 ctx.cache_deprecated = true;
             }

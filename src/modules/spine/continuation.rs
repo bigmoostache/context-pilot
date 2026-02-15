@@ -1,5 +1,5 @@
-use crate::state::State;
 use super::types::ContinuationAction;
+use crate::state::State;
 
 /// Trait for pluggable auto-continuation logic.
 ///
@@ -28,11 +28,8 @@ pub trait AutoContinuation: Send + Sync {
 /// 2. MaxTokensContinuation (continue truncated output)
 /// 3. TodosAutomaticContinuation (continue until todos done)
 pub fn all_continuations() -> &'static [&'static dyn AutoContinuation] {
-    static CONTINUATIONS: &[&dyn AutoContinuation] = &[
-        &NotificationsContinuation,
-        &MaxTokensContinuation,
-        &TodosAutomaticContinuation,
-    ];
+    static CONTINUATIONS: &[&dyn AutoContinuation] =
+        &[&NotificationsContinuation, &MaxTokensContinuation, &TodosAutomaticContinuation];
     CONTINUATIONS
 }
 
@@ -56,22 +53,23 @@ impl AutoContinuation for NotificationsContinuation {
 
         // If ALL unprocessed notifications are "transparent" types (UserMessage
         // or ReloadResume), no synthetic explanation is needed — just relaunch.
-        let all_transparent = unprocessed.iter().all(|n| {
-            matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume)
-        });
+        let all_transparent = unprocessed
+            .iter()
+            .all(|n| matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume));
 
         if all_transparent {
             // Check if any are UserMessage (vs pure ReloadResume).
-            let has_user_message = unprocessed.iter().any(|n| {
-                n.notification_type == NotificationType::UserMessage
-            });
+            let has_user_message = unprocessed.iter().any(|n| n.notification_type == NotificationType::UserMessage);
 
             if has_user_message {
                 // User sent a message — check if conversation already ends with
                 // a user message. If so, Relaunch. If not (missed-message during
                 // streaming), we need a synthetic user message because APIs require
                 // the conversation to end with a user message.
-                let last_role = state.messages.iter().rev()
+                let last_role = state
+                    .messages
+                    .iter()
+                    .rev()
                     .find(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
                     .map(|m| m.role.as_str());
 
@@ -85,15 +83,14 @@ impl AutoContinuation for NotificationsContinuation {
             } else {
                 // Pure ReloadResume — use a synthetic message so the API
                 // always sees the conversation ending with a user turn.
-                return ContinuationAction::SyntheticMessage(
-                    "/* Reload complete */".to_string()
-                );
+                return ContinuationAction::SyntheticMessage("/* Reload complete */".to_string());
             }
         }
 
         // Non-transparent notifications exist — build a synthetic message
         // so the LLM knows WHY it was relaunched (e.g., max_tokens, todos).
-        let explain: Vec<_> = unprocessed.iter()
+        let explain: Vec<_> = unprocessed
+            .iter()
             .filter(|n| !matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume))
             .collect();
         let mut parts = Vec::new();
@@ -119,8 +116,7 @@ pub struct MaxTokensContinuation;
 
 impl AutoContinuation for MaxTokensContinuation {
     fn should_continue(&self, state: &State) -> bool {
-        state.spine_config.max_tokens_auto_continue
-            && state.last_stop_reason.as_deref() == Some("max_tokens")
+        state.spine_config.max_tokens_auto_continue && state.last_stop_reason.as_deref() == Some("max_tokens")
     }
 
     fn build_continuation(&self, _state: &State) -> ContinuationAction {
@@ -141,9 +137,7 @@ pub struct TodosAutomaticContinuation;
 
 impl AutoContinuation for TodosAutomaticContinuation {
     fn should_continue(&self, state: &State) -> bool {
-        state.spine_config.continue_until_todos_done
-            && !state.spine_config.user_stopped
-            && state.has_incomplete_todos()
+        state.spine_config.continue_until_todos_done && !state.spine_config.user_stopped && state.has_incomplete_todos()
     }
 
     fn build_continuation(&self, state: &State) -> ContinuationAction {

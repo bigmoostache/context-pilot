@@ -1,6 +1,6 @@
-use crate::tools::{ToolResult, ToolUse};
-use crate::state::{MemoryImportance, MemoryItem, State, estimate_tokens};
 use crate::constants::MEMORY_TLDR_MAX_TOKENS;
+use crate::state::{MemoryImportance, MemoryItem, State, estimate_tokens};
+use crate::tools::{ToolResult, ToolUse};
 
 fn validate_tldr(text: &str) -> Result<(), String> {
     let tokens = estimate_tokens(text);
@@ -22,7 +22,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'memories' array parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -51,37 +51,27 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             continue;
         }
 
-        let importance = memory_value.get("importance")
+        let importance = memory_value
+            .get("importance")
             .and_then(|v| v.as_str())
             .and_then(MemoryImportance::from_str)
             .unwrap_or(MemoryImportance::Medium);
 
-        let labels: Vec<String> = memory_value.get("labels")
+        let labels: Vec<String> = memory_value
+            .get("labels")
             .and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default();
 
-        let contents = memory_value.get("contents")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
+        let contents = memory_value.get("contents").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
         let id = format!("M{}", state.next_memory_id);
         state.next_memory_id += 1;
 
-        state.memories.push(MemoryItem {
-            id: id.clone(),
-            tl_dr: content.clone(),
-            contents,
-            importance,
-            labels,
-        });
+        state.memories.push(MemoryItem { id: id.clone(), tl_dr: content.clone(), contents, importance, labels });
 
-        let preview = if content.len() > 40 {
-            format!("{}...", &content[..content.floor_char_boundary(37)])
-        } else {
-            content
-        };
+        let preview =
+            if content.len() > 40 { format!("{}...", &content[..content.floor_char_boundary(37)]) } else { content };
         created.push(format!("{} [{}]: {}", id, importance.as_str(), preview));
     }
 
@@ -99,11 +89,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors ({}):\n{}", errors.len(), errors.join("\n")));
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: output,
-        is_error: created.is_empty(),
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: created.is_empty() }
 }
 
 pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -114,7 +100,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'updates' array parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -176,15 +162,14 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
 
                 if let Some(importance_str) = update_value.get("importance").and_then(|v| v.as_str())
-                    && let Some(importance) = MemoryImportance::from_str(importance_str) {
-                        m.importance = importance;
-                        changes.push("importance");
-                    }
+                    && let Some(importance) = MemoryImportance::from_str(importance_str)
+                {
+                    m.importance = importance;
+                    changes.push("importance");
+                }
 
                 if let Some(labels_arr) = update_value.get("labels").and_then(|v| v.as_array()) {
-                    m.labels = labels_arr.iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect();
+                    m.labels = labels_arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
                     changes.push("labels");
                 }
 
@@ -243,11 +228,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors:\n{}", errors.join("\n")));
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: output,
-        is_error: updated.is_empty() && deleted.is_empty(),
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: updated.is_empty() && deleted.is_empty() }
 }
 
 #[cfg(test)]

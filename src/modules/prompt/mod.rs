@@ -1,16 +1,16 @@
-pub mod types;
-pub mod seed;
-pub mod storage;
 mod library_panel;
+pub mod seed;
 mod skill_panel;
+pub mod storage;
 mod tools;
+pub mod types;
 
 use serde_json::json;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use self::library_panel::LibraryPanel;
 use self::skill_panel::SkillPanel;
@@ -19,11 +19,21 @@ use super::Module;
 pub struct PromptModule;
 
 impl Module for PromptModule {
-    fn id(&self) -> &'static str { "system" }
-    fn name(&self) -> &'static str { "System" }
-    fn description(&self) -> &'static str { "Prompt library — agents, skills, commands" }
-    fn is_core(&self) -> bool { true }
-    fn is_global(&self) -> bool { true }
+    fn id(&self) -> &'static str {
+        "system"
+    }
+    fn name(&self) -> &'static str {
+        "System"
+    }
+    fn description(&self) -> &'static str {
+        "Prompt library — agents, skills, commands"
+    }
+    fn is_core(&self) -> bool {
+        true
+    }
+    fn is_global(&self) -> bool {
+        true
+    }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         json!({
@@ -39,17 +49,20 @@ impl Module for PromptModule {
         }
         // Backwards compatibility: try old field name
         if state.active_agent_id.is_none()
-            && let Some(v) = data.get("active_system_id") {
-                state.active_agent_id = v.as_str().map(String::from);
-            }
+            && let Some(v) = data.get("active_system_id")
+        {
+            state.active_agent_id = v.as_str().map(String::from);
+        }
         if let Some(arr) = data.get("loaded_skill_ids")
-            && let Ok(v) = serde_json::from_value(arr.clone()) {
-                state.loaded_skill_ids = v;
-            }
+            && let Ok(v) = serde_json::from_value(arr.clone())
+        {
+            state.loaded_skill_ids = v;
+        }
         if let Some(v) = data.get("library_preview")
-            && let Ok(lp) = serde_json::from_value(v.clone()) {
-                state.library_preview = lp;
-            }
+            && let Ok(lp) = serde_json::from_value(v.clone())
+        {
+            state.library_preview = lp;
+        }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
@@ -57,9 +70,7 @@ impl Module for PromptModule {
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![
-            (ContextType::Library, "Library", false),
-        ]
+        vec![(ContextType::Library, "Library", false)]
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {

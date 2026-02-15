@@ -2,18 +2,18 @@ use std::collections::HashMap;
 
 use super::context::{ContextElement, ContextType};
 use super::message::Message;
-use super::render_cache::{MessageRenderCache, InputRenderCache, FullContentCache};
+use super::render_cache::{FullContentCache, InputRenderCache, MessageRenderCache};
 
 // Re-import module-owned types used in State fields
 use crate::llms::ModelInfo;
-use crate::modules::todo::types::TodoItem;
+use crate::modules::git::types::GitFileChange;
+use crate::modules::logs::types::LogEntry;
 use crate::modules::memory::types::MemoryItem;
 use crate::modules::prompt::types::{PromptItem, PromptType};
 use crate::modules::scratchpad::types::ScratchpadCell;
-use crate::modules::logs::types::LogEntry;
 use crate::modules::spine::types::{Notification, SpineConfig};
-use crate::modules::tree::types::{TreeFileDescription, DEFAULT_TREE_FILTER};
-use crate::modules::git::types::GitFileChange;
+use crate::modules::todo::types::TodoItem;
+use crate::modules::tree::types::{DEFAULT_TREE_FILTER, TreeFileDescription};
 use crate::tool_defs::ToolDefinition;
 
 /// Runtime state (messages loaded in memory)
@@ -165,8 +165,6 @@ pub struct State {
     pub git_file_changes: Vec<GitFileChange>,
     /// Whether to show full diff content in Git panel (vs summary only)
     pub git_show_diffs: bool,
-    /// Hash of last git status --porcelain output (for change detection)
-    pub git_status_hash: Option<String>,
     /// Whether to show git log in Git panel
     pub git_show_logs: bool,
     /// Custom git log arguments (e.g., "-5 --oneline")
@@ -208,9 +206,7 @@ impl Default for State {
                 .iter()
                 .enumerate()
                 .map(|(i, (_, _, ct, name, cache_dep))| {
-                    crate::modules::make_default_context_element(
-                        &format!("P{}", i), *ct, name, *cache_dep,
-                    )
+                    crate::modules::make_default_context_element(&format!("P{}", i), *ct, name, *cache_dep)
                 })
                 .collect(),
             messages: vec![],
@@ -289,7 +285,6 @@ impl Default for State {
             git_is_repo: false,
             git_file_changes: vec![],
             git_show_diffs: true, // Show diffs by default
-            git_status_hash: None,
             git_show_logs: false,
             git_log_args: None,
             git_log_content: None,
@@ -316,15 +311,16 @@ impl State {
     pub fn touch_panel(&mut self, context_type: ContextType) {
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == context_type) {
             ctx.last_refresh_ms = crate::core::panels::now_ms();
+            ctx.cache_deprecated = true;
         }
+        self.dirty = true;
     }
 
     /// Find the first available context ID (fills gaps instead of always incrementing)
     pub fn next_available_context_id(&self) -> String {
         // Collect all existing numeric IDs
-        let used_ids: std::collections::HashSet<usize> = self.context.iter()
-            .filter_map(|c| c.id.strip_prefix('P').and_then(|n| n.parse().ok()))
-            .collect();
+        let used_ids: std::collections::HashSet<usize> =
+            self.context.iter().filter_map(|c| c.id.strip_prefix('P').and_then(|n| n.parse().ok())).collect();
 
         // Find first available starting from 9 (P0-P8 are fixed defaults)
         let id = (9..).find(|n| !used_ids.contains(n)).unwrap_or(9);
@@ -483,12 +479,8 @@ impl State {
     ) -> String {
         let id = format!("N{}", self.next_notification_id);
         self.next_notification_id += 1;
-        let notification = crate::modules::spine::types::Notification::new(
-            id.clone(),
-            notification_type,
-            source,
-            content,
-        );
+        let notification =
+            crate::modules::spine::types::Notification::new(id.clone(), notification_type, source, content);
         self.notifications.push(notification);
         // Garbage-collect old processed notifications (cap at 100)
         self.gc_notifications(100);
@@ -549,7 +541,9 @@ impl State {
         use crate::modules::spine::types::NotificationType;
         let mut changed = false;
         for n in &mut self.notifications {
-            if !n.processed && matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume) {
+            if !n.processed
+                && matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume)
+            {
                 n.processed = true;
                 changed = true;
             }
@@ -570,7 +564,8 @@ impl State {
     /// Get a summary of incomplete todos for spine auto-continuation messages
     pub fn incomplete_todos_summary(&self) -> Vec<String> {
         use crate::modules::todo::types::TodoStatus;
-        self.todos.iter()
+        self.todos
+            .iter()
             .filter(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
             .map(|t| format!("[{}] {} — {}", t.id, t.status.icon(), t.name))
             .collect()

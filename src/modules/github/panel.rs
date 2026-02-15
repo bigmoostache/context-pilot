@@ -1,19 +1,21 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
+use crate::actions::Action;
 use crate::cache::{CacheRequest, CacheUpdate};
 use crate::constants::{GH_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
-use crate::core::panels::{update_if_changed, paginate_content, ContextItem, Panel};
-use crate::modules::{run_with_timeout, truncate_output};
-use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, State};
+use crate::core::panels::{ContextItem, Panel, paginate_content, update_if_changed};
+use crate::modules::{run_with_timeout, truncate_output};
+use crate::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 use crate::ui::theme;
 
 pub(crate) struct GithubResultPanel;
 
 impl Panel for GithubResultPanel {
-    fn needs_cache(&self) -> bool { true }
+    fn needs_cache(&self) -> bool {
+        true
+    }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
         Some(120_000) // Fallback timer; GhWatcher also polls via ETag/hash every 60s
@@ -31,13 +33,17 @@ impl Panel for GithubResultPanel {
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
         match update {
-            CacheUpdate::GithubResultContent { content, token_count, is_error, .. } => {
+            CacheUpdate::Content { content, token_count, .. } => {
                 ctx.cached_content = Some(content);
                 ctx.full_token_count = token_count;
                 ctx.total_pages = compute_total_pages(token_count);
                 ctx.current_page = 0;
                 if ctx.total_pages > 1 {
-                    let page_content = paginate_content(ctx.cached_content.as_deref().unwrap_or(""), ctx.current_page, ctx.total_pages);
+                    let page_content = paginate_content(
+                        ctx.cached_content.as_deref().unwrap_or(""),
+                        ctx.current_page,
+                        ctx.total_pages,
+                    );
                     ctx.token_count = estimate_tokens(&page_content);
                 } else {
                     ctx.token_count = token_count;
@@ -45,7 +51,6 @@ impl Panel for GithubResultPanel {
                 ctx.cache_deprecated = false;
                 let content_ref = ctx.cached_content.clone().unwrap_or_default();
                 update_if_changed(ctx, &content_ref);
-                let _ = is_error;
                 true
             }
             _ => false,
@@ -79,7 +84,6 @@ impl Panel for GithubResultPanel {
                 } else {
                     format!("{}\n{}", stdout, stderr)
                 };
-                let is_error = !out.status.success();
                 // Redact token if accidentally in output
                 let content = if github_token.len() >= 8 && content.contains(&github_token) {
                     content.replace(&github_token, "[REDACTED]")
@@ -88,12 +92,12 @@ impl Panel for GithubResultPanel {
                 };
                 let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::GithubResultContent { context_id, content, token_count, is_error })
+                Some(CacheUpdate::Content { context_id, content, token_count })
             }
             Err(e) => {
                 let content = format!("Error executing gh: {}", e);
                 let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::GithubResultContent { context_id, content, token_count, is_error: true })
+                Some(CacheUpdate::Content { context_id, content, token_count })
             }
         }
     }
@@ -111,10 +115,12 @@ impl Panel for GithubResultPanel {
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
             && ctx.context_type == ContextType::GithubResult
-                && let Some(cmd) = &ctx.result_command {
-                    let short = if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.clone() };
-                    return short;
-                }
+            && let Some(cmd) = &ctx.result_command
+        {
+            let short =
+                if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.clone() };
+            return short;
+        }
         "GitHub Result".to_string()
     }
 
@@ -135,13 +141,13 @@ impl Panel for GithubResultPanel {
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut text: Vec<Line> = Vec::new();
 
-        let ctx = state.context.get(state.selected_context)
-            .filter(|c| c.context_type == ContextType::GithubResult);
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GithubResult);
 
         let Some(ctx) = ctx else {
-            text.push(Line::from(vec![
-                Span::styled(" No GitHub result panel", Style::default().fg(theme::text_muted())),
-            ]));
+            text.push(Line::from(vec![Span::styled(
+                " No GitHub result panel",
+                Style::default().fg(theme::text_muted()),
+            )]));
             return text;
         };
 
@@ -163,7 +169,7 @@ impl Panel for GithubResultPanel {
                                     _ => theme::text_secondary(),
                                 };
                                 Style::default().fg(color)
-                            },
+                            }
                             2 => Style::default().fg(theme::text()), // Title
                             _ => Style::default().fg(theme::text_muted()), // Labels, dates, etc.
                         };
@@ -181,9 +187,7 @@ impl Panel for GithubResultPanel {
                 }
             }
         } else {
-            text.push(Line::from(vec![
-                Span::styled(" Loading...", Style::default().fg(theme::text_muted()).italic()),
-            ]));
+            text.push(Line::from(vec![Span::styled(" Loading...", Style::default().fg(theme::text_muted()).italic())]));
         }
 
         text

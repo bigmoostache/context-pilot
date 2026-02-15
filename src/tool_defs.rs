@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Parameter type for tool inputs
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -204,7 +204,8 @@ impl ToolCategory {
 
 /// Build the API tool definitions from enabled tools
 pub fn build_api_tools(tools: &[ToolDefinition]) -> Value {
-    let enabled: Vec<Value> = tools.iter()
+    let enabled: Vec<Value> = tools
+        .iter()
         .filter(|t| t.enabled)
         .map(|t| {
             json!({

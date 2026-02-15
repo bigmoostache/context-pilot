@@ -4,8 +4,8 @@
 //! Toggle with F12.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::RwLock;
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
 
 /// Number of recent samples to keep for trend analysis
@@ -26,11 +26,7 @@ pub struct RingBuffer<T: Copy + Default> {
 
 impl<T: Copy + Default> Default for RingBuffer<T> {
     fn default() -> Self {
-        Self {
-            data: vec![T::default(); SAMPLE_RING_SIZE],
-            write_pos: 0,
-            len: 0,
-        }
+        Self { data: vec![T::default(); SAMPLE_RING_SIZE], write_pos: 0, len: 0 }
     }
 }
 
@@ -49,11 +45,7 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
         }
         let count = count.min(self.len);
         let mut result = Vec::with_capacity(count);
-        let start = if self.len < SAMPLE_RING_SIZE {
-            0
-        } else {
-            self.write_pos
-        };
+        let start = if self.len < SAMPLE_RING_SIZE { 0 } else { self.write_pos };
         for i in 0..count {
             let idx = (start + self.len - count + i) % SAMPLE_RING_SIZE;
             result.push(self.data[idx]);
@@ -140,14 +132,14 @@ fn read_proc_stat() -> Option<(u64, u64)> {
     let utime: u64 = fields.nth(13)?.parse().ok()?;
     let stime: u64 = fields.next()?.parse().ok()?;
     let cpu_ticks = utime + stime;
-    
+
     // Read memory from /proc/self/statm (in pages)
     // First field is total program size, second is RSS
     let statm = std::fs::read_to_string("/proc/self/statm").ok()?;
     let rss_pages: u64 = statm.split_whitespace().nth(1)?.parse().ok()?;
     let page_size = 4096u64; // Standard page size
     let mem_bytes = rss_pages * page_size;
-    
+
     Some((cpu_ticks, mem_bytes))
 }
 
@@ -204,7 +196,7 @@ impl PerfMetrics {
             let mut state = self.frame_state.write().unwrap_or_else(|e| e.into_inner());
             let now = Instant::now();
             let elapsed = now.duration_since(state.last_cpu_measure.0).as_secs_f32();
-            
+
             if elapsed > 0.0 {
                 let tick_delta = cpu_ticks.saturating_sub(state.last_cpu_measure.1);
                 // Convert ticks to seconds (usually 100 ticks/sec on Linux)
@@ -213,7 +205,7 @@ impl PerfMetrics {
                 let cpu_pct = (cpu_seconds / elapsed) * 100.0;
                 self.cpu_usage.store(cpu_pct.to_bits(), Ordering::Relaxed);
             }
-            
+
             state.last_cpu_measure = (now, cpu_ticks);
             self.memory_bytes.store(mem_bytes, Ordering::Relaxed);
         }
@@ -232,20 +224,18 @@ impl PerfMetrics {
                 let count = recent.len();
 
                 // Calculate mean
-                let mean_us = if count > 0 {
-                    recent.iter().sum::<u64>() as f64 / count as f64
-                } else {
-                    0.0
-                };
+                let mean_us = if count > 0 { recent.iter().sum::<u64>() as f64 / count as f64 } else { 0.0 };
 
                 // Calculate standard deviation
                 let std_us = if count > 1 {
-                    let variance = recent.iter()
+                    let variance = recent
+                        .iter()
                         .map(|&x| {
                             let diff = x as f64 - mean_us;
                             diff * diff
                         })
-                        .sum::<f64>() / (count - 1) as f64;
+                        .sum::<f64>()
+                        / (count - 1) as f64;
                     variance.sqrt()
                 } else {
                     0.0
@@ -263,17 +253,10 @@ impl PerfMetrics {
         // Sort by total time descending (hotspots first)
         op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
 
-        let frame_samples: Vec<f64> = frame_times
-            .recent(40)
-            .iter()
-            .map(|&us| us as f64 / 1000.0)
-            .collect();
+        let frame_samples: Vec<f64> = frame_times.recent(40).iter().map(|&us| us as f64 / 1000.0).collect();
 
-        let frame_avg_ms = if frame_samples.is_empty() {
-            0.0
-        } else {
-            frame_samples.iter().sum::<f64>() / frame_samples.len() as f64
-        };
+        let frame_avg_ms =
+            if frame_samples.is_empty() { 0.0 } else { frame_samples.iter().sum::<f64>() / frame_samples.len() as f64 };
         let frame_max_ms = frame_samples.iter().cloned().fold(0.0, f64::max);
 
         PerfSnapshot {

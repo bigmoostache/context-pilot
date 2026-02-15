@@ -79,10 +79,7 @@ pub fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<PromptI
             continue;
         }
 
-        let id = path.file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_string();
+        let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
 
         if id.is_empty() {
             continue;

@@ -95,24 +95,14 @@ pub struct SpineConfig {
     pub autonomous_start_ms: Option<u64>,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 impl Notification {
     /// Create a new notification with the given fields
-    pub fn new(
-        id: String,
-        notification_type: NotificationType,
-        source: String,
-        content: String,
-    ) -> Self {
-        Self {
-            id,
-            notification_type,
-            source,
-            processed: false,
-            timestamp_ms: crate::core::panels::now_ms(),
-            content,
-        }
+    pub fn new(id: String, notification_type: NotificationType, source: String, content: String) -> Self {
+        Self { id, notification_type, source, processed: false, timestamp_ms: crate::core::panels::now_ms(), content }
     }
 }
 

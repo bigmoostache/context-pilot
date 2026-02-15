@@ -164,11 +164,7 @@ pub mod test_helpers {
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
             let id = format!("T{}", n);
             let mut b = Self::base(id.clone(), "assistant", MessageType::ToolCall);
-            b.msg.tool_uses.push(ToolUseRecord {
-                id,
-                name: name.to_string(),
-                input,
-            });
+            b.msg.tool_uses.push(ToolUseRecord { id, name: name.to_string(), input });
             b
         }
 
@@ -214,11 +210,8 @@ pub fn format_messages_to_chunk(messages: &[Message]) -> String {
         match msg.message_type {
             MessageType::ToolCall => {
                 for tu in &msg.tool_uses {
-                    output += &format!(
-                        "tool_call {}({})\n",
-                        tu.name,
-                        serde_json::to_string(&tu.input).unwrap_or_default()
-                    );
+                    output +=
+                        &format!("tool_call {}({})\n", tu.name, serde_json::to_string(&tu.input).unwrap_or_default());
                 }
             }
             MessageType::ToolResult => {
@@ -228,9 +221,7 @@ pub fn format_messages_to_chunk(messages: &[Message]) -> String {
             }
             MessageType::TextMessage => {
                 let content = match msg.status {
-                    MessageStatus::Summarized => {
-                        msg.tl_dr.as_deref().unwrap_or(&msg.content)
-                    }
+                    MessageStatus::Summarized => msg.tl_dr.as_deref().unwrap_or(&msg.content),
                     _ => &msg.content,
                 };
                 if !content.is_empty() {
@@ -254,10 +245,7 @@ mod tests {
 
     #[test]
     fn format_user_and_assistant() {
-        let msgs = vec![
-            MessageBuilder::user("hello").build(),
-            MessageBuilder::assistant("world").build(),
-        ];
+        let msgs = vec![MessageBuilder::user("hello").build(), MessageBuilder::assistant("world").build()];
         let chunk = format_messages_to_chunk(&msgs);
         assert!(chunk.contains("[user]: hello\n"));
         assert!(chunk.contains("[assistant]: world\n"));
@@ -278,12 +266,8 @@ mod tests {
 
     #[test]
     fn format_summarized_uses_tldr() {
-        let msgs = vec![
-            MessageBuilder::assistant("long content")
-                .status(MessageStatus::Summarized)
-                .tl_dr("short")
-                .build(),
-        ];
+        let msgs =
+            vec![MessageBuilder::assistant("long content").status(MessageStatus::Summarized).tl_dr("short").build()];
         let chunk = format_messages_to_chunk(&msgs);
         assert!(chunk.contains("[assistant]: short\n"));
         assert!(!chunk.contains("long content"));
@@ -291,9 +275,7 @@ mod tests {
 
     #[test]
     fn format_tool_call() {
-        let msgs = vec![
-            MessageBuilder::tool_call("read_file", serde_json::json!({"path": "foo.rs"})).build(),
-        ];
+        let msgs = vec![MessageBuilder::tool_call("read_file", serde_json::json!({"path": "foo.rs"})).build()];
         let chunk = format_messages_to_chunk(&msgs);
         assert!(chunk.contains("tool_call read_file("));
         assert!(chunk.contains("foo.rs"));
@@ -301,9 +283,7 @@ mod tests {
 
     #[test]
     fn format_tool_result() {
-        let msgs = vec![
-            MessageBuilder::tool_result("T1", "file contents here").build(),
-        ];
+        let msgs = vec![MessageBuilder::tool_result("T1", "file contents here").build()];
         let chunk = format_messages_to_chunk(&msgs);
         assert!(chunk.contains("file contents here\n"));
     }

@@ -1,11 +1,14 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{estimate_tokens, ContextType, State, MemoryImportance};
-use crate::ui::{theme, helpers::{render_table, Cell}};
+use crate::core::panels::{ContextItem, Panel};
+use crate::state::{ContextType, MemoryImportance, State, estimate_tokens};
+use crate::ui::{
+    helpers::{Cell, render_table},
+    theme,
+};
 
 pub struct MemoryPanel;
 
@@ -27,12 +30,8 @@ impl MemoryPanel {
             MemoryImportance::Low => 3,
         });
 
-        let closed: Vec<_> = sorted.iter()
-            .filter(|m| !state.open_memory_ids.contains(&m.id))
-            .collect();
-        let open: Vec<_> = sorted.iter()
-            .filter(|m| state.open_memory_ids.contains(&m.id))
-            .collect();
+        let closed: Vec<_> = sorted.iter().filter(|m| !state.open_memory_ids.contains(&m.id)).collect();
+        let open: Vec<_> = sorted.iter().filter(|m| state.open_memory_ids.contains(&m.id)).collect();
 
         let mut output = String::new();
 
@@ -40,19 +39,13 @@ impl MemoryPanel {
         if !closed.is_empty() {
             // Compute column widths
             let headers = ["ID", "Summary", "Importance", "Labels"];
-            let rows: Vec<[String; 4]> = closed.iter().map(|m| {
-                let labels = if m.labels.is_empty() {
-                    String::new()
-                } else {
-                    m.labels.join(", ")
-                };
-                [
-                    m.id.clone(),
-                    m.tl_dr.clone(),
-                    m.importance.as_str().to_string(),
-                    labels,
-                ]
-            }).collect();
+            let rows: Vec<[String; 4]> = closed
+                .iter()
+                .map(|m| {
+                    let labels = if m.labels.is_empty() { String::new() } else { m.labels.join(", ") };
+                    [m.id.clone(), m.tl_dr.clone(), m.importance.as_str().to_string(), labels]
+                })
+                .collect();
 
             let mut widths = headers.map(|h| h.len());
             for row in &rows {
@@ -64,8 +57,14 @@ impl MemoryPanel {
             // Header
             output.push_str(&format!(
                 "{:<w0$} │ {:<w1$} │ {:<w2$} │ {:<w3$}\n",
-                headers[0], headers[1], headers[2], headers[3],
-                w0 = widths[0], w1 = widths[1], w2 = widths[2], w3 = widths[3],
+                headers[0],
+                headers[1],
+                headers[2],
+                headers[3],
+                w0 = widths[0],
+                w1 = widths[1],
+                w2 = widths[2],
+                w3 = widths[3],
             ));
             // Separator
             output.push_str(&format!(
@@ -79,8 +78,14 @@ impl MemoryPanel {
             for row in &rows {
                 output.push_str(&format!(
                     "{:<w0$} │ {:<w1$} │ {:<w2$} │ {:<w3$}\n",
-                    row[0], row[1], row[2], row[3],
-                    w0 = widths[0], w1 = widths[1], w2 = widths[2], w3 = widths[3],
+                    row[0],
+                    row[1],
+                    row[2],
+                    row[3],
+                    w0 = widths[0],
+                    w1 = widths[1],
+                    w2 = widths[2],
+                    w3 = widths[3],
                 ));
             }
         }
@@ -142,7 +147,9 @@ impl Panel for MemoryPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_memories_for_context(state);
-        let (id, last_refresh_ms) = state.context.iter()
+        let (id, last_refresh_ms) = state
+            .context
+            .iter()
             .find(|c| c.context_type == ContextType::Memory)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
             .unwrap_or(("P4", 0));
@@ -169,12 +176,8 @@ impl Panel for MemoryPanel {
             MemoryImportance::Low => 3,
         });
 
-        let closed: Vec<_> = sorted.iter()
-            .filter(|m| !state.open_memory_ids.contains(&m.id))
-            .collect();
-        let open: Vec<_> = sorted.iter()
-            .filter(|m| state.open_memory_ids.contains(&m.id))
-            .collect();
+        let closed: Vec<_> = sorted.iter().filter(|m| !state.open_memory_ids.contains(&m.id)).collect();
+        let open: Vec<_> = sorted.iter().filter(|m| state.open_memory_ids.contains(&m.id)).collect();
 
         // Closed memories as table
         if !closed.is_empty() {
@@ -185,27 +188,26 @@ impl Panel for MemoryPanel {
                 Cell::new("Labels", Style::default()),
             ];
 
-            let rows: Vec<Vec<Cell>> = closed.iter().map(|memory| {
-                let importance_color = match memory.importance {
-                    MemoryImportance::Critical => theme::warning(),
-                    MemoryImportance::High => theme::accent(),
-                    MemoryImportance::Medium => theme::text_secondary(),
-                    MemoryImportance::Low => theme::text_muted(),
-                };
+            let rows: Vec<Vec<Cell>> = closed
+                .iter()
+                .map(|memory| {
+                    let importance_color = match memory.importance {
+                        MemoryImportance::Critical => theme::warning(),
+                        MemoryImportance::High => theme::accent(),
+                        MemoryImportance::Medium => theme::text_secondary(),
+                        MemoryImportance::Low => theme::text_muted(),
+                    };
 
-                let labels = if memory.labels.is_empty() {
-                    String::new()
-                } else {
-                    memory.labels.join(", ")
-                };
+                    let labels = if memory.labels.is_empty() { String::new() } else { memory.labels.join(", ") };
 
-                vec![
-                    Cell::new(&memory.id, Style::default().fg(theme::accent_dim())),
-                    Cell::new(&memory.tl_dr, Style::default().fg(theme::text())),
-                    Cell::new(memory.importance.as_str(), Style::default().fg(importance_color)),
-                    Cell::new(labels, Style::default().fg(theme::text_muted())),
-                ]
-            }).collect();
+                    vec![
+                        Cell::new(&memory.id, Style::default().fg(theme::accent_dim())),
+                        Cell::new(&memory.tl_dr, Style::default().fg(theme::text())),
+                        Cell::new(memory.importance.as_str(), Style::default().fg(importance_color)),
+                        Cell::new(labels, Style::default().fg(theme::text_muted())),
+                    ]
+                })
+                .collect();
 
             text.extend(render_table(&header, &rows, None, 1));
         }

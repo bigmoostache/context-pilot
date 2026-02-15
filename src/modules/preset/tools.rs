@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use crate::constants::{STORE_DIR, PRESETS_DIR};
+use crate::constants::{PRESETS_DIR, STORE_DIR};
 use crate::core::ensure_default_contexts;
 use crate::state::{ContextElement, State};
 use crate::tools::{ToolResult, ToolUse};
@@ -52,11 +52,7 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     if let Err(e) = validate_name(name) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: e,
-            is_error: true,
-        };
+        return ToolResult { tool_use_id: tool.id.clone(), content: e, is_error: true };
     }
 
     let replace = tool.input.get("replace").and_then(|v| v.as_str());
@@ -70,22 +66,20 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
             // Check if it's a built-in preset
             if let Ok(contents) = fs::read_to_string(&replace_path)
                 && let Ok(existing) = serde_json::from_str::<Preset>(&contents)
-                    && existing.built_in {
-                        return ToolResult {
-                            tool_use_id: tool.id.clone(),
-                            content: format!("Cannot replace built-in preset '{}'", replace_name),
-                            is_error: true,
-                        };
-                    }
+                && existing.built_in
+            {
+                return ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Cannot replace built-in preset '{}'", replace_name),
+                    is_error: true,
+                };
+            }
             let _ = fs::remove_file(&replace_path);
         }
     } else if file_path.exists() {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!(
-                "Preset '{}' already exists. Use the 'replace' parameter to overwrite it.",
-                name
-            ),
+            content: format!("Preset '{}' already exists. Use the 'replace' parameter to overwrite it.", name),
             is_error: true,
         };
     }
@@ -97,12 +91,7 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
     let active_modules: Vec<String> = state.active_modules.iter().cloned().collect();
 
     // Capture disabled_tools
-    let disabled_tools: Vec<String> = state
-        .tools
-        .iter()
-        .filter(|t| !t.enabled)
-        .map(|t| t.id.clone())
-        .collect();
+    let disabled_tools: Vec<String> = state.tools.iter().filter(|t| !t.enabled).map(|t| t.id.clone()).collect();
 
     // Capture per-worker module data (non-global modules only)
     let mut module_data = std::collections::HashMap::new();
@@ -184,10 +173,7 @@ pub fn execute_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
     let module_count = preset.worker_state.active_modules.len();
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!(
-            "Preset '{}' saved ({} modules, {} dynamic panels)",
-            name, module_count, panel_count
-        ),
+        content: format!("Preset '{}' saved ({} modules, {} dynamic panels)", name, module_count, panel_count),
         is_error: false,
     }
 }
@@ -212,17 +198,9 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
         let msg = if available.is_empty() {
             format!("Preset '{}' not found. No presets available.", name)
         } else {
-            format!(
-                "Preset '{}' not found. Available presets: {}",
-                name,
-                available.join(", ")
-            )
+            format!("Preset '{}' not found. Available presets: {}", name, available.join(", "))
         };
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: msg,
-            is_error: true,
-        };
+        return ToolResult { tool_use_id: tool.id.clone(), content: msg, is_error: true };
     }
 
     let preset: Preset = match fs::read_to_string(&file_path) {
@@ -249,18 +227,15 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // 1. Set active_agent_id (only if the referenced system exists)
     if let Some(ref sys_id) = ws.active_agent_id
-        && state.agents.iter().any(|s| s.id == *sys_id) {
-            state.active_agent_id = Some(sys_id.clone());
-        }
-        // If system doesn't exist, keep current active_agent_id
+        && state.agents.iter().any(|s| s.id == *sys_id)
+    {
+        state.active_agent_id = Some(sys_id.clone());
+    }
+    // If system doesn't exist, keep current active_agent_id
 
     // 2. Set active_modules — ensure core modules are always included
     let modules = crate::modules::all_modules();
-    let core_ids: HashSet<String> = modules
-        .iter()
-        .filter(|m| m.is_core())
-        .map(|m| m.id().to_string())
-        .collect();
+    let core_ids: HashSet<String> = modules.iter().filter(|m| m.is_core()).map(|m| m.id().to_string()).collect();
     let mut new_active: HashSet<String> = ws.active_modules.iter().cloned().collect();
     // Always include core modules
     for core_id in &core_ids {
@@ -275,8 +250,7 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let disabled_set: HashSet<&str> = ws.disabled_tools.iter().map(|s| s.as_str()).collect();
     let mut new_tools = crate::modules::active_tool_definitions(&state.active_modules);
     for t in &mut new_tools {
-        if t.id != "tool_manage" && t.id != "module_toggle" && disabled_set.contains(t.id.as_str())
-        {
+        if t.id != "tool_manage" && t.id != "module_toggle" && disabled_set.contains(t.id.as_str()) {
             t.enabled = false;
         }
     }
@@ -298,23 +272,21 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Load preset module data for non-global modules
     for module in &modules {
         if !module.is_global()
-            && let Some(data) = ws.modules.get(module.id()) {
-                module.load_module_data(data, state);
-            }
+            && let Some(data) = ws.modules.get(module.id())
+        {
+            module.load_module_data(data, state);
+        }
     }
 
     // 5. Remove existing dynamic panels (kill tmux panes first)
     for ctx in &state.context {
         if ctx.context_type == crate::state::ContextType::Tmux
-            && let Some(pane_id) = &ctx.tmux_pane_id {
-                let _ = std::process::Command::new("tmux")
-                    .args(["kill-window", "-t", pane_id])
-                    .output();
-            }
+            && let Some(pane_id) = &ctx.tmux_pane_id
+        {
+            let _ = std::process::Command::new("tmux").args(["kill-window", "-t", pane_id]).output();
+        }
     }
-    state
-        .context
-        .retain(|ctx| ctx.context_type.is_fixed());
+    state.context.retain(|ctx| ctx.context_type.is_fixed());
 
     // 6. Recreate dynamic panels from preset config
     for panel_cfg in &ws.dynamic_panels {
@@ -329,7 +301,6 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
             name: panel_cfg.name.clone(),
             token_count: 0,
             file_path: panel_cfg.file_path.clone(),
-            file_hash: None,
             glob_pattern: panel_cfg.glob_pattern.clone(),
             glob_path: panel_cfg.glob_path.clone(),
             grep_pattern: panel_cfg.grep_pattern.clone(),
@@ -340,16 +311,14 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
             tmux_last_keys: None,
             tmux_description: panel_cfg.tmux_description.clone(),
             result_command: None,
-            result_command_hash: None,
             skill_prompt_id: panel_cfg.skill_prompt_id.clone(),
             cached_content: None,
             history_messages: None,
             cache_deprecated: true,
             cache_in_flight: false,
             last_refresh_ms: crate::core::panels::now_ms(),
-            last_polled_ms: 0,
             content_hash: None,
-            tmux_last_lines_hash: None,
+            source_hash: None,
             current_page: 0,
             total_pages: 1,
             full_token_count: 0,
@@ -359,18 +328,17 @@ pub fn execute_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // 6b. Restore loaded_skill_ids (filter to skills that still exist)
-    state.loaded_skill_ids = ws.loaded_skill_ids.iter()
-        .filter(|id| state.skills.iter().any(|s| &s.id == *id))
-        .cloned()
-        .collect();
+    state.loaded_skill_ids =
+        ws.loaded_skill_ids.iter().filter(|id| state.skills.iter().any(|s| &s.id == *id)).cloned().collect();
 
     // 6c. Populate cached_content for restored skill panels
     for ctx in &mut state.context {
         if ctx.context_type == crate::state::ContextType::Skill
             && let Some(ref skill_id) = ctx.skill_prompt_id
-                && let Some(skill) = state.skills.iter().find(|s| s.id == *skill_id) {
-                    ctx.cached_content = Some(skill.content.clone());
-                }
+            && let Some(skill) = state.skills.iter().find(|s| s.id == *skill_id)
+        {
+            ctx.cached_content = Some(skill.content.clone());
+        }
     }
 
     // 7. Ensure default fixed panels exist for newly activated modules
@@ -399,12 +367,7 @@ fn list_available_presets() -> Vec<String> {
     let mut names = Vec::new();
     if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
-            if let Some(name) = entry
-                .path()
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| s.to_string())
-            {
+            if let Some(name) = entry.path().file_stem().and_then(|s| s.to_str()).map(|s| s.to_string()) {
                 names.push(name);
             }
         }
@@ -431,13 +394,14 @@ pub fn list_presets_with_info() -> Vec<PresetInfo> {
                 continue;
             }
             if let Ok(contents) = fs::read_to_string(&path)
-                && let Ok(preset) = serde_json::from_str::<Preset>(&contents) {
-                    presets.push(PresetInfo {
-                        name: preset.preset_name,
-                        description: preset.description,
-                        built_in: preset.built_in,
-                    });
-                }
+                && let Ok(preset) = serde_json::from_str::<Preset>(&contents)
+            {
+                presets.push(PresetInfo {
+                    name: preset.preset_name,
+                    description: preset.description,
+                    built_in: preset.built_in,
+                });
+            }
         }
     }
     presets.sort_by(|a, b| a.name.cmp(&b.name));

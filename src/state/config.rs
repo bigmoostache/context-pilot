@@ -157,9 +157,6 @@ pub struct PanelData {
     /// Command string for GitResult/GithubResult panels
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result_command: Option<String>,
-    /// SHA-256 hash of result_command (for dedup)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub result_command_hash: Option<String>,
     /// Skill prompt ID (for Skill panels)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill_prompt_id: Option<String>,

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex, LazyLock};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{Style, ThemeSet};
@@ -12,7 +12,8 @@ use ratatui::style::Color;
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
 static THEME_SET: LazyLock<ThemeSet> = LazyLock::new(ThemeSet::load_defaults);
 type HighlightResult = Vec<Vec<(Color, String)>>;
-static HIGHLIGHT_CACHE: LazyLock<Mutex<HashMap<String, Arc<HighlightResult>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static HIGHLIGHT_CACHE: LazyLock<Mutex<HashMap<String, Arc<HighlightResult>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Convert syntect color to ratatui color
 fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {
@@ -68,9 +69,7 @@ fn do_highlight(path: &str, content: &str) -> Vec<Vec<(Color, String)>> {
     let mut result = Vec::new();
 
     for line in LinesWithEndings::from(content) {
-        let ranges: Vec<(Style, &str)> = highlighter
-            .highlight_line(line, &SYNTAX_SET)
-            .unwrap_or_default();
+        let ranges: Vec<(Style, &str)> = highlighter.highlight_line(line, &SYNTAX_SET).unwrap_or_default();
 
         let spans: Vec<(Color, String)> = ranges
             .into_iter()

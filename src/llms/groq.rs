@@ -12,9 +12,9 @@ use secrecy::{ExposeSecret, SecretBox};
 use serde::Serialize;
 use serde_json::Value;
 
-use super::openai_compat::{self, OaiMessage, BuildOptions, ToolCallAccumulator};
-use super::{LlmClient, LlmRequest, StreamEvent};
 use super::error::LlmError;
+use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
+use super::{LlmClient, LlmRequest, StreamEvent};
 use crate::constants::MAX_RESPONSE_TOKENS;
 use crate::tool_defs::ToolDefinition;
 
@@ -28,9 +28,7 @@ pub struct GroqClient {
 impl GroqClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
-        Self {
-            api_key: env::var("GROQ_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))),
-        }
+        Self { api_key: env::var("GROQ_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }
 
@@ -45,7 +43,7 @@ struct GroqRequest {
     model: String,
     messages: Vec<OaiMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    tools: Vec<Value>,  // Can be function tools or built-in tools (browser_search, code_interpreter)
+    tools: Vec<Value>, // Can be function tools or built-in tools (browser_search, code_interpreter)
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
     max_completion_tokens: u32,
@@ -54,15 +52,14 @@ struct GroqRequest {
 
 impl LlmClient for GroqClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self
-            .api_key
-            .as_ref()
-            .ok_or_else(|| LlmError::Auth("GROQ_API_KEY not set".into()))?;
+        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("GROQ_API_KEY not set".into()))?;
 
         let client = Client::new();
 
         // Collect pending tool result IDs
-        let pending_tool_ids: Vec<String> = request.tool_results.as_ref()
+        let pending_tool_ids: Vec<String> = request
+            .tool_results
+            .as_ref()
             .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
             .unwrap_or_default();
 
@@ -136,16 +133,21 @@ impl LlmClient for GroqClient {
 
             if let Some(resp) = openai_compat::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
-                    if let Some(inp) = usage.prompt_tokens { input_tokens = inp; }
-                    if let Some(out) = usage.completion_tokens { output_tokens = out; }
+                    if let Some(inp) = usage.prompt_tokens {
+                        input_tokens = inp;
+                    }
+                    if let Some(out) = usage.completion_tokens {
+                        output_tokens = out;
+                    }
                 }
 
                 for choice in resp.choices {
                     if let Some(delta) = choice.delta {
                         if let Some(content) = delta.content
-                            && !content.is_empty() {
-                                let _ = tx.send(StreamEvent::Chunk(content));
-                            }
+                            && !content.is_empty()
+                        {
+                            let _ = tx.send(StreamEvent::Chunk(content));
+                        }
                         if let Some(calls) = delta.tool_calls {
                             for call in &calls {
                                 tool_acc.feed(call);
@@ -181,7 +183,7 @@ impl LlmClient for GroqClient {
                     streaming_ok: false,
                     tools_ok: false,
                     error: Some("GROQ_API_KEY not set".to_string()),
-                }
+                };
             }
         };
 
@@ -202,16 +204,8 @@ impl LlmClient for GroqClient {
         let auth_ok = auth_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
         if !auth_ok {
-            let error = auth_result
-                .err()
-                .map(|e| e.to_string())
-                .or_else(|| Some("Auth failed".to_string()));
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error,
-            };
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            return super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
         // Test 2: Streaming
@@ -255,12 +249,7 @@ impl LlmClient for GroqClient {
 
         let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
-        super::ApiCheckResult {
-            auth_ok,
-            streaming_ok,
-            tools_ok,
-            error: None,
-        }
+        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
 }
 
@@ -270,14 +259,16 @@ fn tools_to_groq(tools: &[ToolDefinition], model: &str) -> Vec<Value> {
     let mut groq_tools: Vec<Value> = tools
         .iter()
         .filter(|t| t.enabled)
-        .map(|t| serde_json::json!({
-            "type": "function",
-            "function": {
-                "name": t.id,
-                "description": t.description,
-                "parameters": t.to_json_schema(),
-            }
-        }))
+        .map(|t| {
+            serde_json::json!({
+                "type": "function",
+                "function": {
+                    "name": t.id,
+                    "description": t.description,
+                    "parameters": t.to_json_schema(),
+                }
+            })
+        })
         .collect();
 
     // Add built-in tools for GPT-OSS models

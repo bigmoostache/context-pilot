@@ -9,9 +9,12 @@ use secrecy::{ExposeSecret, SecretBox};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
 use super::error::LlmError;
-use crate::constants::{library, API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS};
+use super::{
+    ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent, panel_footer_text, panel_header_text,
+    panel_timestamp_text, prepare_panel_messages,
+};
+use crate::constants::{API_ENDPOINT, API_VERSION, MAX_RESPONSE_TOKENS, library};
 use crate::core::panels::now_ms;
 use crate::state::{Message, MessageStatus, MessageType};
 use crate::tool_defs::build_api_tools;
@@ -25,9 +28,7 @@ pub struct AnthropicClient {
 impl AnthropicClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
-        Self {
-            api_key: env::var("ANTHROPIC_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))),
-        }
+        Self { api_key: env::var("ANTHROPIC_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }
 
@@ -83,32 +84,27 @@ struct StreamUsage {
 
 impl LlmClient for AnthropicClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self
-            .api_key
-            .as_ref()
-            .ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
+        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
 
         let client = Client::new();
 
         // Build API messages
         let include_tool_uses = request.tool_results.is_some();
-        let mut api_messages =
-            messages_to_api(&request.messages, &request.context_items, include_tool_uses, request.seed_content.as_deref());
+        let mut api_messages = messages_to_api(
+            &request.messages,
+            &request.context_items,
+            include_tool_uses,
+            request.seed_content.as_deref(),
+        );
 
         // Add tool results if present
         if let Some(results) = &request.tool_results {
             let tool_result_blocks: Vec<ContentBlock> = results
                 .iter()
-                .map(|r| ContentBlock::ToolResult {
-                    tool_use_id: r.tool_use_id.clone(),
-                    content: r.content.clone(),
-                })
+                .map(|r| ContentBlock::ToolResult { tool_use_id: r.tool_use_id.clone(), content: r.content.clone() })
                 .collect();
 
-            api_messages.push(ApiMessage {
-                role: "user".to_string(),
-                content: tool_result_blocks,
-            });
+            api_messages.push(ApiMessage { role: "user".to_string(), content: tool_result_blocks });
         }
 
         // Handle cleaner mode or custom system prompt
@@ -117,10 +113,7 @@ impl LlmClient for AnthropicClient {
                 api_messages.push(ApiMessage {
                     role: "user".to_string(),
                     content: vec![ContentBlock::Text {
-                        text: format!(
-                            "Please clean up the context to reduce token usage:\n\n{}",
-                            context
-                        ),
+                        text: format!("Please clean up the context to reduce token usage:\n\n{}", context),
                     }],
                 });
             }
@@ -182,13 +175,11 @@ impl LlmClient for AnthropicClient {
                 match event.event_type.as_str() {
                     "content_block_start" => {
                         if let Some(block) = event.content_block
-                            && block.block_type.as_deref() == Some("tool_use") {
-                                current_tool = Some((
-                                    block.id.unwrap_or_default(),
-                                    block.name.unwrap_or_default(),
-                                    String::new(),
-                                ));
-                            }
+                            && block.block_type.as_deref() == Some("tool_use")
+                        {
+                            current_tool =
+                                Some((block.id.unwrap_or_default(), block.name.unwrap_or_default(), String::new()));
+                        }
                     }
                     "content_block_delta" => {
                         if let Some(delta) = event.delta {
@@ -200,9 +191,10 @@ impl LlmClient for AnthropicClient {
                                 }
                                 Some("input_json_delta") => {
                                     if let Some(json) = delta.partial_json
-                                        && let Some((_, _, ref mut input)) = current_tool {
-                                            input.push_str(&json);
-                                        }
+                                        && let Some((_, _, ref mut input)) = current_tool
+                                    {
+                                        input.push_str(&json);
+                                    }
                                 }
                                 _ => {}
                             }
@@ -217,9 +209,10 @@ impl LlmClient for AnthropicClient {
                     }
                     "message_delta" => {
                         if let Some(ref delta) = event.delta
-                            && let Some(ref reason) = delta.stop_reason {
-                                stop_reason = Some(reason.clone());
-                            }
+                            && let Some(ref reason) = delta.stop_reason
+                        {
+                            stop_reason = Some(reason.clone());
+                        }
                         if let Some(usage) = event.usage {
                             if let Some(inp) = usage.input_tokens {
                                 input_tokens = inp;
@@ -254,7 +247,7 @@ impl LlmClient for AnthropicClient {
                     streaming_ok: false,
                     tools_ok: false,
                     error: Some("ANTHROPIC_API_KEY not set".to_string()),
-                }
+                };
             }
         };
 
@@ -276,16 +269,8 @@ impl LlmClient for AnthropicClient {
         let auth_ok = auth_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
         if !auth_ok {
-            let error = auth_result
-                .err()
-                .map(|e| e.to_string())
-                .or_else(|| Some("Auth failed".to_string()));
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error,
-            };
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            return super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
         // Test 2: Streaming
@@ -328,12 +313,7 @@ impl LlmClient for AnthropicClient {
 
         let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
-        super::ApiCheckResult {
-            auth_ok,
-            streaming_ok,
-            tools_ok,
-            error: None,
-        }
+        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
 }
 
@@ -416,9 +396,7 @@ fn messages_to_api(
             });
             api_messages.push(ApiMessage {
                 role: "assistant".to_string(),
-                content: vec![ContentBlock::Text {
-                    text: "Understood. I will follow these instructions.".to_string(),
-                }],
+                content: vec![ContentBlock::Text { text: "Understood. I will follow these instructions.".to_string() }],
             });
         }
     }
@@ -443,10 +421,7 @@ fn messages_to_api(
             }
 
             if !content_blocks.is_empty() {
-                api_messages.push(ApiMessage {
-                    role: "user".to_string(),
-                    content: content_blocks,
-                });
+                api_messages.push(ApiMessage { role: "user".to_string(), content: content_blocks });
             }
             continue;
         }
@@ -458,11 +433,7 @@ fn messages_to_api(
                 .iter()
                 .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
                 .filter(|m| m.message_type == MessageType::ToolResult)
-                .any(|m| {
-                    m.tool_results
-                        .iter()
-                        .any(|r| tool_use_ids.contains(&r.tool_use_id.as_str()))
-                });
+                .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
 
             if has_matching_tool_result {
                 for tool_use in &msg.tool_uses {
@@ -479,10 +450,11 @@ fn messages_to_api(
                 }
 
                 if let Some(last_api_msg) = api_messages.last_mut()
-                    && last_api_msg.role == "assistant" {
-                        last_api_msg.content.extend(content_blocks);
-                        continue;
-                    }
+                    && last_api_msg.role == "assistant"
+                {
+                    last_api_msg.content.extend(content_blocks);
+                    continue;
+                }
             } else {
                 continue;
             }
@@ -497,11 +469,7 @@ fn messages_to_api(
             }
 
             let is_last = idx == messages.len().saturating_sub(1);
-            if msg.role == "assistant"
-                && include_last_tool_uses
-                && is_last
-                && !msg.tool_uses.is_empty()
-            {
+            if msg.role == "assistant" && include_last_tool_uses && is_last && !msg.tool_uses.is_empty() {
                 for tool_use in &msg.tool_uses {
                     let input = if tool_use.input.is_null() {
                         Value::Object(serde_json::Map::new())
@@ -518,10 +486,7 @@ fn messages_to_api(
         }
 
         if !content_blocks.is_empty() {
-            api_messages.push(ApiMessage {
-                role: msg.role.clone(),
-                content: content_blocks,
-            });
+            api_messages.push(ApiMessage { role: msg.role.clone(), content: content_blocks });
         }
     }
 

@@ -1,9 +1,9 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
-use crate::actions::{parse_context_pattern, find_context_by_id, Action};
+use crate::actions::{Action, find_context_by_id, parse_context_pattern};
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 use crate::core::panels::get_panel;
+use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 use crate::state::State;
 
 pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
@@ -45,9 +45,10 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 || key.modifiers.contains(KeyModifiers::ALT);
             if ((key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' '))
                 && let Some(id) = parse_context_pattern(&state.input)
-                    && find_context_by_id(state, &id).is_some() {
-                        return Some(Action::InputSubmit);
-                    }
+                && find_context_by_id(state, &id).is_some()
+            {
+                return Some(Action::InputSubmit);
+            }
 
             // Let the current panel handle the key first
             if let Some(ctx) = state.context.get(state.selected_context) {
@@ -94,26 +95,32 @@ fn handle_config_event(key: &KeyEvent, _state: &State) -> Option<Action> {
         KeyCode::Char('5') => Some(Action::ConfigSelectProvider(LlmProvider::DeepSeek)),
         // Letter keys select model based on current provider
         KeyCode::Char('a') => match _state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45)),
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode => {
+                Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeOpus45))
+            }
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok41Fast)),
             LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss120b)),
             LlmProvider::DeepSeek => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekChat)),
         },
         KeyCode::Char('b') => match _state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45)),
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode => {
+                Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeSonnet45))
+            }
             LlmProvider::Grok => Some(Action::ConfigSelectGrokModel(GrokModel::Grok4Fast)),
             LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::GptOss20b)),
             LlmProvider::DeepSeek => Some(Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekReasoner)),
         },
         KeyCode::Char('c') => match _state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode => Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45)),
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode => {
+                Some(Action::ConfigSelectAnthropicModel(AnthropicModel::ClaudeHaiku45))
+            }
             LlmProvider::Grok | LlmProvider::DeepSeek => Some(Action::None),
             LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama33_70b)),
         },
         KeyCode::Char('d') => match _state.llm_provider {
             LlmProvider::Groq => Some(Action::ConfigSelectGroqModel(GroqModel::Llama31_8b)),
             _ => Some(Action::None),
-        }
+        },
         // Theme selection - t/T to cycle through themes
         KeyCode::Char('t') => Some(Action::ConfigNextTheme),
         KeyCode::Char('T') => Some(Action::ConfigPrevTheme),

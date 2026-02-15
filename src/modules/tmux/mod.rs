@@ -6,8 +6,8 @@ pub const TMUX_DEPRECATION_MS: u64 = 100; // 100ms — capture-pane is a cheap k
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use self::panel::TmuxPanel;
 use super::Module;
@@ -15,9 +15,15 @@ use super::Module;
 pub struct TmuxModule;
 
 impl Module for TmuxModule {
-    fn id(&self) -> &'static str { "tmux" }
-    fn name(&self) -> &'static str { "Tmux" }
-    fn description(&self) -> &'static str { "Terminal console management via tmux" }
+    fn id(&self) -> &'static str {
+        "tmux"
+    }
+    fn name(&self) -> &'static str {
+        "Tmux"
+    }
+    fn description(&self) -> &'static str {
+        "Terminal console management via tmux"
+    }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
         vec![ContextType::Tmux]

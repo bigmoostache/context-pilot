@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::tools::{ToolResult, ToolUse};
 use crate::state::{ContextElement, ContextType, State};
+use crate::tools::{ToolResult, ToolUse};
 
 pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     let path = match tool.input.get("path").and_then(|v| v.as_str()) {
@@ -11,7 +11,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'path' parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -42,10 +42,7 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    let file_name = path_obj
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.to_string());
+    let file_name = path_obj.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
 
     // Generate context ID (fills gaps) and UID
     let context_id = state.next_available_context_id();
@@ -61,7 +58,6 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         name: file_name,
         token_count: 0, // Will be updated by cache
         file_path: Some(path.to_string()),
-        file_hash: None, // Will be computed by cache
         glob_pattern: None,
         glob_path: None,
         grep_pattern: None,
@@ -72,16 +68,14 @@ pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_last_keys: None,
         tmux_description: None,
         result_command: None,
-        result_command_hash: None,
         skill_prompt_id: None,
         cached_content: None, // Background will populate
         history_messages: None,
         cache_deprecated: true, // Trigger background refresh
         cache_in_flight: false,
         last_refresh_ms: crate::core::panels::now_ms(),
-        last_polled_ms: 0,
         content_hash: None,
-        tmux_last_lines_hash: None,
+        source_hash: None,
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,

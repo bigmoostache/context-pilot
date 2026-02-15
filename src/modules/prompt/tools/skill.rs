@@ -1,7 +1,7 @@
-use crate::tools::{ToolResult, ToolUse};
-use crate::state::{ContextType, State, estimate_tokens};
 use crate::modules::prompt::storage;
 use crate::modules::prompt::types::{PromptItem, PromptType};
+use crate::state::{ContextType, State, estimate_tokens};
+use crate::tools::{ToolResult, ToolUse};
 
 pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let name = tool.input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -155,13 +155,14 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     if let Some(skill) = state.skills.iter().find(|s| s.id == id)
-        && skill.is_builtin {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Cannot delete built-in skill '{}'", id),
-                is_error: true,
-            };
-        }
+        && skill.is_builtin
+    {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Cannot delete built-in skill '{}'", id),
+            is_error: true,
+        };
+    }
 
     let idx = match state.skills.iter().position(|s| s.id == id) {
         Some(i) => i,
@@ -239,7 +240,6 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
         name: skill.name.clone(),
         token_count: tokens,
         file_path: None,
-        file_hash: None,
         glob_pattern: None,
         glob_path: None,
         grep_pattern: None,
@@ -250,16 +250,14 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_last_keys: None,
         tmux_description: None,
         result_command: None,
-        result_command_hash: None,
         skill_prompt_id: Some(id.to_string()),
         cached_content: Some(content),
         history_messages: None,
         cache_deprecated: false,
         cache_in_flight: false,
         last_refresh_ms: crate::core::panels::now_ms(),
-        last_polled_ms: 0,
         content_hash: None,
-        tmux_last_lines_hash: None,
+        source_hash: None,
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,
@@ -300,24 +298,22 @@ pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Remove the skill panel from context
-    let panel_id = state.context.iter()
-        .find(|c| c.skill_prompt_id.as_deref() == Some(id))
-        .map(|c| c.id.clone());
+    let panel_id = state.context.iter().find(|c| c.skill_prompt_id.as_deref() == Some(id)).map(|c| c.id.clone());
 
     state.context.retain(|c| c.skill_prompt_id.as_deref() != Some(id));
     state.loaded_skill_ids.retain(|s| s != id);
 
     state.touch_panel(ContextType::Library);
 
-    let name = state.skills.iter()
-        .find(|s| s.id == id)
-        .map(|s| s.name.as_str())
-        .unwrap_or(id);
+    let name = state.skills.iter().find(|s| s.id == id).map(|s| s.name.as_str()).unwrap_or(id);
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!("Unloaded skill '{}'{}", name,
-            panel_id.map(|p| format!(" (removed {})", p)).unwrap_or_default()),
+        content: format!(
+            "Unloaded skill '{}'{}",
+            name,
+            panel_id.map(|p| format!(" (removed {})", p)).unwrap_or_default()
+        ),
         is_error: false,
     }
 }

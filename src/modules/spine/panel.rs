@@ -1,10 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::SCROLL_ARROW_AMOUNT;
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::core::panels::{ContextItem, Panel};
+use crate::state::{ContextType, State, estimate_tokens};
 use crate::ui::theme;
 
 use super::types::NotificationType;
@@ -24,19 +24,14 @@ impl SpinePanel {
     /// Format notifications for LLM context
     fn format_notifications_for_context(state: &State) -> String {
         let unprocessed: Vec<_> = state.notifications.iter().filter(|n| !n.processed).collect();
-        let recent_processed: Vec<_> = state.notifications.iter()
-            .filter(|n| n.processed)
-            .rev()
-            .take(10)
-            .collect();
+        let recent_processed: Vec<_> = state.notifications.iter().filter(|n| n.processed).rev().take(10).collect();
 
         let mut output = String::new();
 
         if !unprocessed.is_empty() {
             for n in &unprocessed {
                 let ts = format_timestamp(n.timestamp_ms);
-                output.push_str(&format!("[{}] {} {} — {}\n",
-                    n.id, ts, n.notification_type.label(), n.content));
+                output.push_str(&format!("[{}] {} {} — {}\n", n.id, ts, n.notification_type.label(), n.content));
             }
         } else {
             output.push_str("No unprocessed notifications.\n");
@@ -46,8 +41,7 @@ impl SpinePanel {
             output.push_str("\n=== Recent Processed ===\n");
             for n in &recent_processed {
                 let ts = format_timestamp(n.timestamp_ms);
-                output.push_str(&format!("[{}] {} {} — {}\n",
-                    n.id, ts, n.notification_type.label(), n.content));
+                output.push_str(&format!("[{}] {} {} — {}\n", n.id, ts, n.notification_type.label(), n.content));
             }
         }
 
@@ -93,7 +87,9 @@ impl Panel for SpinePanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_notifications_for_context(state);
-        let (id, last_refresh_ms) = state.context.iter()
+        let (id, last_refresh_ms) = state
+            .context
+            .iter()
             .find(|c| c.context_type == ContextType::Spine)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
             .unwrap_or(("P9", 0));
@@ -107,29 +103,18 @@ impl Panel for SpinePanel {
         let unprocessed: Vec<_> = state.notifications.iter().filter(|n| !n.processed).collect();
 
         if unprocessed.is_empty() {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    "No unprocessed notifications".to_string(),
-                    Style::default().fg(theme::text_muted()).italic(),
-                ),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                "No unprocessed notifications".to_string(),
+                Style::default().fg(theme::text_muted()).italic(),
+            )]));
         } else {
             for n in &unprocessed {
                 let type_color = notification_type_color(&n.notification_type);
                 let ts = format_timestamp(n.timestamp_ms);
                 lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("{} ", n.id),
-                        Style::default().fg(type_color).bold(),
-                    ),
-                    Span::styled(
-                        format!("{} ", ts),
-                        Style::default().fg(theme::text_muted()),
-                    ),
-                    Span::styled(
-                        n.notification_type.label().to_string(),
-                        Style::default().fg(type_color),
-                    ),
+                    Span::styled(format!("{} ", n.id), Style::default().fg(type_color).bold()),
+                    Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
+                    Span::styled(n.notification_type.label().to_string(), Style::default().fg(type_color)),
                     Span::styled(
                         format!(" — {}", truncate_content(&n.content, 80)),
                         Style::default().fg(theme::text()),
@@ -141,36 +126,21 @@ impl Panel for SpinePanel {
         lines.push(Line::from(""));
 
         // === Recent Processed ===
-        let recent_processed: Vec<_> = state.notifications.iter()
-            .filter(|n| n.processed)
-            .rev()
-            .take(10)
-            .collect();
+        let recent_processed: Vec<_> = state.notifications.iter().filter(|n| n.processed).rev().take(10).collect();
 
         if !recent_processed.is_empty() {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!("Processed ({})", recent_processed.len()),
-                    Style::default().fg(theme::text_muted()),
-                ),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                format!("Processed ({})", recent_processed.len()),
+                Style::default().fg(theme::text_muted()),
+            )]));
 
             for n in &recent_processed {
                 let type_color = notification_type_color(&n.notification_type);
                 let ts = format_timestamp(n.timestamp_ms);
                 lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("{} ", n.id),
-                        Style::default().fg(type_color),
-                    ),
-                    Span::styled(
-                        format!("{} ", ts),
-                        Style::default().fg(theme::text_muted()),
-                    ),
-                    Span::styled(
-                        n.notification_type.label().to_string(),
-                        Style::default().fg(theme::text_muted()),
-                    ),
+                    Span::styled(format!("{} ", n.id), Style::default().fg(type_color)),
+                    Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
+                    Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::text_muted())),
                     Span::styled(
                         format!(" — {}", truncate_content(&n.content, 60)),
                         Style::default().fg(theme::text_muted()),
@@ -182,12 +152,7 @@ impl Panel for SpinePanel {
         lines.push(Line::from(""));
 
         // === Config Summary ===
-        lines.push(Line::from(vec![
-            Span::styled(
-                "Config".to_string(),
-                Style::default().fg(theme::text_secondary()),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled("Config".to_string(), Style::default().fg(theme::text_secondary()))]));
 
         let config_items = vec![
             ("max_tokens_auto_continue", format!("{}", state.spine_config.max_tokens_auto_continue)),
@@ -197,10 +162,7 @@ impl Panel for SpinePanel {
 
         for (key, val) in config_items {
             lines.push(Line::from(vec![
-                Span::styled(
-                    format!("  {}", key),
-                    Style::default().fg(theme::text_muted()),
-                ),
+                Span::styled(format!("  {}", key), Style::default().fg(theme::text_muted())),
                 Span::styled(": ".to_string(), Style::default().fg(theme::text_muted())),
                 Span::styled(val, Style::default().fg(theme::text())),
             ]));
@@ -223,9 +185,5 @@ fn notification_type_color(nt: &NotificationType) -> Color {
 /// Truncate content for display, appending "..." if truncated
 fn truncate_content(s: &str, max_chars: usize) -> String {
     let first_line = s.lines().next().unwrap_or(s);
-    if first_line.len() > max_chars {
-        format!("{}...", &first_line[..max_chars])
-    } else {
-        first_line.to_string()
-    }
+    if first_line.len() > max_chars { format!("{}...", &first_line[..max_chars]) } else { first_line.to_string() }
 }

@@ -4,7 +4,6 @@ use std::sync::LazyLock;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-
 // ============================================================================
 // Prompts Configuration
 // ============================================================================
@@ -99,7 +98,9 @@ pub struct ContextIcons {
     pub spine: String,
 }
 
-fn default_spine_icon() -> String { "⚡".to_string() }
+fn default_spine_icon() -> String {
+    "⚡".to_string()
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct StatusIcons {
@@ -164,24 +165,24 @@ pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea
 // ============================================================================
 
 fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
-    serde_yaml::from_str(content)
-        .unwrap_or_else(|e| panic!("Failed to parse {}: {}", name, e))
+    serde_yaml::from_str(content).unwrap_or_else(|e| panic!("Failed to parse {}: {}", name, e))
 }
 
 // ============================================================================
 // Global Configuration (Lazy Static — embedded at compile time)
 // ============================================================================
 
-pub static PROMPTS: LazyLock<PromptsConfig> = LazyLock::new(|| parse_yaml("prompts.yaml", include_str!("../yamls/prompts.yaml")));
-pub static LIBRARY: LazyLock<LibraryConfig> = LazyLock::new(|| parse_yaml("library.yaml", include_str!("../yamls/library.yaml")));
+pub static PROMPTS: LazyLock<PromptsConfig> =
+    LazyLock::new(|| parse_yaml("prompts.yaml", include_str!("../yamls/prompts.yaml")));
+pub static LIBRARY: LazyLock<LibraryConfig> =
+    LazyLock::new(|| parse_yaml("library.yaml", include_str!("../yamls/library.yaml")));
 pub static UI: LazyLock<UiConfig> = LazyLock::new(|| parse_yaml("ui.yaml", include_str!("../yamls/ui.yaml")));
-pub static THEMES: LazyLock<ThemesConfig> = LazyLock::new(|| parse_yaml("themes.yaml", include_str!("../yamls/themes.yaml")));
+pub static THEMES: LazyLock<ThemesConfig> =
+    LazyLock::new(|| parse_yaml("themes.yaml", include_str!("../yamls/themes.yaml")));
 
 /// Get a theme by ID, falling back to default if not found
 pub fn get_theme(theme_id: &str) -> &'static Theme {
-    THEMES.themes.get(theme_id)
-        .or_else(|| THEMES.themes.get(DEFAULT_THEME))
-        .expect("Default theme must exist")
+    THEMES.themes.get(theme_id).or_else(|| THEMES.themes.get(DEFAULT_THEME)).expect("Default theme must exist")
 }
 
 // ============================================================================
@@ -224,4 +225,3 @@ pub fn active_theme() -> &'static Theme {
 pub fn normalize_icon(icon: &str) -> String {
     format!("{} ", icon)
 }
-

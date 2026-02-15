@@ -1,15 +1,20 @@
 use ratatui::prelude::*;
 
-use crate::state::{ContextType, State, TodoStatus, MemoryImportance};
-use crate::ui::{theme, chars, helpers::{format_number, render_table, Cell}};
+use crate::state::{ContextType, MemoryImportance, State, TodoStatus};
+use crate::ui::{
+    chars,
+    helpers::{Cell, format_number, render_table},
+    theme,
+};
 
 /// Horizontal separator line.
 pub fn separator() -> Vec<Line<'static>> {
     vec![
         Line::from(""),
-        Line::from(vec![
-            Span::styled(format!(" {}", chars::HORIZONTAL.repeat(60)), Style::default().fg(theme::border())),
-        ]),
+        Line::from(vec![Span::styled(
+            format!(" {}", chars::HORIZONTAL.repeat(60)),
+            Style::default().fg(theme::border()),
+        )]),
         Line::from(""),
     ]
 }
@@ -99,11 +104,7 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
 
     // Branch name
     if let Some(branch) = &state.git_branch {
-        let branch_color = if branch.starts_with("detached:") {
-            theme::warning()
-        } else {
-            theme::accent()
-        };
+        let branch_color = if branch.starts_with("detached:") { theme::warning() } else { theme::accent() };
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("Branch: ".to_string(), Style::default().fg(theme::text_secondary())),
@@ -131,38 +132,54 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
             Cell::right("Net", Style::default()),
         ];
 
-        let rows: Vec<Vec<Cell>> = state.git_file_changes.iter().map(|file| {
-            total_add += file.additions;
-            total_del += file.deletions;
-            let net = file.additions - file.deletions;
+        let rows: Vec<Vec<Cell>> = state
+            .git_file_changes
+            .iter()
+            .map(|file| {
+                total_add += file.additions;
+                total_del += file.deletions;
+                let net = file.additions - file.deletions;
 
-            let (type_char, _type_color) = match file.change_type {
-                GitChangeType::Added => ("A", theme::success()),
-                GitChangeType::Untracked => ("U", theme::success()),
-                GitChangeType::Deleted => ("D", theme::error()),
-                GitChangeType::Modified => ("M", theme::warning()),
-                GitChangeType::Renamed => ("R", theme::accent()),
-            };
+                let (type_char, _type_color) = match file.change_type {
+                    GitChangeType::Added => ("A", theme::success()),
+                    GitChangeType::Untracked => ("U", theme::success()),
+                    GitChangeType::Deleted => ("D", theme::error()),
+                    GitChangeType::Modified => ("M", theme::warning()),
+                    GitChangeType::Renamed => ("R", theme::accent()),
+                };
 
-            let display_path = if file.path.len() > 38 {
-                format!("{}...{}", type_char, &file.path[file.path.len() - 35..])
-            } else {
-                format!("{} {}", type_char, file.path)
-            };
+                let display_path = if file.path.len() > 38 {
+                    format!("{}...{}", type_char, &file.path[file.path.len() - 35..])
+                } else {
+                    format!("{} {}", type_char, file.path)
+                };
 
-            let net_color = if net > 0 { theme::success() } else if net < 0 { theme::error() } else { theme::text_muted() };
-            let net_str = if net > 0 { format!("+{}", net) } else { format!("{}", net) };
+                let net_color = if net > 0 {
+                    theme::success()
+                } else if net < 0 {
+                    theme::error()
+                } else {
+                    theme::text_muted()
+                };
+                let net_str = if net > 0 { format!("+{}", net) } else { format!("{}", net) };
 
-            vec![
-                Cell::new(display_path, Style::default().fg(theme::text())),
-                Cell::right(format!("+{}", file.additions), Style::default().fg(theme::success())),
-                Cell::right(format!("-{}", file.deletions), Style::default().fg(theme::error())),
-                Cell::right(net_str, Style::default().fg(net_color)),
-            ]
-        }).collect();
+                vec![
+                    Cell::new(display_path, Style::default().fg(theme::text())),
+                    Cell::right(format!("+{}", file.additions), Style::default().fg(theme::success())),
+                    Cell::right(format!("-{}", file.deletions), Style::default().fg(theme::error())),
+                    Cell::right(net_str, Style::default().fg(net_color)),
+                ]
+            })
+            .collect();
 
         let total_net = total_add - total_del;
-        let total_net_color = if total_net > 0 { theme::success() } else if total_net < 0 { theme::error() } else { theme::text_muted() };
+        let total_net_color = if total_net > 0 {
+            theme::success()
+        } else if total_net < 0 {
+            theme::error()
+        } else {
+            theme::text_muted()
+        };
         let total_net_str = if total_net > 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
 
         let footer = [
@@ -204,79 +221,79 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
 
     let now_ms = crate::core::panels::now_ms();
 
-    let rows: Vec<Vec<Cell>> = sorted_contexts.iter().map(|ctx| {
-        let type_name = match ctx.context_type {
-            ContextType::System => "system",
-            ContextType::Conversation => "conversation",
-            ContextType::File => "file",
-            ContextType::Tree => "tree",
-            ContextType::Glob => "glob",
-            ContextType::Grep => "grep",
-            ContextType::Tmux => "tmux",
-            ContextType::Todo => "todo",
-            ContextType::Memory => "memory",
-            ContextType::Overview => "overview",
-            ContextType::Git => "git",
-            ContextType::GitResult => "git-result",
-            ContextType::GithubResult => "github-result",
-            ContextType::Scratchpad => "scratchpad",
-            ContextType::Library => "library",
-            ContextType::Skill => "skill",
-            ContextType::ConversationHistory => "chat-history",
-            ContextType::Spine => "spine",
-            ContextType::Logs => "logs",
-        };
+    let rows: Vec<Vec<Cell>> = sorted_contexts
+        .iter()
+        .map(|ctx| {
+            let type_name = match ctx.context_type {
+                ContextType::System => "system",
+                ContextType::Conversation => "conversation",
+                ContextType::File => "file",
+                ContextType::Tree => "tree",
+                ContextType::Glob => "glob",
+                ContextType::Grep => "grep",
+                ContextType::Tmux => "tmux",
+                ContextType::Todo => "todo",
+                ContextType::Memory => "memory",
+                ContextType::Overview => "overview",
+                ContextType::Git => "git",
+                ContextType::GitResult => "git-result",
+                ContextType::GithubResult => "github-result",
+                ContextType::Scratchpad => "scratchpad",
+                ContextType::Library => "library",
+                ContextType::Skill => "skill",
+                ContextType::ConversationHistory => "chat-history",
+                ContextType::Spine => "spine",
+                ContextType::Logs => "logs",
+            };
 
-        let details = match ctx.context_type {
-            ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
-            ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
-            ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
-            ContextType::Tmux => {
-                let pane = ctx.tmux_pane_id.as_deref().unwrap_or("?");
-                let desc = ctx.tmux_description.as_deref().unwrap_or("");
-                if desc.is_empty() { pane.to_string() } else { format!("{}: {}", pane, desc) }
-            }
-            ContextType::GitResult | ContextType::GithubResult => {
-                ctx.result_command.as_deref().unwrap_or("").to_string()
-            }
-            _ => String::new(),
-        };
+            let details = match ctx.context_type {
+                ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
+                ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
+                ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
+                ContextType::Tmux => {
+                    let pane = ctx.tmux_pane_id.as_deref().unwrap_or("?");
+                    let desc = ctx.tmux_description.as_deref().unwrap_or("");
+                    if desc.is_empty() { pane.to_string() } else { format!("{}: {}", pane, desc) }
+                }
+                ContextType::GitResult | ContextType::GithubResult => {
+                    ctx.result_command.as_deref().unwrap_or("").to_string()
+                }
+                _ => String::new(),
+            };
 
-        let truncated_details = if details.len() > 30 {
-            format!("{}...", &details[..details.floor_char_boundary(27)])
-        } else {
-            details
-        };
+            let truncated_details = if details.len() > 30 {
+                format!("{}...", &details[..details.floor_char_boundary(27)])
+            } else {
+                details
+            };
 
-        // Format refresh time as relative
-        let refreshed = if ctx.last_refresh_ms < 1577836800000 {
-            "—".to_string()
-        } else if now_ms > ctx.last_refresh_ms {
-            crate::ui::helpers::format_time_ago(now_ms - ctx.last_refresh_ms)
-        } else {
-            "now".to_string()
-        };
+            // Format refresh time as relative
+            let refreshed = if ctx.last_refresh_ms < 1577836800000 {
+                "—".to_string()
+            } else if now_ms > ctx.last_refresh_ms {
+                crate::ui::helpers::format_time_ago(now_ms - ctx.last_refresh_ms)
+            } else {
+                "now".to_string()
+            };
 
-        let icon = ctx.context_type.icon();
-        let id_with_icon = format!("{}{}", icon, ctx.id);
+            let icon = ctx.context_type.icon();
+            let id_with_icon = format!("{}{}", icon, ctx.id);
 
-        let cost_str = format!("${:.2}", ctx.panel_total_cost);
-        let (hit_str, hit_color) = if ctx.panel_cache_hit {
-            ("\u{2713}", theme::success())
-        } else {
-            ("\u{2717}", theme::error())
-        };
+            let cost_str = format!("${:.2}", ctx.panel_total_cost);
+            let (hit_str, hit_color) =
+                if ctx.panel_cache_hit { ("\u{2713}", theme::success()) } else { ("\u{2717}", theme::error()) };
 
-        vec![
-            Cell::new(id_with_icon, Style::default().fg(theme::accent_dim())),
-            Cell::new(type_name, Style::default().fg(theme::text_secondary())),
-            Cell::right(format_number(ctx.token_count), Style::default().fg(theme::accent())),
-            Cell::right(cost_str, Style::default().fg(theme::text_muted())),
-            Cell::new(hit_str, Style::default().fg(hit_color)),
-            Cell::new(refreshed, Style::default().fg(theme::text_muted())),
-            Cell::new(truncated_details, Style::default().fg(theme::text_muted())),
-        ]
-    }).collect();
+            vec![
+                Cell::new(id_with_icon, Style::default().fg(theme::accent_dim())),
+                Cell::new(type_name, Style::default().fg(theme::text_secondary())),
+                Cell::right(format_number(ctx.token_count), Style::default().fg(theme::accent())),
+                Cell::right(cost_str, Style::default().fg(theme::text_muted())),
+                Cell::new(hit_str, Style::default().fg(hit_color)),
+                Cell::new(refreshed, Style::default().fg(theme::text_muted())),
+                Cell::new(truncated_details, Style::default().fg(theme::text_muted())),
+            ]
+        })
+        .collect();
 
     text.extend(render_table(&header, &rows, None, 1));
 
@@ -301,7 +318,10 @@ pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>>
         Span::styled(" ".to_string(), base_style),
         Span::styled("Messages: ".to_string(), Style::default().fg(theme::text_secondary())),
         Span::styled(format!("{}", total_msgs), Style::default().fg(theme::text()).bold()),
-        Span::styled(format!(" ({} user, {} assistant)", user_msgs, assistant_msgs), Style::default().fg(theme::text_muted())),
+        Span::styled(
+            format!(" ({} user, {} assistant)", user_msgs, assistant_msgs),
+            Style::default().fg(theme::text_muted()),
+        ),
     ]));
 
     let total_todos = state.todos.len();
@@ -315,7 +335,10 @@ pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>>
             Span::styled("Todos: ".to_string(), Style::default().fg(theme::text_secondary())),
             Span::styled(format!("{}/{}", done_todos, total_todos), Style::default().fg(theme::success()).bold()),
             Span::styled(" done".to_string(), Style::default().fg(theme::text_muted())),
-            Span::styled(format!(", {} in progress, {} pending", in_progress, pending), Style::default().fg(theme::text_muted())),
+            Span::styled(
+                format!(", {} in progress, {} pending", in_progress, pending),
+                Style::default().fg(theme::text_muted()),
+            ),
         ]));
     }
 
@@ -330,7 +353,10 @@ pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>>
             Span::styled(" ".to_string(), base_style),
             Span::styled("Memories: ".to_string(), Style::default().fg(theme::text_secondary())),
             Span::styled(format!("{}", total_memories), Style::default().fg(theme::text()).bold()),
-            Span::styled(format!(" ({} critical, {} high, {} medium, {} low)", critical, high, medium, low), Style::default().fg(theme::text_muted())),
+            Span::styled(
+                format!(" ({} critical, {} high, {} medium, {} low)", critical, high, medium, low),
+                Style::default().fg(theme::text_muted()),
+            ),
         ]));
     }
 
@@ -355,33 +381,34 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
         Cell::new("Description", Style::default()),
     ];
 
-    let rows: Vec<Vec<Cell>> = state.agents.iter().map(|agent| {
-        let is_active = state.active_agent_id.as_deref() == Some(&agent.id);
-        let (active_str, active_color) = if is_active {
-            ("\u{2713}", theme::success())
-        } else {
-            ("", theme::text_muted())
-        };
+    let rows: Vec<Vec<Cell>> = state
+        .agents
+        .iter()
+        .map(|agent| {
+            let is_active = state.active_agent_id.as_deref() == Some(&agent.id);
+            let (active_str, active_color) =
+                if is_active { ("\u{2713}", theme::success()) } else { ("", theme::text_muted()) };
 
-        let display_name = if agent.name.len() > 20 {
-            format!("{}...", &agent.name[..agent.name.floor_char_boundary(17)])
-        } else {
-            agent.name.clone()
-        };
+            let display_name = if agent.name.len() > 20 {
+                format!("{}...", &agent.name[..agent.name.floor_char_boundary(17)])
+            } else {
+                agent.name.clone()
+            };
 
-        let display_desc = if agent.description.len() > 35 {
-            format!("{}...", &agent.description[..agent.description.floor_char_boundary(32)])
-        } else {
-            agent.description.clone()
-        };
+            let display_desc = if agent.description.len() > 35 {
+                format!("{}...", &agent.description[..agent.description.floor_char_boundary(32)])
+            } else {
+                agent.description.clone()
+            };
 
-        vec![
-            Cell::new(&agent.id, Style::default().fg(theme::accent_dim())),
-            Cell::new(display_name, Style::default().fg(theme::text())),
-            Cell::new(active_str, Style::default().fg(active_color)),
-            Cell::new(display_desc, Style::default().fg(theme::text_muted())),
-        ]
-    }).collect();
+            vec![
+                Cell::new(&agent.id, Style::default().fg(theme::accent_dim())),
+                Cell::new(display_name, Style::default().fg(theme::text())),
+                Cell::new(active_str, Style::default().fg(active_color)),
+                Cell::new(display_desc, Style::default().fg(theme::text_muted())),
+            ]
+        })
+        .collect();
 
     text.extend(render_table(&header, &rows, None, 1));
 
@@ -391,7 +418,10 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("SKILLS".to_string(), Style::default().fg(theme::text_muted()).bold()),
-            Span::styled(format!("  ({} available, {} loaded)", state.skills.len(), state.loaded_skill_ids.len()), Style::default().fg(theme::text_muted())),
+            Span::styled(
+                format!("  ({} available, {} loaded)", state.skills.len(), state.loaded_skill_ids.len()),
+                Style::default().fg(theme::text_muted()),
+            ),
         ]));
         text.push(Line::from(""));
 
@@ -402,20 +432,21 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
             Cell::new("Description", Style::default()),
         ];
 
-        let skill_rows: Vec<Vec<Cell>> = state.skills.iter().map(|skill| {
-            let is_loaded = state.loaded_skill_ids.contains(&skill.id);
-            let (loaded_str, loaded_color) = if is_loaded {
-                ("\u{2713}", theme::success())
-            } else {
-                ("", theme::text_muted())
-            };
-            vec![
-                Cell::new(&skill.id, Style::default().fg(theme::accent_dim())),
-                Cell::new(skill.name.clone(), Style::default().fg(theme::text())),
-                Cell::new(loaded_str, Style::default().fg(loaded_color)),
-                Cell::new(skill.description.clone(), Style::default().fg(theme::text_muted())),
-            ]
-        }).collect();
+        let skill_rows: Vec<Vec<Cell>> = state
+            .skills
+            .iter()
+            .map(|skill| {
+                let is_loaded = state.loaded_skill_ids.contains(&skill.id);
+                let (loaded_str, loaded_color) =
+                    if is_loaded { ("\u{2713}", theme::success()) } else { ("", theme::text_muted()) };
+                vec![
+                    Cell::new(&skill.id, Style::default().fg(theme::accent_dim())),
+                    Cell::new(skill.name.clone(), Style::default().fg(theme::text())),
+                    Cell::new(loaded_str, Style::default().fg(loaded_color)),
+                    Cell::new(skill.description.clone(), Style::default().fg(theme::text_muted())),
+                ]
+            })
+            .collect();
 
         text.extend(render_table(&skill_header, &skill_rows, None, 1));
     }
@@ -436,13 +467,17 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
             Cell::new("Description", Style::default()),
         ];
 
-        let cmd_rows: Vec<Vec<Cell>> = state.commands.iter().map(|cmd| {
-            vec![
-                Cell::new(format!("/{}", cmd.id), Style::default().fg(theme::accent())),
-                Cell::new(cmd.name.clone(), Style::default().fg(theme::text())),
-                Cell::new(cmd.description.clone(), Style::default().fg(theme::text_muted())),
-            ]
-        }).collect();
+        let cmd_rows: Vec<Vec<Cell>> = state
+            .commands
+            .iter()
+            .map(|cmd| {
+                vec![
+                    Cell::new(format!("/{}", cmd.id), Style::default().fg(theme::accent())),
+                    Cell::new(cmd.name.clone(), Style::default().fg(theme::text())),
+                    Cell::new(cmd.description.clone(), Style::default().fg(theme::text_muted())),
+                ]
+            })
+            .collect();
 
         text.extend(render_table(&cmd_header, &cmd_rows, None, 1));
     }
@@ -472,31 +507,31 @@ pub fn render_presets(base_style: Style) -> Vec<Line<'static>> {
         Cell::new("Description", Style::default()),
     ];
 
-    let rows: Vec<Vec<Cell>> = presets.iter().map(|p| {
-        let (type_label, type_color) = if p.built_in {
-            ("built-in", theme::accent_dim())
-        } else {
-            ("custom", theme::success())
-        };
+    let rows: Vec<Vec<Cell>> = presets
+        .iter()
+        .map(|p| {
+            let (type_label, type_color) =
+                if p.built_in { ("built-in", theme::accent_dim()) } else { ("custom", theme::success()) };
 
-        let display_name = if p.name.len() > 25 {
-            format!("{}...", &p.name[..p.name.floor_char_boundary(22)])
-        } else {
-            p.name.clone()
-        };
+            let display_name = if p.name.len() > 25 {
+                format!("{}...", &p.name[..p.name.floor_char_boundary(22)])
+            } else {
+                p.name.clone()
+            };
 
-        let display_desc = if p.description.len() > 35 {
-            format!("{}...", &p.description[..p.description.floor_char_boundary(32)])
-        } else {
-            p.description.clone()
-        };
+            let display_desc = if p.description.len() > 35 {
+                format!("{}...", &p.description[..p.description.floor_char_boundary(32)])
+            } else {
+                p.description.clone()
+            };
 
-        vec![
-            Cell::new(display_name, Style::default().fg(theme::text())),
-            Cell::new(type_label, Style::default().fg(type_color)),
-            Cell::new(display_desc, Style::default().fg(theme::text_muted())),
-        ]
-    }).collect();
+            vec![
+                Cell::new(display_name, Style::default().fg(theme::text())),
+                Cell::new(type_label, Style::default().fg(type_color)),
+                Cell::new(display_desc, Style::default().fg(theme::text_muted())),
+            ]
+        })
+        .collect();
 
     text.extend(render_table(&header, &rows, None, 1));
 
@@ -513,7 +548,10 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
         Span::styled("TOOLS".to_string(), Style::default().fg(theme::text_muted()).bold()),
-        Span::styled(format!("  ({} enabled, {} disabled)", enabled_count, disabled_count), Style::default().fg(theme::text_muted())),
+        Span::styled(
+            format!("  ({} enabled, {} disabled)", enabled_count, disabled_count),
+            Style::default().fg(theme::text_muted()),
+        ),
     ]));
     text.push(Line::from(""));
 
@@ -521,9 +559,7 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
     use crate::tool_defs::ToolCategory;
 
     for category in ToolCategory::all() {
-        let category_tools: Vec<_> = state.tools.iter()
-            .filter(|t| &t.category == category)
-            .collect();
+        let category_tools: Vec<_> = state.tools.iter().filter(|t| &t.category == category).collect();
 
         if category_tools.is_empty() {
             continue;
@@ -558,19 +594,19 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
             Cell::new("Description", Style::default()),
         ];
 
-        let rows: Vec<Vec<Cell>> = category_tools.iter().map(|tool| {
-            let (status_icon, status_color) = if tool.enabled {
-                ("\u{2713}", theme::success())
-            } else {
-                ("\u{2717}", theme::error())
-            };
+        let rows: Vec<Vec<Cell>> = category_tools
+            .iter()
+            .map(|tool| {
+                let (status_icon, status_color) =
+                    if tool.enabled { ("\u{2713}", theme::success()) } else { ("\u{2717}", theme::error()) };
 
-            vec![
-                Cell::new(&tool.id, Style::default().fg(theme::text())),
-                Cell::new(status_icon, Style::default().fg(status_color)),
-                Cell::new(&tool.short_desc, Style::default().fg(theme::text_muted())),
-            ]
-        }).collect();
+                vec![
+                    Cell::new(&tool.id, Style::default().fg(theme::text())),
+                    Cell::new(status_icon, Style::default().fg(status_color)),
+                    Cell::new(&tool.short_desc, Style::default().fg(theme::text_muted())),
+                ]
+            })
+            .collect();
 
         text.extend(render_table(&header, &rows, None, 2));
         text.push(Line::from(""));

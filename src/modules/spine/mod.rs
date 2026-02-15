@@ -1,16 +1,16 @@
-pub mod types;
 pub mod continuation;
-pub mod guard_rail;
 pub mod engine;
+pub mod guard_rail;
 mod panel;
 pub(crate) mod tools;
+pub mod types;
 
 use serde_json::json;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use self::panel::SpinePanel;
 use super::Module;
@@ -18,29 +18,27 @@ use super::Module;
 pub struct SpineModule;
 
 impl Module for SpineModule {
-    fn id(&self) -> &'static str { "spine" }
-    fn name(&self) -> &'static str { "Spine" }
-    fn description(&self) -> &'static str { "Unified auto-continuation and stream control" }
+    fn id(&self) -> &'static str {
+        "spine"
+    }
+    fn name(&self) -> &'static str {
+        "Spine"
+    }
+    fn description(&self) -> &'static str {
+        "Unified auto-continuation and stream control"
+    }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         // Prune old processed notifications: keep all unprocessed + latest 10 processed
-        let mut to_save: Vec<_> = state.notifications.iter()
-            .filter(|n| !n.processed)
-            .cloned()
-            .collect();
-        let mut processed: Vec<_> = state.notifications.iter()
-            .filter(|n| n.processed)
-            .cloned()
-            .collect();
+        let mut to_save: Vec<_> = state.notifications.iter().filter(|n| !n.processed).cloned().collect();
+        let mut processed: Vec<_> = state.notifications.iter().filter(|n| n.processed).cloned().collect();
         // Keep only the latest 10 processed (they're in chronological order)
         if processed.len() > 10 {
             processed = processed.split_off(processed.len() - 10);
         }
         to_save.extend(processed);
         // Sort by ID number to maintain order
-        to_save.sort_by_key(|n| {
-            n.id.trim_start_matches('N').parse::<usize>().unwrap_or(0)
-        });
+        to_save.sort_by_key(|n| n.id.trim_start_matches('N').parse::<usize>().unwrap_or(0));
 
         json!({
             "notifications": to_save,
@@ -51,16 +49,18 @@ impl Module for SpineModule {
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("notifications")
-            && let Ok(v) = serde_json::from_value(arr.clone()) {
-                state.notifications = v;
-            }
+            && let Ok(v) = serde_json::from_value(arr.clone())
+        {
+            state.notifications = v;
+        }
         if let Some(v) = data.get("next_notification_id").and_then(|v| v.as_u64()) {
             state.next_notification_id = v as usize;
         }
         if let Some(cfg) = data.get("spine_config")
-            && let Ok(v) = serde_json::from_value(cfg.clone()) {
-                state.spine_config = v;
-            }
+            && let Ok(v) = serde_json::from_value(cfg.clone())
+        {
+            state.spine_config = v;
+        }
         // Prune stale processed notifications on load too
         prune_notifications(&mut state.notifications);
     }

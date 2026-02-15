@@ -12,9 +12,9 @@ use reqwest::blocking::Client;
 use secrecy::{ExposeSecret, SecretBox};
 use serde::Serialize;
 
-use super::openai_compat::{self, OaiMessage, BuildOptions, ToolCallAccumulator};
-use super::{LlmClient, LlmRequest, StreamEvent};
 use super::error::LlmError;
+use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
+use super::{LlmClient, LlmRequest, StreamEvent};
 
 const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
@@ -26,9 +26,7 @@ pub struct DeepSeekClient {
 impl DeepSeekClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
-        Self {
-            api_key: env::var("DEEPSEEK_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))),
-        }
+        Self { api_key: env::var("DEEPSEEK_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }
 
@@ -60,11 +58,7 @@ struct DsMessage {
 impl DsMessage {
     /// Convert from shared OaiMessage, adding reasoning_content for assistant messages.
     fn from_oai(msg: OaiMessage, is_reasoner: bool) -> Self {
-        let reasoning_content = if is_reasoner && msg.role == "assistant" {
-            Some(String::new())
-        } else {
-            None
-        };
+        let reasoning_content = if is_reasoner && msg.role == "assistant" { Some(String::new()) } else { None };
         Self {
             role: msg.role,
             content: msg.content,
@@ -89,16 +83,15 @@ struct DsRequest {
 
 impl LlmClient for DeepSeekClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self
-            .api_key
-            .as_ref()
-            .ok_or_else(|| LlmError::Auth("DEEPSEEK_API_KEY not set".into()))?;
+        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("DEEPSEEK_API_KEY not set".into()))?;
 
         let client = Client::new();
         let is_reasoner = request.model == "deepseek-reasoner";
 
         // Collect pending tool result IDs
-        let pending_tool_ids: Vec<String> = request.tool_results.as_ref()
+        let pending_tool_ids: Vec<String> = request
+            .tool_results
+            .as_ref()
             .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
             .unwrap_or_default();
 
@@ -115,10 +108,8 @@ impl LlmClient for DeepSeekClient {
         );
 
         // Convert to DeepSeek format (adds reasoning_content for assistant messages)
-        let mut ds_messages: Vec<DsMessage> = oai_messages
-            .into_iter()
-            .map(|m| DsMessage::from_oai(m, is_reasoner))
-            .collect();
+        let mut ds_messages: Vec<DsMessage> =
+            oai_messages.into_iter().map(|m| DsMessage::from_oai(m, is_reasoner)).collect();
 
         // Add tool results if present
         if let Some(results) = &request.tool_results {
@@ -174,19 +165,28 @@ impl LlmClient for DeepSeekClient {
 
             if let Some(resp) = openai_compat::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
-                    if let Some(inp) = usage.prompt_tokens { input_tokens = inp; }
-                    if let Some(out) = usage.completion_tokens { output_tokens = out; }
+                    if let Some(inp) = usage.prompt_tokens {
+                        input_tokens = inp;
+                    }
+                    if let Some(out) = usage.completion_tokens {
+                        output_tokens = out;
+                    }
                     // DeepSeek-specific cache fields
-                    if let Some(hit) = usage.prompt_cache_hit_tokens { cache_hit_tokens = hit; }
-                    if let Some(miss) = usage.prompt_cache_miss_tokens { cache_miss_tokens = miss; }
+                    if let Some(hit) = usage.prompt_cache_hit_tokens {
+                        cache_hit_tokens = hit;
+                    }
+                    if let Some(miss) = usage.prompt_cache_miss_tokens {
+                        cache_miss_tokens = miss;
+                    }
                 }
 
                 for choice in resp.choices {
                     if let Some(delta) = choice.delta {
                         if let Some(content) = delta.content
-                            && !content.is_empty() {
-                                let _ = tx.send(StreamEvent::Chunk(content));
-                            }
+                            && !content.is_empty()
+                        {
+                            let _ = tx.send(StreamEvent::Chunk(content));
+                        }
                         if let Some(calls) = delta.tool_calls {
                             for call in &calls {
                                 tool_acc.feed(call);
@@ -222,7 +222,7 @@ impl LlmClient for DeepSeekClient {
                     streaming_ok: false,
                     tools_ok: false,
                     error: Some("DEEPSEEK_API_KEY not set".to_string()),
-                }
+                };
             }
         };
 
@@ -243,16 +243,8 @@ impl LlmClient for DeepSeekClient {
         let auth_ok = auth_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
         if !auth_ok {
-            let error = auth_result
-                .err()
-                .map(|e| e.to_string())
-                .or_else(|| Some("Auth failed".to_string()));
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error,
-            };
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            return super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
         // Test 2: Streaming
@@ -296,11 +288,6 @@ impl LlmClient for DeepSeekClient {
 
         let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
-        super::ApiCheckResult {
-            auth_ok,
-            streaming_ok,
-            tools_ok,
-            error: None,
-        }
+        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
 }

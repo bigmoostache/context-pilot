@@ -57,11 +57,10 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             // for this guard rail. Without this check, every main loop tick
             // (8-50ms) would create a new notification when blocked.
             let source_tag = format!("guard_rail:{}", guard.name());
-            let already_notified = state.notifications.iter().any(|n| {
-                !n.processed
-                    && n.notification_type == NotificationType::Custom
-                    && n.source == source_tag
-            });
+            let already_notified = state
+                .notifications
+                .iter()
+                .any(|n| !n.processed && n.notification_type == NotificationType::Custom && n.source == source_tag);
             if !already_notified {
                 let notif_id = format!("N{}", state.next_notification_id);
                 state.next_notification_id += 1;
@@ -114,7 +113,10 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
             // Relaunch expects the conversation to already end with a user
             // message.  If it doesn't (defensive), fall back to a tiny
             // synthetic user message so the API always sees alternating roles.
-            let last_role = state.messages.iter().rev()
+            let last_role = state
+                .messages
+                .iter()
+                .rev()
                 .find(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
                 .map(|m| m.role.as_str());
 

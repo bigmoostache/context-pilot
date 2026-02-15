@@ -26,10 +26,7 @@ impl InvalidationRule {
     fn new(trigger: &str, invalidates: &[&str]) -> Self {
         Self {
             trigger: Regex::new(trigger).expect("invalid trigger regex"),
-            invalidates: invalidates
-                .iter()
-                .map(|p| p.to_string())
-                .collect(),
+            invalidates: invalidates.iter().map(|p| p.to_string()).collect(),
         }
     }
 }
@@ -50,45 +47,24 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
             r"^gh\s+issue\s+(close|reopen|edit|delete|transfer|pin|unpin)\s+(\d+)",
             &[
                 r"^gh\s+issue\s+list",
-                r"^gh\s+issue\s+view\s+\2\b",  // backreference to issue number
+                r"^gh\s+issue\s+view\s+\2\b", // backreference to issue number
                 r"^gh\s+issue\s+status",
             ],
         ),
-
         // gh issue create → invalidate all issue lists + issue status
-        InvalidationRule::new(
-            r"^gh\s+issue\s+create",
-            &[
-                r"^gh\s+issue\s+list",
-                r"^gh\s+issue\s+status",
-            ],
-        ),
-
+        InvalidationRule::new(r"^gh\s+issue\s+create", &[r"^gh\s+issue\s+list", r"^gh\s+issue\s+status"]),
         // gh issue comment <number> → invalidate issue view for that number
-        InvalidationRule::new(
-            r"^gh\s+issue\s+comment\s+(\d+)",
-            &[r"^gh\s+issue\s+view\s+\1\b"],
-        ),
-
+        InvalidationRule::new(r"^gh\s+issue\s+comment\s+(\d+)", &[r"^gh\s+issue\s+view\s+\1\b"]),
         // gh issue label add/remove → invalidate issue list + issue view + issue status
         InvalidationRule::new(
             r"^gh\s+issue\s+label\s+(add|remove)\s+(\d+)",
-            &[
-                r"^gh\s+issue\s+list",
-                r"^gh\s+issue\s+view\s+\2\b",
-                r"^gh\s+issue\s+status",
-            ],
+            &[r"^gh\s+issue\s+list", r"^gh\s+issue\s+view\s+\2\b", r"^gh\s+issue\s+status"],
         ),
-
         // gh issue assign/unassign → invalidate issue view + issue status
         InvalidationRule::new(
             r"^gh\s+issue\s+(assign|unassign)\s+(\d+)",
-            &[
-                r"^gh\s+issue\s+view\s+\2\b",
-                r"^gh\s+issue\s+status",
-            ],
+            &[r"^gh\s+issue\s+view\s+\2\b", r"^gh\s+issue\s+status"],
         ),
-
         // =====================================================================
         // Pull Requests
         // =====================================================================
@@ -97,44 +73,19 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
         // → invalidate: pr list, pr view <same number>, pr status
         InvalidationRule::new(
             r"^gh\s+pr\s+(close|reopen|edit|merge)\s+(\d+)",
-            &[
-                r"^gh\s+pr\s+list",
-                r"^gh\s+pr\s+view\s+\2\b",
-                r"^gh\s+pr\s+status",
-            ],
+            &[r"^gh\s+pr\s+list", r"^gh\s+pr\s+view\s+\2\b", r"^gh\s+pr\s+status"],
         ),
-
         // gh pr create → invalidate all pr lists + pr status
-        InvalidationRule::new(
-            r"^gh\s+pr\s+create",
-            &[
-                r"^gh\s+pr\s+list",
-                r"^gh\s+pr\s+status",
-            ],
-        ),
-
+        InvalidationRule::new(r"^gh\s+pr\s+create", &[r"^gh\s+pr\s+list", r"^gh\s+pr\s+status"]),
         // gh pr review <number> → invalidate pr view
-        InvalidationRule::new(
-            r"^gh\s+pr\s+review\s+(\d+)",
-            &[r"^gh\s+pr\s+view\s+\1\b"],
-        ),
-
+        InvalidationRule::new(r"^gh\s+pr\s+review\s+(\d+)", &[r"^gh\s+pr\s+view\s+\1\b"]),
         // gh pr comment <number> → invalidate pr view
-        InvalidationRule::new(
-            r"^gh\s+pr\s+comment\s+(\d+)",
-            &[r"^gh\s+pr\s+view\s+\1\b"],
-        ),
-
+        InvalidationRule::new(r"^gh\s+pr\s+comment\s+(\d+)", &[r"^gh\s+pr\s+view\s+\1\b"]),
         // gh pr ready/draft <number> → invalidate pr list + pr view + pr status
         InvalidationRule::new(
             r"^gh\s+pr\s+(ready|draft)\s+(\d+)",
-            &[
-                r"^gh\s+pr\s+list",
-                r"^gh\s+pr\s+view\s+\2\b",
-                r"^gh\s+pr\s+status",
-            ],
+            &[r"^gh\s+pr\s+list", r"^gh\s+pr\s+view\s+\2\b", r"^gh\s+pr\s+status"],
         ),
-
         // =====================================================================
         // Releases
         // =====================================================================
@@ -142,43 +93,25 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
         // gh release create/edit/delete → invalidate release list + release view
         InvalidationRule::new(
             r"^gh\s+release\s+(create|edit|delete)",
-            &[
-                r"^gh\s+release\s+list",
-                r"^gh\s+release\s+view",
-            ],
+            &[r"^gh\s+release\s+list", r"^gh\s+release\s+view"],
         ),
-
         // =====================================================================
         // Labels
         // =====================================================================
 
         // gh label create/edit/delete → invalidate label list + issue list
-        InvalidationRule::new(
-            r"^gh\s+label\s+(create|edit|delete)",
-            &[
-                r"^gh\s+label\s+list",
-                r"^gh\s+issue\s+list",
-            ],
-        ),
-
+        InvalidationRule::new(r"^gh\s+label\s+(create|edit|delete)", &[r"^gh\s+label\s+list", r"^gh\s+issue\s+list"]),
         // =====================================================================
         // Repository
         // =====================================================================
 
         // gh repo edit → invalidate repo view
-        InvalidationRule::new(
-            r"^gh\s+repo\s+edit",
-            &[r"^gh\s+repo\s+view"],
-        ),
-
+        InvalidationRule::new(r"^gh\s+repo\s+edit", &[r"^gh\s+repo\s+view"]),
         // =====================================================================
         // API catch-all: any gh api POST/PUT/PATCH/DELETE → invalidate all gh api panels
         // This is a broad fallback for direct API calls
         // =====================================================================
-        InvalidationRule::new(
-            r"^gh\s+api\s+.+\s+-(X|method)\s+(POST|PUT|PATCH|DELETE)",
-            &[r"^gh\s+api\s+"],
-        ),
+        InvalidationRule::new(r"^gh\s+api\s+.+\s+-(X|method)\s+(POST|PUT|PATCH|DELETE)", &[r"^gh\s+api\s+"]),
     ]
 }
 

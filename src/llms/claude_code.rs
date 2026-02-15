@@ -14,9 +14,12 @@ use secrecy::{ExposeSecret, SecretBox};
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent, prepare_panel_messages, panel_header_text, panel_footer_text, panel_timestamp_text};
 use super::error::LlmError;
-use crate::constants::{library, API_VERSION, MAX_RESPONSE_TOKENS};
+use super::{
+    ApiCheckResult, LlmClient, LlmRequest, StreamEvent, panel_footer_text, panel_header_text, panel_timestamp_text,
+    prepare_panel_messages,
+};
+use crate::constants::{API_VERSION, MAX_RESPONSE_TOKENS, library};
 use crate::core::panels::now_ms;
 use crate::state::{MessageStatus, MessageType};
 use crate::tool_defs::build_api_tools;
@@ -32,7 +35,8 @@ const OAUTH_BETA_HEADER: &str = "claude-code-20250219,oauth-2025-04-20,interleav
 const BILLING_HEADER: &str = "x-anthropic-billing-header: cc_version=2.1.37.fbe; cc_entrypoint=cli; cch=e5401;";
 
 /// System reminder injected into first user message for Claude Code validation
-const SYSTEM_REMINDER: &str = "<system-reminder>\nThe following skills are available for use with the Skill tool:\n</system-reminder>";
+const SYSTEM_REMINDER: &str =
+    "<system-reminder>\nThe following skills are available for use with the Skill tool:\n</system-reminder>";
 
 /// Map model names to full API model identifiers
 fn map_model_name(model: &str) -> &str {
@@ -59,9 +63,10 @@ fn inject_system_reminder(messages: &mut Vec<Value>) {
 
         // Skip tool_result messages (from panel injection / tool loop)
         if let Some(arr) = msg["content"].as_array()
-            && arr.iter().any(|block| block["type"] == "tool_result") {
-                continue;
-            }
+            && arr.iter().any(|block| block["type"] == "tool_result")
+        {
+            continue;
+        }
 
         // Convert string content to array format and prepend reminder
         let content = &msg["content"];
@@ -72,23 +77,30 @@ fn inject_system_reminder(messages: &mut Vec<Value>) {
                 {"type": "text", "text": text}
             ]);
         } else if content.is_array()
-            && let Some(arr) = msg["content"].as_array_mut() {
-                arr.insert(0, reminder);
-            }
+            && let Some(arr) = msg["content"].as_array_mut()
+        {
+            arr.insert(0, reminder);
+        }
         return; // Only inject into first eligible user message
     }
 
     // No eligible user message found (all are tool_results, e.g. during tool loop).
     // Prepend a standalone user message with just the reminder at position 0.
-    messages.insert(0, serde_json::json!({
-        "role": "user",
-        "content": [reminder]
-    }));
+    messages.insert(
+        0,
+        serde_json::json!({
+            "role": "user",
+            "content": [reminder]
+        }),
+    );
     // Must follow with a minimal assistant ack to maintain user/assistant alternation.
-    messages.insert(1, serde_json::json!({
-        "role": "assistant",
-        "content": [{"type": "text", "text": "ok"}]
-    }));
+    messages.insert(
+        1,
+        serde_json::json!({
+            "role": "assistant",
+            "content": [{"type": "text", "text": "ok"}]
+        }),
+    );
 }
 
 /// Ensure strict user/assistant message alternation as required by the API.
@@ -113,13 +125,10 @@ fn ensure_message_alternation(messages: &mut Vec<Value>) {
         }
 
         let prev_has_tool_result = result.last().is_some_and(|last| {
-            last["content"].as_array().is_some_and(|arr| {
-                arr.iter().any(|b| b["type"] == "tool_result")
-            })
+            last["content"].as_array().is_some_and(|arr| arr.iter().any(|b| b["type"] == "tool_result"))
         });
-        let curr_has_tool_result = msg["content"].as_array().is_some_and(|arr| {
-            arr.iter().any(|b| b["type"] == "tool_result")
-        });
+        let curr_has_tool_result =
+            msg["content"].as_array().is_some_and(|arr| arr.iter().any(|b| b["type"] == "tool_result"));
 
         if prev_has_tool_result != curr_has_tool_result {
             // Different content types — insert placeholder assistant to separate them
@@ -141,10 +150,13 @@ fn ensure_message_alternation(messages: &mut Vec<Value>) {
     // API requires first message to be user role. Panel injection starts with
     // assistant messages, so prepend a placeholder user message if needed.
     if result.first().is_some_and(|m| m["role"] == "assistant") {
-        result.insert(0, serde_json::json!({
-            "role": "user",
-            "content": [{"type": "text", "text": "ok"}]
-        }));
+        result.insert(
+            0,
+            serde_json::json!({
+                "role": "user",
+                "content": [{"type": "text", "text": "ok"}]
+            }),
+        );
     }
 
     *messages = result;
@@ -224,10 +236,7 @@ impl ClaudeCodeClient {
         let creds: CredentialsFile = serde_json::from_str(&content).ok()?;
 
         // Check if token is expired
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()?
-            .as_millis() as u64;
+        let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
 
         if now_ms > creds.claude_ai_oauth.expires_at {
             return None; // Token expired
@@ -320,11 +329,8 @@ impl LlmClient for ClaudeCodeClient {
 
             for (idx, panel) in fake_panels.iter().enumerate() {
                 let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
-                let text = if idx == 0 {
-                    format!("{}\n\n{}", panel_header_text(), timestamp_text)
-                } else {
-                    timestamp_text
-                };
+                let text =
+                    if idx == 0 { format!("{}\n\n{}", panel_header_text(), timestamp_text) } else { timestamp_text };
 
                 // Assistant message with tool_use
                 json_messages.push(serde_json::json!({
@@ -392,13 +398,20 @@ impl LlmClient for ClaudeCodeClient {
         // First pass: collect tool_use IDs that have matching results (will be included)
         let mut included_tool_use_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         for (idx, msg) in request.messages.iter().enumerate() {
-            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached || msg.message_type != MessageType::ToolCall {
+            if msg.status == MessageStatus::Deleted
+                || msg.status == MessageStatus::Detached
+                || msg.message_type != MessageType::ToolCall
+            {
                 continue;
             }
             let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
             let has_result = request.messages[idx + 1..]
                 .iter()
-                .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached && m.message_type == MessageType::ToolResult)
+                .filter(|m| {
+                    m.status != MessageStatus::Deleted
+                        && m.status != MessageStatus::Detached
+                        && m.message_type == MessageType::ToolResult
+                })
                 .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
             if has_result {
                 for id in tool_use_ids {
@@ -417,7 +430,9 @@ impl LlmClient for ClaudeCodeClient {
 
             // Handle tool results - only include if tool_use was included
             if msg.message_type == MessageType::ToolResult {
-                let tool_results: Vec<Value> = msg.tool_results.iter()
+                let tool_results: Vec<Value> = msg
+                    .tool_results
+                    .iter()
                     .filter(|r| included_tool_use_ids.contains(&r.tool_use_id))
                     .map(|r| {
                         serde_json::json!({
@@ -425,7 +440,8 @@ impl LlmClient for ClaudeCodeClient {
                             "tool_use_id": r.tool_use_id,
                             "content": r.content
                         })
-                    }).collect();
+                    })
+                    .collect();
 
                 if !tool_results.is_empty() {
                     json_messages.push(serde_json::json!({
@@ -438,7 +454,9 @@ impl LlmClient for ClaudeCodeClient {
 
             // Handle tool calls - only include if has matching result
             if msg.message_type == MessageType::ToolCall {
-                let tool_uses: Vec<Value> = msg.tool_uses.iter()
+                let tool_uses: Vec<Value> = msg
+                    .tool_uses
+                    .iter()
                     .filter(|tu| included_tool_use_ids.contains(&tu.id))
                     .map(|tu| {
                         serde_json::json!({
@@ -447,17 +465,19 @@ impl LlmClient for ClaudeCodeClient {
                             "name": tu.name,
                             "input": if tu.input.is_null() { serde_json::json!({}) } else { tu.input.clone() }
                         })
-                    }).collect();
+                    })
+                    .collect();
 
                 if !tool_uses.is_empty() {
                     // Append to last assistant message or create new one
                     if let Some(last) = json_messages.last_mut()
                         && last["role"] == "assistant"
-                            && let Some(content) = last.get_mut("content")
-                                && let Some(arr) = content.as_array_mut() {
-                                    arr.extend(tool_uses);
-                                    continue;
-                                }
+                        && let Some(content) = last.get_mut("content")
+                        && let Some(arr) = content.as_array_mut()
+                    {
+                        arr.extend(tool_uses);
+                        continue;
+                    }
 
                     json_messages.push(serde_json::json!({
                         "role": "assistant",
@@ -484,41 +504,49 @@ impl LlmClient for ClaudeCodeClient {
             // Add tool uses to last assistant message if this is the last message
             let is_last = idx == request.messages.len().saturating_sub(1);
             if msg.role == "assistant" && include_tool_uses && is_last && !msg.tool_uses.is_empty() {
-                let tool_uses: Vec<Value> = msg.tool_uses.iter().map(|tu| {
-                    serde_json::json!({
-                        "type": "tool_use",
-                        "id": tu.id,
-                        "name": tu.name,
-                        "input": if tu.input.is_null() { serde_json::json!({}) } else { tu.input.clone() }
+                let tool_uses: Vec<Value> = msg
+                    .tool_uses
+                    .iter()
+                    .map(|tu| {
+                        serde_json::json!({
+                            "type": "tool_use",
+                            "id": tu.id,
+                            "name": tu.name,
+                            "input": if tu.input.is_null() { serde_json::json!({}) } else { tu.input.clone() }
+                        })
                     })
-                }).collect();
+                    .collect();
 
                 if let Some(last) = json_messages.last_mut()
-                    && last["role"] == "assistant" {
-                        // Convert string content to array and add tool uses
-                        let existing_content = last["content"].clone();
-                        let mut content_array = if existing_content.is_string() {
-                            vec![serde_json::json!({"type": "text", "text": existing_content.as_str().unwrap_or("")})]
-                        } else if let Some(arr) = existing_content.as_array() {
-                            arr.clone()
-                        } else {
-                            vec![]
-                        };
-                        content_array.extend(tool_uses);
-                        last["content"] = Value::Array(content_array);
-                    }
+                    && last["role"] == "assistant"
+                {
+                    // Convert string content to array and add tool uses
+                    let existing_content = last["content"].clone();
+                    let mut content_array = if existing_content.is_string() {
+                        vec![serde_json::json!({"type": "text", "text": existing_content.as_str().unwrap_or("")})]
+                    } else if let Some(arr) = existing_content.as_array() {
+                        arr.clone()
+                    } else {
+                        vec![]
+                    };
+                    content_array.extend(tool_uses);
+                    last["content"] = Value::Array(content_array);
+                }
             }
         }
 
         // Add pending tool results
         if let Some(results) = &request.tool_results {
-            let tool_results: Vec<Value> = results.iter().map(|r| {
-                serde_json::json!({
-                    "type": "tool_result",
-                    "tool_use_id": r.tool_use_id,
-                    "content": r.content
+            let tool_results: Vec<Value> = results
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "type": "tool_result",
+                        "tool_use_id": r.tool_use_id,
+                        "content": r.content
+                    })
                 })
-            }).collect();
+                .collect();
             json_messages.push(serde_json::json!({
                 "role": "user",
                 "content": tool_results
@@ -597,13 +625,11 @@ impl LlmClient for ClaudeCodeClient {
                 match event.event_type.as_str() {
                     "content_block_start" => {
                         if let Some(block) = event.content_block
-                            && block.block_type.as_deref() == Some("tool_use") {
-                                current_tool = Some((
-                                    block.id.unwrap_or_default(),
-                                    block.name.unwrap_or_default(),
-                                    String::new(),
-                                ));
-                            }
+                            && block.block_type.as_deref() == Some("tool_use")
+                        {
+                            current_tool =
+                                Some((block.id.unwrap_or_default(), block.name.unwrap_or_default(), String::new()));
+                        }
                     }
                     "content_block_delta" => {
                         if let Some(delta) = event.delta {
@@ -615,9 +641,10 @@ impl LlmClient for ClaudeCodeClient {
                                 }
                                 Some("input_json_delta") => {
                                     if let Some(json) = delta.partial_json
-                                        && let Some((_, _, ref mut input)) = current_tool {
-                                            input.push_str(&json);
-                                        }
+                                        && let Some((_, _, ref mut input)) = current_tool
+                                    {
+                                        input.push_str(&json);
+                                    }
                                 }
                                 _ => {}
                             }
@@ -632,23 +659,25 @@ impl LlmClient for ClaudeCodeClient {
                     }
                     "message_start" => {
                         if let Some(msg_body) = event.message
-                            && let Some(usage) = msg_body.usage {
-                                if let Some(hit) = usage.cache_read_input_tokens {
-                                    cache_hit_tokens = hit;
-                                }
-                                if let Some(miss) = usage.cache_creation_input_tokens {
-                                    cache_miss_tokens = miss;
-                                }
-                                if let Some(inp) = usage.input_tokens {
-                                    input_tokens = inp;
-                                }
+                            && let Some(usage) = msg_body.usage
+                        {
+                            if let Some(hit) = usage.cache_read_input_tokens {
+                                cache_hit_tokens = hit;
                             }
+                            if let Some(miss) = usage.cache_creation_input_tokens {
+                                cache_miss_tokens = miss;
+                            }
+                            if let Some(inp) = usage.input_tokens {
+                                input_tokens = inp;
+                            }
+                        }
                     }
                     "message_delta" => {
                         if let Some(ref delta) = event.delta
-                            && let Some(ref reason) = delta.stop_reason {
-                                stop_reason = Some(reason.clone());
-                            }
+                            && let Some(ref reason) = delta.stop_reason
+                        {
+                            stop_reason = Some(reason.clone());
+                        }
                         if let Some(usage) = event.usage {
                             if let Some(inp) = usage.input_tokens {
                                 input_tokens = inp;
@@ -683,7 +712,7 @@ impl LlmClient for ClaudeCodeClient {
                     streaming_ok: false,
                     tools_ok: false,
                     error: Some("OAuth token not found or expired".to_string()),
-                }
+                };
             }
         };
 
@@ -737,16 +766,8 @@ impl LlmClient for ClaudeCodeClient {
         };
 
         if !auth_ok {
-            let error = auth_result
-                .err()
-                .map(|e| e.to_string())
-                .or_else(|| Some("Auth failed".to_string()));
-            return ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error,
-            };
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
         // Test 2: Streaming request
@@ -829,12 +850,7 @@ impl LlmClient for ClaudeCodeClient {
 
         let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
-        ApiCheckResult {
-            auth_ok,
-            streaming_ok,
-            tools_ok,
-            error: None,
-        }
+        ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
 }
 
@@ -846,9 +862,10 @@ mod tests {
     /// Minimal request matching working Python exactly.
     /// No panels, no tools, no message prefixes — just raw API call.
     #[test]
+    #[ignore] // Requires OAuth token — run with `cargo test -- --ignored`
     fn test_general_kenobi() {
-        let token = ClaudeCodeClient::load_oauth_token()
-            .expect("OAuth token not found or expired — run 'claude login'");
+        let token =
+            ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
 
         let client = Client::new();
 
@@ -894,29 +911,19 @@ mod tests {
         let status = response.status();
         let resp_body: serde_json::Value = response.json().expect("Failed to parse JSON response");
 
-        assert!(
-            status.is_success(),
-            "API returned {}: {}",
-            status,
-            serde_json::to_string_pretty(&resp_body).unwrap()
-        );
+        assert!(status.is_success(), "API returned {}: {}", status, serde_json::to_string_pretty(&resp_body).unwrap());
 
-        let text = resp_body["content"][0]["text"]
-            .as_str()
-            .expect("No text in response content");
+        let text = resp_body["content"][0]["text"].as_str().expect("No text in response content");
 
-        assert!(
-            text.to_lowercase().contains("general kenobi"),
-            "Expected 'General Kenobi' in response, got: {}",
-            text
-        );
+        assert!(text.to_lowercase().contains("general kenobi"), "Expected 'General Kenobi' in response, got: {}", text);
     }
 
     /// Same as above but with tools and streaming — matches what stream() actually sends.
     #[test]
+    #[ignore] // Requires OAuth token — run with `cargo test -- --ignored`
     fn test_general_kenobi_with_tools_streaming() {
-        let token = ClaudeCodeClient::load_oauth_token()
-            .expect("OAuth token not found or expired — run 'claude login'");
+        let token =
+            ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
 
         let client = Client::new();
 
@@ -977,9 +984,13 @@ mod tests {
         let reader = std::io::BufReader::new(response);
         for line in reader.lines() {
             let line = line.expect("Read error");
-            if !line.starts_with("data: ") { continue; }
+            if !line.starts_with("data: ") {
+                continue;
+            }
             let json_str = &line[6..];
-            if json_str == "[DONE]" { break; }
+            if json_str == "[DONE]" {
+                break;
+            }
             if let Ok(event) = serde_json::from_str::<Value>(json_str) {
                 if event["type"] == "content_block_delta" {
                     if let Some(text) = event["delta"]["text"].as_str() {
@@ -1026,20 +1037,11 @@ mod tests {
         );
 
         // Regular user message should now be an array with reminder first
-        assert!(
-            messages[2]["content"].is_array(),
-            "Regular user message not converted to array"
-        );
+        assert!(messages[2]["content"].is_array(), "Regular user message not converted to array");
         let arr = messages[2]["content"].as_array().unwrap();
         assert_eq!(arr.len(), 2, "Expected 2 blocks (reminder + text)");
-        assert!(
-            arr[0]["text"].as_str().unwrap().contains("system-reminder"),
-            "First block should be system-reminder"
-        );
-        assert_eq!(
-            arr[1]["text"].as_str().unwrap(),
-            "Hello there"
-        );
+        assert!(arr[0]["text"].as_str().unwrap().contains("system-reminder"), "First block should be system-reminder");
+        assert_eq!(arr[1]["text"].as_str().unwrap(), "Hello there");
     }
 
     /// Test inject_system_reminder: when no eligible message, prepends fallback pair
@@ -1089,8 +1091,13 @@ mod tests {
         ensure_message_alternation(&mut messages);
 
         // Should have 5: prepended user "ok", assistant, tool_result user, placeholder assistant, merged text user
-        assert_eq!(messages.len(), 5, "Got {} messages: {:?}",
-            messages.len(), messages.iter().map(|m| m["role"].as_str().unwrap_or("?")).collect::<Vec<_>>());
+        assert_eq!(
+            messages.len(),
+            5,
+            "Got {} messages: {:?}",
+            messages.len(),
+            messages.iter().map(|m| m["role"].as_str().unwrap_or("?")).collect::<Vec<_>>()
+        );
         assert_eq!(messages[0]["role"], "user"); // prepended because first msg was assistant
         assert_eq!(messages[1]["role"], "assistant");
         assert_eq!(messages[2]["role"], "user");
@@ -1123,8 +1130,10 @@ mod tests {
         assert_eq!(messages.len(), 5);
         // The prepended user message (index 0) should have system-reminder injected
         let user_content = messages[0]["content"].as_array().unwrap();
-        assert!(user_content[0]["text"].as_str().unwrap().contains("system-reminder"),
-            "First block should be system-reminder, got: {:?}", user_content[0]);
+        assert!(
+            user_content[0]["text"].as_str().unwrap().contains("system-reminder"),
+            "First block should be system-reminder, got: {:?}",
+            user_content[0]
+        );
     }
 }
-

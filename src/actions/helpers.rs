@@ -4,8 +4,10 @@ use regex::Regex;
 
 use crate::state::State;
 
-static RE_ID_PREFIX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\[A\d+\]:\s*)+").expect("invalid RE_ID_PREFIX regex"));
-static RE_ID_MULTILINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^\[A\d+\]:\s*").expect("invalid RE_ID_MULTILINE regex"));
+static RE_ID_PREFIX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(\[A\d+\]:\s*)+").expect("invalid RE_ID_PREFIX regex"));
+static RE_ID_MULTILINE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?m)^\[A\d+\]:\s*").expect("invalid RE_ID_MULTILINE regex"));
 
 /// Remove LLM's mistaken ID prefixes like "[A84]: " from responses
 pub fn clean_llm_id_prefix(content: &str) -> String {
@@ -41,11 +43,7 @@ pub fn parse_context_pattern(input: &str) -> Option<String> {
     let rest = &input_lower[1..];
 
     // Skip optional separator (- or _)
-    let num_str = if rest.starts_with('-') || rest.starts_with('_') {
-        &rest[1..]
-    } else {
-        rest
-    };
+    let num_str = if rest.starts_with('-') || rest.starts_with('_') { &rest[1..] } else { rest };
 
     // Parse the number and return the canonical ID format
     num_str.parse::<usize>().ok().map(|n| format!("P{}", n))

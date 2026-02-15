@@ -11,9 +11,9 @@ use reqwest::blocking::Client;
 use secrecy::{ExposeSecret, SecretBox};
 use serde::Serialize;
 
-use super::openai_compat::{self, OaiMessage, BuildOptions, ToolCallAccumulator};
-use super::{LlmClient, LlmRequest, StreamEvent};
 use super::error::LlmError;
+use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
+use super::{LlmClient, LlmRequest, StreamEvent};
 use crate::constants::MAX_RESPONSE_TOKENS;
 
 const GROK_API_ENDPOINT: &str = "https://api.x.ai/v1/chat/completions";
@@ -26,9 +26,7 @@ pub struct GrokClient {
 impl GrokClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
-        Self {
-            api_key: env::var("XAI_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))),
-        }
+        Self { api_key: env::var("XAI_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }
 
@@ -52,15 +50,14 @@ struct GrokRequest {
 
 impl LlmClient for GrokClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self
-            .api_key
-            .as_ref()
-            .ok_or_else(|| LlmError::Auth("XAI_API_KEY not set".into()))?;
+        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("XAI_API_KEY not set".into()))?;
 
         let client = Client::new();
 
         // Collect pending tool result IDs
-        let pending_tool_ids: Vec<String> = request.tool_results.as_ref()
+        let pending_tool_ids: Vec<String> = request
+            .tool_results
+            .as_ref()
             .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
             .unwrap_or_default();
 
@@ -127,16 +124,21 @@ impl LlmClient for GrokClient {
 
             if let Some(resp) = openai_compat::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
-                    if let Some(inp) = usage.prompt_tokens { input_tokens = inp; }
-                    if let Some(out) = usage.completion_tokens { output_tokens = out; }
+                    if let Some(inp) = usage.prompt_tokens {
+                        input_tokens = inp;
+                    }
+                    if let Some(out) = usage.completion_tokens {
+                        output_tokens = out;
+                    }
                 }
 
                 for choice in resp.choices {
                     if let Some(delta) = choice.delta {
                         if let Some(content) = delta.content
-                            && !content.is_empty() {
-                                let _ = tx.send(StreamEvent::Chunk(content));
-                            }
+                            && !content.is_empty()
+                        {
+                            let _ = tx.send(StreamEvent::Chunk(content));
+                        }
                         if let Some(calls) = delta.tool_calls {
                             for call in &calls {
                                 tool_acc.feed(call);
@@ -172,7 +174,7 @@ impl LlmClient for GrokClient {
                     streaming_ok: false,
                     tools_ok: false,
                     error: Some("XAI_API_KEY not set".to_string()),
-                }
+                };
             }
         };
 
@@ -193,16 +195,8 @@ impl LlmClient for GrokClient {
         let auth_ok = auth_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
         if !auth_ok {
-            let error = auth_result
-                .err()
-                .map(|e| e.to_string())
-                .or_else(|| Some("Auth failed".to_string()));
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error,
-            };
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            return super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
         // Test 2: Streaming
@@ -246,11 +240,6 @@ impl LlmClient for GrokClient {
 
         let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
-        super::ApiCheckResult {
-            auth_ok,
-            streaming_ok,
-            tools_ok,
-            error: None,
-        }
+        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
 }

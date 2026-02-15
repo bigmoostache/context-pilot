@@ -17,12 +17,7 @@ impl PaletteCommand {
     pub fn new(id: impl Into<String>, label: impl Into<String>, description: impl Into<String>) -> Self {
         let label = label.into();
         let keywords = vec![label.to_lowercase()];
-        Self {
-            id: id.into(),
-            label,
-            description: description.into(),
-            keywords,
-        }
+        Self { id: id.into(), label, description: description.into(), keywords }
     }
 
     pub fn with_keywords(mut self, keywords: Vec<&str>) -> Self {
@@ -85,50 +80,38 @@ pub fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
 
     // System commands at the top
     commands.push(
-        PaletteCommand::new(
-            "quit",
-            "Quit",
-            "Exit the application (Ctrl+Q)",
-        )
-        .with_keywords(vec!["exit", "close", "q"])
+        PaletteCommand::new("quit", "Quit", "Exit the application (Ctrl+Q)").with_keywords(vec!["exit", "close", "q"]),
     );
 
-    commands.push(
-        PaletteCommand::new(
-            "reload",
-            "Reload",
-            "Reload the TUI",
-        )
-        .with_keywords(vec!["restart", "refresh"])
-    );
+    commands.push(PaletteCommand::new("reload", "Reload", "Reload the TUI").with_keywords(vec!["restart", "refresh"]));
 
-    commands.push(
-        PaletteCommand::new(
-            "config",
-            "Config",
-            "Open configuration panel (Ctrl+H)",
-        )
-        .with_keywords(vec!["settings", "options", "preferences", "provider", "model"])
-    );
+    commands.push(PaletteCommand::new("config", "Config", "Open configuration panel (Ctrl+H)").with_keywords(vec![
+        "settings",
+        "options",
+        "preferences",
+        "provider",
+        "model",
+    ]));
 
     // Conversation entry (special: no Px ID, always first in panels)
     if let Some(conv) = state.context.iter().find(|c| c.context_type == crate::state::ContextType::Conversation) {
         let icon = conv.context_type.icon();
         commands.push(
-            PaletteCommand::new(
-                &conv.id,
-                format!("{} Conversation", icon),
-                "Go to conversation",
-            )
-            .with_keywords(vec!["conversation", "chat", "messages", "panel", "go", "navigate"])
+            PaletteCommand::new(&conv.id, format!("{} Conversation", icon), "Go to conversation").with_keywords(vec![
+                "conversation",
+                "chat",
+                "messages",
+                "panel",
+                "go",
+                "navigate",
+            ]),
         );
     }
 
     // Panel navigation commands (P1, P2, ...)
     // Sort by P-number for consistent ordering
-    let mut sorted_contexts: Vec<_> = state.context.iter()
-        .filter(|c| c.context_type != crate::state::ContextType::Conversation)
-        .collect();
+    let mut sorted_contexts: Vec<_> =
+        state.context.iter().filter(|c| c.context_type != crate::state::ContextType::Conversation).collect();
     sorted_contexts.sort_by(|a, b| {
         let id_a = a.id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
         let id_b = b.id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
@@ -143,7 +126,7 @@ pub fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
                 format!("{} {} {}", &ctx.id, icon, &ctx.name),
                 format!("Go to {} panel", &ctx.name),
             )
-            .with_keywords(vec![&ctx.name, "panel", "go", "navigate"])
+            .with_keywords(vec![&ctx.name, "panel", "go", "navigate"]),
         );
     }
 

@@ -1,11 +1,8 @@
-use ratatui::{
-    prelude::*,
-    widgets::Paragraph,
-};
+use ratatui::{prelude::*, widgets::Paragraph};
 
+use super::{chars, helpers::*, spinner, theme};
 use crate::constants::SIDEBAR_HELP_HEIGHT;
 use crate::state::State;
-use super::{theme, chars, spinner, helpers::*};
 
 /// Maximum number of dynamic contexts (P7+) to show per page
 const MAX_DYNAMIC_PER_PAGE: usize = 10;
@@ -18,8 +15,8 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     let sidebar_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(1),                        // Context list
-            Constraint::Length(SIDEBAR_HELP_HEIGHT),   // Help hints
+            Constraint::Min(1),                      // Context list
+            Constraint::Length(SIDEBAR_HELP_HEIGHT), // Help hints
         ])
         .split(area);
 
@@ -56,7 +53,8 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         .partition(|&i| state.context[i].context_type.is_fixed());
 
     // Render Conversation entry (special: no Px ID, highlights when selected)
-    if let Some(conv_idx) = state.context.iter().position(|c| c.context_type == crate::state::ContextType::Conversation) {
+    if let Some(conv_idx) = state.context.iter().position(|c| c.context_type == crate::state::ContextType::Conversation)
+    {
         let is_selected = conv_idx == state.selected_context;
         let indicator = if is_selected { chars::ARROW_RIGHT } else { " " };
         let indicator_color = if is_selected { theme::accent() } else { theme::bg_base() };
@@ -98,9 +96,8 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
     // Add separator if there are dynamic contexts
     if total_dynamic > 0 {
-        lines.push(Line::from(vec![
-            Span::styled(format!("  {:─<32}", ""), Style::default().fg(theme::border_muted())),
-        ]));
+        lines
+            .push(Line::from(vec![Span::styled(format!("  {:─<32}", ""), Style::default().fg(theme::border_muted()))]));
 
         // Render dynamic contexts for current page
         for &i in &page_indices {
@@ -110,20 +107,19 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
         // Page indicator (only if more than one page)
         if total_pages > 1 {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!("  page {}/{}", current_page + 1, total_pages),
-                    Style::default().fg(theme::text_muted()),
-                ),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                format!("  page {}/{}", current_page + 1, total_pages),
+                Style::default().fg(theme::text_muted()),
+            )]));
         }
     }
 
     // Separator
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled(format!(" {}", chars::HORIZONTAL.repeat(34)), Style::default().fg(theme::border())),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        format!(" {}", chars::HORIZONTAL.repeat(34)),
+        Style::default().fg(theme::border()),
+    )]));
 
     // Token usage bar - full width
     let bar_width = 34usize;
@@ -240,9 +236,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
                 return None;
             }
 
-            let fmt = |cost: &str| -> String {
-                if cost.is_empty() { String::new() } else { format!("${}", cost) }
-            };
+            let fmt = |cost: &str| -> String { if cost.is_empty() { String::new() } else { format!("${}", cost) } };
 
             Some(vec![
                 Cell::new("", Style::default()),
@@ -260,16 +254,30 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
         // strm row
         if state.stream_output_tokens > 0 || state.stream_cache_hit_tokens > 0 || state.stream_cache_miss_tokens > 0 {
-            rows.push(counts_row("strm", state.stream_cache_hit_tokens, state.stream_cache_miss_tokens, state.stream_output_tokens));
-            if let Some(row) = costs_row(state.stream_cache_hit_tokens, state.stream_cache_miss_tokens, state.stream_output_tokens) {
+            rows.push(counts_row(
+                "strm",
+                state.stream_cache_hit_tokens,
+                state.stream_cache_miss_tokens,
+                state.stream_output_tokens,
+            ));
+            if let Some(row) =
+                costs_row(state.stream_cache_hit_tokens, state.stream_cache_miss_tokens, state.stream_output_tokens)
+            {
                 rows.push(row);
             }
         }
 
         // tick row
         if state.tick_output_tokens > 0 || state.tick_cache_hit_tokens > 0 || state.tick_cache_miss_tokens > 0 {
-            rows.push(counts_row("tick", state.tick_cache_hit_tokens, state.tick_cache_miss_tokens, state.tick_output_tokens));
-            if let Some(row) = costs_row(state.tick_cache_hit_tokens, state.tick_cache_miss_tokens, state.tick_output_tokens) {
+            rows.push(counts_row(
+                "tick",
+                state.tick_cache_hit_tokens,
+                state.tick_cache_miss_tokens,
+                state.tick_output_tokens,
+            ));
+            if let Some(row) =
+                costs_row(state.tick_cache_hit_tokens, state.tick_cache_miss_tokens, state.tick_output_tokens)
+            {
                 rows.push(row);
             }
         }
@@ -281,19 +289,16 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
             + crate::state::State::token_cost(state.cache_miss_tokens, miss_price)
             + crate::state::State::token_cost(state.total_output_tokens, out_price);
         if total_cost >= 0.001 {
-            let total_str = if total_cost < 0.01 {
-                format!("${:.3}", total_cost)
-            } else {
-                format!("${:.2}", total_cost)
-            };
-            lines.push(Line::from(vec![
-                Span::styled(format!(" total: {}", total_str), Style::default().fg(theme::text_muted())),
-            ]));
+            let total_str =
+                if total_cost < 0.01 { format!("${:.3}", total_cost) } else { format!("${:.2}", total_cost) };
+            lines.push(Line::from(vec![Span::styled(
+                format!(" total: {}", total_str),
+                Style::default().fg(theme::text_muted()),
+            )]));
         }
     }
 
-    let paragraph = Paragraph::new(lines)
-        .style(base_style);
+    let paragraph = Paragraph::new(lines).style(base_style);
     frame.render_widget(paragraph, sidebar_layout[0]);
 
     // Help hints at bottom of sidebar
@@ -321,8 +326,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         ]),
     ];
 
-    let help_paragraph = Paragraph::new(help_lines)
-        .style(base_style);
+    let help_paragraph = Paragraph::new(help_lines).style(base_style);
     frame.render_widget(help_paragraph, sidebar_layout[1]);
 }
 

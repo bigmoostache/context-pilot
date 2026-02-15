@@ -1,5 +1,5 @@
-use crate::tools::{ToolResult, ToolUse};
 use crate::state::{ScratchpadCell, State};
+use crate::tools::{ToolResult, ToolUse};
 
 /// Create a new scratchpad cell
 pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -10,7 +10,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'cell_title' parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -21,27 +21,20 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'cell_contents' parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
     let id = format!("C{}", state.next_scratchpad_id);
     state.next_scratchpad_id += 1;
 
-    state.scratchpad_cells.push(ScratchpadCell {
-        id: id.clone(),
-        title: title.clone(),
-        content: contents.clone(),
-    });
+    state.scratchpad_cells.push(ScratchpadCell { id: id.clone(), title: title.clone(), content: contents.clone() });
 
     // Update Scratchpad panel timestamp
     state.touch_panel(crate::state::ContextType::Scratchpad);
 
-    let preview = if contents.len() > 50 {
-        format!("{}...", &contents[..contents.floor_char_boundary(47)])
-    } else {
-        contents
-    };
+    let preview =
+        if contents.len() > 50 { format!("{}...", &contents[..contents.floor_char_boundary(47)]) } else { contents };
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -59,7 +52,7 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'cell_id' parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -95,11 +88,9 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             }
         }
-        None => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Cell not found: {}", cell_id),
-            is_error: true,
-        },
+        None => {
+            ToolResult { tool_use_id: tool.id.clone(), content: format!("Cell not found: {}", cell_id), is_error: true }
+        }
     }
 }
 
@@ -112,7 +103,7 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'cell_ids' array parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
@@ -130,10 +121,7 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Otherwise, delete specific cells
-    let ids_to_delete: Vec<String> = cell_ids
-        .iter()
-        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-        .collect();
+    let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
 
     let initial_count = state.scratchpad_cells.len();
     state.scratchpad_cells.retain(|c| !ids_to_delete.contains(&c.id));
@@ -151,9 +139,5 @@ pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         state.touch_panel(crate::state::ContextType::Scratchpad);
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: output,
-        is_error: deleted_count == 0,
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: deleted_count == 0 }
 }

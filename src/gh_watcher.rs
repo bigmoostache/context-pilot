@@ -3,7 +3,7 @@
 //! Uses HTTP ETags for `gh api` commands and output hashing for other `gh`
 //! commands to efficiently detect changes. Respects the `X-Poll-Interval`
 //! header from GitHub API responses to dynamically adjust per-watch polling
-//! frequency. Sends `CacheUpdate::GithubResultContent` through the shared
+//! frequency. Sends `CacheUpdate::Content` through the shared
 //! `cache_tx` channel when content changes.
 
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 use secrecy::{ExposeSecret, SecretBox};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 use crate::cache::CacheUpdate;
 use crate::constants::{GH_CMD_TIMEOUT_SECS, MAX_RESULT_CONTENT_BYTES};
@@ -65,10 +65,7 @@ impl GhWatcher {
             poll_loop(watches_clone, cache_tx);
         });
 
-        Self {
-            watches,
-            _thread: thread,
-        }
+        Self { watches, _thread: thread }
     }
 
     /// Reconcile the watch list with current GithubResult panels.
@@ -78,8 +75,7 @@ impl GhWatcher {
         let mut watches = self.watches.lock().unwrap_or_else(|e| e.into_inner());
 
         // Remove watches for panels that no longer exist
-        let active_ids: std::collections::HashSet<&str> =
-            panels.iter().map(|(id, _, _)| id.as_str()).collect();
+        let active_ids: std::collections::HashSet<&str> = panels.iter().map(|(id, _, _)| id.as_str()).collect();
         watches.retain(|id, _| active_ids.contains(id.as_str()));
 
         // Add watches for new panels
@@ -96,16 +92,19 @@ impl GhWatcher {
             let is_api_command = is_api_command(&args);
 
             let token = Arc::new(SecretBox::new(Box::new(github_token.clone())));
-            watches.insert(context_id.clone(), GhWatch {
-                context_id: context_id.clone(),
-                github_token: token,
-                args,
-                is_api_command,
-                etag: None,
-                last_output_hash: None,
-                poll_interval_secs: GH_DEFAULT_POLL_INTERVAL_SECS,
-                last_poll_ms: 0, // Poll immediately on first sync; initial content comes from cache system but we want fast change detection
-            });
+            watches.insert(
+                context_id.clone(),
+                GhWatch {
+                    context_id: context_id.clone(),
+                    github_token: token,
+                    args,
+                    is_api_command,
+                    etag: None,
+                    last_output_hash: None,
+                    poll_interval_secs: GH_DEFAULT_POLL_INTERVAL_SECS,
+                    last_poll_ms: 0, // Poll immediately on first sync; initial content comes from cache system but we want fast change detection
+                },
+            );
         }
     }
 }
@@ -125,7 +124,7 @@ fn is_api_command(args: &[String]) -> bool {
 ///
 /// The normal cache invalidation pattern is two-phase: mark a panel dirty
 /// (`cache_deprecated = true`), then let the cache pipeline re-fetch data.
-/// This watcher shortcuts that by sending `CacheUpdate::GithubResultContent`
+/// This watcher shortcuts that by sending `CacheUpdate::Content`
 /// directly through `cache_tx`.
 ///
 /// This is intentional: both polling methods (ETag-based and hash-based)
@@ -142,16 +141,19 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
         // Snapshot only watches that are due for polling
         let due: Vec<DueWatch> = {
             let watches = watches.lock().unwrap_or_else(|e| e.into_inner());
-            watches.values()
+            watches
+                .values()
                 .filter(|w| current_ms.saturating_sub(w.last_poll_ms) >= w.poll_interval_secs * 1000)
-                .map(|w| (
-                    w.context_id.clone(),
-                    w.args.clone(),
-                    Arc::clone(&w.github_token),
-                    w.is_api_command,
-                    w.etag.clone(),
-                    w.last_output_hash.clone(),
-                ))
+                .map(|w| {
+                    (
+                        w.context_id.clone(),
+                        w.args.clone(),
+                        Arc::clone(&w.github_token),
+                        w.is_api_command,
+                        w.etag.clone(),
+                        w.last_output_hash.clone(),
+                    )
+                })
                 .collect()
         };
 
@@ -179,12 +181,7 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
                     let body = truncate_output(&body, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&body);
 
-                    let _ = cache_tx.send(CacheUpdate::GithubResultContent {
-                        context_id,
-                        content: body,
-                        token_count,
-                        is_error: false,
-                    });
+                    let _ = cache_tx.send(CacheUpdate::Content { context_id, content: body, token_count });
                 }
             } else {
                 let result = poll_cli_command(&args, token_str, last_hash.as_deref());
@@ -205,12 +202,7 @@ fn poll_loop(watches: Arc<Mutex<HashMap<String, GhWatch>>>, cache_tx: Sender<Cac
                     let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&content);
 
-                    let _ = cache_tx.send(CacheUpdate::GithubResultContent {
-                        context_id,
-                        content,
-                        token_count,
-                        is_error: false,
-                    });
+                    let _ = cache_tx.send(CacheUpdate::Content { context_id, content, token_count });
                 }
             }
         }
@@ -269,10 +261,7 @@ fn poll_api_command(args: &[String], github_token: &str, current_etag: Option<&s
 
     // 200 OK: parse headers and body
     let (new_etag, poll_interval, body) = parse_api_response(&stdout);
-    ApiPollOutcome {
-        content: Some((new_etag, body)),
-        poll_interval,
-    }
+    ApiPollOutcome { content: Some((new_etag, body)), poll_interval }
 }
 
 /// Poll a non-API `gh` command using output hash comparison.
@@ -324,8 +313,7 @@ fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String) {
     };
 
     let etag = extract_header(headers, "etag");
-    let poll_interval = extract_header(headers, "x-poll-interval")
-        .and_then(|v| v.parse::<u64>().ok());
+    let poll_interval = extract_header(headers, "x-poll-interval").and_then(|v| v.parse::<u64>().ok());
 
     (etag, poll_interval, body.to_string())
 }
@@ -334,19 +322,14 @@ fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String) {
 fn extract_header(headers: &str, name: &str) -> Option<String> {
     let prefix = format!("{}:", name);
     headers.lines().find_map(|line| {
-        if line.to_lowercase().starts_with(&prefix) {
-            Some(line[prefix.len()..].trim().to_string())
-        } else {
-            None
-        }
+        if line.to_lowercase().starts_with(&prefix) { Some(line[prefix.len()..].trim().to_string()) } else { None }
     })
 }
 
 /// Try to extract X-Poll-Interval from raw output (for 304 responses where
 /// gh may still emit response headers to stdout).
 fn extract_poll_interval(stdout: &str) -> Option<u64> {
-    extract_header(stdout, "x-poll-interval")
-        .and_then(|v| v.parse::<u64>().ok())
+    extract_header(stdout, "x-poll-interval").and_then(|v| v.parse::<u64>().ok())
 }
 
 /// Compute SHA-256 hex hash of a string
@@ -358,11 +341,7 @@ fn sha256_hex(input: &str) -> String {
 
 /// Redact a GitHub token from command output if accidentally leaked.
 fn redact_token(output: &str, token: &str) -> String {
-    if token.len() >= 8 && output.contains(token) {
-        output.replace(token, "[REDACTED]")
-    } else {
-        output.to_string()
-    }
+    if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_string() }
 }
 
 #[cfg(test)]
@@ -472,13 +451,15 @@ mod tests {
 
     #[test]
     fn test_is_api_command_with_template() {
-        let args: Vec<String> = vec!["api", "/repos/foo/bar", "--template", "{{.name}}"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> =
+            vec!["api", "/repos/foo/bar", "--template", "{{.name}}"].iter().map(|s| s.to_string()).collect();
         assert!(!is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_with_short_template() {
-        let args: Vec<String> = vec!["api", "/repos/foo/bar", "-t", "{{.name}}"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> =
+            vec!["api", "/repos/foo/bar", "-t", "{{.name}}"].iter().map(|s| s.to_string()).collect();
         assert!(!is_api_command(&args));
     }
 

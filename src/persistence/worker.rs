@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::constants::{STORE_DIR, STATES_DIR};
+use crate::constants::{STATES_DIR, STORE_DIR};
 use crate::state::WorkerState;
 
 fn states_dir() -> PathBuf {
@@ -20,5 +20,3 @@ pub fn load_worker(worker_id: &str) -> Option<WorkerState> {
     let json = fs::read_to_string(&path).ok()?;
     serde_json::from_str(&json).ok()
 }
-
-

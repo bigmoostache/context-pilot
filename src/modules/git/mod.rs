@@ -1,8 +1,8 @@
-pub mod types;
-pub mod classify;
 pub mod cache_invalidation;
+pub mod classify;
 mod panel;
 pub(crate) mod tools;
+pub mod types;
 
 /// Refresh interval for git status (milliseconds)
 pub const GIT_STATUS_REFRESH_MS: u64 = 2_000; // 2 seconds
@@ -11,8 +11,8 @@ use serde_json::json;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use self::panel::{GitPanel, GitResultPanel};
 use super::Module;
@@ -20,9 +20,15 @@ use super::Module;
 pub struct GitModule;
 
 impl Module for GitModule {
-    fn id(&self) -> &'static str { "git" }
-    fn name(&self) -> &'static str { "Git" }
-    fn description(&self) -> &'static str { "Git version control tools and status panel" }
+    fn id(&self) -> &'static str {
+        "git"
+    }
+    fn name(&self) -> &'static str {
+        "Git"
+    }
+    fn description(&self) -> &'static str {
+        "Git version control tools and status panel"
+    }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         json!({
@@ -69,7 +75,8 @@ impl Module for GitModule {
                 description: "Executes a git command. Read-only commands (log, diff, show, status, blame, etc.) \
                     create a dynamic result panel that auto-refreshes. Mutating commands (commit, push, pull, \
                     merge, rebase, etc.) execute directly and return output. Shell operators (|, ;, &&) are \
-                    not allowed.".to_string(),
+                    not allowed."
+                    .to_string(),
                 params: vec![
                     ToolParam::new("command", ParamType::String)
                         .desc("Full git command string (e.g., 'git log --oneline -10', 'git commit -m \"message\"')")
@@ -83,12 +90,11 @@ impl Module for GitModule {
                 name: "Configure Git Panel".to_string(),
                 short_desc: "Configure P6 panel".to_string(),
                 description: "Configures the P6 git status panel. Can toggle diff display, log display, \
-                    change log arguments, and set a diff base ref for comparison.".to_string(),
+                    change log arguments, and set a diff base ref for comparison."
+                    .to_string(),
                 params: vec![
-                    ToolParam::new("show_diffs", ParamType::Boolean)
-                        .desc("Show full diff content in P6 panel"),
-                    ToolParam::new("show_logs", ParamType::Boolean)
-                        .desc("Show recent commit history in P6 panel"),
+                    ToolParam::new("show_diffs", ParamType::Boolean).desc("Show full diff content in P6 panel"),
+                    ToolParam::new("show_logs", ParamType::Boolean).desc("Show recent commit history in P6 panel"),
                     ToolParam::new("log_args", ParamType::String)
                         .desc("Custom git log arguments (e.g., '-10 --oneline')"),
                     ToolParam::new("diff_base", ParamType::String)

@@ -5,18 +5,14 @@ use std::thread;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
-use crate::constants::{MODEL_TLDR, MAX_TLDR_TOKENS, API_ENDPOINT, API_VERSION, prompts};
+use crate::constants::{API_ENDPOINT, API_VERSION, MAX_TLDR_TOKENS, MODEL_TLDR, prompts};
 use crate::llms::error::LlmError;
 use crate::state::estimate_tokens;
 
 /// Simple debug logging to file
 fn log(msg: &str) {
     use std::io::Write;
-    if let Ok(mut f) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("tldr_debug.log")
-    {
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("tldr_debug.log") {
         let _ = writeln!(f, "{}", msg);
     }
 }
@@ -39,11 +35,7 @@ pub fn generate_tldr(message_id: String, content: String, tx: Sender<TlDrResult>
         // If short enough, use content directly
         if token_count < prompts::tldr_min_tokens() {
             log("Using content directly (short message)");
-            let result = tx.send(TlDrResult {
-                message_id,
-                tl_dr: content,
-                token_count,
-            });
+            let result = tx.send(TlDrResult { message_id, tl_dr: content, token_count });
             log(&format!("Send result: {:?}", result.is_ok()));
             return;
         }
@@ -54,28 +46,16 @@ pub fn generate_tldr(message_id: String, content: String, tx: Sender<TlDrResult>
             Ok(summary) => {
                 log(&format!("Got summary: {}", &summary[..summary.len().min(50)]));
                 let summary_tokens = estimate_tokens(&summary);
-                let result = tx.send(TlDrResult {
-                    message_id,
-                    tl_dr: summary,
-                    token_count: summary_tokens,
-                });
+                let result = tx.send(TlDrResult { message_id, tl_dr: summary, token_count: summary_tokens });
                 log(&format!("Send result: {:?}", result.is_ok()));
             }
             Err(e) => {
                 log(&format!("LLM error: {}", e));
                 // On error, truncate content as fallback
                 let truncated: String = content.chars().take(100).collect();
-                let truncated = if content.len() > 100 {
-                    format!("{}...", truncated)
-                } else {
-                    truncated
-                };
+                let truncated = if content.len() > 100 { format!("{}...", truncated) } else { truncated };
                 let token_count = estimate_tokens(&truncated);
-                let result = tx.send(TlDrResult {
-                    message_id,
-                    tl_dr: truncated,
-                    token_count,
-                });
+                let result = tx.send(TlDrResult { message_id, tl_dr: truncated, token_count });
                 log(&format!("Fallback send result: {:?}", result.is_ok()));
             }
         }
@@ -85,8 +65,7 @@ pub fn generate_tldr(message_id: String, content: String, tx: Sender<TlDrResult>
 /// Call LLM to summarize content
 fn summarize_content(content: &str) -> Result<String, LlmError> {
     dotenvy::dotenv().ok();
-    let api_key = env::var("ANTHROPIC_API_KEY")
-        .map_err(|_| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
+    let api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
 
     let client = Client::new();
 
@@ -138,13 +117,7 @@ fn summarize_content(content: &str) -> Result<String, LlmError> {
         return Err(LlmError::Api { status, body });
     }
 
-    let result: SummaryResponse = response
-        .json()
-        .map_err(|e| LlmError::Parse(e.to_string()))?;
+    let result: SummaryResponse = response.json().map_err(|e| LlmError::Parse(e.to_string()))?;
 
-    result
-        .content
-        .first()
-        .and_then(|c| c.text.clone())
-        .ok_or_else(|| LlmError::Parse("No content in response".into()))
+    result.content.first().and_then(|c| c.text.clone()).ok_or_else(|| LlmError::Parse("No content in response".into()))
 }

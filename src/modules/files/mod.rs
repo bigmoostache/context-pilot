@@ -3,8 +3,8 @@ mod tools;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use self::panel::FilePanel;
 use super::Module;
@@ -12,11 +12,21 @@ use super::Module;
 pub struct FilesModule;
 
 impl Module for FilesModule {
-    fn id(&self) -> &'static str { "files" }
-    fn name(&self) -> &'static str { "Files" }
-    fn description(&self) -> &'static str { "File open, edit, write, and create tools" }
-    fn is_core(&self) -> bool { true }
-    fn is_global(&self) -> bool { true }
+    fn id(&self) -> &'static str {
+        "files"
+    }
+    fn name(&self) -> &'static str {
+        "Files"
+    }
+    fn description(&self) -> &'static str {
+        "File open, edit, write, and create tools"
+    }
+    fn is_core(&self) -> bool {
+        true
+    }
+    fn is_global(&self) -> bool {
+        true
+    }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
         vec![ContextType::File]
@@ -91,7 +101,6 @@ impl Module for FilesModule {
             "file_open" => Some(self::tools::file::execute_open(tool, state)),
             "file_edit" => Some(self::tools::edit_file::execute_edit(tool, state)),
             "file_write" => Some(self::tools::write::execute(tool, state)),
-
 
             _ => None,
         }

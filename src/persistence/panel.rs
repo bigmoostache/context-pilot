@@ -4,7 +4,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::constants::{STORE_DIR, PANELS_DIR};
+use crate::constants::{PANELS_DIR, STORE_DIR};
 use crate::state::PanelData;
 
 fn panels_dir() -> PathBuf {
@@ -21,5 +21,3 @@ pub fn load_panel(uid: &str) -> Option<PanelData> {
     let json = fs::read_to_string(&path).ok()?;
     serde_json::from_str(&json).ok()
 }
-
-

@@ -8,14 +8,13 @@ pub mod theme;
 
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, BorderType, Clear, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
 use crate::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT};
 use crate::core::panels;
-use crate::perf::{PERF, FRAME_BUDGET_60FPS, FRAME_BUDGET_30FPS};
+use crate::perf::{FRAME_BUDGET_30FPS, FRAME_BUDGET_60FPS, PERF};
 use crate::state::{ContextType, State};
-
 
 pub fn render(frame: &mut Frame, state: &mut State) {
     PERF.frame_start();
@@ -23,17 +22,14 @@ pub fn render(frame: &mut Frame, state: &mut State) {
     let area = frame.area();
 
     // Fill base background
-    frame.render_widget(
-        Block::default().style(Style::default().bg(theme::bg_base())),
-        area
-    );
+    frame.render_widget(Block::default().style(Style::default().bg(theme::bg_base())), area);
 
     // Main layout: body + footer (no header)
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(1),                        // Body
-            Constraint::Length(STATUS_BAR_HEIGHT),    // Status bar
+            Constraint::Min(1),                    // Body
+            Constraint::Length(STATUS_BAR_HEIGHT), // Status bar
         ])
         .split(area);
 
@@ -58,8 +54,8 @@ fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
     let body_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Length(SIDEBAR_WIDTH),  // Sidebar
-            Constraint::Min(1),                 // Main content
+            Constraint::Length(SIDEBAR_WIDTH), // Sidebar
+            Constraint::Min(1),                // Main content
         ])
         .split(area);
 
@@ -74,9 +70,8 @@ fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
 
 fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
     let _guard = crate::profile!("ui::render_panel");
-    let context_type = state.context.get(state.selected_context)
-        .map(|c| c.context_type)
-        .unwrap_or(ContextType::Conversation);
+    let context_type =
+        state.context.get(state.selected_context).map(|c| c.context_type).unwrap_or(ContextType::Conversation);
 
     let panel = panels::get_panel(context_type);
     panel.render(frame, state, area);
@@ -100,16 +95,15 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
 
     // FPS and frame time
-    let fps = if snapshot.frame_avg_ms > 0.0 {
-        1000.0 / snapshot.frame_avg_ms
-    } else {
-        0.0
-    };
+    let fps = if snapshot.frame_avg_ms > 0.0 { 1000.0 / snapshot.frame_avg_ms } else { 0.0 };
     let fps_color = frame_time_color(snapshot.frame_avg_ms);
 
     lines.push(Line::from(vec![
         Span::styled(format!(" FPS: {:.0}", fps), Style::default().fg(fps_color).bold()),
-        Span::styled(format!("  Frame: {:.1}ms avg  {:.1}ms max", snapshot.frame_avg_ms, snapshot.frame_max_ms), Style::default().fg(theme::text_muted())),
+        Span::styled(
+            format!("  Frame: {:.1}ms avg  {:.1}ms max", snapshot.frame_avg_ms, snapshot.frame_max_ms),
+            Style::default().fg(theme::text_muted()),
+        ),
     ]));
 
     // CPU and RAM line
@@ -145,41 +139,46 @@ fn render_perf_overlay(frame: &mut Frame, area: Rect) {
         Cell::right("Cumul", Style::default()),
     ];
 
-    let rows: Vec<Vec<Cell>> = snapshot.ops.iter().take(10).map(|op| {
-        let pct = if total_time > 0.0 { op.total_ms / total_time * 100.0 } else { 0.0 };
-        let is_hotspot = pct > 30.0;
+    let rows: Vec<Vec<Cell>> = snapshot
+        .ops
+        .iter()
+        .take(10)
+        .map(|op| {
+            let pct = if total_time > 0.0 { op.total_ms / total_time * 100.0 } else { 0.0 };
+            let is_hotspot = pct > 30.0;
 
-        let name = truncate_op_name(op.name, 24);
-        let name_str = if is_hotspot { format!("! {}", name) } else { format!("  {}", name) };
+            let name = truncate_op_name(op.name, 24);
+            let name_str = if is_hotspot { format!("! {}", name) } else { format!("  {}", name) };
 
-        let name_style = if is_hotspot {
-            Style::default().fg(theme::warning()).bold()
-        } else {
-            Style::default().fg(theme::text())
-        };
+            let name_style = if is_hotspot {
+                Style::default().fg(theme::warning()).bold()
+            } else {
+                Style::default().fg(theme::text())
+            };
 
-        let mean_color = frame_time_color(op.mean_ms);
-        let std_color = if op.std_ms < 1.0 {
-            theme::success()
-        } else if op.std_ms < 5.0 {
-            theme::warning()
-        } else {
-            theme::error()
-        };
+            let mean_color = frame_time_color(op.mean_ms);
+            let std_color = if op.std_ms < 1.0 {
+                theme::success()
+            } else if op.std_ms < 5.0 {
+                theme::warning()
+            } else {
+                theme::error()
+            };
 
-        let cumul_str = if op.total_ms >= 1000.0 {
-            format!("{:.1}s", op.total_ms / 1000.0)
-        } else {
-            format!("{:.0}ms", op.total_ms)
-        };
+            let cumul_str = if op.total_ms >= 1000.0 {
+                format!("{:.1}s", op.total_ms / 1000.0)
+            } else {
+                format!("{:.0}ms", op.total_ms)
+            };
 
-        vec![
-            Cell::new(name_str, name_style),
-            Cell::right(format!("{:.2}ms", op.mean_ms), Style::default().fg(mean_color)),
-            Cell::right(format!("{:.2}ms", op.std_ms), Style::default().fg(std_color)),
-            Cell::right(cumul_str, Style::default().fg(theme::text_muted())),
-        ]
-    }).collect();
+            vec![
+                Cell::new(name_str, name_style),
+                Cell::right(format!("{:.2}ms", op.mean_ms), Style::default().fg(mean_color)),
+                Cell::right(format!("{:.2}ms", op.std_ms), Style::default().fg(std_color)),
+                Cell::right(cumul_str, Style::default().fg(theme::text_muted())),
+            ]
+        })
+        .collect();
 
     lines.extend(render_table(&header, &rows, None, 1));
 
@@ -230,7 +229,10 @@ fn render_budget_bar(current_ms: f64, label: &str, budget_ms: f64) -> Line<'stat
     Line::from(vec![
         Span::styled(format!(" {:<6}", label), Style::default().fg(theme::text_muted())),
         Span::styled(chars::BLOCK_FULL.repeat(filled.min(bar_width)), Style::default().fg(color)),
-        Span::styled(chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)), Style::default().fg(theme::bg_elevated())),
+        Span::styled(
+            chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)),
+            Style::default().fg(theme::bg_elevated()),
+        ),
         Span::styled(format!(" {:>5.0}%", pct), Style::default().fg(color)),
     ])
 }
@@ -261,11 +263,7 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
 }
 
 fn truncate_op_name(name: &str, max_len: usize) -> String {
-    if name.len() <= max_len {
-        name.to_string()
-    } else {
-        format!("..{}", &name[name.len() - max_len + 2..])
-    }
+    if name.len() <= max_len { name.to_string() } else { format!("..{}", &name[name.len() - max_len + 2..]) }
 }
 
 fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
@@ -281,9 +279,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
 
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled("  LLM Provider", Style::default().fg(theme::text_secondary()).bold()),
-    ]));
+    lines.push(Line::from(vec![Span::styled("  LLM Provider", Style::default().fg(theme::text_secondary()).bold())]));
     lines.push(Line::from(""));
 
     // Provider options
@@ -300,11 +296,8 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         let indicator = if is_selected { ">" } else { " " };
         let check = if is_selected { "[x]" } else { "[ ]" };
 
-        let style = if is_selected {
-            Style::default().fg(theme::accent()).bold()
-        } else {
-            Style::default().fg(theme::text())
-        };
+        let style =
+            if is_selected { Style::default().fg(theme::accent()).bold() } else { Style::default().fg(theme::text()) };
 
         lines.push(Line::from(vec![
             Span::styled(format!("  {} ", indicator), Style::default().fg(theme::accent())),
@@ -315,15 +308,14 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {}", chars::HORIZONTAL.repeat(50)),
+        Style::default().fg(theme::border()),
+    )]));
     lines.push(Line::from(""));
 
     // Model selection based on current provider
-    lines.push(Line::from(vec![
-        Span::styled("  Model", Style::default().fg(theme::text_secondary()).bold()),
-    ]));
+    lines.push(Line::from(vec![Span::styled("  Model", Style::default().fg(theme::text_secondary()).bold())]));
     lines.push(Line::from(""));
 
     match state.llm_provider {
@@ -338,10 +330,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
             }
         }
         LlmProvider::Grok => {
-            for (model, key) in [
-                (GrokModel::Grok41Fast, "a"),
-                (GrokModel::Grok4Fast, "b"),
-            ] {
+            for (model, key) in [(GrokModel::Grok41Fast, "a"), (GrokModel::Grok4Fast, "b")] {
                 let is_selected = state.grok_model == model;
                 render_model_line_with_info(&mut lines, is_selected, key, &model);
             }
@@ -358,10 +347,7 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
             }
         }
         LlmProvider::DeepSeek => {
-            for (model, key) in [
-                (DeepSeekModel::DeepseekChat, "a"),
-                (DeepSeekModel::DeepseekReasoner, "b"),
-            ] {
+            for (model, key) in [(DeepSeekModel::DeepseekChat, "a"), (DeepSeekModel::DeepseekReasoner, "b")] {
                 let is_selected = state.deepseek_model == model;
                 render_model_line_with_info(&mut lines, is_selected, key, &model);
             }
@@ -385,9 +371,15 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
             (normalize_icon("✗"), theme::error(), err.as_str())
         } else {
             let mut issues = Vec::new();
-            if !result.auth_ok { issues.push("auth"); }
-            if !result.streaming_ok { issues.push("streaming"); }
-            if !result.tools_ok { issues.push("tools"); }
+            if !result.auth_ok {
+                issues.push("auth");
+            }
+            if !result.streaming_ok {
+                issues.push("streaming");
+            }
+            if !result.tools_ok {
+                issues.push("tools");
+            }
             (normalize_icon("!"), theme::warning(), if issues.is_empty() { "Unknown issue" } else { "Issues detected" })
         };
         lines.push(Line::from(vec![
@@ -397,9 +389,10 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {}", chars::HORIZONTAL.repeat(50)),
+        Style::default().fg(theme::border()),
+    )]));
     lines.push(Line::from(""));
 
     // Helper to format token count
@@ -419,7 +412,14 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     let selected = state.config_selected_bar;
 
     // Helper to render a progress bar with selection indicator
-    let render_bar = |lines: &mut Vec<Line>, idx: usize, label: &str, pct: usize, filled: usize, tokens: usize, bar_color: Color, extra: Option<&str>| {
+    let render_bar = |lines: &mut Vec<Line>,
+                      idx: usize,
+                      label: &str,
+                      pct: usize,
+                      filled: usize,
+                      tokens: usize,
+                      bar_color: Color,
+                      extra: Option<&str>| {
         let is_selected = selected == idx;
         let indicator = if is_selected { ">" } else { " " };
         let label_style = if is_selected {
@@ -436,10 +436,16 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
         lines.push(Line::from(vec![
             Span::styled("   ◀ ", Style::default().fg(arrow_color)),
             Span::styled(chars::BLOCK_FULL.repeat(filled.min(bar_width)), Style::default().fg(bar_color)),
-            Span::styled(chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)), Style::default().fg(theme::bg_elevated())),
+            Span::styled(
+                chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)),
+                Style::default().fg(theme::bg_elevated()),
+            ),
             Span::styled(" ▶ ", Style::default().fg(arrow_color)),
             Span::styled(format!("{}%", pct), Style::default().fg(theme::text()).bold()),
-            Span::styled(format!("  {} tok{}", format_tokens(tokens), extra.unwrap_or("")), Style::default().fg(theme::text_muted())),
+            Span::styled(
+                format!("  {} tok{}", format_tokens(tokens), extra.unwrap_or("")),
+                Style::default().fg(theme::text_muted()),
+            ),
         ]));
     };
 
@@ -452,7 +458,16 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     let threshold_pct = (state.cleaning_threshold * 100.0) as usize;
     let threshold_tokens = state.cleaning_threshold_tokens();
     let threshold_filled = ((state.cleaning_threshold * bar_width as f32) as usize).min(bar_width);
-    render_bar(&mut lines, 1, "Clean Trigger", threshold_pct, threshold_filled, threshold_tokens, theme::warning(), None);
+    render_bar(
+        &mut lines,
+        1,
+        "Clean Trigger",
+        threshold_pct,
+        threshold_filled,
+        threshold_tokens,
+        theme::warning(),
+        None,
+    );
 
     // 3. Target Cleaning
     let target_pct = (state.cleaning_target_proportion * 100.0) as usize;
@@ -463,20 +478,19 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     render_bar(&mut lines, 2, "Clean Target", target_pct, target_filled, target_tokens, theme::accent(), Some(&extra));
 
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {}", chars::HORIZONTAL.repeat(50)),
+        Style::default().fg(theme::border()),
+    )]));
     lines.push(Line::from(""));
 
     // Theme selection
-    lines.push(Line::from(vec![
-        Span::styled("  Theme", Style::default().fg(theme::text_secondary()).bold()),
-    ]));
+    lines.push(Line::from(vec![Span::styled("  Theme", Style::default().fg(theme::text_secondary()).bold())]));
     lines.push(Line::from(""));
 
     // Show current theme with preview icons
     {
-        use crate::config::{get_theme, THEME_ORDER};
+        use crate::config::{THEME_ORDER, get_theme};
         let current_theme = get_theme(&state.active_theme);
 
         // Show theme name and preview icons
@@ -484,28 +498,35 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
             Span::styled("   ◀ ", Style::default().fg(theme::accent())),
             Span::styled(format!("{:<12}", current_theme.name), Style::default().fg(theme::accent()).bold()),
             Span::styled(" ▶  ", Style::default().fg(theme::accent())),
-            Span::styled(format!("{} {} {} {}",
-                current_theme.messages.user,
-                current_theme.messages.assistant,
-                current_theme.context.tree,
-                current_theme.context.file,
-            ), Style::default().fg(theme::text())),
+            Span::styled(
+                format!(
+                    "{} {} {} {}",
+                    current_theme.messages.user,
+                    current_theme.messages.assistant,
+                    current_theme.context.tree,
+                    current_theme.context.file,
+                ),
+                Style::default().fg(theme::text()),
+            ),
         ]));
-        lines.push(Line::from(vec![
-            Span::styled(format!("     {}", current_theme.description), Style::default().fg(theme::text_muted())),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("     {}", current_theme.description),
+            Style::default().fg(theme::text_muted()),
+        )]));
 
         // Show position in theme list
         let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
-        lines.push(Line::from(vec![
-            Span::styled(format!("     ({}/{})", current_idx + 1, THEME_ORDER.len()), Style::default().fg(theme::text_muted())),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("     ({}/{})", current_idx + 1, THEME_ORDER.len()),
+            Style::default().fg(theme::text_muted()),
+        )]));
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled(format!("  {}", chars::HORIZONTAL.repeat(50)), Style::default().fg(theme::border())),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {}", chars::HORIZONTAL.repeat(50)),
+        Style::default().fg(theme::border()),
+    )]));
 
     // Help text
     lines.push(Line::from(vec![
@@ -530,23 +551,21 @@ fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     frame.render_widget(paragraph, overlay_area);
 }
 
-fn render_model_line_with_info<M: crate::llms::ModelInfo>(lines: &mut Vec<Line>, is_selected: bool, key: &str, model: &M) {
+fn render_model_line_with_info<M: crate::llms::ModelInfo>(
+    lines: &mut Vec<Line>,
+    is_selected: bool,
+    key: &str,
+    model: &M,
+) {
     let indicator = if is_selected { ">" } else { " " };
     let check = if is_selected { "[x]" } else { "[ ]" };
 
-    let style = if is_selected {
-        Style::default().fg(theme::accent()).bold()
-    } else {
-        Style::default().fg(theme::text())
-    };
+    let style =
+        if is_selected { Style::default().fg(theme::accent()).bold() } else { Style::default().fg(theme::text()) };
 
     // Format context window (e.g., "200K" or "2M")
     let ctx = model.context_window();
-    let ctx_str = if ctx >= 1_000_000 {
-        format!("{}M", ctx / 1_000_000)
-    } else {
-        format!("{}K", ctx / 1_000)
-    };
+    let ctx_str = if ctx >= 1_000_000 { format!("{}M", ctx / 1_000_000) } else { format!("{}K", ctx / 1_000) };
 
     // Format pricing info
     let price_str = format!("${:.0}/${:.0}", model.input_price_per_mtok(), model.output_price_per_mtok());

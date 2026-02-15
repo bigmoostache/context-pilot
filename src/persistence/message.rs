@@ -9,7 +9,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::constants::{STORE_DIR, MESSAGES_DIR};
+use crate::constants::{MESSAGES_DIR, STORE_DIR};
 use crate::state::Message;
 
 fn messages_dir() -> PathBuf {

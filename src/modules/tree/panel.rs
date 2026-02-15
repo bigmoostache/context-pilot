@@ -1,17 +1,19 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use crate::cache::{CacheRequest, CacheUpdate};
-use crate::core::panels::{paginate_content, ContextItem, Panel};
 use crate::actions::Action;
+use crate::cache::{CacheRequest, CacheUpdate};
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{compute_total_pages, estimate_tokens, ContextElement, ContextType, State};
-use crate::ui::{theme, helpers::*};
+use crate::core::panels::{ContextItem, Panel, paginate_content};
+use crate::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+use crate::ui::{helpers::*, theme};
 
 pub struct TreePanel;
 
 impl Panel for TreePanel {
-    fn needs_cache(&self) -> bool { true }
+    fn needs_cache(&self) -> bool {
+        true
+    }
 
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         match key.code {
@@ -37,7 +39,7 @@ impl Panel for TreePanel {
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
-        let CacheUpdate::TreeContent { content, token_count, .. } = update else {
+        let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
         ctx.cache_deprecated = false;
@@ -59,16 +61,13 @@ impl Panel for TreePanel {
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
-        let CacheRequest::RefreshTree { context_id, tree_filter, tree_open_folders, tree_descriptions } = request else {
+        let CacheRequest::RefreshTree { context_id, tree_filter, tree_open_folders, tree_descriptions } = request
+        else {
             return None;
         };
         let content = super::tools::generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
         let token_count = estimate_tokens(&content);
-        Some(CacheUpdate::TreeContent {
-            context_id,
-            content,
-            token_count,
-        })
+        Some(CacheUpdate::Content { context_id, content, token_count })
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
@@ -76,15 +75,11 @@ impl Panel for TreePanel {
         for ctx in &state.context {
             if ctx.context_type == ContextType::Tree {
                 if let Some(content) = &ctx.cached_content
-                    && !content.is_empty() {
-                        let output = paginate_content(content, ctx.current_page, ctx.total_pages);
-                        return vec![ContextItem::new(
-                            &ctx.id,
-                            "Directory Tree",
-                            output,
-                            ctx.last_refresh_ms,
-                        )];
-                    }
+                    && !content.is_empty()
+                {
+                    let output = paginate_content(content, ctx.current_page, ctx.total_pages);
+                    return vec![ContextItem::new(&ctx.id, "Directory Tree", output, ctx.last_refresh_ms)];
+                }
                 break;
             }
         }
@@ -94,7 +89,9 @@ impl Panel for TreePanel {
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         let _guard = crate::profile!("panel::tree::content");
         // Find tree context and use cached content
-        let tree_content = state.context.iter()
+        let tree_content = state
+            .context
+            .iter()
             .find(|c| c.context_type == ContextType::Tree)
             .and_then(|ctx| ctx.cached_content.as_ref())
             .cloned()

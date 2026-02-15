@@ -1,7 +1,7 @@
 use std::process::Command;
 
-use crate::tools::{ToolResult, ToolUse};
 use crate::state::{ContextType, State};
+use crate::tools::{ToolResult, ToolUse};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let ids = match tool.input.get("ids").and_then(|v| v.as_array()) {
@@ -11,16 +11,12 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'ids' array parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
     if ids.is_empty() {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Empty 'ids' array".to_string(),
-            is_error: true,
-        };
+        return ToolResult { tool_use_id: tool.id.clone(), content: "Empty 'ids' array".to_string(), is_error: true };
     }
 
     let mut closed: Vec<String> = Vec::new();
@@ -45,7 +41,17 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let ctx = &state.context[idx];
 
         match ctx.context_type {
-            ContextType::System | ContextType::Tree | ContextType::Conversation | ContextType::Todo | ContextType::Memory | ContextType::Overview | ContextType::Git | ContextType::Scratchpad | ContextType::Library | ContextType::Spine | ContextType::Logs => {
+            ContextType::System
+            | ContextType::Tree
+            | ContextType::Conversation
+            | ContextType::Todo
+            | ContextType::Memory
+            | ContextType::Overview
+            | ContextType::Git
+            | ContextType::Scratchpad
+            | ContextType::Library
+            | ContextType::Spine
+            | ContextType::Logs => {
                 // Protected - cannot close
                 skipped.push(format!("{} (protected)", id));
             }
@@ -88,9 +94,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
                 // Kill the tmux window
                 if let Some(pane) = &pane_id {
-                    let output = Command::new("tmux")
-                        .args(["kill-window", "-t", pane])
-                        .output();
+                    let output = Command::new("tmux").args(["kill-window", "-t", pane]).output();
 
                     match output {
                         Ok(out) if out.status.success() => {
@@ -100,8 +104,11 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                         Ok(out) => {
                             // Still remove from context even if kill failed
                             state.context.remove(idx);
-                            errors.push(format!("{}: tmux kill failed: {}", id,
-                                String::from_utf8_lossy(&out.stderr).trim()));
+                            errors.push(format!(
+                                "{}: tmux kill failed: {}",
+                                id,
+                                String::from_utf8_lossy(&out.stderr).trim()
+                            ));
                         }
                         Err(e) => {
                             state.context.remove(idx);
@@ -144,9 +151,5 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&format!("Errors:\n{}", errors.join("\n")));
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: output,
-        is_error: closed.is_empty() && skipped.is_empty(),
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: output, is_error: closed.is_empty() && skipped.is_empty() }
 }

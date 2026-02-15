@@ -168,37 +168,67 @@ pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
 // =============================================================================
 
 pub mod theme {
-    use ratatui::style::Color;
     use crate::config::active_theme;
+    use ratatui::style::Color;
 
     fn rgb(c: [u8; 3]) -> Color {
         Color::Rgb(c[0], c[1], c[2])
     }
 
     // Primary brand colors
-    pub fn accent() -> Color { rgb(active_theme().colors.accent) }
-    pub fn accent_dim() -> Color { rgb(active_theme().colors.accent_dim) }
-    pub fn success() -> Color { rgb(active_theme().colors.success) }
-    pub fn warning() -> Color { rgb(active_theme().colors.warning) }
-    pub fn error() -> Color { rgb(active_theme().colors.error) }
+    pub fn accent() -> Color {
+        rgb(active_theme().colors.accent)
+    }
+    pub fn accent_dim() -> Color {
+        rgb(active_theme().colors.accent_dim)
+    }
+    pub fn success() -> Color {
+        rgb(active_theme().colors.success)
+    }
+    pub fn warning() -> Color {
+        rgb(active_theme().colors.warning)
+    }
+    pub fn error() -> Color {
+        rgb(active_theme().colors.error)
+    }
 
     // Text colors
-    pub fn text() -> Color { rgb(active_theme().colors.text) }
-    pub fn text_secondary() -> Color { rgb(active_theme().colors.text_secondary) }
-    pub fn text_muted() -> Color { rgb(active_theme().colors.text_muted) }
+    pub fn text() -> Color {
+        rgb(active_theme().colors.text)
+    }
+    pub fn text_secondary() -> Color {
+        rgb(active_theme().colors.text_secondary)
+    }
+    pub fn text_muted() -> Color {
+        rgb(active_theme().colors.text_muted)
+    }
 
     // Background colors
-    pub fn bg_base() -> Color { rgb(active_theme().colors.bg_base) }
-    pub fn bg_surface() -> Color { rgb(active_theme().colors.bg_surface) }
-    pub fn bg_elevated() -> Color { rgb(active_theme().colors.bg_elevated) }
+    pub fn bg_base() -> Color {
+        rgb(active_theme().colors.bg_base)
+    }
+    pub fn bg_surface() -> Color {
+        rgb(active_theme().colors.bg_surface)
+    }
+    pub fn bg_elevated() -> Color {
+        rgb(active_theme().colors.bg_elevated)
+    }
 
     // Border colors
-    pub fn border() -> Color { rgb(active_theme().colors.border) }
-    pub fn border_muted() -> Color { rgb(active_theme().colors.border_muted) }
+    pub fn border() -> Color {
+        rgb(active_theme().colors.border)
+    }
+    pub fn border_muted() -> Color {
+        rgb(active_theme().colors.border_muted)
+    }
 
     // Role-specific colors
-    pub fn user() -> Color { rgb(active_theme().colors.user) }
-    pub fn assistant() -> Color { rgb(active_theme().colors.assistant) }
+    pub fn user() -> Color {
+        rgb(active_theme().colors.user)
+    }
+    pub fn assistant() -> Color {
+        rgb(active_theme().colors.assistant)
+    }
 }
 
 // =============================================================================
@@ -225,38 +255,90 @@ pub mod icons {
     use crate::config::{active_theme, normalize_icon};
 
     // Message types - accessor functions for active theme (normalized to 2 cells)
-    pub fn msg_user() -> String { normalize_icon(&active_theme().messages.user) }
-    pub fn msg_assistant() -> String { normalize_icon(&active_theme().messages.assistant) }
-    pub fn msg_tool_call() -> String { normalize_icon(&active_theme().messages.tool_call) }
-    pub fn msg_tool_result() -> String { normalize_icon(&active_theme().messages.tool_result) }
-    pub fn msg_error() -> String { normalize_icon(&active_theme().messages.error) }
+    pub fn msg_user() -> String {
+        normalize_icon(&active_theme().messages.user)
+    }
+    pub fn msg_assistant() -> String {
+        normalize_icon(&active_theme().messages.assistant)
+    }
+    pub fn msg_tool_call() -> String {
+        normalize_icon(&active_theme().messages.tool_call)
+    }
+    pub fn msg_tool_result() -> String {
+        normalize_icon(&active_theme().messages.tool_result)
+    }
+    pub fn msg_error() -> String {
+        normalize_icon(&active_theme().messages.error)
+    }
 
     // Context panel types (normalized to 2 cells)
-    pub fn ctx_system() -> String { normalize_icon(&active_theme().context.system) }
-    pub fn ctx_conversation() -> String { normalize_icon(&active_theme().context.conversation) }
-    pub fn ctx_tree() -> String { normalize_icon(&active_theme().context.tree) }
-    pub fn ctx_todo() -> String { normalize_icon(&active_theme().context.todo) }
-    pub fn ctx_memory() -> String { normalize_icon(&active_theme().context.memory) }
-    pub fn ctx_overview() -> String { normalize_icon(&active_theme().context.overview) }
-    pub fn ctx_file() -> String { normalize_icon(&active_theme().context.file) }
-    pub fn ctx_glob() -> String { normalize_icon(&active_theme().context.glob) }
-    pub fn ctx_grep() -> String { normalize_icon(&active_theme().context.grep) }
-    pub fn ctx_tmux() -> String { normalize_icon(&active_theme().context.tmux) }
-    pub fn ctx_git() -> String { normalize_icon(&active_theme().context.git) }
-    pub fn ctx_scratchpad() -> String { normalize_icon(&active_theme().context.scratchpad) }
-    pub fn ctx_library() -> String { normalize_icon(&active_theme().context.library) }
-    pub fn ctx_skill() -> String { normalize_icon(&active_theme().context.skill) }
-    pub fn ctx_spine() -> String { normalize_icon(&active_theme().context.spine) }
+    pub fn ctx_system() -> String {
+        normalize_icon(&active_theme().context.system)
+    }
+    pub fn ctx_conversation() -> String {
+        normalize_icon(&active_theme().context.conversation)
+    }
+    pub fn ctx_tree() -> String {
+        normalize_icon(&active_theme().context.tree)
+    }
+    pub fn ctx_todo() -> String {
+        normalize_icon(&active_theme().context.todo)
+    }
+    pub fn ctx_memory() -> String {
+        normalize_icon(&active_theme().context.memory)
+    }
+    pub fn ctx_overview() -> String {
+        normalize_icon(&active_theme().context.overview)
+    }
+    pub fn ctx_file() -> String {
+        normalize_icon(&active_theme().context.file)
+    }
+    pub fn ctx_glob() -> String {
+        normalize_icon(&active_theme().context.glob)
+    }
+    pub fn ctx_grep() -> String {
+        normalize_icon(&active_theme().context.grep)
+    }
+    pub fn ctx_tmux() -> String {
+        normalize_icon(&active_theme().context.tmux)
+    }
+    pub fn ctx_git() -> String {
+        normalize_icon(&active_theme().context.git)
+    }
+    pub fn ctx_scratchpad() -> String {
+        normalize_icon(&active_theme().context.scratchpad)
+    }
+    pub fn ctx_library() -> String {
+        normalize_icon(&active_theme().context.library)
+    }
+    pub fn ctx_skill() -> String {
+        normalize_icon(&active_theme().context.skill)
+    }
+    pub fn ctx_spine() -> String {
+        normalize_icon(&active_theme().context.spine)
+    }
 
     // Message status (normalized to 2 cells)
-    pub fn status_full() -> String { normalize_icon(&active_theme().status.full) }
-    pub fn status_summarized() -> String { normalize_icon(&active_theme().status.summarized) }
-    pub fn status_deleted() -> String { normalize_icon(&active_theme().status.deleted) }
+    pub fn status_full() -> String {
+        normalize_icon(&active_theme().status.full)
+    }
+    pub fn status_summarized() -> String {
+        normalize_icon(&active_theme().status.summarized)
+    }
+    pub fn status_deleted() -> String {
+        normalize_icon(&active_theme().status.deleted)
+    }
 
     // Todo status (normalized to 2 cells)
-    pub fn todo_pending() -> String { normalize_icon(&active_theme().todo.pending) }
-    pub fn todo_in_progress() -> String { normalize_icon(&active_theme().todo.in_progress) }
-    pub fn todo_done() -> String { normalize_icon(&active_theme().todo.done) }
+    pub fn todo_pending() -> String {
+        normalize_icon(&active_theme().todo.pending)
+    }
+    pub fn todo_in_progress() -> String {
+        normalize_icon(&active_theme().todo.in_progress)
+    }
+    pub fn todo_done() -> String {
+        normalize_icon(&active_theme().todo.done)
+    }
 }
 
 // =============================================================================
@@ -266,14 +348,30 @@ pub mod icons {
 pub mod tool_categories {
     use crate::config::UI;
 
-    pub fn file_desc() -> &'static str { &UI.tool_categories.file }
-    pub fn tree_desc() -> &'static str { &UI.tool_categories.tree }
-    pub fn console_desc() -> &'static str { &UI.tool_categories.console }
-    pub fn context_desc() -> &'static str { &UI.tool_categories.context }
-    pub fn todo_desc() -> &'static str { &UI.tool_categories.todo }
-    pub fn memory_desc() -> &'static str { &UI.tool_categories.memory }
-    pub fn git_desc() -> &'static str { &UI.tool_categories.git }
-    pub fn scratchpad_desc() -> &'static str { &UI.tool_categories.scratchpad }
+    pub fn file_desc() -> &'static str {
+        &UI.tool_categories.file
+    }
+    pub fn tree_desc() -> &'static str {
+        &UI.tool_categories.tree
+    }
+    pub fn console_desc() -> &'static str {
+        &UI.tool_categories.console
+    }
+    pub fn context_desc() -> &'static str {
+        &UI.tool_categories.context
+    }
+    pub fn todo_desc() -> &'static str {
+        &UI.tool_categories.todo
+    }
+    pub fn memory_desc() -> &'static str {
+        &UI.tool_categories.memory
+    }
+    pub fn git_desc() -> &'static str {
+        &UI.tool_categories.git
+    }
+    pub fn scratchpad_desc() -> &'static str {
+        &UI.tool_categories.scratchpad
+    }
 }
 
 // =============================================================================
@@ -283,28 +381,52 @@ pub mod tool_categories {
 pub mod library {
     use crate::config::LIBRARY;
 
-    pub fn default_agent_id() -> &'static str { &LIBRARY.default_agent_id }
+    pub fn default_agent_id() -> &'static str {
+        &LIBRARY.default_agent_id
+    }
     pub fn default_agent_content() -> &'static str {
         let id = &LIBRARY.default_agent_id;
-        LIBRARY.agents.iter().find(|a| a.id == *id)
-            .map(|a| a.content.as_str())
-            .unwrap_or("")
+        LIBRARY.agents.iter().find(|a| a.id == *id).map(|a| a.content.as_str()).unwrap_or("")
     }
-    pub fn agents() -> &'static [crate::config::SeedEntry] { &LIBRARY.agents }
-    pub fn skills() -> &'static [crate::config::SeedEntry] { &LIBRARY.skills }
-    pub fn commands() -> &'static [crate::config::SeedEntry] { &LIBRARY.commands }
+    pub fn agents() -> &'static [crate::config::SeedEntry] {
+        &LIBRARY.agents
+    }
+    pub fn skills() -> &'static [crate::config::SeedEntry] {
+        &LIBRARY.skills
+    }
+    pub fn commands() -> &'static [crate::config::SeedEntry] {
+        &LIBRARY.commands
+    }
 }
 
 pub mod prompts {
     use crate::config::PROMPTS;
 
-    pub fn tldr_prompt() -> &'static str { &PROMPTS.tldr_prompt }
-    pub fn tldr_min_tokens() -> usize { PROMPTS.tldr_min_tokens }
-    pub fn panel_header() -> &'static str { &PROMPTS.panel.header }
-    pub fn panel_timestamp() -> &'static str { &PROMPTS.panel.timestamp }
-    pub fn panel_timestamp_unknown() -> &'static str { &PROMPTS.panel.timestamp_unknown }
-    pub fn panel_footer() -> &'static str { &PROMPTS.panel.footer }
-    pub fn panel_footer_msg_line() -> &'static str { &PROMPTS.panel.footer_msg_line }
-    pub fn panel_footer_msg_header() -> &'static str { &PROMPTS.panel.footer_msg_header }
-    pub fn panel_footer_ack() -> &'static str { &PROMPTS.panel.footer_ack }
+    pub fn tldr_prompt() -> &'static str {
+        &PROMPTS.tldr_prompt
+    }
+    pub fn tldr_min_tokens() -> usize {
+        PROMPTS.tldr_min_tokens
+    }
+    pub fn panel_header() -> &'static str {
+        &PROMPTS.panel.header
+    }
+    pub fn panel_timestamp() -> &'static str {
+        &PROMPTS.panel.timestamp
+    }
+    pub fn panel_timestamp_unknown() -> &'static str {
+        &PROMPTS.panel.timestamp_unknown
+    }
+    pub fn panel_footer() -> &'static str {
+        &PROMPTS.panel.footer
+    }
+    pub fn panel_footer_msg_line() -> &'static str {
+        &PROMPTS.panel.footer_msg_line
+    }
+    pub fn panel_footer_msg_header() -> &'static str {
+        &PROMPTS.panel.footer_msg_header
+    }
+    pub fn panel_footer_ack() -> &'static str {
+        &PROMPTS.panel.footer_ack
+    }
 }

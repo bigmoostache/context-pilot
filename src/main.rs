@@ -6,35 +6,35 @@ mod config;
 mod constants;
 mod core;
 mod events;
+mod gh_watcher;
 mod help;
 mod highlight;
 mod llms;
+mod modules;
 mod perf;
 mod persistence;
 mod profiler;
 mod state;
 mod tool_defs;
-mod modules;
 mod tools;
 mod typewriter;
 mod ui;
 mod watcher;
-mod gh_watcher;
 
 use std::io;
 use std::sync::mpsc;
 
 use crossterm::{
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    event::{EnableBracketedPaste, DisableBracketedPaste},
     ExecutableCommand,
+    event::{DisableBracketedPaste, EnableBracketedPaste},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::prelude::*;
 
 use api::StreamEvent;
 use background::TlDrResult;
 use cache::CacheUpdate;
-use core::{ensure_default_contexts, ensure_default_agent, App};
+use core::{App, ensure_default_agent, ensure_default_contexts};
 use persistence::load_state;
 
 fn main() -> io::Result<()> {

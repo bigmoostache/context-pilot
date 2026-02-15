@@ -1,26 +1,27 @@
 use crate::persistence::log_error;
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::state::{ContextType, State, estimate_tokens};
 
-use super::helpers::clean_llm_id_prefix;
 use super::ActionResult;
+use super::helpers::clean_llm_id_prefix;
 
 /// Handle AppendChars action — append streaming text to assistant message
 pub fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
     if let Some(msg) = state.messages.last_mut()
-        && msg.role == "assistant" {
-            msg.content.push_str(text);
+        && msg.role == "assistant"
+    {
+        msg.content.push_str(text);
 
-            // Update estimated token count during streaming
-            let new_estimate = estimate_tokens(&msg.content);
-            let added = new_estimate.saturating_sub(state.streaming_estimated_tokens);
+        // Update estimated token count during streaming
+        let new_estimate = estimate_tokens(&msg.content);
+        let added = new_estimate.saturating_sub(state.streaming_estimated_tokens);
 
-            if added > 0 {
-                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
-                    ctx.token_count += added;
-                }
-                state.streaming_estimated_tokens = new_estimate;
+        if added > 0 {
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+                ctx.token_count += added;
             }
+            state.streaming_estimated_tokens = new_estimate;
         }
+    }
     ActionResult::Nothing
 }
 
@@ -54,23 +55,23 @@ pub fn handle_stream_done(
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
         // Remove our estimate, add actual
-        ctx.token_count = ctx.token_count
-            .saturating_sub(state.streaming_estimated_tokens)
-            .saturating_add(output_tokens);
+        ctx.token_count =
+            ctx.token_count.saturating_sub(state.streaming_estimated_tokens).saturating_add(output_tokens);
         ctx.last_refresh_ms = crate::core::panels::now_ms();
     }
     state.streaming_estimated_tokens = 0;
 
     // Store actual token count on message and clean up LLM prefixes
     if let Some(msg) = state.messages.last_mut()
-        && msg.role == "assistant" {
-            // Remove any [A##]: prefixes the LLM mistakenly added
-            msg.content = clean_llm_id_prefix(&msg.content);
-            msg.content_token_count = output_tokens;
-            msg.input_tokens = _input_tokens;
-            let id = msg.id.clone();
-            return ActionResult::SaveMessage(id);
-        }
+        && msg.role == "assistant"
+    {
+        // Remove any [A##]: prefixes the LLM mistakenly added
+        msg.content = clean_llm_id_prefix(&msg.content);
+        msg.content_token_count = output_tokens;
+        msg.input_tokens = _input_tokens;
+        let id = msg.id.clone();
+        return ActionResult::SaveMessage(id);
+    }
     ActionResult::Save
 }
 
@@ -88,10 +89,11 @@ pub fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
     let error_file = log_error(error);
 
     if let Some(msg) = state.messages.last_mut()
-        && msg.role == "assistant" {
-            msg.content = format!("[Error occurred. See details in {}]", error_file);
-            let id = msg.id.clone();
-            return ActionResult::SaveMessage(id);
-        }
+        && msg.role == "assistant"
+    {
+        msg.content = format!("[Error occurred. See details in {}]", error_file);
+        let id = msg.id.clone();
+        return ActionResult::SaveMessage(id);
+    }
     ActionResult::Save
 }

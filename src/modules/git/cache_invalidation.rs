@@ -24,7 +24,9 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
         // COMMIT-LIKE — new commit on current branch
         InvalidationRule::new(
             r"^git\s+(commit|cherry-pick|revert|am)\b",
-            &[r"^git\s+(log|diff|show|status|blame|shortlog|rev-list|rev-parse|ls-tree|for-each-ref|describe|reflog|cat-file|format-patch)\b"],
+            &[
+                r"^git\s+(log|diff|show|status|blame|shortlog|rev-list|rev-parse|ls-tree|for-each-ref|describe|reflog|cat-file|format-patch)\b",
+            ],
         ),
         // STAGING — index/working tree changes
         InvalidationRule::new(
@@ -37,35 +39,17 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
             &[r"^git\s+(diff|status|stash|ls-files|grep)\b"],
         ),
         // STASH_REMOVE — stash drop/clear only affects stash list
-        InvalidationRule::new(
-            r"^git\s+stash\s+(drop|clear)\b",
-            &[r"^git\s+stash\b"],
-        ),
+        InvalidationRule::new(r"^git\s+stash\s+(drop|clear)\b", &[r"^git\s+stash\b"]),
         // PUSH — only remote tracking changes
-        InvalidationRule::new(
-            r"^git\s+push\b",
-            &[r"^git\s+log\b"],
-        ),
+        InvalidationRule::new(r"^git\s+push\b", &[r"^git\s+log\b"]),
         // FETCH — updates remote refs
-        InvalidationRule::new(
-            r"^git\s+fetch\b",
-            &[r"^git\s+(log|branch|tag|for-each-ref)\b"],
-        ),
+        InvalidationRule::new(r"^git\s+fetch\b", &[r"^git\s+(log|branch|tag|for-each-ref)\b"]),
         // BRANCH_MGMT — create/delete/rename branches
-        InvalidationRule::new(
-            r"^git\s+branch\s+(-d|-D|-m|-M|-c|-C|[^-])",
-            &[r"^git\s+(branch|for-each-ref|reflog)\b"],
-        ),
+        InvalidationRule::new(r"^git\s+branch\s+(-d|-D|-m|-M|-c|-C|[^-])", &[r"^git\s+(branch|for-each-ref|reflog)\b"]),
         // TAG_MGMT — create/delete tags
-        InvalidationRule::new(
-            r"^git\s+tag\s+(-d|[^-])",
-            &[r"^git\s+(tag|for-each-ref|describe)\b"],
-        ),
+        InvalidationRule::new(r"^git\s+tag\s+(-d|[^-])", &[r"^git\s+(tag|for-each-ref|describe)\b"]),
         // CONFIG — config changes
-        InvalidationRule::new(
-            r"^git\s+config\b",
-            &[r"^git\s+config\b"],
-        ),
+        InvalidationRule::new(r"^git\s+config\b", &[r"^git\s+config\b"]),
         // REMOTE — remote management
         InvalidationRule::new(
             r"^git\s+remote\s+(add|remove|rm|rename|set-url|set-head|prune)\b",
@@ -88,7 +72,6 @@ pub fn find_invalidations(mutating_command: &str) -> Vec<Regex> {
     }
     result
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -126,4 +109,3 @@ mod tests {
         assert!(!inv.iter().any(|re| re.is_match("git branch")));
     }
 }
-

@@ -1,5 +1,5 @@
 //! Command classification for gh (GitHub CLI) commands.
-use crate::modules::git::classify::{CommandClass, parse_shell_args, check_shell_operators};
+use crate::modules::git::classify::{CommandClass, check_shell_operators, parse_shell_args};
 
 /// Validate a raw command string intended for `gh`.
 /// Returns parsed args on success, or an error message on failure.
@@ -36,25 +36,24 @@ pub fn classify_gh(args: &[String]) -> CommandClass {
         // PR commands
         "pr" => match action {
             "list" | "view" | "status" | "checks" | "diff" => CommandClass::ReadOnly,
-            "create" | "merge" | "close" | "reopen" | "edit" | "comment" | "review" | "ready" => {
-                CommandClass::Mutating
-            }
+            "create" | "merge" | "close" | "reopen" | "edit" | "comment" | "review" | "ready" => CommandClass::Mutating,
             _ => CommandClass::Mutating,
         },
 
         // Issue commands
         "issue" => match action {
             "list" | "view" | "status" => CommandClass::ReadOnly,
-            "create" | "close" | "reopen" | "edit" | "comment" | "delete" | "transfer"
-            | "pin" | "unpin" | "lock" | "unlock" => CommandClass::Mutating,
+            "create" | "close" | "reopen" | "edit" | "comment" | "delete" | "transfer" | "pin" | "unpin" | "lock"
+            | "unlock" => CommandClass::Mutating,
             _ => CommandClass::Mutating,
         },
 
         // Repo commands
         "repo" => match action {
             "view" | "list" => CommandClass::ReadOnly,
-            "create" | "clone" | "fork" | "delete" | "edit" | "rename" | "archive"
-            | "unarchive" | "sync" => CommandClass::Mutating,
+            "create" | "clone" | "fork" | "delete" | "edit" | "rename" | "archive" | "unarchive" | "sync" => {
+                CommandClass::Mutating
+            }
             _ => CommandClass::Mutating,
         },
 
@@ -102,11 +101,7 @@ pub fn classify_gh(args: &[String]) -> CommandClass {
                 (w[0] == "--method" || w[0] == "-X")
                     && matches!(w[1].to_uppercase().as_str(), "POST" | "PUT" | "PATCH" | "DELETE")
             });
-            if has_mutating_method {
-                CommandClass::Mutating
-            } else {
-                CommandClass::ReadOnly
-            }
+            if has_mutating_method { CommandClass::Mutating } else { CommandClass::ReadOnly }
         }
 
         // Label commands
@@ -227,10 +222,8 @@ mod tests {
 
     #[test]
     fn test_api_post_mutating() {
-        let args = vec![
-            "api".to_string(), "/repos/foo/bar/issues".to_string(),
-            "--method".to_string(), "POST".to_string(),
-        ];
+        let args =
+            vec!["api".to_string(), "/repos/foo/bar/issues".to_string(), "--method".to_string(), "POST".to_string()];
         assert_eq!(classify_gh(&args), CommandClass::Mutating);
     }
 
@@ -332,19 +325,13 @@ mod tests {
 
     #[test]
     fn test_api_delete_mutating() {
-        let args = vec![
-            "api".to_string(), "/repos/foo/bar".to_string(),
-            "-X".to_string(), "DELETE".to_string(),
-        ];
+        let args = vec!["api".to_string(), "/repos/foo/bar".to_string(), "-X".to_string(), "DELETE".to_string()];
         assert_eq!(classify_gh(&args), CommandClass::Mutating);
     }
 
     #[test]
     fn test_api_put_mutating() {
-        let args = vec![
-            "api".to_string(), "/repos/foo/bar".to_string(),
-            "--method".to_string(), "PUT".to_string(),
-        ];
+        let args = vec!["api".to_string(), "/repos/foo/bar".to_string(), "--method".to_string(), "PUT".to_string()];
         assert_eq!(classify_gh(&args), CommandClass::Mutating);
     }
 

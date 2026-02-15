@@ -1,5 +1,5 @@
-use ratatui::prelude::*;
 use super::theme;
+use ratatui::prelude::*;
 
 /// Calculate the display width of text after stripping markdown markers
 fn markdown_display_width(text: &str) -> usize {
@@ -91,9 +91,7 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style) -> Vec<Vec<Span
         let cells: Vec<String> = inner.split('|').map(|c| c.trim().to_string()).collect();
 
         // Check if this is a separator row (contains only dashes and colons)
-        let is_sep = cells.iter().all(|c| {
-            c.chars().all(|ch| ch == '-' || ch == ':' || ch == ' ')
-        });
+        let is_sep = cells.iter().all(|c| c.chars().all(|ch| ch == '-' || ch == ':' || ch == ' '));
 
         is_separator_row.push(is_sep);
         rows.push(cells);
@@ -251,11 +249,10 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                     let mut bold_text = String::new();
                     #[allow(clippy::while_let_on_iterator)]
                     while let Some(next) = chars.next() {
-                        if next == c
-                            && chars.peek() == Some(&c) {
-                                chars.next(); // consume closing **
-                                break;
-                            }
+                        if next == c && chars.peek() == Some(&c) {
+                            chars.next(); // consume closing **
+                            break;
+                        }
                         bold_text.push(next);
                     }
 

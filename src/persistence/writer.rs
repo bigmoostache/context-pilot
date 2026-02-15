@@ -9,7 +9,7 @@
 use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Mutex, Condvar};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -72,11 +72,7 @@ impl PersistenceWriter {
             })
             .expect("failed to spawn persistence writer thread");
 
-        Self {
-            tx,
-            flush_sync,
-            handle: Some(handle),
-        }
+        Self { tx, flush_sync, handle: Some(handle) }
     }
 
     /// Queue a batch of writes (debounced — may be coalesced with subsequent batches)
@@ -107,8 +103,7 @@ impl PersistenceWriter {
         let mut flushed = lock.lock().unwrap_or_else(|e| e.into_inner());
         while !*flushed {
             // Timeout after 5 seconds to prevent infinite hang on shutdown
-            let result = cvar.wait_timeout(flushed, Duration::from_secs(5))
-                .unwrap_or_else(|e| e.into_inner());
+            let result = cvar.wait_timeout(flushed, Duration::from_secs(5)).unwrap_or_else(|e| e.into_inner());
             flushed = result.0;
             if result.1.timed_out() {
                 break;
@@ -218,9 +213,10 @@ fn execute_batch(batch: Option<WriteBatch>) {
     // Execute deletes
     for op in &batch.deletes {
         if let Err(e) = fs::remove_file(&op.path)
-            && e.kind() != std::io::ErrorKind::NotFound {
-                eprintln!("[persistence] failed to delete {}: {}", op.path.display(), e);
-            }
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            eprintln!("[persistence] failed to delete {}: {}", op.path.display(), e);
+        }
     }
 }
 
@@ -228,10 +224,11 @@ fn execute_batch(batch: Option<WriteBatch>) {
 /// Logs errors instead of silently swallowing them.
 fn write_file(path: &PathBuf, content: &[u8]) {
     if let Some(parent) = path.parent()
-        && let Err(e) = fs::create_dir_all(parent) {
-            eprintln!("[persistence] failed to create dir {}: {}", parent.display(), e);
-            return;
-        }
+        && let Err(e) = fs::create_dir_all(parent)
+    {
+        eprintln!("[persistence] failed to create dir {}: {}", parent.display(), e);
+        return;
+    }
     if let Err(e) = fs::write(path, content) {
         eprintln!("[persistence] failed to write {}: {}", path.display(), e);
     }

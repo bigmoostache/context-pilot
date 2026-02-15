@@ -92,9 +92,7 @@ pub fn count_wrapped_lines(line: &ratatui::prelude::Line, max_width: usize) -> u
     }
 
     // Concatenate all span content
-    let full_text: String = line.spans.iter()
-        .map(|s| s.content.as_ref())
-        .collect();
+    let full_text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
 
     if full_text.is_empty() {
         return 1;
@@ -165,8 +163,8 @@ pub fn render_table<'a>(
     footer: Option<&[Cell]>,
     indent: usize,
 ) -> Vec<ratatui::prelude::Line<'a>> {
-    use ratatui::prelude::*;
     use crate::ui::theme;
+    use ratatui::prelude::*;
 
     let num_cols = header.len();
 
@@ -212,7 +210,7 @@ pub fn render_table<'a>(
             if let Some(cell) = cells.get(col) {
                 let padded = match cell.align {
                     Align::Right => format!("{:>width$}", cell.text, width = *col_w),
-                    Align::Left  => format!("{:<width$}", cell.text, width = *col_w),
+                    Align::Left => format!("{:<width$}", cell.text, width = *col_w),
                 };
                 let style = if bold { cell.style.bold() } else { cell.style };
                 spans.push(Span::styled(padded, style));
@@ -233,7 +231,7 @@ pub fn render_table<'a>(
             let w = col_widths[col];
             let padded = match hdr.align {
                 Align::Right => format!("{:>width$}", hdr.text, width = w),
-                Align::Left  => format!("{:<width$}", hdr.text, width = w),
+                Align::Left => format!("{:<width$}", hdr.text, width = w),
             };
             spans.push(Span::styled(padded, Style::default().fg(theme::accent()).bold()));
         }
@@ -276,11 +274,7 @@ pub fn find_size_pattern(line: &str) -> Option<usize> {
         num_start -= 1;
     }
 
-    if num_start > 0 && bytes[num_start - 1] == b' ' {
-        Some(num_start - 1)
-    } else {
-        None
-    }
+    if num_start > 0 && bytes[num_start - 1] == b' ' { Some(num_start - 1) } else { None }
 }
 
 /// Find children count pattern in tree output (e.g., "(5 children)" or "(1 child)")

@@ -1,9 +1,10 @@
-use crate::core::panels::{collect_all_context, now_ms, refresh_all_panels, ContextItem};
 use crate::cache::hash_content;
-use crate::constants::{DETACH_CHUNK_MIN_MESSAGES, DETACH_CHUNK_MIN_TOKENS, DETACH_KEEP_MIN_MESSAGES, DETACH_KEEP_MIN_TOKENS};
+use crate::constants::{
+    DETACH_CHUNK_MIN_MESSAGES, DETACH_CHUNK_MIN_TOKENS, DETACH_KEEP_MIN_MESSAGES, DETACH_KEEP_MIN_TOKENS,
+};
+use crate::core::panels::{ContextItem, collect_all_context, now_ms, refresh_all_panels};
 use crate::state::{
-    compute_total_pages, estimate_tokens, ContextElement, ContextType,
-    Message, MessageStatus, MessageType, State,
+    ContextElement, ContextType, Message, MessageStatus, MessageType, State, compute_total_pages, estimate_tokens,
 };
 use crate::tool_defs::ToolDefinition;
 use crate::tools::refresh_conversation_context;
@@ -53,7 +54,8 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
     // accumulate per-panel costs based on cache hit/miss pricing.
     {
         // Build hash list from panel content (excluding "chat" which is conversation)
-        let panel_hashes: Vec<(String, String, usize)> = context_items.iter()
+        let panel_hashes: Vec<(String, String, usize)> = context_items
+            .iter()
             .filter(|item| item.id != "chat")
             .map(|item| {
                 let h = hash_content(&item.content);
@@ -61,16 +63,11 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
             })
             .collect();
 
-        let new_hash_list: Vec<String> = panel_hashes.iter()
-            .map(|(id, h, _)| format!("{}:{}", id, h))
-            .collect();
+        let new_hash_list: Vec<String> = panel_hashes.iter().map(|(id, h, _)| format!("{}:{}", id, h)).collect();
 
         // Find max prefix match index
         let prev = &state.previous_panel_hash_list;
-        let prefix_len = new_hash_list.iter()
-            .zip(prev.iter())
-            .take_while(|(a, b)| a == b)
-            .count();
+        let prefix_len = new_hash_list.iter().zip(prev.iter()).take_while(|(a, b)| a == b).count();
 
         // Get pricing from current model
         let hit_price = state.cache_hit_price_per_mtok();
@@ -102,23 +99,23 @@ pub fn prepare_stream_context(state: &mut State, include_last_message: bool) -> 
 
     // Prepare messages
     let messages: Vec<_> = if include_last_message {
-        state.messages.iter()
+        state
+            .messages
+            .iter()
             .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
             .cloned()
             .collect()
     } else {
-        state.messages.iter()
+        state
+            .messages
+            .iter()
             .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
             .take(state.messages.len().saturating_sub(1))
             .cloned()
             .collect()
     };
 
-    StreamContext {
-        messages,
-        context_items,
-        tools: state.tools.clone(),
-    }
+    StreamContext { messages, context_items, tools: state.tools.clone() }
 }
 
 // ─── Conversation History Detachment ────────────────────────────────────────
@@ -171,10 +168,14 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
 pub fn detach_conversation_chunks(state: &mut State) {
     loop {
         // 1. Count active (non-Deleted, non-Detached) messages and total tokens
-        let active_count = state.messages.iter()
+        let active_count = state
+            .messages
+            .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .count();
-        let total_tokens: usize = state.messages.iter()
+        let total_tokens: usize = state
+            .messages
+            .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .map(|m| estimate_tokens(&m.content))
             .sum();
@@ -216,10 +217,12 @@ pub fn detach_conversation_chunks(state: &mut State) {
         };
 
         // 4. Verify the remaining tip satisfies both keep minimums
-        let remaining_active = state.messages[boundary..].iter()
+        let remaining_active = state.messages[boundary..]
+            .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .count();
-        let remaining_tokens: usize = state.messages[boundary..].iter()
+        let remaining_tokens: usize = state.messages[boundary..]
+            .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .map(|m| estimate_tokens(&m.content))
             .sum();
@@ -229,17 +232,21 @@ pub fn detach_conversation_chunks(state: &mut State) {
         }
 
         // 4. Collect message IDs for the chunk name
-        let first_timestamp = state.messages[..boundary].iter()
+        let first_timestamp = state.messages[..boundary]
+            .iter()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .map(|m| m.timestamp_ms)
             .unwrap_or(0);
-        let last_timestamp = state.messages[..boundary].iter().rev()
+        let last_timestamp = state.messages[..boundary]
+            .iter()
+            .rev()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .map(|m| m.timestamp_ms)
             .unwrap_or(0);
 
         // 5. Collect Message objects for UI rendering + format chunk content for LLM
-        let history_msgs: Vec<Message> = state.messages[..boundary].iter()
+        let history_msgs: Vec<Message> = state.messages[..boundary]
+            .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .cloned()
             .collect();
@@ -250,7 +257,8 @@ pub fn detach_conversation_chunks(state: &mut State) {
         }
 
         // 6. Get timestamp from first active message (for sort ordering — oldest first)
-        let chunk_timestamp = state.messages[..boundary].iter()
+        let chunk_timestamp = state.messages[..boundary]
+            .iter()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .map(|m| m.timestamp_ms)
             .unwrap_or_else(now_ms);
@@ -284,7 +292,6 @@ pub fn detach_conversation_chunks(state: &mut State) {
             name: chunk_name,
             token_count,
             file_path: None,
-            file_hash: None,
             glob_pattern: None,
             glob_path: None,
             grep_pattern: None,
@@ -295,16 +302,14 @@ pub fn detach_conversation_chunks(state: &mut State) {
             tmux_last_keys: None,
             tmux_description: None,
             result_command: None,
-            result_command_hash: None,
             skill_prompt_id: None,
             cached_content: Some(content),
             history_messages: Some(history_msgs),
             cache_deprecated: false,
             cache_in_flight: false,
             last_refresh_ms: chunk_timestamp,
-            last_polled_ms: 0,
             content_hash: None,
-            tmux_last_lines_hash: None,
+            source_hash: None,
             current_page: 0,
             total_pages,
             full_token_count: token_count,
@@ -331,28 +336,20 @@ mod tests {
 
     #[test]
     fn turn_boundary_assistant_text() {
-        let msgs = vec![
-            MessageBuilder::user("hi").build(),
-            MessageBuilder::assistant("hello").build(),
-        ];
+        let msgs = vec![MessageBuilder::user("hi").build(), MessageBuilder::assistant("hello").build()];
         assert!(!is_turn_boundary(&msgs, 0)); // user msg — not a boundary
         assert!(is_turn_boundary(&msgs, 1)); // assistant text — boundary
     }
 
     #[test]
     fn turn_boundary_tool_call_not_boundary() {
-        let msgs = vec![
-            MessageBuilder::tool_call("read_file", serde_json::json!({})).build(),
-        ];
+        let msgs = vec![MessageBuilder::tool_call("read_file", serde_json::json!({})).build()];
         assert!(!is_turn_boundary(&msgs, 0));
     }
 
     #[test]
     fn turn_boundary_tool_result_then_user() {
-        let msgs = vec![
-            MessageBuilder::tool_result("T1", "ok").build(),
-            MessageBuilder::user("next question").build(),
-        ];
+        let msgs = vec![MessageBuilder::tool_result("T1", "ok").build(), MessageBuilder::user("next question").build()];
         assert!(is_turn_boundary(&msgs, 0)); // tool result + next user = boundary
     }
 
@@ -367,25 +364,19 @@ mod tests {
 
     #[test]
     fn turn_boundary_tool_result_last_message() {
-        let msgs = vec![
-            MessageBuilder::tool_result("T1", "ok").build(),
-        ];
+        let msgs = vec![MessageBuilder::tool_result("T1", "ok").build()];
         assert!(is_turn_boundary(&msgs, 0)); // last message — boundary
     }
 
     #[test]
     fn turn_boundary_deleted_not_boundary() {
-        let msgs = vec![
-            MessageBuilder::assistant("deleted").status(MessageStatus::Deleted).build(),
-        ];
+        let msgs = vec![MessageBuilder::assistant("deleted").status(MessageStatus::Deleted).build()];
         assert!(!is_turn_boundary(&msgs, 0));
     }
 
     #[test]
     fn turn_boundary_detached_not_boundary() {
-        let msgs = vec![
-            MessageBuilder::assistant("detached").status(MessageStatus::Detached).build(),
-        ];
+        let msgs = vec![MessageBuilder::assistant("detached").status(MessageStatus::Detached).build()];
         assert!(!is_turn_boundary(&msgs, 0));
     }
 

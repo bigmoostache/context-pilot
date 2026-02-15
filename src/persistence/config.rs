@@ -4,7 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 
-use crate::constants::{STORE_DIR, CONFIG_FILE};
+use crate::constants::{CONFIG_FILE, STORE_DIR};
 use crate::state::SharedConfig;
 
 fn config_path() -> PathBuf {
@@ -22,5 +22,3 @@ pub fn load_config() -> Option<SharedConfig> {
     let json = fs::read_to_string(&path).ok()?;
     serde_json::from_str(&json).ok()
 }
-
-

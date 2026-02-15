@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 
 use crate::core::panels::{ContextItem, Panel};
-use crate::state::{estimate_tokens, ContextType, State};
+use crate::state::{ContextType, State, estimate_tokens};
 use crate::ui::theme;
 
 use super::types::LogEntry;
@@ -21,9 +21,7 @@ impl LogsPanel {
 
         let mut output = String::new();
         // Only show top-level logs (no parent_id)
-        let top_level: Vec<&LogEntry> = state.logs.iter()
-            .filter(|l| l.is_top_level())
-            .collect();
+        let top_level: Vec<&LogEntry> = state.logs.iter().filter(|l| l.is_top_level()).collect();
 
         for log in &top_level {
             format_log_entry(&mut output, log, &state.logs, &state.open_log_ids, 0);
@@ -33,13 +31,7 @@ impl LogsPanel {
 }
 
 /// Recursively format a log entry with indentation for tree display.
-fn format_log_entry(
-    output: &mut String,
-    entry: &LogEntry,
-    all_logs: &[LogEntry],
-    open_ids: &[String],
-    depth: usize,
-) {
+fn format_log_entry(output: &mut String, entry: &LogEntry, all_logs: &[LogEntry], open_ids: &[String], depth: usize) {
     let indent = "  ".repeat(depth);
     let time_str = format_timestamp(entry.timestamp_ms);
 
@@ -56,7 +48,10 @@ fn format_log_entry(
                 }
             }
         } else {
-            output.push_str(&format!("{}{} [{}] {} {} ({} children)\n", indent, icon, entry.id, time_str, entry.content, child_count));
+            output.push_str(&format!(
+                "{}{} [{}] {} {} ({} children)\n",
+                indent, icon, entry.id, time_str, entry.content, child_count
+            ));
         }
     } else {
         output.push_str(&format!("{}[{}] {} {}\n", indent, entry.id, time_str, entry.content));
@@ -82,7 +77,9 @@ impl Panel for LogsPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_logs_tree(state);
-        let (id, last_refresh_ms) = state.context.iter()
+        let (id, last_refresh_ms) = state
+            .context
+            .iter()
             .find(|c| c.context_type == ContextType::Logs)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
             .unwrap_or(("P10", 0));
@@ -91,18 +88,14 @@ impl Panel for LogsPanel {
 
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         if state.logs.is_empty() {
-            return vec![Line::from(vec![
-                Span::styled(
-                    "No logs yet".to_string(),
-                    Style::default().fg(theme::text_muted()).italic(),
-                ),
-            ])];
+            return vec![Line::from(vec![Span::styled(
+                "No logs yet".to_string(),
+                Style::default().fg(theme::text_muted()).italic(),
+            )])];
         }
 
         let mut lines = Vec::new();
-        let top_level: Vec<&LogEntry> = state.logs.iter()
-            .filter(|l| l.is_top_level())
-            .collect();
+        let top_level: Vec<&LogEntry> = state.logs.iter().filter(|l| l.is_top_level()).collect();
 
         for log in &top_level {
             render_log_entry(&mut lines, log, &state.logs, &state.open_log_ids, 0);
@@ -129,29 +122,14 @@ fn render_log_entry(
 
         let mut spans = vec![
             Span::styled(indent.clone(), Style::default()),
-            Span::styled(
-                format!("{} ", icon),
-                Style::default().fg(theme::accent()),
-            ),
-            Span::styled(
-                format!("{} ", entry.id),
-                Style::default().fg(theme::accent_dim()),
-            ),
-            Span::styled(
-                format!("{} ", time_str),
-                Style::default().fg(theme::text_muted()),
-            ),
-            Span::styled(
-                entry.content.clone(),
-                Style::default().fg(theme::text()),
-            ),
+            Span::styled(format!("{} ", icon), Style::default().fg(theme::accent())),
+            Span::styled(format!("{} ", entry.id), Style::default().fg(theme::accent_dim())),
+            Span::styled(format!("{} ", time_str), Style::default().fg(theme::text_muted())),
+            Span::styled(entry.content.clone(), Style::default().fg(theme::text())),
         ];
 
         if !is_open {
-            spans.push(Span::styled(
-                format!(" ({} children)", child_count),
-                Style::default().fg(theme::text_muted()),
-            ));
+            spans.push(Span::styled(format!(" ({} children)", child_count), Style::default().fg(theme::text_muted())));
         }
 
         lines.push(Line::from(spans));
@@ -166,18 +144,9 @@ fn render_log_entry(
     } else {
         lines.push(Line::from(vec![
             Span::styled(indent, Style::default()),
-            Span::styled(
-                format!("{} ", entry.id),
-                Style::default().fg(theme::accent_dim()),
-            ),
-            Span::styled(
-                format!("{} ", time_str),
-                Style::default().fg(theme::text_muted()),
-            ),
-            Span::styled(
-                entry.content.clone(),
-                Style::default().fg(theme::text()),
-            ),
+            Span::styled(format!("{} ", entry.id), Style::default().fg(theme::accent_dim())),
+            Span::styled(format!("{} ", time_str), Style::default().fg(theme::text_muted())),
+            Span::styled(entry.content.clone(), Style::default().fg(theme::text())),
         ]));
     }
 }

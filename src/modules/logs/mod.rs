@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::constants::{STORE_DIR, LOGS_DIR, LOGS_CHUNK_SIZE, MEMORY_TLDR_MAX_TOKENS};
+use crate::constants::{LOGS_CHUNK_SIZE, LOGS_DIR, MEMORY_TLDR_MAX_TOKENS, STORE_DIR};
 use crate::core::panels::Panel;
 use crate::modules::Module;
 use crate::persistence::writer::WriteOp;
@@ -43,10 +43,7 @@ pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<WriteOp
     for (idx, chunk_logs) in &chunks {
         let path = dir.join(format!("chunk_{}.json", idx));
         if let Ok(json) = serde_json::to_string_pretty(chunk_logs) {
-            ops.push(WriteOp {
-                path,
-                content: json.into_bytes(),
-            });
+            ops.push(WriteOp { path, content: json.into_bytes() });
         }
     }
 
@@ -54,10 +51,7 @@ pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<WriteOp
     let next_id_path = dir.join("next_id.json");
     let json = serde_json::json!({ "next_log_id": next_log_id });
     if let Ok(s) = serde_json::to_string_pretty(&json) {
-        ops.push(WriteOp {
-            path: next_id_path,
-            content: s.into_bytes(),
-        });
+        ops.push(WriteOp { path: next_id_path, content: s.into_bytes() });
     }
 
     ops
@@ -73,9 +67,10 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
     let next_id_path = dir.join("next_id.json");
     if let Ok(content) = fs::read_to_string(&next_id_path)
         && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
-            && let Some(v) = val.get("next_log_id").and_then(|v| v.as_u64()) {
-                next_log_id = v as usize;
-            }
+        && let Some(v) = val.get("next_log_id").and_then(|v| v.as_u64())
+    {
+        next_log_id = v as usize;
+    }
 
     // Load all chunk files
     if let Ok(entries) = fs::read_dir(&dir) {
@@ -92,16 +87,15 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
 
         for (_, path) in chunk_files {
             if let Ok(content) = fs::read_to_string(&path)
-                && let Ok(logs) = serde_json::from_str::<Vec<LogEntry>>(&content) {
-                    all_logs.extend(logs);
-                }
+                && let Ok(logs) = serde_json::from_str::<Vec<LogEntry>>(&content)
+            {
+                all_logs.extend(logs);
+            }
         }
     }
 
     // Sort by ID number for consistent ordering
-    all_logs.sort_by_key(|l| {
-        l.id.strip_prefix('L').and_then(|n| n.parse::<usize>().ok()).unwrap_or(0)
-    });
+    all_logs.sort_by_key(|l| l.id.strip_prefix('L').and_then(|n| n.parse::<usize>().ok()).unwrap_or(0));
 
     (all_logs, next_log_id)
 }
@@ -109,12 +103,24 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
 pub struct LogsModule;
 
 impl Module for LogsModule {
-    fn id(&self) -> &'static str { "logs" }
-    fn name(&self) -> &'static str { "Logs" }
-    fn description(&self) -> &'static str { "Timestamped log entries and conversation history management" }
-    fn is_core(&self) -> bool { false }
-    fn is_global(&self) -> bool { true }
-    fn dependencies(&self) -> &[&'static str] { &["core"] }
+    fn id(&self) -> &'static str {
+        "logs"
+    }
+    fn name(&self) -> &'static str {
+        "Logs"
+    }
+    fn description(&self) -> &'static str {
+        "Timestamped log entries and conversation history management"
+    }
+    fn is_core(&self) -> bool {
+        false
+    }
+    fn is_global(&self) -> bool {
+        true
+    }
+    fn dependencies(&self) -> &[&'static str] {
+        &["core"]
+    }
 
     fn save_module_data(&self, _state: &State) -> serde_json::Value {
         // Logs are saved via build_log_write_ops() integrated into the WriteBatch,
@@ -139,9 +145,7 @@ impl Module for LogsModule {
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("open_log_ids").and_then(|v| v.as_array()) {
-            state.open_log_ids = arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect();
+            state.open_log_ids = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
         }
     }
 
@@ -310,29 +314,24 @@ fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut count = 0;
     for entry_obj in entries {
         if let Some(content) = entry_obj.get("content").and_then(|v| v.as_str())
-            && !content.is_empty() {
-                push_log(state, content.to_string());
-                count += 1;
-            }
+            && !content.is_empty()
+        {
+            push_log(state, content.to_string());
+            count += 1;
+        }
     }
 
     if count > 0 {
         touch_logs_panel(state);
     }
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Created {} log(s)", count),
-        is_error: false,
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: format!("Created {} log(s)", count), is_error: false }
 }
 
 fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Parse log_ids
     let log_ids: Vec<String> = match tool.input.get("log_ids").and_then(|v| v.as_array()) {
-        Some(arr) => arr.iter()
-            .filter_map(|v| v.as_str().map(String::from))
-            .collect(),
+        Some(arr) => arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
@@ -386,7 +385,8 @@ fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Compute timestamp = max of children timestamps
-    let max_timestamp = log_ids.iter()
+    let max_timestamp = log_ids
+        .iter()
         .filter_map(|id| state.logs.iter().find(|l| l.id == *id))
         .map(|l| l.timestamp_ms)
         .max()
@@ -480,8 +480,6 @@ fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
-
-
 fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
     // 1. Validate the panel ID
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
@@ -509,7 +507,10 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
             if state.context[idx].context_type != ContextType::ConversationHistory {
                 return ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!("Panel '{}' is not a conversation history panel (type: {:?})", panel_id, state.context[idx].context_type),
+                    content: format!(
+                        "Panel '{}' is not a conversation history panel (type: {:?})",
+                        panel_id, state.context[idx].context_type
+                    ),
                     is_error: true,
                 };
             }
@@ -527,10 +528,9 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
 
     // 3. Validate that logs are provided (at least one non-empty entry)
     let logs_array = tool.input.get("logs").and_then(|v| v.as_array());
-    let has_logs = logs_array
-        .is_some_and(|arr| arr.iter().any(|e| {
-            e.get("content").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty())
-        }));
+    let has_logs = logs_array.is_some_and(|arr| {
+        arr.iter().any(|e| e.get("content").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty()))
+    });
 
     if !has_logs {
         return ToolResult {
@@ -547,14 +547,15 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         let mut log_count = 0;
         for log_obj in logs_array {
             if let Some(content) = log_obj.get("content").and_then(|v| v.as_str())
-                && !content.is_empty() {
-                    if last_msg_timestamp > 0 {
-                        push_log_with_timestamp(state, content.to_string(), last_msg_timestamp);
-                    } else {
-                        push_log(state, content.to_string());
-                    }
-                    log_count += 1;
+                && !content.is_empty()
+            {
+                if last_msg_timestamp > 0 {
+                    push_log_with_timestamp(state, content.to_string(), last_msg_timestamp);
+                } else {
+                    push_log(state, content.to_string());
                 }
+                log_count += 1;
+            }
         }
         if log_count > 0 {
             output_parts.push(format!("Created {} log(s)", log_count));
@@ -567,66 +568,53 @@ fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> Tool
         let mut mem_count = 0;
         for mem_obj in memories_array {
             if let Some(content) = mem_obj.get("content").and_then(|v| v.as_str())
-                && !content.is_empty() {
-                    // Validate tl_dr length
-                    let tokens = estimate_tokens(content);
-                    if tokens > MEMORY_TLDR_MAX_TOKENS {
-                        return ToolResult {
-                            tool_use_id: tool.id.clone(),
-                            content: format!(
-                                "Memory content too long for tl_dr: ~{} tokens (max {}). Keep it short.",
-                                tokens, MEMORY_TLDR_MAX_TOKENS
-                            ),
-                            is_error: true,
-                        };
-                    }
-
-                    let importance = mem_obj
-                        .get("importance")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("medium");
-
-                    let importance_level = match importance {
-                        "low" => crate::state::MemoryImportance::Low,
-                        "high" => crate::state::MemoryImportance::High,
-                        "critical" => crate::state::MemoryImportance::Critical,
-                        _ => crate::state::MemoryImportance::Medium,
+                && !content.is_empty()
+            {
+                // Validate tl_dr length
+                let tokens = estimate_tokens(content);
+                if tokens > MEMORY_TLDR_MAX_TOKENS {
+                    return ToolResult {
+                        tool_use_id: tool.id.clone(),
+                        content: format!(
+                            "Memory content too long for tl_dr: ~{} tokens (max {}). Keep it short.",
+                            tokens, MEMORY_TLDR_MAX_TOKENS
+                        ),
+                        is_error: true,
                     };
-
-                    let id = format!("M{}", state.next_memory_id);
-                    state.next_memory_id += 1;
-                    state.memories.push(crate::state::MemoryItem {
-                        id,
-                        tl_dr: content.to_string(),
-                        contents: String::new(),
-                        importance: importance_level,
-                        labels: vec![],
-                    });
-                    mem_count += 1;
                 }
+
+                let importance = mem_obj.get("importance").and_then(|v| v.as_str()).unwrap_or("medium");
+
+                let importance_level = match importance {
+                    "low" => crate::state::MemoryImportance::Low,
+                    "high" => crate::state::MemoryImportance::High,
+                    "critical" => crate::state::MemoryImportance::Critical,
+                    _ => crate::state::MemoryImportance::Medium,
+                };
+
+                let id = format!("M{}", state.next_memory_id);
+                state.next_memory_id += 1;
+                state.memories.push(crate::state::MemoryItem {
+                    id,
+                    tl_dr: content.to_string(),
+                    contents: String::new(),
+                    importance: importance_level,
+                    labels: vec![],
+                });
+                mem_count += 1;
+            }
         }
         if mem_count > 0 {
             output_parts.push(format!("Created {} memory(ies)", mem_count));
             // Deprecate the memory panel cache
-            for ctx in &mut state.context {
-                if ctx.context_type == ContextType::Memory {
-                    ctx.cache_deprecated = true;
-                }
-            }
+            crate::core::panels::mark_panels_dirty(state, ContextType::Memory);
         }
     }
 
     // 6. Close the conversation history panel
-    let panel_name = state.context.iter()
-        .find(|c| c.id == panel_id)
-        .map(|c| c.name.clone())
-        .unwrap_or_default();
+    let panel_name = state.context.iter().find(|c| c.id == panel_id).map(|c| c.name.clone()).unwrap_or_default();
     state.context.retain(|c| c.id != panel_id);
     output_parts.push(format!("Closed {} ({})", panel_id, panel_name));
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: output_parts.join("\n"),
-        is_error: false,
-    }
+    ToolResult { tool_use_id: tool.id.clone(), content: output_parts.join("\n"), is_error: false }
 }

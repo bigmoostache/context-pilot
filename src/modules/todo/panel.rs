@@ -1,10 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
-use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
 use crate::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
-use crate::state::{estimate_tokens, ContextType, State, TodoItem, TodoStatus};
+use crate::core::panels::{ContextItem, Panel};
+use crate::state::{ContextType, State, TodoItem, TodoStatus, estimate_tokens};
 use crate::ui::theme;
 
 pub struct TodoPanel;
@@ -72,7 +72,9 @@ impl Panel for TodoPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_todos_for_context(state);
         // Find the Todo context element to get its ID and timestamp
-        let (id, last_refresh_ms) = state.context.iter()
+        let (id, last_refresh_ms) = state
+            .context
+            .iter()
             .find(|c| c.context_type == ContextType::Todo)
             .map(|c| (c.id.as_str(), c.last_refresh_ms))
             .unwrap_or(("P3", 0));

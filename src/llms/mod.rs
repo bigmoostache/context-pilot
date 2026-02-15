@@ -28,7 +28,13 @@ pub enum StreamEvent {
     /// Tool use request from the LLM
     ToolUse(ToolUse),
     /// Stream completed with token usage
-    Done { input_tokens: usize, output_tokens: usize, cache_hit_tokens: usize, cache_miss_tokens: usize, stop_reason: Option<String> },
+    Done {
+        input_tokens: usize,
+        output_tokens: usize,
+        cache_hit_tokens: usize,
+        cache_miss_tokens: usize,
+        stop_reason: Option<String>,
+    },
     /// Error occurred
     Error(String),
 }
@@ -61,9 +67,13 @@ pub trait ModelInfo {
     /// Output price per million tokens in USD
     fn output_price_per_mtok(&self) -> f32;
     /// Cache hit price per million tokens in USD (default: same as input)
-    fn cache_hit_price_per_mtok(&self) -> f32 { self.input_price_per_mtok() * 0.1 }
+    fn cache_hit_price_per_mtok(&self) -> f32 {
+        self.input_price_per_mtok() * 0.1
+    }
     /// Cache write/miss price per million tokens in USD (default: 1.25x input)
-    fn cache_miss_price_per_mtok(&self) -> f32 { self.input_price_per_mtok() * 1.25 }
+    fn cache_miss_price_per_mtok(&self) -> f32 {
+        self.input_price_per_mtok() * 1.25
+    }
 }
 
 /// Available LLM providers
@@ -176,14 +186,14 @@ impl ModelInfo for GrokModel {
 
     fn input_price_per_mtok(&self) -> f32 {
         match self {
-            GrokModel::Grok41Fast => 0.20,  // $0.20/1M input
+            GrokModel::Grok41Fast => 0.20, // $0.20/1M input
             GrokModel::Grok4Fast => 0.20,
         }
     }
 
     fn output_price_per_mtok(&self) -> f32 {
         match self {
-            GrokModel::Grok41Fast => 0.50,  // $0.50/1M output
+            GrokModel::Grok41Fast => 0.50, // $0.50/1M output
             GrokModel::Grok4Fast => 0.50,
         }
     }
@@ -326,11 +336,7 @@ pub fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
 }
 
 /// Start API check in background
-pub fn start_api_check(
-    provider: LlmProvider,
-    model: String,
-    tx: Sender<ApiCheckResult>,
-) {
+pub fn start_api_check(provider: LlmProvider, model: String, tx: Sender<ApiCheckResult>) {
     let client = get_client(provider);
     std::thread::spawn(move || {
         let result = client.check_api(&model);
@@ -447,8 +453,7 @@ fn ms_to_iso8601(ms: u64) -> String {
         }
         let day = remaining_days + 1;
 
-        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-            year, month, day, hours, minutes, seconds)
+        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, month, day, hours, minutes, seconds)
     } else {
         "1970-01-01T00:00:00Z".to_string()
     }
@@ -465,18 +470,10 @@ fn format_time_delta(delta_ms: u64) -> String {
         format!("{} seconds ago", seconds)
     } else if seconds < 3600 {
         let minutes = seconds / 60;
-        if minutes == 1 {
-            "1 minute ago".to_string()
-        } else {
-            format!("{} minutes ago", minutes)
-        }
+        if minutes == 1 { "1 minute ago".to_string() } else { format!("{} minutes ago", minutes) }
     } else {
         let hours = seconds / 3600;
-        if hours == 1 {
-            "1 hour ago".to_string()
-        } else {
-            format!("{} hours ago", hours)
-        }
+        if hours == 1 { "1 hour ago".to_string() } else { format!("{} hours ago", hours) }
     }
 }
 
@@ -498,8 +495,7 @@ pub fn panel_timestamp_text(timestamp_ms: u64) -> String {
 
     let iso_time = ms_to_iso8601(timestamp_ms);
 
-    prompts::panel_timestamp()
-        .replace("{iso_time}", &iso_time)
+    prompts::panel_timestamp().replace("{iso_time}", &iso_time)
 }
 
 /// Generate the footer text for dynamic panel display, including message timestamps
@@ -507,12 +503,7 @@ pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
     use crate::constants::prompts;
 
     // Get last 25 messages with non-zero timestamps
-    let recent_messages: Vec<&Message> = messages
-        .iter()
-        .filter(|m| m.timestamp_ms > 0)
-        .rev()
-        .take(25)
-        .collect();
+    let recent_messages: Vec<&Message> = messages.iter().filter(|m| m.timestamp_ms > 0).rev().take(25).collect();
 
     // Build message timestamps section
     let message_timestamps = if !recent_messages.is_empty() {
@@ -548,11 +539,8 @@ pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
 /// - Returns FakePanelMessage structs that providers can convert to their format
 pub fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMessage> {
     // Filter out Conversation panel (id="chat") — it's the live message feed, not a context panel
-    let filtered: Vec<&ContextItem> = context_items
-        .iter()
-        .filter(|item| !item.content.is_empty())
-        .filter(|item| item.id != "chat")
-        .collect();
+    let filtered: Vec<&ContextItem> =
+        context_items.iter().filter(|item| !item.content.is_empty()).filter(|item| item.id != "chat").collect();
 
     filtered
         .into_iter()

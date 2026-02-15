@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::constants::{STORE_DIR, PRESETS_DIR};
+use crate::constants::{PRESETS_DIR, STORE_DIR};
 
 use super::types::{Preset, PresetWorkerState};
 
@@ -35,9 +35,10 @@ pub fn ensure_builtin_presets() {
     for preset in builtin_preset_definitions() {
         let path = dir.join(format!("{}.json", preset.preset_name));
         if !path.exists()
-            && let Ok(json) = serde_json::to_string_pretty(&preset) {
-                let _ = fs::write(&path, json);
-            }
+            && let Ok(json) = serde_json::to_string_pretty(&preset)
+        {
+            let _ = fs::write(&path, json);
+        }
     }
 }
 

@@ -2,8 +2,7 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use crate::constants::{
-    TYPEWRITER_MOVING_AVG_SIZE, TYPEWRITER_MIN_DELAY_MS,
-    TYPEWRITER_MAX_DELAY_MS, TYPEWRITER_DEFAULT_DELAY_MS,
+    TYPEWRITER_DEFAULT_DELAY_MS, TYPEWRITER_MAX_DELAY_MS, TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MOVING_AVG_SIZE,
 };
 
 pub struct TypewriterBuffer {
@@ -69,9 +68,7 @@ impl TypewriterBuffer {
             return;
         }
 
-        let total_interval_ms: f64 = self.chunk_intervals.iter()
-            .map(|d| d.as_secs_f64() * 1000.0)
-            .sum();
+        let total_interval_ms: f64 = self.chunk_intervals.iter().map(|d| d.as_secs_f64() * 1000.0).sum();
         let avg_interval_ms = total_interval_ms / self.chunk_intervals.len() as f64;
 
         let total_chars: usize = self.chunk_sizes.iter().sum();

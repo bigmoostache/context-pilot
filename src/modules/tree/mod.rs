@@ -1,13 +1,13 @@
-pub mod types;
 mod panel;
 pub mod tools;
+pub mod types;
 
 use serde_json::json;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ToolDefinition, ToolParam, ParamType, ToolCategory};
-use crate::tools::{ToolUse, ToolResult};
+use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tools::{ToolResult, ToolUse};
 
 use self::panel::TreePanel;
 use super::Module;
@@ -15,10 +15,18 @@ use super::Module;
 pub struct TreeModule;
 
 impl Module for TreeModule {
-    fn id(&self) -> &'static str { "tree" }
-    fn name(&self) -> &'static str { "Tree" }
-    fn description(&self) -> &'static str { "Directory tree view with filtering and descriptions" }
-    fn is_global(&self) -> bool { true }
+    fn id(&self) -> &'static str {
+        "tree"
+    }
+    fn name(&self) -> &'static str {
+        "Tree"
+    }
+    fn description(&self) -> &'static str {
+        "Directory tree view with filtering and descriptions"
+    }
+    fn is_global(&self) -> bool {
+        true
+    }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         json!({
@@ -32,17 +40,19 @@ impl Module for TreeModule {
             state.tree_filter = v.to_string();
         }
         if let Some(arr) = data.get("tree_descriptions")
-            && let Ok(v) = serde_json::from_value(arr.clone()) {
-                state.tree_descriptions = v;
-            }
+            && let Ok(v) = serde_json::from_value(arr.clone())
+        {
+            state.tree_descriptions = v;
+        }
         // Legacy: load tree_open_folders from global config if present (migration)
         if let Some(arr) = data.get("tree_open_folders")
-            && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone()) {
-                state.tree_open_folders = v;
-                if !state.tree_open_folders.contains(&".".to_string()) {
-                    state.tree_open_folders.insert(0, ".".to_string());
-                }
+            && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone())
+        {
+            state.tree_open_folders = v;
+            if !state.tree_open_folders.contains(&".".to_string()) {
+                state.tree_open_folders.insert(0, ".".to_string());
             }
+        }
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
@@ -53,13 +63,14 @@ impl Module for TreeModule {
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("tree_open_folders")
-            && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone()) {
-                state.tree_open_folders = v;
-                // Ensure root is always open
-                if !state.tree_open_folders.contains(&".".to_string()) {
-                    state.tree_open_folders.insert(0, ".".to_string());
-                }
+            && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone())
+        {
+            state.tree_open_folders = v;
+            // Ensure root is always open
+            if !state.tree_open_folders.contains(&".".to_string()) {
+                state.tree_open_folders.insert(0, ".".to_string());
             }
+        }
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {

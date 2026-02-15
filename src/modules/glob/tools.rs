@@ -1,7 +1,7 @@
 use ignore::WalkBuilder;
 
-use crate::tools::{ToolResult, ToolUse};
 use crate::state::{ContextElement, ContextType, State};
+use crate::tools::{ToolResult, ToolUse};
 
 pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let pattern = match tool.input.get("pattern").and_then(|v| v.as_str()) {
@@ -11,16 +11,12 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'pattern' parameter".to_string(),
                 is_error: true,
-            }
+            };
         }
     };
 
     // Validate glob pattern early (cheap operation)
-    if globset::GlobBuilder::new(pattern)
-        .literal_separator(true)
-        .build()
-        .is_err()
-    {
+    if globset::GlobBuilder::new(pattern).literal_separator(true).build().is_err() {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Invalid glob pattern: '{}'", pattern),
@@ -28,9 +24,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    let path = tool.input.get("path")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+    let path = tool.input.get("path").and_then(|v| v.as_str()).map(|s| s.to_string());
 
     let search_path = path.as_deref().unwrap_or(".").to_string();
 
@@ -49,7 +43,6 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         name,
         token_count: 0, // Will be updated by cache
         file_path: None,
-        file_hash: None,
         glob_pattern: Some(pattern.to_string()),
         glob_path: path,
         grep_pattern: None,
@@ -60,16 +53,14 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         tmux_last_keys: None,
         tmux_description: None,
         result_command: None,
-        result_command_hash: None,
         skill_prompt_id: None,
         cached_content: None, // Background will populate
         history_messages: None,
         cache_deprecated: true, // Trigger background refresh
         cache_in_flight: false,
         last_refresh_ms: crate::core::panels::now_ms(),
-        last_polled_ms: 0,
         content_hash: None,
-        tmux_last_lines_hash: None,
+        source_hash: None,
         current_page: 0,
         total_pages: 1,
         full_token_count: 0,
@@ -87,20 +78,14 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Compute glob results and return (formatted output, match count)
 pub fn compute_glob_results(pattern: &str, search_path: &str) -> (String, usize) {
     let mut matches: Vec<String> = Vec::new();
-    let glob_matcher = match globset::GlobBuilder::new(pattern)
-        .literal_separator(true)
-        .build()
-    {
+    let glob_matcher = match globset::GlobBuilder::new(pattern).literal_separator(true).build() {
         Ok(g) => g.compile_matcher(),
         Err(e) => {
             return (format!("Invalid glob pattern: {}", e), 0);
         }
     };
 
-    let walker = WalkBuilder::new(search_path)
-        .hidden(false)
-        .git_ignore(true)
-        .build();
+    let walker = WalkBuilder::new(search_path).hidden(false).git_ignore(true).build();
 
     for entry in walker.flatten() {
         let path = entry.path();
@@ -115,11 +100,7 @@ pub fn compute_glob_results(pattern: &str, search_path: &str) -> (String, usize)
     matches.sort();
     let count = matches.len();
 
-    let output = if matches.is_empty() {
-        "No files found".to_string()
-    } else {
-        matches.join("\n")
-    };
+    let output = if matches.is_empty() { "No files found".to_string() } else { matches.join("\n") };
 
     (output, count)
 }

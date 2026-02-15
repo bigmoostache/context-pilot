@@ -6,11 +6,10 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
-use crate::core::panels::{ContextItem, Panel};
 use crate::actions::Action;
+use crate::core::panels::{ContextItem, Panel};
 use crate::state::{
-    hash_values, ContextType, FullContentCache, MessageRenderCache, InputRenderCache,
-    MessageStatus, MessageType, State,
+    ContextType, FullContentCache, InputRenderCache, MessageRenderCache, MessageStatus, MessageType, State, hash_values,
 };
 use crate::ui::theme;
 
@@ -36,9 +35,10 @@ impl ConversationPanel {
         hash_values(&[
             msg.content.as_str(),
             tl_dr_str,
-            &format!("{}{}{}{}{}{}",
-                status_num, viewport_width, dev_mode as u8,
-                tool_uses_len, tool_results_len, msg.input_tokens),
+            &format!(
+                "{}{}{}{}{}{}",
+                status_num, viewport_width, dev_mode as u8, tool_uses_len, tool_results_len, msg.input_tokens
+            ),
         ])
     }
 
@@ -57,9 +57,7 @@ impl ConversationPanel {
         std::hash::Hash::hash(&state.is_streaming, &mut hasher);
 
         // Hash conversation history panel count (invalidate when panels added/removed)
-        let history_count = state.context.iter()
-            .filter(|c| c.context_type == ContextType::ConversationHistory)
-            .count();
+        let history_count = state.context.iter().filter(|c| c.context_type == ContextType::ConversationHistory).count();
         std::hash::Hash::hash(&history_count, &mut hasher);
 
         // Hash all message content that affects rendering
@@ -91,17 +89,16 @@ impl ConversationPanel {
 
         // Check full content cache first - if valid, return immediately
         if let Some(ref cached) = state.full_content_cache
-            && cached.content_hash == full_hash {
-                // Full cache hit - return cached lines (just clone the Rc's inner vec)
-                return (*cached.lines).clone();
-            }
+            && cached.content_hash == full_hash
+        {
+            // Full cache hit - return cached lines (just clone the Rc's inner vec)
+            return (*cached.lines).clone();
+        }
 
         // Cache miss - need to rebuild
         // Check if viewport width changed - invalidate per-message caches
-        let width_changed = state.message_cache.values()
-            .next()
-            .map(|c| c.viewport_width != viewport_width)
-            .unwrap_or(false);
+        let width_changed =
+            state.message_cache.values().next().map(|c| c.viewport_width != viewport_width).unwrap_or(false);
         if width_changed {
             state.message_cache.clear();
             state.input_cache = None;
@@ -111,34 +108,30 @@ impl ConversationPanel {
 
         // Prepend frozen ConversationHistory panels (oldest first)
         {
-            let mut history_panels: Vec<_> = state.context.iter()
-                .filter(|c| c.context_type == ContextType::ConversationHistory)
-                .collect();
+            let mut history_panels: Vec<_> =
+                state.context.iter().filter(|c| c.context_type == ContextType::ConversationHistory).collect();
             history_panels.sort_by_key(|c| c.last_refresh_ms);
 
             for ctx in &history_panels {
                 if let Some(ref msgs) = ctx.history_messages {
                     // Separator header
-                    text.push(Line::from(vec![
-                        Span::styled(
-                            format!("── {} ──", ctx.name),
-                            Style::default().fg(theme::text_muted()).bold(),
-                        ),
-                    ]));
+                    text.push(Line::from(vec![Span::styled(
+                        format!("── {} ──", ctx.name),
+                        Style::default().fg(theme::text_muted()).bold(),
+                    )]));
 
                     // Render each frozen message with full formatting
                     for msg in msgs {
-                        let lines = conversation_render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
+                        let lines =
+                            conversation_render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
                         text.extend(lines);
                     }
 
                     // Separator footer
-                    text.push(Line::from(vec![
-                        Span::styled(
-                            "── ── ── ──".to_string(),
-                            Style::default().fg(theme::text_muted()),
-                        ),
-                    ]));
+                    text.push(Line::from(vec![Span::styled(
+                        "── ── ── ──".to_string(),
+                        Style::default().fg(theme::text_muted()),
+                    )]));
                     text.push(Line::from(""));
                 }
             }
@@ -147,10 +140,10 @@ impl ConversationPanel {
         if state.messages.is_empty() {
             text.push(Line::from(""));
             text.push(Line::from(""));
-            text.push(Line::from(vec![
-                Span::styled("  Start a conversation by typing below".to_string(),
-                    Style::default().fg(theme::text_muted()).italic()),
-            ]));
+            text.push(Line::from(vec![Span::styled(
+                "  Start a conversation by typing below".to_string(),
+                Style::default().fg(theme::text_muted()).italic(),
+            )]));
         } else {
             let last_msg_id = state.messages.last().map(|m| m.id.clone());
 
@@ -163,10 +156,7 @@ impl ConversationPanel {
                 let is_streaming_this = state.is_streaming && is_last && msg.role == "assistant";
 
                 // Skip empty text messages (unless streaming)
-                if msg.message_type == MessageType::TextMessage
-                    && msg.content.trim().is_empty()
-                    && !is_streaming_this
-                {
+                if msg.message_type == MessageType::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
                     continue;
                 }
 
@@ -175,22 +165,29 @@ impl ConversationPanel {
 
                 // Check per-message cache
                 if let Some(cached) = state.message_cache.get(&msg.id)
-                    && cached.content_hash == hash && cached.viewport_width == viewport_width {
-                        // Cache hit - extend from Rc without full clone
-                        text.extend(cached.lines.iter().cloned());
-                        continue;
-                    }
+                    && cached.content_hash == hash
+                    && cached.viewport_width == viewport_width
+                {
+                    // Cache hit - extend from Rc without full clone
+                    text.extend(cached.lines.iter().cloned());
+                    continue;
+                }
 
                 // Cache miss - render message
-                let lines = conversation_render::render_message(msg, viewport_width, base_style, is_streaming_this, state.dev_mode);
+                let lines = conversation_render::render_message(
+                    msg,
+                    viewport_width,
+                    base_style,
+                    is_streaming_this,
+                    state.dev_mode,
+                );
 
                 // Store in per-message cache (but not for streaming message)
                 if !is_streaming_this {
-                    state.message_cache.insert(msg.id.clone(), MessageRenderCache {
-                        lines: Rc::new(lines.clone()),
-                        content_hash: hash,
-                        viewport_width,
-                    });
+                    state.message_cache.insert(
+                        msg.id.clone(),
+                        MessageRenderCache { lines: Rc::new(lines.clone()), content_hash: hash, viewport_width },
+                    );
                 }
 
                 text.extend(lines);
@@ -206,22 +203,32 @@ impl ConversationPanel {
                 text.extend(cached.lines.iter().cloned());
             } else {
                 // Cache miss
-                let input_lines = conversation_render::render_input(&state.input, state.input_cursor, viewport_width, base_style, &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(), &state.paste_buffers, &state.paste_buffer_labels);
-                state.input_cache = Some(InputRenderCache {
-                    lines: Rc::new(input_lines.clone()),
-                    input_hash,
+                let input_lines = conversation_render::render_input(
+                    &state.input,
+                    state.input_cursor,
                     viewport_width,
-                });
+                    base_style,
+                    &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
+                    &state.paste_buffers,
+                    &state.paste_buffer_labels,
+                );
+                state.input_cache =
+                    Some(InputRenderCache { lines: Rc::new(input_lines.clone()), input_hash, viewport_width });
                 text.extend(input_lines);
             }
         } else {
             // No cache
-            let input_lines = conversation_render::render_input(&state.input, state.input_cursor, viewport_width, base_style, &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(), &state.paste_buffers, &state.paste_buffer_labels);
-            state.input_cache = Some(InputRenderCache {
-                lines: Rc::new(input_lines.clone()),
-                input_hash,
+            let input_lines = conversation_render::render_input(
+                &state.input,
+                state.input_cursor,
                 viewport_width,
-            });
+                base_style,
+                &state.commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
+                &state.paste_buffers,
+                &state.paste_buffer_labels,
+            );
+            state.input_cache =
+                Some(InputRenderCache { lines: Rc::new(input_lines.clone()), input_hash, viewport_width });
             text.extend(input_lines);
         }
 
@@ -231,10 +238,7 @@ impl ConversationPanel {
         }
 
         // Store in full content cache
-        state.full_content_cache = Some(FullContentCache {
-            lines: Rc::new(text.clone()),
-            content_hash: full_hash,
-        });
+        state.full_content_cache = Some(FullContentCache { lines: Rc::new(text.clone()), content_hash: full_hash });
 
         text
     }
@@ -247,11 +251,7 @@ impl Panel for ConversationPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        if state.is_streaming {
-            "Conversation *".to_string()
-        } else {
-            "Conversation".to_string()
-        }
+        if state.is_streaming { "Conversation *".to_string() } else { "Conversation".to_string() }
     }
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
@@ -305,12 +305,7 @@ impl Panel for ConversationPanel {
         let base_style = Style::default().bg(theme::bg_surface());
         let title = self.title(state);
 
-        let inner_area = Rect::new(
-            area.x + 1,
-            area.y,
-            area.width.saturating_sub(2),
-            area.height
-        );
+        let inner_area = Rect::new(area.x + 1, area.y, area.width.saturating_sub(2), area.height);
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -364,15 +359,14 @@ impl Panel for ConversationPanel {
                 .style(Style::default().fg(theme::bg_elevated()))
                 .thumb_style(Style::default().fg(theme::accent_dim()));
 
-            let mut scrollbar_state = ScrollbarState::new(max_scroll as usize)
-                .position(state.scroll_offset.round() as usize);
+            let mut scrollbar_state =
+                ScrollbarState::new(max_scroll as usize).position(state.scroll_offset.round() as usize);
 
             frame.render_stateful_widget(
                 scrollbar,
                 inner_area.inner(Margin { horizontal: 0, vertical: 1 }),
-                &mut scrollbar_state
+                &mut scrollbar_state,
             );
         }
-
     }
 }
