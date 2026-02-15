@@ -41,7 +41,7 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let ctx = &state.context[idx];
 
         match ctx.context_type.as_str() {
-            ContextType::new(ContextType::SYSTEM)
+            ContextType::SYSTEM
             | ContextType::TREE
             | ContextType::CONVERSATION
             | ContextType::TODO

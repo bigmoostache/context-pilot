@@ -143,7 +143,7 @@ pub fn generate_context_content(state: &State) -> String {
         let status = if tool.enabled { "✓" } else { "✗" };
         output.push_str(&format!(
             "| {} | {} | {} | {} |\n",
-            tool.category.short_name(),
+            tool.category,
             tool.id,
             status,
             tool.short_desc
