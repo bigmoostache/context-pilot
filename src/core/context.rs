@@ -288,7 +288,7 @@ pub fn detach_conversation_chunks(state: &mut State) {
         state.context.push(ContextElement {
             id: panel_id,
             uid: Some(panel_uid),
-            context_type: ContextType::ConversationHistory,
+            context_type: ContextType::new(ContextType::CONVERSATION_HISTORY),
             name: chunk_name,
             token_count,
             file_path: None,

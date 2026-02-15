@@ -16,7 +16,7 @@ pub fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
         let added = new_estimate.saturating_sub(state.streaming_estimated_tokens);
 
         if added > 0 {
-            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
                 ctx.token_count += added;
             }
             state.streaming_estimated_tokens = new_estimate;
@@ -53,7 +53,7 @@ pub fn handle_stream_done(
     state.total_output_tokens += output_tokens;
 
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
         // Remove our estimate, add actual
         ctx.token_count =
             ctx.token_count.saturating_sub(state.streaming_estimated_tokens).saturating_add(output_tokens);
@@ -80,7 +80,7 @@ pub fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
     state.is_streaming = false;
 
     // Remove estimated tokens on error from Conversation context
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
         ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
     }
     state.streaming_estimated_tokens = 0;

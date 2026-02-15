@@ -6,93 +6,8 @@
 use std::sync::mpsc::{self, Sender};
 use std::thread;
 
-use sha2::{Digest, Sha256};
-
-use crate::state::TreeFileDescription;
-
-/// Result of a background cache operation
-#[derive(Debug, Clone)]
-pub enum CacheUpdate {
-    /// Generic content update (used by File, Tree, Glob, Grep, Tmux, GitResult, GithubResult)
-    Content { context_id: String, content: String, token_count: usize },
-    /// Git status was fetched (special case: writes to State fields, not just ContextElement)
-    GitStatus {
-        branch: Option<String>,
-        is_repo: bool,
-        /// (path, additions, deletions, change_type, diff_content)
-        file_changes: Vec<(String, i32, i32, crate::state::GitChangeType, String)>,
-        /// All local branches (name, is_current)
-        branches: Vec<(String, bool)>,
-        /// Formatted content for LLM context
-        formatted_content: String,
-        /// Token count for formatted content
-        token_count: usize,
-        /// Source data hash for early-exit optimization on next refresh
-        source_hash: String,
-    },
-    /// Git status unchanged (hash matched, no need to update)
-    GitStatusUnchanged,
-    /// Content unchanged — clear cache_in_flight without updating content
-    Unchanged { context_id: String },
-}
-
-/// Request for background cache operations
-#[derive(Debug, Clone)]
-#[allow(clippy::enum_variant_names)]
-pub enum CacheRequest {
-    /// Refresh a file's cache
-    RefreshFile { context_id: String, file_path: String, current_source_hash: Option<String> },
-    /// Refresh tree cache
-    RefreshTree {
-        context_id: String,
-        tree_filter: String,
-        tree_open_folders: Vec<String>,
-        tree_descriptions: Vec<TreeFileDescription>,
-    },
-    /// Refresh glob cache
-    RefreshGlob { context_id: String, pattern: String, base_path: Option<String> },
-    /// Refresh grep cache
-    RefreshGrep { context_id: String, pattern: String, path: Option<String>, file_pattern: Option<String> },
-    /// Refresh tmux pane cache
-    RefreshTmux { context_id: String, pane_id: String, lines: Option<usize>, current_source_hash: Option<String> },
-    /// Refresh git status
-    RefreshGitStatus {
-        /// Whether to include full diff content in formatted output
-        show_diffs: bool,
-        /// Current source hash (for change detection - skip if unchanged)
-        current_source_hash: Option<String>,
-        /// Diff base ref (e.g., "HEAD~3", "main") — None means default (HEAD/working tree)
-        diff_base: Option<String>,
-    },
-    /// Refresh a git result panel (re-execute read-only git command)
-    RefreshGitResult { context_id: String, command: String },
-    /// Refresh a GitHub result panel (re-execute read-only gh command)
-    RefreshGithubResult { context_id: String, command: String, github_token: String },
-}
-
-impl CacheRequest {
-    /// Get the context type this request is for, to dispatch to the correct panel.
-    pub fn context_type(&self) -> crate::state::ContextType {
-        use crate::state::ContextType;
-        match self {
-            CacheRequest::RefreshFile { .. } => ContextType::File,
-            CacheRequest::RefreshTree { .. } => ContextType::Tree,
-            CacheRequest::RefreshGlob { .. } => ContextType::Glob,
-            CacheRequest::RefreshGrep { .. } => ContextType::Grep,
-            CacheRequest::RefreshTmux { .. } => ContextType::Tmux,
-            CacheRequest::RefreshGitStatus { .. } => ContextType::Git,
-            CacheRequest::RefreshGitResult { .. } => ContextType::GitResult,
-            CacheRequest::RefreshGithubResult { .. } => ContextType::GithubResult,
-        }
-    }
-}
-
-/// Hash content for change detection (SHA-256, collision-resistant)
-pub fn hash_content(content: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    format!("{:064x}", hasher.finalize())
-}
+// Re-export shared cache types from cp-base
+pub use cp_base::cache::{CacheRequest, CacheUpdate, hash_content};
 
 /// Maximum concurrent cache worker threads
 const CACHE_POOL_SIZE: usize = 6;
@@ -122,7 +37,7 @@ impl CachePool {
                         match job {
                             Ok((request, tx)) => {
                                 let context_type = request.context_type();
-                                if let Some(panel) = crate::modules::create_panel(context_type)
+                                if let Some(panel) = crate::modules::create_panel(&context_type)
                                     && let Some(update) = panel.refresh_cache(request)
                                 {
                                     let _ = tx.send(update);

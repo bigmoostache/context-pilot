@@ -52,7 +52,7 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
 
             // Let the current panel handle the key first
             if let Some(ctx) = state.context.get(state.selected_context) {
-                let panel = get_panel(ctx.context_type);
+                let panel = get_panel(&ctx.context_type);
                 if let Some(action) = panel.handle_key(key, state) {
                     return Some(action);
                 }

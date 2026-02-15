@@ -224,38 +224,38 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
     let rows: Vec<Vec<Cell>> = sorted_contexts
         .iter()
         .map(|ctx| {
-            let type_name = match ctx.context_type {
-                ContextType::System => "system",
-                ContextType::Conversation => "conversation",
-                ContextType::File => "file",
-                ContextType::Tree => "tree",
-                ContextType::Glob => "glob",
-                ContextType::Grep => "grep",
-                ContextType::Tmux => "tmux",
-                ContextType::Todo => "todo",
-                ContextType::Memory => "memory",
-                ContextType::Overview => "overview",
-                ContextType::Git => "git",
-                ContextType::GitResult => "git-result",
-                ContextType::GithubResult => "github-result",
-                ContextType::Scratchpad => "scratchpad",
-                ContextType::Library => "library",
-                ContextType::Skill => "skill",
-                ContextType::ConversationHistory => "chat-history",
-                ContextType::Spine => "spine",
-                ContextType::Logs => "logs",
+            let type_name = match ctx.context_type.as_str() {
+                ContextType::SYSTEM => "system",
+                ContextType::CONVERSATION => "conversation",
+                ContextType::FILE => "file",
+                ContextType::TREE => "tree",
+                ContextType::GLOB => "glob",
+                ContextType::GREP => "grep",
+                ContextType::TMUX => "tmux",
+                ContextType::TODO => "todo",
+                ContextType::MEMORY => "memory",
+                ContextType::OVERVIEW => "overview",
+                ContextType::GIT => "git",
+                ContextType::GIT_RESULT => "git-result",
+                ContextType::GITHUB_RESULT => "github-result",
+                ContextType::SCRATCHPAD => "scratchpad",
+                ContextType::LIBRARY => "library",
+                ContextType::SKILL => "skill",
+                ContextType::CONVERSATION_HISTORY => "chat-history",
+                ContextType::SPINE => "spine",
+                ContextType::LOGS => "logs",
             };
 
-            let details = match ctx.context_type {
-                ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
-                ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
-                ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
-                ContextType::Tmux => {
+            let details = match ctx.context_type.as_str() {
+                ContextType::FILE => ctx.file_path.as_deref().unwrap_or("").to_string(),
+                ContextType::GLOB => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
+                ContextType::GREP => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
+                ContextType::TMUX => {
                     let pane = ctx.tmux_pane_id.as_deref().unwrap_or("?");
                     let desc = ctx.tmux_description.as_deref().unwrap_or("");
                     if desc.is_empty() { pane.to_string() } else { format!("{}: {}", pane, desc) }
                 }
-                ContextType::GitResult | ContextType::GithubResult => {
+                ContextType::GIT_RESULT | ContextType::GITHUB_RESULT => {
                     ctx.result_command.as_deref().unwrap_or("").to_string()
                 }
                 _ => String::new(),
@@ -489,7 +489,7 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
 pub fn render_presets(base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line> = Vec::new();
 
-    let presets = crate::modules::preset::tools::list_presets_with_info();
+    let presets = cp_mod_preset::tools::list_presets_with_info();
     if presets.is_empty() {
         return text;
     }
@@ -556,30 +556,39 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
     text.push(Line::from(""));
 
     use crate::constants::tool_categories;
-    use crate::tool_defs::ToolCategory;
 
-    for category in ToolCategory::all() {
-        let category_tools: Vec<_> = state.tools.iter().filter(|t| &t.category == category).collect();
+    // Collect unique categories in order of first appearance
+    let mut seen_cats = std::collections::HashSet::new();
+    let categories: Vec<String> = state
+        .tools
+        .iter()
+        .filter(|t| seen_cats.insert(t.category.clone()))
+        .map(|t| t.category.clone())
+        .collect();
+
+    for category in &categories {
+        let category_tools: Vec<_> = state.tools.iter().filter(|t| t.category == *category).collect();
 
         if category_tools.is_empty() {
             continue;
         }
 
-        let (cat_name, cat_desc) = match category {
-            ToolCategory::File => ("FILE", tool_categories::file_desc()),
-            ToolCategory::Tree => ("TREE", tool_categories::tree_desc()),
-            ToolCategory::Console => ("CONSOLE", tool_categories::console_desc()),
-            ToolCategory::Context => ("CONTEXT", tool_categories::context_desc()),
-            ToolCategory::Skill => ("SKILL", "Manage knowledge skills"),
-            ToolCategory::Agent => ("AGENT", "Manage system prompt agents"),
-            ToolCategory::Command => ("COMMAND", "Manage input commands"),
-            ToolCategory::System => ("SYSTEM", "System configuration and control"),
-            ToolCategory::Todo => ("TODO", tool_categories::todo_desc()),
-            ToolCategory::Memory => ("MEMORY", tool_categories::memory_desc()),
-            ToolCategory::Git => ("GIT", tool_categories::git_desc()),
-            ToolCategory::Github => ("GITHUB", "GitHub API operations via gh CLI"),
-            ToolCategory::Scratchpad => ("SCRATCHPAD", tool_categories::scratchpad_desc()),
-            ToolCategory::Spine => ("SPINE", "Auto-continuation and stream control"),
+        let (cat_name, cat_desc) = match category.as_str() {
+            "File" => ("FILE", tool_categories::file_desc()),
+            "Tree" => ("TREE", tool_categories::tree_desc()),
+            "Console" => ("CONSOLE", tool_categories::console_desc()),
+            "Context" => ("CONTEXT", tool_categories::context_desc()),
+            "Skill" => ("SKILL", "Manage knowledge skills"),
+            "Agent" => ("AGENT", "Manage system prompt agents"),
+            "Command" => ("COMMAND", "Manage input commands"),
+            "System" => ("SYSTEM", "System configuration and control"),
+            "Todo" => ("TODO", tool_categories::todo_desc()),
+            "Memory" => ("MEMORY", tool_categories::memory_desc()),
+            "Git" => ("GIT", tool_categories::git_desc()),
+            "GitHub" => ("GITHUB", "GitHub API operations via gh CLI"),
+            "Scratchpad" => ("SCRATCHPAD", tool_categories::scratchpad_desc()),
+            "Spine" => ("SPINE", "Auto-continuation and stream control"),
+            other => (other, ""),
         };
 
         text.push(Line::from(vec![

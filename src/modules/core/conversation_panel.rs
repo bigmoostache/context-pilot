@@ -57,7 +57,7 @@ impl ConversationPanel {
         std::hash::Hash::hash(&state.is_streaming, &mut hasher);
 
         // Hash conversation history panel count (invalidate when panels added/removed)
-        let history_count = state.context.iter().filter(|c| c.context_type == ContextType::ConversationHistory).count();
+        let history_count = state.context.iter().filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY).count();
         std::hash::Hash::hash(&history_count, &mut hasher);
 
         // Hash all message content that affects rendering
@@ -109,7 +109,7 @@ impl ConversationPanel {
         // Prepend frozen ConversationHistory panels (oldest first)
         {
             let mut history_panels: Vec<_> =
-                state.context.iter().filter(|c| c.context_type == ContextType::ConversationHistory).collect();
+                state.context.iter().filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY).collect();
             history_panels.sort_by_key(|c| c.last_refresh_ms);
 
             for ctx in &history_panels {

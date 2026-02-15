@@ -84,7 +84,7 @@ impl GhWatcher {
                 continue; // Already watching — preserve etag/hash/interval state
             }
 
-            let args = match crate::modules::github::classify::validate_gh_command(command) {
+            let args = match cp_mod_github::classify::validate_gh_command(command) {
                 Ok(a) => a,
                 Err(_) => continue, // Skip invalid commands
             };

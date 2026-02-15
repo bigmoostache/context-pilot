@@ -2,7 +2,7 @@ use ratatui::{prelude::*, widgets::Paragraph};
 
 use super::{chars, helpers::*, spinner, theme};
 use crate::constants::SIDEBAR_HELP_HEIGHT;
-use crate::state::State;
+use crate::state::{ContextType, State};
 
 /// Maximum number of dynamic contexts (P7+) to show per page
 const MAX_DYNAMIC_PER_PAGE: usize = 10;
@@ -49,17 +49,17 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     // Separate fixed (P1-P9) and dynamic (P10+) contexts, skipping Conversation (it's the chat feed, not a numbered panel)
     let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
         .into_iter()
-        .filter(|&i| state.context[i].context_type != crate::state::ContextType::Conversation)
+        .filter(|&i| state.context[i].context_type != ContextType::new(ContextType::CONVERSATION))
         .partition(|&i| state.context[i].context_type.is_fixed());
 
     // Render Conversation entry (special: no Px ID, highlights when selected)
-    if let Some(conv_idx) = state.context.iter().position(|c| c.context_type == crate::state::ContextType::Conversation)
+    if let Some(conv_idx) = state.context.iter().position(|c| c.context_type == ContextType::new(ContextType::CONVERSATION))
     {
         let is_selected = conv_idx == state.selected_context;
         let indicator = if is_selected { chars::ARROW_RIGHT } else { " " };
         let indicator_color = if is_selected { theme::accent() } else { theme::bg_base() };
         let name_color = if is_selected { theme::accent() } else { theme::text_secondary() };
-        let icon = crate::state::ContextType::Conversation.icon();
+        let icon = ContextType::new(ContextType::CONVERSATION).icon();
         let conv_tokens = format_number(state.context[conv_idx].token_count);
 
         lines.push(Line::from(vec![

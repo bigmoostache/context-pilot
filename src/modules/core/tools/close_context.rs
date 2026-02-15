@@ -40,22 +40,22 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let ctx = &state.context[idx];
 
-        match ctx.context_type {
-            ContextType::System
-            | ContextType::Tree
-            | ContextType::Conversation
-            | ContextType::Todo
-            | ContextType::Memory
-            | ContextType::Overview
-            | ContextType::Git
-            | ContextType::Scratchpad
-            | ContextType::Library
-            | ContextType::Spine
-            | ContextType::Logs => {
+        match ctx.context_type.as_str() {
+            ContextType::SYSTEM
+            | ContextType::TREE
+            | ContextType::CONVERSATION
+            | ContextType::TODO
+            | ContextType::MEMORY
+            | ContextType::OVERVIEW
+            | ContextType::GIT
+            | ContextType::SCRATCHPAD
+            | ContextType::LIBRARY
+            | ContextType::SPINE
+            | ContextType::LOGS => {
                 // Protected - cannot close
                 skipped.push(format!("{} (protected)", id));
             }
-            ContextType::Skill => {
+            ContextType::SKILL => {
                 let name = ctx.name.clone();
                 // Remove from loaded_skill_ids
                 if let Some(skill_id) = ctx.skill_prompt_id.clone() {
@@ -64,31 +64,31 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 state.context.remove(idx);
                 closed.push(format!("{} (skill: {})", id, name));
             }
-            ContextType::ConversationHistory => {
+            ContextType::CONVERSATION_HISTORY => {
                 // Redirect to close_conversation_history tool
                 skipped.push(format!("{} — Cannot close conversation history with context_close. Use close_conversation_history instead, which lets you create logs and memories to preserve important information before closing.", id));
             }
-            ContextType::GitResult | ContextType::GithubResult => {
+            ContextType::GIT_RESULT | ContextType::GITHUB_RESULT => {
                 let cmd = ctx.result_command.clone().unwrap_or_default();
                 state.context.remove(idx);
                 closed.push(format!("{} ({})", id, cmd));
             }
-            ContextType::File => {
+            ContextType::FILE => {
                 let name = ctx.name.clone();
                 state.context.remove(idx);
                 closed.push(format!("{} (file: {})", id, name));
             }
-            ContextType::Glob => {
+            ContextType::GLOB => {
                 let pattern = ctx.glob_pattern.clone().unwrap_or_default();
                 state.context.remove(idx);
                 closed.push(format!("{} (glob: {})", id, pattern));
             }
-            ContextType::Grep => {
+            ContextType::GREP => {
                 let pattern = ctx.grep_pattern.clone().unwrap_or_default();
                 state.context.remove(idx);
                 closed.push(format!("{} (grep: {})", id, pattern));
             }
-            ContextType::Tmux => {
+            ContextType::TMUX => {
                 let pane_id = ctx.tmux_pane_id.clone();
                 let desc = ctx.tmux_description.clone().unwrap_or_default();
 

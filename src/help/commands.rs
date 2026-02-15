@@ -1,4 +1,4 @@
-use crate::state::State;
+use crate::state::{ContextType, State};
 
 /// A command that can be executed from the palette
 #[derive(Debug, Clone)]
@@ -94,7 +94,7 @@ pub fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
     ]));
 
     // Conversation entry (special: no Px ID, always first in panels)
-    if let Some(conv) = state.context.iter().find(|c| c.context_type == crate::state::ContextType::Conversation) {
+    if let Some(conv) = state.context.iter().find(|c| c.context_type == ContextType::new(ContextType::CONVERSATION)) {
         let icon = conv.context_type.icon();
         commands.push(
             PaletteCommand::new(&conv.id, format!("{} Conversation", icon), "Go to conversation").with_keywords(vec![
@@ -111,7 +111,7 @@ pub fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
     // Panel navigation commands (P1, P2, ...)
     // Sort by P-number for consistent ordering
     let mut sorted_contexts: Vec<_> =
-        state.context.iter().filter(|c| c.context_type != crate::state::ContextType::Conversation).collect();
+        state.context.iter().filter(|c| c.context_type != ContextType::new(ContextType::CONVERSATION)).collect();
     sorted_contexts.sort_by(|a, b| {
         let id_a = a.id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
         let id_b = b.id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);

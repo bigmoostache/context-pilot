@@ -12,7 +12,7 @@ use serde_json::json;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use crate::tools::{ToolResult, ToolUse};
 
 use self::conversation_panel::ConversationPanel;
@@ -145,22 +145,22 @@ impl Module for CoreModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::Overview]
+        vec![ContextType::new(ContextType::OVERVIEW)]
     }
 
     fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::ConversationHistory]
+        vec![ContextType::new(ContextType::CONVERSATION_HISTORY)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::Overview, "World", false)]
+        vec![(ContextType::new(ContextType::OVERVIEW), "World", false)]
     }
 
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>> {
-        match context_type {
-            ContextType::Conversation => Some(Box::new(ConversationPanel)),
-            ContextType::Overview => Some(Box::new(OverviewPanel)),
-            ContextType::ConversationHistory => Some(Box::new(conversation_history_panel::ConversationHistoryPanel)),
+    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            ContextType::CONVERSATION => Some(Box::new(ConversationPanel)),
+            ContextType::OVERVIEW => Some(Box::new(OverviewPanel)),
+            ContextType::CONVERSATION_HISTORY => Some(Box::new(conversation_history_panel::ConversationHistoryPanel)),
             _ => None,
         }
     }
@@ -179,7 +179,7 @@ impl Module for CoreModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::Context,
+                category: "Context".to_string(),
             },
 
             // System tools (reload stays in core)
@@ -190,7 +190,7 @@ impl Module for CoreModule {
                 description: "Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.".to_string(),
                 params: vec![],
                 enabled: true,
-                category: ToolCategory::System,
+                category: "System".to_string(),
             },
 
             // Meta tools
@@ -213,7 +213,7 @@ impl Module for CoreModule {
                         .required(),
                 ],
                 enabled: true,
-                category: ToolCategory::System,
+                category: "System".to_string(),
             },
         ];
 
@@ -230,7 +230,7 @@ impl Module for CoreModule {
                 ToolParam::new("page", ParamType::Integer).desc("Page number (1-indexed)").required(),
             ],
             enabled: false,
-            category: ToolCategory::Context,
+            category: "Context".to_string(),
         });
 
         // Add module_toggle tool

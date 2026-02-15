@@ -13,12 +13,12 @@ pub fn has_dirty_panels(state: &State) -> bool {
     state
         .context
         .iter()
-        .any(|c| (c.context_type == ContextType::File || c.context_type == ContextType::Tmux) && c.cache_deprecated)
+        .any(|c| (c.context_type == ContextType::FILE || c.context_type == ContextType::TMUX) && c.cache_deprecated)
 }
 
 /// Check if any File context panels have cache_deprecated = true
 pub fn has_dirty_file_panels(state: &State) -> bool {
-    state.context.iter().any(|c| c.context_type == ContextType::File && c.cache_deprecated)
+    state.context.iter().any(|c| c.context_type == ContextType::FILE && c.cache_deprecated)
 }
 
 /// Trigger immediate cache refresh for all dirty file panels.
@@ -26,8 +26,8 @@ pub fn has_dirty_file_panels(state: &State) -> bool {
 pub fn trigger_dirty_panel_refresh(state: &State, cache_tx: &Sender<CacheUpdate>) -> bool {
     let mut any_triggered = false;
     for ctx in &state.context {
-        if ctx.context_type == ContextType::File && ctx.cache_deprecated && !ctx.cache_in_flight {
-            let panel = crate::core::panels::get_panel(ctx.context_type);
+        if ctx.context_type == ContextType::FILE && ctx.cache_deprecated && !ctx.cache_in_flight {
+            let panel = crate::core::panels::get_panel(&ctx.context_type);
             if let Some(request) = panel.build_cache_request(ctx, state) {
                 process_cache_request(request, cache_tx.clone());
                 any_triggered = true;

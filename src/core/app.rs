@@ -6,7 +6,7 @@ use crossterm::event;
 use ratatui::prelude::*;
 
 use crate::actions::{Action, ActionResult, apply_action, clean_llm_id_prefix};
-use crate::api::{StreamEvent, start_streaming};
+use crate::api::{StreamEvent, StreamParams, start_streaming};
 use crate::background::{TlDrResult, generate_tldr};
 use crate::cache::{CacheRequest, CacheUpdate, process_cache_request};
 use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
@@ -126,7 +126,7 @@ impl App {
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
-            use crate::modules::spine::types::NotificationType;
+            use cp_base::types::spine::NotificationType;
             self.state.create_notification(
                 NotificationType::ReloadResume,
                 "reload_resume".to_string(),
@@ -294,15 +294,16 @@ impl App {
                 self.typewriter.reset();
                 self.pending_done = None;
                 start_streaming(
-                    self.state.llm_provider,
-                    self.state.current_model(),
-                    ctx.messages,
-                    ctx.context_items,
-                    ctx.tools,
-                    None,
-                    system_prompt.clone(),
-                    Some(system_prompt),
-                    DEFAULT_WORKER_ID.to_string(),
+                    StreamParams {
+                        provider: self.state.llm_provider,
+                        model: self.state.current_model(),
+                        messages: ctx.messages,
+                        context_items: ctx.context_items,
+                        tools: ctx.tools,
+                        system_prompt: system_prompt.clone(),
+                        seed_content: Some(system_prompt),
+                        worker_id: DEFAULT_WORKER_ID.to_string(),
+                    },
                     tx.clone(),
                 );
                 self.state.dirty = true;
@@ -518,15 +519,16 @@ impl App {
         self.typewriter.reset();
         self.pending_done = None;
         start_streaming(
-            self.state.llm_provider,
-            self.state.current_model(),
-            ctx.messages,
-            ctx.context_items,
-            ctx.tools,
-            None,
-            system_prompt.clone(),
-            Some(system_prompt),
-            DEFAULT_WORKER_ID.to_string(),
+            StreamParams {
+                provider: self.state.llm_provider,
+                model: self.state.current_model(),
+                messages: ctx.messages,
+                context_items: ctx.context_items,
+                tools: ctx.tools,
+                system_prompt: system_prompt.clone(),
+                seed_content: Some(system_prompt),
+                worker_id: DEFAULT_WORKER_ID.to_string(),
+            },
             tx.clone(),
         );
     }
@@ -568,18 +570,18 @@ impl App {
 
         if needs_tmux {
             // send_keys: deprecate tmux panels and wait for refresh
-            crate::core::panels::mark_panels_dirty(&mut self.state, ContextType::Tmux);
+            crate::core::panels::mark_panels_dirty(&mut self.state, ContextType::new(ContextType::TMUX));
             // Trigger tmux panel refreshes
             for ctx in &self.state.context {
-                if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated && !ctx.cache_in_flight {
-                    let panel = crate::core::panels::get_panel(ctx.context_type);
+                if ctx.context_type == ContextType::TMUX && ctx.cache_deprecated && !ctx.cache_in_flight {
+                    let panel = crate::core::panels::get_panel(&ctx.context_type);
                     if let Some(request) = panel.build_cache_request(ctx, &self.state) {
                         crate::cache::process_cache_request(request, self.cache_tx.clone());
                     }
                 }
             }
             for ctx in &mut self.state.context {
-                if ctx.context_type == ContextType::Tmux && ctx.cache_deprecated {
+                if ctx.context_type == ContextType::TMUX && ctx.cache_deprecated {
                     ctx.cache_in_flight = true;
                 }
             }
@@ -666,7 +668,7 @@ impl App {
                 // We set user_stopped instead of disabling continue_until_todos_done,
                 // so auto-continuation resumes when the user sends a new message.
                 self.state.spine_config.user_stopped = true;
-                self.state.touch_panel(ContextType::Spine);
+                self.state.touch_panel(ContextType::new(ContextType::SPINE));
                 if let Some(msg) = self.state.messages.last()
                     && msg.role == "assistant"
                 {
@@ -710,7 +712,7 @@ impl App {
 
         // Watch files in File contexts
         for ctx in &self.state.context {
-            if ctx.context_type == ContextType::File
+            if ctx.context_type == ContextType::FILE
                 && let Some(path) = &ctx.file_path
                 && !self.watched_file_paths.contains(path)
                 && watcher.watch_file(path).is_ok()
@@ -751,7 +753,7 @@ impl App {
             .state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::GithubResult)
+            .filter(|c| c.context_type == ContextType::GITHUB_RESULT)
             .filter_map(|c| c.result_command.as_ref().map(|cmd| (c.id.clone(), cmd.clone(), token.clone())))
             .collect();
         self.gh_watcher.sync_watches(&panels);
@@ -768,7 +770,7 @@ impl App {
             if !ctx.context_type.is_fixed() {
                 continue;
             }
-            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let panel = crate::core::panels::get_panel(&ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
             if let Some(request) = request {
                 process_cache_request(request, self.cache_tx.clone());
@@ -797,10 +799,10 @@ impl App {
 
             // GitStatus: match by context_type
             if matches!(update, CacheUpdate::GitStatus { .. } | CacheUpdate::GitStatusUnchanged) {
-                let idx = state.context.iter().position(|c| c.context_type == ContextType::Git);
+                let idx = state.context.iter().position(|c| c.context_type == ContextType::GIT);
                 let Some(idx) = idx else { continue };
                 let mut ctx = state.context.remove(idx);
-                let panel = crate::core::panels::get_panel(ctx.context_type);
+                let panel = crate::core::panels::get_panel(&ctx.context_type);
                 // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
                 let _changed = panel.apply_cache_update(update, &mut ctx, state);
                 ctx.cache_in_flight = false;
@@ -814,7 +816,7 @@ impl App {
             let idx = state.context.iter().position(|c| c.id == *context_id);
             let Some(idx) = idx else { continue };
             let mut ctx = state.context.remove(idx);
-            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let panel = crate::core::panels::get_panel(&ctx.context_type);
             // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
             let _changed = panel.apply_cache_update(update, &mut ctx, state);
             ctx.cache_in_flight = false;
@@ -847,14 +849,14 @@ impl App {
                         // Git events: only mark deprecated, don't spawn immediately.
                         // The timer-based check will handle refresh at the proper interval,
                         // preventing the feedback loop (git status → .git/index → watcher → repeat).
-                        mark_panels_dirty(&mut self.state, ContextType::Git);
-                        mark_panels_dirty(&mut self.state, ContextType::GitResult);
+                        mark_panels_dirty(&mut self.state, ContextType::new(ContextType::GIT));
+                        mark_panels_dirty(&mut self.state, ContextType::new(ContextType::GIT_RESULT));
                     } else {
                         for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                            let should_dirty = match ctx.context_type {
-                                ContextType::File => ctx.file_path.as_deref() == Some(path.as_str()),
+                            let should_dirty = match ctx.context_type.as_str() {
+                                ContextType::FILE => ctx.file_path.as_deref() == Some(path.as_str()),
                                 // File content change affects grep results
-                                ContextType::Grep => {
+                                ContextType::GREP => {
                                     let base = ctx.grep_path.as_deref().unwrap_or(".");
                                     path.starts_with(base)
                                 }
@@ -874,19 +876,19 @@ impl App {
                     let is_git_event = path.starts_with(".git/") || self.watched_git_paths.contains(path.as_str());
                     if is_git_event {
                         // Git events: only mark deprecated (same as FileChanged above)
-                        mark_panels_dirty(&mut self.state, ContextType::Git);
-                        mark_panels_dirty(&mut self.state, ContextType::GitResult);
+                        mark_panels_dirty(&mut self.state, ContextType::new(ContextType::GIT));
+                        mark_panels_dirty(&mut self.state, ContextType::new(ContextType::GIT_RESULT));
                     } else {
                         // Directory changed: invalidate Tree, Glob, and Grep panels
                         // whose search paths overlap with the changed directory.
                         for (i, ctx) in self.state.context.iter_mut().enumerate() {
-                            let should_dirty = match ctx.context_type {
-                                ContextType::Tree => true,
-                                ContextType::Glob => {
+                            let should_dirty = match ctx.context_type.as_str() {
+                                ContextType::TREE => true,
+                                ContextType::GLOB => {
                                     let base = ctx.glob_path.as_deref().unwrap_or(".");
                                     path.starts_with(base) || base.starts_with(path.as_str())
                                 }
-                                ContextType::Grep => {
+                                ContextType::GREP => {
                                     let base = ctx.grep_path.as_deref().unwrap_or(".");
                                     path.starts_with(base) || base.starts_with(path.as_str())
                                 }
@@ -911,7 +913,7 @@ impl App {
                 continue;
             }
             let ctx = &self.state.context[i];
-            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let panel = crate::core::panels::get_panel(&ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
             if let Some(request) = request {
                 process_cache_request(request, self.cache_tx.clone());
@@ -958,7 +960,7 @@ impl App {
                 continue;
             }
 
-            let panel = crate::core::panels::get_panel(ctx.context_type);
+            let panel = crate::core::panels::get_panel(&ctx.context_type);
 
             // Case 1: Initial load — panel has no content yet
             if ctx.cached_content.is_none() && ctx.context_type.needs_cache() {
@@ -1003,7 +1005,7 @@ impl App {
 
         for ctx in &self.state.context {
             // File panels: watch individual files
-            if ctx.context_type == ContextType::File
+            if ctx.context_type == ContextType::FILE
                 && let Some(path) = &ctx.file_path
                 && !self.watched_file_paths.contains(path)
                 && watcher.watch_file(path).is_ok()
@@ -1012,7 +1014,7 @@ impl App {
             }
 
             // Glob panels: watch base directory
-            if ctx.context_type == ContextType::Glob {
+            if ctx.context_type == ContextType::GLOB {
                 let dir = ctx.glob_path.as_deref().unwrap_or(".");
                 if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
                     self.watched_dir_paths.insert(dir.to_string());
@@ -1020,7 +1022,7 @@ impl App {
             }
 
             // Grep panels: watch search directory
-            if ctx.context_type == ContextType::Grep {
+            if ctx.context_type == ContextType::GREP {
                 let dir = ctx.grep_path.as_deref().unwrap_or(".");
                 if !self.watched_dir_paths.contains(dir) && watcher.watch_dir(dir).is_ok() {
                     self.watched_dir_paths.insert(dir.to_string());
@@ -1033,7 +1035,7 @@ impl App {
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
     fn check_spine(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
-        use crate::modules::spine::engine::{SpineDecision, apply_continuation, check_spine};
+        use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 
         match check_spine(&mut self.state) {
             SpineDecision::Idle => {}
@@ -1059,15 +1061,16 @@ impl App {
                     let ctx = prepare_stream_context(&mut self.state, false);
                     let system_prompt = get_active_agent_content(&self.state);
                     start_streaming(
-                        self.state.llm_provider,
-                        self.state.current_model(),
-                        ctx.messages,
-                        ctx.context_items,
-                        ctx.tools,
-                        None,
-                        system_prompt.clone(),
-                        Some(system_prompt),
-                        DEFAULT_WORKER_ID.to_string(),
+                        StreamParams {
+                            provider: self.state.llm_provider,
+                            model: self.state.current_model(),
+                            messages: ctx.messages,
+                            context_items: ctx.context_items,
+                            tools: ctx.tools,
+                            system_prompt: system_prompt.clone(),
+                            seed_content: Some(system_prompt),
+                            worker_id: DEFAULT_WORKER_ID.to_string(),
+                        },
                         tx.clone(),
                     );
                     self.save_state_async();

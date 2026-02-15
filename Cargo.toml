@@ -1,22 +1,53 @@
+[workspace]
+members = [".", "crates/cp-base", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-glob", "crates/cp-mod-grep", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-tmux", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-preset"]
+
+[workspace.dependencies]
+cp-base = { path = "crates/cp-base" }
+ratatui = "0.30"
+crossterm = "0.29"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+sha2 = "0.10"
+chrono = "0.4"
+regex = "1.10"
+ignore = "0.4"
+globset = "0.4"
+
 [package]
 name = "tui"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-crossterm = "0.29.0"
-ratatui = "0.30.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_yaml = "0.9"
+cp-base.workspace = true
+cp-mod-scratchpad = { path = "crates/cp-mod-scratchpad" }
+cp-mod-glob = { path = "crates/cp-mod-glob" }
+cp-mod-grep = { path = "crates/cp-mod-grep" }
+cp-mod-todo = { path = "crates/cp-mod-todo" }
+cp-mod-memory = { path = "crates/cp-mod-memory" }
+cp-mod-tree = { path = "crates/cp-mod-tree" }
+cp-mod-git = { path = "crates/cp-mod-git" }
+cp-mod-logs = { path = "crates/cp-mod-logs" }
+cp-mod-github = { path = "crates/cp-mod-github" }
+cp-mod-tmux = { path = "crates/cp-mod-tmux" }
+cp-mod-files = { path = "crates/cp-mod-files" }
+cp-mod-spine = { path = "crates/cp-mod-spine" }
+cp-mod-preset = { path = "crates/cp-mod-preset" }
+cp-mod-prompt = { path = "crates/cp-mod-prompt" }
+crossterm.workspace = true
+ratatui.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+sha2.workspace = true
+chrono.workspace = true
+ignore.workspace = true
+globset.workspace = true
+regex.workspace = true
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 dotenvy = "0.15"
-ignore = "0.4"
-globset = "0.4"
-regex = "1.10"
 unicode-width = "0.2"
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "default-themes", "regex-onig"] }
-sha2 = "0.10"
 secrecy = { version = "0.10", features = ["serde"] }
 notify = "6.1"
-chrono = "0.4"

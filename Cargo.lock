@@ -222,6 +222,170 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
+name = "cp-base"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "crossterm",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+]
+
+[[package]]
+name = "cp-mod-files"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-git"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "regex",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-github"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "regex",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-glob"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "globset",
+ "ignore",
+ "ratatui",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-grep"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "globset",
+ "ignore",
+ "ratatui",
+ "regex",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-logs"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-memory"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-preset"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
+name = "cp-mod-prompt"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
+name = "cp-mod-scratchpad"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-spine"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-tmux"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-todo"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde_json",
+]
+
+[[package]]
+name = "cp-mod-tree"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ignore",
+ "ratatui",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2504,6 +2668,21 @@ name = "tui"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "cp-base",
+ "cp-mod-files",
+ "cp-mod-git",
+ "cp-mod-github",
+ "cp-mod-glob",
+ "cp-mod-grep",
+ "cp-mod-logs",
+ "cp-mod-memory",
+ "cp-mod-preset",
+ "cp-mod-prompt",
+ "cp-mod-scratchpad",
+ "cp-mod-spine",
+ "cp-mod-tmux",
+ "cp-mod-todo",
+ "cp-mod-tree",
  "crossterm",
  "dotenvy",
  "globset",

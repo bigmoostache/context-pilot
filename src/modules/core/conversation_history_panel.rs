@@ -14,7 +14,7 @@ impl Panel for ConversationHistoryPanel {
         state
             .context
             .get(state.selected_context)
-            .filter(|c| c.context_type == ContextType::ConversationHistory)
+            .filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY)
             .map(|c| c.name.clone())
             .unwrap_or_else(|| "Chat History".to_string())
     }
@@ -23,7 +23,7 @@ impl Panel for ConversationHistoryPanel {
         state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::ConversationHistory)
+            .filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY)
             .filter_map(|c| {
                 let content = c.cached_content.as_ref()?;
                 let output = paginate_content(content, c.current_page, c.total_pages);
@@ -38,7 +38,7 @@ impl Panel for ConversationHistoryPanel {
 
         // Render only the currently selected context element
         let ctx = match state.context.get(state.selected_context) {
-            Some(c) if c.context_type == ContextType::ConversationHistory => c,
+            Some(c) if c.context_type == ContextType::CONVERSATION_HISTORY => c,
             _ => {
                 lines.push(Line::from(vec![Span::styled(
                     "No conversation history.".to_string(),

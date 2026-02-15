@@ -45,65 +45,8 @@ fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
     cursor
 }
 
-#[derive(Debug, Clone)]
-pub enum Action {
-    InputChar(char),
-    InsertText(String),
-    PasteText(String),
-    InputBackspace,
-    InputDelete,
-    InputSubmit,
-    CursorWordLeft,
-    CursorWordRight,
-    DeleteWordLeft,
-    RemoveListItem, // Remove empty list item, keep newline
-    CursorHome,
-    CursorEnd,
-    ClearConversation,
-    NewContext,
-    SelectNextContext,
-    SelectPrevContext,
-    AppendChars(String),
-    StreamDone {
-        _input_tokens: usize,
-        output_tokens: usize,
-        cache_hit_tokens: usize,
-        cache_miss_tokens: usize,
-        stop_reason: Option<String>,
-    },
-    StreamError(String),
-    ScrollUp(f32),
-    ScrollDown(f32),
-    StopStreaming,
-    TmuxSendKeys {
-        pane_id: String,
-        keys: String,
-    },
-    TogglePerfMonitor,
-    ToggleConfigView,
-    ConfigSelectProvider(crate::llms::LlmProvider),
-    ConfigSelectAnthropicModel(crate::llms::AnthropicModel),
-    ConfigSelectGrokModel(crate::llms::GrokModel),
-    ConfigSelectGroqModel(crate::llms::GroqModel),
-    ConfigSelectDeepSeekModel(crate::llms::DeepSeekModel),
-    ConfigSelectNextBar,
-    ConfigSelectPrevBar,
-    ConfigIncreaseSelectedBar,
-    ConfigDecreaseSelectedBar,
-    ConfigNextTheme,
-    ConfigPrevTheme,
-    OpenCommandPalette,
-    SelectContextById(String),
-    None,
-}
-
-pub enum ActionResult {
-    Nothing,
-    StopStream,
-    StartApiCheck,
-    Save,
-    SaveMessage(String),
-}
+// Re-export Action/ActionResult from cp-base (shared with module crates)
+pub use cp_base::actions::{Action, ActionResult};
 
 pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
     // Reset scroll acceleration on non-scroll actions
@@ -289,7 +232,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.context.push(ContextElement {
                 id: context_id,
                 uid: None,
-                context_type: ContextType::Conversation,
+                context_type: ContextType::new(ContextType::CONVERSATION),
                 name: format!("Conv {}", state.context.len()),
                 token_count: 0,
                 file_path: None,
@@ -398,7 +341,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StopStreaming => {
             if state.is_streaming {
                 state.is_streaming = false;
-                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::Conversation) {
+                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
                     ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
                 }
                 state.streaming_estimated_tokens = 0;

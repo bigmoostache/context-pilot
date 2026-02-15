@@ -1,138 +1,44 @@
 pub mod core;
-pub mod files;
-pub mod git;
-pub mod github;
-pub mod glob;
-pub mod grep;
-pub mod logs;
-pub mod memory;
-pub mod preset;
-pub mod prompt;
-pub mod scratchpad;
-pub mod spine;
-pub mod tmux;
-pub mod todo;
-pub mod tree;
 
 use std::collections::HashSet;
-use std::process::{Command, Output, Stdio};
-use std::time::Duration;
 
 use crate::core::panels::Panel;
 use crate::state::{ContextType, State};
-use crate::tool_defs::{ParamType, ToolCategory, ToolDefinition, ToolParam};
+use crate::tool_defs::{ParamType, ToolDefinition, ToolParam};
 use crate::tools::{ToolResult, ToolUse};
 
-/// Run a Command with a timeout. Returns TimedOut error if the command exceeds the limit.
-pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<Output> {
-    cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
-    let child = cmd.spawn()?;
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(child.wait_with_output());
-    });
-    match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
-        Ok(result) => result,
-        Err(_) => {
-            Err(std::io::Error::new(std::io::ErrorKind::TimedOut, format!("Command timed out after {}s", timeout_secs)))
-        }
-    }
-}
+pub use cp_mod_files::FilesModule;
+pub use cp_mod_git::GitModule;
+pub use cp_mod_github::GithubModule;
+pub use cp_mod_glob::GlobModule;
+pub use cp_mod_grep::GrepModule;
+pub use cp_mod_logs::LogsModule;
+pub use cp_mod_memory::MemoryModule;
+pub use cp_mod_preset::PresetModule;
+pub use cp_mod_prompt::PromptModule;
+pub use cp_mod_scratchpad::ScratchpadModule;
+pub use cp_mod_spine::SpineModule;
+pub use cp_mod_tmux::TmuxModule;
+pub use cp_mod_todo::TodoModule;
+pub use cp_mod_tree::TreeModule;
 
-/// Truncate output to max_bytes, respecting UTF-8 char boundaries.
-pub fn truncate_output(output: &str, max_bytes: usize) -> String {
-    if output.len() <= max_bytes {
-        output.to_string()
-    } else {
-        let truncated = &output[..output.floor_char_boundary(max_bytes)];
-        format!("{}\n\n[Output truncated at 1MB]", truncated)
-    }
-}
-
-/// A module that provides tools, panels, and configuration to the TUI.
-///
-/// Modules are stateless — all runtime state lives in `State`.
-/// Activation/deactivation is a config toggle that controls whether
-/// the module's tools and panels are registered.
-pub trait Module: Send + Sync {
-    /// Unique identifier (e.g., "core", "git", "tmux")
-    fn id(&self) -> &'static str;
-    /// Display name
-    fn name(&self) -> &'static str;
-    /// Short description
-    fn description(&self) -> &'static str;
-    /// IDs of modules this one depends on
-    fn dependencies(&self) -> &[&'static str] {
-        &[]
-    }
-    /// Core modules cannot be deactivated
-    fn is_core(&self) -> bool {
-        false
-    }
-
-    /// Whether this module's data is global (config.json) or per-worker (worker.json)
-    fn is_global(&self) -> bool {
-        false
-    }
-
-    /// Serialize this module's data from State into a JSON value for persistence.
-    /// Returns Value::Null if this module has no data to persist.
-    /// Stored in SharedConfig (if is_global) or WorkerState (if !is_global).
-    fn save_module_data(&self, _state: &State) -> serde_json::Value {
-        serde_json::Value::Null
-    }
-
-    /// Deserialize this module's data from a JSON value and apply it to State.
-    /// Data comes from SharedConfig (if is_global) or WorkerState (if !is_global).
-    fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
-
-    /// Serialize worker-specific data for modules that are global but also need per-worker state.
-    /// Returns Value::Null if no worker-specific data. Always stored in WorkerState.
-    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
-        serde_json::Value::Null
-    }
-
-    /// Deserialize worker-specific data. Always loaded from WorkerState.
-    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
-
-    /// Tool definitions provided by this module
-    fn tool_definitions(&self) -> Vec<ToolDefinition>;
-    /// Execute a tool. Returns None if this module doesn't own the tool.
-    fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult>;
-
-    /// Create a panel for the given context type. Returns None if not owned by this module.
-    fn create_panel(&self, context_type: ContextType) -> Option<Box<dyn Panel>>;
-
-    /// Fixed panel types owned by this module (P0-P7)
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![]
-    }
-    /// Dynamic panel types this module can create (File, Glob, Grep, Tmux)
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![]
-    }
-
-    /// Default settings for fixed panels: (context_type, display_name, cache_deprecated).
-    /// Used by ensure_default_contexts to create missing panels generically.
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![]
-    }
-}
+// Re-export Module trait and helpers from cp-base
+pub use cp_base::modules::{Module, run_with_timeout, truncate_output};
 
 /// Canonical order of fixed panels.
 /// This defines the sidebar position and ID assignment for each fixed panel.
 /// Conversation is NOT included — it's the live chat feed, not a numbered panel.
 /// System (Seed) is NOT included — agent prompt is injected as system message.
-const FIXED_PANEL_ORDER: &[ContextType] = &[
-    ContextType::Todo,       // P1
-    ContextType::Library,    // P2
-    ContextType::Overview,   // P3
-    ContextType::Tree,       // P4
-    ContextType::Memory,     // P5
-    ContextType::Spine,      // P6
-    ContextType::Logs,       // P7
-    ContextType::Git,        // P8
-    ContextType::Scratchpad, // P9
+const FIXED_PANEL_ORDER: &[&str] = &[
+    ContextType::TODO,       // P1
+    ContextType::LIBRARY,    // P2
+    ContextType::OVERVIEW,   // P3
+    ContextType::TREE,       // P4
+    ContextType::MEMORY,     // P5
+    ContextType::SPINE,      // P6
+    ContextType::LOGS,       // P7
+    ContextType::GIT,        // P8
+    ContextType::SCRATCHPAD, // P9
 ];
 
 /// Collect all fixed panel defaults in canonical P0-P7 order.
@@ -150,7 +56,10 @@ pub fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'sta
     // Return in canonical order
     FIXED_PANEL_ORDER
         .iter()
-        .filter_map(|ct| lookup.get(ct).map(|(mid, is_core, name, cache_dep)| (*mid, *is_core, *ct, *name, *cache_dep)))
+        .filter_map(|ct_str| {
+            let ct = ContextType::new(ct_str);
+            lookup.get(&ct).map(|(mid, is_core, name, cache_dep)| (*mid, *is_core, ct, *name, *cache_dep))
+        })
         .collect()
 }
 
@@ -161,57 +70,27 @@ pub fn make_default_context_element(
     name: &str,
     cache_deprecated: bool,
 ) -> crate::state::ContextElement {
-    crate::state::ContextElement {
-        id: id.to_string(),
-        uid: None,
-        context_type,
-        name: name.to_string(),
-        token_count: 0,
-        file_path: None,
-        glob_pattern: None,
-        glob_path: None,
-        grep_pattern: None,
-        grep_path: None,
-        grep_file_pattern: None,
-        tmux_pane_id: None,
-        tmux_lines: None,
-        tmux_last_keys: None,
-        tmux_description: None,
-        result_command: None,
-        skill_prompt_id: None,
-        cached_content: None,
-        history_messages: None,
-        cache_deprecated,
-        cache_in_flight: false,
-        last_refresh_ms: crate::core::panels::now_ms(),
-        content_hash: None,
-        source_hash: None,
-        current_page: 0,
-        total_pages: 1,
-        full_token_count: 0,
-        panel_cache_hit: false,
-        panel_total_cost: 0.0,
-    }
+    cp_base::state::make_default_context_element(id, context_type, name, cache_deprecated)
 }
 
 /// Returns all registered modules.
 pub fn all_modules() -> Vec<Box<dyn Module>> {
     vec![
         Box::new(core::CoreModule),
-        Box::new(prompt::PromptModule),
-        Box::new(files::FilesModule),
-        Box::new(tree::TreeModule),
-        Box::new(git::GitModule),
-        Box::new(github::GithubModule),
-        Box::new(glob::GlobModule),
-        Box::new(grep::GrepModule),
-        Box::new(tmux::TmuxModule),
-        Box::new(todo::TodoModule),
-        Box::new(memory::MemoryModule),
-        Box::new(scratchpad::ScratchpadModule),
-        Box::new(preset::PresetModule),
-        Box::new(spine::SpineModule),
-        Box::new(logs::LogsModule),
+        Box::new(PromptModule),
+        Box::new(FilesModule),
+        Box::new(TreeModule),
+        Box::new(GitModule),
+        Box::new(GithubModule),
+        Box::new(GlobModule),
+        Box::new(GrepModule),
+        Box::new(TmuxModule),
+        Box::new(TodoModule),
+        Box::new(MemoryModule),
+        Box::new(ScratchpadModule),
+        Box::new(PresetModule::new(all_modules, active_tool_definitions, crate::core::ensure_default_contexts)),
+        Box::new(SpineModule),
+        Box::new(LogsModule),
     ]
 }
 
@@ -244,7 +123,7 @@ pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet
 }
 
 /// Create a panel for the given context type by asking all modules.
-pub fn create_panel(context_type: ContextType) -> Option<Box<dyn Panel>> {
+pub fn create_panel(context_type: &ContextType) -> Option<Box<dyn Panel>> {
     for module in all_modules() {
         if let Some(panel) = module.create_panel(context_type) {
             return Some(panel);
@@ -314,7 +193,7 @@ pub fn module_toggle_tool_definition() -> ToolDefinition {
             .required(),
         ],
         enabled: true,
-        category: ToolCategory::System,
+        category: "System".to_string(),
     }
 }
 

@@ -20,34 +20,34 @@ pub fn generate_context_content(state: &State) -> String {
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
 
     for ctx in &sorted_contexts {
-        let type_name = match ctx.context_type {
-            ContextType::System => "seed",
-            ContextType::Conversation => "chat",
-            ContextType::File => "file",
-            ContextType::Tree => "tree",
-            ContextType::Glob => "glob",
-            ContextType::Grep => "grep",
-            ContextType::Tmux => "tmux",
-            ContextType::Todo => "wip",
-            ContextType::Memory => "memories",
-            ContextType::Overview => "world",
-            ContextType::Git => "changes",
-            ContextType::GitResult => "git-cmd",
-            ContextType::GithubResult => "gh-cmd",
-            ContextType::Scratchpad => "scratch",
-            ContextType::Library => "library",
-            ContextType::Skill => "skill",
-            ContextType::ConversationHistory => "history",
-            ContextType::Spine => "spine",
-            ContextType::Logs => "logs",
+        let type_name = match ctx.context_type.as_str() {
+            ContextType::SYSTEM => "seed",
+            ContextType::CONVERSATION => "chat",
+            ContextType::FILE => "file",
+            ContextType::TREE => "tree",
+            ContextType::GLOB => "glob",
+            ContextType::GREP => "grep",
+            ContextType::TMUX => "tmux",
+            ContextType::TODO => "wip",
+            ContextType::MEMORY => "memories",
+            ContextType::OVERVIEW => "world",
+            ContextType::GIT => "changes",
+            ContextType::GIT_RESULT => "git-cmd",
+            ContextType::GITHUB_RESULT => "gh-cmd",
+            ContextType::SCRATCHPAD => "scratch",
+            ContextType::LIBRARY => "library",
+            ContextType::SKILL => "skill",
+            ContextType::CONVERSATION_HISTORY => "history",
+            ContextType::SPINE => "spine",
+            ContextType::LOGS => "logs",
         };
 
-        let details = match ctx.context_type {
-            ContextType::File => ctx.file_path.as_deref().unwrap_or("").to_string(),
-            ContextType::Glob => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
-            ContextType::Grep => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
-            ContextType::Tmux => ctx.tmux_pane_id.as_deref().unwrap_or("").to_string(),
-            ContextType::GitResult | ContextType::GithubResult => {
+        let details = match ctx.context_type.as_str() {
+            ContextType::FILE => ctx.file_path.as_deref().unwrap_or("").to_string(),
+            ContextType::GLOB => ctx.glob_pattern.as_deref().unwrap_or("").to_string(),
+            ContextType::GREP => ctx.grep_pattern.as_deref().unwrap_or("").to_string(),
+            ContextType::TMUX => ctx.tmux_pane_id.as_deref().unwrap_or("").to_string(),
+            ContextType::GIT_RESULT | ContextType::GITHUB_RESULT => {
                 ctx.result_command.as_deref().unwrap_or("").to_string()
             }
             _ => String::new(),
@@ -86,7 +86,7 @@ pub fn generate_context_content(state: &State) -> String {
     }
 
     // Presets table for LLM
-    let presets = crate::modules::preset::tools::list_presets_with_info();
+    let presets = cp_mod_preset::tools::list_presets_with_info();
     if !presets.is_empty() {
         output.push_str("\nPresets:\n\n");
         output.push_str("| Name | Type | Description |\n");
@@ -143,7 +143,7 @@ pub fn generate_context_content(state: &State) -> String {
         let status = if tool.enabled { "✓" } else { "✗" };
         output.push_str(&format!(
             "| {} | {} | {} | {} |\n",
-            tool.category.short_name(),
+            tool.category,
             tool.id,
             status,
             tool.short_desc
