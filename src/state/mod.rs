@@ -8,6 +8,7 @@ pub use cp_base::state::*;
 
 // ── Submodule re-exports (accessed via path, e.g. crate::state::config::SCHEMA_VERSION) ──
 pub use cp_base::state::config;
+#[cfg(test)]
 pub use cp_base::state::message;
 
 // Module-owned types are already re-exported by cp_base::state::* above
