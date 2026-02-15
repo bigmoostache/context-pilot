@@ -1,0 +1,12 @@
+[package]
+name = "cp-mod-glob"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cp-base.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+serde_json.workspace = true
+globset.workspace = true
+ignore.workspace = true

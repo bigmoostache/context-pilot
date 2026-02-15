@@ -6,7 +6,7 @@ use crossterm::event;
 use ratatui::prelude::*;
 
 use crate::actions::{Action, ActionResult, apply_action, clean_llm_id_prefix};
-use crate::api::{StreamEvent, start_streaming};
+use crate::api::{StreamEvent, StreamParams, start_streaming};
 use crate::background::{TlDrResult, generate_tldr};
 use crate::cache::{CacheRequest, CacheUpdate, process_cache_request};
 use crate::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, MAX_API_RETRIES, RENDER_THROTTLE_MS};
@@ -126,7 +126,7 @@ impl App {
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
-            use crate::modules::spine::types::NotificationType;
+            use cp_base::types::spine::NotificationType;
             self.state.create_notification(
                 NotificationType::ReloadResume,
                 "reload_resume".to_string(),
@@ -294,15 +294,16 @@ impl App {
                 self.typewriter.reset();
                 self.pending_done = None;
                 start_streaming(
-                    self.state.llm_provider,
-                    self.state.current_model(),
-                    ctx.messages,
-                    ctx.context_items,
-                    ctx.tools,
-                    None,
-                    system_prompt.clone(),
-                    Some(system_prompt),
-                    DEFAULT_WORKER_ID.to_string(),
+                    StreamParams {
+                        provider: self.state.llm_provider,
+                        model: self.state.current_model(),
+                        messages: ctx.messages,
+                        context_items: ctx.context_items,
+                        tools: ctx.tools,
+                        system_prompt: system_prompt.clone(),
+                        seed_content: Some(system_prompt),
+                        worker_id: DEFAULT_WORKER_ID.to_string(),
+                    },
                     tx.clone(),
                 );
                 self.state.dirty = true;
@@ -518,15 +519,16 @@ impl App {
         self.typewriter.reset();
         self.pending_done = None;
         start_streaming(
-            self.state.llm_provider,
-            self.state.current_model(),
-            ctx.messages,
-            ctx.context_items,
-            ctx.tools,
-            None,
-            system_prompt.clone(),
-            Some(system_prompt),
-            DEFAULT_WORKER_ID.to_string(),
+            StreamParams {
+                provider: self.state.llm_provider,
+                model: self.state.current_model(),
+                messages: ctx.messages,
+                context_items: ctx.context_items,
+                tools: ctx.tools,
+                system_prompt: system_prompt.clone(),
+                seed_content: Some(system_prompt),
+                worker_id: DEFAULT_WORKER_ID.to_string(),
+            },
             tx.clone(),
         );
     }
@@ -1033,7 +1035,7 @@ impl App {
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
     fn check_spine(&mut self, tx: &Sender<StreamEvent>, tldr_tx: &Sender<TlDrResult>) {
-        use crate::modules::spine::engine::{SpineDecision, apply_continuation, check_spine};
+        use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 
         match check_spine(&mut self.state) {
             SpineDecision::Idle => {}
@@ -1059,15 +1061,16 @@ impl App {
                     let ctx = prepare_stream_context(&mut self.state, false);
                     let system_prompt = get_active_agent_content(&self.state);
                     start_streaming(
-                        self.state.llm_provider,
-                        self.state.current_model(),
-                        ctx.messages,
-                        ctx.context_items,
-                        ctx.tools,
-                        None,
-                        system_prompt.clone(),
-                        Some(system_prompt),
-                        DEFAULT_WORKER_ID.to_string(),
+                        StreamParams {
+                            provider: self.state.llm_provider,
+                            model: self.state.current_model(),
+                            messages: ctx.messages,
+                            context_items: ctx.context_items,
+                            tools: ctx.tools,
+                            system_prompt: system_prompt.clone(),
+                            seed_content: Some(system_prompt),
+                            worker_id: DEFAULT_WORKER_ID.to_string(),
+                        },
                         tx.clone(),
                     );
                     self.save_state_async();

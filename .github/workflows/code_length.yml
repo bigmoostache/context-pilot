@@ -1,0 +1,37 @@
+name: Code Structure Checks
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  structure-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check file lengths (max 500 lines)
+        run: |
+          exit_code=0
+          while IFS= read -r f; do
+            lines=$(wc -l < "$f")
+            if [ "$lines" -gt 500 ]; then
+              echo "::error file=$f::$f has $lines lines (max 500)"
+              exit_code=1
+            fi
+          done < <(find . -name '*.rs' -not -path './target/*')
+          exit $exit_code
+
+      - name: Check folder sizes (max 8 entries, excluding root)
+        run: |
+          exit_code=0
+          while IFS= read -r dir; do
+            count=$(find "$dir" -maxdepth 1 -mindepth 1 | wc -l)
+            if [ "$count" -gt 8 ]; then
+              echo "::error::$dir has $count entries (max 8)"
+              exit_code=1
+            fi
+          done < <(find . -mindepth 1 -type d -not -path './target/*' -not -path './.git/*')
+          exit $exit_code

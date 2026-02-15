@@ -21,12 +21,6 @@ pub const API_VERSION: &str = "2023-06-01";
 // CONTEXT & TOKEN MANAGEMENT
 // =============================================================================
 
-/// Average characters per token for token estimation
-pub const CHARS_PER_TOKEN: f32 = 3.3;
-
-/// Maximum token length for memory tl_dr field (enforced on create/update)
-pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
-
 /// Minimum active messages in a chunk before it can be detached.
 pub const DETACH_CHUNK_MIN_MESSAGES: usize = 25;
 
@@ -97,12 +91,6 @@ pub const RENDER_THROTTLE_MS: u64 = 36;
 /// Interval for CPU/RAM stats refresh in perf overlay (ms)
 pub const PERF_STATS_REFRESH_MS: u64 = 500;
 
-/// Delay after tmux send-keys in milliseconds (allows command output to appear)
-pub const TMUX_SEND_DELAY_MS: u64 = 1000;
-
-/// Fixed sleep duration in seconds for the sleep tool
-pub const SLEEP_DURATION_SECS: u64 = 1;
-
 /// Maximum number of retries for API errors
 pub const MAX_API_RETRIES: u32 = 3;
 
@@ -134,31 +122,8 @@ pub const PRESETS_DIR: &str = "presets";
 /// Logs subdirectory (chunked JSON files, global across workers)
 pub const LOGS_DIR: &str = "logs";
 
-/// Number of log entries per chunk file
-pub const LOGS_CHUNK_SIZE: usize = 1000;
-
-// =============================================================================
-// PANEL SIZE LIMITS
-// =============================================================================
-
-/// Hard cap: refuse to load any panel content larger than this (bytes)
-pub const PANEL_MAX_LOAD_BYTES: usize = 5 * 1024 * 1024; // 5 MB
-
-/// Tokens per page when paginating (also serves as the soft cap — panels exceeding this get paginated)
-pub const PANEL_PAGE_TOKENS: usize = 25_000;
-
-// =============================================================================
-// TMUX
-// =============================================================================
-
-/// Background session name for tmux operations
-pub const TMUX_BG_SESSION: &str = "context-pilot-bg";
-
 /// Maximum size for command output cached in result panels (bytes)
 pub const MAX_RESULT_CONTENT_BYTES: usize = 1_000_000; // 1 MB
-
-/// Timeout for git commands (seconds)
-pub const GIT_CMD_TIMEOUT_SECS: u64 = 30;
 
 /// Timeout for gh commands (seconds)
 pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
@@ -239,7 +204,6 @@ pub mod chars {
     pub const HORIZONTAL: &str = "─";
     pub const BLOCK_FULL: &str = "█";
     pub const BLOCK_LIGHT: &str = "░";
-    pub const DOT: &str = "●";
     pub const ARROW_RIGHT: &str = "▸";
     pub const ARROW_UP: &str = "↑";
     pub const ARROW_DOWN: &str = "↓";
@@ -271,53 +235,6 @@ pub mod icons {
         normalize_icon(&active_theme().messages.error)
     }
 
-    // Context panel types (normalized to 2 cells)
-    pub fn ctx_system() -> String {
-        normalize_icon(&active_theme().context.system)
-    }
-    pub fn ctx_conversation() -> String {
-        normalize_icon(&active_theme().context.conversation)
-    }
-    pub fn ctx_tree() -> String {
-        normalize_icon(&active_theme().context.tree)
-    }
-    pub fn ctx_todo() -> String {
-        normalize_icon(&active_theme().context.todo)
-    }
-    pub fn ctx_memory() -> String {
-        normalize_icon(&active_theme().context.memory)
-    }
-    pub fn ctx_overview() -> String {
-        normalize_icon(&active_theme().context.overview)
-    }
-    pub fn ctx_file() -> String {
-        normalize_icon(&active_theme().context.file)
-    }
-    pub fn ctx_glob() -> String {
-        normalize_icon(&active_theme().context.glob)
-    }
-    pub fn ctx_grep() -> String {
-        normalize_icon(&active_theme().context.grep)
-    }
-    pub fn ctx_tmux() -> String {
-        normalize_icon(&active_theme().context.tmux)
-    }
-    pub fn ctx_git() -> String {
-        normalize_icon(&active_theme().context.git)
-    }
-    pub fn ctx_scratchpad() -> String {
-        normalize_icon(&active_theme().context.scratchpad)
-    }
-    pub fn ctx_library() -> String {
-        normalize_icon(&active_theme().context.library)
-    }
-    pub fn ctx_skill() -> String {
-        normalize_icon(&active_theme().context.skill)
-    }
-    pub fn ctx_spine() -> String {
-        normalize_icon(&active_theme().context.spine)
-    }
-
     // Message status (normalized to 2 cells)
     pub fn status_full() -> String {
         normalize_icon(&active_theme().status.full)
@@ -327,17 +244,6 @@ pub mod icons {
     }
     pub fn status_deleted() -> String {
         normalize_icon(&active_theme().status.deleted)
-    }
-
-    // Todo status (normalized to 2 cells)
-    pub fn todo_pending() -> String {
-        normalize_icon(&active_theme().todo.pending)
-    }
-    pub fn todo_in_progress() -> String {
-        normalize_icon(&active_theme().todo.in_progress)
-    }
-    pub fn todo_done() -> String {
-        normalize_icon(&active_theme().todo.done)
     }
 }
 
@@ -381,21 +287,9 @@ pub mod tool_categories {
 pub mod library {
     use crate::config::LIBRARY;
 
-    pub fn default_agent_id() -> &'static str {
-        &LIBRARY.default_agent_id
-    }
     pub fn default_agent_content() -> &'static str {
         let id = &LIBRARY.default_agent_id;
         LIBRARY.agents.iter().find(|a| a.id == *id).map(|a| a.content.as_str()).unwrap_or("")
-    }
-    pub fn agents() -> &'static [crate::config::SeedEntry] {
-        &LIBRARY.agents
-    }
-    pub fn skills() -> &'static [crate::config::SeedEntry] {
-        &LIBRARY.skills
-    }
-    pub fn commands() -> &'static [crate::config::SeedEntry] {
-        &LIBRARY.commands
     }
 }
 

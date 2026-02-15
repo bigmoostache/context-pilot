@@ -2,8 +2,8 @@ use ratatui::{prelude::*, widgets::Paragraph};
 
 use super::{spinner, theme};
 use crate::llms::{LlmProvider, ModelInfo};
-use crate::modules::git::types::GitChangeType;
 use crate::state::State;
+use cp_base::types::git::GitChangeType;
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     let base_style = Style::default().bg(theme::bg_base()).fg(theme::text_muted());

@@ -1,30 +1,14 @@
-//! State types split into domain-focused modules.
+//! State types — re-exported from cp-base shared library.
 //!
-//! - `context` — ContextType, ContextElement, estimate_tokens, compute_total_pages
-//! - `message` — MessageType, MessageStatus, Message, ToolUseRecord, ToolResultRecord
-//! - `config` — SharedConfig, WorkerState, PanelData, ImportantPanelUids
-//! - `render_cache` — MessageRenderCache, InputRenderCache, FullContentCache, hash_values
-//! - `runtime` — State struct (the main runtime state)
+//! All types live in `cp_base::state`. This module re-exports them so that
+//! existing `crate::state::X` imports throughout the binary keep working.
 
-pub mod config;
-pub mod context;
-pub mod message;
-pub mod render_cache;
-pub mod runtime;
+// ── Wildcard re-export: State, ContextElement, ContextType, Message, etc. ──
+pub use cp_base::state::*;
 
-// === Re-exports for backwards compatibility ===
-// All existing `use crate::state::X` imports continue to work.
+// ── Submodule re-exports (accessed via path, e.g. crate::state::config::SCHEMA_VERSION) ──
+pub use cp_base::state::config;
+pub use cp_base::state::message;
 
-pub use config::{PanelData, SharedConfig, WorkerState};
-pub use context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
-pub use message::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord, format_messages_to_chunk};
-pub use render_cache::{FullContentCache, InputRenderCache, MessageRenderCache, hash_values};
-pub use runtime::State;
-
-// Re-export module-owned types (originally re-exported from old state.rs)
-pub use crate::modules::git::types::{GitChangeType, GitFileChange};
-pub use crate::modules::memory::types::{MemoryImportance, MemoryItem};
-pub use crate::modules::prompt::types::PromptItem;
-pub use crate::modules::scratchpad::types::ScratchpadCell;
-pub use crate::modules::todo::types::{TodoItem, TodoStatus};
-pub use crate::modules::tree::types::TreeFileDescription;
+// Module-owned types are already re-exported by cp_base::state::* above
+// (GitFileChange, TodoItem, MemoryItem, etc. from cp_base::types::*)

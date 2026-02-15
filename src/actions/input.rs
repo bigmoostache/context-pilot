@@ -1,6 +1,6 @@
-use crate::modules::spine::types::NotificationType;
 use crate::persistence::{delete_message, save_message};
 use crate::state::{ContextType, Message, PromptItem, State, estimate_tokens};
+use cp_base::types::spine::NotificationType;
 
 use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};

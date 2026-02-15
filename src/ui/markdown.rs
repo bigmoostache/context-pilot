@@ -24,8 +24,8 @@ fn markdown_display_width(text: &str) -> usize {
                 if chars.peek() == Some(&c) {
                     chars.next(); // consume second marker
                     // Count until closing **
-                    #[allow(clippy::while_let_on_iterator)]
-                    while let Some(next) = chars.next() {
+                    loop {
+                        let Some(next) = chars.next() else { break };
                         if next == c && chars.peek() == Some(&c) {
                             chars.next();
                             break;
@@ -247,8 +247,8 @@ pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
 
                     // Bold text
                     let mut bold_text = String::new();
-                    #[allow(clippy::while_let_on_iterator)]
-                    while let Some(next) = chars.next() {
+                    loop {
+                        let Some(next) = chars.next() else { break };
                         if next == c && chars.peek() == Some(&c) {
                             chars.next(); // consume closing **
                             break;

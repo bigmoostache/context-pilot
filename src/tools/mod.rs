@@ -1,24 +1,9 @@
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+pub use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::state::State;
 
 // Re-export from core module for backwards compatibility
 pub use crate::modules::core::conversation::refresh_conversation_context;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolUse {
-    pub id: String,
-    pub name: String,
-    pub input: Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolResult {
-    pub tool_use_id: String,
-    pub content: String,
-    pub is_error: bool,
-}
 
 /// Execute a tool and return the result.
 /// Delegates to the module system for dispatch.

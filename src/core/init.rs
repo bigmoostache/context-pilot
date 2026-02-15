@@ -2,7 +2,7 @@ use crate::modules;
 use crate::state::{ContextType, State};
 
 // Re-export agent/seed functions from prompt module
-pub use crate::modules::prompt::seed::{ensure_default_agent, get_active_agent_content};
+pub use cp_mod_prompt::seed::{ensure_default_agent, get_active_agent_content};
 
 /// Assign a UID to a panel if it doesn't have one
 fn assign_panel_uid(state: &mut State, context_type: ContextType) {

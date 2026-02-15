@@ -272,7 +272,11 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
     }
 
     // Chunked log files (global, shared across workers)
-    writes.extend(crate::modules::logs::build_log_write_ops(&state.logs, state.next_log_id));
+    writes.extend(
+        cp_mod_logs::build_log_write_ops(&state.logs, state.next_log_id)
+            .into_iter()
+            .map(|(path, content)| WriteOp { path, content }),
+    );
 
     // Build important_panel_uids
     let mut important_uids: HashMap<ContextType, String> = HashMap::new();

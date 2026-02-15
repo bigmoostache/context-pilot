@@ -74,7 +74,7 @@ fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
         state.context.get(state.selected_context).map(|c| c.context_type).unwrap_or(ContextType::Conversation);
 
     let panel = panels::get_panel(context_type);
-    panel.render(frame, state, area);
+    panels::render_panel_default(panel.as_ref(), frame, state, area);
 }
 
 fn render_perf_overlay(frame: &mut Frame, area: Rect) {
