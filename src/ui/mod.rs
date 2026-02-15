@@ -74,7 +74,14 @@ fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
         state.context.get(state.selected_context).map(|c| c.context_type).unwrap_or(ContextType::Conversation);
 
     let panel = panels::get_panel(context_type);
-    panels::render_panel_default(panel.as_ref(), frame, state, area);
+
+    // ConversationPanel overrides render() with custom scrollbar + caching.
+    // All other panels use render_panel_default (which calls panel.content()).
+    if context_type == ContextType::Conversation {
+        panel.render(frame, state, area);
+    } else {
+        panels::render_panel_default(panel.as_ref(), frame, state, area);
+    }
 }
 
 fn render_perf_overlay(frame: &mut Frame, area: Rect) {
