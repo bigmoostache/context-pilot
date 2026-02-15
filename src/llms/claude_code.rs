@@ -862,6 +862,7 @@ mod tests {
     /// Minimal request matching working Python exactly.
     /// No panels, no tools, no message prefixes — just raw API call.
     #[test]
+    #[ignore] // Requires OAuth token — run with `cargo test -- --ignored`
     fn test_general_kenobi() {
         let token =
             ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
@@ -919,6 +920,7 @@ mod tests {
 
     /// Same as above but with tools and streaming — matches what stream() actually sends.
     #[test]
+    #[ignore] // Requires OAuth token — run with `cargo test -- --ignored`
     fn test_general_kenobi_with_tools_streaming() {
         let token =
             ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
