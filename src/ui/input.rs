@@ -8,6 +8,7 @@ use crate::llms::{LlmProvider, ModelInfo};
 use crate::state::State;
 
 use cp_mod_prompt::PromptState;
+use cp_mod_queue::QueueState;
 
 pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
     let base_style = Style::default().bg(theme::bg_base()).fg(theme::text_muted());
@@ -160,56 +161,23 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
             }
         }
 
-        let net_change = total_additions - total_deletions;
-
         // Line changes card: +N/-N/net
-        let (net_prefix, net_value) = if net_change >= 0 { ("+", net_change) } else { ("", net_change) };
+        let net_change = total_additions - total_deletions;
+        let (net_prefix, net_color) = if net_change >= 0 { ("+", theme::success()) } else { ("", theme::error()) };
+        let bg = theme::bg_elevated();
 
-        spans.push(Span::styled(" +", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
+        spans.push(Span::styled(format!(" +{}", total_additions), Style::default().fg(theme::success()).bg(bg).bold()));
+        spans.push(Span::styled(format!("/-{}", total_deletions), Style::default().fg(theme::error()).bg(bg).bold()));
         spans.push(Span::styled(
-            format!("{}", total_additions),
-            Style::default().fg(theme::success()).bg(theme::bg_elevated()).bold(),
-        ));
-        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
-        spans.push(Span::styled("-", Style::default().fg(theme::error()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            format!("{}", total_deletions),
-            Style::default().fg(theme::error()).bg(theme::bg_elevated()).bold(),
-        ));
-        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            net_prefix,
-            Style::default()
-                .fg(if net_change >= 0 { theme::success() } else { theme::error() })
-                .bg(theme::bg_elevated()),
-        ));
-        spans.push(Span::styled(
-            format!("{} ", net_value.abs()),
-            Style::default()
-                .fg(if net_change >= 0 { theme::success() } else { theme::error() })
-                .bg(theme::bg_elevated())
-                .bold(),
+            format!("/{}{} ", net_prefix, net_change.abs()),
+            Style::default().fg(net_color).bg(bg).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
 
         // File changes card: U/M/D
-        spans.push(Span::styled(" U", Style::default().fg(theme::success()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            format!("{}", untracked_count),
-            Style::default().fg(theme::success()).bg(theme::bg_elevated()).bold(),
-        ));
-        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
-        spans.push(Span::styled("M", Style::default().fg(theme::warning()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            format!("{}", modified_count),
-            Style::default().fg(theme::warning()).bg(theme::bg_elevated()).bold(),
-        ));
-        spans.push(Span::styled("/", Style::default().fg(theme::text_muted()).bg(theme::bg_elevated())));
-        spans.push(Span::styled("D", Style::default().fg(theme::error()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(
-            format!("{} ", deleted_count),
-            Style::default().fg(theme::error()).bg(theme::bg_elevated()).bold(),
-        ));
+        spans.push(Span::styled(format!(" U{}", untracked_count), Style::default().fg(theme::success()).bg(bg).bold()));
+        spans.push(Span::styled(format!("/M{}", modified_count), Style::default().fg(theme::warning()).bg(bg).bold()));
+        spans.push(Span::styled(format!("/D{} ", deleted_count), Style::default().fg(theme::error()).bg(bg).bold()));
         spans.push(Span::styled(" ", base_style));
     }
 
@@ -244,6 +212,19 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
             Style::default().fg(Color::White).bg(Color::Rgb(100, 60, 160)).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
+    }
+
+    // Queue status card — visible when queue is active
+    {
+        let qs = QueueState::get(state);
+        if qs.active {
+            let n = qs.queued_calls.len();
+            spans.push(Span::styled(
+                format!(" ⏳ Queue ({}) ", n),
+                Style::default().fg(Color::White).bg(Color::Rgb(180, 120, 40)).bold(),
+            ));
+            spans.push(Span::styled(" ", base_style));
+        }
     }
 
     // Right side info

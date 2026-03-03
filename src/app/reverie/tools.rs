@@ -103,7 +103,22 @@ pub fn optimize_context_tool_definition() -> ToolDefinition {
 /// Returns the ToolResult. The caller (event loop) is responsible for actually
 /// destroying the reverie state after processing this result.
 #[cfg_attr(not(test), allow(dead_code))]
-pub fn execute_report(tool: &ToolUse) -> ToolResult {
+pub fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
+    // Block report if queue has unflushed actions
+    let qs = cp_mod_queue::QueueState::get(state);
+    if !qs.queued_calls.is_empty() {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!(
+                "Cannot report with {} unflushed queued action(s). \
+                 Call Queue_execute to flush or Queue_empty to discard first.",
+                qs.queued_calls.len()
+            ),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        };
+    }
+
     let summary = tool.input.get("summary").and_then(|v| v.as_str()).unwrap_or("Reverie completed without summary.");
 
     // The actual spine notification creation and reverie destruction
@@ -176,7 +191,7 @@ pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
 #[cfg_attr(not(test), allow(dead_code))]
 pub fn dispatch_reverie_tool(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     match tool.name.as_str() {
-        "reverie_report" => Some(execute_report(tool)),
+        "reverie_report" => Some(execute_report(tool, state)),
         _ => {
             // Verify tool is allowed for reveries via the reverie_allowed flag
             if state.tools.iter().any(|t| t.id == tool.name && t.reverie_allowed) {
@@ -228,7 +243,9 @@ mod tests {
             name: "reverie_report".to_string(),
             input: serde_json::json!({"summary": "Closed 3 panels"}),
         };
-        let result = execute_report(&tool);
+        let mut state = State::default();
+        state.set_ext(cp_mod_queue::QueueState::new());
+        let result = execute_report(&tool, &state);
         assert!(result.content.starts_with("REVERIE_REPORT:"));
         assert!(result.content.contains("Closed 3 panels"));
     }
@@ -241,6 +258,7 @@ mod tests {
             input: serde_json::json!({"summary": "done"}),
         };
         let mut state = State::default();
+        state.set_ext(cp_mod_queue::QueueState::new());
         let result = dispatch_reverie_tool(&tool, &mut state);
         assert!(result.is_some());
         assert!(result.unwrap().content.starts_with("REVERIE_REPORT:"));

@@ -21,6 +21,7 @@ pub use cp_mod_logs::LogsModule;
 pub use cp_mod_memory::MemoryModule;
 pub use cp_mod_preset::PresetModule;
 pub use cp_mod_prompt::PromptModule;
+pub use cp_mod_queue::QueueModule;
 pub use cp_mod_scratchpad::ScratchpadModule;
 pub use cp_mod_spine::SpineModule;
 pub use cp_mod_todo::TodoModule;
@@ -93,6 +94,7 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(TypstModule),
         Box::new(BraveModule),
         Box::new(FirecrawlModule),
+        Box::new(QueueModule),
     ]
 }
 

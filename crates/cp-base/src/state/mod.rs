@@ -51,6 +51,8 @@ pub mod reverie {
         pub is_streaming: bool,
         /// How many times we've auto-relaunched for missing Report (max 1).
         pub report_retries: usize,
+        /// Whether this reverie's tool calls should be queued (RAM-only, not persisted).
+        pub queue_active: bool,
     }
 
     impl ReverieState {
@@ -64,6 +66,7 @@ pub mod reverie {
                 tool_call_count: 0,
                 is_streaming: true,
                 report_retries: 0,
+                queue_active: false,
             }
         }
     }

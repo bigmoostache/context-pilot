@@ -13,6 +13,7 @@ use crate::state::{
 use cp_mod_callback::firing as callback_firing;
 use cp_mod_callback::trigger as callback_trigger;
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
+use cp_mod_queue::QueueState;
 
 use crate::app::App;
 
@@ -114,7 +115,23 @@ impl App {
             self.save_message_async(&tool_msg);
             self.state.messages.push(tool_msg);
 
-            let result = execute_tool(tool, &mut self.state);
+            let result = if tool.name == "Queue_execute" {
+                // Queue flush: execute all queued calls through normal dispatch
+                super::tool_cleanup::execute_queue_flush(tool, &mut self.state)
+            } else if QueueState::get(&self.state).active && !QueueState::is_queue_tool(&tool.name) {
+                // Queue intercept: enqueue instead of executing
+                let qs = QueueState::get_mut(&mut self.state);
+                let idx = qs.enqueue(tool.name.clone(), tool.id.clone(), tool.input.clone(), now_ms());
+                let params = serde_json::to_string(&tool.input).unwrap_or_default();
+                let short = if params.len() > 120 { format!("{}...", &params[..117]) } else { params };
+                crate::infra::tools::ToolResult::new(
+                    tool.id.clone(),
+                    format!("Queued as #{}: {}({})", idx, tool.name, short),
+                    false,
+                )
+            } else {
+                execute_tool(tool, &mut self.state)
+            };
             tool_results.push(result);
         }
 

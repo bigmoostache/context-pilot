@@ -22,6 +22,7 @@ pub(super) fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String>
         }
         "callback" => cp_mod_callback::types::CallbackState::get(state).active_set.len(),
         "scratchpad" => cp_mod_scratchpad::ScratchpadState::get(state).scratchpad_cells.len(),
+        "queue" => cp_mod_queue::QueueState::get(state).queued_calls.len(),
         "overview" => state.context.len() + 2, // +2 for system prompt + tool definitions
         "tools" => state.tools.iter().filter(|t| t.enabled).count(),
         _ => return None,
@@ -220,8 +221,6 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
     lines.push(Line::from(bar_spans));
 
     // Separator before token stats
-    lines.push(Line::from(""));
-
     // PR card (if current branch has an active PR)
     if let Some(pr) = &cp_mod_github::GithubState::get(state).branch_pr {
         let state_color = match pr.state.as_str() {

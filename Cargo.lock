@@ -575,6 +575,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-mod-queue"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "ratatui",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cp-mod-scratchpad"
 version = "0.1.0"
 dependencies = [
@@ -4009,6 +4020,7 @@ dependencies = [
  "cp-mod-memory",
  "cp-mod-preset",
  "cp-mod-prompt",
+ "cp-mod-queue",
  "cp-mod-scratchpad",
  "cp-mod-spine",
  "cp-mod-todo",

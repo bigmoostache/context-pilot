@@ -2,10 +2,12 @@ use std::sync::mpsc::Sender;
 
 use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
-use crate::state::{Message, MessageStatus, MessageType, ToolResultRecord};
+use crate::infra::tools::execute_tool;
+use crate::state::{Message, MessageStatus, MessageType, State, ToolResultRecord};
 
 use cp_base::watchers::WatcherRegistry;
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
+use cp_mod_queue::QueueState;
 use cp_mod_spine::{NotificationType, SpineState};
 
 use crate::app::App;
@@ -333,4 +335,39 @@ impl App {
         self.save_message_async(&result_msg);
         self.state.messages.push(result_msg);
     }
+}
+
+// ─── Queue flush (called from tool_pipeline.rs) ─────────────────────────────
+
+/// Execute all queued tool calls in order, returning a summary result.
+pub(super) fn execute_queue_flush(
+    tool: &cp_base::tools::ToolUse,
+    state: &mut State,
+) -> crate::infra::tools::ToolResult {
+    let qs = QueueState::get_mut(state);
+    if qs.queued_calls.is_empty() {
+        return crate::infra::tools::ToolResult::new(
+            tool.id.clone(),
+            "Queue is empty — nothing to execute.".to_string(),
+            false,
+        );
+    }
+    let calls = qs.flush();
+    qs.active = false;
+
+    // All hands on deck — execute each queued order in sequence
+    let mut summary = format!("Executed {} queued action(s):\n", calls.len());
+    for call in &calls {
+        let queued_tool = cp_base::tools::ToolUse {
+            id: call.tool_use_id.clone(),
+            name: call.tool_name.clone(),
+            input: call.input.clone(),
+        };
+        let result = execute_tool(&queued_tool, state);
+        let status = if result.is_error { "ERROR" } else { "ok" };
+        let short =
+            if result.content.len() > 100 { format!("{}...", &result.content[..97]) } else { result.content.clone() };
+        summary.push_str(&format!("{}. {} → {} ({})\n", call.index, call.tool_name, status, short));
+    }
+    crate::infra::tools::ToolResult::new(tool.id.clone(), summary, false)
 }

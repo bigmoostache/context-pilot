@@ -106,6 +106,7 @@ impl ContextType {
     pub const CONSOLE: &str = "console";
     pub const CALLBACK: &str = "callback";
     pub const TOOLS: &str = "tools";
+    pub const QUEUE: &str = "queue";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
     pub fn is_fixed(&self) -> bool {

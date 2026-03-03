@@ -7,6 +7,7 @@ use crate::app::App;
 use crate::app::reverie::{streaming, tools};
 use crate::infra::api::StreamEvent;
 use crate::state::persistence::save_state;
+use cp_mod_queue::QueueState;
 
 impl App {
     /// Check if any reverie needs a stream started (state has reverie but no stream).
@@ -94,6 +95,8 @@ impl App {
                             "Reverie".to_string(),
                             format!("Reverie '{}' error: {}. Destroying session.", agent_id, e),
                         );
+                        // Discard any queued actions from the failed reverie
+                        QueueState::get_mut(&mut self.state).clear();
                         self.state.reveries.remove(&agent_id);
                         self.reverie_streams.remove(&agent_id);
                         break; // This agent's stream is gone, move to next
@@ -138,36 +141,60 @@ impl App {
                         "Reverie".to_string(),
                         format!("Tool cap ({}) reached for '{}'. Force-stopping.", cap, agent_id),
                     );
+                    QueueState::get_mut(&mut self.state).clear();
                     self.state.reveries.remove(&agent_id);
                     self.reverie_streams.remove(&agent_id);
                     break; // Move to next agent
                 }
 
                 // Dispatch through reverie tool router
-                let result = match tools::dispatch_reverie_tool(tool, &mut self.state) {
-                    Some(result) => {
-                        // Check for Report sentinel
-                        if result.content.starts_with("REVERIE_REPORT:") {
-                            let summary = result.content.strip_prefix("REVERIE_REPORT:").unwrap_or("Completed");
-                            cp_mod_spine::SpineState::create_notification(
-                                &mut self.state,
-                                cp_mod_spine::NotificationType::Custom,
-                                "Reverie".to_string(),
-                                summary.to_string(),
-                            );
-                            if let Some(stream) = self.reverie_streams.get_mut(&agent_id) {
-                                stream.report_called = true;
-                            }
-                            // Destroy this agent's reverie
-                            self.state.reveries.remove(&agent_id);
-                            self.reverie_streams.remove(&agent_id);
-                            save_state(&self.state);
-                            break; // Move to next agent
+                // Queue_execute needs special handling (flush lives in tool_cleanup, not the module)
+                let result = if tool.name == "Queue_execute" {
+                    super::tool_cleanup::execute_queue_flush(tool, &mut self.state)
+                } else if let Some(result) = tools::dispatch_reverie_tool(tool, &mut self.state) {
+                    // Check for Report sentinel
+                    if result.content.starts_with("REVERIE_REPORT:") {
+                        let summary = result.content.strip_prefix("REVERIE_REPORT:").unwrap_or("Completed");
+                        cp_mod_spine::SpineState::create_notification(
+                            &mut self.state,
+                            cp_mod_spine::NotificationType::Custom,
+                            "Reverie".to_string(),
+                            summary.to_string(),
+                        );
+                        if let Some(stream) = self.reverie_streams.get_mut(&agent_id) {
+                            stream.report_called = true;
                         }
-                        result
+                        // Deactivate queue on clean exit (should already be empty)
+                        let qs = QueueState::get_mut(&mut self.state);
+                        qs.active = false;
+                        // Destroy this agent's reverie
+                        self.state.reveries.remove(&agent_id);
+                        self.reverie_streams.remove(&agent_id);
+                        save_state(&self.state);
+                        break; // Move to next agent
                     }
-                    None => {
-                        // Delegate to normal module dispatch
+                    result
+                } else {
+                    // Tool is allowed — check if reverie queue is active
+                    let should_queue = self.state.reveries.get(&agent_id).is_some_and(|r| r.queue_active)
+                        && !QueueState::is_queue_tool(&tool.name);
+                    if should_queue {
+                        let qs = QueueState::get_mut(&mut self.state);
+                        let idx = qs.enqueue(
+                            tool.name.clone(),
+                            tool.id.clone(),
+                            tool.input.clone(),
+                            crate::app::panels::now_ms(),
+                        );
+                        let params = serde_json::to_string(&tool.input).unwrap_or_default();
+                        let short = if params.len() > 120 { format!("{}...", &params[..117]) } else { params };
+                        crate::infra::tools::ToolResult::new(
+                            tool.id.clone(),
+                            format!("Queued as #{}: {}({})", idx, tool.name, short),
+                            false,
+                        )
+                    } else {
+                        // Execute normally through module dispatch
                         let active = self.state.active_modules.clone();
                         crate::modules::dispatch_tool(tool, &mut self.state, &active)
                     }
@@ -259,6 +286,7 @@ impl App {
                     "Reverie".to_string(),
                     format!("Reverie '{}' ended without Report after retry. Force-destroying.", agent_id),
                 );
+                QueueState::get_mut(&mut self.state).clear();
                 self.state.reveries.remove(&agent_id);
                 self.reverie_streams.remove(&agent_id);
                 continue;
