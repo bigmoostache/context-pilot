@@ -3,7 +3,7 @@
 //! The reverie has access to a curated subset of tools for context management,
 //! plus a mandatory Report tool to end its run.
 
-use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolResult, ToolTexts, ToolUse};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolResult, ToolTexts, ToolUse};
 use crate::state::State;
 use cp_base::config::REVERIE;
 
@@ -72,7 +72,6 @@ pub fn optimize_context_tool_definition() -> ToolDefinition {
 ///
 /// Returns the ToolResult. The caller (event loop) is responsible for actually
 /// destroying the reverie state after processing this result.
-#[cfg_attr(not(test), allow(dead_code))]
 pub fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
     // Block report if queue has unflushed actions
     let qs = cp_mod_queue::QueueState::get(state);
@@ -151,7 +150,6 @@ pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
 ///
 /// Routes Report to our handler, everything else to the normal module dispatch.
 /// Returns None if the tool should be dispatched to modules (caller handles it).
-#[cfg_attr(not(test), allow(dead_code))]
 pub fn dispatch_reverie_tool(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     match tool.name.as_str() {
         "reverie_report" => Some(execute_report(tool, state)),

@@ -1,6 +1,7 @@
 pub mod conversation;
 pub mod conversation_history;
 pub mod overview;
+pub mod pre_flight;
 pub mod questions;
 
 use std::collections::{HashMap, HashSet};
@@ -165,8 +166,6 @@ pub fn create_panel(context_type: &ContextType) -> Option<Box<dyn Panel>> {
     None
 }
 
-/// Validate that all dependencies of active modules are also active.
-/// Called at startup. Panics on unmet dependencies.
 pub fn validate_dependencies(active: &HashSet<String>) {
     for module in all_modules() {
         if active.contains(module.id()) {

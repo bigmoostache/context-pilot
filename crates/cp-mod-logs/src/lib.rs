@@ -18,7 +18,7 @@ use cp_base::config::constants::STORE_DIR;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
@@ -223,6 +223,65 @@ impl Module for LogsModule {
                 )
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "log_summarize" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(ids) = tool.input.get("log_ids").and_then(|v| v.as_array()) {
+                    let logs = &LogsState::get(state).logs;
+                    for id_val in ids {
+                        if let Some(id) = id_val.as_str()
+                            && !logs.iter().any(|l| l.id == id)
+                        {
+                            pf.errors.push(format!("Log '{}' not found", id));
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            "log_toggle" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    let logs = &LogsState::get(state).logs;
+                    match logs.iter().find(|l| l.id == id) {
+                        None => pf.errors.push(format!("Log '{}' not found", id)),
+                        Some(log) if log.children_ids.is_empty() => {
+                            pf.errors.push(format!("Log '{}' has no children — can only toggle summaries", id));
+                        }
+                        _ => {}
+                    }
+                }
+                Some(pf)
+            }
+            "Close_conversation_history" => {
+                let mut pf = PreFlightResult::new();
+                // Queue must be active for destructive history panel operations
+                if !cp_mod_queue::QueueState::get(state).active {
+                    pf.errors.push(
+                        "Cannot close conversation history without an active queue. \
+                         Activate the queue first (Queue_activate), then queue this call. \
+                         Closing history panels causes irreversible context loss."
+                            .to_string(),
+                    );
+                }
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    match state.context.iter().find(|c| c.id == id) {
+                        None => pf.errors.push(format!("Panel '{}' not found", id)),
+                        Some(ctx) if ctx.context_type != ContextType::CONVERSATION_HISTORY => {
+                            pf.errors.push(format!(
+                                "Panel '{}' is not a conversation history panel — use Close_panel instead",
+                                id
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

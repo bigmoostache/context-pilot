@@ -4,53 +4,17 @@ use crate::app::actions::clean_llm_id_prefix;
 use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
 use crate::infra::tools::{execute_tool, perform_reload};
-use crate::state::cache::{CacheUpdate, process_cache_request};
+use crate::modules::pre_flight::pre_flight_tool;
 use crate::state::persistence::build_message_op;
-use crate::state::{
-    Message, MessageStatus, MessageType, State, ToolResultRecord, ToolUseRecord, get_context_type_meta,
-};
+use crate::state::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
 
+use super::streaming::{has_dirty_file_panels, has_dirty_panels, trigger_dirty_panel_refresh};
 use cp_mod_callback::firing as callback_firing;
 use cp_mod_callback::trigger as callback_trigger;
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_mod_queue::QueueState;
 
 use crate::app::App;
-
-// ─── Wait helpers (panel-readiness checks) ──────────────────────────────────
-
-/// Check if any async-wait panels have cache_deprecated = true
-pub fn has_dirty_panels(state: &State) -> bool {
-    state.context.iter().any(|c| {
-        get_context_type_meta(c.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false)
-            && c.cache_deprecated
-    })
-}
-
-/// Check if any async-wait panels have cache_deprecated = true (file-like panels that need refresh before stream)
-pub fn has_dirty_file_panels(state: &State) -> bool {
-    state.context.iter().any(|c| {
-        get_context_type_meta(c.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false)
-            && c.cache_deprecated
-    })
-}
-
-/// Trigger immediate cache refresh for all dirty async-wait panels.
-/// Returns true if any panels needed refresh.
-pub fn trigger_dirty_panel_refresh(state: &State, cache_tx: &Sender<CacheUpdate>) -> bool {
-    let mut any_triggered = false;
-    for ctx in &state.context {
-        let needs_wait = get_context_type_meta(ctx.context_type.as_str()).map(|m| m.needs_async_wait).unwrap_or(false);
-        if needs_wait && ctx.cache_deprecated && !ctx.cache_in_flight {
-            let panel = crate::app::panels::get_panel(&ctx.context_type);
-            if let Some(request) = panel.build_cache_request(ctx, state) {
-                process_cache_request(request, cache_tx.clone());
-                any_triggered = true;
-            }
-        }
-    }
-    any_triggered
-}
 
 // ─── Tool pipeline ──────────────────────────────────────────────────────────
 
@@ -118,27 +82,39 @@ impl App {
             let result = if tool.name == "Queue_execute" {
                 // Queue flush: execute all queued calls through normal dispatch
                 super::tool_cleanup::execute_queue_flush(tool, &mut self.state)
-            } else if QueueState::get(&self.state).active && !QueueState::is_queue_tool(&tool.name) {
-                // Queue intercept: enqueue instead of executing
-                let qs = QueueState::get_mut(&mut self.state);
-                let idx = qs.enqueue(tool.name.clone(), tool.id.clone(), tool.input.clone(), now_ms());
-                let params = serde_json::to_string(&tool.input).unwrap_or_default();
-                let short = if params.len() > 120 {
-                    let mut end = 117;
-                    while !params.is_char_boundary(end) {
-                        end -= 1;
-                    }
-                    format!("{}...", &params[..end])
-                } else {
-                    params
-                };
-                crate::infra::tools::ToolResult::new(
-                    tool.id.clone(),
-                    format!("Queued as #{}: {}({})", idx, tool.name, short),
-                    false,
-                )
             } else {
-                execute_tool(tool, &mut self.state)
+                // Pre-flight: schema check + module semantic check (ALWAYS runs, queue or not)
+                let pf = pre_flight_tool(tool, &self.state, &self.state.active_modules.clone());
+                if pf.has_errors() {
+                    // Hard stop — don't queue, don't execute
+                    crate::infra::tools::ToolResult::new(tool.id.clone(), pf.format_errors(), true)
+                } else if QueueState::get(&self.state).active && !QueueState::is_queue_tool(&tool.name) {
+                    // Queue intercept: enqueue instead of executing
+                    let qs = QueueState::get_mut(&mut self.state);
+                    let idx = qs.enqueue(tool.name.clone(), tool.id.clone(), tool.input.clone(), now_ms());
+                    let params = serde_json::to_string(&tool.input).unwrap_or_default();
+                    let short = if params.len() > 120 {
+                        let mut end = 117;
+                        while !params.is_char_boundary(end) {
+                            end -= 1;
+                        }
+                        format!("{}...", &params[..end])
+                    } else {
+                        params
+                    };
+                    let mut msg = format!("Queued as #{}: {}({})", idx, tool.name, short);
+                    if pf.has_warnings() {
+                        msg.push_str(&format!("\n{}", pf.format_errors()));
+                    }
+                    crate::infra::tools::ToolResult::new(tool.id.clone(), msg, false)
+                } else {
+                    // Execute normally
+                    let mut result = execute_tool(tool, &mut self.state);
+                    if pf.has_warnings() {
+                        result.content.push_str(&format!("\n{}", pf.format_errors()));
+                    }
+                    result
+                }
             };
             tool_results.push(result);
         }

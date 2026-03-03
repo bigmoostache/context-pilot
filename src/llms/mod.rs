@@ -5,10 +5,9 @@
 pub mod anthropic;
 pub mod claude_code;
 pub mod claude_code_api_key;
-pub mod deepseek;
-pub mod grok;
-pub mod groq;
+pub mod oai_providers;
 pub mod openai_compat;
+pub mod openai_streaming;
 
 use std::sync::mpsc::Sender;
 
@@ -24,6 +23,11 @@ use crate::state::Message;
 pub use cp_base::llm_types::{
     AnthropicModel, ApiCheckResult, DeepSeekModel, GrokModel, GroqModel, LlmProvider, ModelInfo, StreamEvent,
 };
+
+// Re-export provider clients through the module path for get_client()
+use oai_providers::deepseek;
+use oai_providers::grok;
+use oai_providers::groq;
 
 /// Configuration for an LLM request
 #[derive(Debug, Clone)]

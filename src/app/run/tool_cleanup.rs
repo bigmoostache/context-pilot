@@ -259,8 +259,8 @@ impl App {
         self.save_state_async();
         self.state.dirty = true;
 
-        super::tool_pipeline::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
-        if super::tool_pipeline::has_dirty_file_panels(&self.state) {
+        super::streaming::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        if super::streaming::has_dirty_file_panels(&self.state) {
             self.state.waiting_for_panels = true;
             self.wait_started_ms = now_ms();
         } else {

@@ -1,9 +1,9 @@
 use ratatui::prelude::*;
 
-use super::{helpers::*, theme};
+use super::super::{helpers::*, theme};
 use crate::state::{ContextType, State};
 
-use super::sidebar::fixed_panel_badge;
+use super::full::fixed_panel_badge;
 
 /// Render a collapsed sidebar (icons + badges only, ~14 columns wide).
 /// Shows: selection arrow, icon, badge count. Token bar at the bottom.

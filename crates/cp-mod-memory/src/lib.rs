@@ -12,7 +12,7 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::MemoryPanel;
@@ -133,6 +133,26 @@ impl Module for MemoryModule {
                 )
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "memory_update" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) {
+                    let ms = MemoryState::get(state);
+                    for update in updates {
+                        if let Some(id) = update.get("id").and_then(|v| v.as_str())
+                            && !ms.memories.iter().any(|m| m.id == id)
+                        {
+                            pf.errors.push(format!("Memory '{}' not found", id));
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

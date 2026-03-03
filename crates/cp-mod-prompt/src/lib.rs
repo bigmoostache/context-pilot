@@ -12,7 +12,7 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::library_panel::LibraryPanel;
@@ -171,6 +171,103 @@ impl Module for PromptModule {
                 .param("id", ParamType::String, true)
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        let ps = PromptState::get(state);
+        match tool.name.as_str() {
+            "agent_delete" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    match ps.agents.iter().find(|a| a.id == id) {
+                        None => pf.errors.push(format!("Agent '{}' not found", id)),
+                        Some(a) if a.is_builtin => {
+                            pf.errors.push(format!("Agent '{}' is built-in and cannot be deleted", id));
+                        }
+                        _ => {}
+                    }
+                }
+                Some(pf)
+            }
+            "agent_load" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
+                    && !id.is_empty()
+                    && !ps.agents.iter().any(|a| a.id == id)
+                {
+                    pf.errors.push(format!("Agent '{}' not found", id));
+                }
+                Some(pf)
+            }
+            "skill_delete" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    match ps.skills.iter().find(|s| s.id == id) {
+                        None => pf.errors.push(format!("Skill '{}' not found", id)),
+                        Some(s) if s.is_builtin => {
+                            pf.errors.push(format!("Skill '{}' is built-in and cannot be deleted", id));
+                        }
+                        _ => {}
+                    }
+                }
+                Some(pf)
+            }
+            "skill_load" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    if !ps.skills.iter().any(|s| s.id == id) {
+                        pf.errors.push(format!("Skill '{}' not found", id));
+                    } else if ps.loaded_skill_ids.contains(&id.to_string()) {
+                        pf.warnings.push(format!("Skill '{}' is already loaded", id));
+                    }
+                }
+                Some(pf)
+            }
+            "skill_unload" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    if !ps.skills.iter().any(|s| s.id == id) {
+                        pf.errors.push(format!("Skill '{}' not found", id));
+                    } else if !ps.loaded_skill_ids.contains(&id.to_string()) {
+                        pf.warnings.push(format!("Skill '{}' is not currently loaded", id));
+                    }
+                }
+                Some(pf)
+            }
+            "Edit_prompt" | "Library_open_prompt_editor" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    let exists = ps.agents.iter().any(|a| a.id == id)
+                        || ps.skills.iter().any(|s| s.id == id)
+                        || ps.commands.iter().any(|c| c.id == id);
+                    if !exists {
+                        pf.errors.push(format!("Prompt '{}' not found (not an agent, skill, or command)", id));
+                    }
+                }
+                Some(pf)
+            }
+            "Library_close_prompt_editor" => {
+                let mut pf = PreFlightResult::new();
+                if ps.open_prompt_id.is_none() {
+                    pf.warnings.push("No prompt editor is currently open".to_string());
+                }
+                Some(pf)
+            }
+            "command_delete" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    match ps.commands.iter().find(|c| c.id == id) {
+                        None => pf.errors.push(format!("Command '{}' not found", id)),
+                        Some(c) if c.is_builtin => {
+                            pf.errors.push(format!("Command '{}' is built-in and cannot be deleted", id));
+                        }
+                        _ => {}
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

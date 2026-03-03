@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
@@ -69,6 +69,35 @@ impl Module for PresetModule {
                 .param("name", ParamType::String, true)
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, _state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "preset_load" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
+                    let presets = tools::list_presets_with_info();
+                    if !presets.iter().any(|p| p.name == name) {
+                        let available: Vec<&str> = presets.iter().map(|p| p.name.as_str()).collect();
+                        pf.errors.push(format!("Preset '{}' not found. Available: {}", name, available.join(", ")));
+                    }
+                }
+                Some(pf)
+            }
+            "preset_snapshot_myself" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
+                    let replace = tool.input.get("replace").and_then(|v| v.as_str());
+                    let presets = tools::list_presets_with_info();
+                    if presets.iter().any(|p| p.name == name) && replace.is_none() {
+                        pf.errors
+                            .push(format!("Preset '{}' already exists. Pass replace:'{}' to overwrite.", name, name));
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

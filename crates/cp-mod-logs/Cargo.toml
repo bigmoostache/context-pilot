@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 cp-base.workspace = true
 cp-mod-memory = { path = "../cp-mod-memory" }
+cp-mod-queue = { path = "../cp-mod-queue" }
 ratatui.workspace = true
 crossterm.workspace = true
 serde.workspace = true

@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::panels::Panel;
 use crate::state::{ContextType, ContextTypeMeta, State};
 use crate::tools::ToolDefinition;
-use crate::tools::{ToolResult, ToolUse};
+use crate::tools::{PreFlightResult, ToolResult, ToolUse};
 
 /// A function that transforms tool result content into styled terminal lines.
 /// Receives the raw content string and available display width.
@@ -95,6 +95,14 @@ pub trait Module: Send + Sync {
     fn tool_definitions(&self) -> Vec<ToolDefinition>;
     /// Execute a tool. Returns None if this module doesn't own the tool.
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult>;
+
+    /// Pre-flight validation for a tool call. Runs BEFORE execution (and before
+    /// queueing). Returns `None` if this module doesn't own the tool.
+    /// Returns `Some(PreFlightResult)` with errors (block execution) and/or
+    /// warnings (pass-through, tool still runs). Default: no custom checks.
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<PreFlightResult> {
+        None
+    }
 
     /// Create a panel for the given context type. Returns None if not owned by this module.
     fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>>;

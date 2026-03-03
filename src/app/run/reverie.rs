@@ -152,6 +152,23 @@ impl App {
                 // Queue_execute needs special handling (flush lives in tool_cleanup, not the module)
                 let result = if tool.name == "Queue_execute" {
                     super::tool_cleanup::execute_queue_flush(tool, &mut self.state)
+                } else if tool.name == "Queue_activate" {
+                    // Toggle the reverie's own queue flag, NOT the main worker's QueueState.active
+                    if let Some(rev) = self.state.reveries.get_mut(&agent_id) {
+                        rev.queue_active = true;
+                    }
+                    crate::infra::tools::ToolResult::new(tool.id.clone(), "Queue activated (reverie)".into(), false)
+                } else if tool.name == "Queue_pause" {
+                    if let Some(rev) = self.state.reveries.get_mut(&agent_id) {
+                        rev.queue_active = false;
+                    }
+                    crate::infra::tools::ToolResult::new(tool.id.clone(), "Queue paused (reverie)".into(), false)
+                } else if tool.name == "Queue_empty" {
+                    if let Some(rev) = self.state.reveries.get_mut(&agent_id) {
+                        rev.queue_active = false;
+                    }
+                    QueueState::get_mut(&mut self.state).clear();
+                    crate::infra::tools::ToolResult::new(tool.id.clone(), "Queue emptied (reverie)".into(), false)
                 } else if let Some(result) = tools::dispatch_reverie_tool(tool, &mut self.state) {
                     // Check for Report sentinel
                     if result.content.starts_with("REVERIE_REPORT:") {
@@ -165,9 +182,9 @@ impl App {
                         if let Some(stream) = self.reverie_streams.get_mut(&agent_id) {
                             stream.report_called = true;
                         }
-                        // Deactivate queue on clean exit (should already be empty)
-                        let qs = QueueState::get_mut(&mut self.state);
-                        qs.active = false;
+                        // Clear queued actions from this reverie (shared queue) but
+                        // do NOT touch QueueState.active — that's the main worker's toggle.
+                        QueueState::get_mut(&mut self.state).clear();
                         // Destroy this agent's reverie
                         self.state.reveries.remove(&agent_id);
                         self.reverie_streams.remove(&agent_id);

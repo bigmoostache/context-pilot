@@ -2,8 +2,9 @@ tools:
   Open:
     description: |
       Opens a file and adds it to context so you can see its content. ALWAYS use this BEFORE file_edit to see current content - you need exact text for edits.
+      PREFER opening multiple files in a single call — it saves context by avoiding redundant tool call/result message pairs.
     parameters:
-      path: "Path to the file to open"
+      path: "Path to the file to open (string or array of strings to open multiple files at once)"
 
   Edit:
     description: |

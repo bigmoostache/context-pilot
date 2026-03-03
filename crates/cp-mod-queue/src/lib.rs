@@ -7,7 +7,7 @@ pub use types::{QueueState, QueuedToolCall};
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::QueuePanel;
@@ -106,6 +106,47 @@ impl Module for QueueModule {
                 .reverie_allowed(true)
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        let qs = QueueState::get(state);
+        match tool.name.as_str() {
+            "Queue_activate" => {
+                let mut pf = PreFlightResult::new();
+                if qs.active {
+                    pf.warnings.push("Queue is already active".to_string());
+                }
+                Some(pf)
+            }
+            "Queue_pause" => {
+                let mut pf = PreFlightResult::new();
+                if !qs.active {
+                    pf.warnings.push("Queue is not active".to_string());
+                }
+                Some(pf)
+            }
+            "Queue_execute" => {
+                let mut pf = PreFlightResult::new();
+                if qs.queued_calls.is_empty() {
+                    pf.warnings.push("Queue is empty — nothing to execute".to_string());
+                }
+                Some(pf)
+            }
+            "Queue_undo" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(indices) = tool.input.get("indices").and_then(|v| v.as_array()) {
+                    for idx_val in indices {
+                        if let Some(idx) = idx_val.as_i64()
+                            && !qs.queued_calls.iter().any(|c| c.index == idx as usize)
+                        {
+                            pf.errors.push(format!("Queue index {} not found", idx));
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

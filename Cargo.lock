@@ -536,6 +536,7 @@ dependencies = [
  "chrono",
  "cp-base",
  "cp-mod-memory",
+ "cp-mod-queue",
  "crossterm",
  "ratatui",
  "serde",

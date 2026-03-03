@@ -1,8 +1,7 @@
-//! DeepSeek API implementation.
+//! xAI Grok API implementation.
 //!
-//! DeepSeek uses an OpenAI-compatible API format.
-//! Message building is delegated to the shared `openai_compat` module,
-//! with a thin wrapper to add `reasoning_content` for deepseek-reasoner.
+//! Grok uses an OpenAI-compatible API format.
+//! Message building is delegated to the shared `openai_compat` module.
 
 use std::env;
 use std::io::{BufRead, BufReader};
@@ -12,67 +11,35 @@ use reqwest::blocking::Client;
 use secrecy::{ExposeSecret, SecretBox};
 use serde::Serialize;
 
-use super::error::LlmError;
-use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
-use super::{LlmClient, LlmRequest, StreamEvent};
+use super::super::error::LlmError;
+use super::super::openai_compat::{self, BuildOptions, OaiMessage};
+use super::super::openai_streaming::ToolCallAccumulator;
+use super::super::{LlmClient, LlmRequest, StreamEvent};
 
-const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
+const GROK_API_ENDPOINT: &str = "https://api.x.ai/v1/chat/completions";
 
-/// DeepSeek client
-pub struct DeepSeekClient {
+/// xAI Grok client
+pub struct GrokClient {
     api_key: Option<SecretBox<String>>,
 }
 
-impl DeepSeekClient {
+impl GrokClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
-        Self { api_key: env::var("DEEPSEEK_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
+        Self { api_key: env::var("XAI_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }
 
-impl Default for DeepSeekClient {
+impl Default for GrokClient {
     fn default() -> Self {
         Self::new()
     }
 }
 
-// ───────────────────────────────────────────────────────────────────
-// DeepSeek-specific message type (adds reasoning_content field)
-// ───────────────────────────────────────────────────────────────────
-
-/// DeepSeek message — wraps the shared OaiMessage but adds `reasoning_content`
-/// which is required for deepseek-reasoner model on assistant messages.
 #[derive(Debug, Serialize)]
-struct DsMessage {
-    role: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    content: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    reasoning_content: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tool_calls: Option<Vec<openai_compat::OaiToolCall>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tool_call_id: Option<String>,
-}
-
-impl DsMessage {
-    /// Convert from shared OaiMessage, adding reasoning_content for assistant messages.
-    fn from_oai(msg: OaiMessage, is_reasoner: bool) -> Self {
-        let reasoning_content = if is_reasoner && msg.role == "assistant" { Some(String::new()) } else { None };
-        Self {
-            role: msg.role,
-            content: msg.content,
-            reasoning_content,
-            tool_calls: msg.tool_calls,
-            tool_call_id: msg.tool_call_id,
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct DsRequest {
+struct GrokRequest {
     model: String,
-    messages: Vec<DsMessage>,
+    messages: Vec<OaiMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tools: Vec<openai_compat::OaiTool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -81,12 +48,11 @@ struct DsRequest {
     stream: bool,
 }
 
-impl LlmClient for DeepSeekClient {
+impl LlmClient for GrokClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("DEEPSEEK_API_KEY not set".into()))?;
+        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("XAI_API_KEY not set".into()))?;
 
         let client = Client::new();
-        let is_reasoner = request.model == "deepseek-reasoner";
 
         // Collect pending tool result IDs
         let pending_tool_ids: Vec<String> = request
@@ -96,7 +62,7 @@ impl LlmClient for DeepSeekClient {
             .unwrap_or_default();
 
         // Build messages using shared builder
-        let oai_messages = openai_compat::build_messages(
+        let mut messages = openai_compat::build_messages(
             &request.messages,
             &request.context_items,
             &BuildOptions {
@@ -108,17 +74,12 @@ impl LlmClient for DeepSeekClient {
             &request.api_messages,
         );
 
-        // Convert to DeepSeek format (adds reasoning_content for assistant messages)
-        let mut ds_messages: Vec<DsMessage> =
-            oai_messages.into_iter().map(|m| DsMessage::from_oai(m, is_reasoner)).collect();
-
         // Add tool results if present
         if let Some(results) = &request.tool_results {
             for result in results {
-                ds_messages.push(DsMessage {
+                messages.push(OaiMessage {
                     role: "tool".to_string(),
                     content: Some(result.content.clone()),
-                    reasoning_content: None,
                     tool_calls: None,
                     tool_call_id: Some(result.tool_use_id.clone()),
                 });
@@ -128,19 +89,19 @@ impl LlmClient for DeepSeekClient {
         let tools = openai_compat::tools_to_oai(&request.tools);
         let tool_choice = if tools.is_empty() { None } else { Some("auto".to_string()) };
 
-        let api_request = DsRequest {
+        let api_request = GrokRequest {
             model: request.model.clone(),
-            messages: ds_messages,
+            messages,
             tools,
             tool_choice,
             max_tokens: request.max_output_tokens,
             stream: true,
         };
 
-        openai_compat::dump_request(&request.worker_id, "deepseek", &api_request);
+        super::super::openai_streaming::dump_request(&request.worker_id, "grok", &api_request);
 
         let response = client
-            .post(DEEPSEEK_API_ENDPOINT)
+            .post(GROK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&api_request)
@@ -156,28 +117,19 @@ impl LlmClient for DeepSeekClient {
         let reader = BufReader::new(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
-        let mut cache_hit_tokens = 0;
-        let mut cache_miss_tokens = 0;
         let mut stop_reason: Option<String> = None;
         let mut tool_acc = ToolCallAccumulator::new();
 
         for line in reader.lines() {
             let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
 
-            if let Some(resp) = openai_compat::parse_sse_line(&line) {
+            if let Some(resp) = super::super::openai_streaming::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
                     if let Some(inp) = usage.prompt_tokens {
                         input_tokens = inp;
                     }
                     if let Some(out) = usage.completion_tokens {
                         output_tokens = out;
-                    }
-                    // DeepSeek-specific cache fields
-                    if let Some(hit) = usage.prompt_cache_hit_tokens {
-                        cache_hit_tokens = hit;
-                    }
-                    if let Some(miss) = usage.prompt_cache_miss_tokens {
-                        cache_miss_tokens = miss;
                     }
                 }
 
@@ -195,7 +147,7 @@ impl LlmClient for DeepSeekClient {
                         }
                     }
                     if let Some(ref reason) = choice.finish_reason {
-                        stop_reason = Some(openai_compat::normalize_stop_reason(reason));
+                        stop_reason = Some(super::super::openai_streaming::normalize_stop_reason(reason));
                         for tool_use in tool_acc.drain() {
                             let _ = tx.send(StreamEvent::ToolUse(tool_use));
                         }
@@ -207,22 +159,22 @@ impl LlmClient for DeepSeekClient {
         let _ = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
-            cache_hit_tokens,
-            cache_miss_tokens,
+            cache_hit_tokens: 0,
+            cache_miss_tokens: 0,
             stop_reason,
         });
         Ok(())
     }
 
-    fn check_api(&self, model: &str) -> super::ApiCheckResult {
+    fn check_api(&self, model: &str) -> super::super::ApiCheckResult {
         let api_key = match self.api_key.as_ref() {
             Some(k) => k,
             None => {
-                return super::ApiCheckResult {
+                return super::super::ApiCheckResult {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some("DEEPSEEK_API_KEY not set".to_string()),
+                    error: Some("XAI_API_KEY not set".to_string()),
                 };
             }
         };
@@ -231,7 +183,7 @@ impl LlmClient for DeepSeekClient {
 
         // Test 1: Basic auth
         let auth_result = client
-            .post(DEEPSEEK_API_ENDPOINT)
+            .post(GROK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
@@ -245,12 +197,12 @@ impl LlmClient for DeepSeekClient {
 
         if !auth_ok {
             let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
-            return super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
+            return super::super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
         // Test 2: Streaming
         let stream_result = client
-            .post(DEEPSEEK_API_ENDPOINT)
+            .post(GROK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
@@ -265,7 +217,7 @@ impl LlmClient for DeepSeekClient {
 
         // Test 3: Tools
         let tools_result = client
-            .post(DEEPSEEK_API_ENDPOINT)
+            .post(GROK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
@@ -289,6 +241,6 @@ impl LlmClient for DeepSeekClient {
 
         let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
-        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        super::super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
 }

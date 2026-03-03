@@ -1,7 +1,8 @@
-//! Groq API implementation.
+//! DeepSeek API implementation.
 //!
-//! Groq uses an OpenAI-compatible API format.
-//! Message building is delegated to the shared `openai_compat` module.
+//! DeepSeek uses an OpenAI-compatible API format.
+//! Message building is delegated to the shared `openai_compat` module,
+//! with a thin wrapper to add `reasoning_content` for deepseek-reasoner.
 
 use std::env;
 use std::io::{BufRead, BufReader};
@@ -10,51 +11,83 @@ use std::sync::mpsc::Sender;
 use reqwest::blocking::Client;
 use secrecy::{ExposeSecret, SecretBox};
 use serde::Serialize;
-use serde_json::Value;
 
-use super::error::LlmError;
-use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
-use super::{LlmClient, LlmRequest, StreamEvent};
-use crate::infra::tools::ToolDefinition;
-use cp_base::config::INJECTIONS;
+use super::super::error::LlmError;
+use super::super::openai_compat::{self, BuildOptions, OaiMessage};
+use super::super::openai_streaming::ToolCallAccumulator;
+use super::super::{LlmClient, LlmRequest, StreamEvent};
 
-const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
+const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
-/// Groq client
-pub struct GroqClient {
+/// DeepSeek client
+pub struct DeepSeekClient {
     api_key: Option<SecretBox<String>>,
 }
 
-impl GroqClient {
+impl DeepSeekClient {
     pub fn new() -> Self {
         dotenvy::dotenv().ok();
-        Self { api_key: env::var("GROQ_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
+        Self { api_key: env::var("DEEPSEEK_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }
 
-impl Default for GroqClient {
+impl Default for DeepSeekClient {
     fn default() -> Self {
         Self::new()
     }
 }
 
+// ───────────────────────────────────────────────────────────────────
+// DeepSeek-specific message type (adds reasoning_content field)
+// ───────────────────────────────────────────────────────────────────
+
+/// DeepSeek message — wraps the shared OaiMessage but adds `reasoning_content`
+/// which is required for deepseek-reasoner model on assistant messages.
 #[derive(Debug, Serialize)]
-struct GroqRequest {
+struct DsMessage {
+    role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<openai_compat::OaiToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+}
+
+impl DsMessage {
+    /// Convert from shared OaiMessage, adding reasoning_content for assistant messages.
+    fn from_oai(msg: OaiMessage, is_reasoner: bool) -> Self {
+        let reasoning_content = if is_reasoner && msg.role == "assistant" { Some(String::new()) } else { None };
+        Self {
+            role: msg.role,
+            content: msg.content,
+            reasoning_content,
+            tool_calls: msg.tool_calls,
+            tool_call_id: msg.tool_call_id,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct DsRequest {
     model: String,
-    messages: Vec<OaiMessage>,
+    messages: Vec<DsMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    tools: Vec<Value>, // Can be function tools or built-in tools (browser_search, code_interpreter)
+    tools: Vec<openai_compat::OaiTool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
-    max_completion_tokens: u32,
+    max_tokens: u32,
     stream: bool,
 }
 
-impl LlmClient for GroqClient {
+impl LlmClient for DeepSeekClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("GROQ_API_KEY not set".into()))?;
+        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("DEEPSEEK_API_KEY not set".into()))?;
 
         let client = Client::new();
+        let is_reasoner = request.model == "deepseek-reasoner";
 
         // Collect pending tool result IDs
         let pending_tool_ids: Vec<String> = request
@@ -63,54 +96,52 @@ impl LlmClient for GroqClient {
             .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
             .unwrap_or_default();
 
-        // GPT-OSS models get extra info about built-in tools
-        let system_suffix = if request.model.starts_with("openai/gpt-oss") {
-            Some(INJECTIONS.providers.gpt_oss_suffix.trim_end().to_string())
-        } else {
-            None
-        };
-
         // Build messages using shared builder
-        let mut messages = openai_compat::build_messages(
+        let oai_messages = openai_compat::build_messages(
             &request.messages,
             &request.context_items,
             &BuildOptions {
                 system_prompt: request.system_prompt.clone(),
-                system_suffix,
+                system_suffix: None,
                 extra_context: request.extra_context.clone(),
                 pending_tool_result_ids: pending_tool_ids,
             },
             &request.api_messages,
         );
 
+        // Convert to DeepSeek format (adds reasoning_content for assistant messages)
+        let mut ds_messages: Vec<DsMessage> =
+            oai_messages.into_iter().map(|m| DsMessage::from_oai(m, is_reasoner)).collect();
+
         // Add tool results if present
         if let Some(results) = &request.tool_results {
             for result in results {
-                messages.push(OaiMessage {
+                ds_messages.push(DsMessage {
                     role: "tool".to_string(),
                     content: Some(result.content.clone()),
+                    reasoning_content: None,
                     tool_calls: None,
                     tool_call_id: Some(result.tool_use_id.clone()),
                 });
             }
         }
 
-        let tools = tools_to_groq(&request.tools, &request.model);
+        let tools = openai_compat::tools_to_oai(&request.tools);
         let tool_choice = if tools.is_empty() { None } else { Some("auto".to_string()) };
 
-        let api_request = GroqRequest {
+        let api_request = DsRequest {
             model: request.model.clone(),
-            messages,
+            messages: ds_messages,
             tools,
             tool_choice,
-            max_completion_tokens: request.max_output_tokens,
+            max_tokens: request.max_output_tokens,
             stream: true,
         };
 
-        openai_compat::dump_request(&request.worker_id, "groq", &api_request);
+        super::super::openai_streaming::dump_request(&request.worker_id, "deepseek", &api_request);
 
         let response = client
-            .post(GROQ_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&api_request)
@@ -126,19 +157,28 @@ impl LlmClient for GroqClient {
         let reader = BufReader::new(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
+        let mut cache_hit_tokens = 0;
+        let mut cache_miss_tokens = 0;
         let mut stop_reason: Option<String> = None;
         let mut tool_acc = ToolCallAccumulator::new();
 
         for line in reader.lines() {
             let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
 
-            if let Some(resp) = openai_compat::parse_sse_line(&line) {
+            if let Some(resp) = super::super::openai_streaming::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
                     if let Some(inp) = usage.prompt_tokens {
                         input_tokens = inp;
                     }
                     if let Some(out) = usage.completion_tokens {
                         output_tokens = out;
+                    }
+                    // DeepSeek-specific cache fields
+                    if let Some(hit) = usage.prompt_cache_hit_tokens {
+                        cache_hit_tokens = hit;
+                    }
+                    if let Some(miss) = usage.prompt_cache_miss_tokens {
+                        cache_miss_tokens = miss;
                     }
                 }
 
@@ -156,7 +196,7 @@ impl LlmClient for GroqClient {
                         }
                     }
                     if let Some(ref reason) = choice.finish_reason {
-                        stop_reason = Some(openai_compat::normalize_stop_reason(reason));
+                        stop_reason = Some(super::super::openai_streaming::normalize_stop_reason(reason));
                         for tool_use in tool_acc.drain() {
                             let _ = tx.send(StreamEvent::ToolUse(tool_use));
                         }
@@ -168,22 +208,22 @@ impl LlmClient for GroqClient {
         let _ = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
-            cache_hit_tokens: 0,
-            cache_miss_tokens: 0,
+            cache_hit_tokens,
+            cache_miss_tokens,
             stop_reason,
         });
         Ok(())
     }
 
-    fn check_api(&self, model: &str) -> super::ApiCheckResult {
+    fn check_api(&self, model: &str) -> super::super::ApiCheckResult {
         let api_key = match self.api_key.as_ref() {
             Some(k) => k,
             None => {
-                return super::ApiCheckResult {
+                return super::super::ApiCheckResult {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some("GROQ_API_KEY not set".to_string()),
+                    error: Some("DEEPSEEK_API_KEY not set".to_string()),
                 };
             }
         };
@@ -192,12 +232,12 @@ impl LlmClient for GroqClient {
 
         // Test 1: Basic auth
         let auth_result = client
-            .post(GROQ_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
-                "max_completion_tokens": 10,
+                "max_tokens": 10,
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
             .send();
@@ -206,17 +246,17 @@ impl LlmClient for GroqClient {
 
         if !auth_ok {
             let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
-            return super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
+            return super::super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
         // Test 2: Streaming
         let stream_result = client
-            .post(GROQ_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
-                "max_completion_tokens": 10,
+                "max_tokens": 10,
                 "stream": true,
                 "messages": [{"role": "user", "content": "Say ok"}]
             }))
@@ -226,12 +266,12 @@ impl LlmClient for GroqClient {
 
         // Test 3: Tools
         let tools_result = client
-            .post(GROQ_API_ENDPOINT)
+            .post(DEEPSEEK_API_ENDPOINT)
             .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
-                "max_completion_tokens": 50,
+                "max_tokens": 50,
                 "tools": [{
                     "type": "function",
                     "function": {
@@ -250,33 +290,6 @@ impl LlmClient for GroqClient {
 
         let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
 
-        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        super::super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
-}
-
-/// Convert tool definitions to Groq format.
-/// For GPT-OSS models, also adds built-in tools (browser_search, code_interpreter).
-fn tools_to_groq(tools: &[ToolDefinition], model: &str) -> Vec<Value> {
-    let mut groq_tools: Vec<Value> = tools
-        .iter()
-        .filter(|t| t.enabled)
-        .map(|t| {
-            serde_json::json!({
-                "type": "function",
-                "function": {
-                    "name": t.id,
-                    "description": t.description,
-                    "parameters": t.to_json_schema(),
-                }
-            })
-        })
-        .collect();
-
-    // Add built-in tools for GPT-OSS models
-    if model.starts_with("openai/gpt-oss") {
-        groq_tools.push(serde_json::json!({"type": "browser_search"}));
-        groq_tools.push(serde_json::json!({"type": "code_interpreter"}));
-    }
-
-    groq_tools
 }

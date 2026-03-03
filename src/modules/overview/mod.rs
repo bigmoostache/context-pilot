@@ -8,7 +8,7 @@ mod tools_panel;
 use serde_json::json;
 
 use crate::app::panels::Panel;
-use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
+use crate::infra::tools::{ParamType, PreFlightResult, ToolDefinition, ToolParam, ToolTexts};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::modules::ToolVisualizer;
 use crate::state::{ContextType, ContextTypeMeta, State};
@@ -280,6 +280,62 @@ impl Module for OverviewModule {
         defs.push(super::module_toggle_tool_definition());
 
         defs
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "Close_panel" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(ids) = tool.input.get("ids").and_then(|v| v.as_array()) {
+                    for id_val in ids {
+                        if let Some(id) = id_val.as_str() {
+                            if !state.context.iter().any(|c| c.id == id) {
+                                pf.warnings.push(format!("Panel '{}' not found — will be skipped", id));
+                            } else if state.context.iter().any(|c| c.id == id && c.context_type.is_fixed()) {
+                                pf.warnings.push(format!(
+                                    "Panel '{}' is a fixed panel and cannot be closed — will be skipped",
+                                    id
+                                ));
+                            }
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            "tool_manage" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(changes) = tool.input.get("changes").and_then(|v| v.as_array()) {
+                    for change in changes {
+                        if let Some(tool_id) = change.get("tool").and_then(|v| v.as_str()) {
+                            if !state.tools.iter().any(|t| t.id == tool_id) {
+                                pf.errors.push(format!("Tool '{}' not found", tool_id));
+                            } else if tool_id == "tool_manage" {
+                                pf.errors.push("Cannot disable 'tool_manage' — it protects itself".to_string());
+                            }
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            "panel_goto_page" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(panel_id) = tool.input.get("panel_id").and_then(|v| v.as_str()) {
+                    match state.context.iter().find(|c| c.id == panel_id) {
+                        None => pf.errors.push(format!("Panel '{}' not found", panel_id)),
+                        Some(ctx) => {
+                            if let Some(page) = tool.input.get("page").and_then(|v| v.as_i64()) {
+                                let total = ctx.total_pages as i64;
+                                if total > 0 && (page < 1 || page > total) {
+                                    pf.errors.push(format!("Page {} out of range (1-{})", page, total));
+                                }
+                            }
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

@@ -7,7 +7,7 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TreePanel;
@@ -142,6 +142,28 @@ impl Module for TreeModule {
                 )
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, _state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "tree_toggle" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(paths) = tool.input.get("paths").and_then(|v| v.as_array()) {
+                    for path_val in paths {
+                        if let Some(path) = path_val.as_str() {
+                            let p = std::path::Path::new(path);
+                            if !p.exists() {
+                                pf.warnings.push(format!("Path '{}' does not exist", path));
+                            } else if !p.is_dir() {
+                                pf.warnings.push(format!("'{}' is not a directory", path));
+                            }
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

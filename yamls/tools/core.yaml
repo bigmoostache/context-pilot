@@ -2,6 +2,7 @@ tools:
   Close_panel:
     description: |
       Closes context elements by their IDs (e.g., P6, P7). Cannot close core elements (P1-P6).
+      WARNING: Closing a panel causes INSTANT, IRREVERSIBLE memory loss — the panel's content is immediately removed from your context and you will have NO memory of what it contained. This is NOT like "reading then closing" — the moment the panel closes, all information in it vanishes from your awareness. Therefore: ALWAYS finish all work that depends on a panel's content BEFORE closing it. The pattern "open → remember content → close → use remembered content" DOES NOT WORK. You must act on the information while the panel is still open.
     parameters:
       ids: "List of context IDs to close"
 

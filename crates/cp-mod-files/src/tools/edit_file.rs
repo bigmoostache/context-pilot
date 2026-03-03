@@ -13,7 +13,7 @@ fn normalize_for_match(s: &str) -> String {
 
 /// Find the best match for `needle` in `haystack` using normalized comparison.
 /// Returns the actual substring from haystack that matches (preserving original whitespace).
-fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Option<&'a str> {
+pub(crate) fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Option<&'a str> {
     let norm_needle = normalize_for_match(needle);
     let needle_lines: Vec<&str> = norm_needle.lines().collect();
 

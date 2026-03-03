@@ -12,7 +12,7 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::SpinePanel;
@@ -143,6 +143,26 @@ impl Module for SpineModule {
                 .param("datetime", ParamType::String, false)
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "notification_mark_processed" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(ids) = tool.input.get("ids").and_then(|v| v.as_array()) {
+                    let ss = SpineState::get(state);
+                    for id_val in ids {
+                        if let Some(id) = id_val.as_str()
+                            && !ss.notifications.iter().any(|n| n.id == id)
+                        {
+                            pf.warnings.push(format!("Notification '{}' not found", id));
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

@@ -9,6 +9,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::FilePanel;
 use cp_base::modules::Module;
+use cp_base::tools::PreFlightResult;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
     serde_yaml::from_str(include_str!("../../../yamls/tools/files.yaml")).expect("Failed to parse files tool YAML")
@@ -51,7 +52,7 @@ impl Module for FilesModule {
                 .short_desc("Read file into context")
                 .category("File")
                 .reverie_allowed(true)
-                .param("path", ParamType::String, true)
+                .param_array("path", ParamType::String, true)
                 .build(),
             ToolDefinition::from_yaml("Edit", t)
                 .short_desc("Modify file content")
@@ -70,6 +71,75 @@ impl Module for FilesModule {
                 .param_array("skip_callbacks", ParamType::String, false)
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "Open" => {
+                let mut pf = PreFlightResult::new();
+                let paths: Vec<String> = match tool.input.get("path") {
+                    Some(serde_json::Value::String(s)) => vec![s.clone()],
+                    Some(serde_json::Value::Array(arr)) => {
+                        arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+                    }
+                    _ => return Some(pf),
+                };
+                for path in &paths {
+                    let p = std::path::Path::new(path);
+                    if !p.exists() {
+                        pf.errors.push(format!("File '{}' not found", path));
+                    } else if !p.is_file() {
+                        pf.errors.push(format!("'{}' is not a file", path));
+                    } else if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(path)) {
+                        pf.warnings.push(format!("File '{}' is already open in context", path));
+                    }
+                }
+                Some(pf)
+            }
+            "Edit" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
+                    let p = std::path::Path::new(path_str);
+                    if !p.exists() {
+                        pf.errors.push(format!("File '{}' not found", path_str));
+                    } else if !p.is_file() {
+                        pf.errors.push(format!("'{}' is not a file", path_str));
+                    } else {
+                        let is_open = state.context.iter().any(|c| {
+                            c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str)
+                        });
+                        if !is_open {
+                            pf.warnings.push(format!("File '{}' is not open in context — open it first", path_str));
+                        }
+                        // Verify old_string actually matches file content
+                        if let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str())
+                            && let Ok(content) = std::fs::read_to_string(p)
+                            && tools::edit_file::find_normalized_match(&content, old_string).is_none()
+                        {
+                            pf.errors.push(format!(
+                                "old_string not found in '{}' — open the file to see current content",
+                                path_str
+                            ));
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            "Write" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
+                    let p = std::path::Path::new(path_str);
+                    if let Some(parent) = p.parent()
+                        && !parent.as_os_str().is_empty()
+                        && !parent.exists()
+                    {
+                        pf.errors.push(format!("Parent directory '{}' does not exist", parent.display()));
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

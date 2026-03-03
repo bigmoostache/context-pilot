@@ -103,6 +103,64 @@ impl ParamType {
     }
 }
 
+// =============================================================================
+// Pre-flight validation — runs before execution (even when queued)
+// =============================================================================
+
+/// Result of pre-flight validation. Errors block execution; warnings are
+/// attached to the result but the tool still runs.
+#[derive(Debug, Clone, Default)]
+pub struct PreFlightResult {
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+impl PreFlightResult {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    pub fn has_warnings(&self) -> bool {
+        !self.warnings.is_empty()
+    }
+
+    pub fn is_clean(&self) -> bool {
+        self.errors.is_empty() && self.warnings.is_empty()
+    }
+
+    pub fn error(mut self, msg: impl Into<String>) -> Self {
+        self.errors.push(msg.into());
+        self
+    }
+
+    pub fn warning(mut self, msg: impl Into<String>) -> Self {
+        self.warnings.push(msg.into());
+        self
+    }
+
+    /// Merge another PreFlightResult into this one.
+    pub fn merge(&mut self, other: PreFlightResult) {
+        self.errors.extend(other.errors);
+        self.warnings.extend(other.warnings);
+    }
+
+    /// Format errors and warnings into a human-readable string.
+    pub fn format_errors(&self) -> String {
+        let mut lines = Vec::new();
+        for e in &self.errors {
+            lines.push(format!("Error: {}", e));
+        }
+        for w in &self.warnings {
+            lines.push(format!("Warning: {}", w));
+        }
+        lines.join("\n")
+    }
+}
+
 /// A single tool parameter
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolParam {

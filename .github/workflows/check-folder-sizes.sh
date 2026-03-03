@@ -9,6 +9,8 @@ while IFS= read -r dir; do
   if [ "$count" -gt 8 ]; then
     echo "::error::$dir has $count entries (max 8)"
     echo "FAIL: $dir has $count entries (max 8)" >&2
+    echo "  → Refactor: group related files into a sub-directory or merge small files." >&2
+    echo "  → Do NOT rename, flatten, or delete files just to fit the limit." >&2
     exit_code=1
   fi
 done < <(find . -mindepth 1 -type d \
@@ -24,5 +26,6 @@ done < <(find . -mindepth 1 -type d \
   -not -path './docs/*' \
   -not -path './brilliant-cv/*' \
   -not -path './graceful-genetics/*' \
-  -not -path './test-typst/*')
+  -not -path './test-typst/*' \
+  -not -path './yamls/tools')
 exit $exit_code

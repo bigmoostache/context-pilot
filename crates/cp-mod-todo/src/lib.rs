@@ -11,7 +11,7 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TodoPanel;
@@ -121,6 +121,55 @@ impl Module for TodoModule {
                 .param("after_id", ParamType::String, false)
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "todo_create" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(todos) = tool.input.get("todos").and_then(|v| v.as_array()) {
+                    let ts = TodoState::get(state);
+                    for todo in todos {
+                        if let Some(parent_id) = todo.get("parent_id").and_then(|v| v.as_str())
+                            && !ts.todos.iter().any(|t| t.id == parent_id)
+                        {
+                            pf.errors.push(format!("Parent todo '{}' not found", parent_id));
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            "todo_update" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) {
+                    let ts = TodoState::get(state);
+                    for update in updates {
+                        if let Some(id) = update.get("id").and_then(|v| v.as_str())
+                            && !ts.todos.iter().any(|t| t.id == id)
+                        {
+                            pf.errors.push(format!("Todo '{}' not found", id));
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            "todo_move" => {
+                let mut pf = PreFlightResult::new();
+                let ts = TodoState::get(state);
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
+                    && !ts.todos.iter().any(|t| t.id == id)
+                {
+                    pf.errors.push(format!("Todo '{}' not found", id));
+                }
+                if let Some(after_id) = tool.input.get("after_id").and_then(|v| v.as_str())
+                    && !ts.todos.iter().any(|t| t.id == after_id)
+                {
+                    pf.warnings.push(format!("after_id '{}' not found — will move to top", after_id));
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

@@ -5,7 +5,6 @@ mod input;
 pub mod markdown;
 pub mod perf;
 mod sidebar;
-mod sidebar_collapsed;
 pub use crate::infra::constants::theme;
 pub mod typewriter;
 
@@ -80,13 +79,13 @@ fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
         .split(area);
 
     match state.sidebar_mode {
-        cp_base::state::sidebar::SidebarMode::Normal => {
+        cp_base::state::SidebarMode::Normal => {
             sidebar::render_sidebar(frame, state, body_layout[0]);
         }
-        cp_base::state::sidebar::SidebarMode::Collapsed => {
-            sidebar_collapsed::render_sidebar_collapsed(frame, state, body_layout[0]);
+        cp_base::state::SidebarMode::Collapsed => {
+            sidebar::render_sidebar_collapsed(frame, state, body_layout[0]);
         }
-        cp_base::state::sidebar::SidebarMode::Hidden => {} // handled above
+        cp_base::state::SidebarMode::Hidden => {} // handled above
     }
     render_main_content(frame, state, body_layout[1]);
 }

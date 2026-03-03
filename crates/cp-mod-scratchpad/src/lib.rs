@@ -9,7 +9,7 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::ScratchpadPanel;
@@ -101,6 +101,38 @@ impl Module for ScratchpadModule {
                 .param_array("cell_ids", ParamType::String, true)
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "scratchpad_edit_cell" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(cell_id) = tool.input.get("cell_id").and_then(|v| v.as_str()) {
+                    let ss = ScratchpadState::get(state);
+                    if !ss.scratchpad_cells.iter().any(|c| c.id == cell_id) {
+                        pf.errors.push(format!("Cell '{}' not found", cell_id));
+                    }
+                }
+                Some(pf)
+            }
+            "scratchpad_wipe" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(ids) = tool.input.get("cell_ids").and_then(|v| v.as_array())
+                    && !ids.is_empty()
+                {
+                    let ss = ScratchpadState::get(state);
+                    for id_val in ids {
+                        if let Some(id) = id_val.as_str()
+                            && !ss.scratchpad_cells.iter().any(|c| c.id == id)
+                        {
+                            pf.warnings.push(format!("Cell '{}' not found — will be skipped", id));
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

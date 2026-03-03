@@ -15,7 +15,7 @@ use serde_json::json;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, ContextTypeMeta, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::manager::SessionHandle;
@@ -236,6 +236,35 @@ impl Module for ConsoleModule {
                 .param("cwd", ParamType::String, false)
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "console_send_keys" | "console_wait" | "console_watch" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(panel_id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    match state.context.iter().find(|c| c.id == panel_id) {
+                        None => pf.errors.push(format!("Panel '{}' not found", panel_id)),
+                        Some(ctx) if ctx.context_type != ContextType::CONSOLE => {
+                            pf.errors.push(format!("Panel '{}' is not a console panel", panel_id));
+                        }
+                        Some(ctx) => {
+                            // Check if process has exited
+                            if let Some(name) = ctx.get_meta_str("console_name")
+                                && let Some(handle) = ConsoleState::get(state).sessions.get(name)
+                                && handle.get_status().is_terminal()
+                            {
+                                let status = handle.get_status().label();
+                                pf.warnings
+                                    .push(format!("Console '{}' process has {} — commands may not work", name, status));
+                            }
+                        }
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

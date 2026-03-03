@@ -6,10 +6,9 @@ use std::rc::Rc;
 
 use ratatui::text::Line;
 
+use super::config::SidebarMode;
 use super::context::{ContextElement, ContextType};
 use super::message::Message;
-use super::sidebar::SidebarMode;
-
 use crate::llm_types::ModelInfo;
 use crate::tools::ToolDefinition;
 

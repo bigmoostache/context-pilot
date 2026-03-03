@@ -12,7 +12,7 @@ use serde_json::json;
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, ContextTypeMeta, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
+use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::CallbackPanel;
@@ -152,6 +152,53 @@ impl Module for CallbackModule {
                 .param("active", ParamType::Boolean, true)
                 .build(),
         ]
+    }
+
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+        match tool.name.as_str() {
+            "Callback_upsert" => {
+                let mut pf = PreFlightResult::new();
+                let action = tool.input.get("action").and_then(|v| v.as_str()).unwrap_or("");
+                if (action == "update" || action == "delete")
+                    && let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
+                {
+                    let cs = CallbackState::get(state);
+                    if !cs.definitions.iter().any(|d| d.id == id) {
+                        pf.errors.push(format!("Callback '{}' not found", id));
+                    }
+                }
+                Some(pf)
+            }
+            "Callback_open_editor" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    let cs = CallbackState::get(state);
+                    if !cs.definitions.iter().any(|d| d.id == id) {
+                        pf.errors.push(format!("Callback '{}' not found", id));
+                    }
+                }
+                Some(pf)
+            }
+            "Callback_close_editor" => {
+                let mut pf = PreFlightResult::new();
+                let cs = CallbackState::get(state);
+                if cs.editor_open.is_none() {
+                    pf.warnings.push("No callback editor is currently open".to_string());
+                }
+                Some(pf)
+            }
+            "Callback_toggle" => {
+                let mut pf = PreFlightResult::new();
+                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+                    let cs = CallbackState::get(state);
+                    if !cs.definitions.iter().any(|d| d.id == id) {
+                        pf.errors.push(format!("Callback '{}' not found", id));
+                    }
+                }
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
