@@ -325,7 +325,7 @@ impl App {
         let already = cp_mod_spine::SpineState::get(&self.state)
             .notifications
             .iter()
-            .any(|n| !n.processed && n.source == "todo_continuation");
+            .any(|n| !n.is_processed() && n.source == "todo_continuation");
         if already {
             return;
         }

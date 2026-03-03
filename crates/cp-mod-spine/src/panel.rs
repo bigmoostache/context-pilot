@@ -25,9 +25,14 @@ fn format_timestamp(ms: u64) -> String {
 impl SpinePanel {
     /// Format notifications for LLM context
     fn format_notifications_for_context(state: &State) -> String {
-        let unprocessed: Vec<_> = SpineState::get(state).notifications.iter().filter(|n| !n.processed).collect();
+        let unprocessed: Vec<_> = SpineState::get(state).notifications.iter().filter(|n| n.is_unprocessed()).collect();
+        let blocked: Vec<_> = SpineState::get(state)
+            .notifications
+            .iter()
+            .filter(|n| n.status == crate::types::NotificationStatus::Blocked)
+            .collect();
         let recent_processed: Vec<_> =
-            SpineState::get(state).notifications.iter().filter(|n| n.processed).rev().take(10).collect();
+            SpineState::get(state).notifications.iter().filter(|n| n.is_processed()).rev().take(10).collect();
 
         let mut output = String::new();
 
@@ -38,6 +43,14 @@ impl SpinePanel {
             }
         } else {
             output.push_str("No unprocessed notifications.\n");
+        }
+
+        if !blocked.is_empty() {
+            output.push_str("\n=== Blocked (awaiting guard rail clearance) ===\n");
+            for n in &blocked {
+                let ts = format_timestamp(n.timestamp_ms);
+                output.push_str(&format!("[{}] {} {} — {}\n", n.id, ts, n.notification_type.label(), n.content));
+            }
         }
 
         if !recent_processed.is_empty() {
@@ -121,7 +134,7 @@ impl Panel for SpinePanel {
         let mut lines: Vec<Line> = Vec::new();
 
         // === Unprocessed Notifications ===
-        let unprocessed: Vec<_> = SpineState::get(state).notifications.iter().filter(|n| !n.processed).collect();
+        let unprocessed: Vec<_> = SpineState::get(state).notifications.iter().filter(|n| n.is_unprocessed()).collect();
 
         if unprocessed.is_empty() {
             lines.push(Line::from(vec![Span::styled(
@@ -162,9 +175,52 @@ impl Panel for SpinePanel {
 
         lines.push(Line::from(""));
 
+        // === Blocked Notifications (held by guard rails) ===
+        let blocked: Vec<_> = SpineState::get(state)
+            .notifications
+            .iter()
+            .filter(|n| n.status == crate::types::NotificationStatus::Blocked)
+            .collect();
+
+        if !blocked.is_empty() {
+            lines.push(Line::from(vec![Span::styled(
+                format!("Blocked ({})", blocked.len()),
+                Style::default().fg(theme::warning()),
+            )]));
+
+            let viewport = state.last_viewport_width as usize;
+            for n in &blocked {
+                let type_color = notification_type_color(&n.notification_type);
+                let ts = format_timestamp(n.timestamp_ms);
+                let prefix = format!("{} {} {} — ", n.id, ts, n.notification_type.label());
+                let prefix_width = UnicodeWidthStr::width(prefix.as_str());
+                let content_max = if viewport > prefix_width + 10 { viewport - prefix_width } else { 40 };
+                let wrapped = wrap_text_simple(&n.content, content_max);
+
+                lines.push(Line::from(vec![
+                    Span::styled(format!("{} ", n.id), Style::default().fg(type_color)),
+                    Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
+                    Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::warning())),
+                    Span::styled(
+                        format!(" — {}", wrapped.first().map(|s| s.as_str()).unwrap_or("")),
+                        Style::default().fg(theme::text_muted()),
+                    ),
+                ]));
+                for line in wrapped.iter().skip(1) {
+                    let indent = " ".repeat(prefix_width);
+                    lines.push(Line::from(vec![
+                        Span::styled(indent, Style::default()),
+                        Span::styled(line.to_string(), Style::default().fg(theme::text_muted())),
+                    ]));
+                }
+            }
+
+            lines.push(Line::from(""));
+        }
+
         // === Recent Processed ===
         let recent_processed: Vec<_> =
-            SpineState::get(state).notifications.iter().filter(|n| n.processed).rev().take(10).collect();
+            SpineState::get(state).notifications.iter().filter(|n| n.is_processed()).rev().take(10).collect();
 
         if !recent_processed.is_empty() {
             lines.push(Line::from(vec![Span::styled(

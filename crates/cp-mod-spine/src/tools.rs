@@ -21,7 +21,7 @@ pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut not_found = Vec::new();
 
     for id in &all_ids {
-        let status = SpineState::get(state).notifications.iter().find(|n| n.id == *id).map(|n| n.processed);
+        let status = SpineState::get(state).notifications.iter().find(|n| n.id == *id).map(|n| n.is_processed());
         match status {
             Some(true) => already.push(id.as_str()),
             Some(false) => {

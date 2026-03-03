@@ -196,14 +196,20 @@ impl App {
             // Reset auto-continuation count on each successful tick (stream completion).
             // This means MaxAutoRetries only fires on consecutive *failed* continuations,
             // not on total auto-continuations in an autonomous session.
-            let spine_cfg = &mut cp_mod_spine::SpineState::get_mut(&mut self.state).config;
-            spine_cfg.auto_continuation_count = 0;
-            // Reset consecutive error backoff — successful completion proves API is healthy
-            spine_cfg.consecutive_continuation_errors = 0;
-            spine_cfg.last_continuation_error_ms = None;
-            // Reopen the throttle gate — a successful LLM tick means the system processed
-            // the notifications. New notifications can now trigger auto-continuation again.
-            spine_cfg.can_awake_using_notification = true;
+            {
+                let spine_cfg = &mut cp_mod_spine::SpineState::get_mut(&mut self.state).config;
+                spine_cfg.auto_continuation_count = 0;
+                // Reset consecutive error backoff — successful completion proves API is healthy
+                spine_cfg.consecutive_continuation_errors = 0;
+                spine_cfg.last_continuation_error_ms = None;
+                // Reopen the throttle gate — a successful LLM tick means the system processed
+                // the notifications. New notifications can now trigger auto-continuation again.
+                spine_cfg.can_awake_using_notification = true;
+            }
+
+            // Unblock any guard-rail-blocked notifications — they get another chance now
+            // that a stream has completed successfully.
+            cp_mod_spine::SpineState::unblock_all(&mut self.state);
 
             self.typewriter.reset();
             self.pending_done = None;

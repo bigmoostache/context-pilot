@@ -92,7 +92,8 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
                 // If the last message (any role) is still this user message or another
                 // user message, the LLM hasn't processed it yet — block.
                 let last_msg = state.messages.last();
-                let assistant_responded = last_msg.is_some_and(|m| m.role == "assistant" && !m.content.is_empty());
+                let assistant_responded = last_msg
+                    .is_some_and(|m| m.role == "assistant" && (!m.content.is_empty() || !m.tool_uses.is_empty()));
                 if !assistant_responded {
                     return SpineDecision::Idle;
                 }
@@ -110,10 +111,9 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             let reason = guard.block_reason(state);
             // Deduplicate block notifications
             let source_tag = format!("guard_rail:{}", guard.name());
-            let already_notified = SpineState::get(state)
-                .notifications
-                .iter()
-                .any(|n| !n.processed && n.notification_type == NotificationType::Custom && n.source == source_tag);
+            let already_notified = SpineState::get(state).notifications.iter().any(|n| {
+                !n.is_processed() && n.notification_type == NotificationType::Custom && n.source == source_tag
+            });
             if !already_notified {
                 SpineState::create_notification(
                     state,
@@ -126,7 +126,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             // and the decision was "blocked." Persistent watchers will recreate new
             // notifications on the next poll, and we'll re-evaluate then.
             // Without this, notifications accumulate infinitely while blocked.
-            SpineState::mark_all_unprocessed_as_processed(state);
+            SpineState::mark_all_unprocessed_as_blocked(state);
 
             // Close the throttle gate — prevents rapid-fire re-evaluation.
             // Reopened by a successful LLM tick or human message.
@@ -251,7 +251,8 @@ fn check_context_threshold(state: &mut State) {
     }
 
     let source_tag = "context_threshold";
-    let already_notified = SpineState::get(state).notifications.iter().any(|n| !n.processed && n.source == source_tag);
+    let already_notified =
+        SpineState::get(state).notifications.iter().any(|n| !n.is_processed() && n.source == source_tag);
 
     if already_notified {
         return;

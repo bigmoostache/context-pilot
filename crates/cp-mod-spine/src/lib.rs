@@ -49,8 +49,8 @@ impl Module for SpineModule {
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ss = SpineState::get(state);
         // Prune old processed notifications: keep all unprocessed + latest 10 processed
-        let mut to_save: Vec<_> = ss.notifications.iter().filter(|n| !n.processed).cloned().collect();
-        let mut processed: Vec<_> = ss.notifications.iter().filter(|n| n.processed).cloned().collect();
+        let mut to_save: Vec<_> = ss.notifications.iter().filter(|n| !n.is_processed()).cloned().collect();
+        let mut processed: Vec<_> = ss.notifications.iter().filter(|n| n.is_processed()).cloned().collect();
         // Keep only the latest 10 processed (they're in chronological order)
         if processed.len() > 10 {
             processed = processed.split_off(processed.len() - 10);
@@ -264,16 +264,14 @@ fn visualize_spine_output(content: &str, width: usize) -> Vec<ratatui::text::Lin
 
 /// Prune processed notifications: keep all unprocessed + latest 10 processed.
 fn prune_notifications(notifications: &mut Vec<Notification>) {
-    let processed_count = notifications.iter().filter(|n| n.processed).count();
+    let processed_count = notifications.iter().filter(|n| n.is_processed()).count();
     if processed_count <= 10 {
         return;
     }
-    // Find the cutoff: we want to keep only the latest 10 processed.
-    // Notifications are in chronological order, so we drop the oldest processed ones.
     let mut processed_seen = 0;
     let drop_count = processed_count - 10;
     notifications.retain(|n| {
-        if n.processed {
+        if n.is_processed() {
             processed_seen += 1;
             processed_seen > drop_count
         } else {

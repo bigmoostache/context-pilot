@@ -27,6 +27,18 @@ impl NotificationType {
     }
 }
 
+/// Status of a notification in the spine system
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationStatus {
+    /// Not yet handled — triggers auto-continuation
+    Unprocessed,
+    /// Blocked by a guard rail — will be restored to Unprocessed when a stream starts
+    Blocked,
+    /// Handled — no longer triggers anything
+    Processed,
+}
+
 /// A notification in the spine system -- the universal trigger mechanism
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Notification {
@@ -36,8 +48,9 @@ pub struct Notification {
     pub notification_type: NotificationType,
     /// Who created it (message ID, module name, etc.)
     pub source: String,
-    /// Whether this notification has been processed
-    pub processed: bool,
+    /// Notification status: unprocessed → blocked (by guard rail) or processed (handled).
+    /// Blocked notifications are restored to unprocessed when a stream starts.
+    pub status: NotificationStatus,
     /// When this notification was created
     pub timestamp_ms: u64,
     /// Human-readable description
@@ -47,7 +60,22 @@ pub struct Notification {
 impl Notification {
     /// Create a new notification with the given fields
     pub fn new(id: String, notification_type: NotificationType, source: String, content: String) -> Self {
-        Self { id, notification_type, source, processed: false, timestamp_ms: cp_base::panels::now_ms(), content }
+        Self {
+            id,
+            notification_type,
+            source,
+            status: NotificationStatus::Unprocessed,
+            timestamp_ms: cp_base::panels::now_ms(),
+            content,
+        }
+    }
+
+    pub fn is_processed(&self) -> bool {
+        self.status == NotificationStatus::Processed
+    }
+
+    pub fn is_unprocessed(&self) -> bool {
+        self.status == NotificationStatus::Unprocessed
     }
 }
 
@@ -163,7 +191,7 @@ impl SpineState {
                     if removed >= excess {
                         return true;
                     }
-                    if n.processed {
+                    if n.is_processed() {
                         removed += 1;
                         return false;
                     }
@@ -181,7 +209,7 @@ impl SpineState {
         let found = {
             let ss = Self::get_mut(state);
             if let Some(n) = ss.notifications.iter_mut().find(|n| n.id == id) {
-                n.processed = true;
+                n.status = NotificationStatus::Processed;
                 true
             } else {
                 false
@@ -195,25 +223,44 @@ impl SpineState {
 
     /// Get references to all unprocessed notifications
     pub fn unprocessed_notifications(state: &State) -> Vec<&Notification> {
-        Self::get(state).notifications.iter().filter(|n| !n.processed).collect()
+        Self::get(state).notifications.iter().filter(|n| n.is_unprocessed()).collect()
     }
 
     /// Check if there are any unprocessed notifications
     pub fn has_unprocessed_notifications(state: &State) -> bool {
-        Self::get(state).notifications.iter().any(|n| !n.processed)
+        Self::get(state).notifications.iter().any(|n| n.is_unprocessed())
     }
 
-    /// Mark ALL unprocessed notifications as processed.
-    /// Used when a guard rail blocks — the notifications were evaluated but the
-    /// decision was "blocked." Persistent watchers will recreate new ones on the
-    /// next poll cycle.
-    pub fn mark_all_unprocessed_as_processed(state: &mut State) {
+    /// Mark ALL unprocessed notifications as blocked (by guard rails).
+    /// Blocked notifications are restored to unprocessed when a stream starts,
+    /// giving them another chance to fire.
+    pub fn mark_all_unprocessed_as_blocked(state: &mut State) {
         let changed = {
             let ss = Self::get_mut(state);
             let mut changed = false;
             for n in &mut ss.notifications {
-                if !n.processed {
-                    n.processed = true;
+                if n.is_unprocessed() {
+                    n.status = NotificationStatus::Blocked;
+                    changed = true;
+                }
+            }
+            changed
+        };
+        if changed {
+            state.touch_panel(ContextType::new(ContextType::SPINE));
+        }
+    }
+
+    /// Restore all blocked notifications to unprocessed.
+    /// Called when a stream starts, giving guard-rail-blocked notifications
+    /// another chance to fire after the stream completes.
+    pub fn unblock_all(state: &mut State) {
+        let changed = {
+            let ss = Self::get_mut(state);
+            let mut changed = false;
+            for n in &mut ss.notifications {
+                if n.status == NotificationStatus::Blocked {
+                    n.status = NotificationStatus::Unprocessed;
                     changed = true;
                 }
             }
@@ -230,10 +277,10 @@ impl SpineState {
             let ss = Self::get_mut(state);
             let mut changed = false;
             for n in &mut ss.notifications {
-                if !n.processed
+                if n.is_unprocessed()
                     && matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume)
                 {
-                    n.processed = true;
+                    n.status = NotificationStatus::Processed;
                     changed = true;
                 }
             }
