@@ -57,11 +57,20 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // === Guard rail limits (pass null to disable) ===
+    // Zero values are rejected — they would permanently block all auto-continuation.
     if let Some(v) = tool.input.get("max_output_tokens") {
         if v.is_null() {
             SpineState::get_mut(state).config.max_output_tokens = None;
             changes.push("max_output_tokens = disabled".to_string());
         } else if let Some(n) = v.as_u64() {
+            if n == 0 {
+                return ToolResult::new(
+                    tool.id.clone(),
+                    "Error: max_output_tokens = 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_string(),
+                    true,
+                );
+            }
             SpineState::get_mut(state).config.max_output_tokens = Some(n as usize);
             changes.push(format!("max_output_tokens = {}", n));
         }
@@ -72,6 +81,14 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
             SpineState::get_mut(state).config.max_cost = None;
             changes.push("max_cost = disabled".to_string());
         } else if let Some(n) = v.as_f64() {
+            if n <= 0.0 {
+                return ToolResult::new(
+                    tool.id.clone(),
+                    "Error: max_cost <= 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_string(),
+                    true,
+                );
+            }
             SpineState::get_mut(state).config.max_cost = Some(n);
             changes.push(format!("max_cost = ${:.2}", n));
         }
@@ -82,6 +99,14 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
             SpineState::get_mut(state).config.max_stream_cost = None;
             changes.push("max_stream_cost = disabled".to_string());
         } else if let Some(n) = v.as_f64() {
+            if n <= 0.0 {
+                return ToolResult::new(
+                    tool.id.clone(),
+                    "Error: max_stream_cost <= 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_string(),
+                    true,
+                );
+            }
             SpineState::get_mut(state).config.max_stream_cost = Some(n);
             changes.push(format!("max_stream_cost = ${:.2}", n));
         }
@@ -92,6 +117,14 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
             SpineState::get_mut(state).config.max_duration_secs = None;
             changes.push("max_duration_secs = disabled".to_string());
         } else if let Some(n) = v.as_u64() {
+            if n == 0 {
+                return ToolResult::new(
+                    tool.id.clone(),
+                    "Error: max_duration_secs = 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_string(),
+                    true,
+                );
+            }
             SpineState::get_mut(state).config.max_duration_secs = Some(n);
             changes.push(format!("max_duration_secs = {}s", n));
         }
@@ -102,6 +135,14 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
             SpineState::get_mut(state).config.max_messages = None;
             changes.push("max_messages = disabled".to_string());
         } else if let Some(n) = v.as_u64() {
+            if n == 0 {
+                return ToolResult::new(
+                    tool.id.clone(),
+                    "Error: max_messages = 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_string(),
+                    true,
+                );
+            }
             SpineState::get_mut(state).config.max_messages = Some(n as usize);
             changes.push(format!("max_messages = {}", n));
         }
@@ -112,6 +153,14 @@ pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
             SpineState::get_mut(state).config.max_auto_retries = None;
             changes.push("max_auto_retries = disabled".to_string());
         } else if let Some(n) = v.as_u64() {
+            if n == 0 {
+                return ToolResult::new(
+                    tool.id.clone(),
+                    "Error: max_auto_retries = 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_string(),
+                    true,
+                );
+            }
             SpineState::get_mut(state).config.max_auto_retries = Some(n as usize);
             changes.push(format!("max_auto_retries = {}", n));
         }
