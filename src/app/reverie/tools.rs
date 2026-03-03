@@ -11,17 +11,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/reverie.yaml")).expect("Failed to parse reverie tool YAML")
 });
 
-/// Build the Report tool definition — the reverie's mandatory end-of-run tool.
-#[cfg_attr(not(test), allow(dead_code))]
-pub fn report_tool_definition() -> ToolDefinition {
-    let t = &*TOOL_TEXTS;
-    ToolDefinition::from_yaml("reverie_report", t)
-        .short_desc("End reverie run with summary")
-        .category("Reverie")
-        .param("summary", ParamType::String, true)
-        .build()
-}
-
 /// Build a human-readable text describing which tools the reverie is allowed to use.
 /// This is injected at the top of the reverie's conversation panel (P-reverie) so the
 /// LLM knows its constraints, even though it sees ALL tool definitions in the prompt.
@@ -44,16 +33,6 @@ pub fn build_tool_restrictions_text(tools: &[crate::infra::tools::ToolDefinition
     text
 }
 ///
-/// Filters the main tool list to the allowed subset, then appends the Report tool.
-#[cfg_attr(not(test), allow(dead_code))]
-pub fn reverie_tool_definitions(main_tools: &[ToolDefinition]) -> Vec<ToolDefinition> {
-    let mut anchor_tools: Vec<ToolDefinition> =
-        main_tools.iter().filter(|t| t.enabled && t.reverie_allowed).cloned().collect();
-
-    anchor_tools.push(report_tool_definition());
-    anchor_tools
-}
-
 /// Build the optimize_context tool definition for the main AI.
 ///
 /// This tool lets the main AI explicitly invoke a reverie sub-agent
@@ -185,16 +164,6 @@ mod tests {
             reverie_allowed,
             category: String::new(),
         }
-    }
-
-    #[test]
-    fn reverie_tool_definitions_include_allowed_and_report() {
-        let main_tools = vec![make_tool("Close_panel", true), make_tool("Edit", false)];
-
-        let tools = reverie_tool_definitions(&main_tools);
-        assert!(tools.iter().any(|t| t.id == "Close_panel"));
-        assert!(!tools.iter().any(|t| t.id == "Edit"));
-        assert!(tools.iter().any(|t| t.id == "reverie_report"));
     }
 
     #[test]
