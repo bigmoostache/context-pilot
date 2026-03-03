@@ -72,10 +72,10 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     }
 
     // === Guardrail 2: No two synthetic messages in a row ===
-    // If the last non-error user message was a synthetic auto-continuation,
-    // don't fire another one. Wait for the LLM to process it first.
-    // IMPORTANT: skip error messages when scanning — otherwise error→notification
-    // alternation creates an infinite loop.
+    // If the last non-error user message was a synthetic auto-continuation AND
+    // the assistant hasn't responded yet, don't fire another one.
+    // Once the assistant has responded (stream completed), it's safe to inject
+    // a new synthetic message for the next notification.
     {
         let last_non_error_user = state
             .messages
@@ -84,11 +84,18 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             .find(|m| m.role == "user" && m.message_type != cp_base::state::MessageType::ToolResult);
         if let Some(msg) = last_non_error_user {
             let content = msg.content.trim();
-            if content.starts_with("/* Auto-continuation:")
+            let is_synthetic = content.starts_with("/* Auto-continuation:")
                 || content == INJECTIONS.spine.continue_msg.trim()
-                || content == INJECTIONS.spine.reload_complete.trim()
-            {
-                return SpineDecision::Idle;
+                || content == INJECTIONS.spine.reload_complete.trim();
+            if is_synthetic {
+                // Check if the assistant has responded after this synthetic message.
+                // If the last message (any role) is still this user message or another
+                // user message, the LLM hasn't processed it yet — block.
+                let last_msg = state.messages.last();
+                let assistant_responded = last_msg.is_some_and(|m| m.role == "assistant" && !m.content.is_empty());
+                if !assistant_responded {
+                    return SpineDecision::Idle;
+                }
             }
         }
     }
