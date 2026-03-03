@@ -267,8 +267,8 @@ impl App {
     fn check_spine(&mut self, tx: &Sender<StreamEvent>) {
         use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 
-        // Sync TodoWatcher: ensure it exists iff continue_until_todos_done is true
-        self.sync_todo_watcher();
+        // Check if incomplete todos should trigger auto-continuation
+        self.check_todo_continuation();
 
         match check_spine(&mut self.state) {
             SpineDecision::Idle => {}
@@ -312,19 +312,34 @@ impl App {
         }
     }
 
-    /// Sync the TodoWatcher in/out of WatcherRegistry based on config.
-    /// If continue_until_todos_done is true → ensure a TodoWatcher is registered.
-    /// If false → remove any existing TodoWatcher.
-    fn sync_todo_watcher(&mut self) {
-        let enabled = cp_mod_spine::SpineState::get(&self.state).config.continue_until_todos_done;
-        let registry = cp_base::watchers::WatcherRegistry::get_mut(&mut self.state);
-        let has_watcher = registry.has_watcher_with_tag("todo_continuation");
-
-        if enabled && !has_watcher {
-            registry.register(Box::new(cp_mod_todo::TodoWatcher::new()));
-        } else if !enabled && has_watcher {
-            registry.remove_by_tag("todo_continuation");
+    /// Check if todos need auto-continuation. Creates a single deduplicated
+    /// notification — the spine's normal flow handles the rest.
+    fn check_todo_continuation(&mut self) {
+        if !cp_mod_spine::SpineState::get(&self.state).config.continue_until_todos_done {
+            return;
         }
+        if self.state.is_streaming {
+            return;
+        }
+        // Deduplicate: don't create if one already exists unprocessed
+        let already = cp_mod_spine::SpineState::get(&self.state)
+            .notifications
+            .iter()
+            .any(|n| !n.processed && n.source == "todo_continuation");
+        if already {
+            return;
+        }
+        let ts = cp_mod_todo::TodoState::get(&self.state);
+        if !ts.has_incomplete_todos() {
+            return;
+        }
+        let summary = ts.incomplete_todos_summary();
+        cp_mod_spine::SpineState::create_notification(
+            &mut self.state,
+            cp_mod_spine::NotificationType::Custom,
+            "todo_continuation".to_string(),
+            format!("{} todo(s) remaining: {}", summary.len(), summary.join(", ")),
+        );
     }
 
     /// Update spinner animation frame if there's active loading/streaming.

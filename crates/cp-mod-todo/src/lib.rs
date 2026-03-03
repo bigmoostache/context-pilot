@@ -1,10 +1,8 @@
 mod panel;
 mod tools;
 pub mod types;
-pub mod watcher;
 
 pub use types::{TodoItem, TodoState, TodoStatus};
-pub use watcher::TodoWatcher;
 
 use serde_json::json;
 
