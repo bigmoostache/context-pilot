@@ -129,11 +129,15 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::result_panel::GitResultPanel;
 use cp_base::modules::Module;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/git.yaml")).expect("Failed to parse git tool YAML")
+});
 
 pub struct GitModule;
 
@@ -189,24 +193,14 @@ impl Module for GitModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        vec![ToolDefinition {
-            id: "git_execute".to_string(),
-            name: "Git Execute".to_string(),
-            short_desc: "Run git commands".to_string(),
-            description: "Executes a git command. Read-only commands (log, diff, show, status, blame, etc.) \
-                    create a dynamic result panel that auto-refreshes. Mutating commands (commit, push, pull, \
-                    merge, rebase, etc.) execute directly and return output. Shell operators (|, ;, &&) are \
-                    not allowed."
-                .to_string(),
-            params: vec![
-                ToolParam::new("command", ParamType::String)
-                    .desc("Full git command string (e.g., 'git log --oneline -10', 'git commit -m \"message\"')")
-                    .required(),
-            ],
-            enabled: true,
-            reverie_allowed: false,
-            category: "Git".to_string(),
-        }]
+        let t = &*TOOL_TEXTS;
+        vec![
+            ToolDefinition::from_yaml("git_execute", t)
+                .short_desc("Run git commands")
+                .category("Git")
+                .param("command", ParamType::String, true)
+                .build(),
+        ]
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

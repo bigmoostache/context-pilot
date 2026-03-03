@@ -15,7 +15,7 @@ use serde_json::json;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, ContextTypeMeta, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::manager::SessionHandle;
@@ -23,6 +23,10 @@ use self::panel::ConsolePanel;
 use self::types::{ConsoleState, SessionMeta};
 
 pub use self::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/console.yaml")).expect("Failed to parse console tool YAML")
+});
 
 pub struct ConsoleModule;
 
@@ -195,143 +199,42 @@ impl Module for ConsoleModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "console_create".to_string(),
-                name: "Create Console".to_string(),
-                short_desc: "Spawn a new process".to_string(),
-                description: "Spawns a child process and creates a console panel to monitor its output. \
-                    The process runs in the background and survives TUI reloads. \
-                    Close the panel to kill the process. \
-                    For one-shot commands (e.g. 'cargo build'), pass the full command directly — \
-                    the panel shows output and exits when done. \
-                    For interactive shells, pass 'bash' and use console_send_keys to run commands. \
-                    For long-running servers (e.g. 'npm run dev'), combine with console_wait \
-                    (block=false, mode='pattern') to get notified when ready."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("command", ParamType::String)
-                        .desc("Shell command to execute (e.g., 'npm run dev', 'cargo build 2>&1', 'bash')")
-                        .required(),
-                    ToolParam::new("cwd", ParamType::String)
-                        .desc("Working directory for the command (defaults to project root)"),
-                    ToolParam::new("description", ParamType::String)
-                        .desc("Short description for the panel title"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Console".to_string(),
-            },
-            ToolDefinition {
-                id: "console_send_keys".to_string(),
-                name: "Console Send Keys".to_string(),
-                short_desc: "Send input to process".to_string(),
-                description: "Sends input text to a running console's stdin. Use for interactive processes. \
-                    Newline is NOT appended automatically — include \\n if needed. \
-                    Typical usage: send a command followed by \\n (e.g. 'ls -la\\n'). \
-                    For interactive prompts, send the expected response (e.g. 'yes\\n' or 'q'). \
-                    Escape sequences are interpreted as control characters: \
-                    \\x03 (Ctrl+C to interrupt), \\x04 (Ctrl+D for EOF), \\e[A (up arrow), \
-                    \\n (newline), \\t (tab), \\xHH (arbitrary hex byte). \
-                    To stop a process, send \\x03 (Ctrl+C) or close the panel."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("Console panel ID (e.g., 'P11')")
-                        .required(),
-                    ToolParam::new("input", ParamType::String)
-                        .desc("Text to send to stdin (e.g., 'cargo test\\n' or 'yes\\n')")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Console".to_string(),
-            },
-            ToolDefinition {
-                id: "console_wait".to_string(),
-                name: "Console Wait".to_string(),
-                short_desc: "Wait for process event".to_string(),
-                description: "Registers a waiter for a console event. Two modes: \
-                    mode='exit': waits for the process to exit (use for builds, one-shot commands). \
-                    mode='pattern': waits for a regex pattern to match in output (use for server ready messages, specific log lines). \
-                    Patterns are full regex — e.g. 'Listening on port \\d+', 'error|warning', 'Finished.*target'. \
-                    Falls back to literal substring match if the regex is invalid. \
-                    IMPORTANT: Include both success AND failure patterns using regex alternation (|) so you \
-                    catch errors early instead of waiting for timeout. E.g. 'ready to accept|error|panic|failed'. \
-                    BLOCKING: pauses tool execution until condition is met or max_wait expires. \
-                    Best for sequential workflows (build then test). \
-                    For async monitoring (long-running servers), use console_watch instead."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("Console panel ID (e.g., 'P11')")
-                        .required(),
-                    ToolParam::new("mode", ParamType::String)
-                        .desc("Wait mode: 'exit' for process completion, 'pattern' for regex match in output")
-                        .enum_vals(&["exit", "pattern"])
-                        .required(),
-                    ToolParam::new("pattern", ParamType::String)
-                        .desc("Regex pattern to match in output (required when mode='pattern'). \
-                            Use alternation to catch success AND failure: 'Listening on \\d+|error|panic|EADDRINUSE'. \
-                            Falls back to literal match if invalid regex."),
-                    ToolParam::new("max_wait", ParamType::Integer)
-                        .desc("Max wait in seconds, 1-30 (default: 30). On timeout, returns last output lines.")
-                        .default_val("30"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Console".to_string(),
-            },
-            ToolDefinition {
-                id: "console_watch".to_string(),
-                name: "Console Watch".to_string(),
-                short_desc: "Async watch for process event".to_string(),
-                description: "Registers an async watcher for a console event. You continue working and get a spine \
-                    notification when the condition is satisfied. Best for long-running processes where you don't \
-                    want to block (e.g. dev servers, background tasks). Two modes: \
-                    mode='exit': notifies when the process exits. \
-                    mode='pattern': notifies when a regex pattern matches in output. \
-                    If the condition is already met, returns immediately instead of registering a watcher. \
-                    For blocking waits (sequential workflows), use console_wait instead."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("Console panel ID (e.g., 'P11')")
-                        .required(),
-                    ToolParam::new("mode", ParamType::String)
-                        .desc("Watch mode: 'exit' for process completion, 'pattern' for regex match in output")
-                        .enum_vals(&["exit", "pattern"])
-                        .required(),
-                    ToolParam::new("pattern", ParamType::String)
-                        .desc("Regex pattern to match in output (required when mode='pattern'). \
-                            Use alternation to catch success AND failure: 'Listening on \\d+|error|panic|EADDRINUSE'. \
-                            Falls back to literal match if invalid regex."),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Console".to_string(),
-            },
-            ToolDefinition {
-                id: "console_easy_bash".to_string(),
-                name: "Console Easy Bash".to_string(),
-                short_desc: "Run a command and return output".to_string(),
-                description: "Runs a shell command synchronously and returns stdout+stderr directly. \
-                    No server, no background process — just exec and return. \
-                    Use for debugging and quick one-off commands. \
-                    BLOCKING: freezes tool execution until command completes (max 10s, then killed). \
-                    Do NOT use for long-running or interactive commands — use console_create instead."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("command", ParamType::String)
-                        .desc("Shell command to execute (e.g., 'ls -la', 'cat /tmp/foo')")
-                        .required(),
-                    ToolParam::new("cwd", ParamType::String)
-                        .desc("Working directory (defaults to project root)"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Console".to_string(),
-            },
+            ToolDefinition::from_yaml("console_create", t)
+                .short_desc("Spawn a new process")
+                .category("Console")
+                .param("command", ParamType::String, true)
+                .param("cwd", ParamType::String, false)
+                .param("description", ParamType::String, false)
+                .build(),
+            ToolDefinition::from_yaml("console_send_keys", t)
+                .short_desc("Send input to process")
+                .category("Console")
+                .param("id", ParamType::String, true)
+                .param("input", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("console_wait", t)
+                .short_desc("Wait for process event")
+                .category("Console")
+                .param("id", ParamType::String, true)
+                .param_enum("mode", &["exit", "pattern"], true)
+                .param("pattern", ParamType::String, false)
+                .param_with_default("max_wait", ParamType::Integer, "30")
+                .build(),
+            ToolDefinition::from_yaml("console_watch", t)
+                .short_desc("Async watch for process event")
+                .category("Console")
+                .param("id", ParamType::String, true)
+                .param_enum("mode", &["exit", "pattern"], true)
+                .param("pattern", ParamType::String, false)
+                .build(),
+            ToolDefinition::from_yaml("console_easy_bash", t)
+                .short_desc("Run a command and return output")
+                .category("Console")
+                .param("command", ParamType::String, true)
+                .param("cwd", ParamType::String, false)
+                .build(),
         ]
     }
 

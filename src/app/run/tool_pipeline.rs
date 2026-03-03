@@ -123,7 +123,15 @@ impl App {
                 let qs = QueueState::get_mut(&mut self.state);
                 let idx = qs.enqueue(tool.name.clone(), tool.id.clone(), tool.input.clone(), now_ms());
                 let params = serde_json::to_string(&tool.input).unwrap_or_default();
-                let short = if params.len() > 120 { format!("{}...", &params[..117]) } else { params };
+                let short = if params.len() > 120 {
+                    let mut end = 117;
+                    while !params.is_char_boundary(end) {
+                        end -= 1;
+                    }
+                    format!("{}...", &params[..end])
+                } else {
+                    params
+                };
                 crate::infra::tools::ToolResult::new(
                     tool.id.clone(),
                     format!("Queued as #{}: {}({})", idx, tool.name, short),

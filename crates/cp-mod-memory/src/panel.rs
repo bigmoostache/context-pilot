@@ -106,6 +106,7 @@ impl Panel for MemoryPanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::MEMORY {
                 ctx.token_count = token_count;
+                cp_base::panels::update_if_changed(ctx, &memory_content);
                 break;
             }
         }

@@ -18,3 +18,4 @@ comemo = "0.4"
 reqwest = { workspace = true }
 flate2 = "1"
 tar = "0.4"
+serde_yaml.workspace = true

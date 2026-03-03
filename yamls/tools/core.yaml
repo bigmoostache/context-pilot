@@ -1,0 +1,33 @@
+tools:
+  Close_panel:
+    description: |
+      Closes context elements by their IDs (e.g., P6, P7). Cannot close core elements (P1-P6).
+    parameters:
+      ids: "List of context IDs to close"
+
+  system_reload:
+    description: |
+      Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.
+
+  tool_manage:
+    description: |
+      Enables or disables tools. This tool cannot be disabled. Use to customize available capabilities.
+    parameters:
+      changes: "Array of tool changes"
+      tool: "Tool ID to change (e.g., 'edit_file', 'glob')"
+      action: "Action to perform"
+
+  panel_goto_page:
+    description: |
+      Navigates to a specific page of a paginated panel. Only available when a panel has more than one page.
+    parameters:
+      panel_id: "Panel ID (e.g., P8)"
+      page: "Page number (1-indexed)"
+
+  module_toggle:
+    description: |
+      Activates or deactivates modules. Core module cannot be deactivated. Deactivating a module removes its tools and panels. Cannot deactivate a module if another active module depends on it.
+    parameters:
+      changes: "Array of module changes"
+      module: "Module ID (e.g., 'git', 'memory', 'tmux')"
+      action: "Action to perform"

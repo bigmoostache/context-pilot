@@ -1,0 +1,21 @@
+tools:
+  scratchpad_create_cell:
+    description: |
+      Creates a new scratchpad cell for storing temporary notes, code snippets, or data during the conversation.
+    parameters:
+      cell_title: "Title for the cell"
+      cell_contents: "Content to store in the cell"
+
+  scratchpad_edit_cell:
+    description: |
+      Edits an existing scratchpad cell. Can update title and/or contents.
+    parameters:
+      cell_id: "Cell ID to edit (e.g., C1)"
+      cell_title: "New title (omit to keep current)"
+      cell_contents: "New contents (omit to keep current)"
+
+  scratchpad_wipe:
+    description: |
+      Deletes scratchpad cells by their IDs. Pass an empty array to wipe all cells.
+    parameters:
+      cell_ids: "Cell IDs to delete (e.g., ['C1', 'C2']). Empty array deletes all cells."

@@ -12,11 +12,15 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::SpinePanel;
 use cp_base::modules::Module;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/spine.yaml")).expect("Failed to parse spine tool YAML")
+});
 
 pub struct SpineModule;
 
@@ -112,67 +116,32 @@ impl Module for SpineModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "notification_mark_processed".to_string(),
-                name: "Mark Notification Processed".to_string(),
-                short_desc: "Mark notification as handled".to_string(),
-                description: "Marks a spine notification as processed, indicating you've addressed it.".to_string(),
-                params: vec![
-                    ToolParam::new("ids", ParamType::Array(Box::new(ParamType::String)))
-                        .desc("Notification IDs to mark as processed (e.g., ['N1', 'N2'])")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Spine".to_string(),
-            },
-            ToolDefinition {
-                id: "spine_configure".to_string(),
-                name: "Configure Spine".to_string(),
-                short_desc: "Configure auto-continuation and guard rails".to_string(),
-                description: "Configures the spine module's auto-continuation behavior and guard rail limits. All parameters are optional — only provided values are changed. Guard rail limits accept null to disable.".to_string(),
-                params: vec![
-                    ToolParam::new("continue_until_todos_done", ParamType::Boolean)
-                        .desc("Keep auto-continuing until all todos are done (default: false)"),
-                    ToolParam::new("max_output_tokens", ParamType::Integer)
-                        .desc("Guard rail: max total output tokens before blocking. Null to disable."),
-                    ToolParam::new("max_cost", ParamType::Number)
-                        .desc("Guard rail: max cost in USD before blocking. Null to disable."),
-                    ToolParam::new("max_duration_secs", ParamType::Integer)
-                        .desc("Guard rail: max autonomous duration in seconds. Null to disable."),
-                    ToolParam::new("max_messages", ParamType::Integer)
-                        .desc("Guard rail: max conversation messages before blocking. Null to disable."),
-                    ToolParam::new("max_auto_retries", ParamType::Integer)
-                        .desc("Guard rail: max consecutive auto-continuations without human input. Null to disable."),
-                    ToolParam::new("reset_counters", ParamType::Boolean)
-                        .desc("Reset runtime counters (auto_continuation_count, autonomous_start_ms)"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Spine".to_string(),
-            },
-            ToolDefinition {
-                id: "coucou".to_string(),
-                name: "Coucou".to_string(),
-                short_desc: "Schedule a reminder notification".to_string(),
-                description: "Schedules a notification to fire after a delay (timer mode) or at a specific time (datetime mode). The notification appears in the Spine panel and triggers auto-continuation. Use for reminders, delayed checks, or timed follow-ups.".to_string(),
-                params: vec![
-                    ToolParam::new("mode", ParamType::String)
-                        .desc("Scheduling mode: 'timer' for relative delay, 'datetime' for absolute time")
-                        .required(),
-                    ToolParam::new("message", ParamType::String)
-                        .desc("Message to deliver when the notification fires")
-                        .required(),
-                    ToolParam::new("delay", ParamType::String)
-                        .desc("Delay before firing (timer mode only). Examples: '30s', '5m', '1h30m', '2h15m30s'"),
-                    ToolParam::new("datetime", ParamType::String)
-                        .desc("When to fire (datetime mode only). Format: YYYY-MM-DDTHH:MM:SS (local time)"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Spine".to_string(),
-            },
+            ToolDefinition::from_yaml("notification_mark_processed", t)
+                .short_desc("Mark notification as handled")
+                .category("Spine")
+                .param_array("ids", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("spine_configure", t)
+                .short_desc("Configure auto-continuation and guard rails")
+                .category("Spine")
+                .param("continue_until_todos_done", ParamType::Boolean, false)
+                .param("max_output_tokens", ParamType::Integer, false)
+                .param("max_cost", ParamType::Number, false)
+                .param("max_duration_secs", ParamType::Integer, false)
+                .param("max_messages", ParamType::Integer, false)
+                .param("max_auto_retries", ParamType::Integer, false)
+                .param("reset_counters", ParamType::Boolean, false)
+                .build(),
+            ToolDefinition::from_yaml("coucou", t)
+                .short_desc("Schedule a reminder notification")
+                .category("Spine")
+                .param("mode", ParamType::String, true)
+                .param("message", ParamType::String, true)
+                .param("delay", ParamType::String, false)
+                .param("datetime", ParamType::String, false)
+                .build(),
         ]
     }
 

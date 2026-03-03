@@ -1,0 +1,79 @@
+tools:
+  agent_create:
+    description: |
+      Creates a new agent with a name, description, and system prompt content. Agents define the AI's identity and behavior. ID is auto-generated from the name.
+    parameters:
+      name: "Agent name"
+      description: "Short description"
+      content: "System prompt content"
+
+  Edit_prompt:
+    description: |
+      Edits an agent, skill, or command by replacing exact text in its content. Routes automatically based on ID. Uses the same old_string/new_string pattern as the file Edit tool.
+    parameters:
+      id: "Agent, skill, or command ID"
+      old_string: "Exact text to find and replace in content"
+      new_string: "Replacement text"
+      replace_all: "Replace all occurrences (default: false)"
+
+  agent_delete:
+    description: |
+      Deletes an agent. Built-in agents cannot be deleted. If the deleted agent was active, reverts to default.
+    parameters:
+      id: "Agent ID to delete"
+
+  agent_load:
+    description: |
+      Activates an agent as the current system prompt. Pass empty id to revert to default.
+    parameters:
+      id: "Agent ID to activate. Empty to use default."
+
+  skill_create:
+    description: |
+      Creates a new skill. Skills are loaded as context panels that provide additional instructions or knowledge to the AI.
+    parameters:
+      name: "Skill name"
+      description: "Short description"
+      content: "Skill content (instructions/knowledge)"
+
+  skill_delete:
+    description: |
+      Deletes a skill. If loaded, unloads it first. Built-in skills cannot be deleted.
+    parameters:
+      id: "Skill ID to delete"
+
+  skill_load:
+    description: |
+      Loads a skill as a context panel. The skill's content becomes visible to the AI as a context block.
+    parameters:
+      id: "Skill ID to load"
+
+  skill_unload:
+    description: |
+      Unloads a skill, removing its context panel.
+    parameters:
+      id: "Skill ID to unload"
+
+  Library_open_prompt_editor:
+    description: |
+      Opens a prompt's content in the Library panel for reading and editing. Required before using Edit_prompt. Max one prompt open at a time — opening a new one closes the previous. The Library panel will show the prompt content with a warning banner.
+    parameters:
+      id: "Agent, skill, or command ID to open"
+
+  Library_close_prompt_editor:
+    description: |
+      Closes the prompt editor in the Library panel, restoring the normal library view.
+
+  command_create:
+    description: |
+      Creates a new command. Commands are inline replacements triggered by /command-name in the input field.
+    parameters:
+      name: "Command name"
+      description: "Short description"
+      content: "Content to replace the /command with"
+
+  command_delete:
+    description: |
+      Deletes a command. Built-in commands cannot be deleted.
+    parameters:
+      id: "Command ID to delete"

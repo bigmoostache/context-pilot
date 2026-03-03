@@ -1,0 +1,22 @@
+tools:
+  Queue_activate:
+    description: |
+      Activates the tool queue. All subsequent non-Queue tool calls will be intercepted and queued instead of executing. Queue tools themselves always execute immediately. Use Queue_execute to flush the queue.
+
+  Queue_pause:
+    description: |
+      Pauses the queue — tool calls execute normally again. The existing queue stays intact for later flush or empty.
+
+  Queue_execute:
+    description: |
+      Executes all queued tool calls in order, atomically. Returns a summary of results. Clears the queue after execution. This is the 'commit' — one cache break instead of N.
+
+  Queue_undo:
+    description: |
+      Removes specific queued action(s) by their index number. Check the Queue panel to see indices.
+    parameters:
+      indices: "Indices of queued actions to remove (e.g., [1, 3])"
+
+  Queue_empty:
+    description: |
+      Discards all queued actions without executing them. The queue is cleared and deactivated.

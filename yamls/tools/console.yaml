@@ -1,0 +1,39 @@
+tools:
+  console_create:
+    description: |
+      Spawns a child process and creates a console panel to monitor its output. The process runs in the background and survives TUI reloads. Close the panel to kill the process. For one-shot commands (e.g. 'cargo build'), pass the full command directly — the panel shows output and exits when done. For interactive shells, pass 'bash' and use console_send_keys to run commands. For long-running servers (e.g. 'npm run dev'), combine with console_wait (block=false, mode='pattern') to get notified when ready.
+    parameters:
+      command: "Shell command to execute (e.g., 'npm run dev', 'cargo build 2>&1', 'bash')"
+      cwd: "Working directory for the command (defaults to project root)"
+      description: "Short description for the panel title"
+
+  console_send_keys:
+    description: |
+      Sends input text to a running console's stdin. Use for interactive processes. Newline is NOT appended automatically — include \n if needed. Typical usage: send a command followed by \n (e.g. 'ls -la\n'). For interactive prompts, send the expected response (e.g. 'yes\n' or 'q'). Escape sequences are interpreted as control characters: \x03 (Ctrl+C to interrupt), \x04 (Ctrl+D for EOF), \e[A (up arrow), \n (newline), \t (tab), \xHH (arbitrary hex byte). To stop a process, send \x03 (Ctrl+C) or close the panel.
+    parameters:
+      id: "Console panel ID (e.g., 'P11')"
+      input: "Text to send to stdin (e.g., 'cargo test\\n' or 'yes\\n')"
+
+  console_wait:
+    description: |
+      Registers a waiter for a console event. Two modes: mode='exit': waits for the process to exit (use for builds, one-shot commands). mode='pattern': waits for a regex pattern to match in output (use for server ready messages, specific log lines). Patterns are full regex — e.g. 'Listening on port \d+', 'error|warning', 'Finished.*target'. Falls back to literal substring match if the regex is invalid. IMPORTANT: Include both success AND failure patterns using regex alternation (|) so you catch errors early instead of waiting for timeout. E.g. 'ready to accept|error|panic|failed'. BLOCKING: pauses tool execution until condition is met or max_wait expires. Best for sequential workflows (build then test). For async monitoring (long-running servers), use console_watch instead.
+    parameters:
+      id: "Console panel ID (e.g., 'P11')"
+      mode: "Wait mode: 'exit' for process completion, 'pattern' for regex match in output"
+      pattern: "Regex pattern to match in output (required when mode='pattern'). Use alternation to catch success AND failure: 'Listening on \\d+|error|panic|EADDRINUSE'. Falls back to literal match if invalid regex."
+      max_wait: "Max wait in seconds, 1-30 (default: 30). On timeout, returns last output lines."
+
+  console_watch:
+    description: |
+      Registers an async watcher for a console event. You continue working and get a spine notification when the condition is satisfied. Best for long-running processes where you don't want to block (e.g. dev servers, background tasks). Two modes: mode='exit': notifies when the process exits. mode='pattern': notifies when a regex pattern matches in output. If the condition is already met, returns immediately instead of registering a watcher. For blocking waits (sequential workflows), use console_wait instead.
+    parameters:
+      id: "Console panel ID (e.g., 'P11')"
+      mode: "Watch mode: 'exit' for process completion, 'pattern' for regex match in output"
+      pattern: "Regex pattern to match in output (required when mode='pattern'). Use alternation to catch success AND failure: 'Listening on \\d+|error|panic|EADDRINUSE'. Falls back to literal match if invalid regex."
+
+  console_easy_bash:
+    description: |
+      Runs a shell command synchronously and returns stdout+stderr directly. No server, no background process — just exec and return. Use for debugging and quick one-off commands. BLOCKING: freezes tool execution until command completes (max 10s, then killed). Do NOT use for long-running or interactive commands — use console_create instead.
+    parameters:
+      command: "Shell command to execute (e.g., 'ls -la', 'cat /tmp/foo')"
+      cwd: "Working directory (defaults to project root)"

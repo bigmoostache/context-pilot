@@ -1,0 +1,6 @@
+tools:
+  git_execute:
+    description: |
+      Executes a git command. Read-only commands (log, diff, show, status, blame, etc.) create a dynamic result panel that auto-refreshes. Mutating commands (commit, push, pull, merge, rebase, etc.) execute directly and return output. Shell operators (|, ;, &&) are not allowed.
+    parameters:
+      command: "Full git command string (e.g., 'git log --oneline -10', 'git commit -m \"message\"')"

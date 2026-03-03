@@ -7,6 +7,7 @@ use crate::app::App;
 use crate::app::reverie::{streaming, tools};
 use crate::infra::api::StreamEvent;
 use crate::state::persistence::save_state;
+use cp_base::config::REVERIE;
 use cp_mod_queue::QueueState;
 
 impl App {
@@ -187,7 +188,15 @@ impl App {
                             crate::app::panels::now_ms(),
                         );
                         let params = serde_json::to_string(&tool.input).unwrap_or_default();
-                        let short = if params.len() > 120 { format!("{}...", &params[..117]) } else { params };
+                        let short = if params.len() > 120 {
+                            let mut end = 117;
+                            while !params.is_char_boundary(end) {
+                                end -= 1;
+                            }
+                            format!("{}...", &params[..end])
+                        } else {
+                            params
+                        };
                         crate::infra::tools::ToolResult::new(
                             tool.id.clone(),
                             format!("Queued as #{}: {}({})", idx, tool.name, short),
@@ -307,11 +316,7 @@ impl App {
                     id: format!("rev-nudge-{}", rev.messages.len()),
                     uid: None,
                     role: "user".to_string(),
-                    content: "You ended your turn without calling the `reverie_report` tool. \
-                        This is MANDATORY. Call it now with a summary of what you did:\n\n\
-                        reverie_report({\"summary\": \"<your summary here>\"})\n\n\
-                        You MUST call this tool to complete your run."
-                        .to_string(),
+                    content: REVERIE.report_nudge.trim_end().to_string(),
                     message_type: crate::state::MessageType::TextMessage,
                     status: crate::state::MessageStatus::Full,
                     content_token_count: 0,

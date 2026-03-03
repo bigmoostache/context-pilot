@@ -14,6 +14,7 @@ use crate::app::panels::now_ms;
 use crate::infra::constants::{library, prompts};
 use crate::infra::tools::ToolDefinition;
 use crate::state::{Message, MessageStatus, MessageType};
+use cp_base::config::INJECTIONS;
 
 // ───────────────────────────────────────────────────────────────────
 // Shared message type
@@ -229,12 +230,8 @@ fn build_from_api_messages(api_messages: &[super::ApiMessage], opts: &BuildOptio
 
     // Extra context (cleaner mode)
     if let Some(ref ctx) = opts.extra_context {
-        out.push(OaiMessage {
-            role: "user".to_string(),
-            content: Some(format!("Please clean up the context to reduce token usage:\n\n{}", ctx)),
-            tool_calls: None,
-            tool_call_id: None,
-        });
+        let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", ctx);
+        out.push(OaiMessage { role: "user".to_string(), content: Some(msg), tool_calls: None, tool_call_id: None });
     }
 
     out
@@ -321,12 +318,8 @@ fn build_from_raw(
 
     // ── Extra context (cleaner mode) ────────────────────────────
     if let Some(ref ctx) = opts.extra_context {
-        out.push(OaiMessage {
-            role: "user".to_string(),
-            content: Some(format!("Please clean up the context to reduce token usage:\n\n{}", ctx)),
-            tool_calls: None,
-            tool_call_id: None,
-        });
+        let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", ctx);
+        out.push(OaiMessage { role: "user".to_string(), content: Some(msg), tool_calls: None, tool_call_id: None });
     }
 
     // ── Tool pairing ────────────────────────────────────────────

@@ -1,0 +1,27 @@
+tools:
+  notification_mark_processed:
+    description: |
+      Marks a spine notification as processed, indicating you've addressed it.
+    parameters:
+      ids: "Notification IDs to mark as processed (e.g., ['N1', 'N2'])"
+
+  spine_configure:
+    description: |
+      Configures the spine module's auto-continuation behavior and guard rail limits. All parameters are optional — only provided values are changed. Guard rail limits accept null to disable.
+    parameters:
+      continue_until_todos_done: "Keep auto-continuing until all todos are done (default: false)"
+      max_output_tokens: "Guard rail: max total output tokens before blocking. Null to disable."
+      max_cost: "Guard rail: max cost in USD before blocking. Null to disable."
+      max_duration_secs: "Guard rail: max autonomous duration in seconds. Null to disable."
+      max_messages: "Guard rail: max conversation messages before blocking. Null to disable."
+      max_auto_retries: "Guard rail: max consecutive auto-continuations without human input. Null to disable."
+      reset_counters: "Reset runtime counters (auto_continuation_count, autonomous_start_ms)"
+
+  coucou:
+    description: |
+      Schedules a notification to fire after a delay (timer mode) or at a specific time (datetime mode). The notification appears in the Spine panel and triggers auto-continuation. Use for reminders, delayed checks, or timed follow-ups.
+    parameters:
+      mode: "Scheduling mode: 'timer' for relative delay, 'datetime' for absolute time"
+      message: "Message to deliver when the notification fires"
+      delay: "Delay before firing (timer mode only). Examples: '30s', '5m', '1h30m', '2h15m30s'"
+      datetime: "When to fire (datetime mode only). Format: YYYY-MM-DDTHH:MM:SS (local time)"

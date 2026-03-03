@@ -1,0 +1,35 @@
+tools:
+  log_create:
+    description: |
+      Creates timestamped log entries for recording decisions, actions, or notable events during the conversation.
+    parameters:
+      entries: "Array of log entries to create (timestamped automatically)"
+      content: "Short, atomic log entry"
+
+  log_summarize:
+    description: |
+      Summarizes multiple top-level log entries into a single parent summary log. The original logs become children hidden under the summary. Only top-level logs (no parent) can be summarized. Minimum 4 entries required.
+    parameters:
+      log_ids: "Array of log IDs to summarize (e.g., ['L27', 'L28', 'L29']). Minimum 4 entries. All must be top-level (no parent)."
+      content: "Summary text for the new parent log entry"
+
+  log_toggle:
+    description: |
+      Expands or collapses a log summary to show or hide its children. Can only toggle logs that have children (are summaries).
+    parameters:
+      id: "Log ID to toggle (e.g., 'L42')"
+      action: "Action to perform"
+
+  Close_conversation_history:
+    description: |
+      Closes a conversation history panel. Before closing, creates log entries and memory items to preserve important information. Everything in the history panel will be lost after closing.
+
+      IMPORTANT: Before calling this tool, carefully review ALL human messages in the panel. Extract and preserve:
+      - **Logs**: Short, atomic entries for mid-conversation context — decisions made, actions taken, bugs found, user preferences expressed, task context. Logs are medium-lifecycle: they maintain conversation flow across reloads.
+      - **Memories**: Longer-lived knowledge that matters beyond this session — architecture decisions, user preferences, project conventions, important discoveries. Memories persist across conversations.
+
+      Every substantive piece of information from human messages should be captured in either a log or a memory. When in doubt, preserve it. Log timestamps are set to the panel's last message time, not the current time.
+    parameters:
+      id: "ID of the conversation history panel to close (e.g., 'P12')"
+      logs: "Log entries to create (timestamped automatically). Should be short, atomic things to remember from the conversation."
+      memories: "Memory items to create (persistent across conversations)"

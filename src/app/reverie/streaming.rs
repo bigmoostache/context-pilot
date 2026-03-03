@@ -10,6 +10,7 @@ use crate::app::context::{ReverieContext, prepare_stream_context};
 use crate::infra::api::{StreamParams, start_streaming};
 use crate::infra::constants::DEFAULT_WORKER_ID;
 use crate::state::State;
+use cp_base::config::REVERIE;
 use cp_base::llm_types::StreamEvent;
 
 use super::tools;
@@ -26,17 +27,6 @@ fn secondary_model_string(state: &State) -> String {
         LlmProvider::DeepSeek => state.secondary_deepseek_model.api_name().to_string(),
     }
 }
-
-/// The reverie system prompt — kept minimal since the real agent instructions
-/// are injected into the P-reverie panel (for cache-friendly placement).
-const REVERIE_SYSTEM_PROMPT: &str = "You are a background sub-agent. Follow the instructions in the P-reverie panel.";
-
-/// Initial user message sent to kick off a fresh reverie session.
-/// Framed as a dispatch from the main AI so the sub-agent has context.
-const REVERIE_KICKOFF_MSG: &str = "\
-** Message from your main consciousness **\n\n\
-You have been activated as a background sub-agent. Your instructions are in the P-reverie panel above. \
-Read them carefully, then act. Use tools to accomplish your task, and call the Report tool when done.";
 
 /// Build the reverie prompt and start streaming to the secondary LLM.
 ///
@@ -57,7 +47,7 @@ pub fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender<Stream
         reverie_messages.push(cp_base::state::Message::new_user(
             "reverie-kickoff".to_string(),
             "reverie-kickoff".to_string(),
-            REVERIE_KICKOFF_MSG.to_string(),
+            REVERIE.kickoff_message.trim_end().to_string(),
             0,
         ));
     }
@@ -88,7 +78,7 @@ pub fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender<Stream
             messages: ctx.messages,
             context_items: ctx.context_items,
             tools: ctx.tools,
-            system_prompt: REVERIE_SYSTEM_PROMPT.to_string(),
+            system_prompt: REVERIE.system_prompt.trim_end().to_string(),
             seed_content: None,
             worker_id: DEFAULT_WORKER_ID.to_string(),
         },

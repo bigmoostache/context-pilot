@@ -13,6 +13,7 @@ use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_ENDPOINT, API_VERSION, library};
 use crate::infra::tools::ToolUse;
 use crate::infra::tools::build_api_tools;
+use cp_base::config::INJECTIONS;
 
 mod messages;
 
@@ -116,12 +117,9 @@ impl LlmClient for AnthropicClient {
         // Handle cleaner mode or custom system prompt
         let system_prompt = if let Some(ref prompt) = request.system_prompt {
             if let Some(ref context) = request.extra_context {
-                api_messages.push(ApiMessage {
-                    role: "user".to_string(),
-                    content: vec![ContentBlock::Text {
-                        text: format!("Please clean up the context to reduce token usage:\n\n{}", context),
-                    }],
-                });
+                let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", context);
+                api_messages
+                    .push(ApiMessage { role: "user".to_string(), content: vec![ContentBlock::Text { text: msg }] });
             }
             prompt.clone()
         } else {

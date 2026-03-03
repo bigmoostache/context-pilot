@@ -1,0 +1,46 @@
+tools:
+  typst_execute:
+    description: |
+      Executes typst CLI commands through the embedded compiler. No external typst binary needed. Supports: compile, init, query, fonts, update, watch, unwatch, watchlist.
+
+      SUBCOMMANDS:
+      - 'typst compile <file.typ> [-o <output.pdf>]' — Compile a .typ file to PDF. Output defaults to same name with .pdf extension.
+      - 'typst init @preview/<template>:<version> [directory]' — Download a template from Typst Universe and scaffold a project. Example: 'typst init @preview/brilliant-cv:2.0.3'.
+      - 'typst watch <file.typ>' — Add a document to the auto-compile watchlist. Compiles immediately and records ALL dependencies (imports, images, bib files, toml, packages). From then on, editing ANY dependency auto-recompiles the PDF via a callback. Use this for documents the user is actively working on.
+      - 'typst unwatch <file.typ>' — Remove a document from the watchlist.
+      - 'typst watchlist' — List all watched documents and their dependency counts.
+      - 'typst fonts [--variants]' — List available system fonts (creates a panel).
+      - 'typst query <file.typ> <selector>' — Query document metadata (creates a panel).
+      - 'typst update [@preview/pkg:version]' — Re-download cached packages.
+
+      FILE ORGANIZATION — CRITICAL PRINCIPLES:
+      Context Pilot is installed into the user's project. You MUST keep their workspace clean. The guiding principle: separate CONTENT (what the user cares about) from STYLING (reusable infrastructure). Content lives next to the document. Styling lives in .context-pilot/shared/.
+
+      What goes in .context-pilot/shared/typst-templates/:
+      - Template files (#let report = ..., #let invoice = ...) — reusable across documents
+      - Shared styling (fonts, colors, layouts, page setup, headers/footers)
+      - Shared assets used by templates (logos, icons, common images)
+      - Shared data (company info TOML, common variables)
+      These are version-controlled and shared across all workers. They are infrastructure, not user content.
+
+      What goes next to the document (in the user's project folder):
+      - The .typ document itself — containing ONLY content (text, data, tables)
+      - Content-specific assets (photos for THIS report, data files for THIS document)
+      - The compiled .pdf output
+      - Configuration (metadata.toml, bibliography .bib) specific to THIS document
+      Keep the user's folders minimal — only what the user authored or needs to see.
+
+      When using 'typst init' to scaffold from @preview/ templates:
+      - The template's reusable styling/library files should go into .context-pilot/shared/typst-templates/
+      - Only the user's content files (the actual document, data, images) should go in the project directory
+      - This prevents template scaffolding from dumping dozens of infrastructure files into the user's workspace
+
+      WORKFLOW — BEST PRACTICES:
+      1. After creating or scaffolding a .typ document, ALWAYS run 'typst watch' on the main document so edits auto-recompile.
+      2. When the user asks to create a PDF, first check if a suitable template exists in .context-pilot/shared/typst-templates/. If not, create one there, then create the document that imports it.
+      3. Documents should #import templates: #import "../../.context-pilot/shared/typst-templates/report.typ": report
+      4. 'typst watch' tracks the FULL dependency tree automatically — imports, images, bibliography files, toml config, even package files. No manual dependency management needed.
+      5. Use 'typst compile' for one-off compilations. Use 'typst watch' for documents under active development.
+      6. @preview/ packages are downloaded from Typst Universe and cached globally at ~/.cache/typst/packages/.
+    parameters:
+      command: "Full typst command string (e.g., 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts')"

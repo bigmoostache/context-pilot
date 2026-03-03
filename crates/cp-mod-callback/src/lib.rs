@@ -12,11 +12,16 @@ use serde_json::json;
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, ContextTypeMeta, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::CallbackPanel;
 use self::types::CallbackState;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/callback.yaml"))
+        .expect("Failed to parse callback tool YAML")
+});
 
 pub struct CallbackModule;
 
@@ -112,92 +117,40 @@ impl Module for CallbackModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "Callback_upsert".to_string(),
-                name: "Callback Upsert".to_string(),
-                short_desc: "Create, update, or delete a callback".to_string(),
-                description: "Creates, updates, or deletes a file edit callback. \
-                    Callbacks are bash scripts that auto-fire when the AI edits files matching a glob pattern. \
-                    Use action='create' to define a new callback with its script. \
-                    Use action='update' to modify an existing callback. \
-                    Use action='delete' to remove a callback and its script file."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("action", ParamType::String)
-                        .desc("Action: 'create', 'update', or 'delete'")
-                        .enum_vals(&["create", "update", "delete"])
-                        .required(),
-                    ToolParam::new("id", ParamType::String)
-                        .desc("Callback ID (required for update/delete, e.g. 'CB1')"),
-                    ToolParam::new("name", ParamType::String)
-                        .desc("Display name (e.g., 'rust-check'). Required for create."),
-                    ToolParam::new("description", ParamType::String)
-                        .desc("Short explanation of what this callback does"),
-                    ToolParam::new("pattern", ParamType::String)
-                        .desc("Gitignore-style glob (e.g., '*.rs', 'src/**/*.ts'). Required for create."),
-                    ToolParam::new("script_content", ParamType::String)
-                        .desc("Bash script body (shebang auto-prepended). Required for create."),
-                    ToolParam::new("blocking", ParamType::Boolean)
-                        .desc("Block Edit/Write result until script completes (default: false)"),
-                    ToolParam::new("timeout", ParamType::Integer)
-                        .desc("Max execution time in seconds (required if blocking)"),
-                    ToolParam::new("success_message", ParamType::String)
-                        .desc("Custom message on success (e.g., 'Build passed ✓')"),
-                    ToolParam::new("cwd", ParamType::String).desc("Working directory (defaults to project root)"),
-                    ToolParam::new("one_at_a_time", ParamType::Boolean)
-                        .desc("Don't run simultaneously with itself (default: false)"),
-                    ToolParam::new("old_string", ParamType::String)
-                        .desc("For diff-based script update: exact text to find"),
-                    ToolParam::new("new_string", ParamType::String)
-                        .desc("For diff-based script update: replacement text"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Callback".to_string(),
-            },
-            ToolDefinition {
-                id: "Callback_open_editor".to_string(),
-                name: "Callback Open Editor".to_string(),
-                short_desc: "Open callback script in editor".to_string(),
-                description: "Opens a callback's script content in the Callbacks panel for reading and editing. \
-                    Required before using diff-based script editing (old_string/new_string in Callback_upsert update). \
-                    Max one callback open at a time — opening a new one closes the previous."
-                    .to_string(),
-                params: vec![ToolParam::new("id", ParamType::String).desc("Callback ID (e.g., 'CB1')").required()],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Callback".to_string(),
-            },
-            ToolDefinition {
-                id: "Callback_close_editor".to_string(),
-                name: "Callback Close Editor".to_string(),
-                short_desc: "Close callback script editor".to_string(),
-                description:
-                    "Closes the callback script editor in the Callbacks panel, restoring the normal table view."
-                        .to_string(),
-                params: vec![],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Callback".to_string(),
-            },
-            ToolDefinition {
-                id: "Callback_toggle".to_string(),
-                name: "Callback Toggle".to_string(),
-                short_desc: "Activate/deactivate a callback for this worker".to_string(),
-                description: "Activates or deactivates a callback for the current worker. \
-                    Does NOT modify the callback definition — only this worker's activation state."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Callback ID (e.g., 'CB1')").required(),
-                    ToolParam::new("active", ParamType::Boolean)
-                        .desc("true to activate, false to deactivate")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Callback".to_string(),
-            },
+            ToolDefinition::from_yaml("Callback_upsert", t)
+                .short_desc("Create, update, or delete a callback")
+                .category("Callback")
+                .param_enum("action", &["create", "update", "delete"], true)
+                .param("id", ParamType::String, false)
+                .param("name", ParamType::String, false)
+                .param("description", ParamType::String, false)
+                .param("pattern", ParamType::String, false)
+                .param("script_content", ParamType::String, false)
+                .param("blocking", ParamType::Boolean, false)
+                .param("timeout", ParamType::Integer, false)
+                .param("success_message", ParamType::String, false)
+                .param("cwd", ParamType::String, false)
+                .param("one_at_a_time", ParamType::Boolean, false)
+                .param("old_string", ParamType::String, false)
+                .param("new_string", ParamType::String, false)
+                .build(),
+            ToolDefinition::from_yaml("Callback_open_editor", t)
+                .short_desc("Open callback script in editor")
+                .category("Callback")
+                .param("id", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("Callback_close_editor", t)
+                .short_desc("Close callback script editor")
+                .category("Callback")
+                .build(),
+            ToolDefinition::from_yaml("Callback_toggle", t)
+                .short_desc("Activate/deactivate a callback for this worker")
+                .category("Callback")
+                .param("id", ParamType::String, true)
+                .param("active", ParamType::Boolean, true)
+                .build(),
         ]
     }
 

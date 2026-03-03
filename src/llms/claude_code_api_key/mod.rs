@@ -19,6 +19,7 @@ use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent, api_messages_to_cc_json};
 use crate::infra::constants::library;
 use crate::infra::tools::build_api_tools;
+use cp_base::config::INJECTIONS;
 
 use helpers::*;
 
@@ -65,9 +66,10 @@ impl LlmClient for ClaudeCodeApiKeyClient {
 
         // Handle cleaner mode extra context
         if let Some(ref context) = request.extra_context {
+            let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", context);
             json_messages.push(serde_json::json!({
                 "role": "user",
-                "content": format!("Please clean up the context to reduce token usage:\n\n{}", context)
+                "content": msg
             }));
         }
 

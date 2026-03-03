@@ -6,8 +6,13 @@ pub mod types;
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, ContextTypeMeta, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/firecrawl.yaml"))
+        .expect("Failed to parse firecrawl tool YAML")
+});
 
 pub struct FirecrawlModule;
 
@@ -50,113 +55,48 @@ impl Module for FirecrawlModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "firecrawl_scrape".to_string(),
-                name: "Firecrawl Scrape".to_string(),
-                short_desc: "Scrape a URL for full content".to_string(),
-                description: concat!(
-                    "Full-page content extraction from a single known URL. ",
-                    "Renders JavaScript via headless Chromium. Returns clean markdown ",
-                    "(~67% fewer tokens than raw HTML) plus page links. ",
-                    "Use when you need the full content of a specific page (Tier 3a).\n\n",
-                    "ESCALATION: Use after brave_search/brave_llm_context when ",
-                    "snippets are insufficient and you have a specific URL to extract.\n\n",
-                    "FORMATS: 'markdown' (default, clean text), 'html', 'links' (all page URLs), ",
-                    "'summary', 'images'. Default: ['markdown', 'links'].\n\n",
-                    "KEY DECISION: This tool REQUIRES a known URL — it cannot discover pages. ",
-                    "If you don't have a URL yet, use brave_search first (to find URLs) or firecrawl_search ",
-                    "(to search AND scrape in one step). One page per call."
+            ToolDefinition::from_yaml("firecrawl_scrape", t)
+                .short_desc("Scrape a URL for full content")
+                .category("Web Scrape")
+                .param("url", ParamType::String, true)
+                .param_array("formats", ParamType::String, false)
+                .param_object(
+                    "location",
+                    vec![
+                        ToolParam::new("country", ParamType::String),
+                        ToolParam::new("languages", ParamType::Array(Box::new(ParamType::String))),
+                    ],
+                    false,
                 )
-                .to_string(),
-                params: vec![
-                    ToolParam::new("url", ParamType::String).desc("Target URL to scrape").required(),
-                    ToolParam::new("formats", ParamType::Array(Box::new(ParamType::String))).desc(
-                        "Output formats: 'markdown'|'html'|'links'|'summary'|'images' (default ['markdown','links'])",
-                    ),
-                    ToolParam::new(
-                        "location",
-                        ParamType::Object(vec![
-                            ToolParam::new("country", ParamType::String).desc("2-letter country code"),
-                            ToolParam::new("languages", ParamType::Array(Box::new(ParamType::String)))
-                                .desc("Language codes"),
-                        ]),
-                    )
-                    .desc("Optional location for geo-targeted scraping"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Web Scrape".to_string(),
-            },
-            ToolDefinition {
-                id: "firecrawl_search".to_string(),
-                name: "Firecrawl Search".to_string(),
-                short_desc: "Search and scrape in one call".to_string(),
-                description: concat!(
-                    "Combined search + scrape in a single API call. Discovers URLs matching a query ",
-                    "and returns full markdown content for the top results. ",
-                    "Use when you need full pages but don't have specific URLs yet (Tier 3b).\n\n",
-                    "ESCALATION: Use after brave_search when snippets are insufficient ",
-                    "and you need deep content from multiple pages.\n\n",
-                    "KEY DIFFERENCE from firecrawl_scrape: this tool discovers AND scrapes in one step — ",
-                    "you don't need a URL first. It replaces the brave_search→firecrawl_scrape two-step when you know ",
-                    "upfront you'll need full page content. More expensive per call but saves a round trip.\n\n",
-                    "CATEGORIES: 'github' (repos/code), 'research' (arxiv/nature/ieee), 'pdf'.\n",
-                    "TBS (time filter): 'qdr:h' (hour), 'qdr:d' (day), 'qdr:w' (week), ",
-                    "'qdr:m' (month), 'qdr:y' (year)."
+                .build(),
+            ToolDefinition::from_yaml("firecrawl_search", t)
+                .short_desc("Search and scrape in one call")
+                .category("Web Scrape")
+                .param("query", ParamType::String, true)
+                .param("limit", ParamType::Integer, false)
+                .param_array("sources", ParamType::String, false)
+                .param_array("categories", ParamType::String, false)
+                .param("tbs", ParamType::String, false)
+                .param("location", ParamType::String, false)
+                .build(),
+            ToolDefinition::from_yaml("firecrawl_map", t)
+                .short_desc("Discover all URLs on a domain")
+                .category("Web Scrape")
+                .param("url", ParamType::String, true)
+                .param("limit", ParamType::Integer, false)
+                .param("search", ParamType::String, false)
+                .param("include_subdomains", ParamType::Boolean, false)
+                .param_object(
+                    "location",
+                    vec![
+                        ToolParam::new("country", ParamType::String),
+                        ToolParam::new("languages", ParamType::Array(Box::new(ParamType::String))),
+                    ],
+                    false,
                 )
-                .to_string(),
-                params: vec![
-                    ToolParam::new("query", ParamType::String).desc("Search query").required(),
-                    ToolParam::new("limit", ParamType::Integer).desc("Pages to scrape (1-10, default 3)"),
-                    ToolParam::new("sources", ParamType::Array(Box::new(ParamType::String)))
-                        .desc("Source types: 'web'|'news'|'images' (default ['web'])"),
-                    ToolParam::new("categories", ParamType::Array(Box::new(ParamType::String)))
-                        .desc("Target categories: 'github'|'research'|'pdf'"),
-                    ToolParam::new("tbs", ParamType::String)
-                        .desc("Time filter: 'qdr:h'|'qdr:d'|'qdr:w'|'qdr:m'|'qdr:y'"),
-                    ToolParam::new("location", ParamType::String)
-                        .desc("Location string, e.g. 'Germany', 'San Francisco,California'"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Web Scrape".to_string(),
-            },
-            ToolDefinition {
-                id: "firecrawl_map".to_string(),
-                name: "Firecrawl Map".to_string(),
-                short_desc: "Discover all URLs on a domain".to_string(),
-                description: concat!(
-                    "Discovers all URLs on a given domain. Primarily from sitemap, ",
-                    "supplemented by SERP and cached crawl data. ",
-                    "Use to explore a site's structure before targeted scraping (Tier 4).\n\n",
-                    "ESCALATION: Use when you need to understand a site's structure ",
-                    "to find the right pages to scrape. Typically followed by firecrawl_scrape.\n\n",
-                    "COST: 1 credit per call regardless of URLs returned. Very cheap for exploration.\n\n",
-                    "WARNING: Returns URLs ONLY — no page content. This is a discovery/exploration tool. ",
-                    "After finding interesting URLs, use firecrawl_scrape to get the actual content. ",
-                    "If you already know what you're looking for, use firecrawl_search instead (search + scrape in one step)."
-                )
-                .to_string(),
-                params: vec![
-                    ToolParam::new("url", ParamType::String).desc("Root domain or subdomain to map").required(),
-                    ToolParam::new("limit", ParamType::Integer).desc("Max URLs returned (1-5000, default 50)"),
-                    ToolParam::new("search", ParamType::String).desc("Optional keyword filter on discovered URLs"),
-                    ToolParam::new("include_subdomains", ParamType::Boolean).desc("Include subdomains (default false)"),
-                    ToolParam::new(
-                        "location",
-                        ParamType::Object(vec![
-                            ToolParam::new("country", ParamType::String).desc("2-letter country code"),
-                            ToolParam::new("languages", ParamType::Array(Box::new(ParamType::String)))
-                                .desc("Language codes"),
-                        ]),
-                    )
-                    .desc("Optional location for geo-targeted mapping"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Web Scrape".to_string(),
-            },
+                .build(),
         ]
     }
 

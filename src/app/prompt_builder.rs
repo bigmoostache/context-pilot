@@ -15,6 +15,7 @@ use crate::llms::{
     ApiMessage, ContentBlock, panel_footer_text, panel_header_text, panel_timestamp_text, prepare_panel_messages,
 };
 use crate::state::{Message, MessageStatus, MessageType};
+use cp_base::config::INJECTIONS;
 
 /// Assemble the full prompt as `Vec<ApiMessage>`.
 ///
@@ -161,15 +162,14 @@ fn inject_panel_messages(
 
     // Re-inject seed/system prompt after panels
     if let Some(seed) = seed_content {
+        let header = &INJECTIONS.providers.seed_reinjection_header;
         api_messages.push(ApiMessage {
             role: "user".to_string(),
-            content: vec![ContentBlock::Text {
-                text: format!("System instructions (repeated for emphasis):\n\n{}", seed),
-            }],
+            content: vec![ContentBlock::Text { text: format!("{}\n\n{}", header, seed) }],
         });
         api_messages.push(ApiMessage {
             role: "assistant".to_string(),
-            content: vec![ContentBlock::Text { text: "Understood. I will follow these instructions.".to_string() }],
+            content: vec![ContentBlock::Text { text: INJECTIONS.providers.seed_reinjection_ack.clone() }],
         });
     }
 }

@@ -6,9 +6,13 @@ pub mod questions;
 use std::collections::{HashMap, HashSet};
 
 use crate::app::panels::Panel;
-use crate::infra::tools::{ParamType, ToolDefinition, ToolParam};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{ContextType, State};
+
+static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../yamls/tools/core.yaml")).expect("Failed to parse core tool YAML")
+});
 
 pub use cp_mod_brave::BraveModule;
 pub use cp_mod_callback::CallbackModule;
@@ -197,34 +201,24 @@ pub fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result<(), St
 
 /// Returns the module_toggle tool definition (added by core module).
 pub fn module_toggle_tool_definition() -> ToolDefinition {
-    ToolDefinition {
-        id: "module_toggle".to_string(),
-        name: "Toggle Module".to_string(),
-        short_desc: "Activate/deactivate modules".to_string(),
-        description: "Activates or deactivates modules. Core module cannot be deactivated. \
-            Deactivating a module removes its tools and panels. \
-            Cannot deactivate a module if another active module depends on it."
-            .to_string(),
-        params: vec![
-            ToolParam::new(
-                "changes",
-                ParamType::Array(Box::new(ParamType::Object(vec![
-                    ToolParam::new("module", ParamType::String)
-                        .desc("Module ID (e.g., 'git', 'memory', 'tmux')")
-                        .required(),
-                    ToolParam::new("action", ParamType::String)
-                        .desc("Action to perform")
-                        .enum_vals(&["activate", "deactivate"])
-                        .required(),
-                ]))),
-            )
-            .desc("Array of module changes")
-            .required(),
-        ],
-        enabled: true,
-        reverie_allowed: false,
-        category: "System".to_string(),
-    }
+    let t = &*CORE_TOOL_TEXTS;
+    ToolDefinition::from_yaml("module_toggle", t)
+        .short_desc("Activate/deactivate modules")
+        .category("System")
+        .param_array(
+            "changes",
+            ParamType::Object(vec![
+                ToolParam::new("module", ParamType::String)
+                    .desc("Module ID (e.g., 'git', 'memory', 'tmux')")
+                    .required(),
+                ToolParam::new("action", ParamType::String)
+                    .desc("Action to perform")
+                    .enum_vals(&["activate", "deactivate"])
+                    .required(),
+            ]),
+            true,
+        )
+        .build()
 }
 
 /// Execute the module_toggle tool.

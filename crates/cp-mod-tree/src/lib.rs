@@ -7,7 +7,7 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TreePanel;
@@ -17,6 +17,10 @@ pub use types::{DEFAULT_TREE_FILTER, TreeFileDescription, TreeState};
 
 // Re-export directory listing for autocomplete
 pub use self::tools::list_dir_entries;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/tree.yaml")).expect("Failed to parse tree tool YAML")
+});
 
 pub struct TreeModule;
 
@@ -108,61 +112,35 @@ impl Module for TreeModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "tree_filter".to_string(),
-                name: "Tree Filter".to_string(),
-                short_desc: "Configure directory filter".to_string(),
-                description: "Edits the gitignore-style filter for the directory tree view.".to_string(),
-                params: vec![
-                    ToolParam::new("filter", ParamType::String)
-                        .desc("Gitignore-style patterns, one per line")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Tree".to_string(),
-            },
-            ToolDefinition {
-                id: "tree_toggle".to_string(),
-                name: "Tree Toggle".to_string(),
-                short_desc: "Open/close folders".to_string(),
-                description: "Opens or closes folders in the directory tree view. Closed folders show child count, open folders show contents.".to_string(),
-                params: vec![
-                    ToolParam::new("paths", ParamType::Array(Box::new(ParamType::String)))
-                        .desc("Folder paths to toggle (e.g., ['src', 'src/ui'])")
-                        .required(),
-                    ToolParam::new("action", ParamType::String)
-                        .desc("Action to perform")
-                        .enum_vals(&["open", "close", "toggle"])
-                        .default_val("toggle"),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Tree".to_string(),
-            },
-            ToolDefinition {
-                id: "tree_describe".to_string(),
-                name: "Tree Describe".to_string(),
-                short_desc: "Add file/folder descriptions".to_string(),
-                description: "Adds or updates descriptions for files and folders in the tree. Descriptions appear next to items. A [!] marker indicates the file changed since description was written.".to_string(),
-                params: vec![
-                    ToolParam::new("descriptions", ParamType::Array(Box::new(ParamType::Object(vec![
-                        ToolParam::new("path", ParamType::String)
-                            .desc("File or folder path")
-                            .required(),
-                        ToolParam::new("description", ParamType::String)
-                            .desc("Description text"),
-                        ToolParam::new("delete", ParamType::Boolean)
-                            .desc("Set true to remove description"),
-                    ]))))
-                        .desc("Array of path descriptions")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Tree".to_string(),
-            },
+            ToolDefinition::from_yaml("tree_filter", t)
+                .short_desc("Configure directory filter")
+                .category("Tree")
+                .reverie_allowed(true)
+                .param("filter", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("tree_toggle", t)
+                .short_desc("Open/close folders")
+                .category("Tree")
+                .reverie_allowed(true)
+                .param_array("paths", ParamType::String, true)
+                .param_enum("action", &["open", "close", "toggle"], false)
+                .build(),
+            ToolDefinition::from_yaml("tree_describe", t)
+                .short_desc("Add file/folder descriptions")
+                .category("Tree")
+                .reverie_allowed(true)
+                .param_array(
+                    "descriptions",
+                    ParamType::Object(vec![
+                        ToolParam::new("path", ParamType::String).desc("File or folder path").required(),
+                        ToolParam::new("description", ParamType::String).desc("Description text"),
+                        ToolParam::new("delete", ParamType::Boolean).desc("Set true to remove description"),
+                    ]),
+                    true,
+                )
+                .build(),
         ]
     }
 

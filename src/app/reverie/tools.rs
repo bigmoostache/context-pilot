@@ -3,60 +3,44 @@
 //! The reverie has access to a curated subset of tools for context management,
 //! plus a mandatory Report tool to end its run.
 
-use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolResult, ToolUse};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolResult, ToolTexts, ToolUse};
 use crate::state::State;
+use cp_base::config::REVERIE;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/reverie.yaml")).expect("Failed to parse reverie tool YAML")
+});
 
 /// Build the Report tool definition — the reverie's mandatory end-of-run tool.
 #[cfg_attr(not(test), allow(dead_code))]
 pub fn report_tool_definition() -> ToolDefinition {
-    ToolDefinition {
-        id: "reverie_report".to_string(),
-        name: "Report".to_string(),
-        short_desc: "End reverie run with summary".to_string(),
-        description: "Mandatory: call this when you're done optimizing context. \
-        Writes a summary of what you did to a spine notification, then destroys this reverie session. \
-        You MUST call this tool before ending your turn."
-            .to_string(),
-        params: vec![
-            ToolParam::new("summary", ParamType::String)
-                .desc("Brief summary of what you optimized (1-3 sentences)")
-                .required(),
-        ],
-        enabled: true,
-        reverie_allowed: false,
-        category: "Reverie".to_string(),
-    }
+    let t = &*TOOL_TEXTS;
+    ToolDefinition::from_yaml("reverie_report", t)
+        .short_desc("End reverie run with summary")
+        .category("Reverie")
+        .param("summary", ParamType::String, true)
+        .build()
 }
 
 /// Build a human-readable text describing which tools the reverie is allowed to use.
 /// This is injected at the top of the reverie's conversation panel (P-reverie) so the
 /// LLM knows its constraints, even though it sees ALL tool definitions in the prompt.
 pub fn build_tool_restrictions_text(tools: &[crate::infra::tools::ToolDefinition]) -> String {
-    let mut text = String::from(
-        "## Tool Restrictions\n\
-         You are a reverie (context optimizer sub-agent). You may ONLY use the following tools:\n\n",
-    );
+    let r = &REVERIE.tool_restrictions;
+    let mut text = r.header.trim_end().to_string();
+    text.push('\n');
+
     for tool in tools {
         if tool.reverie_allowed {
-            text.push_str(&format!("- {}\n", tool.id));
+            text.push_str(&format!("\n- {}", tool.id));
         }
     }
-    text.push_str(
-        "\nIf you call any tool NOT in this list, it will be rejected with an error. \
-         Focus on context management only.\n\n",
-    );
 
-    // Report instructions — the reverie ends by calling a special tool
-    text.push_str(
-        "## Ending Your Run (MANDATORY)\n\
-         When you are done optimizing, you MUST call the `reverie_report` tool with a brief summary.\n\
-         This is how you signal completion. Your run will be force-terminated if you don't.\n\n\
-         Call it like this:\n\
-         ```\n\
-         reverie_report({\"summary\": \"Closed 5 stale panels, summarized 12 logs.\"})\n\
-         ```\n\
-         The `summary` parameter is a short string (1-3 sentences) describing what you did.\n",
-    );
+    text.push_str("\n\n");
+    text.push_str(r.footer.trim_end());
+    text.push_str("\n\n");
+    text.push_str(r.report_instructions.trim_end());
+    text.push('\n');
     text
 }
 ///
@@ -75,27 +59,13 @@ pub fn reverie_tool_definitions(main_tools: &[ToolDefinition]) -> Vec<ToolDefini
 /// This tool lets the main AI explicitly invoke a reverie sub-agent
 /// with an optional directive and agent selection.
 pub fn optimize_context_tool_definition() -> ToolDefinition {
-    ToolDefinition {
-        id: "optimize_context".to_string(),
-        name: "Optimize Context".to_string(),
-        short_desc: "Invoke the reverie context optimizer".to_string(),
-        description: "Triggers the background context optimizer (reverie). \
-        The reverie will analyze current context, close irrelevant panels, \
-        summarize logs, and reshape context for the current task. \
-        Optionally provide a directive to guide optimization \
-        (e.g., 'I'm about to work on the UI, optimize context for that'). \
-        Cannot invoke if a reverie is already active or reverie is disabled."
-            .to_string(),
-        params: vec![
-            ToolParam::new("directive", ParamType::String)
-                .desc("Optional guidance for the optimizer (e.g., 'focus on git module files')"),
-            ToolParam::new("agent", ParamType::String)
-                .desc("Agent ID to drive the reverie (default: 'cleaner'). Use 'cartographer' to auto-describe files in the tree."),
-        ],
-        enabled: true,
-        reverie_allowed: false,
-        category: "Reverie".to_string(),
-    }
+    let t = &*TOOL_TEXTS;
+    ToolDefinition::from_yaml("optimize_context", t)
+        .short_desc("Invoke the reverie context optimizer")
+        .category("Reverie")
+        .param("directive", ParamType::String, false)
+        .param("agent", ParamType::String, false)
+        .build()
 }
 
 /// Execute the Report tool: create a spine notification and signal reverie destruction.
@@ -109,11 +79,7 @@ pub fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
     if !qs.queued_calls.is_empty() {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!(
-                "Cannot report with {} unflushed queued action(s). \
-                 Call Queue_execute to flush or Queue_empty to discard first.",
-                qs.queued_calls.len()
-            ),
+            content: REVERIE.errors.queue_not_empty.replace("{count}", &qs.queued_calls.len().to_string()),
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -141,7 +107,7 @@ pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
     if !state.reverie_enabled {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: "Reverie is disabled. Enable it in config (Ctrl+H → r) first.".to_string(),
+            content: REVERIE.errors.reverie_disabled.clone(),
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -155,10 +121,7 @@ pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
     if state.reveries.contains_key(&agent_id) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!(
-                "A reverie with agent '{}' is already running. Wait for it to complete before invoking again.",
-                agent_id
-            ),
+            content: REVERIE.errors.already_running.replace("{agent_id}", &agent_id),
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -200,7 +163,7 @@ pub fn dispatch_reverie_tool(tool: &ToolUse, state: &mut State) -> Option<ToolRe
             } else {
                 Some(ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!("Tool '{}' is not available to the reverie.", tool.name),
+                    content: REVERIE.errors.tool_not_available.replace("{tool_name}", &tool.name),
                     is_error: true,
                     tool_name: tool.name.clone(),
                 })

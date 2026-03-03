@@ -7,10 +7,14 @@ pub use types::{QueueState, QueuedToolCall};
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::QueuePanel;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/queue.yaml")).expect("Failed to parse queue tool YAML")
+});
 
 pub struct QueueModule;
 
@@ -73,73 +77,34 @@ impl Module for QueueModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "Queue_activate".to_string(),
-                name: "Queue Activate".to_string(),
-                short_desc: "Start queueing tool calls".to_string(),
-                description: "Activates the tool queue. All subsequent non-Queue tool calls \
-                    will be intercepted and queued instead of executing. Queue tools themselves \
-                    always execute immediately. Use Queue_execute to flush the queue."
-                    .to_string(),
-                params: vec![],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Queue".to_string(),
-            },
-            ToolDefinition {
-                id: "Queue_pause".to_string(),
-                name: "Queue Pause".to_string(),
-                short_desc: "Stop queueing, execute normally".to_string(),
-                description: "Pauses the queue — tool calls execute normally again. \
-                    The existing queue stays intact for later flush or empty."
-                    .to_string(),
-                params: vec![],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Queue".to_string(),
-            },
-            ToolDefinition {
-                id: "Queue_execute".to_string(),
-                name: "Queue Execute".to_string(),
-                short_desc: "Flush: execute all queued actions".to_string(),
-                description: "Executes all queued tool calls in order, atomically. \
-                    Returns a summary of results. Clears the queue after execution. \
-                    This is the 'commit' — one cache break instead of N."
-                    .to_string(),
-                params: vec![],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Queue".to_string(),
-            },
-            ToolDefinition {
-                id: "Queue_undo".to_string(),
-                name: "Queue Undo".to_string(),
-                short_desc: "Remove queued actions by index".to_string(),
-                description: "Removes specific queued action(s) by their index number. \
-                    Check the Queue panel to see indices."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("indices", ParamType::Array(Box::new(ParamType::Integer)))
-                        .desc("Indices of queued actions to remove (e.g., [1, 3])")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Queue".to_string(),
-            },
-            ToolDefinition {
-                id: "Queue_empty".to_string(),
-                name: "Queue Empty".to_string(),
-                short_desc: "Discard all queued actions".to_string(),
-                description: "Discards all queued actions without executing them. \
-                    The queue is cleared and deactivated."
-                    .to_string(),
-                params: vec![],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Queue".to_string(),
-            },
+            ToolDefinition::from_yaml("Queue_activate", t)
+                .short_desc("Start queueing tool calls")
+                .category("Queue")
+                .reverie_allowed(true)
+                .build(),
+            ToolDefinition::from_yaml("Queue_pause", t)
+                .short_desc("Stop queueing, execute normally")
+                .category("Queue")
+                .reverie_allowed(true)
+                .build(),
+            ToolDefinition::from_yaml("Queue_execute", t)
+                .short_desc("Flush: execute all queued actions")
+                .category("Queue")
+                .reverie_allowed(true)
+                .build(),
+            ToolDefinition::from_yaml("Queue_undo", t)
+                .short_desc("Remove queued actions by index")
+                .category("Queue")
+                .reverie_allowed(true)
+                .param_array("indices", ParamType::Integer, true)
+                .build(),
+            ToolDefinition::from_yaml("Queue_empty", t)
+                .short_desc("Discard all queued actions")
+                .category("Queue")
+                .reverie_allowed(true)
+                .build(),
         ]
     }
 

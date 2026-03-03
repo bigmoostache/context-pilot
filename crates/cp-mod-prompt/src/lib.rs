@@ -12,12 +12,16 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::library_panel::LibraryPanel;
 use self::skill_panel::SkillPanel;
 use cp_base::modules::Module;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/prompt.yaml")).expect("Failed to parse prompt tool YAML")
+});
 
 pub struct PromptModule;
 
@@ -92,167 +96,80 @@ impl Module for PromptModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
             // === Agent tools ===
-            ToolDefinition {
-                id: "agent_create".to_string(),
-                name: "Create Agent".to_string(),
-                short_desc: "Create agent (system prompt)".to_string(),
-                description: "Creates a new agent with a name, description, and system prompt content. Agents define the AI's identity and behavior. ID is auto-generated from the name.".to_string(),
-                params: vec![
-                    ToolParam::new("name", ParamType::String).desc("Agent name").required(),
-                    ToolParam::new("description", ParamType::String).desc("Short description"),
-                    ToolParam::new("content", ParamType::String).desc("System prompt content").required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Agent".to_string(),
-            },
-            // === Edit tool (unified for agents, skills, commands) ===
-            ToolDefinition {
-                id: "Edit_prompt".to_string(),
-                name: "Edit Prompt".to_string(),
-                short_desc: "Edit agent/skill/command content".to_string(),
-                description: "Edits an agent, skill, or command by replacing exact text in its content. Routes automatically based on ID. Uses the same old_string/new_string pattern as the file Edit tool.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Agent, skill, or command ID").required(),
-                    ToolParam::new("old_string", ParamType::String).desc("Exact text to find and replace in content").required(),
-                    ToolParam::new("new_string", ParamType::String).desc("Replacement text").required(),
-                    ToolParam::new("replace_all", ParamType::Boolean).desc("Replace all occurrences (default: false)"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Agent".to_string(),
-            },
-            ToolDefinition {
-                id: "agent_delete".to_string(),
-                name: "Delete Agent".to_string(),
-                short_desc: "Delete agent".to_string(),
-                description: "Deletes an agent. Built-in agents cannot be deleted. If the deleted agent was active, reverts to default.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Agent ID to delete").required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Agent".to_string(),
-            },
-            ToolDefinition {
-                id: "agent_load".to_string(),
-                name: "Load Agent".to_string(),
-                short_desc: "Activate agent".to_string(),
-                description: "Activates an agent as the current system prompt. Pass empty id to revert to default.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Agent ID to activate. Empty to use default."),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Agent".to_string(),
-            },
+            ToolDefinition::from_yaml("agent_create", t)
+                .short_desc("Create agent (system prompt)")
+                .category("Agent")
+                .param("name", ParamType::String, true)
+                .param("description", ParamType::String, false)
+                .param("content", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("Edit_prompt", t)
+                .short_desc("Edit agent/skill/command content")
+                .category("Agent")
+                .param("id", ParamType::String, true)
+                .param("old_string", ParamType::String, true)
+                .param("new_string", ParamType::String, true)
+                .param("replace_all", ParamType::Boolean, false)
+                .build(),
+            ToolDefinition::from_yaml("agent_delete", t)
+                .short_desc("Delete agent")
+                .category("Agent")
+                .param("id", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("agent_load", t)
+                .short_desc("Activate agent")
+                .category("Agent")
+                .param("id", ParamType::String, false)
+                .build(),
             // === Skill tools ===
-            ToolDefinition {
-                id: "skill_create".to_string(),
-                name: "Create Skill".to_string(),
-                short_desc: "Create skill".to_string(),
-                description: "Creates a new skill. Skills are loaded as context panels that provide additional instructions or knowledge to the AI.".to_string(),
-                params: vec![
-                    ToolParam::new("name", ParamType::String).desc("Skill name").required(),
-                    ToolParam::new("description", ParamType::String).desc("Short description"),
-                    ToolParam::new("content", ParamType::String).desc("Skill content (instructions/knowledge)").required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Skill".to_string(),
-            },
-            ToolDefinition {
-                id: "skill_delete".to_string(),
-                name: "Delete Skill".to_string(),
-                short_desc: "Delete skill".to_string(),
-                description: "Deletes a skill. If loaded, unloads it first. Built-in skills cannot be deleted.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Skill ID to delete").required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Skill".to_string(),
-            },
-            ToolDefinition {
-                id: "skill_load".to_string(),
-                name: "Load Skill".to_string(),
-                short_desc: "Load skill as panel".to_string(),
-                description: "Loads a skill as a context panel. The skill's content becomes visible to the AI as a context block.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Skill ID to load").required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Skill".to_string(),
-            },
-            ToolDefinition {
-                id: "skill_unload".to_string(),
-                name: "Unload Skill".to_string(),
-                short_desc: "Unload skill panel".to_string(),
-                description: "Unloads a skill, removing its context panel.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Skill ID to unload").required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Skill".to_string(),
-            },
+            ToolDefinition::from_yaml("skill_create", t)
+                .short_desc("Create skill")
+                .category("Skill")
+                .param("name", ParamType::String, true)
+                .param("description", ParamType::String, false)
+                .param("content", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("skill_delete", t)
+                .short_desc("Delete skill")
+                .category("Skill")
+                .param("id", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("skill_load", t)
+                .short_desc("Load skill as panel")
+                .category("Skill")
+                .param("id", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("skill_unload", t)
+                .short_desc("Unload skill panel")
+                .category("Skill")
+                .param("id", ParamType::String, true)
+                .build(),
             // === Library editor tools ===
-            ToolDefinition {
-                id: "Library_open_prompt_editor".to_string(),
-                name: "Open Prompt Editor".to_string(),
-                short_desc: "Open prompt in editor".to_string(),
-                description: "Opens a prompt's content in the Library panel for reading and editing. \
-                    Required before using Edit_prompt. Max one prompt open at a time — opening a new one \
-                    closes the previous. The Library panel will show the prompt content with a warning banner."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Agent, skill, or command ID to open").required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Agent".to_string(),
-            },
-            ToolDefinition {
-                id: "Library_close_prompt_editor".to_string(),
-                name: "Close Prompt Editor".to_string(),
-                short_desc: "Close prompt editor".to_string(),
-                description: "Closes the prompt editor in the Library panel, restoring the normal library view."
-                    .to_string(),
-                params: vec![],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Agent".to_string(),
-            },
+            ToolDefinition::from_yaml("Library_open_prompt_editor", t)
+                .short_desc("Open prompt in editor")
+                .category("Agent")
+                .param("id", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("Library_close_prompt_editor", t)
+                .short_desc("Close prompt editor")
+                .category("Agent")
+                .build(),
             // === Command tools ===
-            ToolDefinition {
-                id: "command_create".to_string(),
-                name: "Create Command".to_string(),
-                short_desc: "Create command".to_string(),
-                description: "Creates a new command. Commands are inline replacements triggered by /command-name in the input field.".to_string(),
-                params: vec![
-                    ToolParam::new("name", ParamType::String).desc("Command name").required(),
-                    ToolParam::new("description", ParamType::String).desc("Short description"),
-                    ToolParam::new("content", ParamType::String).desc("Content to replace the /command with").required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Command".to_string(),
-            },
-            ToolDefinition {
-                id: "command_delete".to_string(),
-                name: "Delete Command".to_string(),
-                short_desc: "Delete command".to_string(),
-                description: "Deletes a command. Built-in commands cannot be deleted.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String).desc("Command ID to delete").required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Command".to_string(),
-            },
+            ToolDefinition::from_yaml("command_create", t)
+                .short_desc("Create command")
+                .category("Command")
+                .param("name", ParamType::String, true)
+                .param("description", ParamType::String, false)
+                .param("content", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("command_delete", t)
+                .short_desc("Delete command")
+                .category("Command")
+                .param("id", ParamType::String, true)
+                .build(),
         ]
     }
 

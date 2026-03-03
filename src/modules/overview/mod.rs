@@ -8,7 +8,7 @@ mod tools_panel;
 use serde_json::json;
 
 use crate::app::panels::Panel;
-use crate::infra::tools::{ParamType, ToolDefinition, ToolParam};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::modules::ToolVisualizer;
 use crate::state::{ContextType, ContextTypeMeta, State};
@@ -16,6 +16,10 @@ use crate::state::{ContextType, ContextTypeMeta, State};
 use self::panel::OverviewPanel;
 use self::tools_panel::ToolsPanel;
 use super::Module;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/core.yaml")).expect("Failed to parse core tool YAML")
+});
 
 pub struct OverviewModule;
 
@@ -230,43 +234,24 @@ impl Module for OverviewModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         let mut defs = vec![
             // Context tools
-            ToolDefinition {
-                id: "Close_panel".to_string(),
-                name: "Close Contexts".to_string(),
-                short_desc: "Remove items from context".to_string(),
-                description: "Closes context elements by their IDs (e.g., P6, P7). Cannot close core elements (P1-P6).".to_string(),
-                params: vec![
-                    ToolParam::new("ids", ParamType::Array(Box::new(ParamType::String)))
-                        .desc("List of context IDs to close")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Context".to_string(),
-            },
-
-            // System tools (reload stays in core)
-            ToolDefinition {
-                id: "system_reload".to_string(),
-                name: "Reload TUI".to_string(),
-                short_desc: "Restart the TUI".to_string(),
-                description: "Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.".to_string(),
-                params: vec![],
-                enabled: true,
-                reverie_allowed: false,
-                category: "System".to_string(),
-            },
-
+            ToolDefinition::from_yaml("Close_panel", t)
+                .short_desc("Remove items from context")
+                .category("Context")
+                .reverie_allowed(true)
+                .param_array("ids", ParamType::String, true)
+                .build(),
+            // System tools
+            ToolDefinition::from_yaml("system_reload", t).short_desc("Restart the TUI").category("System").build(),
             // Meta tools
-            ToolDefinition {
-                id: "tool_manage".to_string(),
-                name: "Manage Tools".to_string(),
-                short_desc: "Enable/disable tools".to_string(),
-                description: "Enables or disables tools. This tool cannot be disabled. Use to customize available capabilities.".to_string(),
-                params: vec![
-                    ToolParam::new("changes", ParamType::Array(Box::new(ParamType::Object(vec![
+            ToolDefinition::from_yaml("tool_manage", t)
+                .short_desc("Enable/disable tools")
+                .category("System")
+                .param_array(
+                    "changes",
+                    ParamType::Object(vec![
                         ToolParam::new("tool", ParamType::String)
                             .desc("Tool ID to change (e.g., 'edit_file', 'glob')")
                             .required(),
@@ -274,32 +259,22 @@ impl Module for OverviewModule {
                             .desc("Action to perform")
                             .enum_vals(&["enable", "disable"])
                             .required(),
-                    ]))))
-                        .desc("Array of tool changes")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "System".to_string(),
-            },
+                    ]),
+                    true,
+                )
+                .build(),
         ];
 
         // Panel pagination tool (dynamically enabled/disabled)
-        defs.push(ToolDefinition {
-            id: "panel_goto_page".to_string(),
-            name: "Go To Page".to_string(),
-            short_desc: "Navigate paginated panel".to_string(),
-            description:
-                "Navigates to a specific page of a paginated panel. Only available when a panel has more than one page."
-                    .to_string(),
-            params: vec![
-                ToolParam::new("panel_id", ParamType::String).desc("Panel ID (e.g., P8)").required(),
-                ToolParam::new("page", ParamType::Integer).desc("Page number (1-indexed)").required(),
-            ],
-            enabled: false,
-            reverie_allowed: false,
-            category: "Context".to_string(),
-        });
+        defs.push(
+            ToolDefinition::from_yaml("panel_goto_page", t)
+                .short_desc("Navigate paginated panel")
+                .category("Context")
+                .enabled(false)
+                .param("panel_id", ParamType::String, true)
+                .param("page", ParamType::Integer, true)
+                .build(),
+        );
 
         // Add module_toggle tool
         defs.push(super::module_toggle_tool_definition());

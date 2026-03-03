@@ -9,11 +9,16 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::ScratchpadPanel;
 use cp_base::modules::Module;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/scratchpad.yaml"))
+        .expect("Failed to parse scratchpad tool YAML")
+});
 
 pub struct ScratchpadModule;
 
@@ -72,56 +77,29 @@ impl Module for ScratchpadModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "scratchpad_create_cell".to_string(),
-                name: "Create Scratchpad Cell".to_string(),
-                short_desc: "Add scratchpad cell".to_string(),
-                description: "Creates a new scratchpad cell for storing temporary notes, code snippets, or data during the conversation.".to_string(),
-                params: vec![
-                    ToolParam::new("cell_title", ParamType::String)
-                        .desc("Title for the cell")
-                        .required(),
-                    ToolParam::new("cell_contents", ParamType::String)
-                        .desc("Content to store in the cell")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Scratchpad".to_string(),
-            },
-            ToolDefinition {
-                id: "scratchpad_edit_cell".to_string(),
-                name: "Edit Scratchpad Cell".to_string(),
-                short_desc: "Modify scratchpad cell".to_string(),
-                description: "Edits an existing scratchpad cell. Can update title and/or contents.".to_string(),
-                params: vec![
-                    ToolParam::new("cell_id", ParamType::String)
-                        .desc("Cell ID to edit (e.g., C1)")
-                        .required(),
-                    ToolParam::new("cell_title", ParamType::String)
-                        .desc("New title (omit to keep current)"),
-                    ToolParam::new("cell_contents", ParamType::String)
-                        .desc("New contents (omit to keep current)"),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Scratchpad".to_string(),
-            },
-            ToolDefinition {
-                id: "scratchpad_wipe".to_string(),
-                name: "Wipe Scratchpad".to_string(),
-                short_desc: "Delete scratchpad cells".to_string(),
-                description: "Deletes scratchpad cells by their IDs. Pass an empty array to wipe all cells.".to_string(),
-                params: vec![
-                    ToolParam::new("cell_ids", ParamType::Array(Box::new(ParamType::String)))
-                        .desc("Cell IDs to delete (e.g., ['C1', 'C2']). Empty array deletes all cells.")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Scratchpad".to_string(),
-            },
+            ToolDefinition::from_yaml("scratchpad_create_cell", t)
+                .short_desc("Add scratchpad cell")
+                .category("Scratchpad")
+                .reverie_allowed(true)
+                .param("cell_title", ParamType::String, true)
+                .param("cell_contents", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("scratchpad_edit_cell", t)
+                .short_desc("Modify scratchpad cell")
+                .category("Scratchpad")
+                .reverie_allowed(true)
+                .param("cell_id", ParamType::String, true)
+                .param("cell_title", ParamType::String, false)
+                .param("cell_contents", ParamType::String, false)
+                .build(),
+            ToolDefinition::from_yaml("scratchpad_wipe", t)
+                .short_desc("Delete scratchpad cells")
+                .category("Scratchpad")
+                .reverie_allowed(true)
+                .param_array("cell_ids", ParamType::String, true)
+                .build(),
         ]
     }
 

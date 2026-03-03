@@ -12,11 +12,15 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::MemoryPanel;
 use cp_base::modules::Module;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/memory.yaml")).expect("Failed to parse memory tool YAML")
+});
 
 pub struct MemoryModule;
 
@@ -84,64 +88,50 @@ impl Module for MemoryModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "memory_create".to_string(),
-                name: "Create Memories".to_string(),
-                short_desc: "Store persistent memories".to_string(),
-                description: "Creates memory items for important information to remember across the conversation."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new(
-                        "memories",
-                        ParamType::Array(Box::new(ParamType::Object(vec![
-                            ToolParam::new("content", ParamType::String).desc("Memory content").required(),
-                            ToolParam::new("contents", ParamType::String)
-                                .desc("Rich body text (visible when memory is opened)"),
-                            ToolParam::new("importance", ParamType::String)
-                                .desc("Importance level")
-                                .enum_vals(&["low", "medium", "high", "critical"]),
-                            ToolParam::new("labels", ParamType::Array(Box::new(ParamType::String)))
-                                .desc("Freeform labels for categorization (e.g., ['architecture', 'bug'])"),
-                        ]))),
-                    )
-                    .desc("Array of memories to create")
-                    .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Memory".to_string(),
-            },
-            ToolDefinition {
-                id: "memory_update".to_string(),
-                name: "Update Memories".to_string(),
-                short_desc: "Modify stored notes".to_string(),
-                description: "Updates or deletes existing memory items.".to_string(),
-                params: vec![
-                    ToolParam::new(
-                        "updates",
-                        ParamType::Array(Box::new(ParamType::Object(vec![
-                            ToolParam::new("id", ParamType::String).desc("Memory ID (e.g., M1)").required(),
-                            ToolParam::new("content", ParamType::String).desc("New content"),
-                            ToolParam::new("contents", ParamType::String)
-                                .desc("New rich body text (visible when memory is opened)"),
-                            ToolParam::new("importance", ParamType::String)
-                                .desc("New importance level")
-                                .enum_vals(&["low", "medium", "high", "critical"]),
-                            ToolParam::new("labels", ParamType::Array(Box::new(ParamType::String)))
-                                .desc("New labels (replaces existing)"),
-                            ToolParam::new("open", ParamType::Boolean)
-                                .desc("Set true to show full contents in panel, false to show only tl;dr"),
-                            ToolParam::new("delete", ParamType::Boolean).desc("Set true to delete"),
-                        ]))),
-                    )
-                    .desc("Array of memory updates")
-                    .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Memory".to_string(),
-            },
+            ToolDefinition::from_yaml("memory_create", t)
+                .short_desc("Store persistent memories")
+                .category("Memory")
+                .reverie_allowed(true)
+                .param_array(
+                    "memories",
+                    ParamType::Object(vec![
+                        ToolParam::new("content", ParamType::String).desc("Memory content").required(),
+                        ToolParam::new("contents", ParamType::String)
+                            .desc("Rich body text (visible when memory is opened)"),
+                        ToolParam::new("importance", ParamType::String)
+                            .desc("Importance level")
+                            .enum_vals(&["low", "medium", "high", "critical"]),
+                        ToolParam::new("labels", ParamType::Array(Box::new(ParamType::String)))
+                            .desc("Freeform labels for categorization (e.g., ['architecture', 'bug'])"),
+                    ]),
+                    true,
+                )
+                .build(),
+            ToolDefinition::from_yaml("memory_update", t)
+                .short_desc("Modify stored notes")
+                .category("Memory")
+                .reverie_allowed(true)
+                .param_array(
+                    "updates",
+                    ParamType::Object(vec![
+                        ToolParam::new("id", ParamType::String).desc("Memory ID (e.g., M1)").required(),
+                        ToolParam::new("content", ParamType::String).desc("New content"),
+                        ToolParam::new("contents", ParamType::String)
+                            .desc("New rich body text (visible when memory is opened)"),
+                        ToolParam::new("importance", ParamType::String)
+                            .desc("New importance level")
+                            .enum_vals(&["low", "medium", "high", "critical"]),
+                        ToolParam::new("labels", ParamType::Array(Box::new(ParamType::String)))
+                            .desc("New labels (replaces existing)"),
+                        ToolParam::new("open", ParamType::Boolean)
+                            .desc("Set true to show full contents in panel, false to show only tl;dr"),
+                        ToolParam::new("delete", ParamType::Boolean).desc("Set true to delete"),
+                    ]),
+                    true,
+                )
+                .build(),
         ]
     }
 

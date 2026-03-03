@@ -1,0 +1,47 @@
+# Reverie sub-agent prompts — system prompt, kickoff, nudge, restrictions.
+# These shape the behavior of background reverie agents (cleaner, cartographer).
+
+# System prompt for the reverie LLM call — kept minimal since real instructions
+# are injected into the P-reverie panel (for cache-friendly placement).
+system_prompt: "You are a background sub-agent. Follow the instructions in the P-reverie panel."
+
+# Initial user message sent to kick off a fresh reverie session.
+# Framed as a dispatch from the main AI so the sub-agent has context.
+kickoff_message: |
+  ** Message from your main consciousness **
+
+  You have been activated as a background sub-agent. Your instructions are in the P-reverie panel above. Read them carefully, then act. Use tools to accomplish your task, and call the Report tool when done.
+
+# Tool restrictions preamble — injected at the top of the P-reverie panel.
+# {tool_list} is replaced with the actual list of allowed tool IDs.
+tool_restrictions:
+  header: |
+    ## Tool Restrictions
+    You are a reverie (context optimizer sub-agent). You may ONLY use the following tools:
+  footer: |
+    If you call any tool NOT in this list, it will be rejected with an error. Focus on context management only.
+  report_instructions: |
+    ## Ending Your Run (MANDATORY)
+    When you are done optimizing, you MUST call the `reverie_report` tool with a brief summary.
+    This is how you signal completion. Your run will be force-terminated if you don't.
+
+    Call it like this:
+    ```
+    reverie_report({"summary": "Closed 5 stale panels, summarized 12 logs."})
+    ```
+    The `summary` parameter is a short string (1-3 sentences) describing what you did.
+
+# Nudge message injected when the reverie ends its turn without calling Report.
+report_nudge: |
+  You ended your turn without calling the `reverie_report` tool. This is MANDATORY. Call it now with a summary of what you did:
+
+  reverie_report({"summary": "<your summary here>"})
+
+  You MUST call this tool to complete your run.
+
+# Error messages returned as tool results
+errors:
+  tool_not_available: "Tool '{tool_name}' is not available to the reverie."
+  queue_not_empty: "Cannot report with {count} unflushed queued action(s). Call Queue_execute to flush or Queue_empty to discard first."
+  reverie_disabled: "Reverie is disabled. Enable it in config (Ctrl+H → r) first."
+  already_running: "A reverie with agent '{agent_id}' is already running. Wait for it to complete before invoking again."

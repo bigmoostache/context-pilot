@@ -45,6 +45,97 @@ pub struct PanelPrompts {
 }
 
 // ============================================================================
+// Injections Configuration (LLM-facing behavioral text)
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct InjectionsConfig {
+    pub spine: SpineInjections,
+    pub editor_warnings: EditorWarnings,
+    pub console_guardrails: ConsoleGuardrails,
+    pub redirects: RedirectInjections,
+    pub providers: ProviderInjections,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SpineInjections {
+    pub auto_continuation: String,
+    pub user_message_during_stream: String,
+    pub reload_complete: String,
+    #[serde(rename = "continue")]
+    pub continue_msg: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EditorWarnings {
+    pub callback: EditorWarningSet,
+    pub prompt: PromptEditorWarningSet,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EditorWarningSet {
+    pub banner: String,
+    pub no_execute: String,
+    pub close_hint: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PromptEditorWarningSet {
+    pub banner: String,
+    pub no_follow: String,
+    pub load_hint: String,
+    pub close_hint: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConsoleGuardrails {
+    pub git: String,
+    pub gh: String,
+    pub typst: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RedirectInjections {
+    pub conversation_history_close: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProviderInjections {
+    pub cleaner_mode: String,
+    pub seed_reinjection_header: String,
+    pub seed_reinjection_ack: String,
+    pub gpt_oss_suffix: String,
+}
+
+// ============================================================================
+// Reverie Configuration (sub-agent prompts and behavioral text)
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct ReverieConfig {
+    pub system_prompt: String,
+    pub kickoff_message: String,
+    pub tool_restrictions: ReverieToolRestrictions,
+    pub report_nudge: String,
+    pub errors: ReverieErrors,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReverieToolRestrictions {
+    pub header: String,
+    pub footer: String,
+    pub report_instructions: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReverieErrors {
+    pub tool_not_available: String,
+    pub queue_not_empty: String,
+    pub reverie_disabled: String,
+    pub already_running: String,
+}
+
+// ============================================================================
 // UI Configuration
 // ============================================================================
 
@@ -170,6 +261,10 @@ pub static LIBRARY: LazyLock<LibraryConfig> =
 pub static UI: LazyLock<UiConfig> = LazyLock::new(|| parse_yaml("ui.yaml", include_str!("../../../../yamls/ui.yaml")));
 pub static THEMES: LazyLock<ThemesConfig> =
     LazyLock::new(|| parse_yaml("themes.yaml", include_str!("../../../../yamls/themes.yaml")));
+pub static INJECTIONS: LazyLock<InjectionsConfig> =
+    LazyLock::new(|| parse_yaml("injections.yaml", include_str!("../../../../yamls/injections.yaml")));
+pub static REVERIE: LazyLock<ReverieConfig> =
+    LazyLock::new(|| parse_yaml("reverie.yaml", include_str!("../../../../yamls/reverie.yaml")));
 
 /// Get a theme by ID, falling back to default if not found
 pub fn get_theme(theme_id: &str) -> &'static Theme {

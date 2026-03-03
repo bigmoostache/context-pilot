@@ -100,6 +100,7 @@ impl Panel for SpinePanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::SPINE {
                 ctx.token_count = token_count;
+                cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }

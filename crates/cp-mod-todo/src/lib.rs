@@ -11,11 +11,15 @@ use serde_json::json;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TodoPanel;
 use cp_base::modules::Module;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/todo.yaml")).expect("Failed to parse todo tool YAML")
+});
 
 pub struct TodoModule;
 
@@ -74,74 +78,48 @@ impl Module for TodoModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "todo_create".to_string(),
-                name: "Create Todos".to_string(),
-                short_desc: "Add task items".to_string(),
-                description: "Creates one or more todo items. Supports nesting via parent_id.".to_string(),
-                params: vec![
-                    ToolParam::new("todos", ParamType::Array(Box::new(ParamType::Object(vec![
-                        ToolParam::new("name", ParamType::String)
-                            .desc("Todo title")
-                            .required(),
-                        ToolParam::new("description", ParamType::String)
-                            .desc("Detailed description"),
-                        ToolParam::new("parent_id", ParamType::String)
-                            .desc("Parent todo ID for nesting"),
-                    ]))))
-                        .desc("Array of todos to create")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Todo".to_string(),
-            },
-            ToolDefinition {
-                id: "todo_update".to_string(),
-                name: "Update Todos".to_string(),
-                short_desc: "Modify task items".to_string(),
-                description: "Updates existing todos: change status, name, description, or delete. Use delete:true to remove a todo.".to_string(),
-                params: vec![
-                    ToolParam::new("updates", ParamType::Array(Box::new(ParamType::Object(vec![
-                        ToolParam::new("id", ParamType::String)
-                            .desc("Todo ID (e.g., X1)")
-                            .required(),
-                        ToolParam::new("status", ParamType::String)
-                            .desc("New status")
-                            .enum_vals(&["pending", "in_progress", "done", "deleted"]),
-                        ToolParam::new("name", ParamType::String)
-                            .desc("New name"),
-                        ToolParam::new("description", ParamType::String)
-                            .desc("New description"),
-                        ToolParam::new("parent_id", ParamType::String)
-                            .desc("New parent ID, or null to make top-level"),
-                        ToolParam::new("delete", ParamType::Boolean)
-                            .desc("Set true to delete this todo"),
-                    ]))))
-                        .desc("Array of todo updates")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Todo".to_string(),
-            },
-            ToolDefinition {
-                id: "todo_move".to_string(),
-                name: "Move Todo".to_string(),
-                short_desc: "Reorder a task".to_string(),
-                description: "Moves a todo to a new position in the list. Place it after another todo, or at the top if after_id is null.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("Todo ID to move (e.g., X1)")
-                        .required(),
-                    ToolParam::new("after_id", ParamType::String)
-                        .desc("Place after this todo ID. Null or omit to move to top."),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Todo".to_string(),
-            },
+            ToolDefinition::from_yaml("todo_create", t)
+                .short_desc("Add task items")
+                .category("Todo")
+                .param_array(
+                    "todos",
+                    ParamType::Object(vec![
+                        ToolParam::new("name", ParamType::String).desc("Todo title").required(),
+                        ToolParam::new("description", ParamType::String).desc("Detailed description"),
+                        ToolParam::new("parent_id", ParamType::String).desc("Parent todo ID for nesting"),
+                    ]),
+                    true,
+                )
+                .build(),
+            ToolDefinition::from_yaml("todo_update", t)
+                .short_desc("Modify task items")
+                .category("Todo")
+                .param_array(
+                    "updates",
+                    ParamType::Object(vec![
+                        ToolParam::new("id", ParamType::String).desc("Todo ID (e.g., X1)").required(),
+                        ToolParam::new("status", ParamType::String).desc("New status").enum_vals(&[
+                            "pending",
+                            "in_progress",
+                            "done",
+                            "deleted",
+                        ]),
+                        ToolParam::new("name", ParamType::String).desc("New name"),
+                        ToolParam::new("description", ParamType::String).desc("New description"),
+                        ToolParam::new("parent_id", ParamType::String).desc("New parent ID, or null to make top-level"),
+                        ToolParam::new("delete", ParamType::Boolean).desc("Set true to delete this todo"),
+                    ]),
+                    true,
+                )
+                .build(),
+            ToolDefinition::from_yaml("todo_move", t)
+                .short_desc("Reorder a task")
+                .category("Todo")
+                .param("id", ParamType::String, true)
+                .param("after_id", ParamType::String, false)
+                .build(),
         ]
     }
 

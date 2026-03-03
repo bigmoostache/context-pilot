@@ -20,6 +20,11 @@ impl Panel for QueuePanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::QUEUE {
                 ctx.token_count = token_count;
+                // Hash content and only bump last_refresh_ms when it actually changes.
+                // This ensures the panel sorts correctly in context ordering —
+                // unchanged panels stay near the top (cache-friendly), changed panels
+                // float to the end (near conversation) so they don't break the prefix.
+                cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }
@@ -73,7 +78,15 @@ impl Panel for QueuePanel {
         // Queued calls list
         for call in &qs.queued_calls {
             let params = serde_json::to_string(&call.input).unwrap_or_default();
-            let short = if params.len() > 80 { format!("{}...", &params[..77]) } else { params };
+            let short = if params.len() > 80 {
+                let mut end = 77;
+                while !params.is_char_boundary(end) {
+                    end -= 1;
+                }
+                format!("{}...", &params[..end])
+            } else {
+                params
+            };
             lines.push(Line::from(vec![
                 Span::styled(format!("  {}. ", call.index), Style::default().fg(muted)),
                 Span::styled(call.tool_name.clone(), Style::default().fg(accent).bold()),
@@ -99,7 +112,15 @@ impl QueuePanel {
             text.push_str(&format!("Queue {} — {} action(s) queued:\n\n", status, qs.queued_calls.len()));
             for call in &qs.queued_calls {
                 let params = serde_json::to_string(&call.input).unwrap_or_default();
-                let short = if params.len() > 120 { format!("{}...", &params[..117]) } else { params };
+                let short = if params.len() > 120 {
+                    let mut end = 117;
+                    while !params.is_char_boundary(end) {
+                        end -= 1;
+                    }
+                    format!("{}...", &params[..end])
+                } else {
+                    params
+                };
                 text.push_str(&format!("{}. {}({})\n", call.index, call.tool_name, short));
             }
         }

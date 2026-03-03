@@ -1,0 +1,14 @@
+tools:
+  preset_snapshot_myself:
+    description: |
+      Saves the current worker configuration as a named preset. Captures: active system prompt, active modules, disabled tools, per-worker module data (todos, scratchpad, git settings), and dynamic panels. Does NOT capture messages or global config.
+    parameters:
+      name: "Preset name (alphanumeric and hyphens only, e.g., 'my-preset')"
+      description: "Description of what this preset is for"
+      replace: "Name of existing preset to overwrite. Required if a preset with this name already exists."
+
+  preset_load:
+    description: |
+      Loads a named preset, replacing the current worker configuration. Replaces: active system prompt, active modules, disabled tools, per-worker module data, and dynamic panels. Messages and conversation history are preserved.
+    parameters:
+      name: "Name of the preset to load"

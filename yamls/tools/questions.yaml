@@ -1,0 +1,12 @@
+tools:
+  ask_user_question:
+    description: |
+      Presents 1-4 multiple-choice questions to the user as an interactive form. The form replaces the input field until the user submits answers or presses Esc to dismiss. Each question has 2-4 options plus an auto-appended "Other" free-text option. Use this to gather preferences, clarify ambiguous instructions, or get implementation decisions. The user can select one option (or multiple if multiSelect), or choose "Other" and type a custom answer. If recommending a specific option, list it first with "(Recommended)" in the label.
+    parameters:
+      questions: "1-4 questions to ask the user"
+      question: "The complete question text. Should be clear, specific, and end with ?"
+      header: "Very short label (max 12 chars). E.g. \"Auth method\", \"Library\""
+      options: "2-4 available choices. An \"Other\" free-text option is appended automatically."
+      label: "Display text (1-5 words)"
+      description: "Explanation of what this option means"
+      multiSelect: "If true, user can select multiple options"

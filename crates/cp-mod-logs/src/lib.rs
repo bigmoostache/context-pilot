@@ -18,8 +18,12 @@ use cp_base::config::constants::STORE_DIR;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/logs.yaml")).expect("Failed to parse logs tool YAML")
+});
 
 /// Directory for chunked log files
 fn logs_dir() -> PathBuf {
@@ -166,92 +170,58 @@ impl Module for LogsModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "log_create".to_string(),
-                name: "Create Logs".to_string(),
-                short_desc: "Create timestamped log entries".to_string(),
-                description: "Creates timestamped log entries for recording decisions, actions, or notable events during the conversation.".to_string(),
-                params: vec![
-                    ToolParam::new("entries", ParamType::Array(Box::new(ParamType::Object(vec![
-                        ToolParam::new("content", ParamType::String)
-                            .desc("Short, atomic log entry")
-                            .required(),
-                    ]))))
-                        .desc("Array of log entries to create (timestamped automatically)")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Context".to_string(),
-            },
-
-            ToolDefinition {
-                id: "log_summarize".to_string(),
-                name: "Summarize Logs".to_string(),
-                short_desc: "Summarize multiple logs into a parent log".to_string(),
-                description: "Summarizes multiple top-level log entries into a single parent summary log. The original logs become children hidden under the summary. Only top-level logs (no parent) can be summarized. Minimum 4 entries required.".to_string(),
-                params: vec![
-                    ToolParam::new("log_ids", ParamType::Array(Box::new(ParamType::String)))
-                        .desc("Array of log IDs to summarize (e.g., ['L27', 'L28', 'L29']). Minimum 4 entries. All must be top-level (no parent).")
-                        .required(),
-                    ToolParam::new("content", ParamType::String)
-                        .desc("Summary text for the new parent log entry")
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Context".to_string(),
-            },
-
-            ToolDefinition {
-                id: "log_toggle".to_string(),
-                name: "Toggle Log Summary".to_string(),
-                short_desc: "Expand or collapse a log summary".to_string(),
-                description: "Expands or collapses a log summary to show or hide its children. Can only toggle logs that have children (are summaries).".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("Log ID to toggle (e.g., 'L42')")
-                        .required(),
-                    ToolParam::new("action", ParamType::String)
-                        .desc("Action to perform")
-                        .enum_vals(&["expand", "collapse"])
-                        .required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Context".to_string(),
-            },
-
-            ToolDefinition {
-                id: "Close_conversation_history".to_string(),
-                name: "Close Conversation History".to_string(),
-                short_desc: "Close a conversation history panel with logs/memories".to_string(),
-                description: "Closes a conversation history panel. Before closing, creates log entries and memory items to preserve important information. Everything in the history panel will be lost after closing.\n\nIMPORTANT: Before calling this tool, carefully review ALL human messages in the panel. Extract and preserve:\n- **Logs**: Short, atomic entries for mid-conversation context — decisions made, actions taken, bugs found, user preferences expressed, task context. Logs are medium-lifecycle: they maintain conversation flow across reloads.\n- **Memories**: Longer-lived knowledge that matters beyond this session — architecture decisions, user preferences, project conventions, important discoveries. Memories persist across conversations.\n\nEvery substantive piece of information from human messages should be captured in either a log or a memory. When in doubt, preserve it. Log timestamps are set to the panel's last message time, not the current time.".to_string(),
-                params: vec![
-                    ToolParam::new("id", ParamType::String)
-                        .desc("ID of the conversation history panel to close (e.g., 'P12')")
-                        .required(),
-                    ToolParam::new("logs", ParamType::Array(Box::new(ParamType::Object(vec![
+            ToolDefinition::from_yaml("log_create", t)
+                .short_desc("Create timestamped log entries")
+                .category("Context")
+                .reverie_allowed(true)
+                .param_array(
+                    "entries",
+                    ParamType::Object(vec![
+                        ToolParam::new("content", ParamType::String).desc("Short, atomic log entry").required(),
+                    ]),
+                    true,
+                )
+                .build(),
+            ToolDefinition::from_yaml("log_summarize", t)
+                .short_desc("Summarize multiple logs into a parent log")
+                .category("Context")
+                .reverie_allowed(true)
+                .param_array("log_ids", ParamType::String, true)
+                .param("content", ParamType::String, true)
+                .build(),
+            ToolDefinition::from_yaml("log_toggle", t)
+                .short_desc("Expand or collapse a log summary")
+                .category("Context")
+                .param("id", ParamType::String, true)
+                .param_enum("action", &["expand", "collapse"], true)
+                .build(),
+            ToolDefinition::from_yaml("Close_conversation_history", t)
+                .short_desc("Close a conversation history panel with logs/memories")
+                .category("Context")
+                .reverie_allowed(true)
+                .param("id", ParamType::String, true)
+                .param_array(
+                    "logs",
+                    ParamType::Object(vec![
                         ToolParam::new("content", ParamType::String)
                             .desc("Short, atomic log entry to remember")
                             .required(),
-                    ]))))
-                        .desc("Log entries to create (timestamped automatically). Should be short, atomic things to remember from the conversation."),
-                    ToolParam::new("memories", ParamType::Array(Box::new(ParamType::Object(vec![
-                        ToolParam::new("content", ParamType::String)
-                            .desc("Memory content")
-                            .required(),
+                    ]),
+                    false,
+                )
+                .param_array(
+                    "memories",
+                    ParamType::Object(vec![
+                        ToolParam::new("content", ParamType::String).desc("Memory content").required(),
                         ToolParam::new("importance", ParamType::String)
                             .desc("Importance level")
                             .enum_vals(&["low", "medium", "high", "critical"]),
-                    ]))))
-                        .desc("Memory items to create (persistent across conversations)"),
-                ],
-                enabled: true,
-                reverie_allowed: true,
-                category: "Context".to_string(),
-            },
+                    ]),
+                    false,
+                )
+                .build(),
         ]
     }
 

@@ -16,6 +16,7 @@ use super::error::LlmError;
 use super::openai_compat::{self, BuildOptions, OaiMessage, ToolCallAccumulator};
 use super::{LlmClient, LlmRequest, StreamEvent};
 use crate::infra::tools::ToolDefinition;
+use cp_base::config::INJECTIONS;
 
 const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -64,7 +65,7 @@ impl LlmClient for GroqClient {
 
         // GPT-OSS models get extra info about built-in tools
         let system_suffix = if request.model.starts_with("openai/gpt-oss") {
-            Some("You have access to built-in tools: browser_search (for web searches) and code_interpreter (for running code). Use browser_search when the user asks to search the web or look up current information.".to_string())
+            Some(INJECTIONS.providers.gpt_oss_suffix.trim_end().to_string())
         } else {
             None
         };

@@ -1,0 +1,23 @@
+tools:
+  memory_create:
+    description: |
+      Creates memory items for important information to remember across the conversation.
+    parameters:
+      memories: "Array of memories to create"
+      content: "Memory content"
+      contents: "Rich body text (visible when memory is opened)"
+      importance: "Importance level"
+      labels: "Freeform labels for categorization (e.g., ['architecture', 'bug'])"
+
+  memory_update:
+    description: |
+      Updates or deletes existing memory items.
+    parameters:
+      updates: "Array of memory updates"
+      id: "Memory ID (e.g., M1)"
+      content: "New content"
+      contents: "New rich body text (visible when memory is opened)"
+      importance: "New importance level"
+      labels: "New labels (replaces existing)"
+      open: "Set true to show full contents in panel, false to show only tl;dr"
+      delete: "Set true to delete"

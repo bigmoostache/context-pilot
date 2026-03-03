@@ -1,3 +1,4 @@
+use cp_base::config::INJECTIONS;
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State, make_default_context_element};
 use cp_base::tools::{ToolResult, ToolUse};
@@ -44,25 +45,13 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
         let binary = cmd_part.rsplit('/').next().unwrap_or(cmd_part);
 
         if binary == "git" {
-            return Some(
-                "Blocked: use the `git_execute` tool instead of running git through console.\n\
-                 Example: git_execute with command=\"git status\""
-                    .to_string(),
-            );
+            return Some(INJECTIONS.console_guardrails.git.trim_end().to_string());
         }
         if binary == "gh" {
-            return Some(
-                "Blocked: use the `gh_execute` tool instead of running gh through console.\n\
-                 Example: gh_execute with command=\"gh pr list\""
-                    .to_string(),
-            );
+            return Some(INJECTIONS.console_guardrails.gh.trim_end().to_string());
         }
         if binary == "typst" {
-            return Some(
-                "Blocked: use the `typst_execute` tool instead — typst is embedded in the TUI.\n\
-                 Example: typst_execute with command=\"typst compile doc.typ -o out.pdf\""
-                    .to_string(),
-            );
+            return Some(INJECTIONS.console_guardrails.typst.trim_end().to_string());
         }
     }
 

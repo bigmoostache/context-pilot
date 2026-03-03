@@ -9,8 +9,12 @@ pub mod watchlist;
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/typst.yaml")).expect("Failed to parse typst tool YAML")
+});
 
 pub struct TypstModule;
 
@@ -55,59 +59,14 @@ impl Module for TypstModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        vec![ToolDefinition {
-            id: "typst_execute".to_string(),
-            name: "Execute Typst Command".to_string(),
-            short_desc: "Run typst commands via embedded compiler".to_string(),
-            description: concat!(
-                "Executes typst CLI commands through the embedded compiler. No external typst binary needed. ",
-                "Supports: compile, init, query, fonts, update, watch, unwatch, watchlist.\n\n",
-                "SUBCOMMANDS:\n",
-                "- 'typst compile <file.typ> [-o <output.pdf>]' — Compile a .typ file to PDF. Output defaults to same name with .pdf extension.\n",
-                "- 'typst init @preview/<template>:<version> [directory]' — Download a template from Typst Universe and scaffold a project. Example: 'typst init @preview/brilliant-cv:2.0.3'.\n",
-                "- 'typst watch <file.typ>' — Add a document to the auto-compile watchlist. Compiles immediately and records ALL dependencies (imports, images, bib files, toml, packages). ",
-                "From then on, editing ANY dependency auto-recompiles the PDF via a callback. Use this for documents the user is actively working on.\n",
-                "- 'typst unwatch <file.typ>' — Remove a document from the watchlist.\n",
-                "- 'typst watchlist' — List all watched documents and their dependency counts.\n",
-                "- 'typst fonts [--variants]' — List available system fonts (creates a panel).\n",
-                "- 'typst query <file.typ> <selector>' — Query document metadata (creates a panel).\n",
-                "- 'typst update [@preview/pkg:version]' — Re-download cached packages.\n\n",
-                "FILE ORGANIZATION — CRITICAL PRINCIPLES:\n",
-                "Context Pilot is installed into the user's project. You MUST keep their workspace clean. The guiding principle: ",
-                "separate CONTENT (what the user cares about) from STYLING (reusable infrastructure). Content lives next to the document. Styling lives in .context-pilot/shared/.\n\n",
-                "What goes in .context-pilot/shared/typst-templates/:\n",
-                "- Template files (#let report = ..., #let invoice = ...) — reusable across documents\n",
-                "- Shared styling (fonts, colors, layouts, page setup, headers/footers)\n",
-                "- Shared assets used by templates (logos, icons, common images)\n",
-                "- Shared data (company info TOML, common variables)\n",
-                "These are version-controlled and shared across all workers. They are infrastructure, not user content.\n\n",
-                "What goes next to the document (in the user's project folder):\n",
-                "- The .typ document itself — containing ONLY content (text, data, tables)\n",
-                "- Content-specific assets (photos for THIS report, data files for THIS document)\n",
-                "- The compiled .pdf output\n",
-                "- Configuration (metadata.toml, bibliography .bib) specific to THIS document\n",
-                "Keep the user's folders minimal — only what the user authored or needs to see.\n\n",
-                "When using 'typst init' to scaffold from @preview/ templates:\n",
-                "- The template's reusable styling/library files should go into .context-pilot/shared/typst-templates/\n",
-                "- Only the user's content files (the actual document, data, images) should go in the project directory\n",
-                "- This prevents template scaffolding from dumping dozens of infrastructure files into the user's workspace\n\n",
-                "WORKFLOW — BEST PRACTICES:\n",
-                "1. After creating or scaffolding a .typ document, ALWAYS run 'typst watch' on the main document so edits auto-recompile.\n",
-                "2. When the user asks to create a PDF, first check if a suitable template exists in .context-pilot/shared/typst-templates/. If not, create one there, then create the document that imports it.\n",
-                "3. Documents should #import templates: #import \"../../.context-pilot/shared/typst-templates/report.typ\": report\n",
-                "4. 'typst watch' tracks the FULL dependency tree automatically — imports, images, bibliography files, toml config, even package files. No manual dependency management needed.\n",
-                "5. Use 'typst compile' for one-off compilations. Use 'typst watch' for documents under active development.\n",
-                "6. @preview/ packages are downloaded from Typst Universe and cached globally at ~/.cache/typst/packages/.",
-            ).to_string(),
-            params: vec![
-                ToolParam::new("command", ParamType::String)
-                    .desc("Full typst command string (e.g., 'typst compile doc.typ -o out.pdf', 'typst init @preview/graceful-genetics:0.2.0', 'typst fonts')")
-                    .required(),
-            ],
-            enabled: true,
-            reverie_allowed: false,
-            category: "PDF".to_string(),
-        }]
+        let t = &*TOOL_TEXTS;
+        vec![
+            ToolDefinition::from_yaml("typst_execute", t)
+                .short_desc("Run typst commands via embedded compiler")
+                .category("PDF")
+                .param("command", ParamType::String, true)
+                .build(),
+        ]
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

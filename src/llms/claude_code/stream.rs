@@ -13,6 +13,7 @@ use crate::infra::constants::{API_VERSION, library};
 use crate::infra::tools::{ToolUse, build_api_tools};
 use crate::llms::error::LlmError;
 use crate::llms::{LlmRequest, StreamEvent, api_messages_to_cc_json};
+use cp_base::config::INJECTIONS;
 
 impl ClaudeCodeClient {
     pub(super) fn do_stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
@@ -36,9 +37,10 @@ impl ClaudeCodeClient {
 
         // Handle cleaner mode extra context
         if let Some(ref context) = request.extra_context {
+            let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", context);
             json_messages.push(serde_json::json!({
                 "role": "user",
-                "content": format!("Please clean up the context to reduce token usage:\n\n{}", context)
+                "content": msg
             }));
         }
 

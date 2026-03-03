@@ -1,0 +1,52 @@
+tools:
+  firecrawl_scrape:
+    description: |
+      Full-page content extraction from a single known URL. Renders JavaScript via headless Chromium. Returns clean markdown (~67% fewer tokens than raw HTML) plus page links. Use when you need the full content of a specific page (Tier 3a).
+
+      ESCALATION: Use after brave_search/brave_llm_context when snippets are insufficient and you have a specific URL to extract.
+
+      FORMATS: 'markdown' (default, clean text), 'html', 'links' (all page URLs), 'summary', 'images'. Default: ['markdown', 'links'].
+
+      KEY DECISION: This tool REQUIRES a known URL — it cannot discover pages. If you don't have a URL yet, use brave_search first (to find URLs) or firecrawl_search (to search AND scrape in one step). One page per call.
+    parameters:
+      url: "Target URL to scrape"
+      formats: "Output formats: 'markdown'|'html'|'links'|'summary'|'images' (default ['markdown','links'])"
+      location: "Optional location for geo-targeted scraping"
+      country: "2-letter country code"
+      languages: "Language codes"
+
+  firecrawl_search:
+    description: |
+      Combined search + scrape in a single API call. Discovers URLs matching a query and returns full markdown content for the top results. Use when you need full pages but don't have specific URLs yet (Tier 3b).
+
+      ESCALATION: Use after brave_search when snippets are insufficient and you need deep content from multiple pages.
+
+      KEY DIFFERENCE from firecrawl_scrape: this tool discovers AND scrapes in one step — you don't need a URL first. It replaces the brave_search→firecrawl_scrape two-step when you know upfront you'll need full page content. More expensive per call but saves a round trip.
+
+      CATEGORIES: 'github' (repos/code), 'research' (arxiv/nature/ieee), 'pdf'.
+      TBS (time filter): 'qdr:h' (hour), 'qdr:d' (day), 'qdr:w' (week), 'qdr:m' (month), 'qdr:y' (year).
+    parameters:
+      query: "Search query"
+      limit: "Pages to scrape (1-10, default 3)"
+      sources: "Source types: 'web'|'news'|'images' (default ['web'])"
+      categories: "Target categories: 'github'|'research'|'pdf'"
+      tbs: "Time filter: 'qdr:h'|'qdr:d'|'qdr:w'|'qdr:m'|'qdr:y'"
+      location: "Location string, e.g. 'Germany', 'San Francisco,California'"
+
+  firecrawl_map:
+    description: |
+      Discovers all URLs on a given domain. Primarily from sitemap, supplemented by SERP and cached crawl data. Use to explore a site's structure before targeted scraping (Tier 4).
+
+      ESCALATION: Use when you need to understand a site's structure to find the right pages to scrape. Typically followed by firecrawl_scrape.
+
+      COST: 1 credit per call regardless of URLs returned. Very cheap for exploration.
+
+      WARNING: Returns URLs ONLY — no page content. This is a discovery/exploration tool. After finding interesting URLs, use firecrawl_scrape to get the actual content. If you already know what you're looking for, use firecrawl_search instead (search + scrape in one step).
+    parameters:
+      url: "Root domain or subdomain to map"
+      limit: "Max URLs returned (1-5000, default 50)"
+      search: "Optional keyword filter on discovered URLs"
+      include_subdomains: "Include subdomains (default false)"
+      location: "Optional location for geo-targeted mapping"
+      country: "2-letter country code"
+      languages: "Language codes"

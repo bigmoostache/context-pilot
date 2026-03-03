@@ -1,11 +1,16 @@
 mod ask_question;
 
 use crate::app::panels::Panel;
-use crate::infra::tools::{ParamType, ToolDefinition, ToolParam};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{ContextType, State};
 
 use super::Module;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/questions.yaml"))
+        .expect("Failed to parse questions tool YAML")
+});
 
 pub struct QuestionsModule;
 
@@ -31,53 +36,38 @@ impl Module for QuestionsModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "ask_user_question".to_string(),
-                name: "Ask User Question".to_string(),
-                short_desc: "Ask user multiple-choice questions".to_string(),
-                description: "Presents 1-4 multiple-choice questions to the user as an interactive form. \
-                    The form replaces the input field until the user submits answers or presses Esc to dismiss. \
-                    Each question has 2-4 options plus an auto-appended \"Other\" free-text option. \
-                    Use this to gather preferences, clarify ambiguous instructions, or get implementation decisions. \
-                    The user can select one option (or multiple if multiSelect), or choose \"Other\" and type a custom answer. \
-                    If recommending a specific option, list it first with \"(Recommended)\" in the label."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new(
-                        "questions",
-                        ParamType::Array(Box::new(ParamType::Object(vec![
-                            ToolParam::new("question", ParamType::String)
-                                .desc("The complete question text. Should be clear, specific, and end with ?")
-                                .required(),
-                            ToolParam::new("header", ParamType::String)
-                                .desc("Very short label (max 12 chars). E.g. \"Auth method\", \"Library\"")
-                                .required(),
-                            ToolParam::new(
-                                "options",
-                                ParamType::Array(Box::new(ParamType::Object(vec![
-                                    ToolParam::new("label", ParamType::String)
-                                        .desc("Display text (1-5 words)")
-                                        .required(),
-                                    ToolParam::new("description", ParamType::String)
-                                        .desc("Explanation of what this option means")
-                                        .required(),
-                                ]))),
-                            )
-                            .desc("2-4 available choices. An \"Other\" free-text option is appended automatically.")
+            ToolDefinition::from_yaml("ask_user_question", t)
+                .short_desc("Ask user multiple-choice questions")
+                .category("Context")
+                .param_array(
+                    "questions",
+                    ParamType::Object(vec![
+                        ToolParam::new("question", ParamType::String)
+                            .desc("The complete question text. Should be clear, specific, and end with ?")
                             .required(),
-                            ToolParam::new("multiSelect", ParamType::Boolean)
-                                .desc("If true, user can select multiple options")
-                                .required(),
-                        ]))),
-                    )
-                    .desc("1-4 questions to ask the user")
-                    .required(),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Context".to_string(),
-            },
+                        ToolParam::new("header", ParamType::String)
+                            .desc("Very short label (max 12 chars). E.g. \"Auth method\", \"Library\"")
+                            .required(),
+                        ToolParam::new(
+                            "options",
+                            ParamType::Array(Box::new(ParamType::Object(vec![
+                                ToolParam::new("label", ParamType::String).desc("Display text (1-5 words)").required(),
+                                ToolParam::new("description", ParamType::String)
+                                    .desc("Explanation of what this option means")
+                                    .required(),
+                            ]))),
+                        )
+                        .desc("2-4 available choices. An \"Other\" free-text option is appended automatically.")
+                        .required(),
+                        ToolParam::new("multiSelect", ParamType::Boolean)
+                            .desc("If true, user can select multiple options")
+                            .required(),
+                    ]),
+                    true,
+                )
+                .build(),
         ]
     }
 

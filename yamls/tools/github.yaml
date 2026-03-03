@@ -1,0 +1,6 @@
+tools:
+  gh_execute:
+    description: |
+      Executes a GitHub CLI (gh) command. Requires GITHUB_TOKEN in environment. Read-only commands (pr list, issue view, etc.) create a dynamic result panel that auto-refreshes every 120 seconds. Mutating commands (pr create, issue close, etc.) execute directly and return output. Shell operators (|, ;, &&) are not allowed.
+    parameters:
+      command: "Full gh command string (e.g., 'gh pr list', 'gh issue view 42')"

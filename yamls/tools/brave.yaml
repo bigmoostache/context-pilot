@@ -1,0 +1,39 @@
+tools:
+  brave_search:
+    description: |
+      Search the web using Brave's independent 40-billion-page index. Returns snippets, URLs, and optional rich results (stocks, weather, calculator, crypto, sports). Always the FIRST tool to try for any web query (Tier 1). Supports search operators in query: "exact phrase", -exclude, site:domain, filetype:pdf.
+
+      ESCALATION: Start here. If snippets are insufficient, escalate to brave_llm_context (Tier 2) or firecrawl_scrape/firecrawl_search (Tier 3). Stop at the lowest tier that answers the query.
+
+      PARAMETER GUIDANCE:
+      - count: 3 for simple facts, 5 for multi-faceted, 5-10 for comparative/research
+      - freshness: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year), or custom 'YYYY-MM-DDtoYYYY-MM-DD'
+      - goggles_id: URL of a Brave Goggle for domain re-ranking. Load the 'brave-goggles' skill for curated recommendations.
+    parameters:
+      query: "Search query. Supports operators: \"exact\", -exclude, site:domain, filetype:pdf"
+      count: "Number of results (1-20, default 5)"
+      freshness: "Recency filter: 'pd'|'pw'|'pm'|'py' or 'YYYY-MM-DDtoYYYY-MM-DD'"
+      country: "2-letter ISO country code (default 'US')"
+      search_lang: "Result language ISO 639-1 (default 'en')"
+      safe_search: "'off'|'moderate'|'strict' (default 'moderate')"
+      goggles_id: "Brave Goggle URL for domain re-ranking"
+
+  brave_llm_context:
+    description: |
+      Brave's LLM Context API returns pre-extracted, relevance-scored web content — text chunks, tables, code blocks, structured data — optimized for direct LLM consumption. No scraping needed. Use when brave_search snippets are insufficient (Tier 2).
+
+      KEY DIFFERENCE from brave_search: brave_search returns 2-line snippets per result. This tool returns full paragraphs, tables, and code blocks extracted from the top results — much richer content without needing to scrape individual pages. Still search-based (no specific URL needed). Cheaper and faster than firecrawl_scrape.
+
+      ESCALATION: Use after brave_search when you need deeper content. If you need the full page, escalate to firecrawl_scrape (Tier 3).
+
+      PARAMETER GUIDANCE:
+      - maximum_number_of_tokens: 2048 for quick facts, 8192 default, 16384 for research, 32768 for deep analysis
+      - context_threshold_mode: 'strict' for precise Q&A, 'balanced' default, 'lenient' for broad research, 'disabled' to dump everything
+    parameters:
+      query: "Search query"
+      maximum_number_of_tokens: "Approx max tokens (1024-32768, default 8192)"
+      count: "Max search results to consider (1-50, default 20)"
+      context_threshold_mode: "Relevance threshold: 'strict'|'balanced'|'lenient'|'disabled' (default 'balanced')"
+      freshness: "Recency filter: 'pd'|'pw'|'pm'|'py' or 'YYYY-MM-DDtoYYYY-MM-DD'"
+      country: "2-letter ISO country code (default 'US')"
+      goggles: "Brave Goggle URL or inline definition"

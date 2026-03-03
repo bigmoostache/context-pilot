@@ -9,5 +9,6 @@ cp-mod-console = { path = "../cp-mod-console" }
 ratatui.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml.workspace = true
 globset.workspace = true
 unicode-width.workspace = true

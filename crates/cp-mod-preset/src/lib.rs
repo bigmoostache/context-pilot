@@ -10,8 +10,12 @@ use std::collections::HashSet;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/preset.yaml")).expect("Failed to parse preset tool YAML")
+});
 
 /// Function pointers for module-registry operations that live in the binary.
 /// Injected at construction time so the crate doesn't depend on the binary.
@@ -50,45 +54,20 @@ impl Module for PresetModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "preset_snapshot_myself".to_string(),
-                name: "Snapshot Preset".to_string(),
-                short_desc: "Save current config".to_string(),
-                description: "Saves the current worker configuration as a named preset. \
-                    Captures: active system prompt, active modules, disabled tools, \
-                    per-worker module data (todos, scratchpad, git settings), and dynamic panels. \
-                    Does NOT capture messages or global config."
-                    .to_string(),
-                params: vec![
-                    ToolParam::new("name", ParamType::String)
-                        .desc("Preset name (alphanumeric and hyphens only, e.g., 'my-preset')")
-                        .required(),
-                    ToolParam::new("description", ParamType::String)
-                        .desc("Description of what this preset is for")
-                        .required(),
-                    ToolParam::new("replace", ParamType::String).desc(
-                        "Name of existing preset to overwrite. Required if a preset with this name already exists.",
-                    ),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "System".to_string(),
-            },
-            ToolDefinition {
-                id: "preset_load".to_string(),
-                name: "Load Preset".to_string(),
-                short_desc: "Load saved config".to_string(),
-                description: "Loads a named preset, replacing the current worker configuration. \
-                    Replaces: active system prompt, active modules, disabled tools, \
-                    per-worker module data, and dynamic panels. \
-                    Messages and conversation history are preserved."
-                    .to_string(),
-                params: vec![ToolParam::new("name", ParamType::String).desc("Name of the preset to load").required()],
-                enabled: true,
-                reverie_allowed: false,
-                category: "System".to_string(),
-            },
+            ToolDefinition::from_yaml("preset_snapshot_myself", t)
+                .short_desc("Save current config")
+                .category("System")
+                .param("name", ParamType::String, true)
+                .param("description", ParamType::String, true)
+                .param("replace", ParamType::String, false)
+                .build(),
+            ToolDefinition::from_yaml("preset_load", t)
+                .short_desc("Load saved config")
+                .category("System")
+                .param("name", ParamType::String, true)
+                .build(),
         ]
     }
 

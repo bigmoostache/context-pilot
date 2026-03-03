@@ -1,5 +1,25 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+
+// =============================================================================
+// YAML Tool Text — deserialized from yamls/tools/*.yaml
+// =============================================================================
+
+/// Root structure of a tool YAML file.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ToolTexts {
+    pub tools: HashMap<String, ToolText>,
+}
+
+/// LLM-facing text for a single tool: description + parameter descriptions.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ToolText {
+    pub description: String,
+    #[serde(default)]
+    pub parameters: HashMap<String, String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolUse {
@@ -146,6 +166,139 @@ pub struct ToolDefinition {
     pub reverie_allowed: bool,
     /// Category for grouping (e.g., "File", "Git", "System")
     pub category: String,
+}
+
+// =============================================================================
+// YAML-driven ToolDefinition builder
+// =============================================================================
+
+impl ToolDefinition {
+    /// Create a ToolDefinition from YAML text, pulling description + param descs
+    /// from the `ToolTexts` map. Panics if the tool ID is missing from YAML.
+    pub fn from_yaml<'a>(id: &str, texts: &'a ToolTexts) -> ToolDefBuilder<'a> {
+        let text = texts.tools.get(id).unwrap_or_else(|| {
+            panic!("Tool '{}' not found in YAML", id);
+        });
+        ToolDefBuilder {
+            id: id.to_string(),
+            description: text.description.trim().to_string(),
+            param_descs: &text.parameters,
+            params: Vec::new(),
+            short_desc: String::new(),
+            category: String::new(),
+            enabled: true,
+            reverie_allowed: false,
+        }
+    }
+}
+
+/// Builder for constructing a ToolDefinition from YAML text.
+/// Schema structure (types, required, enums) lives in Rust.
+/// Descriptions (sentences) come from YAML automatically.
+pub struct ToolDefBuilder<'a> {
+    id: String,
+    description: String,
+    param_descs: &'a HashMap<String, String>,
+    params: Vec<ToolParam>,
+    short_desc: String,
+    category: String,
+    enabled: bool,
+    reverie_allowed: bool,
+}
+
+impl<'a> ToolDefBuilder<'a> {
+    pub fn short_desc(mut self, s: &str) -> Self {
+        self.short_desc = s.to_string();
+        self
+    }
+
+    pub fn category(mut self, c: &str) -> Self {
+        self.category = c.to_string();
+        self
+    }
+
+    pub fn reverie_allowed(mut self, allowed: bool) -> Self {
+        self.reverie_allowed = allowed;
+        self
+    }
+
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    /// Add a parameter. Description is auto-pulled from YAML by param name.
+    pub fn param(mut self, name: &str, param_type: ParamType, required: bool) -> Self {
+        let desc = self.param_descs.get(name).cloned();
+        let mut p = ToolParam::new(name, param_type);
+        p.description = desc;
+        if required {
+            p.required = true;
+        }
+        self.params.push(p);
+        self
+    }
+
+    /// Add a parameter with enum values. Description from YAML.
+    pub fn param_enum(mut self, name: &str, values: &[&str], required: bool) -> Self {
+        let desc = self.param_descs.get(name).cloned();
+        let mut p = ToolParam::new(name, ParamType::String);
+        p.description = desc;
+        p.enum_values = Some(values.iter().map(|s| s.to_string()).collect());
+        if required {
+            p.required = true;
+        }
+        self.params.push(p);
+        self
+    }
+
+    /// Add a parameter with a default value. Description from YAML.
+    pub fn param_with_default(mut self, name: &str, param_type: ParamType, default: &str) -> Self {
+        let desc = self.param_descs.get(name).cloned();
+        let mut p = ToolParam::new(name, param_type);
+        p.description = desc;
+        p.default = Some(default.to_string());
+        self.params.push(p);
+        self
+    }
+
+    /// Add a parameter with array type. Description from YAML.
+    pub fn param_array(mut self, name: &str, items: ParamType, required: bool) -> Self {
+        let desc = self.param_descs.get(name).cloned();
+        let mut p = ToolParam::new(name, ParamType::Array(Box::new(items)));
+        p.description = desc;
+        if required {
+            p.required = true;
+        }
+        self.params.push(p);
+        self
+    }
+
+    /// Add a parameter with object type (nested params). Description from YAML.
+    pub fn param_object(mut self, name: &str, fields: Vec<ToolParam>, required: bool) -> Self {
+        let desc = self.param_descs.get(name).cloned();
+        let mut p = ToolParam::new(name, ParamType::Object(fields));
+        p.description = desc;
+        if required {
+            p.required = true;
+        }
+        self.params.push(p);
+        self
+    }
+
+    /// Finalize the builder into a ToolDefinition.
+    pub fn build(self) -> ToolDefinition {
+        ToolDefinition {
+            id: self.id,
+            name: String::new(), // display name derived elsewhere if needed
+            short_desc: self.short_desc,
+            description: self.description,
+            params: self.params,
+            enabled: self.enabled,
+            reverie_allowed: self.reverie_allowed,
+            category: self.category,
+        }
+    }
 }
 
 impl ToolDefinition {

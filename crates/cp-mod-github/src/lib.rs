@@ -14,11 +14,15 @@ pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::GithubResultPanel;
 use cp_base::modules::Module;
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/github.yaml")).expect("Failed to parse github tool YAML")
+});
 
 pub struct GithubModule;
 
@@ -49,24 +53,14 @@ impl Module for GithubModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        vec![ToolDefinition {
-            id: "gh_execute".to_string(),
-            name: "GitHub Execute".to_string(),
-            short_desc: "Run gh commands".to_string(),
-            description: "Executes a GitHub CLI (gh) command. Requires GITHUB_TOKEN in environment. \
-                    Read-only commands (pr list, issue view, etc.) create a dynamic result panel that \
-                    auto-refreshes every 120 seconds. Mutating commands (pr create, issue close, etc.) \
-                    execute directly and return output. Shell operators (|, ;, &&) are not allowed."
-                .to_string(),
-            params: vec![
-                ToolParam::new("command", ParamType::String)
-                    .desc("Full gh command string (e.g., 'gh pr list', 'gh issue view 42')")
-                    .required(),
-            ],
-            enabled: true,
-            reverie_allowed: false,
-            category: "Git".to_string(),
-        }]
+        let t = &*TOOL_TEXTS;
+        vec![
+            ToolDefinition::from_yaml("gh_execute", t)
+                .short_desc("Run gh commands")
+                .category("Git")
+                .param("command", ParamType::String, true)
+                .build(),
+        ]
     }
 
     fn init_state(&self, state: &mut State) {

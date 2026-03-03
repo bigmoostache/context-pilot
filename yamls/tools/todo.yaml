@@ -1,0 +1,28 @@
+tools:
+  todo_create:
+    description: |
+      Creates one or more todo items. Supports nesting via parent_id.
+    parameters:
+      todos: "Array of todos to create"
+      name: "Todo title"
+      description: "Detailed description"
+      parent_id: "Parent todo ID for nesting"
+
+  todo_update:
+    description: |
+      Updates existing todos: change status, name, description, or delete. Use delete:true to remove a todo.
+    parameters:
+      updates: "Array of todo updates"
+      id: "Todo ID (e.g., X1)"
+      status: "New status"
+      name: "New name"
+      description: "New description"
+      parent_id: "New parent ID, or null to make top-level"
+      delete: "Set true to delete this todo"
+
+  todo_move:
+    description: |
+      Moves a todo to a new position in the list. Place it after another todo, or at the top if after_id is null.
+    parameters:
+      id: "Todo ID to move (e.g., X1)"
+      after_id: "Place after this todo ID. Null or omit to move to top."

@@ -67,6 +67,7 @@ impl Panel for TodoPanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::TODO {
                 ctx.token_count = token_count;
+                cp_base::panels::update_if_changed(ctx, &todo_content);
                 break;
             }
         }

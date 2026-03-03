@@ -1,0 +1,13 @@
+tools:
+  reverie_report:
+    description: |
+      Mandatory: call this when you're done optimizing context. Writes a summary of what you did to a spine notification, then destroys this reverie session. You MUST call this tool before ending your turn.
+    parameters:
+      summary: "Brief summary of what you optimized (1-3 sentences)"
+
+  optimize_context:
+    description: |
+      Triggers the background context optimizer (reverie). The reverie will analyze current context, close irrelevant panels, summarize logs, and reshape context for the current task. Optionally provide a directive to guide optimization (e.g., 'I'm about to work on the UI, optimize context for that'). Cannot invoke if a reverie is already active or reverie is disabled.
+    parameters:
+      directive: "Optional guidance for the optimizer (e.g., 'focus on git module files')"
+      agent: "Agent ID to drive the reverie (default: 'cleaner'). Use 'cartographer' to auto-describe files in the tree."

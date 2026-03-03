@@ -1,0 +1,35 @@
+tools:
+  Callback_upsert:
+    description: |
+      Creates, updates, or deletes a file edit callback. Callbacks are bash scripts that auto-fire when the AI edits files matching a glob pattern. Use action='create' to define a new callback with its script. Use action='update' to modify an existing callback. Use action='delete' to remove a callback and its script file.
+    parameters:
+      action: "Action: 'create', 'update', or 'delete'"
+      id: "Callback ID (required for update/delete, e.g. 'CB1')"
+      name: "Display name (e.g., 'rust-check'). Required for create."
+      description: "Short explanation of what this callback does"
+      pattern: "Gitignore-style glob (e.g., '*.rs', 'src/**/*.ts'). Required for create."
+      script_content: "Bash script body (shebang auto-prepended). Required for create."
+      blocking: "Block Edit/Write result until script completes (default: false)"
+      timeout: "Max execution time in seconds (required if blocking)"
+      success_message: "Custom message on success (e.g., 'Build passed ✓')"
+      cwd: "Working directory (defaults to project root)"
+      one_at_a_time: "Don't run simultaneously with itself (default: false)"
+      old_string: "For diff-based script update: exact text to find"
+      new_string: "For diff-based script update: replacement text"
+
+  Callback_open_editor:
+    description: |
+      Opens a callback's script content in the Callbacks panel for reading and editing. Required before using diff-based script editing (old_string/new_string in Callback_upsert update). Max one callback open at a time — opening a new one closes the previous.
+    parameters:
+      id: "Callback ID (e.g., 'CB1')"
+
+  Callback_close_editor:
+    description: |
+      Closes the callback script editor in the Callbacks panel, restoring the normal table view.
+
+  Callback_toggle:
+    description: |
+      Activates or deactivates a callback for the current worker. Does NOT modify the callback definition — only this worker's activation state.
+    parameters:
+      id: "Callback ID (e.g., 'CB1')"
+      active: "true to activate, false to deactivate"

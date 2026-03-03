@@ -7,7 +7,7 @@
 //!
 //! No more AutoContinuation trait — all triggers go through the watcher → notification pipeline.
 
-use cp_base::config::PROMPTS;
+use cp_base::config::{INJECTIONS, PROMPTS};
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State};
 
@@ -85,8 +85,8 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
         if let Some(msg) = last_non_error_user {
             let content = msg.content.trim();
             if content.starts_with("/* Auto-continuation:")
-                || content.starts_with("/* Continue */")
-                || content.starts_with("/* Reload complete */")
+                || content == INJECTIONS.spine.continue_msg.trim()
+                || content == INJECTIONS.spine.reload_complete.trim()
             {
                 return SpineDecision::Idle;
             }
@@ -166,11 +166,12 @@ fn build_continuation_from_notifications(state: &State) -> ContinuationAction {
     for n in &explain {
         parts.push(format!("[{}] {} — {}", n.id, n.notification_type.label(), n.content));
     }
-    let msg = format!(
-        "/* Auto-continuation: {} notification(s):\n{}\nPlease address these. */",
-        explain.len(),
-        parts.join("\n")
-    );
+    let msg = INJECTIONS
+        .spine
+        .auto_continuation
+        .trim_end()
+        .replace("{count}", &explain.len().to_string())
+        .replace("{details}", &parts.join("\n"));
     ContinuationAction::SyntheticMessage(msg)
 }
 
@@ -190,13 +191,11 @@ fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) 
         if last_role == Some("user") {
             ContinuationAction::Relaunch
         } else {
-            ContinuationAction::SyntheticMessage(
-                "/* A user message was submitted while you were streaming. It has been inserted into the conversation above. Please review and respond to it. */".to_string()
-            )
+            ContinuationAction::SyntheticMessage(INJECTIONS.spine.user_message_during_stream.trim_end().to_string())
         }
     } else {
         // Pure ReloadResume
-        ContinuationAction::SyntheticMessage("/* Reload complete */".to_string())
+        ContinuationAction::SyntheticMessage(INJECTIONS.spine.reload_complete.trim_end().to_string())
     }
 }
 
@@ -220,7 +219,7 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
                 .map(|m| m.role.as_str());
 
             if last_role != Some("user") {
-                state.push_user_message("/* Continue */".to_string());
+                state.push_user_message(INJECTIONS.spine.continue_msg.trim_end().to_string());
             }
 
             state.push_empty_assistant();

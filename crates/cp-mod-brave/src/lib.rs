@@ -6,8 +6,12 @@ pub mod types;
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, ContextTypeMeta, State};
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam};
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
+
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    serde_yaml::from_str(include_str!("../../../yamls/tools/brave.yaml")).expect("Failed to parse brave tool YAML")
+});
 
 pub struct BraveModule;
 
@@ -50,89 +54,30 @@ impl Module for BraveModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
+        let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition {
-                id: "brave_search".to_string(),
-                name: "Brave Search".to_string(),
-                short_desc: "Search the web via Brave".to_string(),
-                description: concat!(
-                    "Search the web using Brave's independent 40-billion-page index. ",
-                    "Returns snippets, URLs, and optional rich results (stocks, weather, calculator, crypto, sports). ",
-                    "Always the FIRST tool to try for any web query (Tier 1). ",
-                    "Supports search operators in query: \"exact phrase\", -exclude, site:domain, filetype:pdf.\n\n",
-                    "ESCALATION: Start here. If snippets are insufficient, escalate to brave_llm_context (Tier 2) ",
-                    "or firecrawl_scrape/firecrawl_search (Tier 3). Stop at the lowest tier that answers the query.\n\n",
-                    "PARAMETER GUIDANCE:\n",
-                    "- count: 3 for simple facts, 5 for multi-faceted, 5-10 for comparative/research\n",
-                    "- freshness: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year), ",
-                    "or custom 'YYYY-MM-DDtoYYYY-MM-DD'\n",
-                    "- goggles_id: URL of a Brave Goggle for domain re-ranking. ",
-                    "Load the 'brave-goggles' skill for curated recommendations."
-                ).to_string(),
-                // NOTE: Description is sent as-is to the LLM in tool definitions.
-                // Keep it decision-oriented: when to use, when NOT to use, what it returns.
-                params: vec![
-                    ToolParam::new("query", ParamType::String)
-                        .desc("Search query. Supports operators: \"exact\", -exclude, site:domain, filetype:pdf")
-                        .required(),
-                    ToolParam::new("count", ParamType::Integer)
-                        .desc("Number of results (1-20, default 5)"),
-                    ToolParam::new("freshness", ParamType::String)
-                        .desc("Recency filter: 'pd'|'pw'|'pm'|'py' or 'YYYY-MM-DDtoYYYY-MM-DD'"),
-                    ToolParam::new("country", ParamType::String)
-                        .desc("2-letter ISO country code (default 'US')"),
-                    ToolParam::new("search_lang", ParamType::String)
-                        .desc("Result language ISO 639-1 (default 'en')"),
-                    ToolParam::new("safe_search", ParamType::String)
-                        .desc("'off'|'moderate'|'strict' (default 'moderate')")
-                        .enum_vals(&["off", "moderate", "strict"]),
-                    ToolParam::new("goggles_id", ParamType::String)
-                        .desc("Brave Goggle URL for domain re-ranking"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Web Search".to_string(),
-            },
-            ToolDefinition {
-                id: "brave_llm_context".to_string(),
-                name: "Brave LLM Context".to_string(),
-                short_desc: "Get LLM-optimized web content from Brave".to_string(),
-                description: concat!(
-                    "Brave's LLM Context API returns pre-extracted, relevance-scored web content — ",
-                    "text chunks, tables, code blocks, structured data — optimized for direct LLM consumption. ",
-                    "No scraping needed. Use when brave_search snippets are insufficient (Tier 2).\n\n",
-                    "KEY DIFFERENCE from brave_search: brave_search returns 2-line snippets per result. ",
-                    "This tool returns full paragraphs, tables, and code blocks extracted from the top results — ",
-                    "much richer content without needing to scrape individual pages. Still search-based (no specific URL needed). ",
-                    "Cheaper and faster than firecrawl_scrape.\n\n",
-                    "ESCALATION: Use after brave_search when you need deeper content. ",
-                    "If you need the full page, escalate to firecrawl_scrape (Tier 3).\n\n",
-                    "PARAMETER GUIDANCE:\n",
-                    "- maximum_number_of_tokens: 2048 for quick facts, 8192 default, 16384 for research, 32768 for deep analysis\n",
-                    "- context_threshold_mode: 'strict' for precise Q&A, 'balanced' default, 'lenient' for broad research, 'disabled' to dump everything"
-                ).to_string(),
-                params: vec![
-                    ToolParam::new("query", ParamType::String)
-                        .desc("Search query")
-                        .required(),
-                    ToolParam::new("maximum_number_of_tokens", ParamType::Integer)
-                        .desc("Approx max tokens (1024-32768, default 8192)"),
-                    ToolParam::new("count", ParamType::Integer)
-                        .desc("Max search results to consider (1-50, default 20)"),
-                    ToolParam::new("context_threshold_mode", ParamType::String)
-                        .desc("Relevance threshold: 'strict'|'balanced'|'lenient'|'disabled' (default 'balanced')")
-                        .enum_vals(&["strict", "balanced", "lenient", "disabled"]),
-                    ToolParam::new("freshness", ParamType::String)
-                        .desc("Recency filter: 'pd'|'pw'|'pm'|'py' or 'YYYY-MM-DDtoYYYY-MM-DD'"),
-                    ToolParam::new("country", ParamType::String)
-                        .desc("2-letter ISO country code (default 'US')"),
-                    ToolParam::new("goggles", ParamType::String)
-                        .desc("Brave Goggle URL or inline definition"),
-                ],
-                enabled: true,
-                reverie_allowed: false,
-                category: "Web Search".to_string(),
-            },
+            ToolDefinition::from_yaml("brave_search", t)
+                .short_desc("Search the web via Brave")
+                .category("Web Search")
+                .param("query", ParamType::String, true)
+                .param("count", ParamType::Integer, false)
+                .param("freshness", ParamType::String, false)
+                .param("country", ParamType::String, false)
+                .param("search_lang", ParamType::String, false)
+                .param_enum("safe_search", &["off", "moderate", "strict"], false)
+                .param("goggles_id", ParamType::String, false)
+                .build(),
+            ToolDefinition::from_yaml("brave_llm_context", t)
+                .short_desc("Get LLM-optimized web content from Brave")
+                .category("Web Search")
+                .param("query", ParamType::String, true)
+                .param("maximum_number_of_tokens", ParamType::Integer, false)
+                .param("count", ParamType::Integer, false)
+                .param_enum("context_threshold_mode", &["strict", "balanced", "lenient", "disabled"], false)
+                .param("freshness", ParamType::String, false)
+                .param("country", ParamType::String, false)
+                .param("goggles", ParamType::String, false)
+                .build(),
         ]
     }
 

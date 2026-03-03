@@ -1,0 +1,22 @@
+tools:
+  tree_filter:
+    description: |
+      Edits the gitignore-style filter for the directory tree view.
+    parameters:
+      filter: "Gitignore-style patterns, one per line"
+
+  tree_toggle:
+    description: |
+      Opens or closes folders in the directory tree view. Closed folders show child count, open folders show contents.
+    parameters:
+      paths: "Folder paths to toggle (e.g., ['src', 'src/ui'])"
+      action: "Action to perform"
+
+  tree_describe:
+    description: |
+      Adds or updates descriptions for files and folders in the tree. Descriptions appear next to items. A [!] marker indicates the file changed since description was written.
+    parameters:
+      descriptions: "Array of path descriptions"
+      path: "File or folder path"
+      description: "Description text"
+      delete: "Set true to remove description"

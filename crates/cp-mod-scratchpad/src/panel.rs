@@ -50,6 +50,7 @@ impl Panel for ScratchpadPanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::SCRATCHPAD {
                 ctx.token_count = token_count;
+                cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }
