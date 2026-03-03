@@ -35,17 +35,6 @@ pub fn check_threshold_trigger(state: &mut State) -> bool {
     }
 
     // Threshold breached — fire the reverie
-    let pct = (total_tokens as f64 / state.effective_context_budget() as f64 * 100.0) as usize;
-
-    // Create spine notification before starting
-    let notification_msg = format!("Context at {}% ({} tokens), activating optimizer", pct, total_tokens);
-    cp_mod_spine::SpineState::create_notification(
-        state,
-        cp_mod_spine::NotificationType::Custom,
-        "Reverie".to_string(),
-        notification_msg,
-    );
-
     // Start the reverie session with the default cleaner agent
     let mut rev = ReverieState::new(ReverieType::ContextOptimizer, "cleaner".to_string(), None);
     rev.queue_active = true;
@@ -71,20 +60,6 @@ pub fn start_manual_reverie(state: &mut State, agent_id: String, context: Option
     if !state.reverie_enabled {
         return false;
     }
-
-    // Create spine notification
-    let msg = match &context {
-        Some(c) if !c.is_empty() => {
-            format!("Context optimizer activated (agent: {}) with context: \"{}\"", agent_id, c)
-        }
-        _ => format!("Context optimizer activated (agent: {})", agent_id),
-    };
-    cp_mod_spine::SpineState::create_notification(
-        state,
-        cp_mod_spine::NotificationType::Custom,
-        "Reverie".to_string(),
-        msg,
-    );
 
     // Start the reverie session
     let mut rev = ReverieState::new(ReverieType::ContextOptimizer, agent_id.clone(), context);
