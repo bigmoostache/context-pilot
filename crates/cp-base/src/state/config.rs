@@ -38,6 +38,9 @@ pub struct SharedConfig {
     /// Cursor position in draft input
     #[serde(default)]
     pub draft_cursor: usize,
+    /// Sidebar display mode (Normal/Collapsed/Hidden)
+    #[serde(default)]
+    pub sidebar_mode: super::sidebar::SidebarMode,
 
     // === Module data (keyed by module ID) ===
     #[serde(default)]
@@ -54,6 +57,7 @@ impl Default for SharedConfig {
             selected_context: 0,
             draft_input: String::new(),
             draft_cursor: 0,
+            sidebar_mode: Default::default(),
             modules: HashMap::new(),
         }
     }

@@ -231,8 +231,8 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
         spans.push(Span::styled(" ", base_style));
     }
 
-    // Active reverie card — shows when a background optimizer is running
-    if let Some(rev) = &state.reverie {
+    // Active reverie cards — one per running background optimizer
+    for rev in state.reveries.values() {
         // Look up the agent's display name from PromptState
         let ps = PromptState::get(state);
         let agent_name =

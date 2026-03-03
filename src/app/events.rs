@@ -18,6 +18,7 @@ pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     KeyCode::Char('l') => return Some(Action::ClearConversation),
                     KeyCode::Char('n') => return Some(Action::NewContext),
                     KeyCode::Char('h') => return Some(Action::ToggleConfigView),
+                    KeyCode::Char('v') => return Some(Action::CycleSidebarMode),
                     KeyCode::Char('o') => return Some(Action::ResetSessionCosts),
                     KeyCode::Char('p') => return Some(Action::OpenCommandPalette),
                     _ => {}

@@ -31,6 +31,13 @@ fn secondary_model_string(state: &State) -> String {
 /// are injected into the P-reverie panel (for cache-friendly placement).
 const REVERIE_SYSTEM_PROMPT: &str = "You are a background sub-agent. Follow the instructions in the P-reverie panel.";
 
+/// Initial user message sent to kick off a fresh reverie session.
+/// Framed as a dispatch from the main AI so the sub-agent has context.
+const REVERIE_KICKOFF_MSG: &str = "\
+** Message from your main consciousness **\n\n\
+You have been activated as a background sub-agent. Your instructions are in the P-reverie panel above. \
+Read them carefully, then act. Use tools to accomplish your task, and call the Report tool when done.";
+
 /// Build the reverie prompt and start streaming to the secondary LLM.
 ///
 /// Uses the exact same `prepare_stream_context()` as the main worker. The
@@ -39,11 +46,21 @@ const REVERIE_SYSTEM_PROMPT: &str = "You are a background sub-agent. Follow the 
 /// - Conversation is replaced with P-main-conv + reverie's own messages
 ///
 /// # Panics
-/// Only call when `state.reverie.is_some()`.
+/// Only call when `state.reveries` contains the given `agent_id`.
 #[cfg_attr(not(test), allow(dead_code))]
-pub fn start_reverie_stream(state: &mut State, tx: Sender<StreamEvent>) {
-    // Get the reverie's own messages (empty on first launch) and trim whitespace
-    let mut reverie_messages = state.reverie.as_ref().map(|r| r.messages.clone()).unwrap_or_default();
+pub fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender<StreamEvent>) {
+    // Get the reverie's own messages (empty on first launch) and trim whitespace.
+    // On first launch, inject a user kickoff message so the conversation starts
+    // with a user turn — some models don't support assistant prefill.
+    let mut reverie_messages = state.reveries.get(agent_id).map(|r| r.messages.clone()).unwrap_or_default();
+    if reverie_messages.is_empty() {
+        reverie_messages.push(cp_base::state::Message::new_user(
+            "reverie-kickoff".to_string(),
+            "reverie-kickoff".to_string(),
+            REVERIE_KICKOFF_MSG.to_string(),
+            0,
+        ));
+    }
     for msg in &mut reverie_messages {
         if msg.role == "assistant" {
             msg.content = msg.content.trim_end().to_string();
@@ -56,8 +73,11 @@ pub fn start_reverie_stream(state: &mut State, tx: Sender<StreamEvent>) {
     // Use the EXACT same prepare_stream_context as the main worker.
     // Passing ReverieContext replaces the conversation section with
     // P-main-conv + reverie messages — panels and tools stay IDENTICAL for cache hits.
-    let ctx =
-        prepare_stream_context(state, true, Some(ReverieContext { messages: reverie_messages, tool_restrictions }));
+    let ctx = prepare_stream_context(
+        state,
+        true,
+        Some(ReverieContext { agent_id: agent_id.to_string(), messages: reverie_messages, tool_restrictions }),
+    );
 
     // Fire the stream to the secondary model
     start_streaming(
@@ -69,7 +89,7 @@ pub fn start_reverie_stream(state: &mut State, tx: Sender<StreamEvent>) {
             context_items: ctx.context_items,
             tools: ctx.tools,
             system_prompt: REVERIE_SYSTEM_PROMPT.to_string(),
-            seed_content: Some(REVERIE_SYSTEM_PROMPT.to_string()),
+            seed_content: None,
             worker_id: DEFAULT_WORKER_ID.to_string(),
         },
         tx,

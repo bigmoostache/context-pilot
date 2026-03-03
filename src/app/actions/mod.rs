@@ -486,6 +486,11 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.dirty = true;
             ActionResult::Nothing
         }
+        Action::CycleSidebarMode => {
+            state.sidebar_mode = state.sidebar_mode.next();
+            state.dirty = true;
+            ActionResult::Nothing
+        }
         Action::None => ActionResult::Nothing,
     }
 }

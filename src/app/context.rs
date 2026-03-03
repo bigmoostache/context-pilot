@@ -22,6 +22,8 @@ pub struct StreamContext {
 /// with P-main-conv (main AI's conversation as a read-only panel) and the
 /// reverie's own messages. Panels and tools remain IDENTICAL for cache hits.
 pub struct ReverieContext {
+    /// Agent ID driving this reverie (e.g., "cleaner", "cartographer")
+    pub agent_id: String,
     /// The reverie's own conversation messages (may be empty on first run)
     pub messages: Vec<Message>,
     /// Tool restrictions preamble injected at the top of the reverie conversation
@@ -140,15 +142,17 @@ pub fn prepare_stream_context(
         let mut reverie_panel_content = String::new();
 
         // Inject the reverie agent's prompt content
-        if let Some(rev) = &state.reverie {
+        {
             let ps = cp_mod_prompt::PromptState::get(state);
             if let Some(agent) = ps.agents.iter().find(|a| a.id == rev.agent_id) {
                 reverie_panel_content.push_str("## Agent Instructions\n");
                 reverie_panel_content.push_str(&agent.content);
                 reverie_panel_content.push('\n');
             }
-            // Inject additional context if provided
-            if let Some(ctx) = &rev.context {
+            // Inject additional context from the reverie state
+            if let Some(rev_state) = state.reveries.get(&rev.agent_id)
+                && let Some(ctx) = &rev_state.context
+            {
                 reverie_panel_content.push_str("\n## Additional Context\n");
                 reverie_panel_content.push_str(ctx);
                 reverie_panel_content.push('\n');

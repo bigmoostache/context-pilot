@@ -160,7 +160,7 @@ impl Module for TreeModule {
                         .required(),
                 ],
                 enabled: true,
-                reverie_allowed: false,
+                reverie_allowed: true,
                 category: "Tree".to_string(),
             },
         ]

@@ -4,6 +4,31 @@ use super::{chars, helpers::*, theme};
 use crate::infra::constants::SIDEBAR_HELP_HEIGHT;
 use crate::state::{ContextType, State};
 
+/// Returns a count badge for fixed panels, replacing the panel ID (P1, P2, etc.)
+/// with a meaningful number that reflects the panel's content.
+pub(super) fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String> {
+    let count = match ctx_type {
+        "todo" => {
+            let ts = cp_mod_todo::TodoState::get(state);
+            ts.todos.iter().filter(|t| !matches!(t.status, cp_mod_todo::TodoStatus::Done)).count()
+        }
+        "library" => cp_mod_prompt::types::PromptState::get(state).loaded_skill_ids.len(),
+        "tree" => cp_mod_tree::TreeState::get(state).tree_open_folders.len(),
+        "memory" => cp_mod_memory::MemoryState::get(state).memories.len(),
+        "spine" => cp_mod_spine::SpineState::unprocessed_notifications(state).len(),
+        "logs" => {
+            let ls = cp_mod_logs::LogsState::get(state);
+            ls.logs.iter().filter(|l| l.is_top_level()).count()
+        }
+        "callback" => cp_mod_callback::types::CallbackState::get(state).active_set.len(),
+        "scratchpad" => cp_mod_scratchpad::ScratchpadState::get(state).scratchpad_cells.len(),
+        "overview" => state.context.len() + 2, // +2 for system prompt + tool definitions
+        "tools" => state.tools.iter().filter(|t| t.enabled).count(),
+        _ => return None,
+    };
+    Some(count.to_string())
+}
+
 /// Maximum number of dynamic contexts (P7+) to show per page
 const MAX_DYNAMIC_PER_PAGE: usize = 10;
 
@@ -379,7 +404,6 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
 
     // Help hints at bottom of sidebar
     let help_lines = vec![
-        Line::from(""),
         Line::from(vec![
             Span::styled("  ", base_style),
             Span::styled("Tab", Style::default().fg(theme::accent())),
@@ -394,6 +418,16 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
             Span::styled("  ", base_style),
             Span::styled("Ctrl+P", Style::default().fg(theme::accent())),
             Span::styled(" commands", Style::default().fg(theme::text_muted())),
+        ]),
+        Line::from(vec![
+            Span::styled("  ", base_style),
+            Span::styled("Ctrl+H", Style::default().fg(theme::accent())),
+            Span::styled(" config", Style::default().fg(theme::text_muted())),
+        ]),
+        Line::from(vec![
+            Span::styled("  ", base_style),
+            Span::styled("Ctrl+V", Style::default().fg(theme::accent())),
+            Span::styled(" view", Style::default().fg(theme::text_muted())),
         ]),
         Line::from(vec![
             Span::styled("  ", base_style),
@@ -422,8 +456,13 @@ fn render_context_line(
     // Check if this context is loading (has no cached content but needs it)
     let is_loading = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
 
-    // Build the line with right-aligned ID
-    let shortcut = format!("{:>width$}", &ctx.id, width = id_width);
+    // Build the line — fixed panels show a count badge instead of Px ID
+    let shortcut = if ctx.context_type.is_fixed() {
+        let badge = fixed_panel_badge(ctx.context_type.as_str(), state).unwrap_or_default();
+        format!("{:>width$}", badge, width = id_width)
+    } else {
+        format!("{:>width$}", &ctx.id, width = id_width)
+    };
     let name = truncate_string(&ctx.name, 18);
 
     // Show spinner instead of token count when loading

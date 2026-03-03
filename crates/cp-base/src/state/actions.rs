@@ -53,6 +53,7 @@ pub enum Action {
     ConfigSelectSecondaryDeepSeekModel(crate::llm_types::DeepSeekModel),
     ConfigToggleReverie,
     ConfigToggleSecondaryMode,
+    CycleSidebarMode,
     OpenCommandPalette,
     ResetSessionCosts,
     SelectContextById(String),

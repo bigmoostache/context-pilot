@@ -72,8 +72,8 @@ pub fn reverie_tool_definitions(main_tools: &[ToolDefinition]) -> Vec<ToolDefini
 
 /// Build the optimize_context tool definition for the main AI.
 ///
-/// This tool lets the main AI explicitly invoke the reverie context optimizer
-/// with an optional directive (e.g., "optimize for UI work").
+/// This tool lets the main AI explicitly invoke a reverie sub-agent
+/// with an optional directive and agent selection.
 pub fn optimize_context_tool_definition() -> ToolDefinition {
     ToolDefinition {
         id: "optimize_context".to_string(),
@@ -89,6 +89,8 @@ pub fn optimize_context_tool_definition() -> ToolDefinition {
         params: vec![
             ToolParam::new("directive", ParamType::String)
                 .desc("Optional guidance for the optimizer (e.g., 'focus on git module files')"),
+            ToolParam::new("agent", ParamType::String)
+                .desc("Agent ID to drive the reverie (default: 'cleaner'). Use 'cartographer' to auto-describe files in the tree."),
         ],
         enabled: true,
         reverie_allowed: false,
@@ -130,22 +132,23 @@ pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
         };
     }
 
-    // Guard: reverie already running — one optimizer at a time
-    if state.reverie.is_some() {
-        let agent_name = state.reverie.as_ref().map(|r| r.agent_id.as_str()).unwrap_or("unknown");
+    // Agent is configurable — default to "cleaner" if not provided
+    let agent_id =
+        tool.input.get("agent").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).unwrap_or("cleaner").to_string();
+
+    // Guard: this specific agent type is already running
+    if state.reveries.contains_key(&agent_id) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!(
-                "A reverie is already running (agent: {}). Wait for it to complete before invoking again.",
-                agent_name
+                "A reverie with agent '{}' is already running. Wait for it to complete before invoking again.",
+                agent_id
             ),
             is_error: true,
             tool_name: tool.name.clone(),
         };
     }
 
-    // Agent is always "cleaner" for now (hardcoded default)
-    let agent_id = "cleaner".to_string();
     let context = tool.input.get("directive").and_then(|v| v.as_str()).map(|s| s.to_string());
 
     // Signal to the event loop that a reverie should be started.

@@ -88,9 +88,14 @@ impl Panel for ConsolePanel {
             return Some(CacheUpdate::Unchanged { context_id });
         }
 
-        // Truncate to tail — keep only the most recent output for context
+        // Truncate to tail — keep only the most recent output for context.
+        // We must snap `cut` to a valid UTF-8 char boundary before slicing,
+        // since console output may contain multi-byte characters (e.g. '²').
         let truncated = if buffer_content.len() > MAX_CONTEXT_CHARS {
-            let cut = buffer_content.len() - MAX_CONTEXT_CHARS;
+            let mut cut = buffer_content.len() - MAX_CONTEXT_CHARS;
+            while cut < buffer_content.len() && !buffer_content.is_char_boundary(cut) {
+                cut += 1;
+            }
             let start = buffer_content[cut..].find('\n').map(|p| cut + p + 1).unwrap_or(cut);
             format!(
                 "[...truncated, showing last {}B of {}B...]\n{}",

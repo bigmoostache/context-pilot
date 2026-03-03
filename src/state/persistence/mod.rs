@@ -189,6 +189,7 @@ fn load_state_new() -> State {
         next_result_id: worker_state.next_result_id,
         input: shared_config.draft_input,
         input_cursor: shared_config.draft_cursor,
+        sidebar_mode: shared_config.sidebar_mode,
         active_theme: shared_config.active_theme.clone(),
         ..State::default()
     };
@@ -272,6 +273,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
         selected_context: state.selected_context,
         draft_input: state.input.clone(),
         draft_cursor: state.input_cursor,
+        sidebar_mode: state.sidebar_mode,
         modules: global_modules,
     };
     if let Ok(json) = serde_json::to_string_pretty(&shared_config) {

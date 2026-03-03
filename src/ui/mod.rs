@@ -5,13 +5,14 @@ mod input;
 pub mod markdown;
 pub mod perf;
 mod sidebar;
+mod sidebar_collapsed;
 pub use crate::infra::constants::theme;
 pub mod typewriter;
 
 use ratatui::{prelude::*, widgets::Block};
 
 use crate::app::panels;
-use crate::infra::constants::{SIDEBAR_WIDTH, STATUS_BAR_HEIGHT};
+use crate::infra::constants::STATUS_BAR_HEIGHT;
 use crate::state::{ContextType, State};
 use crate::ui::perf::PERF;
 
@@ -45,8 +46,9 @@ pub fn render(frame: &mut Frame, state: &mut State) {
         && ac.active
     {
         // Position in main content area (right of sidebar, above status bar)
-        let content_x = area.x + SIDEBAR_WIDTH;
-        let content_width = area.width.saturating_sub(SIDEBAR_WIDTH);
+        let sw = state.sidebar_mode.width();
+        let content_x = area.x + sw;
+        let content_width = area.width.saturating_sub(sw);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
         let content_area = Rect::new(content_x, area.y, content_width, content_height);
         input::render_autocomplete_popup(frame, state, content_area);
@@ -61,16 +63,31 @@ pub fn render(frame: &mut Frame, state: &mut State) {
 }
 
 fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
+    let sw = state.sidebar_mode.width();
+    if sw == 0 {
+        // Hidden mode — no sidebar at all
+        render_main_content(frame, state, area);
+        return;
+    }
+
     // Body layout: sidebar + main content
     let body_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Length(SIDEBAR_WIDTH), // Sidebar
-            Constraint::Min(1),                // Main content
+            Constraint::Length(sw), // Sidebar
+            Constraint::Min(1),     // Main content
         ])
         .split(area);
 
-    sidebar::render_sidebar(frame, state, body_layout[0]);
+    match state.sidebar_mode {
+        cp_base::state::sidebar::SidebarMode::Normal => {
+            sidebar::render_sidebar(frame, state, body_layout[0]);
+        }
+        cp_base::state::sidebar::SidebarMode::Collapsed => {
+            sidebar_collapsed::render_sidebar_collapsed(frame, state, body_layout[0]);
+        }
+        cp_base::state::sidebar::SidebarMode::Hidden => {} // handled above
+    }
     render_main_content(frame, state, body_layout[1]);
 }
 

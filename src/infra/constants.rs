@@ -60,14 +60,11 @@ pub const TYPEWRITER_DEFAULT_DELAY_MS: f64 = 15.0;
 // UI LAYOUT
 // =============================================================================
 
-/// Width of the sidebar in characters
-pub const SIDEBAR_WIDTH: u16 = 36;
-
 /// Height of the status bar
 pub const STATUS_BAR_HEIGHT: u16 = 1;
 
 /// Height of the help hints section in sidebar
-pub const SIDEBAR_HELP_HEIGHT: u16 = 8;
+pub const SIDEBAR_HELP_HEIGHT: u16 = 9;
 
 // =============================================================================
 // EVENT LOOP
@@ -90,7 +87,7 @@ pub const MAX_API_RETRIES: u32 = 3;
 // =============================================================================
 
 /// Maximum tool calls per reverie run before force-stopping
-pub const REVERIE_TOOL_CAP: usize = 15;
+pub const REVERIE_TOOL_CAP: usize = 50;
 
 // =============================================================================
 // PERSISTENCE

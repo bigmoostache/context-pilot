@@ -8,6 +8,7 @@ use ratatui::text::Line;
 
 use super::context::{ContextElement, ContextType};
 use super::message::Message;
+use super::sidebar::SidebarMode;
 
 use crate::llm_types::ModelInfo;
 use crate::tools::ToolDefinition;
@@ -73,7 +74,7 @@ pub struct State {
     pub input_cursor: usize,
     /// Paste buffers: stored content for inline paste placeholders
     pub paste_buffers: Vec<String>,
-    /// Labels for paste buffers: None = paste, Some(name) = command expansion
+    /// Labels for paste buffers: None = paste, Some(name) = command
     pub paste_buffer_labels: Vec<Option<String>>,
     pub selected_context: usize,
     pub is_streaming: bool,
@@ -121,48 +122,38 @@ pub struct State {
     pub active_theme: String,
     /// Selected LLM provider
     pub llm_provider: crate::llm_types::LlmProvider,
-    /// Selected Anthropic model
     pub anthropic_model: crate::llm_types::AnthropicModel,
-    /// Selected Grok model
     pub grok_model: crate::llm_types::GrokModel,
-    /// Selected Groq model
     pub groq_model: crate::llm_types::GroqModel,
-    /// Selected DeepSeek model
     pub deepseek_model: crate::llm_types::DeepSeekModel,
     /// Whether config overlay is showing secondary model selection (Tab toggles)
     pub config_secondary_mode: bool,
     /// Secondary LLM provider (for reveries / sub-agents)
     pub secondary_provider: crate::llm_types::LlmProvider,
-    /// Secondary Anthropic model (for reveries / sub-agents)
     pub secondary_anthropic_model: crate::llm_types::AnthropicModel,
-    /// Secondary Grok model
     pub secondary_grok_model: crate::llm_types::GrokModel,
-    /// Secondary Groq model
     pub secondary_groq_model: crate::llm_types::GroqModel,
-    /// Secondary DeepSeek model
     pub secondary_deepseek_model: crate::llm_types::DeepSeekModel,
     /// Whether the reverie system is enabled (auto-trigger on threshold breach)
     pub reverie_enabled: bool,
-    /// Active reverie session (None when no reverie is running).
+    /// Sidebar display mode: Normal (full), Collapsed (icons only), Hidden
+    pub sidebar_mode: SidebarMode,
+    /// Active reverie sessions keyed by agent_id (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
-    pub reverie: Option<super::reverie::ReverieState>,
+    pub reveries: HashMap<String, super::reverie::ReverieState>,
     /// Accumulated prompt_cache_hit_tokens across all API calls (persisted)
     pub cache_hit_tokens: usize,
     /// Accumulated prompt_cache_miss_tokens across all API calls (persisted)
     pub cache_miss_tokens: usize,
     /// Accumulated output tokens across all API calls (persisted)
     pub total_output_tokens: usize,
-    /// Current stream accumulated cache hit tokens (runtime-only, reset per user input)
+    /// Current stream token accumulators (runtime-only, reset per user input)
     pub stream_cache_hit_tokens: usize,
-    /// Current stream accumulated cache miss tokens (runtime-only, reset per user input)
     pub stream_cache_miss_tokens: usize,
-    /// Current stream accumulated output tokens (runtime-only, reset per user input)
     pub stream_output_tokens: usize,
-    /// Last tick cache hit tokens (runtime-only, set per StreamDone)
+    /// Last tick token accumulators (runtime-only, set per StreamDone)
     pub tick_cache_hit_tokens: usize,
-    /// Last tick cache miss tokens (runtime-only, set per StreamDone)
     pub tick_cache_miss_tokens: usize,
-    /// Last tick output tokens (runtime-only, set per StreamDone)
     pub tick_output_tokens: usize,
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     pub cleaning_threshold: f32,
@@ -171,27 +162,24 @@ pub struct State {
     /// Context budget in tokens (None = use model's full context window)
     pub context_budget: Option<usize>,
 
-    // === API Check Status (runtime-only) ===
     /// Whether an API check is in progress
     pub api_check_in_progress: bool,
     /// Result of the last API check
     pub api_check_result: Option<crate::llm_types::ApiCheckResult>,
-
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
     /// Guard rail block reason (set when spine blocks, cleared when streaming starts)
     pub guard_rail_blocked: Option<String>,
-    /// Reload pending flag (set by system_reload tool, triggers reload after tool result is saved)
+    /// Reload pending (set by system_reload, triggers reload after tool result saved)
     pub reload_pending: bool,
     /// Waiting for file panels to load before continuing stream
     pub waiting_for_panels: bool,
-    /// Previous panel hash list for cache cost tracking (ordered hashes from last tick)
+    /// Previous panel hash list for cache cost tracking
     pub previous_panel_hash_list: Vec<String>,
-    /// Sleep timer: if nonzero, tool pipeline should wait until this timestamp (ms) before proceeding
+    /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding
     pub tool_sleep_until_ms: u64,
 
     // === Render Cache (runtime-only) ===
-    /// Last viewport width (for pre-wrapping text)
     pub last_viewport_width: u16,
     /// Cached rendered lines per message ID
     pub message_cache: HashMap<String, MessageRenderCache>,
@@ -257,7 +245,8 @@ impl Default for State {
             secondary_groq_model: crate::llm_types::GroqModel::default(),
             secondary_deepseek_model: crate::llm_types::DeepSeekModel::default(),
             reverie_enabled: true,
-            reverie: None,
+            sidebar_mode: SidebarMode::Normal,
+            reveries: HashMap::new(),
             cache_hit_tokens: 0,
             cache_miss_tokens: 0,
             total_output_tokens: 0,

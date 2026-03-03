@@ -25,6 +25,21 @@ pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>>
     ]));
     text.push(Line::from(""));
 
+    // Open panels: context elements + system prompt + tool definitions
+    let panel_count = state.context.len() + 2;
+    let fixed_count = state.context.iter().filter(|c| c.context_type.is_fixed()).count();
+    let dynamic_count = panel_count - fixed_count - 2; // subtract system + tools
+
+    text.push(Line::from(vec![
+        Span::styled(" ".to_string(), base_style),
+        Span::styled("Panels: ".to_string(), Style::default().fg(theme::text_secondary())),
+        Span::styled(format!("{}", panel_count), Style::default().fg(theme::text()).bold()),
+        Span::styled(
+            format!(" ({} fixed, {} dynamic, 1 system, 1 tools)", fixed_count, dynamic_count),
+            Style::default().fg(theme::text_muted()),
+        ),
+    ]));
+
     let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
     let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
     let total_msgs = state.messages.len();

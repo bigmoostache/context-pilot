@@ -76,8 +76,8 @@ pub struct App {
     pending_console_wait_tool_results: Option<Vec<ToolResult>>,
     /// Accumulated blocking watcher results — collects partial results until ALL blocking watchers complete
     accumulated_blocking_results: Vec<cp_base::watchers::WatcherResult>,
-    /// Active reverie stream (context optimizer sub-agent)
-    reverie_stream: Option<ReverieStream>,
+    /// Active reverie streams keyed by agent_id (one per agent type)
+    reverie_streams: std::collections::HashMap<String, ReverieStream>,
 }
 
 impl App {
@@ -112,7 +112,7 @@ impl App {
             pending_question_tool_results: None,
             pending_console_wait_tool_results: None,
             accumulated_blocking_results: Vec::new(),
-            reverie_stream: None,
+            reverie_streams: std::collections::HashMap::new(),
         }
     }
 

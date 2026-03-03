@@ -22,7 +22,7 @@ pub fn check_threshold_trigger(state: &mut State) -> bool {
     }
 
     // Guard: reverie already running — don't stack 'em
-    if state.reverie.is_some() {
+    if state.reveries.contains_key("cleaner") {
         return false;
     }
 
@@ -47,7 +47,9 @@ pub fn check_threshold_trigger(state: &mut State) -> bool {
     );
 
     // Start the reverie session with the default cleaner agent
-    state.reverie = Some(ReverieState::new(ReverieType::ContextOptimizer, "cleaner".to_string(), None));
+    state
+        .reveries
+        .insert("cleaner".to_string(), ReverieState::new(ReverieType::ContextOptimizer, "cleaner".to_string(), None));
 
     true
 }
@@ -59,8 +61,8 @@ pub fn check_threshold_trigger(state: &mut State) -> bool {
 ///
 /// Returns `true` if the reverie was started, `false` if guards prevented it.
 pub fn start_manual_reverie(state: &mut State, agent_id: String, context: Option<String>) -> bool {
-    // Guard: reverie already running
-    if state.reverie.is_some() {
+    // Guard: this agent type is already running (one per agent)
+    if state.reveries.contains_key(&agent_id) {
         return false;
     }
 
@@ -85,7 +87,7 @@ pub fn start_manual_reverie(state: &mut State, agent_id: String, context: Option
     );
 
     // Start the reverie session
-    state.reverie = Some(ReverieState::new(ReverieType::ContextOptimizer, agent_id, context));
+    state.reveries.insert(agent_id.clone(), ReverieState::new(ReverieType::ContextOptimizer, agent_id, context));
 
     true
 }

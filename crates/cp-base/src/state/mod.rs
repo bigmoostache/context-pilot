@@ -4,6 +4,7 @@ pub mod config;
 pub mod context;
 pub mod message;
 pub mod runtime;
+pub mod sidebar;
 pub mod watchers;
 
 // Re-exports for convenience
