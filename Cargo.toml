@@ -677,6 +677,34 @@ unnecessary_join = "warn"
 unnecessary_wraps = "warn"
 
 # ============================
+# Pedantic → warn (C18)
+# ============================
+# Flatten nested `A | B | C` patterns in match arms
+unnested_or_patterns = "warn"
+# Add underscores for readability: `1_000_000` not `1000000`
+unreadable_literal = "warn"
+# Warn when Deserialize is derived on a struct with unsafe fields
+unsafe_derive_deserialize = "warn"
+# Detect async functions that don't use .await
+unused_async = "warn"
+# Detect methods that don't use `self`
+unused_self = "warn"
+
+# ============================
+# Pedantic → warn (C19)
+# ============================
+# Flag use of `_`-prefixed bindings after they're declared
+used_underscore_binding = "warn"
+# Flag items prefixed with `_` that are actually used
+used_underscore_items = "warn"
+# Prefer `.count_ones() != 0` over `x & (x - 1) != 0` for power-of-two checks
+verbose_bit_mask = "warn"
+# Prefer explicit imports over glob `use foo::*`
+wildcard_imports = "warn"
+# Use `HashSet` instead of `HashMap<K, ()>`
+zero_sized_map_values = "warn"
+
+# ============================
 # Pedantic → warn (C1-C10, prior batches)
 # ============================
 # Use clone_from when possible
@@ -689,6 +717,42 @@ borrow_as_ptr = "warn"
 case_sensitive_file_extension_comparisons = "warn"
 # Use From instead of as for lossless casts
 cast_lossless = "warn"
+
+# ============================
+# Nursery → warn (cherry-picked stable lints)
+# ============================
+# Detect `as_ptr()` followed by `cast_mut()` — use `as_mut_ptr()` instead
+as_ptr_cast_mut = "warn"
+# Detect identical code at start/end of if/else branches — factor out
+branches_sharing_code = "warn"
+# Collection populated but never read — dead code
+collection_is_never_read = "warn"
+# `debug_assert!(x.mutating_call())` — side effect lost in release builds
+debug_assert_with_mut_call = "warn"
+# Derive `Eq` when `PartialEq` is derived and all fields are `Eq`
+derive_partial_eq_without_eq = "warn"
+# `impl From<T>` that can panic — use `TryFrom` instead
+fallible_impl_from = "warn"
+# Futures that are not `Send` — problematic for multi-threaded executors
+future_not_send = "warn"
+# Functions that could be `const fn` but aren't
+missing_const_for_fn = "warn"
+# `&mut T` parameter that doesn't need mutability — use `&T`
+needless_pass_by_ref_mut = "warn"
+# Prefer `map_or` / `map_or_else` over `if let Some(x) = opt { ... } else { ... }`
+option_if_let_else = "warn"
+# Lock/guard held across match scrutinee — potential deadlock
+significant_drop_in_scrutinee = "warn"
+# Drop guards held longer than needed — tighten scope
+significant_drop_tightening = "warn"
+# `T: A + B` where `B: A` — `A` bound is redundant
+trait_duplication_in_bounds = "warn"
+# Same as above but for `where` clauses
+type_repetition_in_bounds = "warn"
+# `Foo { a: a, b: b }` where fields already match — use `Foo { a, b }`
+unnecessary_struct_initialization = "warn"
+# Use `Self` instead of the type name inside impl blocks
+use_self = "warn"
 
 [package]
 name = "tui"

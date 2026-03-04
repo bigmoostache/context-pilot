@@ -67,6 +67,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     let msg = if let Some(prev) = previous {
         format!(
             "Opened callback {anchor_id} in editor (closed previous: {prev}). Script content is now visible in the Callbacks panel."

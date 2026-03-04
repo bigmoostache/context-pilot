@@ -28,7 +28,7 @@ pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult
 /// Handle `StreamDone` action — finalize streaming, correct token counts
 pub(crate) fn handle_stream_done(
     state: &mut State,
-    _input_tokens: usize,
+    input_tokens: usize,
     output_tokens: usize,
     cache_hit_tokens: usize,
     cache_miss_tokens: usize,
@@ -68,7 +68,7 @@ pub(crate) fn handle_stream_done(
         // Remove any [A##]: prefixes the LLM mistakenly added
         msg.content = clean_llm_id_prefix(&msg.content);
         msg.content_token_count = output_tokens;
-        msg.input_tokens = _input_tokens;
+        msg.input_tokens = input_tokens;
         let id = msg.id.clone();
         return ActionResult::SaveMessage(id);
     }

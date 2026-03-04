@@ -3,14 +3,14 @@ use crate::state::State;
 use super::ActionResult;
 
 /// Handle secondary provider selection
-pub(crate) fn handle_secondary_provider(state: &mut State, provider: crate::llms::LlmProvider) -> ActionResult {
+pub(crate) const fn handle_secondary_provider(state: &mut State, provider: crate::llms::LlmProvider) -> ActionResult {
     state.secondary_provider = provider;
     state.dirty = true;
     ActionResult::Save
 }
 
 /// Handle secondary model selection for all providers
-pub(crate) fn handle_secondary_model(state: &mut State, action: &super::Action) -> ActionResult {
+pub(crate) const fn handle_secondary_model(state: &mut State, action: &super::Action) -> ActionResult {
     use super::Action;
     match action {
         Action::ConfigSelectSecondaryAnthropicModel(model) => state.secondary_anthropic_model = *model,

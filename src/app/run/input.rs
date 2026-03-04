@@ -33,6 +33,7 @@ impl App {
                     return;
                 };
 
+                #[expect(clippy::branches_sharing_code, reason = "factoring out shared code would reduce clarity")]
                 if is_dir {
                     // Folder: complete to "dir/" and show contents — don't close
                     let full_path = ac.selected_full_path().unwrap_or(name);

@@ -47,7 +47,7 @@ impl Default for QuestionAnswer {
 impl QuestionAnswer {
     /// Create a blank answer state (no selection, cursor at top).
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { cursor: 0, selected: Vec::new(), other_text: String::new(), typing_other: false }
     }
 }
@@ -219,7 +219,7 @@ impl PendingQuestionForm {
     }
 
     /// Go to previous question (Left arrow). Always allowed if not on first.
-    pub fn prev_question(&mut self) {
+    pub const fn prev_question(&mut self) {
         if self.current_question > 0 {
             self.current_question -= 1;
         }

@@ -1,6 +1,10 @@
 use ratatui::{prelude::*, widgets::Paragraph};
 
-use super::super::{chars, helpers::*, theme};
+use super::super::{
+    chars,
+    helpers::{Cell, format_number, render_table, spinner, truncate_string},
+    theme,
+};
 use crate::infra::constants::SIDEBAR_HELP_HEIGHT;
 use crate::state::{ContextType, State};
 use cp_base::cast::SafeCast;
@@ -129,6 +133,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let total_pages = if total_dynamic == 0 { 1 } else { total_dynamic.div_ceil(MAX_DYNAMIC_PER_PAGE) };
 
     // Determine current page based on selected context
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     let current_page = if let Some(selected_pos) = dynamic_indices.iter().position(|&i| i == state.selected_context) {
         selected_pos / MAX_DYNAMIC_PER_PAGE
     } else {
@@ -389,8 +394,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
             + State::token_cost(state.cache_miss_tokens, miss_price)
             + State::token_cost(state.total_output_tokens, out_price);
         if total_cost >= 0.001 {
-            let total_str =
-                if total_cost < 0.01 { format!("${total_cost:.3}") } else { format!("${total_cost:.2}") };
+            let total_str = if total_cost < 0.01 { format!("${total_cost:.3}") } else { format!("${total_cost:.2}") };
             lines.push(Line::from(vec![Span::styled(
                 format!(" total: {total_str}"),
                 Style::default().fg(theme::text_muted()),

@@ -34,16 +34,16 @@ pub(crate) struct SessionInfo {
 }
 
 impl Response {
-    pub(crate) fn ok() -> Self {
+    pub(crate) const fn ok() -> Self {
         Self { ok: true, error: None, pid: None, status: None, exit_code: None, sessions: None }
     }
-    pub(crate) fn ok_pid(pid: u32) -> Self {
+    pub(crate) const fn ok_pid(pid: u32) -> Self {
         Self { ok: true, error: None, pid: Some(pid), status: None, exit_code: None, sessions: None }
     }
-    pub(crate) fn ok_status(status: String, exit_code: Option<i32>) -> Self {
+    pub(crate) const fn ok_status(status: String, exit_code: Option<i32>) -> Self {
         Self { ok: true, error: None, pid: None, status: Some(status), exit_code, sessions: None }
     }
-    pub(crate) fn ok_sessions(sessions: Vec<SessionInfo>) -> Self {
+    pub(crate) const fn ok_sessions(sessions: Vec<SessionInfo>) -> Self {
         Self { ok: true, error: None, pid: None, status: None, exit_code: None, sessions: Some(sessions) }
     }
     pub(crate) fn err(msg: impl Into<String>) -> Self {
@@ -108,7 +108,7 @@ pub(crate) fn interpret_escapes(input: &str) -> Vec<u8> {
     out
 }
 
-fn hex_digit(b: u8) -> Option<u8> {
+const fn hex_digit(b: u8) -> Option<u8> {
     match b {
         b'0'..=b'9' => Some(b - b'0'),
         b'a'..=b'f' => Some(b - b'a' + 10),

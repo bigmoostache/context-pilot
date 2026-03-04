@@ -26,6 +26,7 @@ impl ClaudeCodeClient {
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
         // Handle cleaner mode or custom system prompt
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         let system_text = if let Some(ref prompt) = request.system_prompt {
             prompt.clone()
         } else {

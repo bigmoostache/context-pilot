@@ -176,13 +176,7 @@ impl App {
             let stop_reason = stop_reason.clone();
             match apply_action(
                 &mut self.state,
-                Action::StreamDone {
-                    _input_tokens: input_tokens,
-                    output_tokens,
-                    cache_hit_tokens,
-                    cache_miss_tokens,
-                    stop_reason,
-                },
+                Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason },
             ) {
                 ActionResult::SaveMessage(id) => {
                     if let Some(msg) = self.state.messages.iter().find(|m| m.id == id) {

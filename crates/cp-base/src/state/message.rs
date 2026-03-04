@@ -129,7 +129,7 @@ impl Message {
 /// Test helpers for building Message instances with sensible defaults.
 /// Not gated behind `#[cfg(test)]` so downstream crates can use them.
 pub mod test_helpers {
-    use super::*;
+    use super::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
 
     /// Builder for constructing test messages with sensible defaults.
     /// Auto-increments IDs per role prefix (U1, A1, T1, R1).
@@ -207,7 +207,7 @@ pub mod test_helpers {
 
         /// Override the message status (builder pattern).
         #[must_use]
-        pub fn status(mut self, s: MessageStatus) -> Self {
+        pub const fn status(mut self, s: MessageStatus) -> Self {
             self.msg.status = s;
             self
         }

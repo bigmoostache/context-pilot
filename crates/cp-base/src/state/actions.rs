@@ -44,7 +44,7 @@ pub enum Action {
     /// Stream finished — carries final token accounting.
     StreamDone {
         /// Input tokens consumed by the prompt.
-        _input_tokens: usize,
+        input_tokens: usize,
         /// Tokens generated in the response.
         output_tokens: usize,
         /// Input tokens served from provider cache.

@@ -21,9 +21,9 @@ impl TodoStatus {
     #[must_use]
     pub fn icon(&self) -> String {
         match self {
-            TodoStatus::Pending => icons::todo_pending(),
-            TodoStatus::InProgress => icons::todo_in_progress(),
-            TodoStatus::Done => icons::todo_done(),
+            Self::Pending => icons::todo_pending(),
+            Self::InProgress => icons::todo_in_progress(),
+            Self::Done => icons::todo_done(),
         }
     }
 }
@@ -33,9 +33,9 @@ impl FromStr for TodoStatus {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            " " | "pending" => Ok(TodoStatus::Pending),
-            "~" | "in_progress" => Ok(TodoStatus::InProgress),
-            "x" | "X" | "done" => Ok(TodoStatus::Done),
+            " " | "pending" => Ok(Self::Pending),
+            "~" | "in_progress" => Ok(Self::InProgress),
+            "x" | "X" | "done" => Ok(Self::Done),
             _ => Err(()),
         }
     }
@@ -77,7 +77,7 @@ impl Default for TodoState {
 impl TodoState {
     /// Create an empty todo state with ID counter at 1.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { todos: vec![], next_todo_id: 1 }
     }
 

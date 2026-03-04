@@ -82,7 +82,7 @@ impl TypewriterBuffer {
         }
     }
 
-    pub(crate) fn mark_done(&mut self) {
+    pub(crate) const fn mark_done(&mut self) {
         self.stream_done = true;
     }
     pub(crate) fn take_chars(&mut self) -> Option<String> {

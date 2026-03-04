@@ -4,7 +4,9 @@ use reqwest::blocking::Client;
 use secrecy::ExposeSecret;
 
 use super::ClaudeCodeApiKeyClient;
-use super::helpers::*;
+use super::helpers::{
+    BILLING_HEADER, CLAUDE_CODE_ENDPOINT, SYSTEM_REMINDER, apply_claude_code_headers, map_model_name,
+};
 use crate::llms::ApiCheckResult;
 
 impl ClaudeCodeApiKeyClient {
@@ -47,6 +49,7 @@ impl ClaudeCodeApiKeyClient {
             }))
             .send();
 
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         let auth_ok = match &auth_result {
             Ok(resp) => resp.status().is_success(),
             Err(_) => false,

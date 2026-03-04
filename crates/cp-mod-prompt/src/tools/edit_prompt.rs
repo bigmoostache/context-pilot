@@ -166,11 +166,11 @@ enum EntityType {
 }
 
 impl EntityType {
-    fn label(&self) -> &'static str {
+    const fn label(&self) -> &'static str {
         match self {
-            EntityType::Agent => "agent",
-            EntityType::Skill => "skill",
-            EntityType::Command => "command",
+            Self::Agent => "agent",
+            Self::Skill => "skill",
+            Self::Command => "command",
         }
     }
 }

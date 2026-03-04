@@ -24,6 +24,7 @@ pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<
     drop(std::thread::spawn(move || {
         let _r = tx.send(child.wait_with_output());
     }));
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
         Ok(result) => result,
         Err(_) => {

@@ -119,7 +119,7 @@ pub(crate) mod theme {
     use crate::infra::config::active_theme;
     use ratatui::style::Color;
 
-    fn rgb(c: [u8; 3]) -> Color {
+    const fn rgb(c: [u8; 3]) -> Color {
         Color::Rgb(c[0], c[1], c[2])
     }
 

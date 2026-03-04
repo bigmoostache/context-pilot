@@ -135,6 +135,7 @@ impl Panel for FilePanel {
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let selected = state.context.get(state.selected_context);
 
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         let (content, file_path) = if let Some(ctx) = selected {
             let path = ctx.get_meta_str("file_path").unwrap_or("");
             // Use cached content only - no blocking file reads

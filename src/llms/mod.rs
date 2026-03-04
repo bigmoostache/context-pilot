@@ -163,6 +163,7 @@ fn ms_to_iso8601(ms: u64) -> String {
     let datetime = UNIX_EPOCH + duration;
 
     // Manual formatting since we don't have chrono
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     if let Ok(since_epoch) = datetime.duration_since(UNIX_EPOCH) {
         let secs = since_epoch.as_secs();
         // Calculate components
@@ -207,7 +208,7 @@ fn ms_to_iso8601(ms: u64) -> String {
     }
 }
 
-fn is_leap_year(year: i32) -> bool {
+const fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
 
@@ -236,8 +237,8 @@ pub(crate) fn panel_timestamp_text(timestamp_ms: u64) -> String {
     use crate::infra::constants::prompts;
 
     // Check for zero/invalid timestamp (1970-01-01 or very old)
-    // Consider anything before year 2020 as invalid (timestamp < ~1577836800000)
-    if timestamp_ms < 1577836800000 {
+    // Consider anything before year 2020 as invalid (timestamp < ~1_577_836_800_000)
+    if timestamp_ms < 1_577_836_800_000 {
         return prompts::panel_timestamp_unknown().to_string();
     }
 
@@ -410,10 +411,10 @@ pub(crate) mod error {
     impl fmt::Display for LlmError {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
-                LlmError::Auth(msg) => write!(f, "Auth error: {msg}"),
-                LlmError::Network(msg) => write!(f, "Network error: {msg}"),
-                LlmError::Api { status, body } => write!(f, "API error {status}: {body}"),
-                LlmError::StreamRead(msg) => write!(f, "Stream read error: {msg}"),
+                Self::Auth(msg) => write!(f, "Auth error: {msg}"),
+                Self::Network(msg) => write!(f, "Network error: {msg}"),
+                Self::Api { status, body } => write!(f, "API error {status}: {body}"),
+                Self::StreamRead(msg) => write!(f, "Stream read error: {msg}"),
             }
         }
     }
@@ -422,7 +423,7 @@ pub(crate) mod error {
 
     impl From<reqwest::Error> for LlmError {
         fn from(e: reqwest::Error) -> Self {
-            LlmError::Network(e.to_string())
+            Self::Network(e.to_string())
         }
     }
 

@@ -189,10 +189,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     } else {
         ToolResult::new(
             tool.id.clone(),
-            format!(
-                "Spine configured:\n{}",
-                changes.iter().map(|c| format!("  • {c}")).collect::<Vec<_>>().join("\n")
-            ),
+            format!("Spine configured:\n{}", changes.iter().map(|c| format!("  • {c}")).collect::<Vec<_>>().join("\n")),
             false,
         )
     }

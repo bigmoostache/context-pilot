@@ -57,6 +57,7 @@ fn exec_compile(
     _root: Option<&str>,
 ) -> ToolResult {
     // Default output: same name with .pdf extension
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     let output_path = if let Some(o) = output {
         o.to_string()
     } else {
@@ -392,6 +393,7 @@ fn collect_font_info(dir: &Path, entries: &mut Vec<(String, String, String)>) {
 /// Compiles immediately and records dependency tree for future change detection.
 fn exec_watch(tool: &ToolUse, input: &str, output: Option<&str>) -> ToolResult {
     // Default output: same name with .pdf extension
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     let output_path = if let Some(o) = output {
         o.to_string()
     } else {

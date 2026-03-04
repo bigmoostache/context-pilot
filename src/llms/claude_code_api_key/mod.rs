@@ -22,7 +22,10 @@ use crate::infra::constants::library;
 use crate::infra::tools::build_api_tools;
 use cp_base::config::INJECTIONS;
 
-use helpers::*;
+use helpers::{
+    BILLING_HEADER, CLAUDE_CODE_ENDPOINT, apply_claude_code_headers, dump_last_request, ensure_message_alternation,
+    inject_system_reminder, map_model_name,
+};
 
 /// Claude Code API Key client
 pub(crate) struct ClaudeCodeApiKeyClient {
@@ -55,6 +58,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
         // Handle cleaner mode or custom system prompt
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         let system_text = if let Some(ref prompt) = request.system_prompt {
             prompt.clone()
         } else {

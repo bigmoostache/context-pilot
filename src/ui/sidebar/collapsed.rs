@@ -1,6 +1,6 @@
 use ratatui::prelude::*;
 
-use super::super::{helpers::*, theme};
+use super::super::{helpers::format_number, theme};
 use crate::state::{ContextType, State};
 
 use super::full::fixed_panel_badge;
@@ -107,6 +107,7 @@ fn render_collapsed_line(
     let icon_color = if is_selected { theme::accent() } else { theme::text_muted() };
 
     // Badge or short ID for dynamic panels
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     let label = if let Some(b) = badge {
         format!("{b:>3}")
     } else if ctx.context_type.is_fixed() {

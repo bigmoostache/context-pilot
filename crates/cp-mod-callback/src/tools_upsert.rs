@@ -284,11 +284,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if changes.is_empty() {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Callback {anchor_id} updated (no changes specified)"),
-            false,
-        );
+        return ToolResult::new(tool.id.clone(), format!("Callback {anchor_id} updated (no changes specified)"), false);
     }
 
     ToolResult::new(tool.id.clone(), format!("Callback {} updated:\n  {}", anchor_id, changes.join("\n  ")), false)

@@ -35,9 +35,15 @@ fn main() -> io::Result<()> {
     if args.len() >= 2 {
         match args[1].as_str() {
             // Compile a .typ → .pdf in the same directory
-            "typst-compile" => return run_typst_compile(&args[2..]),
+            "typst-compile" => {
+                run_typst_compile(&args[2..]);
+                return Ok(());
+            }
             // Recompile watched documents whose dependencies changed
-            "typst-recompile-watched" => return run_typst_recompile_watched(&args[2..]),
+            "typst-recompile-watched" => {
+                run_typst_recompile_watched(&args[2..]);
+                return Ok(());
+            }
             _ => {}
         }
     }
@@ -123,7 +129,7 @@ fn main() -> io::Result<()> {
 /// Run the typst-compile subcommand: compile a .typ file to PDF in the same directory.
 /// Used by the typst-compile callback via $`CP_CHANGED_FILES`.
 /// Usage: cpilot typst-compile <source.typ>
-fn run_typst_compile(args: &[String]) -> io::Result<()> {
+fn run_typst_compile(args: &[String]) {
     if args.is_empty() {
         eprintln!("Usage: cpilot typst-compile <source.typ>");
         std::process::exit(1);
@@ -138,10 +144,7 @@ fn run_typst_compile(args: &[String]) -> io::Result<()> {
     let out = if parent.is_empty() { format!("{stem}.pdf") } else { format!("{parent}/{stem}.pdf") };
 
     match cp_mod_typst::compiler::compile_and_write(source_path, &out) {
-        Ok(msg) => {
-            println!("{msg}");
-            Ok(())
-        }
+        Ok(msg) => println!("{msg}"),
         Err(err) => {
             eprint!("{err}");
             std::process::exit(1);
@@ -152,14 +155,14 @@ fn run_typst_compile(args: &[String]) -> io::Result<()> {
 /// Recompile all watched .typ documents whose dependencies include any of the changed files.
 /// Used by the typst-watchlist callback via $`CP_CHANGED_FILES`.
 /// Usage: cpilot typst-recompile-watched <`changed_file1`> [`changed_file2` ...]
-fn run_typst_recompile_watched(args: &[String]) -> io::Result<()> {
+fn run_typst_recompile_watched(args: &[String]) {
     if args.is_empty() {
-        return Ok(());
+        return;
     }
 
     let watchlist = cp_mod_typst::watchlist::Watchlist::load();
     if watchlist.entries.is_empty() {
-        return Ok(());
+        return;
     }
 
     // Find all watched documents affected by the changed files
@@ -195,5 +198,4 @@ fn run_typst_recompile_watched(args: &[String]) -> io::Result<()> {
     if had_error {
         std::process::exit(1);
     }
-    Ok(())
 }

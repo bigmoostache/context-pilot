@@ -65,6 +65,7 @@ impl ClaudeCodeClient {
             }))
             .send();
 
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         let auth_ok = match &auth_result {
             Ok(resp) => resp.status().is_success(),
             Err(_) => false,

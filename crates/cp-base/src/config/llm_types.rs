@@ -45,7 +45,7 @@ pub struct ApiCheckResult {
 impl ApiCheckResult {
     /// `true` only when auth, streaming, and tool-use all passed.
     #[must_use]
-    pub fn all_ok(&self) -> bool {
+    pub const fn all_ok(&self) -> bool {
         self.auth_ok && self.streaming_ok && self.tools_ok
     }
 }
@@ -112,17 +112,17 @@ pub enum AnthropicModel {
 impl ModelInfo for AnthropicModel {
     fn api_name(&self) -> &'static str {
         match self {
-            AnthropicModel::ClaudeOpus45 => "claude-opus-4-6",
-            AnthropicModel::ClaudeSonnet45 => "claude-sonnet-4-5-20250929",
-            AnthropicModel::ClaudeHaiku45 => "claude-haiku-4-5-20251001",
+            Self::ClaudeOpus45 => "claude-opus-4-6",
+            Self::ClaudeSonnet45 => "claude-sonnet-4-5-20250929",
+            Self::ClaudeHaiku45 => "claude-haiku-4-5-20251001",
         }
     }
 
     fn display_name(&self) -> &'static str {
         match self {
-            AnthropicModel::ClaudeOpus45 => "Opus 4.6",
-            AnthropicModel::ClaudeSonnet45 => "Sonnet 4.5",
-            AnthropicModel::ClaudeHaiku45 => "Haiku 4.5",
+            Self::ClaudeOpus45 => "Opus 4.6",
+            Self::ClaudeSonnet45 => "Sonnet 4.5",
+            Self::ClaudeHaiku45 => "Haiku 4.5",
         }
     }
 
@@ -132,40 +132,40 @@ impl ModelInfo for AnthropicModel {
 
     fn input_price_per_mtok(&self) -> f32 {
         match self {
-            AnthropicModel::ClaudeOpus45 => 5.0,
-            AnthropicModel::ClaudeSonnet45 => 3.0,
-            AnthropicModel::ClaudeHaiku45 => 1.0,
+            Self::ClaudeOpus45 => 5.0,
+            Self::ClaudeSonnet45 => 3.0,
+            Self::ClaudeHaiku45 => 1.0,
         }
     }
 
     fn output_price_per_mtok(&self) -> f32 {
         match self {
-            AnthropicModel::ClaudeOpus45 => 25.0,
-            AnthropicModel::ClaudeSonnet45 => 15.0,
-            AnthropicModel::ClaudeHaiku45 => 5.0,
+            Self::ClaudeOpus45 => 25.0,
+            Self::ClaudeSonnet45 => 15.0,
+            Self::ClaudeHaiku45 => 5.0,
         }
     }
 
     fn cache_hit_price_per_mtok(&self) -> f32 {
         match self {
-            AnthropicModel::ClaudeOpus45 => 0.50,
-            AnthropicModel::ClaudeSonnet45 => 0.30,
-            AnthropicModel::ClaudeHaiku45 => 0.10,
+            Self::ClaudeOpus45 => 0.50,
+            Self::ClaudeSonnet45 => 0.30,
+            Self::ClaudeHaiku45 => 0.10,
         }
     }
 
     fn cache_miss_price_per_mtok(&self) -> f32 {
         match self {
-            AnthropicModel::ClaudeOpus45 => 6.25,
-            AnthropicModel::ClaudeSonnet45 => 3.75,
-            AnthropicModel::ClaudeHaiku45 => 1.25,
+            Self::ClaudeOpus45 => 6.25,
+            Self::ClaudeSonnet45 => 3.75,
+            Self::ClaudeHaiku45 => 1.25,
         }
     }
 
     fn max_output_tokens(&self) -> u32 {
         match self {
-            AnthropicModel::ClaudeOpus45 => 128_000,
-            AnthropicModel::ClaudeSonnet45 | AnthropicModel::ClaudeHaiku45 => 64_000,
+            Self::ClaudeOpus45 => 128_000,
+            Self::ClaudeSonnet45 | Self::ClaudeHaiku45 => 64_000,
         }
     }
 }
@@ -184,33 +184,33 @@ pub enum GrokModel {
 impl ModelInfo for GrokModel {
     fn api_name(&self) -> &'static str {
         match self {
-            GrokModel::Grok41Fast => "grok-4-1-fast",
-            GrokModel::Grok4Fast => "grok-4-fast",
+            Self::Grok41Fast => "grok-4-1-fast",
+            Self::Grok4Fast => "grok-4-fast",
         }
     }
 
     fn display_name(&self) -> &'static str {
         match self {
-            GrokModel::Grok41Fast => "Grok 4.1 Fast",
-            GrokModel::Grok4Fast => "Grok 4 Fast",
+            Self::Grok41Fast => "Grok 4.1 Fast",
+            Self::Grok4Fast => "Grok 4 Fast",
         }
     }
 
     fn context_window(&self) -> usize {
         match self {
-            GrokModel::Grok41Fast | GrokModel::Grok4Fast => 2_000_000,
+            Self::Grok41Fast | Self::Grok4Fast => 2_000_000,
         }
     }
 
     fn input_price_per_mtok(&self) -> f32 {
         match self {
-            GrokModel::Grok41Fast | GrokModel::Grok4Fast => 0.20, // $0.20/1M input
+            Self::Grok41Fast | Self::Grok4Fast => 0.20, // $0.20/1M input
         }
     }
 
     fn output_price_per_mtok(&self) -> f32 {
         match self {
-            GrokModel::Grok41Fast | GrokModel::Grok4Fast => 0.50, // $0.50/1M output
+            Self::Grok41Fast | Self::Grok4Fast => 0.50, // $0.50/1M output
         }
     }
 
@@ -238,19 +238,19 @@ pub enum GroqModel {
 impl ModelInfo for GroqModel {
     fn api_name(&self) -> &'static str {
         match self {
-            GroqModel::GptOss120b => "openai/gpt-oss-120b",
-            GroqModel::GptOss20b => "openai/gpt-oss-20b",
-            GroqModel::Llama33_70b => "llama-3.3-70b-versatile",
-            GroqModel::Llama31_8b => "llama-3.1-8b-instant",
+            Self::GptOss120b => "openai/gpt-oss-120b",
+            Self::GptOss20b => "openai/gpt-oss-20b",
+            Self::Llama33_70b => "llama-3.3-70b-versatile",
+            Self::Llama31_8b => "llama-3.1-8b-instant",
         }
     }
 
     fn display_name(&self) -> &'static str {
         match self {
-            GroqModel::GptOss120b => "GPT-OSS 120B (+web)",
-            GroqModel::GptOss20b => "GPT-OSS 20B (+web)",
-            GroqModel::Llama33_70b => "Llama 3.3 70B",
-            GroqModel::Llama31_8b => "Llama 3.1 8B",
+            Self::GptOss120b => "GPT-OSS 120B (+web)",
+            Self::GptOss20b => "GPT-OSS 20B (+web)",
+            Self::Llama33_70b => "Llama 3.3 70B",
+            Self::Llama31_8b => "Llama 3.1 8B",
         }
     }
 
@@ -260,19 +260,19 @@ impl ModelInfo for GroqModel {
 
     fn input_price_per_mtok(&self) -> f32 {
         match self {
-            GroqModel::GptOss120b => 1.20,
-            GroqModel::GptOss20b => 0.20,
-            GroqModel::Llama33_70b => 0.59,
-            GroqModel::Llama31_8b => 0.05,
+            Self::GptOss120b => 1.20,
+            Self::GptOss20b => 0.20,
+            Self::Llama33_70b => 0.59,
+            Self::Llama31_8b => 0.05,
         }
     }
 
     fn output_price_per_mtok(&self) -> f32 {
         match self {
-            GroqModel::GptOss120b => 1.20,
-            GroqModel::GptOss20b => 0.20,
-            GroqModel::Llama33_70b => 0.79,
-            GroqModel::Llama31_8b => 0.08,
+            Self::GptOss120b => 1.20,
+            Self::GptOss20b => 0.20,
+            Self::Llama33_70b => 0.79,
+            Self::Llama31_8b => 0.08,
         }
     }
 
@@ -295,15 +295,15 @@ pub enum DeepSeekModel {
 impl ModelInfo for DeepSeekModel {
     fn api_name(&self) -> &'static str {
         match self {
-            DeepSeekModel::DeepseekChat => "deepseek-chat",
-            DeepSeekModel::DeepseekReasoner => "deepseek-reasoner",
+            Self::DeepseekChat => "deepseek-chat",
+            Self::DeepseekReasoner => "deepseek-reasoner",
         }
     }
 
     fn display_name(&self) -> &'static str {
         match self {
-            DeepSeekModel::DeepseekChat => "DeepSeek Chat",
-            DeepSeekModel::DeepseekReasoner => "DeepSeek Reasoner",
+            Self::DeepseekChat => "DeepSeek Chat",
+            Self::DeepseekReasoner => "DeepSeek Reasoner",
         }
     }
 
@@ -329,8 +329,8 @@ impl ModelInfo for DeepSeekModel {
 
     fn max_output_tokens(&self) -> u32 {
         match self {
-            DeepSeekModel::DeepseekChat => 8_192,
-            DeepSeekModel::DeepseekReasoner => 16_384,
+            Self::DeepseekChat => 8_192,
+            Self::DeepseekReasoner => 16_384,
         }
     }
 }

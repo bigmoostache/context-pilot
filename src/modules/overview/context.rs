@@ -48,9 +48,8 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     #[expect(clippy::cast_precision_loss, reason = "percentage display — precision loss irrelevant")]
     let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
 
-    let mut output = format!(
-        "Context Usage: {total_tokens} / {threshold} threshold / {budget} budget ({usage_pct:.1}%)\n\n"
-    );
+    let mut output =
+        format!("Context Usage: {total_tokens} / {threshold} threshold / {budget} budget ({usage_pct:.1}%)\n\n");
 
     let mut accumulated = 0usize;
 

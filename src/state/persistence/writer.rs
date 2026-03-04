@@ -87,6 +87,7 @@ impl PersistenceWriter {
 
     /// Flush all pending writes synchronously. Blocks until complete.
     /// Used on app exit to ensure all state is persisted.
+    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     pub(crate) fn flush(&self) {
         // Reset the flush flag
         {
@@ -130,6 +131,7 @@ impl Drop for PersistenceWriter {
 
 /// The writer thread's main loop
 #[expect(clippy::needless_pass_by_value)]
+#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn writer_loop(rx: Receiver<WriterMsg>, flush_sync: Arc<(Mutex<bool>, Condvar)>) {
     let mut pending_batch: Option<WriteBatch> = None;
     let mut pending_messages: Vec<WriteOp> = Vec::new();

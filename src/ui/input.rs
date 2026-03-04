@@ -40,10 +40,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         ));
     } else if state.is_streaming && state.is_tooling {
         // TOOLING — stream active but executing tool calls (same blue as branch name)
-        spans.push(Span::styled(
-            format!(" {spin} TOOLING "),
-            Style::default().fg(Color::White).bg(Color::Blue).bold(),
-        ));
+        spans.push(Span::styled(format!(" {spin} TOOLING "), Style::default().fg(Color::White).bg(Color::Blue).bold()));
     } else if has_question_form {
         // QUESTIONING — waiting for user to answer a question form
         spans.push(Span::styled(" QUESTIONING ", Style::default().fg(theme::bg_base()).bg(theme::warning()).bold()));
@@ -189,10 +186,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
             (normalize_icon("🔄"), theme::text_muted())
         };
         let label = if spine_cfg.continue_until_todos_done { "Auto-continue" } else { "No Auto-continue" };
-        spans.push(Span::styled(
-            format!(" {icon}{label} "),
-            Style::default().fg(theme::bg_base()).bg(bg_color).bold(),
-        ));
+        spans.push(Span::styled(format!(" {icon}{label} "), Style::default().fg(theme::bg_base()).bg(bg_color).bold()));
         spans.push(Span::styled(" ", base_style));
     }
 

@@ -23,7 +23,7 @@ pub enum SidebarMode {
 impl SidebarMode {
     /// Cycle to the next mode: Normal → Collapsed → Hidden → Normal
     #[must_use]
-    pub fn next(self) -> Self {
+    pub const fn next(self) -> Self {
         match self {
             Self::Normal => Self::Collapsed,
             Self::Collapsed => Self::Hidden,
@@ -33,7 +33,7 @@ impl SidebarMode {
 
     /// Width in columns for this sidebar mode
     #[must_use]
-    pub fn width(self) -> u16 {
+    pub const fn width(self) -> u16 {
         match self {
             Self::Normal => 36,
             Self::Collapsed => 14,
@@ -189,7 +189,7 @@ pub struct PanelData {
 /// Maps `ContextType` to panel UID string.
 pub type ImportantPanelUids = HashMap<ContextType, String>;
 
-fn default_schema_version() -> u32 {
+const fn default_schema_version() -> u32 {
     1
 }
 
@@ -197,6 +197,6 @@ fn default_theme() -> String {
     crate::config::DEFAULT_THEME.to_string()
 }
 
-fn default_one() -> usize {
+const fn default_one() -> usize {
     1
 }

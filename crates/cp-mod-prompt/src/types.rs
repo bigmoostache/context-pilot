@@ -17,9 +17,9 @@ pub enum PromptType {
 impl std::fmt::Display for PromptType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PromptType::Agent => write!(f, "agent"),
-            PromptType::Skill => write!(f, "skill"),
-            PromptType::Command => write!(f, "command"),
+            Self::Agent => write!(f, "agent"),
+            Self::Skill => write!(f, "skill"),
+            Self::Command => write!(f, "command"),
         }
     }
 }
@@ -68,7 +68,7 @@ impl Default for PromptState {
 impl PromptState {
     /// Create an empty prompt state with no entries loaded.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             agents: vec![],
             active_agent_id: None,

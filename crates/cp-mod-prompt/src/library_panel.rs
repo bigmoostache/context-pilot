@@ -10,6 +10,7 @@ pub(crate) struct LibraryPanel;
 
 impl Panel for LibraryPanel {
     fn title(&self, state: &State) -> String {
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         if let Some(id) = &PromptState::get(state).open_prompt_id {
             format!("Library: editing {id}")
         } else {

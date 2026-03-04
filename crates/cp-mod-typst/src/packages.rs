@@ -29,8 +29,7 @@ impl PackageSpec {
     /// format, or if any component is empty.
     pub fn parse(spec: &str) -> Result<Self, String> {
         let spec = spec.trim();
-        let rest =
-            spec.strip_prefix('@').ok_or_else(|| format!("Invalid package spec '{spec}': must start with @"))?;
+        let rest = spec.strip_prefix('@').ok_or_else(|| format!("Invalid package spec '{spec}': must start with @"))?;
 
         let (namespace, rest) = rest
             .split_once('/')

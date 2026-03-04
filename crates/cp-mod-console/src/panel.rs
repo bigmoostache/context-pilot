@@ -133,6 +133,7 @@ impl Panel for ConsolePanel {
     }
 
     fn title(&self, state: &State) -> String {
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         if let Some(ctx) = state.context.get(state.selected_context) {
             let desc =
                 ctx.get_meta_str("console_description").or_else(|| ctx.get_meta_str("console_command")).unwrap_or("?");
@@ -144,6 +145,7 @@ impl Panel for ConsolePanel {
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         let (content, command, status) = if let Some(ctx) = state.context.get(state.selected_context) {
             let content = ctx.cached_content.as_ref().cloned().unwrap_or_else(|| {
                 if ctx.cache_deprecated { "Loading...".to_string() } else { "No output".to_string() }

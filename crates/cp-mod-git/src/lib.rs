@@ -48,6 +48,7 @@ pub fn refresh_git_status(state: &mut State) {
 
     // Get file changes with numstat
     let diff_base = gs.git_diff_base.clone();
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     let diff_args = if let Some(ref base) = diff_base {
         vec!["diff", "--numstat", base.as_str()]
     } else {
@@ -270,9 +271,7 @@ impl Module for GitModule {
             }
             let total_net = total_add - total_del;
             let total_net_str = if total_net >= 0 { format!("+{total_net}") } else { format!("{total_net}") };
-            output.push_str(&format!(
-                "| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |\n"
-            ));
+            output.push_str(&format!("| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |\n"));
         }
         Some(output)
     }

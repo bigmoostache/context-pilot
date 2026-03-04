@@ -30,7 +30,7 @@ pub(crate) fn render_panel_default(panel: &dyn Panel, frame: &mut Frame<'_>, sta
     let bottom_title =
         state.context.get(state.selected_context).filter(|ctx| !ctx.context_type.is_fixed()).and_then(|ctx| {
             let ts = ctx.last_refresh_ms;
-            if ts < 1577836800000 {
+            if ts < 1_577_836_800_000 {
                 return None;
             } // invalid timestamp
             let now = now_ms();

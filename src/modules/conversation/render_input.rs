@@ -46,6 +46,7 @@ fn expand_paste_sentinels(
 
                 if let Ok(idx) = idx_str.parse::<usize>() {
                     let label = paste_buffer_labels.get(idx).and_then(|l| l.as_ref());
+                    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
                     let display_text = if let Some(cmd_name) = label {
                         // Command: show full content
                         let content = paste_buffers.get(idx).map_or("", |s| s.as_str());

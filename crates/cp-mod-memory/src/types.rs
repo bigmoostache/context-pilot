@@ -23,10 +23,10 @@ impl FromStr for MemoryImportance {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "low" => Ok(MemoryImportance::Low),
-            "medium" => Ok(MemoryImportance::Medium),
-            "high" => Ok(MemoryImportance::High),
-            "critical" => Ok(MemoryImportance::Critical),
+            "low" => Ok(Self::Low),
+            "medium" => Ok(Self::Medium),
+            "high" => Ok(Self::High),
+            "critical" => Ok(Self::Critical),
             _ => Err(()),
         }
     }
@@ -35,12 +35,12 @@ impl FromStr for MemoryImportance {
 impl MemoryImportance {
     /// String representation for serialization/display.
     #[must_use]
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            MemoryImportance::Low => "low",
-            MemoryImportance::Medium => "medium",
-            MemoryImportance::High => "high",
-            MemoryImportance::Critical => "critical",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Critical => "critical",
         }
     }
 }
@@ -85,7 +85,7 @@ impl Default for MemoryState {
 impl MemoryState {
     /// Create an empty state with ID counter at 1.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { memories: vec![], next_memory_id: 1, open_memory_ids: vec![] }
     }
     /// Get shared ref from State's `TypeMap`.

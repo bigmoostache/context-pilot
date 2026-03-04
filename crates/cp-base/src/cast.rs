@@ -170,7 +170,7 @@ impl SafeCast for f64 {
     fn to_u8(self) -> u8 {
         if self < 0.0 {
             0
-        } else if self > f64::from(u8::MAX) {
+        } else if self > Self::from(u8::MAX) {
             u8::MAX
         } else {
             self as u8
@@ -180,7 +180,7 @@ impl SafeCast for f64 {
     fn to_u16(self) -> u16 {
         if self < 0.0 {
             0
-        } else if self > f64::from(u16::MAX) {
+        } else if self > Self::from(u16::MAX) {
             u16::MAX
         } else {
             self as u16
@@ -190,7 +190,7 @@ impl SafeCast for f64 {
     fn to_u32(self) -> u32 {
         if self < 0.0 {
             0
-        } else if self > f64::from(u32::MAX) {
+        } else if self > Self::from(u32::MAX) {
             u32::MAX
         } else {
             self as u32
@@ -234,7 +234,7 @@ impl SafeCast for f32 {
     fn to_u8(self) -> u8 {
         if self < 0.0 {
             0
-        } else if self > f32::from(u8::MAX) {
+        } else if self > Self::from(u8::MAX) {
             u8::MAX
         } else {
             self as u8
@@ -244,7 +244,7 @@ impl SafeCast for f32 {
     fn to_u16(self) -> u16 {
         if self < 0.0 {
             0
-        } else if self > f32::from(u16::MAX) {
+        } else if self > Self::from(u16::MAX) {
             u16::MAX
         } else {
             self as u16

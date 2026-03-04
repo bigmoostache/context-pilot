@@ -28,9 +28,8 @@ use cp_base::cast::SafeCast;
 /// Returns `Err` if the source path cannot be resolved, compilation fails,
 /// or PDF export encounters errors.
 pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf>), String> {
-    let abs_path = PathBuf::from(source_path)
-        .canonicalize()
-        .map_err(|e| format!("Cannot resolve path '{source_path}': {e}"))?;
+    let abs_path =
+        PathBuf::from(source_path).canonicalize().map_err(|e| format!("Cannot resolve path '{source_path}': {e}"))?;
 
     let root = abs_path.parent().ok_or_else(|| "Source file has no parent directory".to_string())?.to_path_buf();
 
@@ -193,7 +192,7 @@ impl ContextPilotWorld {
     fn resolve_path(&self, id: FileId) -> Result<PathBuf, String> {
         // Check if this FileId belongs to a package (@preview/name:version)
         if let Some(pkg_spec) = id.package() {
-            return self.resolve_package_path(id, pkg_spec);
+            return Self::resolve_package_path(id, pkg_spec);
         }
 
         // Local file — resolve relative to project root
@@ -204,7 +203,7 @@ impl ContextPilotWorld {
 
     /// Resolve a file path within a Typst Universe package.
     /// Downloads the package if not already cached.
-    fn resolve_package_path(&self, id: FileId, pkg: &TypstPackageSpec) -> Result<PathBuf, String> {
+    fn resolve_package_path(id: FileId, pkg: &TypstPackageSpec) -> Result<PathBuf, String> {
         let namespace = pkg.namespace.as_str();
         let name = pkg.name.as_str();
         let version = format!("{}", pkg.version);
@@ -266,6 +265,7 @@ impl World for ContextPilotWorld {
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use chrono::{Datelike, Local, Timelike, Utc};
         let now = Local::now();
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         let naive = if let Some(hours) = offset {
             let utc = Utc::now();
             (utc + chrono::Duration::hours(hours)).naive_utc()

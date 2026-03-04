@@ -112,6 +112,7 @@ impl Panel for TreePanel {
             spans.push(Span::styled(" ".to_string(), Style::default().fg(theme::text())));
 
             // Check for description (after " - ")
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             let (main_line, description) = if let Some(desc_idx) = line.find(" - ") {
                 (&line[..desc_idx], Some(&line[desc_idx..]))
             } else {

@@ -339,6 +339,7 @@ fn build_tree_new(
         .filter(|e| {
             let path = e.path();
             let is_dir = path.is_dir();
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             if let Some(gi) = gitignore { !gi.matched(&path, is_dir).is_ignore() } else { true }
         })
         .collect();
@@ -365,8 +366,7 @@ fn build_tree_new(
         let is_dir = entry.path().is_dir();
 
         // Build path string for this entry
-        let entry_path =
-            if dir_path_str == "." { name_str.to_string() } else { format!("{dir_path_str}/{name_str}") };
+        let entry_path = if dir_path_str == "." { name_str.to_string() } else { format!("{dir_path_str}/{name_str}") };
 
         if is_dir {
             let is_open = open_set.contains(&entry_path);

@@ -6,7 +6,7 @@ use cp_base::config::constants::STORE_DIR;
 use crate::types::{PromptItem, PromptType};
 
 /// Subdirectory names under .context-pilot/ for each prompt type
-fn subdir_for(pt: PromptType) -> &'static str {
+const fn subdir_for(pt: PromptType) -> &'static str {
     match pt {
         PromptType::Agent => "agents",
         PromptType::Skill => "skills",
@@ -38,6 +38,7 @@ pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
 
     // Find the closing ---
     let after_first = &trimmed[3..];
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     if let Some(end) = after_first.find("\n---") {
         let yaml_block = &after_first[..end];
         let body_start = end + 4; // skip \n---

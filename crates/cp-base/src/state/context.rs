@@ -278,7 +278,7 @@ pub fn estimate_tokens(text: &str) -> usize {
 
 /// Compute total pages for a given token count using `PANEL_PAGE_TOKENS`
 #[must_use]
-pub fn compute_total_pages(token_count: usize) -> usize {
+pub const fn compute_total_pages(token_count: usize) -> usize {
     let max = crate::config::constants::PANEL_PAGE_TOKENS;
     if token_count <= max { 1 } else { token_count.div_ceil(max) }
 }

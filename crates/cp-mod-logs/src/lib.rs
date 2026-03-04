@@ -40,7 +40,7 @@ fn logs_dir() -> PathBuf {
 }
 
 /// Get chunk index for a log ID number
-fn chunk_index(log_id_num: usize) -> usize {
+const fn chunk_index(log_id_num: usize) -> usize {
     log_id_num / LOGS_CHUNK_SIZE
 }
 

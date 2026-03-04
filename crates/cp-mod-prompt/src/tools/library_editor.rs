@@ -24,6 +24,7 @@ pub(crate) fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     PromptState::get_mut(state).open_prompt_id = Some(id.clone());
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     let msg = if let Some(prev) = previous {
         format!(
             "Opened '{id}' in Library editor (closed previous: '{prev}'). Content is now visible in the Library panel."

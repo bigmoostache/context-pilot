@@ -130,10 +130,7 @@ fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
 
             let panel_id = crate::panel::create_panel(state, &format!("brave_llm_context: {query}"), &panel_content);
 
-            ok_result(
-                tool,
-                format!("Created panel {panel_id}: {url_count} URLs, ~{max_tokens} tokens for '{query}'"),
-            )
+            ok_result(tool, format!("Created panel {panel_id}: {url_count} URLs, ~{max_tokens} tokens for '{query}'"))
         }
         Err(e) => err_result(tool, e),
     }

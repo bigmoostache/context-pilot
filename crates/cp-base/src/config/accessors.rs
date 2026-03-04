@@ -14,7 +14,7 @@ pub mod theme {
     use ratatui::style::Color;
 
     /// Convert an `[r, g, b]` triple to a ratatui RGB color.
-    fn rgb(c: [u8; 3]) -> Color {
+    const fn rgb(c: [u8; 3]) -> Color {
         Color::Rgb(c[0], c[1], c[2])
     }
 

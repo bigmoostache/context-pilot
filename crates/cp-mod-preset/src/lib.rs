@@ -102,8 +102,7 @@ impl Module for PresetModule {
                     let replace = tool.input.get("replace").and_then(|v| v.as_str());
                     let presets = tools::list_presets_with_info();
                     if presets.iter().any(|p| p.name == name) && replace.is_none() {
-                        pf.errors
-                            .push(format!("Preset '{name}' already exists. Pass replace:'{name}' to overwrite."));
+                        pf.errors.push(format!("Preset '{name}' already exists. Pass replace:'{name}' to overwrite."));
                     }
                 }
                 Some(pf)

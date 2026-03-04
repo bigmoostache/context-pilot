@@ -59,6 +59,7 @@ pub(crate) fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: A
 
 /// Periodically poll the server for process status.
 #[expect(clippy::needless_pass_by_value)]
+#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 pub(crate) fn poll_server_status(
     key: String,
     status: Arc<Mutex<ProcessStatus>>,

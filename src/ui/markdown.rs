@@ -441,12 +441,11 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
 
                 if found_bracket && chars.peek() == Some(&'(') {
                     let _r = chars.next(); // consume (
-                    let mut url = String::new();
+                    // Skip URL characters — we only display the link text
                     for next in chars.by_ref() {
                         if next == ')' {
                             break;
                         }
-                        url.push(next);
                     }
 
                     // Display link text in accent color

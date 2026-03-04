@@ -156,7 +156,7 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
     Ok(total_secs.to_u64() * 1000)
 }
 
-fn is_leap_year(y: i64) -> bool {
+const fn is_leap_year(y: i64) -> bool {
     (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
 }
 
@@ -314,11 +314,7 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
             match parse_datetime_ms(dt_str) {
                 Ok(target_ms) => {
                     if target_ms <= now {
-                        return ToolResult::new(
-                            tool.id.clone(),
-                            format!("DateTime '{dt_str}' is in the past!"),
-                            true,
-                        );
+                        return ToolResult::new(tool.id.clone(), format!("DateTime '{dt_str}' is in the past!"), true);
                     }
                     fire_at_ms = target_ms;
                     let remaining = format_duration(target_ms - now);

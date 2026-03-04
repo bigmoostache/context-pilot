@@ -184,11 +184,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Validate mode
     if mode != "exit" && mode != "pattern" {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Invalid mode '{mode}'. Must be 'exit' or 'pattern'."),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), format!("Invalid mode '{mode}'. Must be 'exit' or 'pattern'."), true);
     }
 
     if mode == "pattern" && pattern.is_none() {
@@ -209,7 +205,9 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Check if condition is already met
     let already_met = match mode.as_str() {
         "exit" => handle.get_status().is_terminal(),
-        "pattern" => {
+        "pattern" =>
+        {
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             if let Some(ref pat) = pattern {
                 handle.buffer.contains_pattern(pat)
             } else {
@@ -270,11 +268,7 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Validate mode
     if mode != "exit" && mode != "pattern" {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Invalid mode '{mode}'. Must be 'exit' or 'pattern'."),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), format!("Invalid mode '{mode}'. Must be 'exit' or 'pattern'."), true);
     }
 
     if mode == "pattern" && pattern.is_none() {
@@ -295,7 +289,9 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Check if condition is already met — return immediately
     let already_met = match mode.as_str() {
         "exit" => handle.get_status().is_terminal(),
-        "pattern" => {
+        "pattern" =>
+        {
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             if let Some(ref pat) = pattern {
                 handle.buffer.contains_pattern(pat)
             } else {

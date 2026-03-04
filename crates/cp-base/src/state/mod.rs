@@ -66,7 +66,7 @@ pub mod reverie {
     impl ReverieState {
         /// Create a new reverie session driven by the given agent.
         #[must_use]
-        pub fn new(reverie_type: ReverieType, agent_id: String, context: Option<String>) -> Self {
+        pub const fn new(reverie_type: ReverieType, agent_id: String, context: Option<String>) -> Self {
             Self {
                 reverie_type,
                 agent_id,
@@ -83,7 +83,7 @@ pub mod reverie {
     impl std::fmt::Display for ReverieType {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                ReverieType::ContextOptimizer => write!(f, "Context Optimizer"),
+                Self::ContextOptimizer => write!(f, "Context Optimizer"),
             }
         }
     }

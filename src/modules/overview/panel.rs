@@ -34,7 +34,7 @@ impl Panel for OverviewPanel {
         }
 
         // Fallback: generate fresh
-        let output = self.generate_context_content(state);
+        let output = Self::generate_context_content(state);
         let (id, last_refresh_ms) = state
             .context
             .iter()
@@ -47,7 +47,7 @@ impl Panel for OverviewPanel {
         // Refresh git status (branch, file changes) before generating context
         cp_mod_git::refresh_git_status(state);
 
-        let content = self.generate_context_content(state);
+        let content = Self::generate_context_content(state);
         let token_count = crate::state::estimate_tokens(&content);
 
         if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::OVERVIEW) {
@@ -80,7 +80,7 @@ impl Panel for OverviewPanel {
 }
 
 impl OverviewPanel {
-    fn generate_context_content(&self, state: &State) -> String {
+    fn generate_context_content(state: &State) -> String {
         super::context::generate_context_content(state)
     }
 }

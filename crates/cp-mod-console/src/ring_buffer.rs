@@ -89,6 +89,7 @@ impl RingBuffer {
     #[must_use]
     pub fn contains_pattern(&self, pattern: &str) -> bool {
         let (content, _) = self.read_all();
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         match regex::Regex::new(pattern) {
             Ok(re) => re.is_match(&content),
             Err(_) => content.contains(pattern),

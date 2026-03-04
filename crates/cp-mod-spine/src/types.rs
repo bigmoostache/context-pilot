@@ -1,7 +1,7 @@
 use cp_base::state::{ContextType, State};
 use serde::{Deserialize, Serialize};
 
-fn default_true() -> bool {
+const fn default_true() -> bool {
     true
 }
 
@@ -20,11 +20,11 @@ pub enum NotificationType {
 impl NotificationType {
     /// Human-readable label (e.g., "User Message", "Reload Resume").
     #[must_use]
-    pub fn label(&self) -> &'static str {
+    pub const fn label(&self) -> &'static str {
         match self {
-            NotificationType::UserMessage => "User Message",
-            NotificationType::ReloadResume => "Reload Resume",
-            NotificationType::Custom => "Custom",
+            Self::UserMessage => "User Message",
+            Self::ReloadResume => "Reload Resume",
+            Self::Custom => "Custom",
         }
     }
 }

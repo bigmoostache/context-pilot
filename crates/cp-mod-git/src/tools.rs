@@ -66,7 +66,8 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
             // If GITHUB_TOKEN is available, create a temporary askpass script
             // so git push/pull/fetch can authenticate via HTTPS automatically.
             let github_token = std::env::var("GITHUB_TOKEN").ok();
-            let _askpass_tempfile = if let Some(ref token) = github_token {
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
+            let askpass_tempfile = if let Some(ref token) = github_token {
                 let mut tmp = std::env::temp_dir();
                 tmp.push(format!("cpilot_askpass_{}", std::process::id()));
                 let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
@@ -88,7 +89,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
             let result = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
             // Clean up temp askpass script
-            if let Some(ref path) = _askpass_tempfile {
+            if let Some(ref path) = askpass_tempfile {
                 let _ = std::fs::remove_file(path).ok();
             }
 

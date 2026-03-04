@@ -276,7 +276,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
             if details.len() > 30 { format!("{}...", &details[..details.floor_char_boundary(27)]) } else { details };
 
         // Format refresh time as relative
-        let refreshed = if ctx.last_refresh_ms < 1577836800000 {
+        let refreshed = if ctx.last_refresh_ms < 1_577_836_800_000 {
             "—".to_string()
         } else if now_ms > ctx.last_refresh_ms {
             crate::ui::helpers::format_time_ago(now_ms - ctx.last_refresh_ms)

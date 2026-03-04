@@ -129,6 +129,7 @@ impl App {
                 let after_sentinel = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
                 // Find matching watcher result by sentinel_id prefix
                 let matched_result = blocking_results.iter().find(|r| {
+                    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
                     if let Some(ref tid) = r.tool_use_id { after_sentinel.starts_with(tid.as_str()) } else { false }
                 });
                 if let Some(result) = matched_result {
@@ -323,6 +324,7 @@ impl App {
             if !stale_ids.is_empty() {
                 let registry = WatcherRegistry::get_mut(&mut self.state);
                 registry.watchers.retain(|w| {
+                    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
                     if let Some(tid) = w.tool_use_id() { !stale_ids.contains(&tid.to_string()) } else { true }
                 });
             }

@@ -203,15 +203,15 @@ pub(crate) fn classify_git(args: &[String]) -> CommandClass {
             _ => CommandClass::Mutating,
         },
         "lfs" => match rest.first() {
-            Some(&"ls-files") | Some(&"status") | Some(&"env") | Some(&"logs") => CommandClass::ReadOnly,
+            Some(&"ls-files" | &"status" | &"env" | &"logs") => CommandClass::ReadOnly,
             _ => CommandClass::Mutating,
         },
         "bisect" => match rest.first() {
-            Some(&"log") | Some(&"visualize") => CommandClass::ReadOnly,
+            Some(&"log" | &"visualize") => CommandClass::ReadOnly,
             _ => CommandClass::Mutating,
         },
         "bundle" => match rest.first() {
-            Some(&"verify") | Some(&"list-heads") => CommandClass::ReadOnly,
+            Some(&"verify" | &"list-heads") => CommandClass::ReadOnly,
             _ => CommandClass::Mutating,
         },
         "apply" => {

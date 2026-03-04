@@ -250,6 +250,7 @@ impl Watcher for CallbackWatcher {
         if exit_code == 0 {
             let log_path = cp_mod_console::manager::log_file_path(&self.session_name);
             let log_path_str = log_path.to_string_lossy();
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             let msg = if let Some(ref sm) = self.success_message {
                 format!("· {} passed ({}). Log: {}", self.callback_name, sm, log_path_str)
             } else {

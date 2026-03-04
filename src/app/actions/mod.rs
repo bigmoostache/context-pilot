@@ -331,10 +331,10 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
 
         // === Streaming (delegated) ===
         Action::AppendChars(text) => streaming::handle_append_chars(state, &text),
-        Action::StreamDone { _input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason } => {
+        Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason } => {
             streaming::handle_stream_done(
                 state,
-                _input_tokens,
+                input_tokens,
                 output_tokens,
                 cache_hit_tokens,
                 cache_miss_tokens,

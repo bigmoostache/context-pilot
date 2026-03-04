@@ -40,26 +40,26 @@ impl ProcessStatus {
     #[must_use]
     pub fn label(&self) -> String {
         match self {
-            ProcessStatus::Running => "running".to_string(),
-            ProcessStatus::Finished(code) => format!("exited({code})"),
-            ProcessStatus::Failed(code) => format!("failed({code})"),
-            ProcessStatus::Killed => "killed".to_string(),
+            Self::Running => "running".to_string(),
+            Self::Finished(code) => format!("exited({code})"),
+            Self::Failed(code) => format!("failed({code})"),
+            Self::Killed => "killed".to_string(),
         }
     }
 
     /// Whether the process has reached a terminal state (not running).
     #[must_use]
-    pub fn is_terminal(&self) -> bool {
-        !matches!(self, ProcessStatus::Running)
+    pub const fn is_terminal(&self) -> bool {
+        !matches!(self, Self::Running)
     }
 
     /// Exit code if terminal (Killed → -9), None if still running.
     #[must_use]
-    pub fn exit_code(&self) -> Option<i32> {
+    pub const fn exit_code(&self) -> Option<i32> {
         match self {
-            ProcessStatus::Finished(c) | ProcessStatus::Failed(c) => Some(*c),
-            ProcessStatus::Running => None,
-            ProcessStatus::Killed => Some(-9),
+            Self::Finished(c) | Self::Failed(c) => Some(*c),
+            Self::Running => None,
+            Self::Killed => Some(-9),
         }
     }
 }
@@ -187,7 +187,9 @@ impl Watcher for ConsoleWatcher {
 
         let satisfied = match self.mode.as_str() {
             "exit" => handle.get_status().is_terminal(),
-            "pattern" => {
+            "pattern" =>
+            {
+                #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
                 if let Some(ref pat) = self.pattern {
                     handle.buffer.contains_pattern(pat)
                 } else {

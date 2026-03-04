@@ -87,7 +87,7 @@ fn check_type(value: &serde_json::Value, expected: &ParamType) -> bool {
 }
 
 /// Human-readable name for a `ParamType`.
-fn type_name(pt: &ParamType) -> &'static str {
+const fn type_name(pt: &ParamType) -> &'static str {
     match pt {
         ParamType::String => "string",
         ParamType::Integer => "integer",
@@ -99,7 +99,7 @@ fn type_name(pt: &ParamType) -> &'static str {
 }
 
 /// Human-readable name for a JSON value type.
-fn json_type_name(val: &serde_json::Value) -> &'static str {
+const fn json_type_name(val: &serde_json::Value) -> &'static str {
     match val {
         serde_json::Value::Null => "null",
         serde_json::Value::Bool(_) => "boolean",

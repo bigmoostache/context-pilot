@@ -151,11 +151,11 @@ pub(crate) static PERF: std::sync::LazyLock<PerfMetrics> = std::sync::LazyLock::
 
 impl PerfMetrics {
     /// Record operation timing
+    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     pub(crate) fn record_op(&self, name: &'static str, duration_us: u64) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-
         let mut ops = self.ops.write().unwrap_or_else(std::sync::PoisonError::into_inner);
         let stats = ops.entry(name).or_default();
         let _r = stats.count.fetch_add(1, Ordering::Relaxed);
@@ -175,6 +175,7 @@ impl PerfMetrics {
     }
 
     /// End frame and record frame time
+    #[expect(clippy::significant_drop_in_scrutinee, reason = "lock scope is intentional")]
     pub(crate) fn frame_end(&self) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
@@ -196,6 +197,7 @@ impl PerfMetrics {
     }
 
     /// Refresh CPU and memory stats
+    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     fn refresh_system_stats(&self) {
         if let Some((cpu_ticks, mem_bytes)) = read_proc_stat() {
             let mut state = self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -217,6 +219,7 @@ impl PerfMetrics {
     }
 
     /// Get snapshot of metrics for display
+    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     pub(crate) fn snapshot(&self) -> PerfSnapshot {
         let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
         let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);

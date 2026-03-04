@@ -128,6 +128,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
 ///
 /// Routes Report to our handler, everything else to the normal module dispatch.
 /// Returns None if the tool should be dispatched to modules (caller handles it).
+#[expect(clippy::needless_pass_by_ref_mut, reason = "state may need mutation in future")]
 pub(crate) fn dispatch_reverie_tool(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     match tool.name.as_str() {
         "reverie_report" => Some(execute_report(tool, state)),

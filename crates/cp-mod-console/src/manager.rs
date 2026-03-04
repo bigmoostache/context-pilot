@@ -298,6 +298,7 @@ impl SessionHandle {
 
     /// Reconnect to a server-managed session after TUI reload.
     #[must_use]
+    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     pub fn reconnect(
         name: String,
         command: String,
@@ -314,6 +315,7 @@ impl SessionHandle {
         let stop_polling = Arc::new(AtomicBool::new(false));
 
         // Load existing log file contents into ring buffer
+        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
         let file_offset = if let Ok(content) = fs::read(&log_path) {
             if !content.is_empty() {
                 buffer.write(&content);
@@ -326,6 +328,7 @@ impl SessionHandle {
         // Check if server knows about this session
         let server_alive = {
             let req = serde_json::json!({"cmd": "status", "key": name});
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             if let Ok(resp) = server_request(&req) {
                 let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
                 if st.starts_with("exited") {
@@ -398,6 +401,7 @@ impl SessionHandle {
             "key": self.name,
             "input": input,
         });
+        #[expect(clippy::branches_sharing_code, reason = "factoring out shared code would reduce clarity")]
         if server_request(&req).is_ok() {
             Ok(())
         } else {
@@ -409,12 +413,12 @@ impl SessionHandle {
     }
 
     /// Kill the process via the server.
+    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     pub fn kill(&self) {
         self.stop_polling.store(true, Ordering::Relaxed);
 
         let req = serde_json::json!({"cmd": "kill", "key": self.name});
         drop(server_request(&req).ok());
-
         let mut status = self.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if !status.is_terminal() {
             *status = ProcessStatus::Killed;
@@ -444,5 +448,5 @@ impl SessionHandle {
     }
 
     /// No-op for backward compat — server holds the stdin, not us.
-    pub fn leak_stdin(&self) {}
+    pub const fn leak_stdin(&self) {}
 }

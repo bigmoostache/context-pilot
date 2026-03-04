@@ -170,8 +170,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             } else {
                 // Fallback: dump as YAML
                 let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
-                let panel_id =
-                    crate::panel::create_panel(state, &format!("firecrawl_search: {query}"), &panel_content);
+                let panel_id = crate::panel::create_panel(state, &format!("firecrawl_search: {query}"), &panel_content);
                 return ok_result(tool, format!("Created panel {panel_id}: results for '{query}'"));
             };
 

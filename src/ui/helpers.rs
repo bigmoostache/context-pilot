@@ -157,7 +157,7 @@ static HIGHLIGHT_CACHE: LazyLock<Mutex<HashMap<String, Arc<HighlightResult>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Convert syntect color to ratatui color
-fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {
+const fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {
     Color::Rgb(color.r, color.g, color.b)
 }
 

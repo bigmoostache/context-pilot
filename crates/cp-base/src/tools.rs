@@ -53,13 +53,13 @@ pub struct ToolResult {
 impl ToolResult {
     /// Create a `ToolResult`. The `tool_name` is left empty — populated by dispatch.
     #[must_use]
-    pub fn new(tool_use_id: String, content: String, is_error: bool) -> Self {
+    pub const fn new(tool_use_id: String, content: String, is_error: bool) -> Self {
         Self { tool_use_id, content, is_error, tool_name: String::new() }
     }
 
     /// Create a `ToolResult` with an explicit tool name.
     #[must_use]
-    pub fn with_name(tool_use_id: String, content: String, is_error: bool, tool_name: String) -> Self {
+    pub const fn with_name(tool_use_id: String, content: String, is_error: bool, tool_name: String) -> Self {
         Self { tool_use_id, content, is_error, tool_name }
     }
 }
@@ -81,7 +81,7 @@ pub enum ParamType {
     /// Boolean flag.
     Boolean,
     /// Ordered list of a single inner type.
-    Array(Box<ParamType>),
+    Array(Box<Self>),
     /// Nested object with named fields.
     Object(Vec<ToolParam>),
 }
@@ -90,15 +90,15 @@ impl ParamType {
     /// Emit the JSON Schema representation (recursive for nested types).
     fn to_json_schema(&self) -> Value {
         match self {
-            ParamType::String => json!({"type": "string"}),
-            ParamType::Integer => json!({"type": "integer"}),
-            ParamType::Number => json!({"type": "number"}),
-            ParamType::Boolean => json!({"type": "boolean"}),
-            ParamType::Array(inner) => json!({
+            Self::String => json!({"type": "string"}),
+            Self::Integer => json!({"type": "integer"}),
+            Self::Number => json!({"type": "number"}),
+            Self::Boolean => json!({"type": "boolean"}),
+            Self::Array(inner) => json!({
                 "type": "array",
                 "items": inner.to_json_schema()
             }),
-            ParamType::Object(params) => {
+            Self::Object(params) => {
                 let mut properties = serde_json::Map::new();
                 let mut required = Vec::new();
                 for param in params {
@@ -147,19 +147,19 @@ impl PreFlightResult {
 
     /// `true` if any blocking errors were recorded.
     #[must_use]
-    pub fn has_errors(&self) -> bool {
+    pub const fn has_errors(&self) -> bool {
         !self.errors.is_empty()
     }
 
     /// `true` if any warnings were recorded.
     #[must_use]
-    pub fn has_warnings(&self) -> bool {
+    pub const fn has_warnings(&self) -> bool {
         !self.warnings.is_empty()
     }
 
     /// `true` if both errors and warnings are empty.
     #[must_use]
-    pub fn is_clean(&self) -> bool {
+    pub const fn is_clean(&self) -> bool {
         self.errors.is_empty() && self.warnings.is_empty()
     }
 
@@ -178,7 +178,7 @@ impl PreFlightResult {
     }
 
     /// Merge another `PreFlightResult` into this one.
-    pub fn merge(&mut self, other: PreFlightResult) {
+    pub fn merge(&mut self, other: Self) {
         self.errors.extend(other.errors);
         self.warnings.extend(other.warnings);
     }
@@ -237,7 +237,7 @@ impl ToolParam {
 
     /// Mark as required (builder pattern).
     #[must_use]
-    pub fn required(mut self) -> Self {
+    pub const fn required(mut self) -> Self {
         self.required = true;
         self
     }
@@ -347,14 +347,14 @@ impl ToolDefBuilder<'_> {
 
     /// Allow or deny reverie sub-agents access to this tool.
     #[must_use]
-    pub fn reverie_allowed(mut self, allowed: bool) -> Self {
+    pub const fn reverie_allowed(mut self, allowed: bool) -> Self {
         self.reverie_allowed = allowed;
         self
     }
 
     /// Set enabled/disabled state.
     #[must_use]
-    pub fn enabled(mut self, enabled: bool) -> Self {
+    pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }

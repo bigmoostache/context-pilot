@@ -30,19 +30,19 @@ impl LogEntry {
 
     /// Create a log entry with an explicit timestamp (ms since UNIX epoch).
     #[must_use]
-    pub fn with_timestamp(id: String, content: String, timestamp_ms: u64) -> Self {
+    pub const fn with_timestamp(id: String, content: String, timestamp_ms: u64) -> Self {
         Self { id, timestamp_ms, content, parent_id: None, children_ids: vec![] }
     }
 
     /// Whether this log is a summary (has children).
     #[must_use]
-    pub fn is_summary(&self) -> bool {
+    pub const fn is_summary(&self) -> bool {
         !self.children_ids.is_empty()
     }
 
     /// Whether this log is top-level (no parent).
     #[must_use]
-    pub fn is_top_level(&self) -> bool {
+    pub const fn is_top_level(&self) -> bool {
         self.parent_id.is_none()
     }
 }
@@ -67,7 +67,7 @@ impl Default for LogsState {
 impl LogsState {
     /// Create an empty state with ID counter at 1.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { logs: vec![], next_log_id: 1, open_log_ids: vec![] }
     }
 

@@ -181,10 +181,12 @@ fn replace_commands(input: &str, commands: &[PromptItem]) -> String {
             }
             // Extract the command token after /
             let token = &trimmed[1..];
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             let (cmd_id, rest) = match token.find(|c: char| c.is_whitespace()) {
                 Some(pos) => (&token[..pos], &token[pos..]),
                 None => (token, ""),
             };
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             if let Some(cmd) = commands.iter().find(|c| c.id == cmd_id) {
                 format!("{}{}", cmd.content.trim_end(), rest)
             } else {

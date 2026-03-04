@@ -39,7 +39,7 @@ impl Default for GithubState {
 impl GithubState {
     /// Create a fresh state with no token or PR info.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { github_token: None, branch_pr: None }
     }
     /// Get shared ref from State's `TypeMap`.

@@ -31,6 +31,7 @@ fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[expect(clippy::needless_pass_by_ref_mut, reason = "state may need mutation in future")]
 pub(crate) fn execute_snapshot(
     tool: &ToolUse,
     state: &mut State,

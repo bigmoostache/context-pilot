@@ -131,6 +131,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Try normalized matching (handles trailing whitespace differences)
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     let replaced = if let Some(actual_match) = find_normalized_match(&content, old_string) {
         if replace_all {
             let count = content.matches(actual_match).count();
@@ -190,9 +191,8 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Header line
     if replace_all && replaced > 1 {
-        result_msg.push_str(&format!(
-            "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)\n"
-        ));
+        result_msg
+            .push_str(&format!("Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)\n"));
     } else {
         result_msg.push_str(&format!("Edited '{path_str}': ~{lines_changed} lines changed\n"));
     }

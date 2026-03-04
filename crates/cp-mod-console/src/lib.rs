@@ -179,6 +179,7 @@ impl Module for ConsoleModule {
             if c.context_type.as_str() != ContextType::CONSOLE {
                 return true; // keep non-console panels
             }
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             match c.get_meta_str("console_name") {
                 Some(name) => live_names.contains(name),
                 None => false, // malformed console panel, remove

@@ -56,7 +56,7 @@ impl Default for GitState {
 impl GitState {
     /// Create a fresh state with no git info.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             git_branch: None,
             git_branches: vec![],

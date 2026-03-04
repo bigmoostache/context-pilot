@@ -366,6 +366,7 @@ pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
         None => 0, // move to top
         Some(aid) => {
             // Find the after_id position (may have shifted after remove)
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             match ts.todos.iter().position(|t| t.id == aid) {
                 Some(idx) => idx + 1, // insert after it
                 None => 0,            // shouldn't happen, we validated above
@@ -376,6 +377,7 @@ pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     ts.todos.insert(insert_idx, item);
     state.touch_panel(ContextType::new(ContextType::TODO));
 
+    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
     let position_desc = match after_id {
         None => "top".to_string(),
         Some(aid) => format!("after {aid}"),

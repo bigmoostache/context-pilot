@@ -76,14 +76,14 @@ impl Session {
         }
     }
 
-    fn exit_code(&self) -> Option<i32> {
+    const fn exit_code(&self) -> Option<i32> {
         match &self.status {
             SessionStatus::Running => None,
             SessionStatus::Exited(c) => Some(*c),
         }
     }
 
-    fn is_terminal(&self) -> bool {
+    const fn is_terminal(&self) -> bool {
         matches!(self.status, SessionStatus::Exited(_))
     }
 }
@@ -142,6 +142,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
         let sessions = Arc::clone(sessions);
         let key = key.to_string();
         drop(std::thread::spawn(move || {
+            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
             let code = match child.wait() {
                 Ok(status) => status.code().unwrap_or(-1),
                 Err(_) => -1,
@@ -160,6 +161,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
     Response::ok_pid(pid)
 }
 
+#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     let bytes = interpret_escapes(input);
     let mut map = sessions.lock().unwrap();
@@ -183,6 +185,7 @@ fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     }
 }
 
+#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn handle_kill(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     let Some(session) = map.get_mut(key) else {
@@ -202,6 +205,7 @@ fn handle_kill(sessions: &Sessions, key: &str) -> Response {
     Response::ok()
 }
 
+#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     if let Some(mut session) = map.remove(key) {
@@ -217,6 +221,7 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     Response::ok()
 }
 
+#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn handle_status(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     let Some(session) = map.get_mut(key) else {
@@ -226,6 +231,7 @@ fn handle_status(sessions: &Sessions, key: &str) -> Response {
     Response::ok_status(session.status_str(), session.exit_code())
 }
 
+#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn handle_list(sessions: &Sessions) -> Response {
     let mut map = sessions.lock().unwrap();
     let infos: Vec<SessionInfo> = map
@@ -248,6 +254,7 @@ fn handle_list(sessions: &Sessions) -> Response {
 // ---------------------------------------------------------------------------
 
 #[expect(clippy::needless_pass_by_value, reason = "thread entry point — Arc is moved from spawn closure")]
+#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn handle_connection(stream: UnixStream, sessions: Sessions) {
     let reader = BufReader::new(stream.try_clone().unwrap());
     let mut writer = stream;

@@ -53,7 +53,7 @@ impl Default for AutocompleteState {
 impl AutocompleteState {
     /// Create a new inactive autocomplete state with all fields zeroed.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             active: false,
             anchor_pos: 0,
@@ -130,7 +130,7 @@ impl AutocompleteState {
     }
 
     /// Move selection up.
-    pub fn select_prev(&mut self) {
+    pub const fn select_prev(&mut self) {
         if self.selected > 0 {
             self.selected -= 1;
             if self.selected < self.scroll_offset {
@@ -140,7 +140,7 @@ impl AutocompleteState {
     }
 
     /// Move selection down.
-    pub fn select_next(&mut self) {
+    pub const fn select_next(&mut self) {
         if !self.matches.is_empty() && self.selected < self.matches.len() - 1 {
             self.selected += 1;
             if self.selected >= self.scroll_offset + MAX_VISIBLE {

@@ -125,14 +125,14 @@ impl CommandPalette {
     }
 
     /// Move selection up
-    pub(crate) fn select_prev(&mut self) {
+    pub(crate) const fn select_prev(&mut self) {
         if !self.filtered_commands.is_empty() {
             self.selected = if self.selected == 0 { self.filtered_commands.len() - 1 } else { self.selected - 1 };
         }
     }
 
     /// Move selection down
-    pub(crate) fn select_next(&mut self) {
+    pub(crate) const fn select_next(&mut self) {
         if !self.filtered_commands.is_empty() {
             self.selected = (self.selected + 1) % self.filtered_commands.len();
         }

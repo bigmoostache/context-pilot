@@ -31,7 +31,7 @@ impl Default for ScratchpadState {
 impl ScratchpadState {
     /// Create an empty scratchpad state with ID counter at 1.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { scratchpad_cells: vec![], next_scratchpad_id: 1 }
     }
     /// Get shared ref from State's `TypeMap`.

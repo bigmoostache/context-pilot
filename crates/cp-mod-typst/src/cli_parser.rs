@@ -85,8 +85,8 @@ pub fn parse_command(command: &str) -> Result<TypstCommand, String> {
         "compile" | "c" => parse_compile(args),
         "init" => parse_init(args),
         "query" => parse_query(args),
-        "fonts" => parse_fonts(args),
-        "update" => parse_update(args),
+        "fonts" => Ok(parse_fonts(args)),
+        "update" => Ok(parse_update(args)),
         "watch" | "w" => parse_watch(args),
         "unwatch" => parse_unwatch(args),
         "watchlist" => Ok(TypstCommand::Watchlist),
@@ -177,14 +177,14 @@ fn parse_query(args: &[String]) -> Result<TypstCommand, String> {
     Ok(TypstCommand::Query { input, selector, field })
 }
 
-fn parse_fonts(args: &[String]) -> Result<TypstCommand, String> {
+fn parse_fonts(args: &[String]) -> TypstCommand {
     let variants = args.iter().any(|a| a == "--variants");
-    Ok(TypstCommand::Fonts { variants })
+    TypstCommand::Fonts { variants }
 }
 
-fn parse_update(args: &[String]) -> Result<TypstCommand, String> {
+fn parse_update(args: &[String]) -> TypstCommand {
     let package = args.first().cloned();
-    Ok(TypstCommand::Update { package })
+    TypstCommand::Update { package }
 }
 
 fn parse_watch(args: &[String]) -> Result<TypstCommand, String> {

@@ -2,7 +2,11 @@ use ratatui::prelude::*;
 
 use crate::infra::constants::icons;
 use crate::state::{Message, MessageStatus, MessageType};
-use crate::ui::{helpers::wrap_text, markdown::*, theme};
+use crate::ui::{
+    helpers::wrap_text,
+    markdown::{parse_markdown_line, render_markdown_table},
+    theme,
+};
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -84,6 +88,7 @@ pub(crate) fn render_message(
                 registry.get(&result.tool_name).map(|visualizer| visualizer(&result.content, wrap_width))
             };
 
+            #[expect(clippy::branches_sharing_code, reason = "factoring out shared code would reduce clarity")]
             if let Some(vis_lines) = custom_lines {
                 // Use module-provided visualization
                 let mut is_first = true;
