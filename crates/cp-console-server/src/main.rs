@@ -1,5 +1,4 @@
 //! Console Server: persistent daemon that owns child processes.
-#![expect(unused_crate_dependencies, reason = "bin target shares Cargo.toml with lib — lib deps aren't used here")]
 //!
 //! Spawns `sh -c` processes with stdout/stderr redirected to log files.
 //! TUI communicates via JSON lines over a Unix socket.
@@ -18,7 +17,7 @@
 //!
 //! ```sh
 //! # 1. Build the new binary
-//! cargo build --release -p cp-mod-console
+//! cargo build --release -p cp-console-server
 //!
 //! # 2. Kill the running server (TUI auto-restarts it on next launch)
 //! kill $(cat .context-pilot/console/server.pid)
@@ -323,17 +322,16 @@ impl ConnectionHandler {
                 "list" => handle_list(&sessions),
                 "ping" => Response::ok(),
                 "shutdown" => {
-                    // Signal the shutdown monitor thread to do cleanup + exit
                     SHUTDOWN_REQUESTED.store(true, Ordering::Relaxed);
                     let resp = Response::ok();
                     drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
-                    break; // Close this connection — monitor thread handles the rest
+                    break;
                 }
                 other => Response::err(format!("Unknown command: {other}")),
             };
 
             if writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()).is_err() {
-                break; // Connection lost
+                break;
             }
         }
     }
@@ -354,7 +352,6 @@ fn main() {
     let _ = std::fs::remove_file(&socket_path).ok();
 
     // Become a session leader so children get SIGHUP when the server dies.
-    // Previously done in the TUI's pre_exec hook — now the server owns its lifecycle.
     #[cfg(unix)]
     #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
     // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
@@ -414,12 +411,12 @@ fn main() {
 /// Each handler atomically sets [`SHUTDOWN_REQUESTED`] — the main accept loop
 /// polls it and breaks cleanly.
 fn install_signal_handlers() {
-    // signal-hook's flag::register is safe — it sets an Arc<AtomicBool> on signal delivery
     for sig in [signal_hook::consts::SIGINT, signal_hook::consts::SIGHUP] {
         drop(signal_hook::flag::register(sig, Arc::clone(&SHUTDOWN_REQUESTED)));
     }
 }
 
+// Here be the last port of call — once ye enter, no process leaves alive.
 /// Kill all sessions — used during shutdown.
 fn kill_all_sessions(sessions: &Sessions) {
     let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);

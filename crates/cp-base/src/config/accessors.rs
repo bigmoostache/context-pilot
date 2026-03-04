@@ -5,7 +5,7 @@
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
-use super::{DEFAULT_THEME, THEME_ORDER, THEMES, Theme, get_theme, yaml_invariant_panic};
+use super::{DEFAULT_THEME, THEME_ORDER, THEMES, Theme, yaml_invariant_panic};
 
 // =============================================================================
 // ACTIVE THEME (Global State — index-based lookup, fully safe)

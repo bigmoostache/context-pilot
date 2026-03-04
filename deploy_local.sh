@@ -25,7 +25,7 @@ echo ""
 echo "[1/4] Building release binary..."
 cd "$SCRIPT_DIR"
 cargo build --release
-cargo build --release -p cp-mod-console
+cargo build --release -p cp-console-server
 echo "      Build complete."
 
 # 2. Install binary

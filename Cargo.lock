@@ -436,6 +436,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-console-server"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+ "signal-hook",
+]
+
+[[package]]
 name = "cp-mod-brave"
 version = "0.1.0"
 dependencies = [
@@ -466,12 +476,10 @@ name = "cp-mod-console"
 version = "0.1.0"
 dependencies = [
  "cp-base",
- "libc",
  "ratatui",
  "regex",
  "serde",
  "serde_json",
- "signal-hook",
 ]
 
 [[package]]
