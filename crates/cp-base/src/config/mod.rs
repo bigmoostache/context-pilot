@@ -376,11 +376,12 @@ pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea
 // Loading Functions
 // ============================================================================
 
-/// Deserialize a YAML string into `T`, panicking with a descriptive message on failure.
+/// Deserialize a YAML string into `T`.
 ///
-/// All YAML embedded via `include_str!` is validated by tests in `lib.rs`.
-/// This panic is the belt-and-suspenders runtime guard — it should never fire
-/// in a correctly-built binary.
+/// # Panics
+///
+/// Panics via [`yaml_invariant_panic`] if the YAML content doesn't match the target type.
+#[must_use]
 pub fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
     serde_yaml::from_str(content).unwrap_or_else(|e| yaml_invariant_panic(&format!("Failed to parse {name}: {e}")))
 }
@@ -388,7 +389,11 @@ pub fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T 
 /// Panic for YAML/config invariant violations.
 ///
 /// Centralizes `clippy::panic` suppression — all compile-time-embedded config
-/// invariant panics route through here. One `#[expect]` to rule them all.
+/// invariant panics route through here.
+///
+/// # Panics
+///
+/// Always panics — that is its purpose.
 #[expect(clippy::panic, reason = "invariant violation is unrecoverable — validated by tests")]
 pub fn yaml_invariant_panic(msg: &str) -> ! {
     panic!("{msg}")
@@ -430,56 +435,11 @@ pub fn get_theme(theme_id: &str) -> Option<&'static Theme> {
 }
 
 // ============================================================================
-// Active Theme (Global State — index-based lookup, fully safe)
+// Active Theme — delegated to accessors module
 // ============================================================================
 
-use std::sync::atomic::{AtomicU8, Ordering};
-
-/// Index into [`THEME_ORDER`] for the active theme.
-/// `u8::MAX` = not yet set (uses [`DEFAULT_THEME`] on first access).
-static CACHED_THEME_IDX: AtomicU8 = AtomicU8::new(u8::MAX);
-
-/// Resolve a theme-order index to its theme reference.
-fn theme_by_index(idx: u8) -> Option<&'static Theme> {
-    THEME_ORDER.get(idx as usize).and_then(|id| THEMES.themes.get(*id))
-}
-
-/// Find the index of `theme_id` in [`THEME_ORDER`], or `None` if absent.
-fn theme_index(theme_id: &str) -> Option<u8> {
-    THEME_ORDER.iter().position(|&id| id == theme_id).and_then(|i| u8::try_from(i).ok())
-}
-
-/// Set the active theme ID (call when state is loaded or theme changes).
-pub fn set_active_theme(theme_id: &str) {
-    if let Some(idx) = theme_index(theme_id) {
-        CACHED_THEME_IDX.store(idx, Ordering::Release);
-    }
-}
-
-/// Get the currently active theme (atomic load + `HashMap` lookup — no unsafe).
-///
-/// Falls back to the default theme, then to any available theme. Panics only
-/// if `themes.yaml` is completely empty (compile-time bug).
-///
-/// # Panics
-///
-/// Panics if the themes map contains zero entries.
-pub fn active_theme() -> &'static Theme {
-    let idx = CACHED_THEME_IDX.load(Ordering::Acquire);
-    let resolve = |theme: Option<&'static Theme>| -> &'static Theme {
-        theme.unwrap_or_else(|| yaml_invariant_panic("themes.yaml has no themes"))
-    };
-    if idx == u8::MAX {
-        // First call before set_active_theme — initialize from default
-        let default_idx = theme_index(DEFAULT_THEME);
-        if let Some(di) = default_idx {
-            CACHED_THEME_IDX.store(di, Ordering::Release);
-        }
-        resolve(default_idx.and_then(theme_by_index).or_else(|| THEMES.themes.values().next()))
-    } else {
-        resolve(theme_by_index(idx).or_else(|| THEMES.themes.values().next()))
-    }
-}
+pub use accessors::active_theme;
+pub use accessors::set_active_theme;
 
 // ============================================================================
 // Icon Helper

@@ -39,14 +39,35 @@ use crate::state::{Action, ContextElement, ContextType, State};
 /// mapping so individual panel `handle_key()` implementations can avoid
 /// matching on `KeyCode` directly.
 #[must_use]
-#[expect(clippy::wildcard_enum_match_arm, reason = "KeyCode is an external enum — new variants are not scroll keys")]
 pub const fn scroll_key_action(key: &KeyEvent) -> Option<Action> {
     match key.code {
         KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
         KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
         KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
         KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
-        _ => None,
+        KeyCode::Backspace
+        | KeyCode::Enter
+        | KeyCode::Left
+        | KeyCode::Right
+        | KeyCode::Home
+        | KeyCode::End
+        | KeyCode::Tab
+        | KeyCode::BackTab
+        | KeyCode::Delete
+        | KeyCode::Insert
+        | KeyCode::F(_)
+        | KeyCode::Char(_)
+        | KeyCode::Null
+        | KeyCode::Esc
+        | KeyCode::CapsLock
+        | KeyCode::ScrollLock
+        | KeyCode::NumLock
+        | KeyCode::PrintScreen
+        | KeyCode::Pause
+        | KeyCode::Menu
+        | KeyCode::KeypadBegin
+        | KeyCode::Media(_)
+        | KeyCode::Modifier(_) => None,
     }
 }
 
