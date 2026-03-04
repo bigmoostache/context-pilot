@@ -76,17 +76,10 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Close the callback editor, restoring the normal table view.
-///
-/// # Panics
-///
-/// Panics if an internal invariant is violated.
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let previous = CallbackState::get(state).editor_open.clone();
-
-    if previous.is_none() {
+    let Some(previous) = CallbackState::get(state).editor_open.clone() else {
         return ToolResult::new(tool.id.clone(), "No callback editor is currently open.".to_string(), true);
-    }
+    };
 
     CallbackState::get_mut(state).editor_open = None;
 
@@ -100,10 +93,7 @@ pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     ToolResult::new(
         tool.id.clone(),
-        format!(
-            "Closed callback editor (was viewing '{}'). Callbacks panel restored to table view.",
-            previous.unwrap()
-        ),
+        format!("Closed callback editor (was viewing '{previous}'). Callbacks panel restored to table view."),
         false,
     )
 }

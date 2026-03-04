@@ -273,6 +273,7 @@ impl State {
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
     #[must_use]
+    #[expect(clippy::expect_used, reason = "centralized panic — callers use ext() to avoid per-site #[expect]")]
     pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
         self.get_ext::<T>().expect("module state not initialized — was init_state() called?")
     }
@@ -282,6 +283,7 @@ impl State {
     /// # Panics
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
+    #[expect(clippy::expect_used, reason = "centralized panic — callers use ext_mut() to avoid per-site #[expect]")]
     pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
         self.get_ext_mut::<T>().expect("module state not initialized — was init_state() called?")
     }

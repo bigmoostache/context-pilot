@@ -27,10 +27,8 @@ use self::library_panel::LibraryPanel;
 use self::skill_panel::SkillPanel;
 use cp_base::modules::Module;
 
-static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
-    serde_yaml::from_str(include_str!("../../../yamls/tools/prompt.yaml")).expect("Failed to parse prompt tool YAML")
-});
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
+    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/prompt.yaml")));
 
 /// Prompt library module: agents, skills, commands — the ship's charter.
 #[derive(Debug, Clone, Copy)]

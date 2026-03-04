@@ -35,10 +35,8 @@ use self::types::{ConsoleState, SessionMeta};
 pub use self::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_base::cast::SafeCast;
 
-static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
-    serde_yaml::from_str(include_str!("../../../yamls/tools/console.yaml")).expect("Failed to parse console tool YAML")
-});
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
+    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/console.yaml")));
 
 /// Console module: spawns child processes, manages sessions, provides interactive I/O.
 #[derive(Debug, Clone, Copy)]

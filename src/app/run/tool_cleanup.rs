@@ -16,7 +16,6 @@ impl App {
     /// Non-blocking check: poll `WatcherRegistry` for satisfied conditions.
     /// - Blocking watchers: replace sentinel tool results and resume pipeline.
     /// - Async watchers: create spine notifications.
-    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     pub(super) fn check_watchers(&mut self, tx: &Sender<StreamEvent>) {
         // Take the registry out of state to avoid borrow conflict
         // (poll_all needs &mut registry + &state simultaneously)
@@ -113,7 +112,9 @@ impl App {
         // All blocking watchers done — merge accumulated results and resume pipeline.
         let blocking_results = std::mem::take(&mut self.accumulated_blocking_results);
 
-        let mut tool_results = self.pending_console_wait_tool_results.take().unwrap();
+        let Some(mut tool_results) = self.pending_console_wait_tool_results.take() else {
+            return;
+        };
 
         // Replace sentinels with real results
         for tr in &mut tool_results {
@@ -132,8 +133,9 @@ impl App {
                 let matched_result = blocking_results
                     .iter()
                     .find(|r| r.tool_use_id.as_ref().is_some_and(|tid| after_sentinel.starts_with(tid.as_str())));
-                if let Some(result) = matched_result {
-                    let sentinel_id = result.tool_use_id.as_ref().unwrap();
+                if let Some(result) = matched_result
+                    && let Some(sentinel_id) = result.tool_use_id.as_ref()
+                {
                     let original_content = &after_sentinel[sentinel_id.len()..];
                     // Collect ALL blocking results for this sentinel (multiple callbacks)
                     let all_matched: Vec<&str> = blocking_results
@@ -235,7 +237,7 @@ impl App {
         self.state.messages.push(result_msg);
 
         if self.state.reload_pending {
-            crate::infra::tools::perform_reload(&mut self.state);
+            crate::infra::tools::perform_reload(&self.state);
         }
 
         // Create new assistant message for continued streaming

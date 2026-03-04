@@ -58,7 +58,6 @@ pub(crate) fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Opti
 }
 
 /// Find closest match for error reporting (returns line number and preview)
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
     let norm_needle = normalize_for_match(needle);
     let first_needle_line = norm_needle.lines().next()?;
@@ -83,7 +82,7 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
 
         let total_score = score.max(contains_score);
 
-        if total_score > 0 && (best_match.is_none() || total_score > best_match.as_ref().unwrap().1) {
+        if total_score > 0 && best_match.as_ref().is_none_or(|b| total_score > b.1) {
             let preview = if norm_line.len() > 60 {
                 format!("{}...", &norm_line[..norm_line.floor_char_boundary(60)])
             } else {

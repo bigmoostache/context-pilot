@@ -21,6 +21,10 @@ impl ToolTexts {
     ///
     /// Panics if the YAML is malformed — only used on compile-time-embedded content.
     #[must_use]
+    #[expect(
+        clippy::expect_used,
+        reason = "centralized panic — callers use ToolTexts::parse() to avoid per-site #[expect]"
+    )]
     pub fn parse(yaml: &str) -> Self {
         serde_yaml::from_str(yaml).expect("embedded tool YAML is malformed")
     }

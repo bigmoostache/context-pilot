@@ -9,7 +9,6 @@ impl App {
     /// Handle keyboard events when the @ autocomplete popup is active.
     /// Mutates `AutocompleteState` and state.input directly.
     #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
-    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     pub(super) fn handle_autocomplete_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
@@ -50,12 +49,16 @@ impl App {
 
                     // Refresh entries for the new directory
                     let filter = cp_mod_tree::TreeState::get(&self.state).tree_filter.clone();
-                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                        return;
+                    };
                     ac.set_query(new_query);
                     let dir = ac.current_dir().to_string();
                     let prefix = ac.current_prefix().to_string();
                     let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
-                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                        return;
+                    };
                     ac.set_matches(entries);
                 } else {
                     // File: insert the full path and close
@@ -92,11 +95,15 @@ impl App {
 
                     // Refresh matches
                     let filter = cp_mod_tree::TreeState::get(&self.state).tree_filter.clone();
-                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                        return;
+                    };
                     let dir = ac.current_dir().to_string();
                     let prefix = ac.current_prefix().to_string();
                     let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
-                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                        return;
+                    };
                     ac.set_matches(entries);
                 } else {
                     // Query was empty — remove the '@' and deactivate
@@ -125,11 +132,15 @@ impl App {
 
                     // Refresh matches with new query
                     let filter = cp_mod_tree::TreeState::get(&self.state).tree_filter.clone();
-                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                        return;
+                    };
                     let dir = ac.current_dir().to_string();
                     let prefix = ac.current_prefix().to_string();
                     let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
-                    let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                        return;
+                    };
                     ac.set_matches(entries);
                 }
             }
@@ -222,7 +233,7 @@ impl App {
                         "quit" => return None, // Signal quit
                         "reload" => {
                             // Perform reload (sets reload_requested flag and exits)
-                            perform_reload(&mut self.state);
+                            perform_reload(&self.state);
                             return None; // Won't reach here, but needed for type system
                         }
                         "config" => return Some(Action::ToggleConfigView),

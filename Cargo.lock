@@ -432,7 +432,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
- "tempfile",
  "unicode-width",
 ]
 
@@ -473,7 +472,6 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "serde_yaml",
 ]
 
 [[package]]
@@ -484,7 +482,6 @@ dependencies = [
  "crossterm",
  "ratatui",
  "serde_json",
- "serde_yaml",
 ]
 
 [[package]]
@@ -521,7 +518,6 @@ dependencies = [
  "ratatui",
  "regex",
  "secrecy",
- "serde_yaml",
  "sha2",
 ]
 
@@ -536,7 +532,6 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
- "serde_yaml",
 ]
 
 [[package]]
@@ -548,7 +543,6 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
- "serde_yaml",
  "unicode-width",
 ]
 
@@ -584,7 +578,6 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
- "serde_yaml",
 ]
 
 [[package]]
@@ -608,7 +601,6 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
- "serde_yaml",
  "unicode-width",
 ]
 
@@ -621,7 +613,6 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
- "serde_yaml",
 ]
 
 [[package]]
@@ -634,7 +625,6 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2",
 ]
 
@@ -649,7 +639,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml",
  "tar",
  "typst",
  "typst-pdf",

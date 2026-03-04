@@ -7,7 +7,6 @@ use cp_base::tools::{ToolResult, ToolUse};
 /// Unified diff-based edit tool for agents, skills, and commands.
 /// Uses the same `old_string/new_string` pattern as the file Edit tool.
 /// Routes to agent/skill/command based on the provided ID.
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) if !id.is_empty() => id,
@@ -57,15 +56,21 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let ps = PromptState::get(state);
     let (is_builtin, current_content) = match entity_type {
         EntityType::Agent => {
-            let a = ps.agents.iter().find(|a| a.id == id).unwrap();
+            let Some(a) = ps.agents.iter().find(|a| a.id == id) else {
+                return ToolResult::new(tool.id.clone(), format!("Agent '{id}' vanished mid-edit"), true);
+            };
             (a.is_builtin, a.content.clone())
         }
         EntityType::Skill => {
-            let s = ps.skills.iter().find(|s| s.id == id).unwrap();
+            let Some(s) = ps.skills.iter().find(|s| s.id == id) else {
+                return ToolResult::new(tool.id.clone(), format!("Skill '{id}' vanished mid-edit"), true);
+            };
             (s.is_builtin, s.content.clone())
         }
         EntityType::Command => {
-            let c = ps.commands.iter().find(|c| c.id == id).unwrap();
+            let Some(c) = ps.commands.iter().find(|c| c.id == id) else {
+                return ToolResult::new(tool.id.clone(), format!("Command '{id}' vanished mid-edit"), true);
+            };
             (c.is_builtin, c.content.clone())
         }
     };
@@ -104,13 +109,17 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let ps = PromptState::get_mut(state);
     match entity_type {
         EntityType::Agent => {
-            let a = ps.agents.iter_mut().find(|a| a.id == id).unwrap();
+            let Some(a) = ps.agents.iter_mut().find(|a| a.id == id) else {
+                return ToolResult::new(tool.id.clone(), format!("Agent '{id}' vanished mid-edit"), true);
+            };
             a.content = new_content;
             storage::save_prompt_to_dir(&storage::dir_for(PromptType::Agent), a);
             state.touch_panel(ContextType::new(ContextType::SYSTEM));
         }
         EntityType::Skill => {
-            let s = ps.skills.iter_mut().find(|s| s.id == id).unwrap();
+            let Some(s) = ps.skills.iter_mut().find(|s| s.id == id) else {
+                return ToolResult::new(tool.id.clone(), format!("Skill '{id}' vanished mid-edit"), true);
+            };
             s.content = new_content;
             let skill_clone = s.clone();
             storage::save_prompt_to_dir(&storage::dir_for(PromptType::Skill), &skill_clone);
@@ -128,7 +137,9 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         }
         EntityType::Command => {
-            let c = ps.commands.iter_mut().find(|c| c.id == id).unwrap();
+            let Some(c) = ps.commands.iter_mut().find(|c| c.id == id) else {
+                return ToolResult::new(tool.id.clone(), format!("Command '{id}' vanished mid-edit"), true);
+            };
             c.content = new_content;
             let cmd_clone = c.clone();
             storage::save_prompt_to_dir(&storage::dir_for(PromptType::Command), &cmd_clone);

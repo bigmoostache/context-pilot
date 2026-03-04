@@ -196,7 +196,6 @@ pub(crate) fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResul
     )
 }
 
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
     // 1. Validate the panel ID
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
@@ -207,27 +206,21 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
     };
 
     // Find the panel and verify it's a ConversationHistory
-    let panel_idx = state.context.iter().position(|c| c.id == panel_id);
-    match panel_idx {
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Panel '{panel_id}' not found"), true);
-        }
-        Some(idx) => {
-            if state.context[idx].context_type != ContextType::CONVERSATION_HISTORY {
-                return ToolResult::new(
-                    tool.id.clone(),
-                    format!(
-                        "Panel '{}' is not a conversation history panel (type: {:?})",
-                        panel_id, state.context[idx].context_type
-                    ),
-                    true,
-                );
-            }
-        }
+    let Some(panel_idx) = state.context.iter().position(|c| c.id == panel_id) else {
+        return ToolResult::new(tool.id.clone(), format!("Panel '{panel_id}' not found"), true);
+    };
+    if state.context[panel_idx].context_type != ContextType::CONVERSATION_HISTORY {
+        return ToolResult::new(
+            tool.id.clone(),
+            format!(
+                "Panel '{}' is not a conversation history panel (type: {:?})",
+                panel_id, state.context[panel_idx].context_type
+            ),
+            true,
+        );
     }
 
     // 2. Extract the last message timestamp from the panel
-    let panel_idx = panel_idx.unwrap();
     let last_msg_timestamp = state.context[panel_idx]
         .history_messages
         .as_ref()

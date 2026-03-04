@@ -250,7 +250,7 @@ impl App {
 
         // Check if reload was requested - perform it after tool result is saved
         if self.state.reload_pending {
-            perform_reload(&mut self.state);
+            perform_reload(&self.state);
             // Note: perform_reload calls std::process::exit(0), so we won't reach here
         }
 
@@ -354,8 +354,6 @@ impl App {
     /// Non-blocking check: if the user has resolved a pending question form,
     /// replace the `__QUESTION_PENDING__` placeholder with the real answer and
     /// resume the tool pipeline (create result message + continue streaming).
-    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     pub(super) fn check_question_form(&mut self, tx: &Sender<StreamEvent>) {
         // Only check if we have pending tool results waiting on a question
         if self.pending_question_tool_results.is_none() {
@@ -370,18 +368,22 @@ impl App {
         }
 
         // Extract the resolved form and remove it from state
-        let form = self
+        let Some(form) = self
             .state
             .module_data
             .remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>())
             .and_then(|v| v.downcast::<cp_base::ui::PendingQuestionForm>().ok())
-            .expect("form must exist since we just checked resolved=true");
+        else {
+            return;
+        };
 
         let result_json =
             form.result_json.unwrap_or_else(|| r#"{"dismissed":true,"message":"User declined to answer"}"#.to_string());
 
         // Replace placeholder in pending tool results
-        let mut tool_results = self.pending_question_tool_results.take().unwrap();
+        let Some(mut tool_results) = self.pending_question_tool_results.take() else {
+            return;
+        };
         for tr in &mut tool_results {
             if tr.content == "__QUESTION_PENDING__" {
                 tr.content.clone_from(&result_json);
@@ -420,7 +422,7 @@ impl App {
 
         // Check if reload was requested
         if self.state.reload_pending {
-            perform_reload(&mut self.state);
+            perform_reload(&self.state);
         }
 
         // Create new assistant message for continued streaming

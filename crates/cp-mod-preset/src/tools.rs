@@ -31,10 +31,9 @@ fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[expect(clippy::needless_pass_by_ref_mut, reason = "state may need mutation in future")]
 pub(crate) fn execute_snapshot(
     tool: &ToolUse,
-    state: &mut State,
+    state: &State,
     all_modules_fn: fn() -> Vec<Box<dyn Module>>,
 ) -> ToolResult {
     let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {

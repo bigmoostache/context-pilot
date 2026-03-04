@@ -155,10 +155,8 @@ fn render_log_entry(
 
 fn format_timestamp(ms: u64) -> String {
     use chrono::{Local, TimeZone};
-    #[expect(clippy::cast_possible_wrap, reason = "ms/1000 won't exceed i64::MAX until year 292 billion")]
-    let secs = (ms / 1000) as i64;
-    Local
-        .timestamp_opt(secs, 0)
-        .single()
+    i64::try_from(ms)
+        .ok()
+        .and_then(|ms| Local.timestamp_millis_opt(ms).single())
         .map_or_else(|| format!("{ms}ms"), |dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
 }

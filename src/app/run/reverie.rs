@@ -170,7 +170,7 @@ impl App {
                     }
                     QueueState::get_mut(&mut self.state).clear();
                     crate::infra::tools::ToolResult::new(tool.id.clone(), "Queue emptied (reverie)".into(), false)
-                } else if let Some(result) = tools::dispatch_reverie_tool(tool, &mut self.state) {
+                } else if let Some(result) = tools::dispatch_reverie_tool(tool, &self.state) {
                     // Check for Report sentinel
                     if result.content.starts_with("REVERIE_REPORT:") {
                         let summary = result.content.strip_prefix("REVERIE_REPORT:").unwrap_or("Completed");

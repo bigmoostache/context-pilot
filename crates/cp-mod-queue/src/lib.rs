@@ -21,10 +21,8 @@ use cp_base::tools::{ToolResult, ToolUse};
 use self::panel::QueuePanel;
 use cp_base::cast::SafeCast;
 
-static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
-    serde_yaml::from_str(include_str!("../../../yamls/tools/queue.yaml")).expect("Failed to parse queue tool YAML")
-});
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
+    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/queue.yaml")));
 
 /// Queue module: batch tool calls and flush them atomically.
 #[derive(Debug, Clone, Copy)]

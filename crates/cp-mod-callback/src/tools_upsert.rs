@@ -142,7 +142,6 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Update an existing callback (full replace or diff-based script edit).
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
@@ -235,7 +234,9 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if has_full_script {
         // Full script replacement
-        let cargo_script = tool.input["script_content"].as_str().unwrap();
+        let Some(cargo_script) = tool.input.get("script_content").and_then(|v| v.as_str()) else {
+            return ToolResult::new(tool.id.clone(), "Missing 'script_content' parameter".to_string(), true);
+        };
         let full_script = format!(
             "#!/usr/bin/env bash\nset -euo pipefail\n\n# Callback: {name}\n# Pattern: {pattern}\n\n{script}",
             name = def.name,
@@ -248,7 +249,9 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         changes.push("script replaced".to_string());
     } else if has_diff {
         // Diff-based script edit
-        let old_str = tool.input["old_string"].as_str().unwrap();
+        let Some(old_str) = tool.input.get("old_string").and_then(|v| v.as_str()) else {
+            return ToolResult::new(tool.id.clone(), "Missing 'old_string' parameter".to_string(), true);
+        };
         let new_str = tool.input.get("new_string").and_then(|v| v.as_str()).unwrap_or("");
 
         let current_script = match fs::read_to_string(&script_path) {

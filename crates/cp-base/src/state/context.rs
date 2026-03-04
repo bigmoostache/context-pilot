@@ -48,15 +48,10 @@ pub fn get_context_type_meta(ct: &str) -> Option<&'static ContextTypeMeta> {
 
 /// Return the canonical fixed panel order, derived from the registry.
 /// Sorted by `fixed_order` for panels that declare `is_fixed = true`.
-///
-/// # Panics
-///
-/// Panics if an internal invariant is violated.
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub fn fixed_panel_order() -> Vec<&'static str> {
     let Some(registry) = CONTEXT_TYPE_REGISTRY.get() else { return vec![] };
     let mut fixed: Vec<_> = registry.iter().filter(|m| m.is_fixed && m.fixed_order.is_some()).collect();
-    fixed.sort_by_key(|m| m.fixed_order.unwrap());
+    fixed.sort_by_key(|m| m.fixed_order.unwrap_or(0));
     fixed.iter().map(|m| m.context_type).collect()
 }
 

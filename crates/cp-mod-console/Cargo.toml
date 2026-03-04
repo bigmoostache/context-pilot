@@ -18,7 +18,6 @@ cp-base.workspace = true
 ratatui.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-serde_yaml.workspace = true
 regex.workspace = true
 libc = "0.2"
 

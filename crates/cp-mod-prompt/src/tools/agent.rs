@@ -79,12 +79,11 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Deleted agent '{}' ({})", agent.name, id), false)
 }
 
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = tool.input.get("id").and_then(|v| v.as_str());
 
     // If id is None or empty, switch to default agent
-    if id.is_none_or(str::is_empty) {
+    let Some(id) = id.filter(|s| !s.is_empty()) else {
         PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_string());
         state.touch_panel(ContextType::new(ContextType::SYSTEM));
         state.touch_panel(ContextType::new(ContextType::LIBRARY));
@@ -93,9 +92,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
             format!("Switched to default agent ({})", library::default_agent_id()),
             false,
         );
-    }
-
-    let id = id.unwrap();
+    };
 
     if !PromptState::get(state).agents.iter().any(|a| a.id == id) {
         return ToolResult::new(tool.id.clone(), format!("Agent '{id}' not found"), true);

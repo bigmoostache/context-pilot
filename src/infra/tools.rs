@@ -22,9 +22,8 @@ pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResul
 }
 
 /// Perform the actual TUI reload (called from app.rs after tool result is saved)
-#[expect(clippy::needless_pass_by_ref_mut, reason = "state may need mutation in future")]
 #[expect(clippy::exit, reason = "process exit is intentional here")]
-pub(crate) fn perform_reload(state: &mut State) {
+pub(crate) fn perform_reload(state: &State) {
     use crate::state::persistence::save_state;
     use crossterm::{
         execute,

@@ -105,11 +105,72 @@ pub fn validate_gh_command(command: &str) -> Result<Vec<String>, String> {
     Ok(args)
 }
 
+/// Groups where every subcommand is read-only — no per-action check needed.
+const READ_ONLY_GROUPS: &[&str] = &["attestation", "browse", "completion", "help", "search", "status", "version"];
+
+/// `(group, action)` pairs classified as read-only.
+/// Sorted by group, then action — both for readability and `binary_search` lookups.
+/// Unlisted pairs default to [`CommandClass::Mutating`] (safe fallback).
+const READ_ONLY_ACTIONS: &[(&str, &str)] = &[
+    ("alias", "list"),
+    ("auth", "status"),
+    ("auth", "token"),
+    ("cache", "list"),
+    ("codespace", "code"),
+    ("codespace", "jupyter"),
+    ("codespace", "list"),
+    ("codespace", "logs"),
+    ("codespace", "ports"),
+    ("codespace", "ssh"),
+    ("codespace", "view"),
+    ("config", "get"),
+    ("config", "list"),
+    ("extension", "browse"),
+    ("extension", "list"),
+    ("extension", "search"),
+    ("gist", "list"),
+    ("gist", "view"),
+    ("gpg-key", "list"),
+    ("issue", "list"),
+    ("issue", "status"),
+    ("issue", "view"),
+    ("label", "list"),
+    ("org", "list"),
+    ("pr", "checks"),
+    ("pr", "diff"),
+    ("pr", "list"),
+    ("pr", "status"),
+    ("pr", "view"),
+    ("project", "field-list"),
+    ("project", "item-list"),
+    ("project", "list"),
+    ("project", "view"),
+    ("release", "download"),
+    ("release", "list"),
+    ("release", "view"),
+    ("repo", "list"),
+    ("repo", "view"),
+    ("ruleset", "check"),
+    ("ruleset", "list"),
+    ("ruleset", "view"),
+    ("run", "download"),
+    ("run", "list"),
+    ("run", "view"),
+    ("run", "watch"),
+    ("secret", "list"),
+    ("ssh-key", "list"),
+    ("variable", "get"),
+    ("variable", "list"),
+    ("workflow", "list"),
+    ("workflow", "view"),
+];
+
 /// Classify a gh command (given as parsed args after "gh") as read-only or mutating.
-#[expect(
-    clippy::match_same_arms,
-    reason = "explicit arms document known gh subcommands — wildcard is the safe fallback"
-)]
+///
+/// Uses static lookup tables ([`READ_ONLY_GROUPS`] and [`READ_ONLY_ACTIONS`]) so
+/// adding new subcommands is a one-line table entry. Unknown commands default to
+/// [`CommandClass::Mutating`] as a safe fallback. The `api` subcommand gets special
+/// handling since its classification depends on the `--method`/`-X` flag.
 #[must_use]
 pub fn classify_gh(args: &[String]) -> CommandClass {
     if args.is_empty() {
@@ -117,154 +178,28 @@ pub fn classify_gh(args: &[String]) -> CommandClass {
     }
 
     let group = args[0].as_str();
-    let action = args.get(1).map_or("", |s| s.as_str());
-    let rest: Vec<&str> = args.iter().skip(1).map(String::as_str).collect();
 
-    match group {
-        // PR commands
-        "pr" => match action {
-            "list" | "view" | "status" | "checks" | "diff" => CommandClass::ReadOnly,
-            "create" | "merge" | "close" | "reopen" | "edit" | "comment" | "review" | "ready" => CommandClass::Mutating,
-            _ => CommandClass::Mutating,
-        },
-
-        // Issue commands
-        "issue" => match action {
-            "list" | "view" | "status" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Repo commands
-        "repo" => match action {
-            "view" | "list" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Release commands
-        "release" => match action {
-            "list" | "view" | "download" => CommandClass::ReadOnly,
-            "create" | "delete" | "edit" | "upload" => CommandClass::Mutating,
-            _ => CommandClass::Mutating,
-        },
-
-        // Run (Actions) commands
-        "run" => match action {
-            "list" | "view" | "download" | "watch" => CommandClass::ReadOnly,
-            "rerun" | "cancel" | "delete" => CommandClass::Mutating,
-            _ => CommandClass::Mutating,
-        },
-
-        // Workflow commands
-        "workflow" => match action {
-            "list" | "view" => CommandClass::ReadOnly,
-            "run" | "enable" | "disable" => CommandClass::Mutating,
-            _ => CommandClass::Mutating,
-        },
-
-        // Gist commands
-        "gist" => match action {
-            "list" | "view" => CommandClass::ReadOnly,
-            "create" | "edit" | "delete" | "clone" | "rename" => CommandClass::Mutating,
-            _ => CommandClass::Mutating,
-        },
-
-        // Search commands (always read-only)
-        "search" => CommandClass::ReadOnly,
-
-        // Auth commands
-        "auth" => match action {
-            "status" | "token" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // API command — special handling
-        "api" => {
-            let has_mutating_method = rest.windows(2).any(|w| {
-                (w[0] == "--method" || w[0] == "-X")
-                    && matches!(w[1].to_uppercase().as_str(), "POST" | "PUT" | "PATCH" | "DELETE")
-            });
-            if has_mutating_method { CommandClass::Mutating } else { CommandClass::ReadOnly }
-        }
-
-        // Label commands
-        "label" => match action {
-            "list" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Project commands
-        "project" => match action {
-            "list" | "view" | "field-list" | "item-list" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // SSH key, GPG key commands
-        "ssh-key" | "gpg-key" => match action {
-            "list" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Always read-only groups
-        "browse" | "status" | "completion" | "help" | "version" => CommandClass::ReadOnly,
-
-        // Attestation (verify, download — always read-only)
-        "attestation" => CommandClass::ReadOnly,
-
-        // Config commands
-        "config" => match action {
-            "get" | "list" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Secret commands
-        "secret" => match action {
-            "list" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Variable commands
-        "variable" => match action {
-            "list" | "get" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Cache commands
-        "cache" => match action {
-            "list" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Ruleset commands
-        "ruleset" => match action {
-            "list" | "view" | "check" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Org commands
-        "org" => match action {
-            "list" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Extension commands
-        "extension" => match action {
-            "list" | "search" | "browse" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Alias commands
-        "alias" => match action {
-            "list" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Codespace commands
-        "codespace" => match action {
-            "list" | "view" | "ssh" | "code" | "jupyter" | "logs" | "ports" => CommandClass::ReadOnly,
-            _ => CommandClass::Mutating,
-        },
-
-        // Unknown → Mutating (safe default)
-        _ => CommandClass::Mutating,
+    // Entire group is read-only?
+    if READ_ONLY_GROUPS.contains(&group) {
+        return CommandClass::ReadOnly;
     }
+
+    // `gh api` — read-only unless an explicit mutating HTTP method is passed
+    if group == "api" {
+        let rest: Vec<&str> = args.iter().skip(1).map(String::as_str).collect();
+        let has_mutating_method = rest.windows(2).any(|w| {
+            (w[0] == "--method" || w[0] == "-X")
+                && matches!(w[1].to_uppercase().as_str(), "POST" | "PUT" | "PATCH" | "DELETE")
+        });
+        return if has_mutating_method { CommandClass::Mutating } else { CommandClass::ReadOnly };
+    }
+
+    // Per-action lookup (binary search on sorted table)
+    let action = args.get(1).map_or("", |s| s.as_str());
+    if READ_ONLY_ACTIONS.binary_search_by(|&(g, a)| g.cmp(group).then_with(|| a.cmp(action))).is_ok() {
+        return CommandClass::ReadOnly;
+    }
+
+    // Safe default: anything we don't explicitly know is read-only gets treated as mutating
+    CommandClass::Mutating
 }

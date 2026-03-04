@@ -17,10 +17,8 @@ use self::panel::FilePanel;
 use cp_base::modules::Module;
 use cp_base::tools::PreFlightResult;
 
-static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
-    serde_yaml::from_str(include_str!("../../../yamls/tools/files.yaml")).expect("Failed to parse files tool YAML")
-});
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
+    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/files.yaml")));
 
 /// Files module: Open, Edit, Write tools for file manipulation.
 #[derive(Debug, Clone, Copy)]

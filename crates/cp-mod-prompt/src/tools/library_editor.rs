@@ -33,20 +33,17 @@ pub(crate) fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Closes the prompt editor in the Library panel.
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let previous = PromptState::get(state).open_prompt_id.clone();
-
-    if previous.is_none() {
+    let Some(previous) = PromptState::get(state).open_prompt_id.clone() else {
         return ToolResult::new(tool.id.clone(), "No prompt editor is currently open.".to_string(), true);
-    }
+    };
 
     PromptState::get_mut(state).open_prompt_id = None;
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
     ToolResult::new(
         tool.id.clone(),
-        format!("Closed prompt editor (was editing '{}'). Library panel restored to normal view.", previous.unwrap()),
+        format!("Closed prompt editor (was editing '{previous}'). Library panel restored to normal view."),
         false,
     )
 }

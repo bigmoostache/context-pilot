@@ -7,10 +7,8 @@ use crate::infra::tools::{ParamType, ToolDefinition, ToolResult, ToolTexts, Tool
 use crate::state::State;
 use cp_base::config::REVERIE;
 
-static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
-    serde_yaml::from_str(include_str!("../../../yamls/tools/reverie.yaml")).expect("Failed to parse reverie tool YAML")
-});
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
+    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/reverie.yaml")));
 
 /// Build a human-readable text describing which tools the reverie is allowed to use.
 /// This is injected at the top of the reverie's conversation panel (P-reverie) so the
@@ -129,8 +127,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
 ///
 /// Routes Report to our handler, everything else to the normal module dispatch.
 /// Returns None if the tool should be dispatched to modules (caller handles it).
-#[expect(clippy::needless_pass_by_ref_mut, reason = "state may need mutation in future")]
-pub(crate) fn dispatch_reverie_tool(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
+pub(crate) fn dispatch_reverie_tool(tool: &ToolUse, state: &State) -> Option<ToolResult> {
     match tool.name.as_str() {
         "reverie_report" => Some(execute_report(tool, state)),
         _ => {

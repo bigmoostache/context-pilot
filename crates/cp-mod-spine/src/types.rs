@@ -182,9 +182,8 @@ impl SpineState {
     ///
     /// Panics if an internal invariant is violated.
     #[must_use]
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     pub fn get(state: &State) -> &Self {
-        state.get_ext::<Self>().expect("SpineState not initialized")
+        state.ext::<Self>()
     }
 
     /// Get mutable ref from State's `TypeMap`.
@@ -192,9 +191,8 @@ impl SpineState {
     /// # Panics
     ///
     /// Panics if an internal invariant is violated.
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     pub fn get_mut(state: &mut State) -> &mut Self {
-        state.get_ext_mut::<Self>().expect("SpineState not initialized")
+        state.ext_mut::<Self>()
     }
 
     /// Create a new notification and add it. Returns the notification ID.

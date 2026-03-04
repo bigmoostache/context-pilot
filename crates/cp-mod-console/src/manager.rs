@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
+use std::hash::BuildHasher;
 use std::io::{BufRead, BufReader, Write as IoWrite};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
@@ -172,8 +173,7 @@ pub fn find_or_create_server() -> Result<(), String> {
 
 /// Kill orphaned processes by asking the server for its session list and
 /// comparing against known session keys.
-#[expect(clippy::implicit_hasher, reason = "internal function, single callsite — generic hasher adds noise")]
-pub fn kill_orphaned_processes(known_keys: &HashSet<String>) {
+pub fn kill_orphaned_processes<S: BuildHasher>(known_keys: &HashSet<String, S>) {
     let list = serde_json::json!({"cmd": "list"});
     if let Ok(resp) = server_request(&list)
         && let Some(sessions) = resp.get("sessions").and_then(|v| v.as_array())
