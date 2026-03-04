@@ -29,7 +29,8 @@ impl Panel for ToolsPanel {
             .context
             .iter()
             .find(|c| c.context_type.as_str() == "tools")
-            .map_or_or(("P?", 0), ("P?", 0), |c| (c.id.as_str(), c.last_refresh_ms)), "Tools", content, last_refresh_ms)]
+            .map_or(("P?", 0), |c| (c.id.as_str(), c.last_refresh_ms));
+        vec![ContextItem::new(id, "Tools", content, last_refresh_ms)]
     }
 
     fn refresh(&self, state: &mut State) {

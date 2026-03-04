@@ -39,7 +39,8 @@ impl Panel for OverviewPanel {
             .context
             .iter()
             .find(|c| c.context_type == ContextType::OVERVIEW)
-            .map_or_or(("P5", 0), ("P5", 0), |c| (c.id.as_str(), c.last_refresh_ms)), "Statistics", output, last_refresh_ms)]
+            .map_or(("P5", 0), |c| (c.id.as_str(), c.last_refresh_ms));
+        vec![ContextItem::new(id, "Statistics", output, last_refresh_ms)]
     }
 
     fn refresh(&self, state: &mut State) {

@@ -304,7 +304,7 @@ impl App {
             }
 
             // End turn without Report — check retry limit
-            let retries = self.state.reveries.get(&agent_id).map(|r| r.report_retries).unwrap_or(0);
+            let retries = self.state.reveries.get(&agent_id).map_or(0, |r| r.report_retries);
             if retries >= 1 {
                 // Max retries reached — force destroy
                 let _r = cp_mod_spine::SpineState::create_notification(

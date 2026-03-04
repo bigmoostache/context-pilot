@@ -113,8 +113,8 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     // Active agent card
     let ps = PromptState::get(state);
     if let Some(ref agent_id) = ps.active_agent_id {
-        let agent_name =
-            ps.agents.iter().find(|a| &a.id == agent_id).map_or_or(agent_id.as_str(), agent_id.as_str(), |a| a.name.as_str())yled(
+        let agent_name = ps.agents.iter().find(|a| &a.id == agent_id).map_or(agent_id.as_str(), |a| a.name.as_str());
+        spans.push(Span::styled(
             format!(" 🤖 {} ", agent_name),
             Style::default().fg(Color::White).bg(Color::Rgb(130, 80, 200)).bold(),
         ));
@@ -123,8 +123,8 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 
     // Loaded skill cards
     for skill_id in &ps.loaded_skill_ids {
-        let skill_name =
-            ps.skills.iter().find(|s| s.id == *skill_id).map_or_or(skill_id.as_str(), skill_id.as_str(), |s| s.name.as_str())yled(
+        let skill_name = ps.skills.iter().find(|s| s.id == *skill_id).map_or(skill_id.as_str(), |s| s.name.as_str());
+        spans.push(Span::styled(
             format!(" 📚 {} ", skill_name),
             Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold(),
         ));
@@ -203,7 +203,8 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         // Look up the agent's display name from PromptState
         let ps = PromptState::get(state);
         let agent_name =
-            ps.agents.iter().find(|a| a.id == rev.agent_id).map_or_or(&rev.agent_id, &rev.agent_id, |a| a.name.as_str())= rev.tool_call_count;
+            ps.agents.iter().find(|a| a.id == rev.agent_id).map_or(rev.agent_id.as_str(), |a| a.name.as_str());
+        let tools_done = rev.tool_call_count;
         let rev_spin = if rev.is_streaming { format!("{} ", spin) } else { String::new() };
         spans.push(Span::styled(
             format!(" {}🧠 {} ({} tools) ", rev_spin, agent_name, tools_done),

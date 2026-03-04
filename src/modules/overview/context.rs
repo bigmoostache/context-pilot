@@ -45,7 +45,7 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
     let budget = state.effective_context_budget();
     let threshold = state.cleaning_threshold_tokens();
-    #[expect(clippy::cast_precision_loss, reason = "token counts ≪ 2^52")]
+    #[expect(clippy::cast_precision_loss, reason = "percentage display — precision loss irrelevant")]
     let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
 
     let mut output = format!(
@@ -81,7 +81,9 @@ pub(crate) fn generate_context_content(state: &State) -> String {
 
     for ctx in &panels {
         let type_name =
-            get_context_type_meta(ctx.context_type.as_str()).map_or_or(ctx.context_type.as_str(), ctx.context_type.as_str(), |m| m.short_name)().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
+            get_context_type_meta(ctx.context_type.as_str()).map_or(ctx.context_type.as_str(), |m| m.short_name);
+
+        let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
         let hit_miss = if ctx.panel_cache_hit { "\u{2713}" } else { "\u{2717}" };
         let cost = format!("${:.2}", ctx.panel_total_cost);

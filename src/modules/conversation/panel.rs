@@ -102,15 +102,15 @@ impl ConversationPanel {
 
         // Cache miss - need to rebuild
         // Check if viewport width changed - invalidate per-message caches
-        let width_changed =
-            state.message_cache.values().next().is_some_andsome_and(|c| c.viewport_width != viewport_width)h_changed {
+        let width_changed = state.message_cache.values().next().is_some_and(|c| c.viewport_width != viewport_width);
+        if width_changed {
             state.message_cache.clear();
             state.input_cache = None;
         }
 
         let mut text: Vec<Line<'static>> = Vec::new();
 
-        // Prepend frozen ConversationHistory panels (oldest first)
+        // Prepend frozen `ConversationHistory` panels (oldest first)
         {
             let mut history_panels: Vec<_> =
                 state.context.iter().filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY).collect();
@@ -284,8 +284,10 @@ impl Panel for ConversationPanel {
             KeyCode::Enter => {
                 // Send if: cursor at end AND (input empty OR ends with empty line)
                 let at_end = state.input_cursor >= state.input.len();
-                let ends_with_empty_line = state.input.ends_with('\n')
-                    || state.input.lines().last().map_or_or(true, true, |l| l.trim().is_empty())   if at_end && ends_with_empty_line {
+                let ends_with_empty_line =
+                    state.input.ends_with('\n') || state.input.lines().last().is_none_or(|l| l.trim().is_empty());
+
+                if at_end && ends_with_empty_line {
                     // Send message
                     Some(Action::InputSubmit)
                 } else {

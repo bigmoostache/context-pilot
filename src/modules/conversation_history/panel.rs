@@ -15,8 +15,7 @@ impl Panel for ConversationHistoryPanel {
             .context
             .get(state.selected_context)
             .filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY)
-            .map(|c| c.name.clone())
-            .unwrap_or_else(|| "Chat History".to_string())
+            .map_or_else(|| "Chat History".to_string(), |c| c.name.clone())
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {

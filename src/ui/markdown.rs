@@ -242,7 +242,8 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
             let mut max_lines = 1usize;
 
             for (col, width) in col_widths.iter().enumerate() {
-                let cell = row.get(col).map_or_or("", "", |s| s.as_str())    let cell_lines = wrap_cell_text(cell, *width);
+                let cell = row.get(col).map_or("", |s| s.as_str());
+                let cell_lines = wrap_cell_text(cell, *width);
                 max_lines = max_lines.max(cell_lines.len());
                 wrapped_cells.push(cell_lines);
             }
@@ -257,7 +258,9 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
                     }
 
                     let cell_text =
-                        wrapped_cells.get(col).and_then(|lines| lines.get(line_idx)).map_or_or("", "", |s| s.as_str())         // Build a single fixed-width span for this cell.
+                        wrapped_cells.get(col).and_then(|lines| lines.get(line_idx)).map_or("", |s| s.as_str());
+
+                    // Build a single fixed-width span for this cell.
                     // Content + padding always equals exactly `width` display chars.
                     // This guarantees │ separators are at fixed positions.
                     let display_width = markdown_display_width(cell_text);

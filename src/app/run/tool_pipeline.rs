@@ -331,9 +331,9 @@ impl App {
         }
     }
 
-    /// Non-blocking check: if a tool requested a sleep (e.g., console_sleep),
+    /// Non-blocking check: if a tool requested a sleep (e.g., `console_sleep`),
     /// wait for the timer to expire, then deprecate tmux panels and continue
-    /// through the normal wait_for_panels → continue_streaming pipeline.
+    /// through the normal `wait_for_panels` → `continue_streaming` pipeline.
     pub(super) fn check_deferred_sleep(&mut self, tx: &Sender<StreamEvent>) {
         if !self.deferred_tool_sleeping {
             return;
@@ -352,7 +352,7 @@ impl App {
     }
 
     /// Non-blocking check: if the user has resolved a pending question form,
-    /// replace the __QUESTION_PENDING__ placeholder with the real answer and
+    /// replace the `__QUESTION_PENDING__` placeholder with the real answer and
     /// resume the tool pipeline (create result message + continue streaming).
     pub(super) fn check_question_form(&mut self, tx: &Sender<StreamEvent>) {
         // Only check if we have pending tool results waiting on a question
@@ -361,7 +361,7 @@ impl App {
         }
 
         // Check if form is resolved
-        let resolved = self.state.get_ext::<cp_base::ui::PendingQuestionForm>().map(|f| f.resolved).unwrap_or(false);
+        let resolved = self.state.get_ext::<cp_base::ui::PendingQuestionForm>().is_some_and(|f| f.resolved);
 
         if !resolved {
             return;
@@ -382,7 +382,7 @@ impl App {
         let mut tool_results = self.pending_question_tool_results.take().unwrap();
         for tr in &mut tool_results {
             if tr.content == "__QUESTION_PENDING__" {
-                tr.content = result_json.clone();
+                tr.content.clone_from(&result_json);
             }
         }
 

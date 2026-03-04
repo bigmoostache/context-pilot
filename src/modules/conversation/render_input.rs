@@ -48,12 +48,15 @@ fn expand_paste_sentinels(
                     let label = paste_buffer_labels.get(idx).and_then(|l| l.as_ref());
                     let display_text = if let Some(cmd_name) = label {
                         // Command: show full content
-                        let content = paste_buffers.get(idx).map_or_or("", "", |s| s.as_str())            format!("{}⚡/{}\n{}{}", PASTE_PLACEHOLDER_START, cmd_name, content, PASTE_PLACEHOLDER_END)
+                        let content = paste_buffers.get(idx).map_or("", |s| s.as_str());
+                        format!("{}⚡/{}\n{}{}", PASTE_PLACEHOLDER_START, cmd_name, content, PASTE_PLACEHOLDER_END)
                     } else {
                         // Paste: show line/token stats
                         let (token_count, line_count) = paste_buffers
                             .get(idx)
-                            .map_or_or((0, 0), (0, 0), |s| (crate::state::estimate_tokens(s), s.lines().count().max(1)))                "{}📋 Paste #{} ({} lines, {} tok){}",
+                            .map_or((0, 0), |s| (crate::state::estimate_tokens(s), s.lines().count().max(1)));
+                        format!(
+                            "{}📋 Paste #{} ({} lines, {} tok){}",
                             PASTE_PLACEHOLDER_START,
                             idx + 1,
                             line_count,
@@ -204,7 +207,8 @@ pub(super) fn render_input(
     // Show hint when next Enter will send
     let at_end = original_cursor >= original_input.len();
     let ends_with_empty_line =
-        original_input.ends_with('\n') || original_input.lines().last().is_some_andsome_and(|l| l.trim().is_empty())l_input.is_empty() && at_end && ends_with_empty_line {
+        original_input.ends_with('\n') || original_input.lines().last().is_some_and(|l| l.trim().is_empty());
+    if !original_input.is_empty() && at_end && ends_with_empty_line {
         lines.push(Line::from(Span::styled("  ↵ Enter to send", Style::default().fg(theme::text_muted()))));
     }
 
@@ -329,7 +333,7 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
         }
 
         // Split cmd_part and rest_part by cursor_char for cursor rendering
-        #[expect(clippy::items_after_statements, reason = "scoped helper used only within this branch")]
+        #[expect(clippy::items_after_statements, reason = "helper scoped to calling function")]
         fn push_with_cursor(spans: &mut Vec<Span<'static>>, text: &str, cursor_char: &str, color: Color) {
             if text.contains(cursor_char) {
                 let parts: Vec<&str> = text.splitn(2, cursor_char).collect();

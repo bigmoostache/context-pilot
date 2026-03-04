@@ -48,14 +48,14 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
     crate::state::format_messages_to_chunk(&messages[start..end])
 }
 
-/// Detach oldest conversation messages into frozen ConversationHistory panels
+/// Detach oldest conversation messages into frozen `ConversationHistory` panels
 /// when the active conversation exceeds thresholds.
 ///
 /// All four constraints must be met to detach:
-/// 1. Chunk has >= DETACH_CHUNK_MIN_MESSAGES active messages
-/// 2. Chunk has >= DETACH_CHUNK_MIN_TOKENS estimated tokens
-/// 3. Remaining tip keeps >= DETACH_KEEP_MIN_MESSAGES active messages
-/// 4. Remaining tip keeps >= DETACH_KEEP_MIN_TOKENS estimated tokens
+/// 1. Chunk has >= `DETACH_CHUNK_MIN_MESSAGES` active messages
+/// 2. Chunk has >= `DETACH_CHUNK_MIN_TOKENS` estimated tokens
+/// 3. Remaining tip keeps >= `DETACH_KEEP_MIN_MESSAGES` active messages
+/// 4. Remaining tip keeps >= `DETACH_KEEP_MIN_TOKENS` estimated tokens
 pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
     loop {
         // 1. Count active (non-Deleted, non-Detached) messages and total tokens
@@ -126,14 +126,12 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
         let first_timestamp = state.messages[..boundary]
             .iter()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| m.timestamp_ms)
-            .unwrap_or(0);
+            .map_or(0, |m| m.timestamp_ms);
         let last_timestamp = state.messages[..boundary]
             .iter()
             .rev()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .map(|m| m.timestamp_ms)
-            .unwrap_or(0);
+            .map_or(0, |m| m.timestamp_ms);
 
         // 5. Collect Message objects for UI rendering + format chunk content for LLM
         let history_msgs: Vec<Message> = state.messages[..boundary]

@@ -172,12 +172,14 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                         state.input_cursor = scan;
                     } else {
                         // Not a sentinel — normal backspace
-                        let prev = state.input[..state.input_cursor].char_indices().last().map_or_or(0, 0, |(i, _)| i)             let _r = state.input.remove(prev);
+                        let prev = state.input[..state.input_cursor].char_indices().last().map_or(0, |(i, _)| i);
+                        let _r = state.input.remove(prev);
                         state.input_cursor = prev;
                     }
                 } else {
                     // Normal backspace — remove one character
-                    let prev = state.input[..state.input_cursor].char_indices().last().map_or_or(0, 0, |(i, _)| i)         let _r = state.input.remove(prev);
+                    let prev = state.input[..state.input_cursor].char_indices().last().map_or(0, |(i, _)| i);
+                    let _r = state.input.remove(prev);
                     state.input_cursor = prev;
                 }
             }
@@ -196,7 +198,8 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 if trimmed.is_empty() {
                     state.input_cursor = 0;
                 } else {
-                    let word_start = trimmed.rfind(|c: char| c.is_whitespace()).map_or_or(0, 0, |i| i + 1)         state.input_cursor = word_start;
+                    let word_start = trimmed.rfind(|c: char| c.is_whitespace()).map_or(0, |i| i + 1);
+                    state.input_cursor = word_start;
                 }
                 state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
             }
@@ -220,7 +223,8 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 let word_start = if trimmed.is_empty() {
                     0
                 } else {
-                    trimmed.rfind(|c: char| c.is_whitespace()).map_or_or(0, 0, |i| i + 1)    };
+                    trimmed.rfind(|c: char| c.is_whitespace()).map_or(0, |i| i + 1)
+                };
                 state.input = format!("{}{}", &state.input[..word_start], &state.input[state.input_cursor..]);
                 state.input_cursor = word_start;
             }
@@ -229,14 +233,16 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::RemoveListItem => {
             if state.input_cursor > 0 {
                 let before = &state.input[..state.input_cursor];
-                let line_start = before.rfind('\n').map_or_or(0, 0, |i| i + 1)     state.input = format!("{}{}", &state.input[..line_start], &state.input[state.input_cursor..]);
+                let line_start = before.rfind('\n').map_or(0, |i| i + 1);
+                state.input = format!("{}{}", &state.input[..line_start], &state.input[state.input_cursor..]);
                 state.input_cursor = line_start;
             }
             ActionResult::Nothing
         }
         Action::CursorHome => {
             let before_cursor = &state.input[..state.input_cursor];
-            state.input_cursor = before_cursor.rfind('\n').map_or_or(0, 0, |i| i + 1) state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
+            state.input_cursor = before_cursor.rfind('\n').map_or(0, |i| i + 1);
+            state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
             ActionResult::Nothing
         }
         Action::CursorEnd => {

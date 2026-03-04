@@ -121,7 +121,11 @@ fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let context_type = state
         .context
         .get(state.selected_context)
-        .map_or_or(ContextType::new(ContextType::CONVERSATION), ContextType::new(ContextType::CONVERSATION), |c| c.context_type.clone())versationPanel overrides render() with custom scrollbar + caching.
+        .map_or(ContextType::new(ContextType::CONVERSATION), |c| c.context_type.clone());
+
+    let panel = panels::get_panel(&context_type);
+
+    // ConversationPanel overrides render() with custom scrollbar + caching.
     // All other panels use render_panel_default (which calls panel.content()).
     if context_type == ContextType::CONVERSATION {
         panel.render(frame, state, area);

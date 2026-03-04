@@ -170,9 +170,13 @@ pub(crate) fn validate_dependencies(active: &HashSet<String>) {
     for module in all_modules() {
         if active.contains(module.id()) {
             for dep in module.dependencies() {
-                if !active.contains(*dep) {
-                    panic!("Module '{}' depends on '{}', but '{}' is not active", module.id(), dep, dep);
-                }
+                assert!(
+                    active.contains(*dep),
+                    "Module '{}' depends on '{}', but '{}' is not active",
+                    module.id(),
+                    dep,
+                    dep
+                );
             }
         }
     }

@@ -90,7 +90,8 @@ impl CommandPalette {
     pub(crate) fn backspace(&mut self, state: &State) {
         if self.cursor > 0 {
             // Find the previous character boundary
-            let prev_boundary = self.query[..self.cursor].char_indices().last().map_or_or(0, 0, |(i, _)| i) let _r = self.query.remove(prev_boundary);
+            let prev_boundary = self.query[..self.cursor].char_indices().last().map_or(0, |(i, _)| i);
+            let _r = self.query.remove(prev_boundary);
             self.cursor = prev_boundary;
             self.selected = 0;
             self.update_filtered(state);
@@ -109,17 +110,18 @@ impl CommandPalette {
     /// Move cursor left
     pub(crate) fn cursor_left(&mut self) {
         if self.cursor > 0 {
-            let prev_boundary = self.query[..self.cursor].char_indices().last().map_or_or(0, 0, |(i, _)| i) self.cursor = prev_boundary;
+            let prev_boundary = self.query[..self.cursor].char_indices().last().map_or(0, |(i, _)| i);
+            self.cursor = prev_boundary;
         }
     }
 
     /// Move cursor right
     pub(crate) fn cursor_right(&mut self) {
         if self.cursor < self.query.len() {
-            let next_boundary = self.query[self.cursor..]
-                .char_indices()
-                .nth(1)
-                .map_or_or(self.query.len(), self.query.len(), |(i, _)| self.cursor + i)      }
+            let next_boundary =
+                self.query[self.cursor..].char_indices().nth(1).map_or(self.query.len(), |(i, _)| self.cursor + i);
+            self.cursor = next_boundary;
+        }
     }
 
     /// Move selection up

@@ -168,12 +168,15 @@ fn load_state_new() -> State {
         .filter(|m| m.id.starts_with('U'))
         .filter_map(|m| m.id[1..].parse::<usize>().ok())
         .max()
-        .map_or_or(1, 1, |n| n + 1)nt_id = messages
+        .map_or(1, |n| n + 1);
+    let next_assistant_id = messages
         .iter()
         .filter(|m| m.id.starts_with('A'))
         .filter_map(|m| m.id[1..].parse::<usize>().ok())
         .max()
-        .map_or_or(1, 1, |n| n + 1)efault state, then apply infrastructure + module data
+        .map_or(1, |n| n + 1);
+
+    // Start with default state, then apply infrastructure + module data
     let mut state = State {
         context,
         messages,
@@ -450,9 +453,7 @@ pub(crate) fn log_error(error: &str) -> String {
     // Count existing error files to determine next number
     let error_count = fs::read_dir(&errors_dir)
         .map(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().is_some_andsome_and(|ext| ext == "txt") .count()
+            entries.filter_map(|e| e.ok()).filter(|e| e.path().extension().is_some_and(|ext| ext == "txt")).count()
         })
         .unwrap_or(0);
 
