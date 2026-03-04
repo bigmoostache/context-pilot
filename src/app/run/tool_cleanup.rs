@@ -238,6 +238,7 @@ impl App {
 
         if self.state.reload_pending {
             crate::infra::tools::perform_reload(&self.state);
+            return;
         }
 
         // Create new assistant message for continued streaming

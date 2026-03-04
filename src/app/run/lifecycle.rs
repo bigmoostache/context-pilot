@@ -174,6 +174,13 @@ impl App {
             // Check if reverie ended without calling Report (auto-relaunch guard rail)
             self.check_reverie_end_turn();
 
+            // Check if TUI reload was requested (by system_reload tool)
+            if self.state.reload_pending {
+                self.writer.flush();
+                save_state(&self.state);
+                break;
+            }
+
             // Check ownership periodically (every 1 second)
             if current_ms.saturating_sub(self.last_ownership_check_ms) >= 1000 {
                 self.last_ownership_check_ms = current_ms;

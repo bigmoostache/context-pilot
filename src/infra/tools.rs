@@ -21,16 +21,14 @@ pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResul
     ToolResult::new(tool.id.clone(), "Reload initiated. Restarting TUI...".to_string(), false)
 }
 
-/// Perform the actual TUI reload (called from app.rs after tool result is saved)
-#[expect(clippy::exit, reason = "process exit is intentional here")]
+/// Set the reload flag in config.json so `run.sh` restarts the TUI.
+///
+/// Callers must `return` immediately after — the main event loop checks
+/// `state.reload_pending` and exits cleanly through `main()`.
+/// Terminal cleanup is handled by `main()` on normal return.
 pub(crate) fn perform_reload(state: &State) {
     use crate::state::persistence::save_state;
-    use crossterm::{
-        execute,
-        terminal::{LeaveAlternateScreen, disable_raw_mode},
-    };
     use std::fs;
-    use std::io::stdout;
 
     let config_path = ".context-pilot/config.json";
 
@@ -39,23 +37,14 @@ pub(crate) fn perform_reload(state: &State) {
 
     // Read config, set reload_requested to true, and save
     if let Ok(json) = fs::read_to_string(config_path) {
-        // Simple string replacement to set reload_requested: true
         let updated = if json.contains("\"reload_requested\":") {
             json.replace("\"reload_requested\": false", "\"reload_requested\": true")
                 .replace("\"reload_requested\":false", "\"reload_requested\":true")
         } else {
-            // Add the field before the final }
             let mut s = json.trim_end().trim_end_matches('}').to_string();
             s.push_str(",\n  \"reload_requested\": true\n}");
             s
         };
         let _r = fs::write(config_path, updated);
     }
-
-    // Clean up terminal
-    let _r = disable_raw_mode();
-    let _r = execute!(stdout(), LeaveAlternateScreen);
-
-    // Exit - the run.sh supervisor will see reload_requested and restart
-    std::process::exit(0);
 }

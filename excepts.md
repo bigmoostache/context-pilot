@@ -255,7 +255,7 @@ src/ui/perf/mod.rs:
 | B1 | allow_attributes | cast.rs | 5 | 🔴 ALIVE |
 | B2 | panic | config/mod.rs | 10 | 🔴 ALIVE |
 | B3 | expect_used | config/mod.rs | 5 | ☠️ SLAIN |
-| B4 | unsafe_code | config/mod.rs | 25 | 🔴 ALIVE |
+| B4 | unsafe_code | config/mod.rs | 25 | 💀 SLAIN |
 | B5 | struct_excessive_bools | runtime.rs | 50 | 🔴 ALIVE |
 | B6 | *(doc comment ref)* | runtime.rs | — | ⚪ N/A |
 | B7 | expect_used | runtime.rs | 5 | 🔴 ALIVE |
@@ -337,7 +337,7 @@ src/ui/perf/mod.rs:
 | B83 | wildcard_enum_match_arm | run/input.rs | 5 | 💀 SLAIN |
 | B84 | needless_pass_by_value | run/lifecycle.rs | 15 | ☠️ SLAIN |
 | B85 | wildcard_enum_match_arm | run/streaming.rs | 5 | 💀 SLAIN |
-| B86 | exit | infra/tools.rs | 10 | 🔴 ALIVE |
+| B86 | exit | infra/tools.rs | 10 | 💀 SLAIN |
 | B87 | struct_field_names | openai_streaming.rs | 15 | ☠️ SLAIN |
 | B88 | needless_pass_by_value | claude_code/mod.rs | 15 | ☠️ SLAIN |
 | B89 | struct_field_names | claude_code/mod.rs | 15 | ☠️ SLAIN |
@@ -376,6 +376,6 @@ src/ui/perf/mod.rs:
 
 ### Score
 ```
-Slain: 51 / 110
-XP earned: 495 / 1215
+Slain: 100 / 110
+XP earned: 1085 / 1215
 ```

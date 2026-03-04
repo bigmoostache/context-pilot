@@ -418,40 +418,55 @@ pub fn get_theme(theme_id: &str) -> Option<&'static Theme> {
 }
 
 // ============================================================================
-// Active Theme (Global State — cached atomic pointer for zero-cost access)
+// Active Theme (Global State — index-based lookup, fully safe)
 // ============================================================================
 
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 
-/// Cached pointer to the active theme. Updated by `set_active_theme()`.
-/// Points into the static THEMES `LazyLock`, so the reference is always valid.
-static CACHED_THEME: AtomicPtr<Theme> = AtomicPtr::new(std::ptr::null_mut());
+/// Index into [`THEME_ORDER`] for the active theme.
+/// `u8::MAX` = not yet set (uses [`DEFAULT_THEME`] on first access).
+static CACHED_THEME_IDX: AtomicU8 = AtomicU8::new(u8::MAX);
 
-/// Set the active theme ID (call when state is loaded or theme changes)
+/// Resolve a theme-order index to its theme reference.
+fn theme_by_index(idx: u8) -> Option<&'static Theme> {
+    THEME_ORDER.get(idx as usize).and_then(|id| THEMES.themes.get(*id))
+}
+
+/// Find the index of `theme_id` in [`THEME_ORDER`], or `None` if absent.
+fn theme_index(theme_id: &str) -> Option<u8> {
+    THEME_ORDER.iter().position(|&id| id == theme_id).and_then(|i| u8::try_from(i).ok())
+}
+
+/// Set the active theme ID (call when state is loaded or theme changes).
 pub fn set_active_theme(theme_id: &str) {
-    if let Some(theme) = get_theme(theme_id) {
-        CACHED_THEME.store(std::ptr::from_ref(theme).cast_mut(), Ordering::Release);
+    if let Some(idx) = theme_index(theme_id) {
+        CACHED_THEME_IDX.store(idx, Ordering::Release);
     }
 }
 
-/// Get the currently active theme (single atomic load — no locking, no allocation)
-#[expect(unsafe_code, reason = "atomic pointer deref from static LazyLock — always valid")]
+/// Get the currently active theme (atomic load + `HashMap` lookup — no unsafe).
+///
+/// Falls back to the default theme, then to any available theme. Panics only
+/// if `themes.yaml` is completely empty (compile-time bug).
+///
+/// # Panics
+///
+/// Panics if the themes map contains zero entries.
+#[expect(clippy::expect_used, reason = "themes.yaml is embedded at compile time — empty map is a build-time bug")]
 pub fn active_theme() -> &'static Theme {
-    let ptr = CACHED_THEME.load(Ordering::Acquire);
-    if ptr.is_null() {
+    let idx = CACHED_THEME_IDX.load(Ordering::Acquire);
+    if idx == u8::MAX {
         // First call before set_active_theme — initialize from default
-        get_theme(DEFAULT_THEME).map_or_else(
-            // SAFETY: THEMES is always non-empty — themes.yaml is embedded at compile time
-            || unsafe { THEMES.themes.values().next().unwrap_unchecked() },
-            |t| {
-                CACHED_THEME.store(std::ptr::from_ref(t).cast_mut(), Ordering::Release);
-                t
-            },
-        )
+        let default_idx = theme_index(DEFAULT_THEME);
+        if let Some(di) = default_idx {
+            CACHED_THEME_IDX.store(di, Ordering::Release);
+        }
+        default_idx
+            .and_then(theme_by_index)
+            .or_else(|| THEMES.themes.values().next())
+            .expect("themes.yaml has no themes")
     } else {
-        // SAFETY: ptr was set from a &'static Theme reference stored in LazyLock THEMES.
-        // The Theme data is never mutated or freed after initialization.
-        unsafe { &*ptr }
+        theme_by_index(idx).or_else(|| THEMES.themes.values().next()).expect("themes.yaml has no themes")
     }
 }
 

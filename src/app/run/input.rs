@@ -269,9 +269,9 @@ impl App {
                     match id.as_str() {
                         "quit" => return None, // Signal quit
                         "reload" => {
-                            // Perform reload (sets reload_requested flag and exits)
+                            self.state.reload_pending = true;
                             perform_reload(&self.state);
-                            return None; // Won't reach here, but needed for type system
+                            return None;
                         }
                         "config" => return Some(Action::ToggleConfigView),
                         _ => {

@@ -248,10 +248,10 @@ impl App {
         self.save_message_async(&result_msg);
         self.state.messages.push(result_msg);
 
-        // Check if reload was requested - perform it after tool result is saved
+        // Check if reload was requested - exit pipeline, main loop will break
         if self.state.reload_pending {
             perform_reload(&self.state);
-            // Note: perform_reload calls std::process::exit(0), so we won't reach here
+            return;
         }
 
         // Create new assistant message
@@ -423,6 +423,7 @@ impl App {
         // Check if reload was requested
         if self.state.reload_pending {
             perform_reload(&self.state);
+            return;
         }
 
         // Create new assistant message for continued streaming
