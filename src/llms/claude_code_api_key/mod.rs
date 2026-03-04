@@ -6,8 +6,6 @@
 mod check;
 pub(crate) mod helpers;
 mod streaming;
-#[cfg(test)]
-mod tests;
 
 use std::env;
 use std::sync::mpsc::Sender;

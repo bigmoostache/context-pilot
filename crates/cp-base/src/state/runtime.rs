@@ -264,6 +264,28 @@ impl State {
         self.module_data.get_mut(&TypeId::of::<T>()).and_then(|v| v.downcast_mut())
     }
 
+    /// Get module state by type, panicking if not initialized.
+    ///
+    /// Prefer this over `get_ext().expect()` — the panic lives here once,
+    /// so callers don't need `#[expect(clippy::expect_used)]`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
+    #[must_use]
+    pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
+        self.get_ext::<T>().expect("module state not initialized — was init_state() called?")
+    }
+
+    /// Get mutable module state by type, panicking if not initialized.
+    ///
+    /// # Panics
+    ///
+    /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
+    pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
+        self.get_ext_mut::<T>().expect("module state not initialized — was init_state() called?")
+    }
+
     /// Set module-owned state by type. Replaces any existing value of this type.
     pub fn set_ext<T: 'static + Send + Sync>(&mut self, val: T) {
         drop(self.module_data.insert(TypeId::of::<T>(), Box::new(val)));

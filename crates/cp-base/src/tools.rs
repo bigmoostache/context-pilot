@@ -14,6 +14,18 @@ pub struct ToolTexts {
     pub tools: HashMap<String, ToolText>,
 }
 
+impl ToolTexts {
+    /// Parse a tool YAML string into `ToolTexts`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the YAML is malformed — only used on compile-time-embedded content.
+    #[must_use]
+    pub fn parse(yaml: &str) -> Self {
+        serde_yaml::from_str(yaml).expect("embedded tool YAML is malformed")
+    }
+}
+
 /// LLM-facing text for a single tool: description + parameter descriptions.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ToolText {

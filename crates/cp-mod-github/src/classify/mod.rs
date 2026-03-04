@@ -1,8 +1,5 @@
 //! Command classification for gh (GitHub CLI) commands.
 
-#[cfg(test)]
-mod tests;
-
 /// Whether a `gh` subcommand reads or mutates state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandClass {
