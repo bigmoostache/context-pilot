@@ -377,9 +377,21 @@ pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea
 // ============================================================================
 
 /// Deserialize a YAML string into `T`, panicking with a descriptive message on failure.
-#[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
-fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
-    serde_yaml::from_str(content).unwrap_or_else(|e| panic!("Failed to parse {name}: {e}"))
+///
+/// All YAML embedded via `include_str!` is validated by tests in `lib.rs`.
+/// This panic is the belt-and-suspenders runtime guard — it should never fire
+/// in a correctly-built binary.
+pub fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
+    serde_yaml::from_str(content).unwrap_or_else(|e| yaml_invariant_panic(&format!("Failed to parse {name}: {e}")))
+}
+
+/// Panic for YAML/config invariant violations.
+///
+/// Centralizes `clippy::panic` suppression — all compile-time-embedded config
+/// invariant panics route through here. One `#[expect]` to rule them all.
+#[expect(clippy::panic, reason = "invariant violation is unrecoverable — validated by tests")]
+pub fn yaml_invariant_panic(msg: &str) -> ! {
+    panic!("{msg}")
 }
 
 // ============================================================================

@@ -21,16 +21,11 @@ pub struct ToolTexts {
 impl ToolTexts {
     /// Parse a tool YAML string into `ToolTexts`.
     ///
-    /// # Panics
-    ///
-    /// Panics if the YAML is malformed — only used on compile-time-embedded content.
+    /// Delegates to [`config::parse_yaml`](crate::config::parse_yaml) — all panic
+    /// handling lives in one place.
     #[must_use]
-    #[expect(
-        clippy::expect_used,
-        reason = "centralized panic — callers use ToolTexts::parse() to avoid per-site #[expect]"
-    )]
     pub fn parse(yaml: &str) -> Self {
-        serde_yaml::from_str(yaml).expect("embedded tool YAML is malformed")
+        crate::config::parse_yaml("tool YAML", yaml)
     }
 }
 
@@ -231,17 +226,18 @@ pub struct ToolDefinition {
 // =============================================================================
 
 impl ToolDefinition {
-    /// Start building a [`ToolDefinition`] from YAML text. Panics if the tool ID is missing.
+    /// Start building a [`ToolDefinition`] from YAML text.
     ///
     /// # Panics
     ///
-    /// Panics if an unexpected state is encountered.
+    /// Panics via [`yaml_invariant_panic`](crate::config::yaml_invariant_panic) if
+    /// the tool ID is missing — indicates a code/YAML mismatch caught during development.
     #[must_use]
-    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     pub fn from_yaml<'a>(id: &str, texts: &'a ToolTexts) -> ToolDefBuilder<'a> {
-        let text = texts.tools.get(id).unwrap_or_else(|| {
-            panic!("Tool '{id}' not found in YAML");
-        });
+        let text = texts
+            .tools
+            .get(id)
+            .unwrap_or_else(|| crate::config::yaml_invariant_panic(&format!("Tool '{id}' not found in YAML")));
         ToolDefBuilder {
             id: id.to_string(),
             description: text.description.trim().to_string(),
