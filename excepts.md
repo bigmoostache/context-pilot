@@ -254,7 +254,7 @@ src/ui/perf/mod.rs:
 |------|------|------|----|--------|
 | B1 | allow_attributes | cast.rs | 5 | 🔴 ALIVE |
 | B2 | panic | config/mod.rs | 10 | 🔴 ALIVE |
-| B3 | expect_used | config/mod.rs | 5 | 🔴 ALIVE |
+| B3 | expect_used | config/mod.rs | 5 | ☠️ SLAIN |
 | B4 | unsafe_code | config/mod.rs | 25 | 🔴 ALIVE |
 | B5 | struct_excessive_bools | runtime.rs | 50 | 🔴 ALIVE |
 | B6 | *(doc comment ref)* | runtime.rs | — | ⚪ N/A |
@@ -263,9 +263,9 @@ src/ui/perf/mod.rs:
 | B9 | needless_pass_by_value | runtime.rs | 15 | 💀 SLAIN |
 | B10 | expect_used | tools/mod.rs | 5 | 🔴 ALIVE |
 | B11 | panic | tools/mod.rs | 10 | 🔴 ALIVE |
-| B12 | expect_used | brave/api.rs | 5 | 🔴 ALIVE |
+| B12 | expect_used | brave/api.rs | 5 | ☠️ SLAIN |
 | B13 | wildcard_enum_match_arm | brave/panel.rs | 5 | 💀 SLAIN |
-| B14 | expect_used | callback/lib.rs | 5 | 🔴 ALIVE |
+| B14 | expect_used | callback/lib.rs | 5 | ☠️ SLAIN |
 | B15 | print_stderr | console/lib.rs | 5 | 🔴 ALIVE |
 | B16 | print_stderr | console/lib.rs | 5 | 🔴 ALIVE |
 | B17 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
@@ -288,74 +288,74 @@ src/ui/perf/mod.rs:
 | B34 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B35 | significant_drop_tightening | server/main.rs | 20 | 💀 SLAIN |
 | B36 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
-| B37 | needless_pass_by_value | server/main.rs | 15 | 🔴 ALIVE |
+| B37 | needless_pass_by_value | server/main.rs | 15 | ☠️ SLAIN |
 | B38 | significant_drop_tightening | server/main.rs | 20 | 💀 SLAIN |
 | B39 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B40 | exit | server/main.rs | 10 | 🔴 ALIVE |
 | B41 | print_stderr | server/main.rs | 5 | 🔴 ALIVE |
-| B42 | expect_used | server/main.rs | 5 | 🔴 ALIVE |
+| B42 | expect_used | server/main.rs | 5 | ☠️ SLAIN |
 | B43 | unsafe_code | server/main.rs | 25 | 🔴 ALIVE |
 | B44 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B45 | wildcard_enum_match_arm | files/panel.rs | 5 | 💀 SLAIN |
-| B46 | expect_used | firecrawl/api.rs | 5 | 🔴 ALIVE |
-| B47 | expect_used | firecrawl/lib.rs | 5 | 🔴 ALIVE |
+| B46 | expect_used | firecrawl/api.rs | 5 | ☠️ SLAIN |
+| B47 | expect_used | firecrawl/lib.rs | 5 | ☠️ SLAIN |
 | B48 | wildcard_enum_match_arm | firecrawl/panel.rs | 5 | 💀 SLAIN |
-| B49 | expect_used | git/cache_invalidation.rs | 5 | 🔴 ALIVE |
-| B50 | expect_used | git/lib.rs | 5 | 🔴 ALIVE |
+| B49 | expect_used | git/cache_invalidation.rs | 5 | ☠️ SLAIN |
+| B50 | expect_used | git/lib.rs | 5 | ☠️ SLAIN |
 | B51 | wildcard_enum_match_arm | git/result_panel.rs | 5 | 💀 SLAIN |
 | B52 | wildcard_enum_match_arm | git/result_panel.rs | 5 | 💀 SLAIN |
-| B53 | expect_used | github/cache_invalidation.rs | 5 | 🔴 ALIVE |
+| B53 | expect_used | github/cache_invalidation.rs | 5 | ☠️ SLAIN |
 | B54 | wildcard_enum_match_arm | github/panel.rs | 5 | 💀 SLAIN |
 | B55 | wildcard_enum_match_arm | github/panel.rs | 5 | 💀 SLAIN |
-| B56 | needless_pass_by_value | github/watcher.rs | 15 | 🔴 ALIVE |
+| B56 | needless_pass_by_value | github/watcher.rs | 15 | ☠️ SLAIN |
 | B57 | wildcard_enum_match_arm | memory/panel.rs | 5 | 💀 SLAIN |
 | B58 | print_stderr | preset/builtin.rs | 5 | 🔴 ALIVE |
 | B59 | print_stderr | preset/builtin.rs | 5 | 🔴 ALIVE |
-| B60 | struct_field_names | preset/lib.rs | 15 | 🔴 ALIVE |
+| B60 | struct_field_names | preset/lib.rs | 15 | ☠️ SLAIN |
 | B61 | expect_used | queue/types.rs | 5 | 🔴 ALIVE |
 | B62 | expect_used | queue/types.rs | 5 | 🔴 ALIVE |
-| B63 | expect_used | scratchpad/lib.rs | 5 | 🔴 ALIVE |
+| B63 | expect_used | scratchpad/lib.rs | 5 | ☠️ SLAIN |
 | B64 | wildcard_enum_match_arm | scratchpad/panel.rs | 5 | 💀 SLAIN |
 | B65 | wildcard_enum_match_arm | spine/panel.rs | 5 | 💀 SLAIN |
 | B66 | wildcard_enum_match_arm | todo/panel.rs | 5 | 💀 SLAIN |
 | B67 | wildcard_enum_match_arm | tree/panel.rs | 5 | 💀 SLAIN |
-| B68 | print_stdout | main.rs | 5 | 🔴 ALIVE |
-| B69 | print_stderr | main.rs | 5 | 🔴 ALIVE |
-| B70 | exit | main.rs | 10 | 🔴 ALIVE |
-| B71 | print_stdout | main.rs | 5 | 🔴 ALIVE |
-| B72 | print_stderr | main.rs | 5 | 🔴 ALIVE |
-| B73 | exit | main.rs | 10 | 🔴 ALIVE |
+| B68 | print_stdout | main.rs | 5 | ☠️ SLAIN |
+| B69 | print_stderr | main.rs | 5 | ☠️ SLAIN |
+| B70 | exit | main.rs | 10 | ☠️ SLAIN |
+| B71 | print_stdout | main.rs | 5 | ☠️ SLAIN |
+| B72 | print_stderr | main.rs | 5 | ☠️ SLAIN |
+| B73 | exit | main.rs | 10 | ☠️ SLAIN |
 | B74 | wildcard_enum_match_arm | events.rs | 5 | 💀 SLAIN |
 | B75 | wildcard_enum_match_arm | events.rs | 5 | 💀 SLAIN |
 | B76 | wildcard_enum_match_arm | actions/config.rs | 5 | 💀 SLAIN |
-| B77 | expect_used | actions/helpers.rs | 5 | 🔴 ALIVE |
-| B78 | expect_used | actions/helpers.rs | 5 | 🔴 ALIVE |
+| B77 | expect_used | actions/helpers.rs | 5 | ☠️ SLAIN |
+| B78 | expect_used | actions/helpers.rs | 5 | ☠️ SLAIN |
 | B79 | needless_pass_by_value | context/mod.rs | 15 | 💀 SLAIN |
 | B80 | wildcard_enum_match_arm | run/input.rs | 5 | 💀 SLAIN |
 | B81 | branches_sharing_code | run/input.rs | 40 | 💀 SLAIN |
 | B82 | wildcard_enum_match_arm | run/input.rs | 5 | 💀 SLAIN |
 | B83 | wildcard_enum_match_arm | run/input.rs | 5 | 💀 SLAIN |
-| B84 | needless_pass_by_value | run/lifecycle.rs | 15 | 🔴 ALIVE |
+| B84 | needless_pass_by_value | run/lifecycle.rs | 15 | ☠️ SLAIN |
 | B85 | wildcard_enum_match_arm | run/streaming.rs | 5 | 💀 SLAIN |
 | B86 | exit | infra/tools.rs | 10 | 🔴 ALIVE |
-| B87 | struct_field_names | openai_streaming.rs | 15 | 🔴 ALIVE |
-| B88 | needless_pass_by_value | claude_code/mod.rs | 15 | 🔴 ALIVE |
-| B89 | struct_field_names | claude_code/mod.rs | 15 | 🔴 ALIVE |
-| B90 | needless_pass_by_value | claude_code/stream.rs | 15 | 🔴 ALIVE |
-| B91 | needless_pass_by_value | claude_code_api_key/helpers.rs | 15 | 🔴 ALIVE |
-| B92 | struct_field_names | claude_code_api_key/streaming.rs | 15 | 🔴 ALIVE |
-| B93 | expect_used | modules/mod.rs | 5 | 🔴 ALIVE |
-| B94 | expect_used | modules/mod.rs | 5 | 🔴 ALIVE |
+| B87 | struct_field_names | openai_streaming.rs | 15 | ☠️ SLAIN |
+| B88 | needless_pass_by_value | claude_code/mod.rs | 15 | ☠️ SLAIN |
+| B89 | struct_field_names | claude_code/mod.rs | 15 | ☠️ SLAIN |
+| B90 | needless_pass_by_value | claude_code/stream.rs | 15 | ☠️ SLAIN |
+| B91 | needless_pass_by_value | claude_code_api_key/helpers.rs | 15 | ☠️ SLAIN |
+| B92 | struct_field_names | claude_code_api_key/streaming.rs | 15 | ☠️ SLAIN |
+| B93 | expect_used | modules/mod.rs | 5 | ☠️ SLAIN |
+| B94 | expect_used | modules/mod.rs | 5 | ☠️ SLAIN |
 | B95 | wildcard_enum_match_arm | conversation/panel.rs | 5 | 💀 SLAIN |
 | B96 | wildcard_enum_match_arm | conversation/render.rs | 5 | 💀 SLAIN |
 | B97 | branches_sharing_code | conversation/render.rs | 40 | 💀 SLAIN |
 | B98 | wildcard_enum_match_arm | overview/panel.rs | 5 | 💀 SLAIN |
 | B99 | wildcard_enum_match_arm | overview/tools_panel.rs | 5 | 💀 SLAIN |
-| B100 | expect_used | questions/mod.rs | 5 | 🔴 ALIVE |
+| B100 | expect_used | questions/mod.rs | 5 | ☠️ SLAIN |
 | B101 | print_stderr | persistence/mod.rs | 5 | 🔴 ALIVE |
-| B102 | expect_used | persistence/writer.rs | 5 | 🔴 ALIVE |
+| B102 | expect_used | persistence/writer.rs | 5 | ☠️ SLAIN |
 | B103 | significant_drop_tightening | persistence/writer.rs | 20 | 🔴 ALIVE |
-| B104 | needless_pass_by_value | persistence/writer.rs | 15 | 🔴 ALIVE |
+| B104 | needless_pass_by_value | persistence/writer.rs | 15 | ☠️ SLAIN |
 | B105 | significant_drop_tightening | persistence/writer.rs | 20 | 🔴 ALIVE |
 | B106 | print_stderr | persistence/writer.rs | 5 | 🔴 ALIVE |
 | B107 | print_stderr | persistence/writer.rs | 5 | 🔴 ALIVE |
@@ -376,6 +376,6 @@ src/ui/perf/mod.rs:
 
 ### Score
 ```
-Slain: 45 / 110
-XP earned: 525 / 1210
+Slain: 33 / 110
+XP earned: 285 / 1205
 ```

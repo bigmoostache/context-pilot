@@ -414,11 +414,7 @@ pub static REVERIE: LazyLock<ReverieConfig> =
 /// Returns `None` only if the themes map is completely empty (compile-time bug).
 #[must_use]
 pub fn get_theme(theme_id: &str) -> Option<&'static Theme> {
-    THEMES
-        .themes
-        .get(theme_id)
-        .or_else(|| THEMES.themes.get(DEFAULT_THEME))
-        .or_else(|| THEMES.themes.values().next())
+    THEMES.themes.get(theme_id).or_else(|| THEMES.themes.get(DEFAULT_THEME)).or_else(|| THEMES.themes.values().next())
 }
 
 // ============================================================================

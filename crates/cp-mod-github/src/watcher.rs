@@ -90,7 +90,7 @@ impl GhWatcher {
         let branch_pr_clone = Arc::clone(&branch_pr_watch);
 
         let thread = thread::spawn(move || {
-            poll_loop(watches_clone, branch_pr_clone, cache_tx);
+            GhPollLoop { watches: watches_clone, branch_pr_watch: branch_pr_clone, cache_tx }.run();
         });
 
         Self { watches, branch_pr_watch, _thread: thread }
@@ -170,121 +170,126 @@ pub fn is_api_command(args: &[String]) -> bool {
         && !args.iter().any(|a| a == "--jq" || a == "-q" || a == "--template" || a == "-t")
 }
 
-/// Background polling loop.
-#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
-fn poll_loop(
+/// Background polling loop state. Owns the shared data for `thread::spawn`.
+struct GhPollLoop {
     watches: Arc<Mutex<HashMap<String, GhWatch>>>,
     branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,
     cache_tx: Sender<CacheUpdate>,
-) -> ! {
-    loop {
-        thread::sleep(std::time::Duration::from_secs(GH_WATCHER_TICK_SECS));
+}
 
-        let current_ms = now_ms();
+impl GhPollLoop {
+    /// Consume self and poll forever. Designed for `thread::spawn`.
+    fn run(self) -> ! {
+        let Self { watches, branch_pr_watch, cache_tx } = self;
+        loop {
+            thread::sleep(std::time::Duration::from_secs(GH_WATCHER_TICK_SECS));
 
-        // === Poll branch PR ===
-        {
-            let snapshot = {
-                let watch = branch_pr_watch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                watch.as_ref().and_then(|w| {
-                    if current_ms.saturating_sub(w.last_poll_ms) >= GH_DEFAULT_POLL_INTERVAL_SECS * 1000 {
-                        Some((w.branch.clone(), Arc::clone(&w.github_token), w.last_output_hash.clone()))
-                    } else {
-                        None
-                    }
-                })
-            };
+            let current_ms = now_ms();
 
-            if let Some((branch, token, last_hash)) = snapshot {
-                let token_str = token.expose_secret();
-                let result = poll_branch_pr(&branch, token_str, last_hash.as_deref());
+            // === Poll branch PR ===
+            {
+                let snapshot = {
+                    let watch = branch_pr_watch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                    watch.as_ref().and_then(|w| {
+                        if current_ms.saturating_sub(w.last_poll_ms) >= GH_DEFAULT_POLL_INTERVAL_SECS * 1000 {
+                            Some((w.branch.clone(), Arc::clone(&w.github_token), w.last_output_hash.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                };
 
-                // Update last_poll_ms and hash
-                {
-                    let mut watch = branch_pr_watch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                    if let Some(ref mut w) = *watch {
-                        w.last_poll_ms = now_ms();
-                        if let Some((ref new_hash, _)) = result {
-                            w.last_output_hash = Some(new_hash.clone());
+                if let Some((branch, token, last_hash)) = snapshot {
+                    let token_str = token.expose_secret();
+                    let result = poll_branch_pr(&branch, token_str, last_hash.as_deref());
+
+                    // Update last_poll_ms and hash
+                    {
+                        let mut watch = branch_pr_watch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                        if let Some(ref mut w) = *watch {
+                            w.last_poll_ms = now_ms();
+                            if let Some((ref new_hash, _)) = result {
+                                w.last_output_hash = Some(new_hash.clone());
+                            }
                         }
                     }
-                }
 
-                // Send update if content changed
-                if let Some((_, pr_info)) = result {
-                    let _r = cache_tx.send(CacheUpdate::ModuleSpecific {
-                        context_type: cp_base::state::ContextType::new(cp_base::state::ContextType::GITHUB_RESULT),
-                        data: Box::new(BranchPrUpdate { pr_info }),
-                    });
+                    // Send update if content changed
+                    if let Some((_, pr_info)) = result {
+                        let _r = cache_tx.send(CacheUpdate::ModuleSpecific {
+                            context_type: cp_base::state::ContextType::new(cp_base::state::ContextType::GITHUB_RESULT),
+                            data: Box::new(BranchPrUpdate { pr_info }),
+                        });
+                    }
                 }
             }
-        }
 
-        // === Poll panel watches ===
+            // === Poll panel watches ===
 
-        // Snapshot only watches that are due for polling
-        let due: Vec<DueWatch> = {
-            let watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            watches
-                .values()
-                .filter(|w| current_ms.saturating_sub(w.last_poll_ms) >= w.poll_interval_secs * 1000)
-                .map(|w| {
-                    (
-                        w.context_id.clone(),
-                        w.args.clone(),
-                        Arc::clone(&w.github_token),
-                        w.is_api_command,
-                        w.etag.clone(),
-                        w.last_output_hash.clone(),
-                    )
-                })
-                .collect()
-        };
+            // Snapshot only watches that are due for polling
+            let due: Vec<DueWatch> = {
+                let watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                watches
+                    .values()
+                    .filter(|w| current_ms.saturating_sub(w.last_poll_ms) >= w.poll_interval_secs * 1000)
+                    .map(|w| {
+                        (
+                            w.context_id.clone(),
+                            w.args.clone(),
+                            Arc::clone(&w.github_token),
+                            w.is_api_command,
+                            w.etag.clone(),
+                            w.last_output_hash.clone(),
+                        )
+                    })
+                    .collect()
+            };
 
-        for (context_id, args, github_token, is_api, etag, last_hash) in due {
-            let token_str = github_token.expose_secret();
-            if is_api {
-                let outcome = poll_api_command(&args, token_str, etag.as_deref());
+            for (context_id, args, github_token, is_api, etag, last_hash) in due {
+                let token_str = github_token.expose_secret();
+                if is_api {
+                    let outcome = poll_api_command(&args, token_str, etag.as_deref());
 
-                {
-                    let mut watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                    if let Some(watch) = watches.get_mut(&context_id) {
-                        watch.last_poll_ms = now_ms();
-                        if let Some(interval) = outcome.poll_interval {
-                            watch.poll_interval_secs = interval;
-                        }
-                        if let Some((ref new_etag, _)) = outcome.content {
-                            watch.etag.clone_from(new_etag);
-                        }
-                    }
-                }
-
-                if let Some((_, body)) = outcome.content {
-                    let body = redact_token(&body, token_str);
-                    let body = truncate_output(&body, MAX_RESULT_CONTENT_BYTES);
-                    let token_count = estimate_tokens(&body);
-
-                    let _r = cache_tx.send(CacheUpdate::Content { context_id, content: body, token_count });
-                }
-            } else {
-                let result = poll_cli_command(&args, token_str, last_hash.as_deref());
-
-                {
-                    let mut watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                    if let Some(watch) = watches.get_mut(&context_id) {
-                        watch.last_poll_ms = now_ms();
-                        if let Some((ref new_hash, _)) = result {
-                            watch.last_output_hash = Some(new_hash.clone());
+                    {
+                        let mut watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                        if let Some(watch) = watches.get_mut(&context_id) {
+                            watch.last_poll_ms = now_ms();
+                            if let Some(interval) = outcome.poll_interval {
+                                watch.poll_interval_secs = interval;
+                            }
+                            if let Some((ref new_etag, _)) = outcome.content {
+                                watch.etag.clone_from(new_etag);
+                            }
                         }
                     }
-                }
 
-                if let Some((_, content)) = result {
-                    let content = redact_token(&content, token_str);
-                    let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
-                    let token_count = estimate_tokens(&content);
+                    if let Some((_, body)) = outcome.content {
+                        let body = redact_token(&body, token_str);
+                        let body = truncate_output(&body, MAX_RESULT_CONTENT_BYTES);
+                        let token_count = estimate_tokens(&body);
 
-                    let _r = cache_tx.send(CacheUpdate::Content { context_id, content, token_count });
+                        let _r = cache_tx.send(CacheUpdate::Content { context_id, content: body, token_count });
+                    }
+                } else {
+                    let result = poll_cli_command(&args, token_str, last_hash.as_deref());
+
+                    {
+                        let mut watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                        if let Some(watch) = watches.get_mut(&context_id) {
+                            watch.last_poll_ms = now_ms();
+                            if let Some((ref new_hash, _)) = result {
+                                watch.last_output_hash = Some(new_hash.clone());
+                            }
+                        }
+                    }
+
+                    if let Some((_, content)) = result {
+                        let content = redact_token(&content, token_str);
+                        let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
+                        let token_count = estimate_tokens(&content);
+
+                        let _r = cache_tx.send(CacheUpdate::Content { context_id, content, token_count });
+                    }
                 }
             }
         }

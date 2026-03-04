@@ -99,7 +99,7 @@ pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
     for msg in messages.drain(..) {
         let same_role = result.last().is_some_and(|last: &Value| last["role"] == msg["role"]);
         if !same_role {
-            let blocks = content_to_blocks(msg["content"].clone());
+            let blocks = content_to_blocks(&msg["content"]);
             result.push(serde_json::json!({"role": msg["role"], "content": blocks}));
             continue;
         }
@@ -112,7 +112,7 @@ pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
 
         if prev_has_tool_result == curr_has_tool_result {
             // Same content type — safe to merge
-            let new_blocks = content_to_blocks(msg["content"].clone());
+            let new_blocks = content_to_blocks(&msg["content"]);
             if let Some(arr) = result.last_mut().and_then(|last| last["content"].as_array_mut()) {
                 arr.extend(new_blocks);
             }
@@ -122,7 +122,7 @@ pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
                 "role": "assistant",
                 "content": [{"type": "text", "text": "ok"}]
             }));
-            let blocks = content_to_blocks(msg["content"].clone());
+            let blocks = content_to_blocks(&msg["content"]);
             result.push(serde_json::json!({"role": msg["role"], "content": blocks}));
         }
     }
@@ -143,8 +143,7 @@ pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
 }
 
 /// Convert content (string or array) to an array of content blocks.
-#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
-pub(crate) fn content_to_blocks(content: Value) -> Vec<Value> {
+pub(crate) fn content_to_blocks(content: &Value) -> Vec<Value> {
     if content.is_string() {
         vec![serde_json::json!({"type": "text", "text": content.as_str().unwrap_or("")})]
     } else if let Some(arr) = content.as_array() {

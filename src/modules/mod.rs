@@ -276,10 +276,8 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                     match check_can_deactivate(module_id, &state.active_modules) {
                         Ok(()) => {
                             // Find panel types to remove
-                            let (fixed_types, dynamic_types) = all_mods
-                                .iter()
-                                .find(|m| m.id() == module_id)
-                                .map_or_else(
+                            let (fixed_types, dynamic_types) =
+                                all_mods.iter().find(|m| m.id() == module_id).map_or_else(
                                     || (Vec::new(), Vec::new()),
                                     |m| (m.fixed_panel_types(), m.dynamic_panel_types()),
                                 );

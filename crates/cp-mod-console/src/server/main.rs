@@ -250,81 +250,90 @@ fn handle_list(sessions: &Sessions) -> Response {
 // Connection handler
 // ---------------------------------------------------------------------------
 
-#[expect(clippy::needless_pass_by_value, reason = "thread entry point — Arc is moved from spawn closure")]
-#[expect(clippy::exit, reason = "process exit is intentional here")]
-fn handle_connection(stream: UnixStream, sessions: Sessions) {
-    let Ok(cloned) = stream.try_clone() else {
-        return;
-    };
-    let reader = BufReader::new(cloned);
-    let mut writer = stream;
+/// Per-connection handler. Owns the stream and sessions Arc for `thread::spawn`.
+struct ConnectionHandler {
+    stream: UnixStream,
+    sessions: Sessions,
+}
 
-    for line in reader.lines() {
-        let Ok(line) = line else {
-            break; // Connection closed
+impl ConnectionHandler {
+    /// Consume self and process JSON-line commands until the connection closes.
+    #[expect(clippy::exit, reason = "process exit is intentional here")]
+    fn run(self) {
+        let Self { stream, sessions } = self;
+        let Ok(cloned) = stream.try_clone() else {
+            return;
         };
-        if line.is_empty() {
-            continue;
-        }
+        let reader = BufReader::new(cloned);
+        let mut writer = stream;
 
-        let req: Request = match serde_json::from_str(&line) {
-            Ok(r) => r,
-            Err(e) => {
-                let resp = Response::err(format!("Invalid JSON: {e}"));
-                drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
+        for line in reader.lines() {
+            let Ok(line) = line else {
+                break; // Connection closed
+            };
+            if line.is_empty() {
                 continue;
             }
-        };
 
-        let resp = match req.cmd.as_str() {
-            "create" => {
-                let key = req.key.as_deref().unwrap_or("");
-                let command = req.command.as_deref().unwrap_or("");
-                let log_path = req.log_path.as_deref().unwrap_or("");
-                if key.is_empty() || command.is_empty() || log_path.is_empty() {
-                    Response::err("Missing key, command, or log_path")
-                } else {
-                    handle_create(&sessions, key, command, req.cwd.as_deref(), log_path)
+            let req: Request = match serde_json::from_str(&line) {
+                Ok(r) => r,
+                Err(e) => {
+                    let resp = Response::err(format!("Invalid JSON: {e}"));
+                    drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
+                    continue;
                 }
-            }
-            "send" => {
-                let key = req.key.as_deref().unwrap_or("");
-                let input = req.input.as_deref().unwrap_or("");
-                if key.is_empty() { Response::err("Missing key") } else { handle_send(&sessions, key, input) }
-            }
-            "kill" => {
-                let key = req.key.as_deref().unwrap_or("");
-                if key.is_empty() { Response::err("Missing key") } else { handle_kill(&sessions, key) }
-            }
-            "remove" => {
-                let key = req.key.as_deref().unwrap_or("");
-                if key.is_empty() { Response::err("Missing key") } else { handle_remove(&sessions, key) }
-            }
-            "status" => {
-                let key = req.key.as_deref().unwrap_or("");
-                if key.is_empty() { Response::err("Missing key") } else { handle_status(&sessions, key) }
-            }
-            "list" => handle_list(&sessions),
-            "ping" => Response::ok(),
-            "shutdown" => {
-                // Kill all sessions and exit
-                let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
-                for (_, session) in map.iter_mut() {
-                    if !session.is_terminal() {
-                        drop(Command::new("kill").args([&session.pid.to_string()]).output());
+            };
+
+            let resp = match req.cmd.as_str() {
+                "create" => {
+                    let key = req.key.as_deref().unwrap_or("");
+                    let command = req.command.as_deref().unwrap_or("");
+                    let log_path = req.log_path.as_deref().unwrap_or("");
+                    if key.is_empty() || command.is_empty() || log_path.is_empty() {
+                        Response::err("Missing key, command, or log_path")
+                    } else {
+                        handle_create(&sessions, key, command, req.cwd.as_deref(), log_path)
                     }
-                    drop(session.stdin.take());
                 }
-                map.clear();
-                let resp = Response::ok();
-                drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
-                std::process::exit(0);
-            }
-            other => Response::err(format!("Unknown command: {other}")),
-        };
+                "send" => {
+                    let key = req.key.as_deref().unwrap_or("");
+                    let input = req.input.as_deref().unwrap_or("");
+                    if key.is_empty() { Response::err("Missing key") } else { handle_send(&sessions, key, input) }
+                }
+                "kill" => {
+                    let key = req.key.as_deref().unwrap_or("");
+                    if key.is_empty() { Response::err("Missing key") } else { handle_kill(&sessions, key) }
+                }
+                "remove" => {
+                    let key = req.key.as_deref().unwrap_or("");
+                    if key.is_empty() { Response::err("Missing key") } else { handle_remove(&sessions, key) }
+                }
+                "status" => {
+                    let key = req.key.as_deref().unwrap_or("");
+                    if key.is_empty() { Response::err("Missing key") } else { handle_status(&sessions, key) }
+                }
+                "list" => handle_list(&sessions),
+                "ping" => Response::ok(),
+                "shutdown" => {
+                    // Kill all sessions and exit
+                    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
+                    for (_, session) in map.iter_mut() {
+                        if !session.is_terminal() {
+                            drop(Command::new("kill").args([&session.pid.to_string()]).output());
+                        }
+                        drop(session.stdin.take());
+                    }
+                    map.clear();
+                    let resp = Response::ok();
+                    drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
+                    std::process::exit(0);
+                }
+                other => Response::err(format!("Unknown command: {other}")),
+            };
 
-        if writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()).is_err() {
-            break; // Connection lost
+            if writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()).is_err() {
+                break; // Connection lost
+            }
         }
     }
 }
@@ -391,7 +400,7 @@ fn main() {
             Ok((stream, _)) => {
                 let sessions = Arc::clone(&sessions);
                 drop(std::thread::spawn(move || {
-                    handle_connection(stream, sessions);
+                    ConnectionHandler { stream, sessions }.run();
                 }));
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {

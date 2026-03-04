@@ -118,7 +118,7 @@ fn main() -> io::Result<()> {
 
     // Create and run app
     let mut app = App::new(state, cache_tx, resume_stream);
-    app.run(&mut terminal, tx, rx, cache_rx)?;
+    app.run(&mut terminal, &tx, &rx, &cache_rx)?;
 
     // Cleanup
     disable_raw_mode()?;

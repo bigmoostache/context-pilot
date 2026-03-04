@@ -12,7 +12,7 @@ use cp_base::config::constants::STORE_DIR;
 use cp_base::panels::now_ms;
 
 use crate::CONSOLE_DIR;
-use crate::pollers::{file_poller, file_poller_from_offset, poll_server_status};
+use crate::pollers::{FilePoller, StatusPoller};
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 use cp_base::cast::SafeCast;
@@ -273,7 +273,7 @@ impl SessionHandle {
             let stop = Arc::clone(&stop_polling);
             let path = log_path;
             drop(std::thread::spawn(move || {
-                file_poller(path, buf, stop);
+                FilePoller { path, buffer: buf, stop, offset: 0 }.run();
             }));
         }
 
@@ -284,7 +284,7 @@ impl SessionHandle {
             let stop_clone = Arc::clone(&stop_polling);
             let key = name.clone();
             drop(std::thread::spawn(move || {
-                poll_server_status(key, status_clone, finished_clone, stop_clone);
+                StatusPoller { key, status: status_clone, finished_at: finished_clone, stop: stop_clone }.run();
             }));
         }
 
@@ -372,7 +372,7 @@ impl SessionHandle {
                 let stop = Arc::clone(&stop_polling);
                 let path = log_path;
                 drop(std::thread::spawn(move || {
-                    file_poller_from_offset(path, buf, stop, file_offset);
+                    FilePoller { path, buffer: buf, stop, offset: file_offset }.run();
                 }));
             }
 
@@ -383,7 +383,7 @@ impl SessionHandle {
                 let stop_clone = Arc::clone(&stop_polling);
                 let key = name.clone();
                 drop(std::thread::spawn(move || {
-                    poll_server_status(key, status_clone, finished_clone, stop_clone);
+                    StatusPoller { key, status: status_clone, finished_at: finished_clone, stop: stop_clone }.run();
                 }));
             }
         }

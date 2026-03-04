@@ -66,7 +66,7 @@ impl PersistenceWriter {
         let flush_sync_clone = Arc::clone(&flush_sync);
 
         let handle = thread::spawn(move || {
-            writer_loop(rx, flush_sync_clone);
+            WriterThread { rx, flush_sync: flush_sync_clone }.run();
         });
 
         Self { tx, flush_sync, handle: Some(handle) }
@@ -126,60 +126,68 @@ impl Drop for PersistenceWriter {
     }
 }
 
-/// The writer thread's main loop
-#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
-#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
-fn writer_loop(rx: Receiver<WriterMsg>, flush_sync: Arc<(Mutex<bool>, Condvar)>) {
-    let mut pending_batch: Option<WriteBatch> = None;
-    let mut pending_messages: Vec<WriteOp> = Vec::new();
+/// Background writer thread state. Owns the channel receiver and flush synchronization.
+struct WriterThread {
+    rx: Receiver<WriterMsg>,
+    flush_sync: Arc<(Mutex<bool>, Condvar)>,
+}
 
-    loop {
-        // If we have a pending batch, wait with timeout (debounce)
-        // If no pending batch, wait indefinitely for the next message
-        let msg = if pending_batch.is_some() {
-            match rx.recv_timeout(Duration::from_millis(DEBOUNCE_MS)) {
-                Ok(msg) => Some(msg),
-                Err(mpsc::RecvTimeoutError::Timeout) => None, // Debounce expired — flush
-                Err(mpsc::RecvTimeoutError::Disconnected) => break,
-            }
-        } else {
-            match rx.recv() {
-                Ok(msg) => Some(msg),
-                Err(_) => break, // Channel disconnected
-            }
-        };
+impl WriterThread {
+    /// Consume self and process write messages until disconnected.
+    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
+    fn run(self) {
+        let Self { rx, flush_sync } = self;
+        let mut pending_batch: Option<WriteBatch> = None;
+        let mut pending_messages: Vec<WriteOp> = Vec::new();
 
-        match msg {
-            Some(WriterMsg::Batch(batch)) => {
-                // Replace the pending batch (coalesce — only the latest state matters)
-                pending_batch = Some(batch);
-                // Don't write yet — wait for debounce timeout
-            }
-            Some(WriterMsg::Message(op)) => {
-                // Messages are not debounced — queue for immediate write
-                pending_messages.push(op);
-                // But don't interrupt the debounce loop — write when we flush
-            }
-            Some(WriterMsg::Flush) => {
-                // Write everything immediately
-                execute_pending_messages(&mut pending_messages);
-                execute_batch(pending_batch.take());
-                // Signal flush completion
-                let (lock, cvar) = &*flush_sync;
-                let mut flushed = lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                *flushed = true;
-                cvar.notify_all();
-            }
-            Some(WriterMsg::Shutdown) => {
-                // Final write + exit
-                execute_pending_messages(&mut pending_messages);
-                execute_batch(pending_batch.take());
-                break;
-            }
-            None => {
-                // Debounce timeout expired — write pending batch
-                execute_pending_messages(&mut pending_messages);
-                execute_batch(pending_batch.take());
+        loop {
+            // If we have a pending batch, wait with timeout (debounce)
+            // If no pending batch, wait indefinitely for the next message
+            let msg = if pending_batch.is_some() {
+                match rx.recv_timeout(Duration::from_millis(DEBOUNCE_MS)) {
+                    Ok(msg) => Some(msg),
+                    Err(mpsc::RecvTimeoutError::Timeout) => None, // Debounce expired — flush
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                }
+            } else {
+                match rx.recv() {
+                    Ok(msg) => Some(msg),
+                    Err(_) => break, // Channel disconnected
+                }
+            };
+
+            match msg {
+                Some(WriterMsg::Batch(batch)) => {
+                    // Replace the pending batch (coalesce — only the latest state matters)
+                    pending_batch = Some(batch);
+                    // Don't write yet — wait for debounce timeout
+                }
+                Some(WriterMsg::Message(op)) => {
+                    // Messages are not debounced — queue for immediate write
+                    pending_messages.push(op);
+                    // But don't interrupt the debounce loop — write when we flush
+                }
+                Some(WriterMsg::Flush) => {
+                    // Write everything immediately
+                    execute_pending_messages(&mut pending_messages);
+                    execute_batch(pending_batch.take());
+                    // Signal flush completion
+                    let (lock, cvar) = &*flush_sync;
+                    let mut flushed = lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                    *flushed = true;
+                    cvar.notify_all();
+                }
+                Some(WriterMsg::Shutdown) => {
+                    // Final write + exit
+                    execute_pending_messages(&mut pending_messages);
+                    execute_batch(pending_batch.take());
+                    break;
+                }
+                None => {
+                    // Debounce timeout expired — write pending batch
+                    execute_pending_messages(&mut pending_messages);
+                    execute_batch(pending_batch.take());
+                }
             }
         }
     }

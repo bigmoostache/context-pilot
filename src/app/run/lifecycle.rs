@@ -21,13 +21,12 @@ use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::{NotificationType, SpineState};
 
 impl App {
-    #[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
     pub(crate) fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-        tx: Sender<StreamEvent>,
-        rx: Receiver<StreamEvent>,
-        cache_rx: Receiver<CacheUpdate>,
+        tx: &Sender<StreamEvent>,
+        rx: &Receiver<StreamEvent>,
+        cache_rx: &Receiver<CacheUpdate>,
     ) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
         self.setup_file_watchers();
@@ -60,7 +59,7 @@ impl App {
                 // Handle command palette events first if it's open
                 if self.command_palette.is_open {
                     if let Some(action) = self.handle_palette_event(&evt) {
-                        self.handle_action(action, &tx);
+                        self.handle_action(action, tx);
                     }
                     self.state.dirty = true;
 
@@ -126,7 +125,7 @@ impl App {
                     self.command_palette.open(&self.state);
                     self.state.dirty = true;
                 } else {
-                    self.handle_action(action, &tx);
+                    self.handle_action(action, tx);
                 }
 
                 // Render immediately after input for instant feedback
@@ -141,28 +140,28 @@ impl App {
             }
 
             // === BACKGROUND PROCESSING ===
-            self.process_stream_events(&rx);
-            self.handle_retry(&tx);
+            self.process_stream_events(rx);
+            self.handle_retry(tx);
             self.process_typewriter();
-            self.process_cache_updates(&cache_rx);
+            self.process_cache_updates(cache_rx);
             self.process_watcher_events();
             // Check if we're waiting for panels and they're ready (non-blocking)
-            self.check_waiting_for_panels(&tx);
+            self.check_waiting_for_panels(tx);
             // Check if deferred sleep timer has expired (non-blocking)
-            self.check_deferred_sleep(&tx);
+            self.check_deferred_sleep(tx);
             // Check if a question form has been resolved by the user
-            self.check_question_form(&tx);
+            self.check_question_form(tx);
             // Check watchers (blocking sentinel replacement + async → spine notifications)
-            self.check_watchers(&tx);
+            self.check_watchers(tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
                 self.sync_gh_watches();
             }
             self.check_timer_based_deprecation();
-            self.handle_tool_execution(&tx);
+            self.handle_tool_execution(tx);
             self.finalize_stream();
-            self.check_spine(&tx);
+            self.check_spine(tx);
             self.process_api_check_results();
 
             // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
