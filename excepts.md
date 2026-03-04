@@ -29,21 +29,14 @@ crates/cp-console-server/src/main.rs:
   356:     #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
   357      // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
 
-src/main.rs:
-  128  /// `Ok(msg)` prints to stdout (if non-empty) and exits 0.
-  129  /// `Err((msg, code))` prints to stderr (if non-empty) and exits with `code`.
-  130: #[expect(
-  131      clippy::exit,
-  132      clippy::print_stdout,
-
 
 # `#[expect]` Audit — Final Status
 
-**110 → 7** annotations remaining. **103 slain.**
+**110 → 6** annotations remaining. **104 slain.**
 
 ---
 
-## Remaining `#[expect]` Annotations (7 total)
+## Remaining `#[expect]` Annotations (6 total)
 
 ### 1. `cast.rs:1` — `allow_attributes`
 
@@ -154,25 +147,6 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 
 ---
 
-### 7. `main.rs:130` — `print_stdout`, `exit`
-
-```rust
-#[expect(
-    clippy::exit,
-    clippy::print_stdout,
-    reason = "CLI entry point — printing and process::exit are the correct interface"
-)]
-fn handle_cli_result(result: Result<String, (String, i32)>) -> ! {
-```
-
-**Justification:** `handle_cli_result()` is the single CLI bridge function — all subcommand results flow through it. It prints success messages to stdout and error messages to stderr, then exits with the appropriate code. This is the correct interface for a CLI tool. The annotation covers one 15-line function (previously a module-level `#![expect]` covering an entire file).
-
-**Strategies to eliminate:**
-- **`ExitCode` return from main:** Change `main()` from `-> io::Result<()>` to `-> ExitCode`. Handle the CLI subcommand result inline and return `ExitCode::from(code)`. Requires restructuring main's control flow — currently, CLI subcommands diverge early and the TUI path assumes `io::Result<()>`.
-- **Separate binary:** Extract the typst CLI subcommands into a standalone `cpilot-typst` binary. Being its own binary, it naturally prints and exits. The main binary drops the subcommand routing entirely.
-
----
-
 ## Summary
 
 | # | File | Lint | Killable? | Best Strategy |
@@ -182,4 +156,3 @@ fn handle_cli_result(result: Result<String, (String, i32)>) -> ! {
 | 3 | `runtime.rs` | `struct_excessive_bools` | 🟡 | Domain sub-structs (scriptable, ~1000 callsites) |
 | 4–5 | `runtime.rs` | `expect_used` (×2) | 🟡 | `Default` fallback or lazy init |
 | 6 | `server/main.rs` | `unsafe_code` | 🔴 | Irreducible — FFI boundary to kernel syscall |
-| 7 | `main.rs` | `print_stdout` + `exit` | 🟡 | `ExitCode` return from main |
