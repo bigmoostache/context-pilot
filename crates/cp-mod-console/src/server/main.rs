@@ -157,47 +157,55 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
     Response::ok_pid(pid)
 }
 
-#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     let bytes = interpret_escapes(input);
-    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
-    let Some(session) = map.get_mut(key) else {
-        return Response::err(format!("Session '{key}' not found"));
-    };
-    if session.is_terminal() {
-        return Response::err(format!("Session '{key}' already exited"));
-    }
-    match &mut session.stdin {
-        Some(stdin) => {
-            if let Err(e) = stdin.write_all(&bytes) {
-                return Response::err(format!("Write failed: {e}"));
-            }
-            if let Err(e) = stdin.flush() {
-                return Response::err(format!("Flush failed: {e}"));
-            }
-            Response::ok()
+
+    // Take stdin out of session (lock held briefly — released before I/O)
+    let mut stdin = match sessions.lock().unwrap_or_else(PoisonError::into_inner).get_mut(key) {
+        None => return Response::err(format!("Session '{key}' not found")),
+        Some(session) if session.is_terminal() => {
+            return Response::err(format!("Session '{key}' already exited"));
         }
-        None => Response::err("No stdin available".to_string()),
+        Some(session) => match session.stdin.take() {
+            Some(s) => s,
+            None => return Response::err("No stdin available".to_string()),
+        },
+    };
+
+    // Perform I/O without holding the session lock
+    let result = stdin.write_all(&bytes).and_then(|()| stdin.flush());
+
+    // Put stdin back
+    if let Some(session) = sessions.lock().unwrap_or_else(PoisonError::into_inner).get_mut(key) {
+        session.stdin = Some(stdin);
     }
+
+    result.map_or_else(|e| Response::err(format!("Write failed: {e}")), |()| Response::ok())
 }
 
-#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn handle_kill(sessions: &Sessions, key: &str) -> Response {
-    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
-    let Some(session) = map.get_mut(key) else {
-        return Response::err(format!("Session '{key}' not found"));
-    };
-    if !session.is_terminal() {
-        // SIGTERM to script PID only — PTY teardown propagates SIGHUP to children
-        drop(Command::new("kill").args([&session.pid.to_string()]).output());
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        if is_pid_alive(session.pid) {
-            drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
+    // Extract pid under lock (lock auto-drops after match expression)
+    let pid = match sessions.lock().unwrap_or_else(PoisonError::into_inner).get_mut(key) {
+        None => return Response::err(format!("Session '{key}' not found")),
+        Some(session) if session.is_terminal() => {
+            drop(session.stdin.take());
+            return Response::ok();
         }
-        session.status = SessionStatus::Exited(-9);
+        Some(session) => session.pid,
+    };
+
+    // Kill process without holding the session lock
+    drop(Command::new("kill").args([&pid.to_string()]).output());
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    if is_pid_alive(pid) {
+        drop(Command::new("kill").args(["-9", &pid.to_string()]).output());
     }
-    // Drop stdin
-    drop(session.stdin.take());
+
+    // Update session state under lock
+    if let Some(session) = sessions.lock().unwrap_or_else(PoisonError::into_inner).get_mut(key) {
+        session.status = SessionStatus::Exited(-9);
+        drop(session.stdin.take());
+    }
     Response::ok()
 }
 
@@ -258,7 +266,6 @@ struct ConnectionHandler {
 
 impl ConnectionHandler {
     /// Consume self and process JSON-line commands until the connection closes.
-    #[expect(clippy::exit, reason = "process exit is intentional here")]
     fn run(self) {
         let Self { stream, sessions } = self;
         let Ok(cloned) = stream.try_clone() else {
@@ -315,18 +322,11 @@ impl ConnectionHandler {
                 "list" => handle_list(&sessions),
                 "ping" => Response::ok(),
                 "shutdown" => {
-                    // Kill all sessions and exit
-                    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
-                    for (_, session) in map.iter_mut() {
-                        if !session.is_terminal() {
-                            drop(Command::new("kill").args([&session.pid.to_string()]).output());
-                        }
-                        drop(session.stdin.take());
-                    }
-                    map.clear();
+                    // Signal the shutdown monitor thread to do cleanup + exit
+                    SHUTDOWN_REQUESTED.store(true, Ordering::Relaxed);
                     let resp = Response::ok();
                     drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
-                    std::process::exit(0);
+                    break; // Close this connection — monitor thread handles the rest
                 }
                 other => Response::err(format!("Unknown command: {other}")),
             };
@@ -345,7 +345,7 @@ impl ConnectionHandler {
 fn main() {
     let Some(socket_path) = std::env::args().nth(1) else {
         drop(writeln!(std::io::stderr(), "Usage: cp-console-server <socket_path>"));
-        std::process::exit(1);
+        return;
     };
     let pid_path = format!("{}.pid", socket_path.trim_end_matches(".sock"));
 
@@ -359,12 +359,9 @@ fn main() {
     let _ = std::fs::write(&pid_path, format!("{}", std::process::id())).ok();
 
     // Bind socket
-    let listener = match UnixListener::bind(&socket_path) {
-        Ok(l) => l,
-        Err(e) => {
-            drop(writeln!(std::io::stderr(), "Failed to bind {socket_path}: {e}"));
-            std::process::exit(1);
-        }
+    let Ok(listener) = UnixListener::bind(&socket_path) else {
+        drop(writeln!(std::io::stderr(), "Failed to bind {socket_path}"));
+        return;
     };
 
     // Set socket to non-blocking so we can check SHUTDOWN_REQUESTED between accepts
@@ -372,26 +369,8 @@ fn main() {
 
     let sessions: Sessions = Arc::new(Mutex::new(HashMap::new()));
 
-    // Install SIGTERM/SIGINT handlers — set flag, cleanup thread does the rest
+    // Install SIGTERM/SIGINT handlers — set flag, main loop polls it
     install_signal_handlers();
-
-    // Spawn a shutdown monitor thread that watches SHUTDOWN_REQUESTED
-    {
-        let sessions = Arc::clone(&sessions);
-        let socket_path = socket_path.clone();
-        let pid_path = pid_path.clone();
-        drop(std::thread::spawn(move || {
-            loop {
-                std::thread::sleep(std::time::Duration::from_millis(100));
-                if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
-                    kill_all_sessions(&sessions);
-                    let _ = std::fs::remove_file(&socket_path).ok();
-                    let _ = std::fs::remove_file(&pid_path).ok();
-                    std::process::exit(0);
-                }
-            }
-        }));
-    }
 
     // Accept connections (one thread per connection)
     loop {
@@ -410,12 +389,14 @@ fn main() {
         }
 
         if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
-            kill_all_sessions(&sessions);
-            let _ = std::fs::remove_file(&socket_path).ok();
-            let _ = std::fs::remove_file(&pid_path).ok();
-            std::process::exit(0);
+            break;
         }
     }
+
+    // Cleanup: kill children, remove socket/pid files
+    kill_all_sessions(&sessions);
+    let _ = std::fs::remove_file(&socket_path).ok();
+    let _ = std::fs::remove_file(&pid_path).ok();
 }
 
 /// Install SIGTERM and SIGINT handlers that set `SHUTDOWN_REQUESTED`.
@@ -426,6 +407,7 @@ fn main() {
 fn install_signal_handlers() {
     // SAFETY: libc::signal() is async-signal-safe (POSIX). The handler function
     // `signal_handler` only sets an atomic flag — no allocations or locks.
+    // The fn-pointer → *const() → usize cast chain is required by the libc::signal() ABI.
     unsafe {
         let handler = signal_handler as *const () as libc::sighandler_t;
         let _ = libc::signal(libc::SIGINT, handler);

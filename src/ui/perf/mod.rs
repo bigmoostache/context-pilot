@@ -151,18 +151,25 @@ pub(crate) static PERF: std::sync::LazyLock<PerfMetrics> = std::sync::LazyLock::
 
 impl PerfMetrics {
     /// Record operation timing
-    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     pub(crate) fn record_op(&self, name: &'static str, duration_us: u64) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-        let mut ops = self.ops.write().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let stats = ops.entry(name).or_default();
-        let _r = stats.count.fetch_add(1, Ordering::Relaxed);
-        let _r = stats.total_us.fetch_add(duration_us, Ordering::Relaxed);
-        let _r = stats.max_us.fetch_max(duration_us, Ordering::Relaxed);
-        if let Ok(mut samples) = stats.samples.write() {
-            samples.push(duration_us);
+        // Ensure the entry exists (write lock), then immediately release.
+        // The OpStats fields are independently synchronized (atomics + inner RwLock),
+        // so we re-acquire a cheaper read lock for the actual recording.
+        {
+            let mut ops = self.ops.write().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let _r = ops.entry(name).or_default();
+        }
+        let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(stats) = ops.get(name) {
+            let _r = stats.count.fetch_add(1, Ordering::Relaxed);
+            let _r = stats.total_us.fetch_add(duration_us, Ordering::Relaxed);
+            let _r = stats.max_us.fetch_max(duration_us, Ordering::Relaxed);
+            if let Ok(mut samples) = stats.samples.write() {
+                samples.push(duration_us);
+            }
         }
     }
 

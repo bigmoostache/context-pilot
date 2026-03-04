@@ -10,7 +10,6 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -42,8 +41,8 @@ enum WriterMsg {
     Batch(WriteBatch),
     /// Save a single message file (not debounced — written immediately)
     Message(WriteOp),
-    /// Flush all pending writes and signal completion
-    Flush,
+    /// Flush all pending writes, then signal completion via the one-shot channel
+    Flush(Sender<()>),
     /// Shutdown the writer thread
     Shutdown,
 }
@@ -51,8 +50,6 @@ enum WriterMsg {
 /// Handle to the background persistence writer
 pub(crate) struct PersistenceWriter {
     tx: Sender<WriterMsg>,
-    /// Shared state for flush synchronization
-    flush_sync: Arc<(Mutex<bool>, Condvar)>,
     handle: Option<JoinHandle<()>>,
 }
 
@@ -63,14 +60,12 @@ impl PersistenceWriter {
     /// Create a new persistence writer with a background thread
     pub(crate) fn new() -> Self {
         let (tx, rx) = mpsc::channel();
-        let flush_sync = Arc::new((Mutex::new(false), Condvar::new()));
-        let flush_sync_clone = Arc::clone(&flush_sync);
 
         let handle = thread::spawn(move || {
-            WriterThread { rx, flush_sync: flush_sync_clone }.run();
+            WriterThread { rx }.run();
         });
 
-        Self { tx, flush_sync, handle: Some(handle) }
+        Self { tx, handle: Some(handle) }
     }
 
     /// Queue a batch of writes (debounced — may be coalesced with subsequent batches)
@@ -85,30 +80,11 @@ impl PersistenceWriter {
 
     /// Flush all pending writes synchronously. Blocks until complete.
     /// Used on app exit to ensure all state is persisted.
-    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     pub(crate) fn flush(&self) {
-        // Reset the flush flag
-        {
-            let (lock, _) = &*self.flush_sync;
-            let mut flushed = lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            *flushed = false;
-        }
-
-        // Send flush request
-        let _r = self.tx.send(WriterMsg::Flush);
-
-        // Wait for the writer to signal completion
-        let (lock, cvar) = &*self.flush_sync;
-        let mut flushed = lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        while !*flushed {
-            // Timeout after 5 seconds to prevent infinite hang on shutdown
-            let result =
-                cvar.wait_timeout(flushed, Duration::from_secs(5)).unwrap_or_else(std::sync::PoisonError::into_inner);
-            flushed = result.0;
-            if result.1.timed_out() {
-                break;
-            }
-        }
+        let (done_tx, done_rx) = mpsc::channel();
+        let _r = self.tx.send(WriterMsg::Flush(done_tx));
+        // Block until the writer signals completion (timeout 5s to prevent infinite hang)
+        let _r = done_rx.recv_timeout(Duration::from_secs(5));
     }
 
     /// Shutdown the writer thread gracefully
@@ -127,17 +103,15 @@ impl Drop for PersistenceWriter {
     }
 }
 
-/// Background writer thread state. Owns the channel receiver and flush synchronization.
+/// Background writer thread state. Owns the channel receiver.
 struct WriterThread {
     rx: Receiver<WriterMsg>,
-    flush_sync: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl WriterThread {
     /// Consume self and process write messages until disconnected.
-    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     fn run(self) {
-        let Self { rx, flush_sync } = self;
+        let Self { rx } = self;
         let mut pending_batch: Option<WriteBatch> = None;
         let mut pending_messages: Vec<WriteOp> = Vec::new();
 
@@ -168,15 +142,12 @@ impl WriterThread {
                     pending_messages.push(op);
                     // But don't interrupt the debounce loop — write when we flush
                 }
-                Some(WriterMsg::Flush) => {
+                Some(WriterMsg::Flush(done_tx)) => {
                     // Write everything immediately
                     execute_pending_messages(&mut pending_messages);
                     execute_batch(pending_batch.take());
-                    // Signal flush completion
-                    let (lock, cvar) = &*flush_sync;
-                    let mut flushed = lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                    *flushed = true;
-                    cvar.notify_all();
+                    // Signal completion — receiver wakes up
+                    let _r = done_tx.send(());
                 }
                 Some(WriterMsg::Shutdown) => {
                     // Final write + exit

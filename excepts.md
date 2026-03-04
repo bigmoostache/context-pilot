@@ -269,8 +269,8 @@ src/ui/perf/mod.rs:
 | B15 | print_stderr | console/lib.rs | 5 | ☠️ SLAIN |
 | B16 | print_stderr | console/lib.rs | 5 | ☠️ SLAIN |
 | B17 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
-| B18 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
-| B19 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
+| B18 | unsafe_code | manager.rs | 25 | ☠️ SLAIN |
+| B19 | unsafe_code | manager.rs | 25 | ☠️ SLAIN |
 | B20 | significant_drop_tightening | manager.rs | 20 | 💀 SLAIN |
 | B21 | branches_sharing_code | manager.rs | 40 | 💀 SLAIN |
 | B22 | significant_drop_tightening | manager.rs | 20 | 💀 SLAIN |
@@ -278,9 +278,9 @@ src/ui/perf/mod.rs:
 | B24 | needless_pass_by_value | pollers.rs | 15 | 🔴 ALIVE |
 | B25 | significant_drop_tightening | pollers.rs | 20 | 💀 SLAIN |
 | B26 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
-| B27 | significant_drop_tightening | server/main.rs | 20 | 🔴 ALIVE |
+| B27 | significant_drop_tightening | server/main.rs | 20 | ☠️ SLAIN |
 | B28 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
-| B29 | significant_drop_tightening | server/main.rs | 20 | 🔴 ALIVE |
+| B29 | significant_drop_tightening | server/main.rs | 20 | ☠️ SLAIN |
 | B30 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B31 | significant_drop_tightening | server/main.rs | 20 | 💀 SLAIN |
 | B32 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
@@ -291,7 +291,7 @@ src/ui/perf/mod.rs:
 | B37 | needless_pass_by_value | server/main.rs | 15 | ☠️ SLAIN |
 | B38 | significant_drop_tightening | server/main.rs | 20 | 💀 SLAIN |
 | B39 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
-| B40 | exit | server/main.rs | 10 | 🔴 ALIVE |
+| B40 | exit | server/main.rs | 10 | ☠️ SLAIN |
 | B41 | print_stderr | server/main.rs | 5 | ☠️ SLAIN |
 | B42 | expect_used | server/main.rs | 5 | ☠️ SLAIN |
 | B43 | unsafe_code | server/main.rs | 25 | 🔴 ALIVE |
@@ -354,12 +354,12 @@ src/ui/perf/mod.rs:
 | B100 | expect_used | questions/mod.rs | 5 | ☠️ SLAIN |
 | B101 | print_stderr | persistence/mod.rs | 5 | ☠️ SLAIN |
 | B102 | expect_used | persistence/writer.rs | 5 | ☠️ SLAIN |
-| B103 | significant_drop_tightening | persistence/writer.rs | 20 | 🔴 ALIVE |
+| B103 | significant_drop_tightening | persistence/writer.rs | 20 | ☠️ SLAIN |
 | B104 | needless_pass_by_value | persistence/writer.rs | 15 | ☠️ SLAIN |
-| B105 | significant_drop_tightening | persistence/writer.rs | 20 | 🔴 ALIVE |
+| B105 | significant_drop_tightening | persistence/writer.rs | 20 | ☠️ SLAIN |
 | B106 | print_stderr | persistence/writer.rs | 5 | ☠️ SLAIN |
 | B107 | print_stderr | persistence/writer.rs | 5 | ☠️ SLAIN |
-| B108 | significant_drop_tightening | perf/mod.rs | 20 | 🔴 ALIVE |
+| B108 | significant_drop_tightening | perf/mod.rs | 20 | ☠️ SLAIN |
 | B109 | significant_drop_tightening | perf/mod.rs | 20 | 💀 SLAIN |
 | B110 | significant_drop_tightening | perf/mod.rs | 20 | 💀 SLAIN |
 
@@ -376,6 +376,6 @@ src/ui/perf/mod.rs:
 
 ### Score
 ```
-Slain: 43 / 110
-XP earned: 335 / 1215
+Slain: 51 / 110
+XP earned: 495 / 1215
 ```

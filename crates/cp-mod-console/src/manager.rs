@@ -221,15 +221,6 @@ pub struct SessionHandle {
     stop_polling: Arc<AtomicBool>,
 }
 
-#[expect(unsafe_code, reason = "SessionHandle fields are Arc<Mutex<T>> — safe to send across threads")]
-// SAFETY: All fields are either Arc<Mutex<T>>, Arc<AtomicBool>, String, u64, or RingBuffer
-// (which wraps Arc<Mutex<_>>). All are Send. No raw pointers or non-Send types.
-unsafe impl Send for SessionHandle {}
-#[expect(unsafe_code, reason = "SessionHandle fields are Arc<Mutex<T>> — safe to share across threads")]
-// SAFETY: All shared access goes through Arc<Mutex<T>> or Arc<AtomicBool>, providing
-// synchronized interior mutability. No unsynchronized shared state exists.
-unsafe impl Sync for SessionHandle {}
-
 impl SessionHandle {
     /// Spawn a new child process via the console server.
     ///
