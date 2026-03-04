@@ -1,6 +1,16 @@
 [workspace]
 members = [".", "crates/cp-base", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-preset", "crates/cp-mod-typst", "crates/cp-mod-brave", "crates/cp-mod-firecrawl"]
 
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Context Pilot — AI coding assistant TUI"
+repository = "https://github.com/gdraznieks/context-pilot"
+keywords = ["ai", "tui", "coding-assistant"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
+
 [workspace.dependencies]
 cp-base = { path = "crates/cp-base" }
 ratatui = "0.30"
@@ -538,6 +548,8 @@ zombie_processes = "deny"
 # ============================
 # Suspicious but sometimes intentional
 cast_abs_to_unsigned = "warn"
+# Sometimes intentional for FFI
+cast_enum_truncation = "warn"
 # Can be intentional in some macro designs
 crate_in_macro_def = "warn"
 # Documentation style issue
@@ -818,10 +830,29 @@ unwrap_used = "warn"
 # Flag `_` in match on non-exhaustive enums — be explicit about variants
 wildcard_enum_match_arm = "warn"
 
+# ============================
+# Cargo → warn
+# ============================
+# Ensures proper Cargo.toml metadata (description, license, etc.)
+cargo_common_metadata = "warn"
+# multiple_crate_versions: skipped — bitflags 1.x/2.x and syn 1.x/2.x
+# are unavoidable transitive duplicates from syntect, notify, and proc-macros
+# Feature names shouldn't be negative (no_*)
+negative_feature_names = "warn"
+# Feature named same as dep is redundant
+redundant_feature_names = "warn"
+# Always pin dependency versions
+wildcard_dependencies = "warn"
+
 [package]
 name = "tui"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 cp-base.workspace = true

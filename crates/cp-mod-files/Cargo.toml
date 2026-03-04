@@ -1,7 +1,13 @@
 [package]
 name = "cp-mod-files"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Context Pilot module"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
 
 [dependencies]
 cp-base.workspace = true

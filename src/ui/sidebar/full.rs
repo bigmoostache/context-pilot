@@ -406,38 +406,24 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     frame.render_widget(paragraph, sidebar_layout[0]);
 
     // Help hints at bottom of sidebar
-    let help_lines = vec![
-        Line::from(vec![
-            Span::styled("  ", base_style),
-            Span::styled("Tab", Style::default().fg(theme::accent())),
-            Span::styled(" next panel", Style::default().fg(theme::text_muted())),
-        ]),
-        Line::from(vec![
-            Span::styled("  ", base_style),
-            Span::styled("↑↓", Style::default().fg(theme::accent())),
-            Span::styled(" scroll", Style::default().fg(theme::text_muted())),
-        ]),
-        Line::from(vec![
-            Span::styled("  ", base_style),
-            Span::styled("Ctrl+P", Style::default().fg(theme::accent())),
-            Span::styled(" commands", Style::default().fg(theme::text_muted())),
-        ]),
-        Line::from(vec![
-            Span::styled("  ", base_style),
-            Span::styled("Ctrl+H", Style::default().fg(theme::accent())),
-            Span::styled(" config", Style::default().fg(theme::text_muted())),
-        ]),
-        Line::from(vec![
-            Span::styled("  ", base_style),
-            Span::styled("Ctrl+V", Style::default().fg(theme::accent())),
-            Span::styled(" view", Style::default().fg(theme::text_muted())),
-        ]),
-        Line::from(vec![
-            Span::styled("  ", base_style),
-            Span::styled("Ctrl+Q", Style::default().fg(theme::accent())),
-            Span::styled(" quit", Style::default().fg(theme::text_muted())),
-        ]),
+    let help_entries = [
+        ("Tab", "next panel"),
+        ("↑↓", "scroll"),
+        ("Ctrl+P", "commands"),
+        ("Ctrl+H", "config"),
+        ("Ctrl+V", "view"),
+        ("Ctrl+Q", "quit"),
     ];
+    let help_lines: Vec<Line<'_>> = help_entries
+        .into_iter()
+        .map(|(key, desc)| {
+            Line::from(vec![
+                Span::styled("  ", base_style),
+                Span::styled(key, Style::default().fg(theme::accent())),
+                Span::styled(format!(" {desc}"), Style::default().fg(theme::text_muted())),
+            ])
+        })
+        .collect();
 
     let help_paragraph = Paragraph::new(help_lines).style(base_style);
     frame.render_widget(help_paragraph, sidebar_layout[1]);
