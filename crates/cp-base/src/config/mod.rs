@@ -464,21 +464,20 @@ pub fn set_active_theme(theme_id: &str) {
 /// # Panics
 ///
 /// Panics if the themes map contains zero entries.
-#[expect(clippy::expect_used, reason = "themes.yaml is embedded at compile time — empty map is a build-time bug")]
 pub fn active_theme() -> &'static Theme {
     let idx = CACHED_THEME_IDX.load(Ordering::Acquire);
+    let resolve = |theme: Option<&'static Theme>| -> &'static Theme {
+        theme.unwrap_or_else(|| yaml_invariant_panic("themes.yaml has no themes"))
+    };
     if idx == u8::MAX {
         // First call before set_active_theme — initialize from default
         let default_idx = theme_index(DEFAULT_THEME);
         if let Some(di) = default_idx {
             CACHED_THEME_IDX.store(di, Ordering::Release);
         }
-        default_idx
-            .and_then(theme_by_index)
-            .or_else(|| THEMES.themes.values().next())
-            .expect("themes.yaml has no themes")
+        resolve(default_idx.and_then(theme_by_index).or_else(|| THEMES.themes.values().next()))
     } else {
-        theme_by_index(idx).or_else(|| THEMES.themes.values().next()).expect("themes.yaml has no themes")
+        resolve(theme_by_index(idx).or_else(|| THEMES.themes.values().next()))
     }
 }
 
