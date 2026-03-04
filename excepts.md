@@ -29,10 +29,12 @@ crates/cp-console-server/src/main.rs:
   356:     #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
   357      // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
 
-src/typst_cli.rs:
-  4  //! printing and `process::exit` are the expected interface.
-  5: #![expect(
-  6      clippy::print_stdout,
+src/main.rs:
+  128  /// `Ok(msg)` prints to stdout (if non-empty) and exits 0.
+  129  /// `Err((msg, code))` prints to stderr (if non-empty) and exits with `code`.
+  130: #[expect(
+  131      clippy::exit,
+  132      clippy::print_stdout,
 
 
 # `#[expect]` Audit — Final Status
@@ -152,22 +154,22 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 
 ---
 
-### 7. `typst_cli.rs:5` — `print_stdout`, `exit`
+### 7. `main.rs:130` — `print_stdout`, `exit`
 
 ```rust
-#![expect(
-    clippy::print_stdout,
+#[expect(
     clippy::exit,
-    reason = "CLI subcommands — stdout output and process::exit are the normal interface"
+    clippy::print_stdout,
+    reason = "CLI entry point — printing and process::exit are the correct interface"
 )]
+fn handle_cli_result(result: Result<String, (String, i32)>) -> ! {
 ```
 
-**Justification:** `typst_cli.rs` contains two functions (`run_typst_compile`, `run_typst_recompile_watched`) that run as one-shot CLI subcommands — they're invoked via `cpilot typst-compile <file>`, not within the TUI. Printing to stdout/stderr and calling `process::exit()` is the correct interface for CLI tools. The module-level annotation covers both functions cleanly.
+**Justification:** `handle_cli_result()` is the single CLI bridge function — all subcommand results flow through it. It prints success messages to stdout and error messages to stderr, then exits with the appropriate code. This is the correct interface for a CLI tool. The annotation covers one 15-line function (previously a module-level `#![expect]` covering an entire file).
 
 **Strategies to eliminate:**
-- **Return `ExitCode` from main:** Refactor both functions to return `Result<String, (String, i32)>` (ok message + err message/code). The caller in `main.rs` handles printing and exit. `typst_cli.rs` becomes a pure logic module with no I/O — no `println!`, no `process::exit()`. Clean separation of concerns.
-- **Separate binary:** Make `cpilot typst-compile` a standalone binary crate (`cp-typst-cli`) instead of a subcommand of the main `cpilot` binary. A CLI binary is naturally expected to print and exit — and being its own crate, it can have its own lint configuration without affecting the main workspace.
-- **`std::io::Write` injection:** Pass a `&mut dyn Write` parameter to both functions. They write to the provided sink instead of stdout. In production, main passes `std::io::stdout()`. In tests, pass a `Vec<u8>`. Eliminates `print_stdout` but still needs `exit` unless combined with the `Result` return strategy.
+- **`ExitCode` return from main:** Change `main()` from `-> io::Result<()>` to `-> ExitCode`. Handle the CLI subcommand result inline and return `ExitCode::from(code)`. Requires restructuring main's control flow — currently, CLI subcommands diverge early and the TUI path assumes `io::Result<()>`.
+- **Separate binary:** Extract the typst CLI subcommands into a standalone `cpilot-typst` binary. Being its own binary, it naturally prints and exits. The main binary drops the subcommand routing entirely.
 
 ---
 
@@ -180,4 +182,4 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 | 3 | `runtime.rs` | `struct_excessive_bools` | 🟡 | Domain sub-structs (scriptable, ~1000 callsites) |
 | 4–5 | `runtime.rs` | `expect_used` (×2) | 🟡 | `Default` fallback or lazy init |
 | 6 | `server/main.rs` | `unsafe_code` | 🔴 | Irreducible — FFI boundary to kernel syscall |
-| 7 | `typst_cli.rs` | `print_stdout` + `exit` | 🟢 | Return `Result` from CLI functions |
+| 7 | `main.rs` | `print_stdout` + `exit` | 🟡 | `ExitCode` return from main |
