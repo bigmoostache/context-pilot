@@ -46,7 +46,7 @@ pub(crate) fn parse_context_pattern(input: &str) -> Option<String> {
     let num_str = if rest.starts_with('-') || rest.starts_with('_') { &rest[1..] } else { rest };
 
     // Parse the number and return the canonical ID format
-    num_str.parse::<usize>().ok().map(|n| format!("P{}", n))
+    num_str.parse::<usize>().ok().map(|n| format!("P{n}"))
 }
 
 /// Find context index by ID

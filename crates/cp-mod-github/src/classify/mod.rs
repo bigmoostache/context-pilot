@@ -65,7 +65,7 @@ fn check_shell_operators(command: &str) -> Result<(), String> {
             '"' if !in_single => in_double = !in_double,
             _ if in_single || in_double => {}
             '|' | ';' | '`' | '>' | '<' => {
-                return Err(format!("Shell operator '{}' is not allowed", c));
+                return Err(format!("Shell operator '{c}' is not allowed"));
             }
             '$' if i + 1 < len && chars[i + 1] == '(' => {
                 return Err("Shell operator '$(' is not allowed".to_string());
@@ -121,7 +121,7 @@ pub fn classify_gh(args: &[String]) -> CommandClass {
 
     let group = args[0].as_str();
     let action = args.get(1).map_or("", |s| s.as_str());
-    let rest: Vec<&str> = args.iter().skip(1).map(|s| s.as_str()).collect();
+    let rest: Vec<&str> = args.iter().skip(1).map(String::as_str).collect();
 
     match group {
         // PR commands

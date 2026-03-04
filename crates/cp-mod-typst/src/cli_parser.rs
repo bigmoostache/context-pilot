@@ -91,8 +91,7 @@ pub fn parse_command(command: &str) -> Result<TypstCommand, String> {
         "unwatch" => parse_unwatch(args),
         "watchlist" => Ok(TypstCommand::Watchlist),
         other => Err(format!(
-            "Unknown subcommand '{}'. Available: compile, init, query, fonts, update, watch, unwatch, watchlist",
-            other
+            "Unknown subcommand '{other}'. Available: compile, init, query, fonts, update, watch, unwatch, watchlist"
         )),
     }
 }

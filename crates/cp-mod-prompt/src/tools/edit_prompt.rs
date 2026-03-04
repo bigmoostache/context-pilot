@@ -21,7 +21,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing required 'new_string' parameter".to_string(), true);
     };
 
-    let replace_all = tool.input.get("replace_all").and_then(|v| v.as_bool()).unwrap_or(false);
+    let replace_all = tool.input.get("replace_all").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
     // Try to find the ID in agents, skills, then commands
     let ps = PromptState::get(state);
@@ -32,7 +32,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     } else if ps.commands.iter().any(|c| c.id == id) {
         EntityType::Command
     } else {
-        return ToolResult::new(tool.id.clone(), format!("ID '{}' not found in agents, skills, or commands", id), true);
+        return ToolResult::new(tool.id.clone(), format!("ID '{id}' not found in agents, skills, or commands"), true);
     };
 
     // Check that the prompt is open in the Library editor
@@ -44,10 +44,9 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(
             tool.id.clone(),
             format!(
-                "Cannot edit '{}': prompt was not open in the Library editor.\n\
+                "Cannot edit '{id}': prompt was not open in the Library editor.\n\
                  I've automatically opened it for you — its content is now visible in the Library panel.\n\
-                 Please review the content and retry your Edit_prompt call.",
-                id
+                 Please review the content and retry your Edit_prompt call."
             ),
             true,
         );

@@ -97,7 +97,7 @@ pub(super) fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
     if let Some(conv) = state.context.iter().find(|c| c.context_type == ContextType::new(ContextType::CONVERSATION)) {
         let icon = conv.context_type.icon();
         commands.push(
-            PaletteCommand::new(&conv.id, format!("{} Conversation", icon), "Go to conversation").with_keywords(&[
+            PaletteCommand::new(&conv.id, format!("{icon} Conversation"), "Go to conversation").with_keywords(&[
                 "conversation",
                 "chat",
                 "messages",

@@ -79,14 +79,14 @@ impl Panel for GitResultPanel {
                 } else if stdout.trim().is_empty() {
                     stderr.to_string()
                 } else {
-                    format!("{}\n{}", stdout, stderr)
+                    format!("{stdout}\n{stderr}")
                 };
                 let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
                 Some(CacheUpdate::Content { context_id, content, token_count })
             }
             Err(e) => {
-                let content = format!("Error executing git: {}", e);
+                let content = format!("Error executing git: {e}");
                 let token_count = estimate_tokens(&content);
                 Some(CacheUpdate::Content { context_id, content, token_count })
             }

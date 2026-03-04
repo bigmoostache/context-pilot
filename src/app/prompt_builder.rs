@@ -165,7 +165,7 @@ fn inject_panel_messages(
         let header = &INJECTIONS.providers.seed_reinjection_header;
         api_messages.push(ApiMessage {
             role: "user".to_string(),
-            content: vec![ContentBlock::Text { text: format!("{}\n\n{}", header, seed) }],
+            content: vec![ContentBlock::Text { text: format!("{header}\n\n{seed}") }],
         });
         api_messages.push(ApiMessage {
             role: "assistant".to_string(),

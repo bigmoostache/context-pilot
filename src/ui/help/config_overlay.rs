@@ -110,9 +110,9 @@ fn render_provider_section(lines: &mut Vec<Line<'_>>, state: &State) {
             if is_selected { Style::default().fg(theme::accent()).bold() } else { Style::default().fg(theme::text()) };
 
         lines.push(Line::from(vec![
-            Span::styled(format!("  {} ", indicator), Style::default().fg(theme::accent())),
-            Span::styled(format!("{} ", key), Style::default().fg(theme::warning())),
-            Span::styled(format!("{} ", check), style),
+            Span::styled(format!("  {indicator} "), Style::default().fg(theme::accent())),
+            Span::styled(format!("{key} "), Style::default().fg(theme::warning())),
+            Span::styled(format!("{check} "), style),
             Span::styled(name.to_string(), style),
         ]));
     }
@@ -161,7 +161,7 @@ fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
         let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
         let spinner = spinner_chars[(state.spinner_frame.to_usize()) % spinner_chars.len()];
         lines.push(Line::from(vec![
-            Span::styled(format!("  {} ", spinner), Style::default().fg(theme::accent())),
+            Span::styled(format!("  {spinner} "), Style::default().fg(theme::accent())),
             Span::styled("Checking API...", Style::default().fg(theme::text_muted())),
         ]));
     } else if let Some(result) = &state.api_check_result {
@@ -174,7 +174,7 @@ fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
             (normalize_icon("!"), theme::warning(), "Issues detected")
         };
         lines.push(Line::from(vec![
-            Span::styled(format!("  {}", icon), Style::default().fg(color)),
+            Span::styled(format!("  {icon}"), Style::default().fg(color)),
             Span::styled(msg.to_string(), Style::default().fg(color)),
         ]));
     }
@@ -186,7 +186,7 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
         } else if tokens >= 1_000 {
             format!("{}K", tokens / 1_000)
         } else {
-            format!("{}", tokens)
+            format!("{tokens}")
         }
     };
 
@@ -237,7 +237,7 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let target_tokens = state.cleaning_target_tokens();
     let target_abs_pct = (state.cleaning_target() * 100.0).to_usize();
     let target_filled = ((state.cleaning_target_proportion * bar_width.to_f32()).to_usize()).min(bar_width);
-    let extra = format!(" ({}%)", target_abs_pct);
+    let extra = format!(" ({target_abs_pct}%)");
     render_bar(
         lines,
         &BarConfig {
@@ -258,7 +258,7 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let max_cost = spine_cfg.max_cost.unwrap_or(0.0);
     let max_display = 20.0f64;
     let cost_filled = ((max_cost / max_display) * bar_width.to_f64()).min(bar_width.to_f64()).to_usize();
-    let cost_label = if max_cost <= 0.0 { "disabled".to_string() } else { format!("${:.2}", max_cost) };
+    let cost_label = if max_cost <= 0.0 { "disabled".to_string() } else { format!("${max_cost:.2}") };
     let is_selected = selected == 3;
     let indicator = if is_selected { ">" } else { " " };
     let label_style = if is_selected {
@@ -269,7 +269,7 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let arrow_color = if is_selected { theme::accent() } else { theme::text_muted() };
 
     lines.push(Line::from(vec![
-        Span::styled(format!(" {} ", indicator), Style::default().fg(theme::accent())),
+        Span::styled(format!(" {indicator} "), Style::default().fg(theme::accent())),
         Span::styled("Max Cost".to_string(), label_style),
     ]));
     lines.push(Line::from(vec![
@@ -308,7 +308,7 @@ fn render_bar(lines: &mut Vec<Line<'_>>, cfg: &BarConfig<'_>) {
     let arrow_color = if is_selected { theme::accent() } else { theme::text_muted() };
 
     lines.push(Line::from(vec![
-        Span::styled(format!(" {} ", indicator), Style::default().fg(theme::accent())),
+        Span::styled(format!(" {indicator} "), Style::default().fg(theme::accent())),
         Span::styled(cfg.label.to_string(), label_style),
     ]));
     lines.push(Line::from(vec![
@@ -369,7 +369,7 @@ fn render_toggles_section(lines: &mut Vec<Line<'_>>, state: &State) {
         if auto_on { ("[x]", "ON", theme::success()) } else { ("[ ]", "OFF", theme::text_muted()) };
     lines.push(Line::from(vec![
         Span::styled("  Auto-continue: ", Style::default().fg(theme::text_secondary()).bold()),
-        Span::styled(format!("{} ", check), Style::default().fg(color).bold()),
+        Span::styled(format!("{check} "), Style::default().fg(color).bold()),
         Span::styled(status, Style::default().fg(color).bold()),
         Span::styled("  (press ", Style::default().fg(theme::text_muted())),
         Span::styled("s", Style::default().fg(theme::warning())),
@@ -382,7 +382,7 @@ fn render_toggles_section(lines: &mut Vec<Line<'_>>, state: &State) {
         if rev_on { ("[x]", "ON", theme::success()) } else { ("[ ]", "OFF", theme::text_muted()) };
     lines.push(Line::from(vec![
         Span::styled("  Reverie:       ", Style::default().fg(theme::text_secondary()).bold()),
-        Span::styled(format!("{} ", check), Style::default().fg(color).bold()),
+        Span::styled(format!("{check} "), Style::default().fg(color).bold()),
         Span::styled(status, Style::default().fg(color).bold()),
         Span::styled("  (press ", Style::default().fg(theme::text_muted())),
         Span::styled("r", Style::default().fg(theme::warning())),
@@ -448,11 +448,11 @@ fn render_model_line_with_info<M: crate::llms::ModelInfo>(
     let price_str = format!("${:.0}/${:.0}", model.input_price_per_mtok(), model.output_price_per_mtok());
 
     lines.push(Line::from(vec![
-        Span::styled(format!("  {} ", indicator), Style::default().fg(theme::accent())),
-        Span::styled(format!("{} ", key), Style::default().fg(theme::warning())),
-        Span::styled(format!("{} ", check), style),
+        Span::styled(format!("  {indicator} "), Style::default().fg(theme::accent())),
+        Span::styled(format!("{key} "), Style::default().fg(theme::warning())),
+        Span::styled(format!("{check} "), style),
         Span::styled(format!("{:<12}", model.display_name()), style),
-        Span::styled(format!("{:>4} ", ctx_str), Style::default().fg(theme::text_muted())),
+        Span::styled(format!("{ctx_str:>4} "), Style::default().fg(theme::text_muted())),
         Span::styled(price_str, Style::default().fg(theme::text_muted())),
     ]));
 }

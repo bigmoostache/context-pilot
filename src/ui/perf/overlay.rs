@@ -34,7 +34,7 @@ pub(crate) fn render_perf_overlay(frame: &mut Frame<'_>, area: Rect) {
     let fps_color = frame_time_color(snapshot.frame_avg_ms);
 
     lines.push(Line::from(vec![
-        Span::styled(format!(" FPS: {:.0}", fps), Style::default().fg(fps_color).bold()),
+        Span::styled(format!(" FPS: {fps:.0}"), Style::default().fg(fps_color).bold()),
         Span::styled(
             format!("  Frame: {:.1}ms avg  {:.1}ms max", snapshot.frame_avg_ms, snapshot.frame_max_ms),
             Style::default().fg(theme::text_muted()),
@@ -82,7 +82,7 @@ pub(crate) fn render_perf_overlay(frame: &mut Frame<'_>, area: Rect) {
 
             let name =
                 if op.name.len() <= 24 { op.name.to_string() } else { format!("..{}", &op.name[op.name.len() - 22..]) };
-            let name_str = if is_hotspot { format!("! {}", name) } else { format!("  {}", name) };
+            let name_str = if is_hotspot { format!("! {name}") } else { format!("  {name}") };
 
             let name_style = if is_hotspot {
                 Style::default().fg(theme::warning()).bold()
@@ -160,13 +160,13 @@ fn render_budget_bar(current_ms: f64, label: &str, budget_ms: f64) -> Line<'stat
     };
 
     Line::from(vec![
-        Span::styled(format!(" {:<6}", label), Style::default().fg(theme::text_muted())),
+        Span::styled(format!(" {label:<6}"), Style::default().fg(theme::text_muted())),
         Span::styled(chars::BLOCK_FULL.repeat(filled.min(bar_width)), Style::default().fg(color)),
         Span::styled(
             chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)),
             Style::default().fg(theme::bg_elevated()),
         ),
-        Span::styled(format!(" {:>5.0}%", pct), Style::default().fg(color)),
+        Span::styled(format!(" {pct:>5.0}%"), Style::default().fg(color)),
     ])
 }
 fn render_sparkline(values: &[f64]) -> Line<'static> {

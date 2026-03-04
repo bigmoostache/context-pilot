@@ -110,7 +110,7 @@ pub fn compile_and_update_deps(source: &str, output: &str) -> Result<String, Str
     if let Some(parent) = Path::new(output).parent() {
         fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {}", parent.display(), e))?;
     }
-    fs::write(output, &pdf_bytes).map_err(|e| format!("write {}: {}", output, e))?;
+    fs::write(output, &pdf_bytes).map_err(|e| format!("write {output}: {e}"))?;
 
     // Convert absolute dep paths to relative (to project root = cwd)
     let cwd = std::env::current_dir().unwrap_or_default();

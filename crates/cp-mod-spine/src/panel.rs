@@ -19,7 +19,7 @@ fn format_timestamp(ms: u64) -> String {
     let hours = (secs % 86400) / 3600;
     let minutes = (secs % 3600) / 60;
     let seconds = secs % 60;
-    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+    format!("{hours:02}:{minutes:02}:{seconds:02}")
 }
 
 impl SpinePanel {
@@ -70,7 +70,7 @@ impl SpinePanel {
         output
             .push_str(&format!("auto_continuation_count: {}\n", SpineState::get(state).config.auto_continuation_count));
         if let Some(v) = SpineState::get(state).config.max_auto_retries {
-            output.push_str(&format!("max_auto_retries: {}\n", v));
+            output.push_str(&format!("max_auto_retries: {v}\n"));
         }
 
         // Show active watchers
@@ -144,7 +144,7 @@ impl Panel for SpinePanel {
             // Calculate wrap width: viewport minus the prefix "N999 HH:MM:SS TYPE — "
             let viewport = state.last_viewport_width as usize;
             for n in &unprocessed {
-                let type_color = notification_type_color(&n.notification_type);
+                let type_color = notification_type_color(n.notification_type);
                 let ts = format_timestamp(n.timestamp_ms);
                 let prefix = format!("{} {} {} — ", n.id, ts, n.notification_type.label());
                 let prefix_width = UnicodeWidthStr::width(prefix.as_str());
@@ -154,7 +154,7 @@ impl Panel for SpinePanel {
                 // First line with full prefix
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", n.id), Style::default().fg(type_color).bold()),
-                    Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
+                    Span::styled(format!("{ts} "), Style::default().fg(theme::text_muted())),
                     Span::styled(n.notification_type.label().to_string(), Style::default().fg(type_color)),
                     Span::styled(
                         format!(" — {}", wrapped.first().map_or("", |s| s.as_str())),
@@ -189,7 +189,7 @@ impl Panel for SpinePanel {
 
             let viewport = state.last_viewport_width as usize;
             for n in &blocked {
-                let type_color = notification_type_color(&n.notification_type);
+                let type_color = notification_type_color(n.notification_type);
                 let ts = format_timestamp(n.timestamp_ms);
                 let prefix = format!("{} {} {} — ", n.id, ts, n.notification_type.label());
                 let prefix_width = UnicodeWidthStr::width(prefix.as_str());
@@ -198,7 +198,7 @@ impl Panel for SpinePanel {
 
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", n.id), Style::default().fg(type_color)),
-                    Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
+                    Span::styled(format!("{ts} "), Style::default().fg(theme::text_muted())),
                     Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::warning())),
                     Span::styled(
                         format!(" — {}", wrapped.first().map_or("", |s| s.as_str())),
@@ -229,7 +229,7 @@ impl Panel for SpinePanel {
 
             let viewport = state.last_viewport_width as usize;
             for n in &recent_processed {
-                let type_color = notification_type_color(&n.notification_type);
+                let type_color = notification_type_color(n.notification_type);
                 let ts = format_timestamp(n.timestamp_ms);
                 let prefix = format!("{} {} {} — ", n.id, ts, n.notification_type.label());
                 let prefix_width = UnicodeWidthStr::width(prefix.as_str());
@@ -239,7 +239,7 @@ impl Panel for SpinePanel {
                 // First line with full prefix
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", n.id), Style::default().fg(type_color)),
-                    Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
+                    Span::styled(format!("{ts} "), Style::default().fg(theme::text_muted())),
                     Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::text_muted())),
                     Span::styled(
                         format!(" — {}", wrapped.first().map_or("", |s| s.as_str())),
@@ -269,7 +269,7 @@ impl Panel for SpinePanel {
 
         for (key, val) in config_items {
             lines.push(Line::from(vec![
-                Span::styled(format!("  {}", key), Style::default().fg(theme::text_muted())),
+                Span::styled(format!("  {key}"), Style::default().fg(theme::text_muted())),
                 Span::styled(": ".to_string(), Style::default().fg(theme::text_muted())),
                 Span::styled(val, Style::default().fg(theme::text())),
             ]));
@@ -290,9 +290,9 @@ impl Panel for SpinePanel {
                     let mode_color = if w.is_blocking() { theme::warning() } else { theme::text_secondary() };
                     let mode_label = if w.is_blocking() { "⏳" } else { "👁" };
                     lines.push(Line::from(vec![
-                        Span::styled(format!("  {} ", mode_label), Style::default().fg(mode_color)),
+                        Span::styled(format!("  {mode_label} "), Style::default().fg(mode_color)),
                         Span::styled(w.description().to_string(), Style::default().fg(theme::text())),
-                        Span::styled(format!(" ({}s)", age_s), Style::default().fg(theme::text_muted())),
+                        Span::styled(format!(" ({age_s}s)"), Style::default().fg(theme::text_muted())),
                     ]));
                 }
             }
@@ -302,7 +302,7 @@ impl Panel for SpinePanel {
     }
 }
 
-fn notification_type_color(nt: &NotificationType) -> Color {
+fn notification_type_color(nt: NotificationType) -> Color {
     match nt {
         NotificationType::UserMessage => theme::user(),
         NotificationType::ReloadResume | NotificationType::Custom => theme::text_secondary(),

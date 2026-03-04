@@ -40,12 +40,12 @@ pub(crate) fn render_message(
                                     if s.len() > 30 {
                                         format!("\"{}...\"", &s[..s.floor_char_boundary(27)])
                                     } else {
-                                        format!("\"{}\"", s)
+                                        format!("\"{s}\"")
                                     }
                                 }
                                 _ => v.to_string(),
                             };
-                            format!("{}={}", k, val)
+                            format!("{k}={val}")
                         })
                         .collect()
                 })
@@ -148,7 +148,7 @@ pub(crate) fn render_message(
 
     let content = &msg.content;
 
-    let prefix = format!("{}{} ", role_icon, status_icon);
+    let prefix = format!("{role_icon}{status_icon} ");
     let prefix_width = prefix.chars().count();
     let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
 

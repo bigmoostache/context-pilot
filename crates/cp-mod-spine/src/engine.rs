@@ -265,7 +265,7 @@ fn check_context_threshold(state: &mut State) {
 
     let content = PROMPTS
         .context_threshold_notification
-        .replace("{usage_pct}", &format!("{:.0}", usage_pct))
+        .replace("{usage_pct}", &format!("{usage_pct:.0}"))
         .replace("{used_tokens}", &total_tokens.to_string())
         .replace("{budget_tokens}", &budget_tokens.to_string());
 

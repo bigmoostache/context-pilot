@@ -27,11 +27,11 @@ impl CachePool {
         for i in 0..CACHE_POOL_SIZE {
             let rx = std::sync::Arc::clone(&job_rx);
             let _r = thread::Builder::new()
-                .name(format!("cache-worker-{}", i))
+                .name(format!("cache-worker-{i}"))
                 .spawn(move || {
                     loop {
                         let job = {
-                            let lock = rx.lock().unwrap_or_else(|e| e.into_inner());
+                            let lock = rx.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                             lock.recv()
                         };
                         match job {

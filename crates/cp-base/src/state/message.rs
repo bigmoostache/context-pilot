@@ -164,7 +164,7 @@ pub mod test_helpers {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let mut b = Self::base(format!("U{}", n), "user", MessageType::TextMessage);
+            let mut b = Self::base(format!("U{n}"), "user", MessageType::TextMessage);
             b.msg.content = content.to_string();
             b
         }
@@ -174,7 +174,7 @@ pub mod test_helpers {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let mut b = Self::base(format!("A{}", n), "assistant", MessageType::TextMessage);
+            let mut b = Self::base(format!("A{n}"), "assistant", MessageType::TextMessage);
             b.msg.content = content.to_string();
             b
         }
@@ -184,7 +184,7 @@ pub mod test_helpers {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let id = format!("T{}", n);
+            let id = format!("T{n}");
             let mut b = Self::base(id.clone(), "assistant", MessageType::ToolCall);
             b.msg.tool_uses.push(ToolUseRecord { id, name: name.to_string(), input });
             b
@@ -195,7 +195,7 @@ pub mod test_helpers {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let mut b = Self::base(format!("R{}", n), "user", MessageType::ToolResult);
+            let mut b = Self::base(format!("R{n}"), "user", MessageType::ToolResult);
             b.msg.tool_results.push(ToolResultRecord {
                 tool_use_id: tool_use_id.to_string(),
                 content: content.to_string(),

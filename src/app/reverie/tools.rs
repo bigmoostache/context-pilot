@@ -70,7 +70,7 @@ pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
     // We return the summary text as content so the event loop knows what to notify.
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!("REVERIE_REPORT:{}", summary),
+        content: format!("REVERIE_REPORT:{summary}"),
         is_error: false,
         tool_name: tool.name.clone(),
     }
@@ -105,14 +105,13 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
         };
     }
 
-    let context = tool.input.get("directive").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let context = tool.input.get("directive").and_then(|v| v.as_str()).map(ToString::to_string);
 
     // Signal to the event loop that a reverie should be started.
     // Sentinel format: REVERIE_START:<agent_id>\n<context_or_empty>\n<human_readable_msg>
     let msg = match &context {
         Some(c) if !c.is_empty() => format!(
-            "Context optimizer activated with directive: \"{}\". It will run in the background and report when done.",
-            c
+            "Context optimizer activated with directive: \"{c}\". It will run in the background and report when done."
         ),
         _ => "Context optimizer activated. It will run in the background and report when done.".to_string(),
     };

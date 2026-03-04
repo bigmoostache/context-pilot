@@ -61,7 +61,7 @@ impl App {
                     }
                     self.state.context.push(ctx);
                     // Enrich the result description with the panel reference
-                    result.description.push_str(&format!("\nSee panel {} for full output.", panel_id));
+                    result.description.push_str(&format!("\nSee panel {panel_id} for full output."));
                 }
                 // Auto-close panels for watchers that request it
                 if result.close_panel
@@ -144,9 +144,9 @@ impl App {
                     let merged_descriptions = all_matched.join("\n");
                     // Append to existing Callbacks block if present, else create new one
                     if original_content.contains("\nCallbacks:\n") {
-                        tr.content = format!("{}\n{}", original_content, merged_descriptions);
+                        tr.content = format!("{original_content}\n{merged_descriptions}");
                     } else {
-                        tr.content = format!("{}\nCallbacks:\n{}", original_content, merged_descriptions);
+                        tr.content = format!("{original_content}\nCallbacks:\n{merged_descriptions}");
                     }
                 }
             }
@@ -197,7 +197,7 @@ impl App {
                     // Callback sentinel: extract original content after sentinel+id prefix
                     let after = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
                     // Try to find where the original content starts (after sentinel_id)
-                    tr.content = format!("Callback result unavailable (timeout). Original: {}", after);
+                    tr.content = format!("Callback result unavailable (timeout). Original: {after}");
                 }
             }
         }

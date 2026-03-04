@@ -33,9 +33,9 @@ pub(super) fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'s
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
         Span::styled("Panels: ".to_string(), Style::default().fg(theme::text_secondary())),
-        Span::styled(format!("{}", panel_count), Style::default().fg(theme::text()).bold()),
+        Span::styled(format!("{panel_count}"), Style::default().fg(theme::text()).bold()),
         Span::styled(
-            format!(" ({} fixed, {} dynamic, 1 system, 1 tools)", fixed_count, dynamic_count),
+            format!(" ({fixed_count} fixed, {dynamic_count} dynamic, 1 system, 1 tools)"),
             Style::default().fg(theme::text_muted()),
         ),
     ]));
@@ -47,9 +47,9 @@ pub(super) fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'s
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
         Span::styled("Messages: ".to_string(), Style::default().fg(theme::text_secondary())),
-        Span::styled(format!("{}", total_msgs), Style::default().fg(theme::text()).bold()),
+        Span::styled(format!("{total_msgs}"), Style::default().fg(theme::text()).bold()),
         Span::styled(
-            format!(" ({} user, {} assistant)", user_msgs, assistant_msgs),
+            format!(" ({user_msgs} user, {assistant_msgs} assistant)"),
             Style::default().fg(theme::text_muted()),
         ),
     ]));
@@ -64,10 +64,10 @@ pub(super) fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'s
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("Todos: ".to_string(), Style::default().fg(theme::text_secondary())),
-            Span::styled(format!("{}/{}", done_todos, total_todos), Style::default().fg(theme::success()).bold()),
+            Span::styled(format!("{done_todos}/{total_todos}"), Style::default().fg(theme::success()).bold()),
             Span::styled(" done".to_string(), Style::default().fg(theme::text_muted())),
             Span::styled(
-                format!(", {} in progress, {} pending", in_progress, pending),
+                format!(", {in_progress} in progress, {pending} pending"),
                 Style::default().fg(theme::text_muted()),
             ),
         ]));
@@ -84,9 +84,9 @@ pub(super) fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'s
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("Memories: ".to_string(), Style::default().fg(theme::text_secondary())),
-            Span::styled(format!("{}", total_memories), Style::default().fg(theme::text()).bold()),
+            Span::styled(format!("{total_memories}"), Style::default().fg(theme::text()).bold()),
             Span::styled(
-                format!(" ({} critical, {} high, {} medium, {} low)", critical, high, medium, low),
+                format!(" ({critical} critical, {high} high, {medium} medium, {low} low)"),
                 Style::default().fg(theme::text_muted()),
             ),
         ]));
@@ -282,7 +282,7 @@ pub(super) fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static
         Span::styled(" ".to_string(), base_style),
         Span::styled("TOOLS".to_string(), Style::default().fg(theme::text_muted()).bold()),
         Span::styled(
-            format!("  ({} enabled, {} disabled)", enabled_count, disabled_count),
+            format!("  ({enabled_count} enabled, {disabled_count} disabled)"),
             Style::default().fg(theme::text_muted()),
         ),
     ]));
@@ -309,7 +309,7 @@ pub(super) fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled(cat_name.clone(), Style::default().fg(theme::accent()).bold()),
-            Span::styled(format!("  {}", cat_desc), Style::default().fg(theme::text_muted())),
+            Span::styled(format!("  {cat_desc}"), Style::default().fg(theme::text_muted())),
         ]));
 
         let header = [

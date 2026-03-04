@@ -56,7 +56,7 @@ fn test_general_kenobi() {
 
     let text = resp_body["content"][0]["text"].as_str().expect("No text in response content");
 
-    assert!(text.to_lowercase().contains("general kenobi"), "Expected 'General Kenobi' in response, got: {}", text);
+    assert!(text.to_lowercase().contains("general kenobi"), "Expected 'General Kenobi' in response, got: {text}");
 }
 
 /// Same as above but with tools and streaming — matches what `stream()` actually sends.
@@ -118,7 +118,7 @@ fn test_general_kenobi_with_tools_streaming() {
     let status = response.status();
 
     // For streaming, read SSE lines and collect text
-    assert!(status.is_success(), "API returned {}", status);
+    assert!(status.is_success(), "API returned {status}");
 
     let mut full_text = String::new();
     let reader = std::io::BufReader::new(response);
@@ -141,8 +141,7 @@ fn test_general_kenobi_with_tools_streaming() {
 
     assert!(
         full_text.to_lowercase().contains("general kenobi"),
-        "Expected 'General Kenobi' in streamed response, got: {}",
-        full_text
+        "Expected 'General Kenobi' in streamed response, got: {full_text}"
     );
 }
 

@@ -91,7 +91,7 @@ impl Module for OverviewModule {
                 }
             }
         }
-        if let Some(v) = data.get("dev_mode").and_then(|v| v.as_bool()) {
+        if let Some(v) = data.get("dev_mode").and_then(serde_json::Value::as_bool) {
             state.dev_mode = v;
         }
         if let Some(v) = data.get("llm_provider")
@@ -144,28 +144,28 @@ impl Module for OverviewModule {
         {
             state.secondary_deepseek_model = m;
         }
-        if let Some(v) = data.get("reverie_enabled").and_then(|v| v.as_bool()) {
+        if let Some(v) = data.get("reverie_enabled").and_then(serde_json::Value::as_bool) {
             state.reverie_enabled = v;
         }
-        if let Some(v) = data.get("cleaning_threshold").and_then(|v| v.as_f64()) {
+        if let Some(v) = data.get("cleaning_threshold").and_then(serde_json::Value::as_f64) {
             state.cleaning_threshold = v.to_f32();
         }
-        if let Some(v) = data.get("cleaning_target_proportion").and_then(|v| v.as_f64()) {
+        if let Some(v) = data.get("cleaning_target_proportion").and_then(serde_json::Value::as_f64) {
             state.cleaning_target_proportion = v.to_f32();
         }
         if let Some(v) = data.get("context_budget") {
-            state.context_budget = v.as_u64().map(|n| n.to_usize());
+            state.context_budget = v.as_u64().map(SafeCast::to_usize);
         }
-        if let Some(v) = data.get("global_next_uid").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("global_next_uid").and_then(serde_json::Value::as_u64) {
             state.global_next_uid = v.to_usize();
         }
-        if let Some(v) = data.get("cache_hit_tokens").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("cache_hit_tokens").and_then(serde_json::Value::as_u64) {
             state.cache_hit_tokens = v.to_usize();
         }
-        if let Some(v) = data.get("cache_miss_tokens").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("cache_miss_tokens").and_then(serde_json::Value::as_u64) {
             state.cache_miss_tokens = v.to_usize();
         }
-        if let Some(v) = data.get("total_output_tokens").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("total_output_tokens").and_then(serde_json::Value::as_u64) {
             state.total_output_tokens = v.to_usize();
         }
         if let Some(arr) = data.get("disabled_tools").and_then(|v| v.as_array()) {
@@ -290,11 +290,10 @@ impl Module for OverviewModule {
                     for id_val in ids {
                         if let Some(id) = id_val.as_str() {
                             if !state.context.iter().any(|c| c.id == id) {
-                                pf.warnings.push(format!("Panel '{}' not found — will be skipped", id));
+                                pf.warnings.push(format!("Panel '{id}' not found — will be skipped"));
                             } else if state.context.iter().any(|c| c.id == id && c.context_type.is_fixed()) {
                                 pf.warnings.push(format!(
-                                    "Panel '{}' is a fixed panel and cannot be closed — will be skipped",
-                                    id
+                                    "Panel '{id}' is a fixed panel and cannot be closed — will be skipped"
                                 ));
                             }
                         }
@@ -308,7 +307,7 @@ impl Module for OverviewModule {
                     for change in changes {
                         if let Some(tool_id) = change.get("tool").and_then(|v| v.as_str()) {
                             if !state.tools.iter().any(|t| t.id == tool_id) {
-                                pf.errors.push(format!("Tool '{}' not found", tool_id));
+                                pf.errors.push(format!("Tool '{tool_id}' not found"));
                             } else if tool_id == "tool_manage" {
                                 pf.errors.push("Cannot disable 'tool_manage' — it protects itself".to_string());
                             }
@@ -321,12 +320,12 @@ impl Module for OverviewModule {
                 let mut pf = PreFlightResult::new();
                 if let Some(panel_id) = tool.input.get("panel_id").and_then(|v| v.as_str()) {
                     match state.context.iter().find(|c| c.id == panel_id) {
-                        None => pf.errors.push(format!("Panel '{}' not found", panel_id)),
+                        None => pf.errors.push(format!("Panel '{panel_id}' not found")),
                         Some(ctx) => {
-                            if let Some(page) = tool.input.get("page").and_then(|v| v.as_i64()) {
+                            if let Some(page) = tool.input.get("page").and_then(serde_json::Value::as_i64) {
                                 let total = ctx.total_pages.to_i64();
                                 if total > 0 && (page < 1 || page > total) {
-                                    pf.errors.push(format!("Page {} out of range (1-{})", page, total));
+                                    pf.errors.push(format!("Page {page} out of range (1-{total})"));
                                 }
                             }
                         }

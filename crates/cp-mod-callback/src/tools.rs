@@ -23,7 +23,7 @@ pub fn execute_upsert(tool: &ToolUse, state: &mut State) -> ToolResult {
         "delete" => tools_upsert::execute_delete(tool, state),
         _ => ToolResult::new(
             tool.id.clone(),
-            format!("Invalid action '{}'. Use 'create', 'update', or 'delete'.", action),
+            format!("Invalid action '{action}'. Use 'create', 'update', or 'delete'."),
             true,
         ),
     }
@@ -40,7 +40,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let cs = CallbackState::get(state);
     let Some(def) = cs.definitions.iter().find(|d| d.id == anchor_id) else {
-        return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
+        return ToolResult::new(tool.id.clone(), format!("Callback '{anchor_id}' not found"), true);
     };
 
     // Read the script file so we can confirm it exists
@@ -69,11 +69,10 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let msg = if let Some(prev) = previous {
         format!(
-            "Opened callback {} in editor (closed previous: {}). Script content is now visible in the Callbacks panel.",
-            anchor_id, prev
+            "Opened callback {anchor_id} in editor (closed previous: {prev}). Script content is now visible in the Callbacks panel."
         )
     } else {
-        format!("Opened callback {} in editor. Script content is now visible in the Callbacks panel.", anchor_id)
+        format!("Opened callback {anchor_id} in editor. Script content is now visible in the Callbacks panel.")
     };
 
     ToolResult::new(tool.id.clone(), msg, false)
@@ -120,21 +119,21 @@ pub fn execute_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let Some(active) = tool.input.get("active").and_then(|v| v.as_bool()) else {
+    let Some(active) = tool.input.get("active").and_then(serde_json::Value::as_bool) else {
         return ToolResult::new(tool.id.clone(), "Missing required parameter 'active' (true/false)".to_string(), true);
     };
 
     let cs = CallbackState::get(state);
     if !cs.definitions.iter().any(|d| d.id == anchor_id) {
-        return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
+        return ToolResult::new(tool.id.clone(), format!("Callback '{anchor_id}' not found"), true);
     }
 
     let cs = CallbackState::get_mut(state);
     if active {
         let _ = cs.active_set.insert(anchor_id.clone());
-        ToolResult::new(tool.id.clone(), format!("Callback {} activated ✓", anchor_id), false)
+        ToolResult::new(tool.id.clone(), format!("Callback {anchor_id} activated ✓"), false)
     } else {
         let _ = cs.active_set.remove(&anchor_id);
-        ToolResult::new(tool.id.clone(), format!("Callback {} deactivated ✗", anchor_id), false)
+        ToolResult::new(tool.id.clone(), format!("Callback {anchor_id} deactivated ✗"), false)
     }
 }

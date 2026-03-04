@@ -190,9 +190,9 @@ impl Module for PromptModule {
                 let mut pf = PreFlightResult::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match ps.agents.iter().find(|a| a.id == id) {
-                        None => pf.errors.push(format!("Agent '{}' not found", id)),
+                        None => pf.errors.push(format!("Agent '{id}' not found")),
                         Some(a) if a.is_builtin => {
-                            pf.errors.push(format!("Agent '{}' is built-in and cannot be deleted", id));
+                            pf.errors.push(format!("Agent '{id}' is built-in and cannot be deleted"));
                         }
                         _ => {}
                     }
@@ -205,7 +205,7 @@ impl Module for PromptModule {
                     && !id.is_empty()
                     && !ps.agents.iter().any(|a| a.id == id)
                 {
-                    pf.errors.push(format!("Agent '{}' not found", id));
+                    pf.errors.push(format!("Agent '{id}' not found"));
                 }
                 Some(pf)
             }
@@ -213,9 +213,9 @@ impl Module for PromptModule {
                 let mut pf = PreFlightResult::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match ps.skills.iter().find(|s| s.id == id) {
-                        None => pf.errors.push(format!("Skill '{}' not found", id)),
+                        None => pf.errors.push(format!("Skill '{id}' not found")),
                         Some(s) if s.is_builtin => {
-                            pf.errors.push(format!("Skill '{}' is built-in and cannot be deleted", id));
+                            pf.errors.push(format!("Skill '{id}' is built-in and cannot be deleted"));
                         }
                         _ => {}
                     }
@@ -226,9 +226,9 @@ impl Module for PromptModule {
                 let mut pf = PreFlightResult::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     if !ps.skills.iter().any(|s| s.id == id) {
-                        pf.errors.push(format!("Skill '{}' not found", id));
+                        pf.errors.push(format!("Skill '{id}' not found"));
                     } else if ps.loaded_skill_ids.contains(&id.to_string()) {
-                        pf.warnings.push(format!("Skill '{}' is already loaded", id));
+                        pf.warnings.push(format!("Skill '{id}' is already loaded"));
                     }
                 }
                 Some(pf)
@@ -237,9 +237,9 @@ impl Module for PromptModule {
                 let mut pf = PreFlightResult::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     if !ps.skills.iter().any(|s| s.id == id) {
-                        pf.errors.push(format!("Skill '{}' not found", id));
+                        pf.errors.push(format!("Skill '{id}' not found"));
                     } else if !ps.loaded_skill_ids.contains(&id.to_string()) {
-                        pf.warnings.push(format!("Skill '{}' is not currently loaded", id));
+                        pf.warnings.push(format!("Skill '{id}' is not currently loaded"));
                     }
                 }
                 Some(pf)
@@ -251,7 +251,7 @@ impl Module for PromptModule {
                         || ps.skills.iter().any(|s| s.id == id)
                         || ps.commands.iter().any(|c| c.id == id);
                     if !exists {
-                        pf.errors.push(format!("Prompt '{}' not found (not an agent, skill, or command)", id));
+                        pf.errors.push(format!("Prompt '{id}' not found (not an agent, skill, or command)"));
                     }
                 }
                 Some(pf)
@@ -267,9 +267,9 @@ impl Module for PromptModule {
                 let mut pf = PreFlightResult::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match ps.commands.iter().find(|c| c.id == id) {
-                        None => pf.errors.push(format!("Command '{}' not found", id)),
+                        None => pf.errors.push(format!("Command '{id}' not found")),
                         Some(c) if c.is_builtin => {
-                            pf.errors.push(format!("Command '{}' is built-in and cannot be deleted", id));
+                            pf.errors.push(format!("Command '{id}' is built-in and cannot be deleted"));
                         }
                         _ => {}
                     }
@@ -335,10 +335,10 @@ impl Module for PromptModule {
             return None;
         }
         let name = ctx.name.clone();
-        if let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(|s| s.to_string()) {
+        if let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(ToString::to_string) {
             PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != &skill_id);
         }
-        Some(Ok(format!("skill: {}", name)))
+        Some(Ok(format!("skill: {name}")))
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {

@@ -8,8 +8,7 @@ fn validate_tldr(text: &str) -> Result<(), String> {
     let tokens = estimate_tokens(text);
     if tokens > MEMORY_TLDR_MAX_TOKENS {
         Err(format!(
-            "tl_dr too long: ~{} tokens (max {}). Keep it to a short one-liner; put details in 'contents' instead.",
-            tokens, MEMORY_TLDR_MAX_TOKENS
+            "tl_dr too long: ~{tokens} tokens (max {MEMORY_TLDR_MAX_TOKENS}). Keep it to a short one-liner; put details in 'contents' instead."
         ))
     } else {
         Ok(())
@@ -103,7 +102,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         // Check for deletion
-        if update_value.get("delete").and_then(|v| v.as_bool()).unwrap_or(false) {
+        if update_value.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false) {
             let ms = MemoryState::get_mut(state);
             let initial_len = ms.memories.len();
             ms.memories.retain(|m| m.id != id);
@@ -127,7 +126,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
                 if let Some(content) = update_value.get("content").and_then(|v| v.as_str()) {
                     if let Err(e) = validate_tldr(content) {
-                        errors.push(format!("{}: {}", id, e));
+                        errors.push(format!("{id}: {e}"));
                         continue;
                     }
                     m.tl_dr = content.to_string();
@@ -152,7 +151,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
 
                 // Handle open/close toggle
-                if let Some(open) = update_value.get("open").and_then(|v| v.as_bool()) {
+                if let Some(open) = update_value.get("open").and_then(serde_json::Value::as_bool) {
                     if open {
                         if !ms.open_memory_ids.contains(&id.to_string()) {
                             ms.open_memory_ids.push(id.to_string());

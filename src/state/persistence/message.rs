@@ -17,7 +17,7 @@ fn messages_dir() -> PathBuf {
 }
 
 fn message_path(uid: &str) -> PathBuf {
-    messages_dir().join(format!("{}.yaml", uid))
+    messages_dir().join(format!("{uid}.yaml"))
 }
 
 /// Load a message by its UID from the messages directory

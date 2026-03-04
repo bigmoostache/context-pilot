@@ -7,7 +7,7 @@ use cp_base::cast::SafeCast;
 /// Execute the `notification_mark_processed` tool
 pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
     let all_ids: Vec<String> = match tool.input.get("ids").and_then(|v| v.as_array()) {
-        Some(arr) => arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect(),
+        Some(arr) => arr.iter().filter_map(|v| v.as_str().map(ToString::to_string)).collect(),
         None => {
             return ToolResult::new(tool.id.clone(), "Missing required 'ids' parameter.".to_string(), true);
         }
@@ -22,7 +22,11 @@ pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolR
     let mut not_found = Vec::new();
 
     for id in &all_ids {
-        let status = SpineState::get(state).notifications.iter().find(|n| n.id == *id).map(|n| n.is_processed());
+        let status = SpineState::get(state)
+            .notifications
+            .iter()
+            .find(|n| n.id == *id)
+            .map(super::types::Notification::is_processed);
         match status {
             Some(true) => already.push(id.as_str()),
             Some(false) => {
@@ -52,9 +56,9 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     let mut changes: Vec<String> = Vec::new();
 
     // === Auto-continuation toggles ===
-    if let Some(v) = tool.input.get("continue_until_todos_done").and_then(|v| v.as_bool()) {
+    if let Some(v) = tool.input.get("continue_until_todos_done").and_then(serde_json::Value::as_bool) {
         SpineState::get_mut(state).config.continue_until_todos_done = v;
-        changes.push(format!("continue_until_todos_done = {}", v));
+        changes.push(format!("continue_until_todos_done = {v}"));
     }
 
     // === Guard rail limits (pass null to disable) ===
@@ -73,7 +77,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
                 );
             }
             SpineState::get_mut(state).config.max_output_tokens = Some(n.to_usize());
-            changes.push(format!("max_output_tokens = {}", n));
+            changes.push(format!("max_output_tokens = {n}"));
         }
     }
 
@@ -91,7 +95,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
                 );
             }
             SpineState::get_mut(state).config.max_cost = Some(n);
-            changes.push(format!("max_cost = ${:.2}", n));
+            changes.push(format!("max_cost = ${n:.2}"));
         }
     }
 
@@ -109,7 +113,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
                 );
             }
             SpineState::get_mut(state).config.max_stream_cost = Some(n);
-            changes.push(format!("max_stream_cost = ${:.2}", n));
+            changes.push(format!("max_stream_cost = ${n:.2}"));
         }
     }
 
@@ -127,7 +131,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
                 );
             }
             SpineState::get_mut(state).config.max_duration_secs = Some(n);
-            changes.push(format!("max_duration_secs = {}s", n));
+            changes.push(format!("max_duration_secs = {n}s"));
         }
     }
 
@@ -145,7 +149,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
                 );
             }
             SpineState::get_mut(state).config.max_messages = Some(n.to_usize());
-            changes.push(format!("max_messages = {}", n));
+            changes.push(format!("max_messages = {n}"));
         }
     }
 
@@ -163,12 +167,12 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
                 );
             }
             SpineState::get_mut(state).config.max_auto_retries = Some(n.to_usize());
-            changes.push(format!("max_auto_retries = {}", n));
+            changes.push(format!("max_auto_retries = {n}"));
         }
     }
 
     // === Reset runtime counters ===
-    if let Some(true) = tool.input.get("reset_counters").and_then(|v| v.as_bool()) {
+    if let Some(true) = tool.input.get("reset_counters").and_then(serde_json::Value::as_bool) {
         SpineState::get_mut(state).config.auto_continuation_count = 0;
         SpineState::get_mut(state).config.autonomous_start_ms = None;
         changes.push("reset runtime counters".to_string());
@@ -187,7 +191,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
             tool.id.clone(),
             format!(
                 "Spine configured:\n{}",
-                changes.iter().map(|c| format!("  • {}", c)).collect::<Vec<_>>().join("\n")
+                changes.iter().map(|c| format!("  • {c}")).collect::<Vec<_>>().join("\n")
             ),
             false,
         )

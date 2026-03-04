@@ -62,7 +62,7 @@ pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<(PathBu
 
     // Build write op for each chunk
     for (idx, chunk_logs) in &chunks {
-        let path = dir.join(format!("chunk_{}.json", idx));
+        let path = dir.join(format!("chunk_{idx}.json"));
         if let Ok(json) = serde_json::to_string_pretty(chunk_logs) {
             ops.push((path, json.into_bytes()));
         }
@@ -88,7 +88,7 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
     let next_id_path = dir.join("next_id.json");
     if let Ok(content) = fs::read_to_string(&next_id_path)
         && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
-        && let Some(v) = val.get("next_log_id").and_then(|v| v.as_u64())
+        && let Some(v) = val.get("next_log_id").and_then(serde_json::Value::as_u64)
     {
         next_log_id = v.to_usize();
     }
@@ -96,7 +96,7 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
     // Load all chunk files
     if let Ok(entries) = fs::read_dir(&dir) {
         let mut chunk_files: Vec<(usize, PathBuf)> = entries
-            .filter_map(|e| e.ok())
+            .filter_map(Result::ok)
             .filter_map(|e| {
                 let path = e.path();
                 let stem = path.file_stem()?.to_str()?;
@@ -247,7 +247,7 @@ impl Module for LogsModule {
                         if let Some(id) = id_val.as_str()
                             && !logs.iter().any(|l| l.id == id)
                         {
-                            pf.errors.push(format!("Log '{}' not found", id));
+                            pf.errors.push(format!("Log '{id}' not found"));
                         }
                     }
                 }
@@ -258,9 +258,9 @@ impl Module for LogsModule {
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let logs = &LogsState::get(state).logs;
                     match logs.iter().find(|l| l.id == id) {
-                        None => pf.errors.push(format!("Log '{}' not found", id)),
+                        None => pf.errors.push(format!("Log '{id}' not found")),
                         Some(log) if log.children_ids.is_empty() => {
-                            pf.errors.push(format!("Log '{}' has no children — can only toggle summaries", id));
+                            pf.errors.push(format!("Log '{id}' has no children — can only toggle summaries"));
                         }
                         _ => {}
                     }
@@ -280,11 +280,10 @@ impl Module for LogsModule {
                 }
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match state.context.iter().find(|c| c.id == id) {
-                        None => pf.errors.push(format!("Panel '{}' not found", id)),
+                        None => pf.errors.push(format!("Panel '{id}' not found")),
                         Some(ctx) if ctx.context_type != ContextType::CONVERSATION_HISTORY => {
                             pf.errors.push(format!(
-                                "Panel '{}' is not a conversation history panel — use Close_panel instead",
-                                id
+                                "Panel '{id}' is not a conversation history panel — use Close_panel instead"
                             ));
                         }
                         _ => {}

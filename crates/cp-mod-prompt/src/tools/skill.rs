@@ -26,7 +26,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if PromptState::get(state).skills.iter().any(|s| s.id == id) {
-        return ToolResult::new(tool.id.clone(), format!("Skill with ID '{}' already exists", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Skill with ID '{id}' already exists"), true);
     }
 
     let item = PromptItem {
@@ -43,7 +43,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Created skill '{}' with ID '{}'", name, id), false)
+    ToolResult::new(tool.id.clone(), format!("Created skill '{name}' with ID '{id}'"), false)
 }
 
 pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -54,12 +54,12 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(skill) = PromptState::get(state).skills.iter().find(|s| s.id == id)
         && skill.is_builtin
     {
-        return ToolResult::new(tool.id.clone(), format!("Cannot delete built-in skill '{}'", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Cannot delete built-in skill '{id}'"), true);
     }
 
     let ps = PromptState::get_mut(state);
     let Some(idx) = ps.skills.iter().position(|s| s.id == id) else {
-        return ToolResult::new(tool.id.clone(), format!("Skill '{}' not found", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Skill '{id}' not found"), true);
     };
 
     // If loaded, unload first
@@ -89,13 +89,13 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let skill = match ps.skills.iter().find(|s| s.id == id) {
         Some(s) => s.clone(),
         None => {
-            return ToolResult::new(tool.id.clone(), format!("Skill '{}' not found", id), true);
+            return ToolResult::new(tool.id.clone(), format!("Skill '{id}' not found"), true);
         }
     };
 
     // Check if already loaded
     if ps.loaded_skill_ids.contains(&id.to_string()) {
-        return ToolResult::new(tool.id.clone(), format!("Skill '{}' is already loaded", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Skill '{id}' is already loaded"), true);
     }
 
     // Create ContextElement for the skill panel
@@ -138,7 +138,7 @@ pub(crate) fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     if !PromptState::get(state).loaded_skill_ids.contains(&id.to_string()) {
-        return ToolResult::new(tool.id.clone(), format!("Skill '{}' is not loaded", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Skill '{id}' is not loaded"), true);
     }
 
     // Remove the skill panel from context
@@ -154,7 +154,7 @@ pub(crate) fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     ToolResult::new(
         tool.id.clone(),
-        format!("Unloaded skill '{}'{}", name, panel_id.map(|p| format!(" (removed {})", p)).unwrap_or_default()),
+        format!("Unloaded skill '{}'{}", name, panel_id.map(|p| format!(" (removed {p})")).unwrap_or_default()),
         false,
     )
 }

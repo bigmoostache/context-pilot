@@ -27,7 +27,7 @@ pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<
     match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
         Ok(result) => result,
         Err(_) => {
-            Err(std::io::Error::new(std::io::ErrorKind::TimedOut, format!("Command timed out after {}s", timeout_secs)))
+            Err(std::io::Error::new(std::io::ErrorKind::TimedOut, format!("Command timed out after {timeout_secs}s")))
         }
     }
 }
@@ -39,7 +39,7 @@ pub fn truncate_output(output: &str, max_bytes: usize) -> String {
         output.to_string()
     } else {
         let truncated = &output[..output.floor_char_boundary(max_bytes)];
-        format!("{}\n\n[Output truncated at 1MB]", truncated)
+        format!("{truncated}\n\n[Output truncated at 1MB]")
     }
 }
 

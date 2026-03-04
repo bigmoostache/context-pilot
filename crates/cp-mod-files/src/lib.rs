@@ -95,11 +95,11 @@ impl Module for FilesModule {
                 for path in &paths {
                     let p = std::path::Path::new(path);
                     if !p.exists() {
-                        pf.errors.push(format!("File '{}' not found", path));
+                        pf.errors.push(format!("File '{path}' not found"));
                     } else if !p.is_file() {
-                        pf.errors.push(format!("'{}' is not a file", path));
+                        pf.errors.push(format!("'{path}' is not a file"));
                     } else if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(path)) {
-                        pf.warnings.push(format!("File '{}' is already open in context", path));
+                        pf.warnings.push(format!("File '{path}' is already open in context"));
                     }
                 }
                 Some(pf)
@@ -109,15 +109,15 @@ impl Module for FilesModule {
                 if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
                     let p = std::path::Path::new(path_str);
                     if !p.exists() {
-                        pf.errors.push(format!("File '{}' not found", path_str));
+                        pf.errors.push(format!("File '{path_str}' not found"));
                     } else if !p.is_file() {
-                        pf.errors.push(format!("'{}' is not a file", path_str));
+                        pf.errors.push(format!("'{path_str}' is not a file"));
                     } else {
                         let is_open = state.context.iter().any(|c| {
                             c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str)
                         });
                         if !is_open {
-                            pf.warnings.push(format!("File '{}' is not open in context. Edit will proceed if old_string has a unique match, but open the file to see current content.", path_str));
+                            pf.warnings.push(format!("File '{path_str}' is not open in context. Edit will proceed if old_string has a unique match, but open the file to see current content."));
                         }
                         // Verify old_string actually matches file content
                         if let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str())
@@ -125,8 +125,7 @@ impl Module for FilesModule {
                             && tools::edit_file::find_normalized_match(&content, old_string).is_none()
                         {
                             pf.errors.push(format!(
-                                "old_string not found in '{}' — open the file to see current content",
-                                path_str
+                                "old_string not found in '{path_str}' — open the file to see current content"
                             ));
                         }
                     }

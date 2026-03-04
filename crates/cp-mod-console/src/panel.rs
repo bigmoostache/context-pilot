@@ -122,7 +122,7 @@ impl Panel for ConsolePanel {
         let _ = update_if_changed(ctx, &content);
 
         // Also update status metadata from session handle
-        if let Some(session_name) = ctx.get_meta_str("console_name").map(|s| s.to_string()) {
+        if let Some(session_name) = ctx.get_meta_str("console_name").map(ToString::to_string) {
             let cs = ConsoleState::get(state);
             if let Some(handle) = cs.sessions.get(&session_name) {
                 let status_label = handle.get_status().label();
@@ -137,7 +137,7 @@ impl Panel for ConsolePanel {
             let desc =
                 ctx.get_meta_str("console_description").or_else(|| ctx.get_meta_str("console_command")).unwrap_or("?");
             let status = ctx.get_meta_str("console_status").unwrap_or("?");
-            format!("console: {} ({})", desc, status)
+            format!("console: {desc} ({status})")
         } else {
             "Console".to_string()
         }
@@ -169,7 +169,7 @@ impl Panel for ConsolePanel {
         lines.push(Line::from(vec![
             Span::styled(" $ ".to_string(), Style::default().fg(theme::accent_dim())),
             Span::styled(command, Style::default().fg(theme::text())),
-            Span::styled(format!("  [{}]", status), Style::default().fg(status_color)),
+            Span::styled(format!("  [{status}]"), Style::default().fg(status_color)),
         ]));
 
         // Divider
@@ -199,7 +199,7 @@ impl Panel for ConsolePanel {
                     c.get_meta_str("console_description").or_else(|| c.get_meta_str("console_command")).unwrap_or("?");
                 let content = c.cached_content.as_ref()?;
                 let status = c.get_meta_str("console_status").unwrap_or("?");
-                let header = format!("Console: {} ({})", desc, status);
+                let header = format!("Console: {desc} ({status})");
 
                 // Content is already truncated to MAX_CONTEXT_CHARS in refresh_cache
                 let output = paginate_content(content, c.current_page, c.total_pages);

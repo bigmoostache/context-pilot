@@ -36,7 +36,7 @@ impl App {
                 if is_dir {
                     // Folder: complete to "dir/" and show contents — don't close
                     let full_path = ac.selected_full_path().unwrap_or(name);
-                    let new_query = format!("{}/", full_path);
+                    let new_query = format!("{full_path}/");
 
                     // Update the input text: replace @<old_query> with @<new_query>
                     let anchor = ac.anchor_pos;

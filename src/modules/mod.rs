@@ -188,7 +188,7 @@ pub(crate) fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result
     // Core modules cannot be deactivated
     for module in all_modules() {
         if module.id() == id && module.is_core() {
-            return Err(format!("Cannot deactivate core module '{}'", id));
+            return Err(format!("Cannot deactivate core module '{id}'"));
         }
     }
 
@@ -260,7 +260,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         match action {
             "activate" => {
                 if state.active_modules.contains(module_id) {
-                    successes.push(format!("'{}' already active", module_id));
+                    successes.push(format!("'{module_id}' already active"));
                 } else {
                     let _r = state.active_modules.insert(module_id.to_string());
                     // Rebuild tools list
@@ -292,14 +292,14 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                             let _r = state.active_modules.remove(module_id);
                             // Rebuild tools list
                             rebuild_tools(state);
-                            successes.push(format!("deactivated '{}'", module_id));
+                            successes.push(format!("deactivated '{module_id}'"));
                         }
                         Err(msg) => {
                             failures.push(format!("Change {}: {}", i + 1, msg));
                         }
                     }
                 } else {
-                    successes.push(format!("'{}' already inactive", module_id));
+                    successes.push(format!("'{module_id}' already inactive"));
                 }
             }
             _ => {

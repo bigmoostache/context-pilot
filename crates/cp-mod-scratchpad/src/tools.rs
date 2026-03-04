@@ -30,7 +30,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let preview =
         if contents.len() > 50 { format!("{}...", &contents[..contents.floor_char_boundary(47)]) } else { contents };
 
-    ToolResult::new(tool.id.clone(), format!("Created cell {} '{}': {}", id, title, preview), false)
+    ToolResult::new(tool.id.clone(), format!("Created cell {id} '{title}': {preview}"), false)
 }
 
 /// Edit an existing scratchpad cell
@@ -57,14 +57,14 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
 
             if changes.is_empty() {
-                ToolResult::new(tool.id.clone(), format!("No changes specified for cell {}", cell_id), true)
+                ToolResult::new(tool.id.clone(), format!("No changes specified for cell {cell_id}"), true)
             } else {
                 // Update Scratchpad panel timestamp
                 state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
                 ToolResult::new(tool.id.clone(), format!("Updated cell {}: {}", cell_id, changes.join(", ")), false)
             }
         }
-        None => ToolResult::new(tool.id.clone(), format!("Cell not found: {}", cell_id), true),
+        None => ToolResult::new(tool.id.clone(), format!("Cell not found: {cell_id}"), true),
     }
 }
 
@@ -81,22 +81,22 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         ss.scratchpad_cells.clear();
         // Update Scratchpad panel timestamp
         state.touch_panel(ContextType::new(ContextType::SCRATCHPAD));
-        return ToolResult::new(tool.id.clone(), format!("Wiped all {} scratchpad cell(s)", count), false);
+        return ToolResult::new(tool.id.clone(), format!("Wiped all {count} scratchpad cell(s)"), false);
     }
 
     // Otherwise, delete specific cells
-    let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+    let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(ToString::to_string)).collect();
 
     let ss = ScratchpadState::get_mut(state);
     let initial_count = ss.scratchpad_cells.len();
     ss.scratchpad_cells.retain(|c| !ids_to_delete.contains(&c.id));
     let deleted_count = initial_count - ss.scratchpad_cells.len();
 
-    let mut output = format!("Deleted {} cell(s)", deleted_count);
+    let mut output = format!("Deleted {deleted_count} cell(s)");
 
     if deleted_count < ids_to_delete.len() {
         let missing_count = ids_to_delete.len() - deleted_count;
-        output.push_str(&format!(", {} not found", missing_count));
+        output.push_str(&format!(", {missing_count} not found"));
     }
 
     // Update Scratchpad panel timestamp if any cells were deleted

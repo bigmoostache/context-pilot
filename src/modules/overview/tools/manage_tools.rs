@@ -50,18 +50,18 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             Some(t) => match action {
                 "enable" => {
                     if t.enabled {
-                        successes.push(format!("'{}' already enabled", tool_name));
+                        successes.push(format!("'{tool_name}' already enabled"));
                     } else {
                         t.enabled = true;
-                        successes.push(format!("enabled '{}'", tool_name));
+                        successes.push(format!("enabled '{tool_name}'"));
                     }
                 }
                 "disable" => {
                     if t.enabled {
                         t.enabled = false;
-                        successes.push(format!("disabled '{}'", tool_name));
+                        successes.push(format!("disabled '{tool_name}'"));
                     } else {
-                        successes.push(format!("'{}' already disabled", tool_name));
+                        successes.push(format!("'{tool_name}' already disabled"));
                     }
                 }
                 _ => {

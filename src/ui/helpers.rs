@@ -34,7 +34,7 @@ pub(crate) fn format_number(n: usize) -> String {
 pub(crate) fn format_time_ago(delta_ms: u64) -> String {
     let seconds = delta_ms / 1000;
     if seconds < 60 {
-        format!("{}s ago", seconds)
+        format!("{seconds}s ago")
     } else if seconds < 3600 {
         format!("{}m ago", seconds / 60)
     } else {
@@ -167,7 +167,7 @@ pub(crate) fn highlight_file(path: &str, content: &str) -> Arc<HighlightResult> 
     // Check cache first (keyed by path + content hash for simplicity)
     let cache_key = format!("{}:{}", path, content.len());
     {
-        let cache = HIGHLIGHT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        let cache = HIGHLIGHT_CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(cached) = cache.get(&cache_key) {
             return Arc::clone(cached);
         }
@@ -177,7 +177,7 @@ pub(crate) fn highlight_file(path: &str, content: &str) -> Arc<HighlightResult> 
 
     // Store in cache
     {
-        let mut cache = HIGHLIGHT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        let mut cache = HIGHLIGHT_CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         // Limit cache size
         if cache.len() > 50 {
             cache.clear();

@@ -63,7 +63,7 @@ pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
 
 /// Format a prompt item back to .md file with YAML frontmatter
 pub(crate) fn format_prompt_file(name: &str, description: &str, content: &str) -> String {
-    format!("---\nname: {}\ndescription: {}\n---\n{}", name, description, content)
+    format!("---\nname: {name}\ndescription: {description}\n---\n{content}")
 }
 
 /// Load all .md prompt files from a directory
@@ -109,7 +109,7 @@ pub(crate) fn save_prompt_to_dir(dir: &Path, item: &PromptItem) {
 
 /// Delete a prompt file from its directory
 pub(crate) fn delete_prompt_from_dir(dir: &Path, id: &str) {
-    let path = dir.join(format!("{}.md", id));
+    let path = dir.join(format!("{id}.md"));
     if path.exists() {
         let _ = fs::remove_file(path).ok();
     }

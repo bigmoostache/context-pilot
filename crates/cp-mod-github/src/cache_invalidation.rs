@@ -26,7 +26,7 @@ impl InvalidationRule {
     fn new(trigger: &str, invalidates: &[&str]) -> Self {
         Self {
             trigger: Regex::new(trigger).expect("invalid trigger regex"),
-            invalidates: invalidates.iter().map(|p| p.to_string()).collect(),
+            invalidates: invalidates.iter().map(ToString::to_string).collect(),
         }
     }
 }
@@ -134,7 +134,7 @@ pub(crate) fn find_invalidations(mutating_command: &str) -> Vec<Regex> {
 
                 // Replace \1 through \9 with captured groups
                 for i in 1..=9 {
-                    let backref = format!("\\{}", i);
+                    let backref = format!("\\{i}");
                     if let Some(group) = captures.get(i) {
                         resolved = resolved.replace(&backref, &regex::escape(group.as_str()));
                     }

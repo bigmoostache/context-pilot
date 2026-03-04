@@ -38,7 +38,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let lower = s.to_lowercase();
                 !s.is_empty() && lower != "none" && lower != "null"
             })
-            .map(|s| s.to_string());
+            .map(ToString::to_string);
 
         // Validate parent exists if specified
         let ts = TodoState::get(state);
@@ -51,7 +51,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             } else {
                 format!("available: {}", available.join(", "))
             };
-            errors.push(format!("Parent '{}' not found for '{}' ({})", pid, name, available_str));
+            errors.push(format!("Parent '{pid}' not found for '{name}' ({available_str})"));
             continue;
         }
 
@@ -67,7 +67,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         ts.todos.push(TodoItem { id: id.clone(), parent_id, name: name.clone(), description, status });
 
-        created.push(format!("{}: {}", id, name));
+        created.push(format!("{id}: {name}"));
     }
 
     let mut output = String::new();
@@ -106,10 +106,10 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let delete_ids: std::collections::HashSet<String> = updates
         .iter()
         .filter(|u| {
-            u.get("delete").and_then(|v| v.as_bool()).unwrap_or(false)
+            u.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false)
                 || u.get("status").and_then(|v| v.as_str()) == Some("deleted")
         })
-        .filter_map(|u| u.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .filter_map(|u| u.get("id").and_then(|v| v.as_str()).map(ToString::to_string))
         .collect();
 
     for update_value in updates {
@@ -119,7 +119,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         // Check for deletion (support both delete:true and status:"deleted")
-        let should_delete = update_value.get("delete").and_then(|v| v.as_bool()).unwrap_or(false)
+        let should_delete = update_value.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false)
             || update_value.get("status").and_then(|v| v.as_str()) == Some("deleted");
 
         if should_delete {
@@ -162,7 +162,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         // Pre-validate parent_id if specified (normalize "none", "null", "" to None)
         let normalized_parent = if update_value.get("parent_id").is_some() {
             let raw = update_value.get("parent_id");
-            if raw.is_some_and(|v| v.is_null()) {
+            if raw.is_some_and(serde_json::Value::is_null) {
                 Some(None) // explicitly set to None
             } else if let Some(pid) = raw.and_then(|v| v.as_str()) {
                 let lower = pid.to_lowercase();
@@ -170,7 +170,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                     Some(None) // normalize to None
                 } else {
                     if pid == id {
-                        errors.push(format!("{}: cannot be its own parent", id));
+                        errors.push(format!("{id}: cannot be its own parent"));
                         continue;
                     }
                     let ts = TodoState::get(state);
@@ -182,7 +182,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                         } else {
                             format!("available: {}", available.join(", "))
                         };
-                        errors.push(format!("{}: parent '{}' not found ({})", id, pid, available_str));
+                        errors.push(format!("{id}: parent '{pid}' not found ({available_str})"));
                         continue;
                     }
                     Some(Some(pid.to_string()))
@@ -344,16 +344,16 @@ pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Find the todo to move
     let ts = TodoState::get(state);
     let Some(move_idx) = ts.todos.iter().position(|t| t.id == id) else {
-        return ToolResult::new(tool.id.clone(), format!("Todo '{}' not found", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Todo '{id}' not found"), true);
     };
 
     // Validate after_id exists if specified
     if let Some(aid) = after_id {
         if aid == id {
-            return ToolResult::new(tool.id.clone(), format!("Cannot move '{}' after itself", id), true);
+            return ToolResult::new(tool.id.clone(), format!("Cannot move '{id}' after itself"), true);
         }
         if !ts.todos.iter().any(|t| t.id == aid) {
-            return ToolResult::new(tool.id.clone(), format!("Target '{}' not found", aid), true);
+            return ToolResult::new(tool.id.clone(), format!("Target '{aid}' not found"), true);
         }
     }
 
@@ -378,8 +378,8 @@ pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let position_desc = match after_id {
         None => "top".to_string(),
-        Some(aid) => format!("after {}", aid),
+        Some(aid) => format!("after {aid}"),
     };
 
-    ToolResult::new(tool.id.clone(), format!("Moved {} to {}", id, position_desc), false)
+    ToolResult::new(tool.id.clone(), format!("Moved {id} to {position_desc}"), false)
 }

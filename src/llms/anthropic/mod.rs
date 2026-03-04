@@ -182,8 +182,7 @@ impl LlmClient for AnthropicClient {
                     let recent =
                         if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
                     return Err(LlmError::StreamRead(format!(
-                        "{}\nStream position: {} bytes, {} lines read\n{}\nLast SSE lines:\n{}",
-                        e, total_bytes, line_count, tool_ctx, recent
+                        "{e}\nStream position: {total_bytes} bytes, {line_count} lines read\n{tool_ctx}\nLast SSE lines:\n{recent}"
                     )));
                 }
             }

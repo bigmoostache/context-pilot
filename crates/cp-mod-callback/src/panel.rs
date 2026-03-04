@@ -35,7 +35,7 @@ impl CallbackPanel {
         for def in &cs.definitions {
             let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
             let blocking = if def.blocking { "yes" } else { "no" };
-            let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{}s", t));
+            let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s"));
             let success = def.success_message.as_deref().unwrap_or("—");
             let cwd = def.cwd.as_deref().unwrap_or("project root");
             let one_at = if def.one_at_a_time { "yes" } else { "no" };
@@ -60,7 +60,7 @@ impl CallbackPanel {
                 "Pattern: {} | Blocking: {} | Timeout: {}",
                 def.pattern,
                 if def.blocking { "yes" } else { "no" },
-                def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{}s", t)),
+                def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s")),
             ));
             lines.push(String::new());
 
@@ -72,7 +72,7 @@ impl CallbackPanel {
                     lines.push("`".to_string());
                 }
                 Err(e) => {
-                    lines.push(format!("Error reading script: {}", e));
+                    lines.push(format!("Error reading script: {e}"));
                 }
             }
         }
@@ -155,7 +155,7 @@ impl Panel for CallbackPanel {
         for (i, def) in cs.definitions.iter().enumerate() {
             let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
             let blocking = if def.blocking { "yes" } else { "no" };
-            let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{}s", t));
+            let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s"));
             let one_at = if def.one_at_a_time { "yes" } else { "no" };
             let wrapped = wrap_text_simple(&def.description, desc_max);
 
@@ -234,7 +234,7 @@ impl Panel for CallbackPanel {
                     "Pattern: {} | Blocking: {} | Timeout: {}",
                     def.pattern,
                     if def.blocking { "yes" } else { "no" },
-                    def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{}s", t)),
+                    def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s")),
                 ),
                 Style::default().fg(theme::text_secondary()),
             )));
@@ -252,7 +252,7 @@ impl Panel for CallbackPanel {
                 }
                 Err(e) => {
                     lines.push(Line::from(Span::styled(
-                        format!("Error reading script: {}", e),
+                        format!("Error reading script: {e}"),
                         Style::default().fg(Color::Red),
                     )));
                 }

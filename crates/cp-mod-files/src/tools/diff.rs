@@ -9,13 +9,13 @@ pub(crate) fn generate_unified_diff(old: &str, new: &str) -> String {
     for op in diff_ops {
         match op {
             DiffOp::Equal(line) => {
-                result.push_str(&format!("  {}\n", line));
+                result.push_str(&format!("  {line}\n"));
             }
             DiffOp::Delete(line) => {
-                result.push_str(&format!("- {}\n", line));
+                result.push_str(&format!("- {line}\n"));
             }
             DiffOp::Insert(line) => {
-                result.push_str(&format!("+ {}\n", line));
+                result.push_str(&format!("+ {line}\n"));
             }
         }
     }
@@ -132,7 +132,7 @@ mod tests {
         assert!(del_pos < add_pos);
 
         let between = &diff[del_pos + "- line2\n".len()..add_pos];
-        assert!(between.is_empty(), "Expected interleaved diff, but found: '{}'", between);
+        assert!(between.is_empty(), "Expected interleaved diff, but found: '{between}'");
     }
 
     #[test]

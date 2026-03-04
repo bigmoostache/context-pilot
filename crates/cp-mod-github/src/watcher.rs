@@ -101,7 +101,7 @@ impl GhWatcher {
     /// Args: `(context_id, command, github_token)`.
     /// Adds missing watches, removes stale ones, preserves etag/hash/interval state on existing.
     pub fn sync_watches(&self, panels: &[(String, String, String)]) {
-        let mut watches = self.watches.lock().unwrap_or_else(|e| e.into_inner());
+        let mut watches = self.watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // Remove watches for panels that no longer exist
         let active_ids: std::collections::HashSet<&str> = panels.iter().map(|(id, _, _)| id.as_str()).collect();
@@ -137,7 +137,7 @@ impl GhWatcher {
     /// Update the branch PR watch with the current branch and token.
     /// Call this whenever the git branch or github token changes.
     pub fn sync_branch_pr(&self, branch: Option<&str>, github_token: Option<&str>) {
-        let mut watch = self.branch_pr_watch.lock().unwrap_or_else(|e| e.into_inner());
+        let mut watch = self.branch_pr_watch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         match (branch, github_token) {
             (Some(branch), Some(token)) => {
                 if let Some(ref mut w) = *watch {
@@ -167,7 +167,7 @@ impl GhWatcher {
 /// Classify whether args represent a `gh api` command eligible for `ETag` polling.
 #[must_use]
 pub fn is_api_command(args: &[String]) -> bool {
-    args.first().map(|s| s.as_str()) == Some("api")
+    args.first().map(String::as_str) == Some("api")
         && !args.iter().any(|a| a == "--jq" || a == "-q" || a == "--template" || a == "-t")
 }
 
@@ -186,7 +186,7 @@ fn poll_loop(
         // === Poll branch PR ===
         {
             let snapshot = {
-                let watch = branch_pr_watch.lock().unwrap_or_else(|e| e.into_inner());
+                let watch = branch_pr_watch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 watch.as_ref().and_then(|w| {
                     if current_ms.saturating_sub(w.last_poll_ms) >= GH_DEFAULT_POLL_INTERVAL_SECS * 1000 {
                         Some((w.branch.clone(), Arc::clone(&w.github_token), w.last_output_hash.clone()))
@@ -202,7 +202,7 @@ fn poll_loop(
 
                 // Update last_poll_ms and hash
                 {
-                    let mut watch = branch_pr_watch.lock().unwrap_or_else(|e| e.into_inner());
+                    let mut watch = branch_pr_watch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     if let Some(ref mut w) = *watch {
                         w.last_poll_ms = now_ms();
                         if let Some((ref new_hash, _)) = result {
@@ -225,7 +225,7 @@ fn poll_loop(
 
         // Snapshot only watches that are due for polling
         let due: Vec<DueWatch> = {
-            let watches = watches.lock().unwrap_or_else(|e| e.into_inner());
+            let watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             watches
                 .values()
                 .filter(|w| current_ms.saturating_sub(w.last_poll_ms) >= w.poll_interval_secs * 1000)
@@ -248,7 +248,7 @@ fn poll_loop(
                 let outcome = poll_api_command(&args, token_str, etag.as_deref());
 
                 {
-                    let mut watches = watches.lock().unwrap_or_else(|e| e.into_inner());
+                    let mut watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     if let Some(watch) = watches.get_mut(&context_id) {
                         watch.last_poll_ms = now_ms();
                         if let Some(interval) = outcome.poll_interval {
@@ -271,7 +271,7 @@ fn poll_loop(
                 let result = poll_cli_command(&args, token_str, last_hash.as_deref());
 
                 {
-                    let mut watches = watches.lock().unwrap_or_else(|e| e.into_inner());
+                    let mut watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     if let Some(watch) = watches.get_mut(&context_id) {
                         watch.last_poll_ms = now_ms();
                         if let Some((ref new_hash, _)) = result {
@@ -307,7 +307,7 @@ fn poll_api_command(args: &[String], github_token: &str, current_etag: Option<&s
 
     if let Some(etag) = current_etag {
         cmd_args.push("-H".to_string());
-        cmd_args.push(format!("If-None-Match: {}", etag));
+        cmd_args.push(format!("If-None-Match: {etag}"));
     }
 
     let mut cmd = Command::new("gh");
@@ -357,7 +357,7 @@ fn poll_cli_command(args: &[String], github_token: &str, last_hash: Option<&str>
     } else if stdout.trim().is_empty() {
         stderr.to_string()
     } else {
-        format!("{}\n{}", stdout, stderr)
+        format!("{stdout}\n{stderr}")
     };
 
     let new_hash = sha256_hex(&content);

@@ -43,7 +43,7 @@ impl RingBuffer {
 
     /// Append bytes to the ring buffer, wrapping around as needed.
     pub fn write(&self, data: &[u8]) {
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut pos = inner.write_pos;
         for &byte in data {
             inner.buf[pos] = byte;
@@ -61,7 +61,7 @@ impl RingBuffer {
     /// Returns (content, `total_bytes_written`).
     #[must_use]
     pub fn read_all(&self) -> (String, u64) {
-        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let inner = self.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let total = inner.total_written;
         let bytes = if inner.wrapped {
             // Data from write_pos..end, then 0..write_pos
@@ -98,7 +98,7 @@ impl RingBuffer {
     /// Monotonic counter of total bytes written (for change detection).
     #[must_use]
     pub fn total_written(&self) -> u64 {
-        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let inner = self.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         inner.total_written
     }
 }

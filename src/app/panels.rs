@@ -45,7 +45,7 @@ pub(crate) fn render_panel_default(panel: &dyn Panel, frame: &mut Frame<'_>, sta
         .border_type(ratatui::widgets::BorderType::Rounded)
         .border_style(Style::default().fg(theme::border()))
         .style(base_style)
-        .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::accent()).bold()));
+        .title(Span::styled(format!(" {title} "), Style::default().fg(theme::accent()).bold()));
 
     if let Some(ref bottom) = bottom_title {
         block = block.title_bottom(Span::styled(bottom, Style::default().fg(theme::text_muted())));

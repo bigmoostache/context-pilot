@@ -248,7 +248,7 @@ impl Module for GitModule {
         }
         let mut output = String::new();
         if let Some(branch) = &gs.git_branch {
-            output.push_str(&format!("\nGit Branch: {}\n", branch));
+            output.push_str(&format!("\nGit Branch: {branch}\n"));
         }
         if gs.git_file_changes.is_empty() {
             output.push_str("Git Status: Working tree clean\n");
@@ -262,17 +262,16 @@ impl Module for GitModule {
                 total_add += file.additions;
                 total_del += file.deletions;
                 let net = file.additions - file.deletions;
-                let net_str = if net >= 0 { format!("+{}", net) } else { format!("{}", net) };
+                let net_str = if net >= 0 { format!("+{net}") } else { format!("{net}") };
                 output.push_str(&format!(
                     "| {} | +{} | -{} | {} |\n",
                     file.path, file.additions, file.deletions, net_str
                 ));
             }
             let total_net = total_add - total_del;
-            let total_net_str = if total_net >= 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
+            let total_net_str = if total_net >= 0 { format!("+{total_net}") } else { format!("{total_net}") };
             output.push_str(&format!(
-                "| **Total** | **+{}** | **-{}** | **{}** |\n",
-                total_add, total_del, total_net_str
+                "| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |\n"
             ));
         }
         Some(output)

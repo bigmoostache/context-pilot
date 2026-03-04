@@ -164,12 +164,14 @@ impl PreFlightResult {
     }
 
     /// Append a blocking error (builder pattern).
+    #[must_use]
     pub fn error(mut self, msg: impl Into<String>) -> Self {
         self.errors.push(msg.into());
         self
     }
 
     /// Append a non-blocking warning (builder pattern).
+    #[must_use]
     pub fn warning(mut self, msg: impl Into<String>) -> Self {
         self.warnings.push(msg.into());
         self
@@ -186,10 +188,10 @@ impl PreFlightResult {
     pub fn format_errors(&self) -> String {
         let mut lines = Vec::new();
         for e in &self.errors {
-            lines.push(format!("Error: {}", e));
+            lines.push(format!("Error: {e}"));
         }
         for w in &self.warnings {
-            lines.push(format!("Warning: {}", w));
+            lines.push(format!("Warning: {w}"));
         }
         lines.join("\n")
     }
@@ -243,7 +245,7 @@ impl ToolParam {
     /// Restrict to specific allowed values (builder pattern).
     #[must_use]
     pub fn enum_vals(mut self, vals: &[&str]) -> Self {
-        self.enum_values = Some(vals.iter().map(|s| s.to_string()).collect());
+        self.enum_values = Some(vals.iter().map(ToString::to_string).collect());
         self
     }
 
@@ -290,7 +292,7 @@ impl ToolDefinition {
     #[must_use]
     pub fn from_yaml<'a>(id: &str, texts: &'a ToolTexts) -> ToolDefBuilder<'a> {
         let text = texts.tools.get(id).unwrap_or_else(|| {
-            panic!("Tool '{}' not found in YAML", id);
+            panic!("Tool '{id}' not found in YAML");
         });
         ToolDefBuilder {
             id: id.to_string(),
@@ -376,7 +378,7 @@ impl ToolDefBuilder<'_> {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, ParamType::String);
         p.description = desc;
-        p.enum_values = Some(values.iter().map(|s| s.to_string()).collect());
+        p.enum_values = Some(values.iter().map(ToString::to_string).collect());
         if required {
             p.required = true;
         }

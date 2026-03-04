@@ -30,7 +30,7 @@ pub(crate) fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Parse the command
     let parsed = match cli_parser::parse_command(&command) {
         Ok(cmd) => cmd,
-        Err(e) => return err_result(tool, format!("Error: {}", e)),
+        Err(e) => return err_result(tool, format!("Error: {e}")),
     };
 
     // Dispatch to subcommand handler
@@ -66,7 +66,7 @@ fn exec_compile(
 
     match crate::compiler::compile_and_write(input, &output_path) {
         Ok(msg) => ok_result(tool, msg),
-        Err(e) => err_result(tool, format!("Compile error:\n{}", e)),
+        Err(e) => err_result(tool, format!("Compile error:\n{e}")),
     }
 }
 
@@ -78,7 +78,7 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
         Err(e) => {
             return err_result(
                 tool,
-                format!("Error: {}\nUsage: typst init @preview/template-name:version [directory]", e),
+                format!("Error: {e}\nUsage: typst init @preview/template-name:version [directory]"),
             );
         }
     };
@@ -86,7 +86,7 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
     // Download/resolve the package
     let pkg_dir = match packages::resolve_package(&spec) {
         Ok(d) => d,
-        Err(e) => return err_result(tool, format!("Error downloading package: {}", e)),
+        Err(e) => return err_result(tool, format!("Error downloading package: {e}")),
     };
 
     // Determine target directory
@@ -97,7 +97,7 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
 
     // Create the target directory
     if let Err(e) = fs::create_dir_all(&target_dir) {
-        return err_result(tool, format!("Error creating directory '{}': {}", target_dir, e));
+        return err_result(tool, format!("Error creating directory '{target_dir}': {e}"));
     }
 
     // Look for a template entry point in the package
@@ -111,9 +111,9 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
     } else {
         // No template dir found — create a basic .typ file that imports the package
         let main_content = format!("#import \"{}\": *\n\n// Your content here\n", spec.to_spec_string());
-        let main_path = format!("{}/main.typ", target_dir);
+        let main_path = format!("{target_dir}/main.typ");
         if let Err(e) = fs::write(&main_path, &main_content) {
-            return err_result(tool, format!("Error writing {}: {}", main_path, e));
+            return err_result(tool, format!("Error writing {main_path}: {e}"));
         }
         files_copied.push("main.typ".to_string());
     }
@@ -126,7 +126,7 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
         pkg_dir.display()
     );
     for f in &files_copied {
-        result.push_str(&format!("  {}\n", f));
+        result.push_str(&format!("  {f}\n"));
     }
 
     ok_result(tool, result)
@@ -160,7 +160,7 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
         // Show all variants (family + style)
         let mut seen = HashSet::new();
         for (family, style, _path) in &font_entries {
-            let key = format!("{} — {}", family, style);
+            let key = format!("{family} — {style}");
             if seen.insert(key.clone()) {
                 output.push_str(&key);
                 output.push('\n');
@@ -189,7 +189,7 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
     let header = format!("=== Typst Fonts ({} {}) ===\n\n", count, if variants { "variants" } else { "families" });
 
     // Create a dynamic context panel for the result
-    let panel_content = format!("{}{}", header, output);
+    let panel_content = format!("{header}{output}");
     let context_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid += 1;
@@ -234,7 +234,7 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str, _f
     // Compile the document to get metadata
     let abs_path = match PathBuf::from(input).canonicalize() {
         Ok(p) => p,
-        Err(e) => return err_result(tool, format!("Error: cannot resolve '{}': {}", input, e)),
+        Err(e) => return err_result(tool, format!("Error: cannot resolve '{input}': {e}")),
     };
 
     // For now, return a basic message about query support
@@ -259,7 +259,7 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str, _f
         id: context_id.clone(),
         uid: Some(uid),
         context_type: ContextType::new("typst_result"),
-        name: format!("Typst Query: {}", selector),
+        name: format!("Typst Query: {selector}"),
         token_count: 0,
         metadata: std::collections::HashMap::new(),
         cached_content: Some(result),
@@ -278,7 +278,7 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str, _f
     elem.set_meta("dynamic_label", &"typst-query".to_string());
     state.context.push(elem);
 
-    ok_result(tool, format!("Query result shown in panel {}.", context_id))
+    ok_result(tool, format!("Query result shown in panel {context_id}."))
 }
 
 /// Subcommand: update — re-download cached packages.
@@ -287,7 +287,7 @@ fn exec_update(tool: &ToolUse, package: Option<&str>) -> ToolResult {
         // Update a specific package
         let spec = match packages::PackageSpec::parse(pkg_spec) {
             Ok(s) => s,
-            Err(e) => return err_result(tool, format!("Error: {}", e)),
+            Err(e) => return err_result(tool, format!("Error: {e}")),
         };
 
         // Remove cached version and re-download
@@ -316,7 +316,7 @@ fn exec_update(tool: &ToolUse, package: Option<&str>) -> ToolResult {
 
         let mut result = format!("Cached packages ({}):\n", cached.len());
         for (ns, name, ver) in &cached {
-            result.push_str(&format!("  @{}/{}:{}\n", ns, name, ver));
+            result.push_str(&format!("  @{ns}/{name}:{ver}\n"));
         }
         result.push_str("\nUse 'typst update @preview/name:version' to re-download a specific package.");
         ok_result(tool, result)
@@ -407,12 +407,11 @@ fn exec_watch(tool: &ToolUse, input: &str, output: Option<&str>) -> ToolResult {
             ok_result(
                 tool,
                 format!(
-                    "✓ Now watching '{}' → '{}'\n{}\n\nThe document and its {} dependencies will auto-recompile when any dependency is edited.",
-                    input, output_path, msg, dep_count
+                    "✓ Now watching '{input}' → '{output_path}'\n{msg}\n\nThe document and its {dep_count} dependencies will auto-recompile when any dependency is edited."
                 ),
             )
         }
-        Err(e) => err_result(tool, format!("Error compiling '{}': {}\nDocument was NOT added to watchlist.", input, e)),
+        Err(e) => err_result(tool, format!("Error compiling '{input}': {e}\nDocument was NOT added to watchlist.")),
     }
 }
 
@@ -420,9 +419,9 @@ fn exec_watch(tool: &ToolUse, input: &str, output: Option<&str>) -> ToolResult {
 fn exec_unwatch(tool: &ToolUse, input: &str) -> ToolResult {
     let mut watchlist = crate::watchlist::Watchlist::load();
     if watchlist.unwatch(input) {
-        ok_result(tool, format!("✓ Removed '{}' from watchlist. It will no longer auto-recompile.", input))
+        ok_result(tool, format!("✓ Removed '{input}' from watchlist. It will no longer auto-recompile."))
     } else {
-        ok_result(tool, format!("'{}' was not in the watchlist.\nUse 'typst watchlist' to see current entries.", input))
+        ok_result(tool, format!("'{input}' was not in the watchlist.\nUse 'typst watchlist' to see current entries."))
     }
 }
 

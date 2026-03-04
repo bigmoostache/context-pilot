@@ -106,7 +106,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                         let idx = state.paste_buffers.len();
                         state.paste_buffers.push(content);
                         state.paste_buffer_labels.push(Some(label));
-                        let sentinel = format!("\x00{}\x00", idx);
+                        let sentinel = format!("\x00{idx}\x00");
                         // Replace /command<space> with sentinel
                         state.input = format!(
                             "{}{}\n{}",
@@ -131,7 +131,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             let idx = state.paste_buffers.len();
             state.paste_buffers.push(text);
             state.paste_buffer_labels.push(None);
-            let sentinel = format!("\x00{}\x00", idx);
+            let sentinel = format!("\x00{idx}\x00");
             state.input.insert_str(state.input_cursor, &sentinel);
             state.input_cursor += sentinel.len();
             ActionResult::Nothing
@@ -338,7 +338,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 output_tokens,
                 cache_hit_tokens,
                 cache_miss_tokens,
-                stop_reason,
+                stop_reason.as_deref(),
             )
         }
         Action::StreamError(e) => streaming::handle_stream_error(state, &e),

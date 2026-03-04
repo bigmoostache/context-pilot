@@ -44,7 +44,7 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
     let current = format_number(total_tokens);
     let threshold_str = format_number(threshold);
     let budget_str = format_number(budget);
-    let pct = format!("{:.1}%", usage_pct);
+    let pct = format!("{usage_pct:.1}%");
 
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
@@ -53,7 +53,7 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
         Span::styled(threshold_str, Style::default().fg(theme::warning())),
         Span::styled(" / ".to_string(), Style::default().fg(theme::text_muted())),
         Span::styled(budget_str, Style::default().fg(theme::accent()).bold()),
-        Span::styled(format!(" ({})", pct), Style::default().fg(theme::text_muted())),
+        Span::styled(format!(" ({pct})"), Style::default().fg(theme::text_muted())),
     ]));
 
     // Progress bar with threshold marker
@@ -166,7 +166,7 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
                     std::cmp::Ordering::Less => theme::error(),
                     std::cmp::Ordering::Equal => theme::text_muted(),
                 };
-                let net_str = if net > 0 { format!("+{}", net) } else { format!("{}", net) };
+                let net_str = if net > 0 { format!("+{net}") } else { format!("{net}") };
 
                 vec![
                     Cell::new(display_path, Style::default().fg(theme::text())),
@@ -183,12 +183,12 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
             std::cmp::Ordering::Less => theme::error(),
             std::cmp::Ordering::Equal => theme::text_muted(),
         };
-        let total_net_str = if total_net > 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
+        let total_net_str = if total_net > 0 { format!("+{total_net}") } else { format!("{total_net}") };
 
         let footer = [
             Cell::new("Total", Style::default().fg(theme::text())),
-            Cell::right(format!("+{}", total_add), Style::default().fg(theme::success())),
-            Cell::right(format!("-{}", total_del), Style::default().fg(theme::error())),
+            Cell::right(format!("+{total_add}"), Style::default().fg(theme::success())),
+            Cell::right(format!("-{total_del}"), Style::default().fg(theme::error())),
             Cell::right(total_net_str, Style::default().fg(total_net_color)),
         ];
 
@@ -246,7 +246,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
     accumulated += tool_def_tokens;
     rows.push(vec![
         Cell::new("--", Style::default().fg(theme::text_muted())),
-        Cell::new(format!("tool-defs ({} enabled)", enabled_count), Style::default().fg(theme::text_secondary())),
+        Cell::new(format!("tool-defs ({enabled_count} enabled)"), Style::default().fg(theme::text_secondary())),
         Cell::right(format_number(tool_def_tokens), Style::default().fg(theme::accent())),
         Cell::right(format_number(accumulated), Style::default().fg(theme::text_muted())),
         Cell::right("—", Style::default().fg(theme::text_muted())),

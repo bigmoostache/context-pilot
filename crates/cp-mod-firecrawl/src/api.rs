@@ -155,7 +155,7 @@ impl FirecrawlClient {
 
     /// POST JSON with 5xx retry (2 attempts, 1s delay).
     fn post_json<T: serde::de::DeserializeOwned>(&self, path: &str, body: &serde_json::Value) -> Result<T, String> {
-        let url = format!("{}{}", FIRECRAWL_BASE_URL, path);
+        let url = format!("{FIRECRAWL_BASE_URL}{path}");
 
         for attempt in 0..3 {
             let resp = self
@@ -165,14 +165,14 @@ impl FirecrawlClient {
                 .header("Content-Type", "application/json")
                 .json(body)
                 .send()
-                .map_err(|e| format!("Request failed: {}", e))?;
+                .map_err(|e| format!("Request failed: {e}"))?;
 
             let status = resp.status().as_u16();
-            let resp_body = resp.text().map_err(|e| format!("Failed to read response: {}", e))?;
+            let resp_body = resp.text().map_err(|e| format!("Failed to read response: {e}"))?;
 
             match status {
                 200..=299 => {
-                    return serde_json::from_str(&resp_body).map_err(|e| format!("Failed to parse response: {}", e));
+                    return serde_json::from_str(&resp_body).map_err(|e| format!("Failed to parse response: {e}"));
                 }
                 429 => {
                     return Err(format!("Rate limited (429). Response: {}", truncate(&resp_body, 200)));

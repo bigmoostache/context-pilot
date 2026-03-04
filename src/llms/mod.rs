@@ -201,7 +201,7 @@ fn ms_to_iso8601(ms: u64) -> String {
         }
         let day = remaining_days + 1;
 
-        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, month, day, hours, minutes, seconds)
+        format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
     } else {
         "1970-01-01T00:00:00Z".to_string()
     }
@@ -215,13 +215,13 @@ fn is_leap_year(year: i32) -> bool {
 fn format_time_delta(delta_ms: u64) -> String {
     let seconds = delta_ms / 1000;
     if seconds < 60 {
-        format!("{} seconds ago", seconds)
+        format!("{seconds} seconds ago")
     } else if seconds < 3600 {
         let minutes = seconds / 60;
-        if minutes == 1 { "1 minute ago".to_string() } else { format!("{} minutes ago", minutes) }
+        if minutes == 1 { "1 minute ago".to_string() } else { format!("{minutes} minutes ago") }
     } else {
         let hours = seconds / 3600;
-        if hours == 1 { "1 hour ago".to_string() } else { format!("{} hours ago", hours) }
+        if hours == 1 { "1 hour ago".to_string() } else { format!("{hours} hours ago") }
     }
 }
 
@@ -381,12 +381,11 @@ pub(crate) fn log_sse_error(
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let recent = if last_lines.is_empty() { "(none)".to_string() } else { last_lines.join("\n") };
     let entry = format!(
-        "[{}] SSE error event ({})\n\
-         Stream position: {} bytes, {} lines\n\
-         Error data: {}\n\
-         Last SSE lines:\n{}\n\
-         ---\n",
-        ts, provider, total_bytes, line_count, json_str, recent
+        "[{ts}] SSE error event ({provider})\n\
+         Stream position: {total_bytes} bytes, {line_count} lines\n\
+         Error data: {json_str}\n\
+         Last SSE lines:\n{recent}\n\
+         ---\n"
     );
 
     let _r = std::fs::OpenOptions::new()
@@ -411,10 +410,10 @@ pub(crate) mod error {
     impl fmt::Display for LlmError {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
-                LlmError::Auth(msg) => write!(f, "Auth error: {}", msg),
-                LlmError::Network(msg) => write!(f, "Network error: {}", msg),
-                LlmError::Api { status, body } => write!(f, "API error {}: {}", status, body),
-                LlmError::StreamRead(msg) => write!(f, "Stream read error: {}", msg),
+                LlmError::Auth(msg) => write!(f, "Auth error: {msg}"),
+                LlmError::Network(msg) => write!(f, "Network error: {msg}"),
+                LlmError::Api { status, body } => write!(f, "API error {status}: {body}"),
+                LlmError::StreamRead(msg) => write!(f, "Stream read error: {msg}"),
             }
         }
     }

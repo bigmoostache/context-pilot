@@ -163,9 +163,9 @@ impl Module for TreeModule {
                         if let Some(path) = path_val.as_str() {
                             let p = std::path::Path::new(path);
                             if !p.exists() {
-                                pf.warnings.push(format!("Path '{}' does not exist", path));
+                                pf.warnings.push(format!("Path '{path}' does not exist"));
                             } else if !p.is_dir() {
-                                pf.warnings.push(format!("'{}' is not a directory", path));
+                                pf.warnings.push(format!("'{path}' is not a directory"));
                             }
                         }
                     }

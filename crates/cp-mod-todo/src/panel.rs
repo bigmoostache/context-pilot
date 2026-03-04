@@ -128,7 +128,7 @@ impl Panel for TodoPanel {
                     Span::styled(" ".to_string(), base_style),
                     Span::styled(prefix.clone(), base_style),
                     Span::styled("[".to_string(), Style::default().fg(theme::text_muted())),
-                    Span::styled(format!("{}", status_char), Style::default().fg(status_color)),
+                    Span::styled(format!("{status_char}"), Style::default().fg(status_color)),
                     Span::styled("] ".to_string(), Style::default().fg(theme::text_muted())),
                     Span::styled(id, Style::default().fg(theme::accent_dim())),
                     Span::styled(" ".to_string(), base_style),

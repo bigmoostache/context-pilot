@@ -7,19 +7,19 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing 'panel_id' parameter".to_string(), true);
     };
 
-    let Some(page) = tool.input.get("page").and_then(|v| v.as_i64()) else {
+    let Some(page) = tool.input.get("page").and_then(serde_json::Value::as_i64) else {
         return ToolResult::new(tool.id.clone(), "Missing 'page' parameter (expected integer)".to_string(), true);
     };
 
     // Find the context element by panel ID
     let Some(ctx) = state.context.iter_mut().find(|c| c.id == panel_id) else {
-        return ToolResult::new(tool.id.clone(), format!("Panel '{}' not found", panel_id), true);
+        return ToolResult::new(tool.id.clone(), format!("Panel '{panel_id}' not found"), true);
     };
 
     if ctx.total_pages <= 1 {
         return ToolResult::new(
             tool.id.clone(),
-            format!("Panel '{}' has only 1 page — no pagination needed", panel_id),
+            format!("Panel '{panel_id}' has only 1 page — no pagination needed"),
             true,
         );
     }

@@ -266,7 +266,7 @@ impl ContextElement {
     /// Fast path: get a metadata `value.to_usize()`.
     #[must_use]
     pub fn get_meta_usize(&self, key: &str) -> Option<usize> {
-        self.metadata.get(key).and_then(|v| v.as_u64()).map(|n| n.to_usize())
+        self.metadata.get(key).and_then(serde_json::Value::as_u64).map(SafeCast::to_usize)
     }
 }
 

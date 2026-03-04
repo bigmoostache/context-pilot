@@ -29,19 +29,19 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     if let Some(ref reason) = state.guard_rail_blocked {
         // BLOCKED — guard rail is preventing auto-continuation
         spans.push(Span::styled(
-            format!(" BLOCKED: {} ", reason),
+            format!(" BLOCKED: {reason} "),
             Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
         ));
     } else if state.is_streaming && !state.is_tooling {
         // STREAMING — actively receiving tokens from API
         spans.push(Span::styled(
-            format!(" {} STREAMING ", spin),
+            format!(" {spin} STREAMING "),
             Style::default().fg(theme::bg_base()).bg(theme::success()).bold(),
         ));
     } else if state.is_streaming && state.is_tooling {
         // TOOLING — stream active but executing tool calls (same blue as branch name)
         spans.push(Span::styled(
-            format!(" {} TOOLING ", spin),
+            format!(" {spin} TOOLING "),
             Style::default().fg(Color::White).bg(Color::Blue).bold(),
         ));
     } else if has_question_form {
@@ -50,7 +50,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     } else if has_timed_watcher {
         // WAITING — idle but a coucou/watcher will fire
         spans.push(Span::styled(
-            format!(" {} WAITING ", spin),
+            format!(" {spin} WAITING "),
             Style::default().fg(Color::White).bg(Color::Magenta).bold(),
         ));
     } else {
@@ -74,7 +74,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 
     if loading_count > 0 {
         spans.push(Span::styled(
-            format!(" {} LOADING {} ", spin, loading_count),
+            format!(" {spin} LOADING {loading_count} "),
             Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
@@ -90,11 +90,11 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         LlmProvider::DeepSeek => ("DeepSeek", state.deepseek_model.display_name()),
     };
     spans.push(Span::styled(
-        format!(" {} ", provider_name),
+        format!(" {provider_name} "),
         Style::default().fg(theme::bg_base()).bg(theme::accent_dim()).bold(),
     ));
     spans.push(Span::styled(" ", base_style));
-    spans.push(Span::styled(format!(" {} ", model_name), Style::default().fg(theme::text()).bg(theme::bg_elevated())));
+    spans.push(Span::styled(format!(" {model_name} "), Style::default().fg(theme::text()).bg(theme::bg_elevated())));
     spans.push(Span::styled(" ", base_style));
 
     // Stop reason from last stream (highlight max_tokens as warning)
@@ -106,7 +106,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         } else {
             (reason.to_uppercase(), Style::default().fg(theme::text()).bg(theme::bg_elevated()))
         };
-        spans.push(Span::styled(format!(" {} ", label), style));
+        spans.push(Span::styled(format!(" {label} "), style));
         spans.push(Span::styled(" ", base_style));
     }
 
@@ -115,7 +115,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     if let Some(ref agent_id) = ps.active_agent_id {
         let agent_name = ps.agents.iter().find(|a| &a.id == agent_id).map_or(agent_id.as_str(), |a| a.name.as_str());
         spans.push(Span::styled(
-            format!(" 🤖 {} ", agent_name),
+            format!(" 🤖 {agent_name} "),
             Style::default().fg(Color::White).bg(Color::Rgb(130, 80, 200)).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
@@ -125,7 +125,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     for skill_id in &ps.loaded_skill_ids {
         let skill_name = ps.skills.iter().find(|s| s.id == *skill_id).map_or(skill_id.as_str(), |s| s.name.as_str());
         spans.push(Span::styled(
-            format!(" 📚 {} ", skill_name),
+            format!(" 📚 {skill_name} "),
             Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
@@ -134,7 +134,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     // Git branch (if available)
     let gs = cp_mod_git::GitState::get(state);
     if let Some(branch) = &gs.git_branch {
-        spans.push(Span::styled(format!(" {} ", branch), Style::default().fg(Color::White).bg(Color::Blue)));
+        spans.push(Span::styled(format!(" {branch} "), Style::default().fg(Color::White).bg(Color::Blue)));
         spans.push(Span::styled(" ", base_style));
     }
 
@@ -163,8 +163,8 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         let (net_prefix, net_color) = if net_change >= 0 { ("+", theme::success()) } else { ("", theme::error()) };
         let bg = theme::bg_elevated();
 
-        spans.push(Span::styled(format!(" +{}", total_additions), Style::default().fg(theme::success()).bg(bg).bold()));
-        spans.push(Span::styled(format!("/-{}", total_deletions), Style::default().fg(theme::error()).bg(bg).bold()));
+        spans.push(Span::styled(format!(" +{total_additions}"), Style::default().fg(theme::success()).bg(bg).bold()));
+        spans.push(Span::styled(format!("/-{total_deletions}"), Style::default().fg(theme::error()).bg(bg).bold()));
         spans.push(Span::styled(
             format!("/{}{} ", net_prefix, net_change.abs()),
             Style::default().fg(net_color).bg(bg).bold(),
@@ -172,9 +172,9 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         spans.push(Span::styled(" ", base_style));
 
         // File changes card: U/M/D
-        spans.push(Span::styled(format!(" U{}", untracked_count), Style::default().fg(theme::success()).bg(bg).bold()));
-        spans.push(Span::styled(format!("/M{}", modified_count), Style::default().fg(theme::warning()).bg(bg).bold()));
-        spans.push(Span::styled(format!("/D{} ", deleted_count), Style::default().fg(theme::error()).bg(bg).bold()));
+        spans.push(Span::styled(format!(" U{untracked_count}"), Style::default().fg(theme::success()).bg(bg).bold()));
+        spans.push(Span::styled(format!("/M{modified_count}"), Style::default().fg(theme::warning()).bg(bg).bold()));
+        spans.push(Span::styled(format!("/D{deleted_count} "), Style::default().fg(theme::error()).bg(bg).bold()));
         spans.push(Span::styled(" ", base_style));
     }
 
@@ -190,7 +190,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         };
         let label = if spine_cfg.continue_until_todos_done { "Auto-continue" } else { "No Auto-continue" };
         spans.push(Span::styled(
-            format!(" {}{} ", icon, label),
+            format!(" {icon}{label} "),
             Style::default().fg(theme::bg_base()).bg(bg_color).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
@@ -203,9 +203,9 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         let agent_name =
             ps.agents.iter().find(|a| a.id == rev.agent_id).map_or(rev.agent_id.as_str(), |a| a.name.as_str());
         let tools_done = rev.tool_call_count;
-        let rev_spin = if rev.is_streaming { format!("{} ", spin) } else { String::new() };
+        let rev_spin = if rev.is_streaming { format!("{spin} ") } else { String::new() };
         spans.push(Span::styled(
-            format!(" {}🧠 {} ({} tools) ", rev_spin, agent_name, tools_done),
+            format!(" {rev_spin}🧠 {agent_name} ({tools_done} tools) "),
             Style::default().fg(Color::White).bg(Color::Rgb(100, 60, 160)).bold(),
         ));
         spans.push(Span::styled(" ", base_style));
@@ -217,7 +217,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         if qs.active {
             let n = qs.queued_calls.len();
             spans.push(Span::styled(
-                format!(" ⏳ Queue ({}) ", n),
+                format!(" ⏳ Queue ({n}) "),
                 Style::default().fg(Color::White).bg(Color::Rgb(180, 120, 40)).bold(),
             ));
             spans.push(Span::styled(" ", base_style));
@@ -226,7 +226,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 
     // Right side info
     let char_count = state.input.chars().count();
-    let right_info = if char_count > 0 { format!("{} chars ", char_count) } else { String::new() };
+    let right_info = if char_count > 0 { format!("{char_count} chars ") } else { String::new() };
 
     let left_width: usize = spans.iter().map(|s| s.content.chars().count()).sum();
     let right_width = right_info.len();
@@ -303,8 +303,8 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
         };
 
         lines.push(Line::from(vec![
-            Span::styled(format!(" {} ", cursor_marker), Style::default().fg(theme::accent())),
-            Span::styled(format!("{} ", indicator), label_style),
+            Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
+            Span::styled(format!("{indicator} "), label_style),
             Span::styled(opt.label.clone(), label_style),
             Span::styled(format!("  {}", opt.description), desc_style),
         ]));
@@ -328,8 +328,8 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
 
         if is_typing {
             lines.push(Line::from(vec![
-                Span::styled(format!(" {} ", cursor_marker), Style::default().fg(theme::accent())),
-                Span::styled(format!("{} ", indicator), label_style),
+                Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
+                Span::styled(format!("{indicator} "), label_style),
                 Span::styled("Other: ", label_style),
                 Span::styled(
                     format!("{}▏", ans.other_text),
@@ -338,8 +338,8 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
             ]));
         } else {
             lines.push(Line::from(vec![
-                Span::styled(format!(" {} ", cursor_marker), Style::default().fg(theme::accent())),
-                Span::styled(format!("{} ", indicator), label_style),
+                Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
+                Span::styled(format!("{indicator} "), label_style),
                 Span::styled("Other", label_style),
                 Span::styled("  Type your own answer", Style::default().fg(theme::text_muted())),
             ]));
@@ -375,7 +375,7 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
     };
     lines.push(Line::from(hint_spans));
 
-    let title = format!(" Question{} ", progress);
+    let title = format!(" Question{progress} ");
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -449,7 +449,7 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, ar
             let suffix = if entry.is_dir { "/" } else { "" };
             let icon = if entry.is_dir { "📁 " } else { "   " };
             lines.push(Line::from(vec![
-                Span::styled(format!(" {} ", cursor_marker), Style::default().fg(theme::accent())),
+                Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
                 Span::styled(icon.to_string(), Style::default()),
                 Span::styled(format!("{}{}", entry.name, suffix), path_style),
             ]));

@@ -64,7 +64,7 @@ impl Module for TodoModule {
         {
             ts.todos = v;
         }
-        if let Some(v) = data.get("next_todo_id").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("next_todo_id").and_then(serde_json::Value::as_u64) {
             ts.next_todo_id = v.to_usize();
         }
     }
@@ -140,7 +140,7 @@ impl Module for TodoModule {
                         if let Some(parent_id) = todo.get("parent_id").and_then(|v| v.as_str())
                             && !ts.todos.iter().any(|t| t.id == parent_id)
                         {
-                            pf.errors.push(format!("Parent todo '{}' not found", parent_id));
+                            pf.errors.push(format!("Parent todo '{parent_id}' not found"));
                         }
                     }
                 }
@@ -154,7 +154,7 @@ impl Module for TodoModule {
                         if let Some(id) = update.get("id").and_then(|v| v.as_str())
                             && !ts.todos.iter().any(|t| t.id == id)
                         {
-                            pf.errors.push(format!("Todo '{}' not found", id));
+                            pf.errors.push(format!("Todo '{id}' not found"));
                         }
                     }
                 }
@@ -166,12 +166,12 @@ impl Module for TodoModule {
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
                     && !ts.todos.iter().any(|t| t.id == id)
                 {
-                    pf.errors.push(format!("Todo '{}' not found", id));
+                    pf.errors.push(format!("Todo '{id}' not found"));
                 }
                 if let Some(after_id) = tool.input.get("after_id").and_then(|v| v.as_str())
                     && !ts.todos.iter().any(|t| t.id == after_id)
                 {
-                    pf.warnings.push(format!("after_id '{}' not found — will move to top", after_id));
+                    pf.warnings.push(format!("after_id '{after_id}' not found — will move to top"));
                 }
                 Some(pf)
             }

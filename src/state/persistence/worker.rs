@@ -11,7 +11,7 @@ fn states_dir() -> PathBuf {
 }
 
 fn worker_path(worker_id: &str) -> PathBuf {
-    states_dir().join(format!("{}.json", worker_id))
+    states_dir().join(format!("{worker_id}.json"))
 }
 
 /// Load worker state from `states/{worker_id}.json`

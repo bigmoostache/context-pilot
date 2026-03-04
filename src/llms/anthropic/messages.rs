@@ -143,7 +143,7 @@ fn inject_panel_messages(
         api_messages.push(ApiMessage {
             role: "user".to_string(),
             content: vec![ContentBlock::Text {
-                text: format!("System instructions (repeated for emphasis):\n\n{}", seed),
+                text: format!("System instructions (repeated for emphasis):\n\n{seed}"),
             }],
         });
         api_messages.push(ApiMessage {

@@ -42,7 +42,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         || vec!["markdown".to_string(), "links".to_string()],
         |arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
     );
-    let formats: Vec<&str> = formats_val.iter().map(|s| s.as_str()).collect();
+    let formats: Vec<&str> = formats_val.iter().map(String::as_str).collect();
 
     // Parse location
     let country_val = tool
@@ -59,7 +59,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         .and_then(|o| o.get("languages"))
         .and_then(|v| v.as_array())
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
-    let languages_refs: Option<Vec<&str>> = languages_val.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+    let languages_refs: Option<Vec<&str>> = languages_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
 
     let params = ScrapeParams { url, formats, country: country_val.as_deref(), languages: languages_refs };
 
@@ -67,7 +67,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         Ok(resp) => {
             if !resp.success {
                 let msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
-                return err_result(tool, format!("Firecrawl scrape failed: {}", msg));
+                return err_result(tool, format!("Firecrawl scrape failed: {msg}"));
             }
 
             let Some(data) = resp.data else { return err_result(tool, "Scrape returned no data".to_string()) };
@@ -81,13 +81,13 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
             if let Some(ref meta) = data.metadata {
                 content.push_str("## Metadata\n\n");
                 if let Some(ref t) = meta.title {
-                    content.push_str(&format!("**Title:** {}\n", t));
+                    content.push_str(&format!("**Title:** {t}\n"));
                 }
                 if let Some(ref d) = meta.description {
-                    content.push_str(&format!("**Description:** {}\n", d));
+                    content.push_str(&format!("**Description:** {d}\n"));
                 }
                 if let Some(ref u) = meta.source_url {
-                    content.push_str(&format!("**URL:** {}\n", u));
+                    content.push_str(&format!("**URL:** {u}\n"));
                 }
                 content.push('\n');
             }
@@ -105,13 +105,13 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
             {
                 content.push_str("## Links\n\n");
                 for link in links {
-                    content.push_str(&format!("- {}\n", link));
+                    content.push_str(&format!("- {link}\n"));
                 }
             }
 
-            let panel_id = crate::panel::create_panel(state, &format!("firecrawl_scrape: {}", url), &content);
+            let panel_id = crate::panel::create_panel(state, &format!("firecrawl_scrape: {url}"), &content);
 
-            ok_result(tool, format!("Created panel {}: scraped {} ({})", panel_id, url, title))
+            ok_result(tool, format!("Created panel {panel_id}: scraped {url} ({title})"))
         }
         Err(e) => err_result(tool, e),
     }
@@ -126,20 +126,20 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         return err_result(tool, "Missing required parameter 'query'".to_string());
     };
 
-    let limit = tool.input.get("limit").and_then(|v| v.as_u64()).unwrap_or(3).to_u32();
+    let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(3).to_u32();
 
     let sources_val: Vec<String> = tool.input.get("sources").and_then(|v| v.as_array()).map_or_else(
         || vec!["web".to_string()],
         |arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
     );
-    let sources: Vec<&str> = sources_val.iter().map(|s| s.as_str()).collect();
+    let sources: Vec<&str> = sources_val.iter().map(String::as_str).collect();
 
     let cats_val: Option<Vec<String>> = tool
         .input
         .get("categories")
         .and_then(|v| v.as_array())
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
-    let cats_refs: Option<Vec<&str>> = cats_val.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+    let cats_refs: Option<Vec<&str>> = cats_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
 
     let tbs_val = tool.input.get("tbs").and_then(|v| v.as_str()).map(String::from);
     let loc_val = tool.input.get("location").and_then(|v| v.as_str()).map(String::from);
@@ -157,10 +157,10 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Ok(resp) => {
             if !resp.success {
                 let msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
-                return err_result(tool, format!("Firecrawl search failed: {}", msg));
+                return err_result(tool, format!("Firecrawl search failed: {msg}"));
             }
 
-            let Some(data) = resp.data else { return ok_result(tool, format!("No results found for '{}'", query)) };
+            let Some(data) = resp.data else { return ok_result(tool, format!("No results found for '{query}'")) };
 
             // Parse data — can be array (scraped results) or object (web/news/images dict)
             let results: Vec<crate::types::SearchResult> = if data.is_array() {
@@ -169,16 +169,16 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 web_arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect()
             } else {
                 // Fallback: dump as YAML
-                let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{:#}", data));
+                let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
                 let panel_id =
-                    crate::panel::create_panel(state, &format!("firecrawl_search: {}", query), &panel_content);
-                return ok_result(tool, format!("Created panel {}: results for '{}'", panel_id, query));
+                    crate::panel::create_panel(state, &format!("firecrawl_search: {query}"), &panel_content);
+                return ok_result(tool, format!("Created panel {panel_id}: results for '{query}'"));
             };
 
             let count = results.len();
 
             if count == 0 {
-                return ok_result(tool, format!("No results found for '{}'", query));
+                return ok_result(tool, format!("No results found for '{query}'"));
             }
 
             // Build panel: concatenated markdown per page
@@ -202,7 +202,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 {
                     content.push_str("**Links:**\n");
                     for link in links.iter().take(10) {
-                        content.push_str(&format!("- {}\n", link));
+                        content.push_str(&format!("- {link}\n"));
                     }
                     content.push('\n');
                 }
@@ -210,9 +210,9 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 content.push_str("---\n\n");
             }
 
-            let panel_id = crate::panel::create_panel(state, &format!("firecrawl_search: {}", query), &content);
+            let panel_id = crate::panel::create_panel(state, &format!("firecrawl_search: {query}"), &content);
 
-            ok_result(tool, format!("Created panel {}: {} results for '{}'", panel_id, count, query))
+            ok_result(tool, format!("Created panel {panel_id}: {count} results for '{query}'"))
         }
         Err(e) => err_result(tool, e),
     }
@@ -227,9 +227,9 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
         return err_result(tool, "Missing required parameter 'url'".to_string());
     };
 
-    let limit = tool.input.get("limit").and_then(|v| v.as_u64()).unwrap_or(50).to_u32();
+    let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(50).to_u32();
     let search_val = tool.input.get("search").and_then(|v| v.as_str()).map(String::from);
-    let include_subdomains = tool.input.get("include_subdomains").and_then(|v| v.as_bool()).unwrap_or(false);
+    let include_subdomains = tool.input.get("include_subdomains").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
     // Parse location
     let country_val = tool
@@ -246,7 +246,7 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
         .and_then(|o| o.get("languages"))
         .and_then(|v| v.as_array())
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
-    let langs_refs: Option<Vec<&str>> = languages_val.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+    let langs_refs: Option<Vec<&str>> = languages_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
 
     let params = MapParams {
         url,
@@ -261,29 +261,29 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
         Ok(resp) => {
             if !resp.success {
                 let msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
-                return err_result(tool, format!("Firecrawl map failed: {}", msg));
+                return err_result(tool, format!("Firecrawl map failed: {msg}"));
             }
 
             let links = resp.links.unwrap_or_default();
             let count = links.len();
 
             if count == 0 {
-                return ok_result(tool, format!("No URLs discovered on '{}'", url));
+                return ok_result(tool, format!("No URLs discovered on '{url}'"));
             }
 
             // YAML panel for URL list
             let panel_content = match serde_yaml::to_string(&links) {
                 Ok(yaml) => yaml,
-                Err(e) => return err_result(tool, format!("Failed to serialize response: {}", e)),
+                Err(e) => return err_result(tool, format!("Failed to serialize response: {e}")),
             };
 
             // Extract domain for title
             let domain =
                 url.trim_start_matches("https://").trim_start_matches("http://").split('/').next().unwrap_or(url);
 
-            let panel_id = crate::panel::create_panel(state, &format!("firecrawl_map: {}", domain), &panel_content);
+            let panel_id = crate::panel::create_panel(state, &format!("firecrawl_map: {domain}"), &panel_content);
 
-            ok_result(tool, format!("Created panel {}: {} URLs discovered on '{}'", panel_id, count, domain))
+            ok_result(tool, format!("Created panel {panel_id}: {count} URLs discovered on '{domain}'"))
         }
         Err(e) => err_result(tool, e),
     }

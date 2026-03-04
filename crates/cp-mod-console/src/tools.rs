@@ -65,8 +65,8 @@ fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> 
         .context
         .iter()
         .find(|c| c.id == panel_id && c.context_type.as_str() == ContextType::CONSOLE)
-        .and_then(|c| c.get_meta_str("console_name").map(|s| s.to_string()))
-        .ok_or_else(|| format!("Console panel '{}' not found", panel_id))
+        .and_then(|c| c.get_meta_str("console_name").map(ToString::to_string))
+        .ok_or_else(|| format!("Console panel '{panel_id}' not found"))
 }
 
 /// Handle `console_create`: spawn a child process and create a panel for its output.
@@ -81,8 +81,8 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), msg, true);
     }
 
-    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let description = tool.input.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(ToString::to_string);
+    let description = tool.input.get("description").and_then(|v| v.as_str()).map(ToString::to_string);
 
     // Auto-generate session key
     let session_key = {
@@ -122,7 +122,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cs = ConsoleState::get_mut(state);
     drop(cs.sessions.insert(session_key, handle));
 
-    ToolResult::new(tool.id.clone(), format!("Console created in {}", panel_id), false)
+    ToolResult::new(tool.id.clone(), format!("Console created in {panel_id}"), false)
 }
 
 /// Handle `console_send_keys`: write input text to a running process's stdin.
@@ -148,7 +148,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let cs = ConsoleState::get(state);
     let Some(handle) = cs.sessions.get(&session_key) else {
-        return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true);
+        return ToolResult::new(tool.id.clone(), format!("Session for '{panel_id}' not found"), true);
     };
 
     if handle.get_status().is_terminal() {
@@ -160,13 +160,13 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if let Err(e) = handle.send_input(&input) {
-        return ToolResult::new(tool.id.clone(), format!("Failed to send input: {}", e), true);
+        return ToolResult::new(tool.id.clone(), format!("Failed to send input: {e}"), true);
     }
 
     // Short delay for output to arrive
     state.tool_sleep_until_ms = now_ms() + 500;
 
-    ToolResult::new(tool.id.clone(), format!("Sent input to console '{}'", panel_id), false)
+    ToolResult::new(tool.id.clone(), format!("Sent input to console '{panel_id}'"), false)
 }
 
 /// Handle `console_wait`: register a blocking watcher for exit or pattern match.
@@ -179,14 +179,14 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(m) => m.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'mode' parameter".to_string(), true),
     };
-    let pattern = tool.input.get("pattern").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let max_wait: u64 = tool.input.get("max_wait").and_then(|v| v.as_u64()).unwrap_or(30).clamp(1, 30);
+    let pattern = tool.input.get("pattern").and_then(|v| v.as_str()).map(ToString::to_string);
+    let max_wait: u64 = tool.input.get("max_wait").and_then(serde_json::Value::as_u64).unwrap_or(30).clamp(1, 30);
 
     // Validate mode
     if mode != "exit" && mode != "pattern" {
         return ToolResult::new(
             tool.id.clone(),
-            format!("Invalid mode '{}'. Must be 'exit' or 'pattern'.", mode),
+            format!("Invalid mode '{mode}'. Must be 'exit' or 'pattern'."),
             true,
         );
     }
@@ -203,7 +203,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Check if session exists
     let cs = ConsoleState::get(state);
     let Some(handle) = cs.sessions.get(&session_key) else {
-        return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true);
+        return ToolResult::new(tool.id.clone(), format!("Session for '{panel_id}' not found"), true);
     };
 
     // Check if condition is already met
@@ -231,13 +231,13 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let now = now_ms();
     let desc = match mode.as_str() {
-        "exit" => format!("⏳ Waiting for {} to exit", panel_id),
+        "exit" => format!("⏳ Waiting for {panel_id} to exit"),
         "pattern" => format!("⏳ Waiting for pattern '{}' in {}", pattern.as_deref().unwrap_or("?"), panel_id),
-        _ => format!("⏳ Waiting on {}", panel_id),
+        _ => format!("⏳ Waiting on {panel_id}"),
     };
 
     let watcher = ConsoleWatcher {
-        watcher_id: format!("console_{}_{}", session_key, mode),
+        watcher_id: format!("console_{session_key}_{mode}"),
         session_name: session_key,
         mode,
         pattern,
@@ -266,13 +266,13 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(m) => m.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'mode' parameter".to_string(), true),
     };
-    let pattern = tool.input.get("pattern").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let pattern = tool.input.get("pattern").and_then(|v| v.as_str()).map(ToString::to_string);
 
     // Validate mode
     if mode != "exit" && mode != "pattern" {
         return ToolResult::new(
             tool.id.clone(),
-            format!("Invalid mode '{}'. Must be 'exit' or 'pattern'.", mode),
+            format!("Invalid mode '{mode}'. Must be 'exit' or 'pattern'."),
             true,
         );
     }
@@ -289,7 +289,7 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Check if session exists
     let cs = ConsoleState::get(state);
     let Some(handle) = cs.sessions.get(&session_key) else {
-        return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true);
+        return ToolResult::new(tool.id.clone(), format!("Session for '{panel_id}' not found"), true);
     };
 
     // Check if condition is already met — return immediately
@@ -317,13 +317,13 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let now = now_ms();
     let desc = match mode.as_str() {
-        "exit" => format!("👁 Watching {} for exit", panel_id),
+        "exit" => format!("👁 Watching {panel_id} for exit"),
         "pattern" => format!("👁 Watching {} for '{}'", panel_id, pattern.as_deref().unwrap_or("?")),
-        _ => format!("👁 Watching {}", panel_id),
+        _ => format!("👁 Watching {panel_id}"),
     };
 
     let watcher = ConsoleWatcher {
-        watcher_id: format!("console_{}_{}", session_key, mode),
+        watcher_id: format!("console_{session_key}_{mode}"),
         session_name: session_key,
         mode,
         pattern,
@@ -341,7 +341,7 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     ToolResult::new(
         tool.id.clone(),
-        format!("Watcher registered for '{}' — you'll get a spine notification when the condition is met.", panel_id),
+        format!("Watcher registered for '{panel_id}' — you'll get a spine notification when the condition is met."),
         false,
     )
 }
@@ -358,7 +358,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), msg, true);
     }
 
-    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(ToString::to_string);
 
     // Spawn via the console server (non-blocking to the main loop)
     let session_key = {
@@ -370,7 +370,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone()) {
         Ok(h) => h,
-        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {}", e), true),
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {e}"), true),
     };
 
     // Create a panel so output goes there instead of flooding the conversation
@@ -396,7 +396,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Register a blocking exit watcher via WatcherRegistry
     let now = now_ms();
     let watcher = ConsoleWatcher {
-        watcher_id: format!("console_{}_easy_bash", session_key),
+        watcher_id: format!("console_{session_key}_easy_bash"),
         session_name: session_key,
         mode: "exit".to_string(),
         pattern: None,

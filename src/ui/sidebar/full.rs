@@ -109,11 +109,11 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let conv_tokens = format_number(state.context[conv_idx].token_count);
 
         lines.push(Line::from(vec![
-            Span::styled(format!(" {}", indicator), Style::default().fg(indicator_color)),
+            Span::styled(format!(" {indicator}"), Style::default().fg(indicator_color)),
             Span::styled(format!(" {:>width$} ", "", width = id_width), Style::default().fg(theme::text_muted())),
             Span::styled(icon, Style::default().fg(if is_selected { theme::accent() } else { theme::text_muted() })),
             Span::styled(format!("{:<18}", "Conversation"), Style::default().fg(name_color)),
-            Span::styled(format!("{:>6}", conv_tokens), Style::default().fg(theme::accent_dim())),
+            Span::styled(format!("{conv_tokens:>6}"), Style::default().fg(theme::accent_dim())),
             Span::styled(" ", base_style),
         ]));
     }
@@ -248,8 +248,8 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
         // +/- stats and review/checks on one line
         let mut detail_spans = vec![Span::styled(" ", base_style)];
         if let (Some(add), Some(del)) = (pr.additions, pr.deletions) {
-            detail_spans.push(Span::styled(format!("+{}", add), Style::default().fg(theme::success())));
-            detail_spans.push(Span::styled(format!(" -{}", del), Style::default().fg(theme::error())));
+            detail_spans.push(Span::styled(format!("+{add}"), Style::default().fg(theme::success())));
+            detail_spans.push(Span::styled(format!(" -{del}"), Style::default().fg(theme::error())));
         }
         if let Some(ref review) = pr.review_decision {
             let (icon, color) = match review.as_str() {
@@ -293,11 +293,11 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
             if cost < 0.001 {
                 String::new()
             } else if cost < 0.01 {
-                format!("{:.3}", cost)
+                format!("{cost:.3}")
             } else if cost < 1.0 {
-                format!("{:.2}", cost)
+                format!("{cost:.2}")
             } else {
-                format!("{:.1}", cost)
+                format!("{cost:.1}")
             }
         };
 
@@ -309,9 +309,9 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
         let header = [
             Cell::new("", Style::default()),
-            Cell::right(format!("{} hit", hit_icon), Style::default().fg(theme::success())),
-            Cell::right(format!("{} miss", miss_icon), Style::default().fg(theme::warning())),
-            Cell::right(format!("{} out", out_icon), Style::default().fg(theme::accent_dim())),
+            Cell::right(format!("{hit_icon} hit"), Style::default().fg(theme::success())),
+            Cell::right(format!("{miss_icon} miss"), Style::default().fg(theme::warning())),
+            Cell::right(format!("{out_icon} out"), Style::default().fg(theme::accent_dim())),
         ];
 
         let mut rows: Vec<Vec<Cell>> = Vec::new();
@@ -336,7 +336,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
                 return None;
             }
 
-            let fmt = |cost: &str| -> String { if cost.is_empty() { String::new() } else { format!("${}", cost) } };
+            let fmt = |cost: &str| -> String { if cost.is_empty() { String::new() } else { format!("${cost}") } };
 
             Some(vec![
                 Cell::new("", Style::default()),
@@ -390,9 +390,9 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
             + State::token_cost(state.total_output_tokens, out_price);
         if total_cost >= 0.001 {
             let total_str =
-                if total_cost < 0.01 { format!("${:.3}", total_cost) } else { format!("${:.2}", total_cost) };
+                if total_cost < 0.01 { format!("${total_cost:.3}") } else { format!("${total_cost:.2}") };
             lines.push(Line::from(vec![Span::styled(
-                format!(" total: {}", total_str),
+                format!(" total: {total_str}"),
                 Style::default().fg(theme::text_muted()),
             )]));
         }
@@ -458,7 +458,7 @@ fn render_context_line(
     // Build the line — fixed panels show a count badge instead of Px ID
     let shortcut = if ctx.context_type.is_fixed() {
         let badge = fixed_panel_badge(ctx.context_type.as_str(), state).unwrap_or_default();
-        format!("{:>width$}", badge, width = id_width)
+        format!("{badge:>id_width$}")
     } else {
         format!("{:>width$}", &ctx.id, width = id_width)
     };
@@ -467,7 +467,7 @@ fn render_context_line(
     // Show spinner instead of token count when loading
     // Show page indicator for paginated panels
     let tokens_or_spinner = if is_loading {
-        format!("{:>6}", spin)
+        format!("{spin:>6}")
     } else if ctx.total_pages > 1 {
         format!("{}/{}", ctx.current_page + 1, ctx.total_pages)
     } else {
@@ -489,11 +489,11 @@ fn render_context_line(
     let tokens_color = if is_loading { theme::warning() } else { theme::accent_dim() };
 
     lines.push(Line::from(vec![
-        Span::styled(format!(" {}", indicator), Style::default().fg(indicator_color)),
-        Span::styled(format!(" {} ", shortcut), Style::default().fg(theme::text_muted())),
+        Span::styled(format!(" {indicator}"), Style::default().fg(indicator_color)),
+        Span::styled(format!(" {shortcut} "), Style::default().fg(theme::text_muted())),
         Span::styled(icon, Style::default().fg(if is_selected { theme::accent() } else { theme::text_muted() })),
-        Span::styled(format!("{:<18}", name), Style::default().fg(name_color)),
-        Span::styled(format!("{:>6}", tokens_or_spinner), Style::default().fg(tokens_color)),
+        Span::styled(format!("{name:<18}"), Style::default().fg(name_color)),
+        Span::styled(format!("{tokens_or_spinner:>6}"), Style::default().fg(tokens_color)),
         Span::styled(" ", base_style),
     ]));
 }

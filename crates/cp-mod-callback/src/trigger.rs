@@ -74,7 +74,7 @@ fn parse_skip_callbacks(input: &serde_json::Value) -> Vec<String> {
     input
         .get("skip_callbacks")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|item| item.as_str().map(|s| s.to_string())).collect())
+        .map(|arr| arr.iter().filter_map(|item| item.as_str().map(ToString::to_string)).collect())
         .unwrap_or_default()
 }
 
@@ -93,7 +93,7 @@ pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<Mat
 
     // Validate skip_callbacks names across all files
     let all_skip_names: Vec<&str> =
-        changed_files.iter().flat_map(|f| f.skip_callbacks.iter().map(|s| s.as_str())).collect();
+        changed_files.iter().flat_map(|f| f.skip_callbacks.iter().map(String::as_str)).collect();
     validate_skip_names(cs, &all_skip_names, &mut warnings);
 
     for def in &cs.definitions {
@@ -154,7 +154,7 @@ fn validate_skip_names(cs: &CallbackState, names: &[&str], warnings: &mut Vec<St
         }
         let _ = seen.insert(*name);
         if !cs.definitions.iter().any(|d| d.name == *name) {
-            warnings.push(format!("skip_callbacks: '{}' does not match any defined callback", name,));
+            warnings.push(format!("skip_callbacks: '{name}' does not match any defined callback",));
         }
     }
 }
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn test_collect_strips_absolute_project_root() {
         let cwd = std::env::current_dir().unwrap().to_string_lossy().to_string();
-        let abs_path = format!("{}/src/main.rs", cwd);
+        let abs_path = format!("{cwd}/src/main.rs");
         let tools = vec![make_tool("Edit", &abs_path)];
         let files = collect_changed_files(&tools);
         assert_eq!(paths(&files), vec!["src/main.rs"]);

@@ -11,7 +11,7 @@ pub fn seed_templates() {
     let templates = [("report", REPORT_TEMPLATE), ("invoice", INVOICE_TEMPLATE), ("letter", LETTER_TEMPLATE)];
 
     for (name, content) in &templates {
-        let path = format!("{}/{}.typ", TEMPLATES_DIR, name);
+        let path = format!("{TEMPLATES_DIR}/{name}.typ");
         if !Path::new(&path).exists() {
             let _r = fs::write(&path, content);
         }

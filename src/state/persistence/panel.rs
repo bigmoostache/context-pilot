@@ -12,7 +12,7 @@ fn panels_dir() -> PathBuf {
 }
 
 fn panel_path(uid: &str) -> PathBuf {
-    panels_dir().join(format!("{}.json", uid))
+    panels_dir().join(format!("{uid}.json"))
 }
 
 /// Load panel data by UID from panels/{uid}.json

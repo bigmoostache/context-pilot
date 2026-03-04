@@ -49,8 +49,7 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
 
     let mut output = format!(
-        "Context Usage: {} / {} threshold / {} budget ({:.1}%)\n\n",
-        total_tokens, threshold, budget, usage_pct
+        "Context Usage: {total_tokens} / {threshold} threshold / {budget} budget ({usage_pct:.1}%)\n\n"
     );
 
     let mut accumulated = 0usize;
@@ -59,13 +58,12 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     output.push_str("Context Elements:\n");
 
     accumulated += system_prompt_tokens;
-    output.push_str(&format!("  -- system-prompt (×2): {} tokens (acc: {})\n", system_prompt_tokens, accumulated));
+    output.push_str(&format!("  -- system-prompt (×2): {system_prompt_tokens} tokens (acc: {accumulated})\n"));
 
     accumulated += tool_def_tokens;
     let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
     output.push_str(&format!(
-        "  -- tool-definitions ({} enabled): {} tokens (acc: {})\n",
-        enabled_count, tool_def_tokens, accumulated
+        "  -- tool-definitions ({enabled_count} enabled): {tool_def_tokens} tokens (acc: {accumulated})\n"
     ));
 
     // --- Panels sorted by last_refresh_ms, with Conversation forced to end ---

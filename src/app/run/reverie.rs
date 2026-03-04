@@ -95,7 +95,7 @@ impl App {
                             &mut self.state,
                             cp_mod_spine::NotificationType::Custom,
                             "Reverie".to_string(),
-                            format!("Reverie '{}' error: {}. Destroying session.", agent_id, e),
+                            format!("Reverie '{agent_id}' error: {e}. Destroying session."),
                         );
                         // Discard any queued actions from the failed reverie
                         QueueState::get_mut(&mut self.state).clear();
@@ -141,7 +141,7 @@ impl App {
                         &mut self.state,
                         cp_mod_spine::NotificationType::Custom,
                         "Reverie".to_string(),
-                        format!("Tool cap ({}) reached for '{}'. Force-stopping.", cap, agent_id),
+                        format!("Tool cap ({cap}) reached for '{agent_id}'. Force-stopping."),
                     );
                     QueueState::get_mut(&mut self.state).clear();
                     let _r = self.state.reveries.remove(&agent_id);
@@ -311,7 +311,7 @@ impl App {
                     &mut self.state,
                     cp_mod_spine::NotificationType::Custom,
                     "Reverie".to_string(),
-                    format!("Reverie '{}' ended without Report after retry. Force-destroying.", agent_id),
+                    format!("Reverie '{agent_id}' ended without Report after retry. Force-destroying."),
                 );
                 QueueState::get_mut(&mut self.state).clear();
                 let _r = self.state.reveries.remove(&agent_id);

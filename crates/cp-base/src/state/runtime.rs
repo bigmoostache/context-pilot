@@ -18,6 +18,7 @@ use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderC
 pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>;
 
 /// Runtime state (messages loaded in memory)
+#[expect(clippy::struct_excessive_bools, reason = "Runtime state legitimately needs many boolean flags")]
 pub struct State {
     /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
     pub context: Vec<ContextElement>,
@@ -284,7 +285,7 @@ impl State {
         let used_ids: std::collections::HashSet<usize> =
             self.context.iter().filter_map(|c| c.id.strip_prefix('P').and_then(|n| n.parse().ok())).collect();
         let id = (9..).find(|n| !used_ids.contains(n)).unwrap_or(9);
-        format!("P{}", id)
+        format!("P{id}")
     }
 
     /// Get the API model string for the current provider/model selection

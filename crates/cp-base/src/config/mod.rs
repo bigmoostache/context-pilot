@@ -275,7 +275,7 @@ impl ContextIcons {
     /// Look up an icon by key (e.g., "tree", "git").
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&str> {
-        self.0.get(key).map(|s| s.as_str())
+        self.0.get(key).map(String::as_str)
     }
 }
 
@@ -378,7 +378,7 @@ pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea
 
 /// Deserialize a YAML string into `T`, panicking with a descriptive message on failure.
 fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
-    serde_yaml::from_str(content).unwrap_or_else(|e| panic!("Failed to parse {}: {}", name, e))
+    serde_yaml::from_str(content).unwrap_or_else(|e| panic!("Failed to parse {name}: {e}"))
 }
 
 // ============================================================================
@@ -459,7 +459,7 @@ pub fn active_theme() -> &'static Theme {
 /// ensures consistent 2-cell alignment in the TUI.
 #[must_use]
 pub fn normalize_icon(icon: &str) -> String {
-    format!("{} ", icon)
+    format!("{icon} ")
 }
 
 // =============================================================================

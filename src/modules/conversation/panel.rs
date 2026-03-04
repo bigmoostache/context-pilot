@@ -49,7 +49,7 @@ impl ConversationPanel {
 
     /// Compute hash for input cache invalidation
     fn compute_input_hash(input: &str, cursor: usize, viewport_width: u16) -> u64 {
-        hash_values(&[input, &format!("{}{}", cursor, viewport_width)])
+        hash_values(&[input, &format!("{cursor}{viewport_width}")])
     }
 
     /// Compute a hash of all content that affects rendering
@@ -324,7 +324,7 @@ impl Panel for ConversationPanel {
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(Style::default().fg(theme::border()))
             .style(base_style)
-            .title(Span::styled(format!(" {} ", title), Style::default().fg(theme::accent()).bold()));
+            .title(Span::styled(format!(" {title} "), Style::default().fg(theme::accent()).bold()));
 
         let content_area = block.inner(inner_area);
         frame.render_widget(block, inner_area);

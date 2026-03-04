@@ -43,6 +43,7 @@ pub(super) struct StreamMessage {
 }
 
 #[derive(Debug, Deserialize)]
+#[expect(clippy::struct_field_names, reason = "Field names mirror the Anthropic API response")]
 pub(super) struct StreamUsage {
     pub input_tokens: Option<usize>,
     pub output_tokens: Option<usize>,
@@ -81,7 +82,7 @@ pub(super) fn parse_sse_stream(
                 let mut root_cause = String::new();
                 let mut source: Option<&dyn std::error::Error> = std::error::Error::source(&e);
                 while let Some(s) = source {
-                    root_cause = format!("{}", s);
+                    root_cause = format!("{s}");
                     source = std::error::Error::source(s);
                 }
                 let tool_ctx = match &current_tool {
@@ -220,12 +221,11 @@ fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lin
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let recent = if last_lines.is_empty() { "(none)".to_string() } else { last_lines.join("\n") };
     let entry = format!(
-        "[{}] SSE error event (claude_code_api_key)\n\
-         Stream position: {} bytes, {} lines\n\
-         Error data: {}\n\
-         Last SSE lines:\n{}\n\
-         ---\n",
-        ts, total_bytes, line_count, json_str, recent
+        "[{ts}] SSE error event (claude_code_api_key)\n\
+         Stream position: {total_bytes} bytes, {line_count} lines\n\
+         Error data: {json_str}\n\
+         Last SSE lines:\n{recent}\n\
+         ---\n"
     );
 
     let _r = std::fs::OpenOptions::new()

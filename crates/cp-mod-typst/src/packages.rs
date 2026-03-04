@@ -30,18 +30,18 @@ impl PackageSpec {
     pub fn parse(spec: &str) -> Result<Self, String> {
         let spec = spec.trim();
         let rest =
-            spec.strip_prefix('@').ok_or_else(|| format!("Invalid package spec '{}': must start with @", spec))?;
+            spec.strip_prefix('@').ok_or_else(|| format!("Invalid package spec '{spec}': must start with @"))?;
 
         let (namespace, rest) = rest
             .split_once('/')
-            .ok_or_else(|| format!("Invalid package spec '{}': expected @namespace/name:version", spec))?;
+            .ok_or_else(|| format!("Invalid package spec '{spec}': expected @namespace/name:version"))?;
 
         let (name, version) = rest
             .split_once(':')
-            .ok_or_else(|| format!("Invalid package spec '{}': expected @namespace/name:version", spec))?;
+            .ok_or_else(|| format!("Invalid package spec '{spec}': expected @namespace/name:version"))?;
 
         if namespace.is_empty() || name.is_empty() || version.is_empty() {
-            return Err(format!("Invalid package spec '{}': namespace, name, and version must not be empty", spec));
+            return Err(format!("Invalid package spec '{spec}': namespace, name, and version must not be empty"));
         }
 
         Ok(Self { namespace: namespace.to_string(), name: name.to_string(), version: version.to_string() })
@@ -111,7 +111,7 @@ pub fn download_package(spec: &PackageSpec) -> Result<(), String> {
     fs::create_dir_all(&cache_dir).map_err(|e| format!("Failed to create cache dir {}: {}", cache_dir.display(), e))?;
 
     // Download the tar.gz
-    let response = reqwest::blocking::get(&url).map_err(|e| format!("Failed to download {}: {}", url, e))?;
+    let response = reqwest::blocking::get(&url).map_err(|e| format!("Failed to download {url}: {e}"))?;
 
     if !response.status().is_success() {
         // Clean up empty cache dir on failure
@@ -123,15 +123,15 @@ pub fn download_package(spec: &PackageSpec) -> Result<(), String> {
         ));
     }
 
-    let bytes = response.bytes().map_err(|e| format!("Failed to read response: {}", e))?;
+    let bytes = response.bytes().map_err(|e| format!("Failed to read response: {e}"))?;
 
     // Extract tar.gz to cache directory
     let gz = GzDecoder::new(&bytes[..]);
     let mut archive = tar::Archive::new(gz);
 
-    for entry in archive.entries().map_err(|e| format!("Failed to read tar archive: {}", e))? {
-        let mut entry = entry.map_err(|e| format!("Failed to read tar entry: {}", e))?;
-        let entry_path = entry.path().map_err(|e| format!("Invalid path in archive: {}", e))?.into_owned();
+    for entry in archive.entries().map_err(|e| format!("Failed to read tar archive: {e}"))? {
+        let mut entry = entry.map_err(|e| format!("Failed to read tar entry: {e}"))?;
+        let entry_path = entry.path().map_err(|e| format!("Invalid path in archive: {e}"))?.into_owned();
 
         // Security: prevent path traversal
         if entry_path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {

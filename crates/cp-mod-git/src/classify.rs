@@ -62,7 +62,7 @@ pub(crate) fn check_shell_operators(command: &str) -> Result<(), String> {
             '"' if !in_single => in_double = !in_double,
             _ if in_single || in_double => {}
             '|' | ';' | '`' | '>' | '<' => {
-                return Err(format!("Shell operator '{}' is not allowed", c));
+                return Err(format!("Shell operator '{c}' is not allowed"));
             }
             '$' if i + 1 < len && chars[i + 1] == '(' => {
                 return Err("Shell operator '$(' is not allowed".to_string());
@@ -107,7 +107,7 @@ pub(crate) fn classify_git(args: &[String]) -> CommandClass {
     }
 
     let subcmd = args[0].as_str();
-    let rest: Vec<&str> = args[1..].iter().map(|s| s.as_str()).collect();
+    let rest: Vec<&str> = args[1..].iter().map(String::as_str).collect();
 
     match subcmd {
         // Always read-only

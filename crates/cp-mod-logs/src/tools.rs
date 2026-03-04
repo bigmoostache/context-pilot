@@ -59,7 +59,7 @@ pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResul
         touch_logs_panel(state);
     }
 
-    ToolResult::new(tool.id.clone(), format!("Created {} log(s)", count), false)
+    ToolResult::new(tool.id.clone(), format!("Created {count} log(s)"), false)
 }
 
 pub(crate) fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -94,13 +94,13 @@ pub(crate) fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolRe
         for id in &log_ids {
             match logs.iter().find(|l| l.id == *id) {
                 None => {
-                    return ToolResult::new(tool.id.clone(), format!("Log '{}' not found", id), true);
+                    return ToolResult::new(tool.id.clone(), format!("Log '{id}' not found"), true);
                 }
                 Some(log) => {
                     if log.parent_id.is_some() {
                         return ToolResult::new(
                             tool.id.clone(),
-                            format!("Log '{}' already has a parent — only top-level logs can be summarized", id),
+                            format!("Log '{id}' already has a parent — only top-level logs can be summarized"),
                             true,
                         );
                     }
@@ -164,13 +164,13 @@ pub(crate) fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResul
         let logs = &LogsState::get(state).logs;
         match logs.iter().find(|l| l.id == id) {
             None => {
-                return ToolResult::new(tool.id.clone(), format!("Log '{}' not found", id), true);
+                return ToolResult::new(tool.id.clone(), format!("Log '{id}' not found"), true);
             }
             Some(log) => {
                 if log.children_ids.is_empty() {
                     return ToolResult::new(
                         tool.id.clone(),
-                        format!("Log '{}' has no children — can only toggle summaries", id),
+                        format!("Log '{id}' has no children — can only toggle summaries"),
                         true,
                     );
                 }
@@ -209,7 +209,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
     let panel_idx = state.context.iter().position(|c| c.id == panel_id);
     match panel_idx {
         None => {
-            return ToolResult::new(tool.id.clone(), format!("Panel '{}' not found", panel_id), true);
+            return ToolResult::new(tool.id.clone(), format!("Panel '{panel_id}' not found"), true);
         }
         Some(idx) => {
             if state.context[idx].context_type != ContextType::CONVERSATION_HISTORY {
@@ -261,7 +261,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
             }
         }
         if log_count > 0 {
-            output_parts.push(format!("Created {} log(s)", log_count));
+            output_parts.push(format!("Created {log_count} log(s)"));
             touch_logs_panel(state);
         }
     }
@@ -279,8 +279,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
                     return ToolResult::new(
                         tool.id.clone(),
                         format!(
-                            "Memory content too long for tl_dr: ~{} tokens (max {}). Keep it short.",
-                            tokens, MEMORY_TLDR_MAX_TOKENS
+                            "Memory content too long for tl_dr: ~{tokens} tokens (max {MEMORY_TLDR_MAX_TOKENS}). Keep it short."
                         ),
                         true,
                     );
@@ -309,7 +308,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
             }
         }
         if mem_count > 0 {
-            output_parts.push(format!("Created {} memory(ies)", mem_count));
+            output_parts.push(format!("Created {mem_count} memory(ies)"));
             mark_panels_dirty(state, ContextType::new(ContextType::MEMORY));
         }
     }
@@ -317,7 +316,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
     // 6. Close the conversation history panel
     let panel_name = state.context.iter().find(|c| c.id == panel_id).map(|c| c.name.clone()).unwrap_or_default();
     state.context.retain(|c| c.id != panel_id);
-    output_parts.push(format!("Closed {} ({})", panel_id, panel_name));
+    output_parts.push(format!("Closed {panel_id} ({panel_name})"));
 
     ToolResult::new(tool.id.clone(), output_parts.join("\n"), false)
 }

@@ -74,12 +74,12 @@ pub(crate) fn poll_server_status(
         if let Ok(resp) = server_request(&req) {
             let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
             if st.starts_with("exited") {
-                let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1).to_i32();
-                let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
+                let code = resp.get("exit_code").and_then(serde_json::Value::as_i64).unwrap_or(-1).to_i32();
+                let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 if !s.is_terminal() {
                     *s = if code == 0 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };
                 }
-                let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
+                let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 if fin.is_none() {
                     *fin = Some(now_ms());
                 }
@@ -88,11 +88,11 @@ pub(crate) fn poll_server_status(
             }
         } else {
             // Server unreachable — mark as dead
-            let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
+            let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if !s.is_terminal() {
                 *s = ProcessStatus::Failed(-1);
             }
-            let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
+            let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if fin.is_none() {
                 *fin = Some(now_ms());
             }

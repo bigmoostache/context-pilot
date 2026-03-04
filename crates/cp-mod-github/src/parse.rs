@@ -28,7 +28,7 @@ pub fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String)
 /// Extract a specific HTTP header value (case-insensitive key match).
 #[must_use]
 pub fn extract_header(headers: &str, name: &str) -> Option<String> {
-    let prefix = format!("{}:", name);
+    let prefix = format!("{name}:");
     headers.lines().find_map(|line| {
         if line.to_lowercase().starts_with(&prefix) { Some(line[prefix.len()..].trim().to_string()) } else { None }
     })
@@ -117,7 +117,7 @@ fn parse_pr_json(json_str: &str) -> Option<crate::types::BranchPrInfo> {
 
 /// Extract a string value from JSON by key (simple parser, no serde dependency)
 fn extract_json_string(json: &str, key: &str) -> Option<String> {
-    let pattern = format!("\"{}\":\"", key);
+    let pattern = format!("\"{key}\":\"");
     if let Some(start) = json.find(&pattern) {
         let value_start = start + pattern.len();
         let rest = &json[value_start..];
@@ -140,11 +140,11 @@ fn extract_json_string(json: &str, key: &str) -> Option<String> {
 
 /// Extract a u64 value from JSON by key
 fn extract_json_u64(json: &str, key: &str) -> Option<u64> {
-    let pattern = format!("\"{}\":", key);
+    let pattern = format!("\"{key}\":");
     if let Some(start) = json.find(&pattern) {
         let value_start = start + pattern.len();
         let rest = json[value_start..].trim_start();
-        let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        let num_str: String = rest.chars().take_while(char::is_ascii_digit).collect();
         return num_str.parse().ok();
     }
     None
@@ -261,38 +261,38 @@ mod tests {
 
     #[test]
     fn test_is_api_command_basic() {
-        let args: Vec<String> = ["api", "/repos/foo/bar"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["api", "/repos/foo/bar"].iter().map(ToString::to_string).collect();
         assert!(crate::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_with_jq() {
-        let args: Vec<String> = ["api", "/repos/foo/bar", "--jq", ".x"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["api", "/repos/foo/bar", "--jq", ".x"].iter().map(ToString::to_string).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_with_short_jq() {
-        let args: Vec<String> = ["api", "/repos/foo/bar", "-q", ".x"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["api", "/repos/foo/bar", "-q", ".x"].iter().map(ToString::to_string).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_with_template() {
         let args: Vec<String> =
-            ["api", "/repos/foo/bar", "--template", "{{.name}}"].iter().map(|s| s.to_string()).collect();
+            ["api", "/repos/foo/bar", "--template", "{{.name}}"].iter().map(ToString::to_string).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_with_short_template() {
-        let args: Vec<String> = ["api", "/repos/foo/bar", "-t", "{{.name}}"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["api", "/repos/foo/bar", "-t", "{{.name}}"].iter().map(ToString::to_string).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_non_api() {
-        let args: Vec<String> = ["pr", "list"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["pr", "list"].iter().map(ToString::to_string).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 

@@ -17,7 +17,7 @@ fn presets_path() -> std::path::PathBuf {
 }
 
 fn preset_file_path(name: &str) -> std::path::PathBuf {
-    presets_path().join(format!("{}.json", name))
+    presets_path().join(format!("{name}.json"))
 }
 
 /// Validate preset name: alphanumeric and hyphens only
@@ -63,7 +63,7 @@ pub(crate) fn execute_snapshot(
             {
                 return ToolResult::new(
                     tool.id.clone(),
-                    format!("Cannot replace built-in preset '{}'", replace_name),
+                    format!("Cannot replace built-in preset '{replace_name}'"),
                     true,
                 );
             }
@@ -72,7 +72,7 @@ pub(crate) fn execute_snapshot(
     } else if file_path.exists() {
         return ToolResult::new(
             tool.id.clone(),
-            format!("Preset '{}' already exists. Use the 'replace' parameter to overwrite it.", name),
+            format!("Preset '{name}' already exists. Use the 'replace' parameter to overwrite it."),
             true,
         );
     }
@@ -105,16 +105,16 @@ pub(crate) fn execute_snapshot(
         .map(|ctx| PresetPanelConfig {
             panel_type: ctx.context_type.clone(),
             name: ctx.name.clone(),
-            file_path: ctx.get_meta_str("file_path").map(|s| s.to_string()),
-            glob_pattern: ctx.get_meta_str("glob_pattern").map(|s| s.to_string()),
-            glob_path: ctx.get_meta_str("glob_path").map(|s| s.to_string()),
-            grep_pattern: ctx.get_meta_str("grep_pattern").map(|s| s.to_string()),
-            grep_path: ctx.get_meta_str("grep_path").map(|s| s.to_string()),
-            grep_file_pattern: ctx.get_meta_str("grep_file_pattern").map(|s| s.to_string()),
-            tmux_pane_id: ctx.get_meta_str("tmux_pane_id").map(|s| s.to_string()),
+            file_path: ctx.get_meta_str("file_path").map(ToString::to_string),
+            glob_pattern: ctx.get_meta_str("glob_pattern").map(ToString::to_string),
+            glob_path: ctx.get_meta_str("glob_path").map(ToString::to_string),
+            grep_pattern: ctx.get_meta_str("grep_pattern").map(ToString::to_string),
+            grep_path: ctx.get_meta_str("grep_path").map(ToString::to_string),
+            grep_file_pattern: ctx.get_meta_str("grep_file_pattern").map(ToString::to_string),
+            tmux_pane_id: ctx.get_meta_str("tmux_pane_id").map(ToString::to_string),
             tmux_lines: ctx.get_meta_usize("tmux_lines"),
-            tmux_description: ctx.get_meta_str("tmux_description").map(|s| s.to_string()),
-            skill_prompt_id: ctx.get_meta_str("skill_prompt_id").map(|s| s.to_string()),
+            tmux_description: ctx.get_meta_str("tmux_description").map(ToString::to_string),
+            skill_prompt_id: ctx.get_meta_str("skill_prompt_id").map(ToString::to_string),
         })
         .collect();
 
@@ -135,18 +135,18 @@ pub(crate) fn execute_snapshot(
     // Ensure directory exists
     let dir = presets_path();
     if let Err(e) = fs::create_dir_all(&dir) {
-        return ToolResult::new(tool.id.clone(), format!("Failed to create presets directory: {}", e), true);
+        return ToolResult::new(tool.id.clone(), format!("Failed to create presets directory: {e}"), true);
     }
 
     // Write preset file
     match serde_json::to_string_pretty(&preset) {
         Ok(json) => {
             if let Err(e) = fs::write(&file_path, json) {
-                return ToolResult::new(tool.id.clone(), format!("Failed to write preset file: {}", e), true);
+                return ToolResult::new(tool.id.clone(), format!("Failed to write preset file: {e}"), true);
             }
         }
         Err(e) => {
-            return ToolResult::new(tool.id.clone(), format!("Failed to serialize preset: {}", e), true);
+            return ToolResult::new(tool.id.clone(), format!("Failed to serialize preset: {e}"), true);
         }
     }
 
@@ -154,7 +154,7 @@ pub(crate) fn execute_snapshot(
     let module_count = preset.worker_state.active_modules.len();
     ToolResult::new(
         tool.id.clone(),
-        format!("Preset '{}' saved ({} modules, {} dynamic panels)", name, module_count, panel_count),
+        format!("Preset '{name}' saved ({module_count} modules, {panel_count} dynamic panels)"),
         false,
     )
 }
@@ -176,7 +176,7 @@ pub(crate) fn execute_load(
         // List available presets in error message
         let available = list_available_presets();
         let msg = if available.is_empty() {
-            format!("Preset '{}' not found. No presets available.", name)
+            format!("Preset '{name}' not found. No presets available.")
         } else {
             format!("Preset '{}' not found. Available presets: {}", name, available.join(", "))
         };
@@ -187,11 +187,11 @@ pub(crate) fn execute_load(
         Ok(json) => match serde_json::from_str(&json) {
             Ok(p) => p,
             Err(e) => {
-                return ToolResult::new(tool.id.clone(), format!("Failed to parse preset '{}': {}", name, e), true);
+                return ToolResult::new(tool.id.clone(), format!("Failed to parse preset '{name}': {e}"), true);
             }
         },
         Err(e) => {
-            return ToolResult::new(tool.id.clone(), format!("Failed to read preset '{}': {}", name, e), true);
+            return ToolResult::new(tool.id.clone(), format!("Failed to read preset '{name}': {e}"), true);
         }
     };
 
@@ -219,7 +219,7 @@ pub(crate) fn execute_load(
     state.active_modules = new_active;
 
     // 3. Rebuild tools from active modules, then apply disabled_tools
-    let disabled_set: HashSet<&str> = ws.disabled_tools.iter().map(|s| s.as_str()).collect();
+    let disabled_set: HashSet<&str> = ws.disabled_tools.iter().map(String::as_str).collect();
     let mut new_tools = active_tool_defs_fn(&state.active_modules);
     for t in &mut new_tools {
         if t.id != "tool_manage" && t.id != "module_toggle" && disabled_set.contains(t.id.as_str()) {
@@ -302,7 +302,7 @@ pub(crate) fn execute_load(
             PromptState::get(state).skills.iter().map(|s| (s.id.clone(), s.content.clone())).collect();
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::SKILL
-                && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(|s| s.to_string())
+                && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(ToString::to_string)
                 && let Some((_, content)) = skill_contents.iter().find(|(id, _)| *id == skill_id)
             {
                 ctx.cached_content = Some(content.clone());
@@ -336,7 +336,7 @@ fn list_available_presets() -> Vec<String> {
     let mut names = Vec::new();
     if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
-            if let Some(name) = entry.path().file_stem().and_then(|s| s.to_str()).map(|s| s.to_string()) {
+            if let Some(name) = entry.path().file_stem().and_then(|s| s.to_str()).map(ToString::to_string) {
                 names.push(name);
             }
         }

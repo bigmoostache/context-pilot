@@ -621,6 +621,62 @@ ptr_as_ptr = "warn"
 ptr_cast_constness = "warn"
 
 # ============================
+# Pedantic → warn (C14)
+# ============================
+# Prefer `0..n` over `0..=n-1`
+range_minus_one = "warn"
+# Prefer `0..=n` over `0..n+1`
+range_plus_one = "warn"
+# Use method reference instead of closure: `.map(|x| x.to_string())` → `.map(ToString::to_string)`
+redundant_closure_for_method_calls = "warn"
+# Use ptr::from_ref() / ptr::from_mut() instead of `&x as *const T`
+ref_as_ptr = "warn"
+# Use `Option<&T>` instead of `&Option<T>` in function args
+ref_option = "warn"
+
+# ============================
+# Pedantic → warn (C15)
+# ============================
+# Detect `Option<&Option<T>>` — usually a mistake
+ref_option_ref = "warn"
+# Methods returning `Self` should be `#[must_use]`
+return_self_not_must_use = "warn"
+# Detect identical function calls in both branches of an if/else
+same_functions_in_if_condition = "warn"
+# `#[should_panic]` tests should specify `expected` string
+should_panic_without_expect = "warn"
+# Use unstable sort for primitives (faster, no allocation)
+stable_sort_primitive = "warn"
+
+# ============================
+# Pedantic → warn (C16)
+# ============================
+# Use `.lines()` instead of `.split('\n')`
+str_split_at_newline = "warn"
+# Use `+=` for string concatenation instead of `= ... + &s`
+string_add_assign = "warn"
+# Flag structs with >3 bool fields
+struct_excessive_bools = "warn"
+# Detect field names that redundantly include the struct name
+struct_field_names = "warn"
+# Use ptr::cast instead of transmute between pointer types
+transmute_ptr_to_ptr = "warn"
+
+# ============================
+# Pedantic → warn (C17)
+# ============================
+# Pass small Copy types by value, not by reference
+trivially_copy_pass_by_ref = "warn"
+# Inline format args: `format!("{x}")` not `format!("{}", x)`
+uninlined_format_args = "warn"
+# Return T instead of Box<T> when the type is known at compile time
+unnecessary_box_returns = "warn"
+# Use `collect::<String>()` instead of `collect::<Vec<_>>().join("")`
+unnecessary_join = "warn"
+# Don't wrap return values in Option/Result when they're always Some/Ok
+unnecessary_wraps = "warn"
+
+# ============================
 # Pedantic → warn (C1-C10, prior batches)
 # ============================
 # Use clone_from when possible

@@ -104,7 +104,7 @@ fn load_state_new() -> State {
     // Load fixed panels in canonical order (P0-P7) from module registry
     let defaults = crate::modules::all_fixed_panel_defaults();
     for (pos, (_, _, ct, name, cache_deprecated)) in defaults.iter().enumerate() {
-        let id = format!("P{}", pos);
+        let id = format!("P{pos}");
         if *ct == ContextType::SYSTEM {
             // System panel is not stored in panels/ - comes from systems[]
             context.push(crate::modules::make_default_context_element(&id, ct.clone(), name, *cache_deprecated));
@@ -317,7 +317,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     };
     if let Ok(json) = serde_json::to_string_pretty(&worker_state) {
         writes.push(WriteOp {
-            path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{}.json", DEFAULT_WORKER_ID)),
+            path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{DEFAULT_WORKER_ID}.json")),
             content: json.into_bytes(),
         });
     }
@@ -353,7 +353,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
                 panel_total_cost: if ctx.panel_total_cost > 0.0 { Some(ctx.panel_total_cost) } else { None },
             };
             if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
-                writes.push(WriteOp { path: panels_dir.join(format!("{}.json", uid)), content: json.into_bytes() });
+                writes.push(WriteOp { path: panels_dir.join(format!("{uid}.json")), content: json.into_bytes() });
             }
         }
     }
@@ -368,7 +368,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
                 let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
                 if let Ok(yaml) = serde_yaml::to_string(msg) {
                     writes.push(WriteOp {
-                        path: messages_dir.join(format!("{}.yaml", file_id)),
+                        path: messages_dir.join(format!("{file_id}.yaml")),
                         content: yaml.into_bytes(),
                     });
                 }
@@ -378,7 +378,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
 
     // Orphan panel deletion
     if let Ok(entries) = fs::read_dir(&panels_dir) {
-        for entry in entries.filter_map(|e| e.ok()) {
+        for entry in entries.filter_map(Result::ok) {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("json") {
                 continue;
@@ -399,7 +399,7 @@ pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
     let dir = PathBuf::from(STORE_DIR).join(crate::infra::constants::MESSAGES_DIR);
     let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
     let yaml = serde_yaml::to_string(msg).unwrap_or_default();
-    WriteOp { path: dir.join(format!("{}.yaml", file_id)), content: yaml.into_bytes() }
+    WriteOp { path: dir.join(format!("{file_id}.yaml")), content: yaml.into_bytes() }
 }
 
 /// Save state synchronously (blocking I/O on calling thread).
@@ -453,23 +453,22 @@ pub(crate) fn log_error(error: &str) -> String {
     // Count existing error files to determine next number
     let error_count = fs::read_dir(&errors_dir)
         .map(|entries| {
-            entries.filter_map(|e| e.ok()).filter(|e| e.path().extension().is_some_and(|ext| ext == "txt")).count()
+            entries.filter_map(Result::ok).filter(|e| e.path().extension().is_some_and(|ext| ext == "txt")).count()
         })
         .unwrap_or(0);
 
     let error_num = error_count + 1;
-    let filename = format!("error_{}.txt", error_num);
+    let filename = format!("error_{error_num}.txt");
     let filepath = errors_dir.join(&filename);
 
     // Create error log content with timestamp
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
     let content = format!(
-        "Error Log #{}\n\
-         Timestamp: {}\n\
+        "Error Log #{error_num}\n\
+         Timestamp: {timestamp}\n\
          \n\
          Error Details:\n\
-         {}\n",
-        error_num, timestamp, error
+         {error}\n"
     );
 
     let _r = fs::write(&filepath, content).ok();

@@ -43,7 +43,7 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         };
 
-        let multi_select = q_val.get("multiSelect").and_then(|v| v.as_bool()).unwrap_or(false);
+        let multi_select = q_val.get("multiSelect").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
         let Some(options_val) = q_val.get("options").and_then(|v| v.as_array()) else {
             return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'options' field", i + 1), true);

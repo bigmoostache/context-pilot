@@ -41,8 +41,8 @@ impl ProcessStatus {
     pub fn label(&self) -> String {
         match self {
             ProcessStatus::Running => "running".to_string(),
-            ProcessStatus::Finished(code) => format!("exited({})", code),
-            ProcessStatus::Failed(code) => format!("failed({})", code),
+            ProcessStatus::Finished(code) => format!("exited({code})"),
+            ProcessStatus::Failed(code) => format!("failed({code})"),
             ProcessStatus::Killed => "killed".to_string(),
         }
     }
@@ -129,8 +129,7 @@ pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, la
     let code_str = exit_code.map_or_else(|| "?".to_string(), |c| c.to_string());
     let now = now_ms();
     format!(
-        "Console '{}' condition met (exit_code={}, panel={}, time={}ms)\nLast output:\n{}",
-        name, code_str, panel_id, now, last_lines
+        "Console '{name}' condition met (exit_code={code_str}, panel={panel_id}, time={now}ms)\nLast output:\n{last_lines}"
     )
 }
 

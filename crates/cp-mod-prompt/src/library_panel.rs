@@ -11,7 +11,7 @@ pub(crate) struct LibraryPanel;
 impl Panel for LibraryPanel {
     fn title(&self, state: &State) -> String {
         if let Some(id) = &PromptState::get(state).open_prompt_id {
-            format!("Library: editing {}", id)
+            format!("Library: editing {id}")
         } else {
             "Library".to_string()
         }
@@ -62,7 +62,7 @@ impl Panel for LibraryPanel {
                 lines.push(Line::from(vec![
                     Span::styled(format!("[{}] ", item.id), Style::default().fg(theme::accent_dim())),
                     Span::styled(item.name.clone(), Style::default().fg(theme::accent()).bold()),
-                    Span::styled(format!(" ({})", type_str), Style::default().fg(theme::text_muted())),
+                    Span::styled(format!(" ({type_str})"), Style::default().fg(theme::text_muted())),
                     if item.is_builtin {
                         Span::styled(" (built-in, read-only)", Style::default().fg(theme::text_muted()))
                     } else {

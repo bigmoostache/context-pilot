@@ -78,7 +78,7 @@ impl Module for CallbackModule {
         {
             CallbackState::get_mut(state).definitions = v;
         }
-        if let Some(v) = data.get("next_id").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("next_id").and_then(serde_json::Value::as_u64) {
             CallbackState::get_mut(state).next_id = v.to_usize();
         }
     }
@@ -96,7 +96,7 @@ impl Module for CallbackModule {
             CallbackState::get_mut(state).active_set = v.into_iter().collect();
         }
         if let Some(v) = data.get("editor_open") {
-            CallbackState::get_mut(state).editor_open = v.as_str().map(|s| s.to_string());
+            CallbackState::get_mut(state).editor_open = v.as_str().map(ToString::to_string);
         }
     }
 
@@ -176,7 +176,7 @@ impl Module for CallbackModule {
                 {
                     let cs = CallbackState::get(state);
                     if !cs.definitions.iter().any(|d| d.id == id) {
-                        pf.errors.push(format!("Callback '{}' not found", id));
+                        pf.errors.push(format!("Callback '{id}' not found"));
                     }
                 }
                 Some(pf)
@@ -186,7 +186,7 @@ impl Module for CallbackModule {
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let cs = CallbackState::get(state);
                     if !cs.definitions.iter().any(|d| d.id == id) {
-                        pf.errors.push(format!("Callback '{}' not found", id));
+                        pf.errors.push(format!("Callback '{id}' not found"));
                     }
                 }
                 Some(pf)
@@ -204,7 +204,7 @@ impl Module for CallbackModule {
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let cs = CallbackState::get(state);
                     if !cs.definitions.iter().any(|d| d.id == id) {
-                        pf.errors.push(format!("Callback '{}' not found", id));
+                        pf.errors.push(format!("Callback '{id}' not found"));
                     }
                 }
                 Some(pf)

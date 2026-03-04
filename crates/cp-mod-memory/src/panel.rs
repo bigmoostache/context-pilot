@@ -74,7 +74,7 @@ impl MemoryPanel {
                 if !memory.contents.is_empty() {
                     output.push_str("  contents: |\n");
                     for line in memory.contents.lines() {
-                        output.push_str(&format!("    {}\n", line));
+                        output.push_str(&format!("    {line}\n"));
                     }
                 }
             }

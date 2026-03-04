@@ -29,6 +29,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
 /// Function pointers for module-registry operations that live in the binary.
 /// Injected at construction time so the crate doesn't depend on the binary.
 #[derive(Debug, Clone, Copy)]
+#[expect(clippy::struct_field_names, reason = "Fields are function pointers — _fn suffix is intentional")]
 pub struct PresetModule {
     pub(crate) all_modules_fn: fn() -> Vec<Box<dyn Module>>,
     pub(crate) active_tool_defs_fn: fn(&HashSet<String>) -> Vec<ToolDefinition>,
@@ -102,7 +103,7 @@ impl Module for PresetModule {
                     let presets = tools::list_presets_with_info();
                     if presets.iter().any(|p| p.name == name) && replace.is_none() {
                         pf.errors
-                            .push(format!("Preset '{}' already exists. Pass replace:'{}' to overwrite.", name, name));
+                            .push(format!("Preset '{name}' already exists. Pass replace:'{name}' to overwrite."));
                     }
                 }
                 Some(pf)

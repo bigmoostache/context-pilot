@@ -34,7 +34,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         // Fixed panels are always protected
         if state.context[idx].context_type.is_fixed() {
-            skipped.push(format!("{} (protected)", id));
+            skipped.push(format!("{id} (protected)"));
             continue;
         }
 
@@ -53,7 +53,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         match close_result {
             Some(Ok(desc)) => {
                 // Context already removed
-                closed.push(format!("{} ({})", id, desc));
+                closed.push(format!("{id} ({desc})"));
             }
             Some(Err(msg)) => {
                 // Put it back — close was rejected
@@ -64,7 +64,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 // Default: use context_detail for description
                 let detail = modules.iter().find_map(|m| m.context_detail(&ctx)).unwrap_or_else(|| ctx.name.clone());
                 // Context already removed
-                closed.push(format!("{} ({})", id, detail));
+                closed.push(format!("{id} ({detail})"));
             }
         }
     }

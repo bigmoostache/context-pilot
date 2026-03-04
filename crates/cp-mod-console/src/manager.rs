@@ -61,7 +61,7 @@ fn server_binary_path() -> PathBuf {
 /// Build the log file path for a given session key (always absolute).
 #[must_use]
 pub fn log_file_path(key: &str) -> PathBuf {
-    let base = PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{}.log", key));
+    let base = PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{key}.log"));
     if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
 }
 
@@ -77,26 +77,26 @@ pub fn log_file_path(key: &str) -> PathBuf {
 /// or if the server response indicates an error.
 pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Value, String> {
     let sock_path = server_socket_path();
-    let stream = UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {}", e))?;
+    let stream = UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {e}"))?;
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok();
     let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok();
 
-    let mut writer = stream.try_clone().map_err(|e| format!("Clone failed: {}", e))?;
+    let mut writer = stream.try_clone().map_err(|e| format!("Clone failed: {e}"))?;
     let reader = BufReader::new(stream);
 
-    let mut line = serde_json::to_string(req).map_err(|e| format!("Serialize failed: {}", e))?;
+    let mut line = serde_json::to_string(req).map_err(|e| format!("Serialize failed: {e}"))?;
     line.push('\n');
-    writer.write_all(line.as_bytes()).map_err(|e| format!("Write failed: {}", e))?;
-    writer.flush().map_err(|e| format!("Flush failed: {}", e))?;
+    writer.write_all(line.as_bytes()).map_err(|e| format!("Write failed: {e}"))?;
+    writer.flush().map_err(|e| format!("Flush failed: {e}"))?;
 
     let mut resp_line = String::new();
     let mut buf_reader = reader;
-    let _ = buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {}", e))?;
+    let _ = buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {e}"))?;
 
     let resp: serde_json::Value =
-        serde_json::from_str(resp_line.trim()).map_err(|e| format!("Parse response failed: {}", e))?;
+        serde_json::from_str(resp_line.trim()).map_err(|e| format!("Parse response failed: {e}"))?;
 
-    if resp.get("ok").and_then(|v| v.as_bool()) == Some(true) {
+    if resp.get("ok").and_then(serde_json::Value::as_bool) == Some(true) {
         Ok(resp)
     } else {
         let err = resp.get("error").and_then(|v| v.as_str()).unwrap_or("unknown error");
@@ -113,7 +113,7 @@ pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Valu
 pub fn find_or_create_server() -> Result<(), String> {
     // Ensure console directory exists
     let console_dir = PathBuf::from(STORE_DIR).join(CONSOLE_DIR);
-    fs::create_dir_all(&console_dir).map_err(|e| format!("Failed to create console dir: {}", e))?;
+    fs::create_dir_all(&console_dir).map_err(|e| format!("Failed to create console dir: {e}"))?;
 
     // Try connecting to existing server
     let ping = serde_json::json!({"cmd": "ping"});
@@ -124,7 +124,7 @@ pub fn find_or_create_server() -> Result<(), String> {
     // Server not running — spawn it
     let binary = server_binary_path();
     if !binary.exists() {
-        return Err(format!("Console server binary not found at {:?}", binary));
+        return Err(format!("Console server binary not found at {binary:?}"));
     }
 
     let sock_path = server_socket_path();
@@ -155,7 +155,7 @@ pub fn find_or_create_server() -> Result<(), String> {
         }
     }
 
-    drop(cmd.spawn().map_err(|e| format!("Failed to spawn console server: {}", e))?);
+    drop(cmd.spawn().map_err(|e| format!("Failed to spawn console server: {e}"))?);
 
     // Wait for socket to appear (up to 3 seconds)
     for _ in 0..30 {
@@ -253,7 +253,7 @@ impl SessionHandle {
             find_or_create_server()?;
             server_request(&req)?
         };
-        let pid = resp.get("pid").and_then(|v| v.as_u64()).unwrap_or(0).to_u32();
+        let pid = resp.get("pid").and_then(serde_json::Value::as_u64).unwrap_or(0).to_u32();
 
         let status = Arc::new(Mutex::new(ProcessStatus::Running));
         let buffer = RingBuffer::new();
@@ -329,10 +329,10 @@ impl SessionHandle {
             if let Ok(resp) = server_request(&req) {
                 let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
                 if st.starts_with("exited") {
-                    let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1).to_i32();
-                    let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
+                    let code = resp.get("exit_code").and_then(serde_json::Value::as_i64).unwrap_or(-1).to_i32();
+                    let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     *s = ProcessStatus::Finished(code);
-                    let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
+                    let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     *fin = Some(now_ms());
                     stop_polling.store(true, Ordering::Relaxed);
                     false
@@ -341,9 +341,9 @@ impl SessionHandle {
                 }
             } else {
                 // Server doesn't know about this session — mark dead
-                let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
+                let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 *s = ProcessStatus::Finished(-1);
-                let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
+                let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 *fin = Some(now_ms());
                 stop_polling.store(true, Ordering::Relaxed);
                 false
@@ -415,11 +415,11 @@ impl SessionHandle {
         let req = serde_json::json!({"cmd": "kill", "key": self.name});
         drop(server_request(&req).ok());
 
-        let mut status = self.status.lock().unwrap_or_else(|e| e.into_inner());
+        let mut status = self.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if !status.is_terminal() {
             *status = ProcessStatus::Killed;
         }
-        let mut fin = self.finished_at.lock().unwrap_or_else(|e| e.into_inner());
+        let mut fin = self.finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if fin.is_none() {
             *fin = Some(now_ms());
         }
@@ -428,7 +428,7 @@ impl SessionHandle {
     /// Get the current process status.
     #[must_use]
     pub fn get_status(&self) -> ProcessStatus {
-        *self.status.lock().unwrap_or_else(|e| e.into_inner())
+        *self.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Get exit code (if process is terminal).
@@ -440,7 +440,7 @@ impl SessionHandle {
     /// Get the PID if available.
     #[must_use]
     pub fn pid(&self) -> Option<u32> {
-        *self.child_id.lock().unwrap_or_else(|e| e.into_inner())
+        *self.child_id.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// No-op for backward compat — server holds the stdin, not us.

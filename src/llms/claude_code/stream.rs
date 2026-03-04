@@ -144,7 +144,7 @@ impl ClaudeCodeClient {
                     let mut root_cause = String::new();
                     let mut source: Option<&dyn std::error::Error> = std::error::Error::source(&e);
                     while let Some(s) = source {
-                        root_cause = format!("{}", s);
+                        root_cause = format!("{s}");
                         source = std::error::Error::source(s);
                     }
                     let tool_ctx = match &current_tool {

@@ -58,7 +58,7 @@ impl Module for QueueModule {
     }
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let qs = QueueState::get_mut(state);
-        if let Some(active) = data.get("active").and_then(|v| v.as_bool()) {
+        if let Some(active) = data.get("active").and_then(serde_json::Value::as_bool) {
             qs.active = active;
         }
         if let Some(arr) = data.get("queued_calls")
@@ -66,7 +66,7 @@ impl Module for QueueModule {
         {
             qs.queued_calls = v;
         }
-        if let Some(v) = data.get("next_index").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("next_index").and_then(serde_json::Value::as_u64) {
             qs.next_index = v.to_usize();
         }
     }
@@ -148,7 +148,7 @@ impl Module for QueueModule {
                         if let Some(idx) = idx_val.as_i64()
                             && !qs.queued_calls.iter().any(|c| c.index == idx.to_usize())
                         {
-                            pf.errors.push(format!("Queue index {} not found", idx));
+                            pf.errors.push(format!("Queue index {idx} not found"));
                         }
                     }
                 }

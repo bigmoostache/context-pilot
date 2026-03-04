@@ -32,10 +32,10 @@ pub(crate) fn handle_stream_done(
     output_tokens: usize,
     cache_hit_tokens: usize,
     cache_miss_tokens: usize,
-    stop_reason: &Option<String>,
+    stop_reason: Option<&str>,
 ) -> ActionResult {
     state.is_streaming = false;
-    state.last_stop_reason.clone_from(stop_reason);
+    state.last_stop_reason = stop_reason.map(ToString::to_string);
 
     // Set tick stats (this tick only)
     state.tick_cache_hit_tokens = cache_hit_tokens;
@@ -91,7 +91,7 @@ pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResul
     if let Some(msg) = state.messages.last_mut()
         && msg.role == "assistant"
     {
-        msg.content = format!("[Error occurred. See details in {}]", error_file);
+        msg.content = format!("[Error occurred. See details in {error_file}]");
         let id = msg.id.clone();
         return ActionResult::SaveMessage(id);
     }

@@ -20,7 +20,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
     let args = match validate_git_command(command) {
         Ok(a) => a,
         Err(e) => {
-            return ToolResult::new(tool.id.clone(), format!("Validation error: {}", e), true);
+            return ToolResult::new(tool.id.clone(), format!("Validation error: {e}"), true);
         }
     };
 
@@ -38,7 +38,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                 // Reuse existing panel — mark deprecated to trigger re-fetch
                 state.context[idx].cache_deprecated = true;
                 let panel_id = state.context[idx].id.clone();
-                ToolResult::new(tool.id.clone(), format!("Panel updated: {}", panel_id), false)
+                ToolResult::new(tool.id.clone(), format!("Panel updated: {panel_id}"), false)
             } else {
                 // Create new GitResult panel
                 let panel_id = state.next_available_context_id();
@@ -55,7 +55,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                 elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);
 
-                ToolResult::new(tool.id.clone(), format!("Panel created: {}", panel_id), false)
+                ToolResult::new(tool.id.clone(), format!("Panel created: {panel_id}"), false)
             }
         }
         CommandClass::Mutating => {
@@ -140,7 +140,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                     let content = if e.kind() == std::io::ErrorKind::NotFound {
                         "git not found. Ensure git is installed and on PATH.".to_string()
                     } else {
-                        format!("Error running git: {}", e)
+                        format!("Error running git: {e}")
                     };
                     ToolResult::new(tool.id.clone(), content, true)
                 }

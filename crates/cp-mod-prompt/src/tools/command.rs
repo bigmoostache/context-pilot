@@ -26,7 +26,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if PromptState::get(state).commands.iter().any(|c| c.id == id) {
-        return ToolResult::new(tool.id.clone(), format!("Command with ID '{}' already exists", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Command with ID '{id}' already exists"), true);
     }
 
     let item = PromptItem {
@@ -43,7 +43,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Created command '{}' with ID '{}' (use as /{})", name, id, id), false)
+    ToolResult::new(tool.id.clone(), format!("Created command '{name}' with ID '{id}' (use as /{id})"), false)
 }
 
 pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -54,12 +54,12 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(cmd) = PromptState::get(state).commands.iter().find(|c| c.id == id)
         && cmd.is_builtin
     {
-        return ToolResult::new(tool.id.clone(), format!("Cannot delete built-in command '{}'", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Cannot delete built-in command '{id}'"), true);
     }
 
     let ps = PromptState::get_mut(state);
     let Some(idx) = ps.commands.iter().position(|c| c.id == id) else {
-        return ToolResult::new(tool.id.clone(), format!("Command '{}' not found", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Command '{id}' not found"), true);
     };
 
     let cmd = ps.commands.remove(idx);

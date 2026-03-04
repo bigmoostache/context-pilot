@@ -56,7 +56,7 @@ fn main() -> io::Result<()> {
         let _r = std::fs::create_dir_all(&error_dir);
         let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
         let backtrace = std::backtrace::Backtrace::force_capture();
-        let msg = format!("[{}] {}\n\n{}\n\n---\n", ts, info, backtrace);
+        let msg = format!("[{ts}] {info}\n\n{backtrace}\n\n---\n");
         let log_path = error_dir.join("panic.log");
         let _r = std::fs::OpenOptions::new().create(true).append(true).open(&log_path).and_then(|mut f| {
             use std::io::Write;
@@ -135,15 +135,15 @@ fn run_typst_compile(args: &[String]) -> io::Result<()> {
     let stem = std::path::Path::new(source_path).file_stem().and_then(|s| s.to_str()).unwrap_or("output");
     let parent =
         std::path::Path::new(source_path).parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
-    let out = if parent.is_empty() { format!("{}.pdf", stem) } else { format!("{}/{}.pdf", parent, stem) };
+    let out = if parent.is_empty() { format!("{stem}.pdf") } else { format!("{parent}/{stem}.pdf") };
 
     match cp_mod_typst::compiler::compile_and_write(source_path, &out) {
         Ok(msg) => {
-            println!("{}", msg);
+            println!("{msg}");
             Ok(())
         }
         Err(err) => {
-            eprint!("{}", err);
+            eprint!("{err}");
             std::process::exit(1);
         }
     }
@@ -184,9 +184,9 @@ fn run_typst_recompile_watched(args: &[String]) -> io::Result<()> {
     let mut had_error = false;
     for (source, output) in &affected {
         match cp_mod_typst::watchlist::compile_and_update_deps(source, output) {
-            Ok(msg) => println!("{}", msg),
+            Ok(msg) => println!("{msg}"),
             Err(err) => {
-                eprint!("Error compiling {}: {}", source, err);
+                eprint!("Error compiling {source}: {err}");
                 had_error = true;
             }
         }

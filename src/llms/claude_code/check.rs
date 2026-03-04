@@ -43,7 +43,7 @@ impl ClaudeCodeClient {
         let auth_result = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "application/json")
-            .header("authorization", format!("Bearer {}", access_token))
+            .header("authorization", format!("Bearer {access_token}"))
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -86,7 +86,7 @@ impl ClaudeCodeClient {
         let stream_result = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", access_token))
+            .header("authorization", format!("Bearer {access_token}"))
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -122,7 +122,7 @@ impl ClaudeCodeClient {
         let tools_result = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "application/json")
-            .header("authorization", format!("Bearer {}", access_token))
+            .header("authorization", format!("Bearer {access_token}"))
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", OAUTH_BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")

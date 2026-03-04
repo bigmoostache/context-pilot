@@ -89,7 +89,7 @@ impl Panel for QueuePanel {
             lines.push(Line::from(vec![
                 Span::styled(format!("  {}. ", call.index), Style::default().fg(muted)),
                 Span::styled(call.tool_name.clone(), Style::default().fg(accent).bold()),
-                Span::styled(format!("({})", short), Style::default().fg(muted)),
+                Span::styled(format!("({short})"), Style::default().fg(muted)),
             ]));
         }
 

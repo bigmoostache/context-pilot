@@ -91,7 +91,7 @@ impl PersistenceWriter {
         // Reset the flush flag
         {
             let (lock, _) = &*self.flush_sync;
-            let mut flushed = lock.lock().unwrap_or_else(|e| e.into_inner());
+            let mut flushed = lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             *flushed = false;
         }
 
@@ -100,10 +100,11 @@ impl PersistenceWriter {
 
         // Wait for the writer to signal completion
         let (lock, cvar) = &*self.flush_sync;
-        let mut flushed = lock.lock().unwrap_or_else(|e| e.into_inner());
+        let mut flushed = lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         while !*flushed {
             // Timeout after 5 seconds to prevent infinite hang on shutdown
-            let result = cvar.wait_timeout(flushed, Duration::from_secs(5)).unwrap_or_else(|e| e.into_inner());
+            let result =
+                cvar.wait_timeout(flushed, Duration::from_secs(5)).unwrap_or_else(std::sync::PoisonError::into_inner);
             flushed = result.0;
             if result.1.timed_out() {
                 break;
@@ -166,7 +167,7 @@ fn writer_loop(rx: Receiver<WriterMsg>, flush_sync: Arc<(Mutex<bool>, Condvar)>)
                 execute_batch(pending_batch.take());
                 // Signal flush completion
                 let (lock, cvar) = &*flush_sync;
-                let mut flushed = lock.lock().unwrap_or_else(|e| e.into_inner());
+                let mut flushed = lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 *flushed = true;
                 cvar.notify_all();
             }

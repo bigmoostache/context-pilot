@@ -92,7 +92,7 @@ impl BraveClient {
 
         let response = self.get_with_retry(&url)?;
         let search_resp: BraveSearchResponse =
-            serde_json::from_str(&response).map_err(|e| format!("Failed to parse search response: {}", e))?;
+            serde_json::from_str(&response).map_err(|e| format!("Failed to parse search response: {e}"))?;
 
         // Auto-fetch rich results if callback_key present
         let rich_data = if let Some(ref rich) = search_resp.rich {
@@ -132,7 +132,7 @@ impl BraveClient {
         }
 
         let response = self.get_with_retry(&url)?;
-        serde_json::from_str(&response).map_err(|e| format!("Failed to parse LLM context response: {}", e))
+        serde_json::from_str(&response).map_err(|e| format!("Failed to parse LLM context response: {e}"))
     }
 
     /// Fetch rich results via callback key.
@@ -140,7 +140,7 @@ impl BraveClient {
         let url = format!("{}/web/rich?callback_key={}", BRAVE_BASE_URL, urlenc(callback_key));
         let response = self.get_with_retry(&url)?;
         let rich: RichCallbackResponse =
-            serde_json::from_str(&response).map_err(|e| format!("Failed to parse rich response: {}", e))?;
+            serde_json::from_str(&response).map_err(|e| format!("Failed to parse rich response: {e}"))?;
         Ok(rich.data)
     }
 
@@ -153,10 +153,10 @@ impl BraveClient {
                 .header("Accept", "application/json")
                 .header("X-Subscription-Token", &self.api_key)
                 .send()
-                .map_err(|e| format!("Request failed: {}", e))?;
+                .map_err(|e| format!("Request failed: {e}"))?;
 
             let status = resp.status().as_u16();
-            let body = resp.text().map_err(|e| format!("Failed to read response: {}", e))?;
+            let body = resp.text().map_err(|e| format!("Failed to read response: {e}"))?;
 
             match status {
                 200..=299 => return Ok(body),
@@ -187,7 +187,7 @@ fn urlenc(s: &str) -> String {
                 result.push(b as char);
             }
             _ => {
-                result.push_str(&format!("%{:02X}", b));
+                result.push_str(&format!("%{b:02X}"));
             }
         }
     }

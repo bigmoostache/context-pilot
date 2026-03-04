@@ -58,7 +58,7 @@ impl Module for ConsoleModule {
         state.set_ext(ConsoleState::new());
         // Ensure the console server is running
         if let Err(e) = manager::find_or_create_server() {
-            eprintln!("Console server startup failed: {}", e);
+            eprintln!("Console server startup failed: {e}");
         }
     }
 
@@ -113,11 +113,11 @@ impl Module for ConsoleModule {
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         // Ensure the console server is running
         if let Err(e) = manager::find_or_create_server() {
-            eprintln!("Console server startup failed: {}", e);
+            eprintln!("Console server startup failed: {e}");
         }
 
         // Restore counter
-        if let Some(v) = data.get("next_session_id").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("next_session_id").and_then(serde_json::Value::as_u64) {
             let cs = ConsoleState::get_mut(state);
             cs.next_session_id = v.to_usize();
         }
@@ -256,9 +256,9 @@ impl Module for ConsoleModule {
                 let mut pf = PreFlightResult::new();
                 if let Some(panel_id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match state.context.iter().find(|c| c.id == panel_id) {
-                        None => pf.errors.push(format!("Panel '{}' not found", panel_id)),
+                        None => pf.errors.push(format!("Panel '{panel_id}' not found")),
                         Some(ctx) if ctx.context_type != ContextType::CONSOLE => {
-                            pf.errors.push(format!("Panel '{}' is not a console panel", panel_id));
+                            pf.errors.push(format!("Panel '{panel_id}' is not a console panel"));
                         }
                         Some(ctx) => {
                             // Check if process has exited
@@ -268,7 +268,7 @@ impl Module for ConsoleModule {
                             {
                                 let status = handle.get_status().label();
                                 pf.warnings
-                                    .push(format!("Console '{}' process has {} — commands may not work", name, status));
+                                    .push(format!("Console '{name}' process has {status} — commands may not work"));
                             }
                         }
                     }
@@ -322,7 +322,7 @@ impl Module for ConsoleModule {
         if !log_path.is_empty() {
             let _ = std::fs::remove_file(&log_path).ok();
         }
-        Some(Ok(format!("console: {}", name)))
+        Some(Ok(format!("console: {name}")))
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
@@ -330,7 +330,7 @@ impl Module for ConsoleModule {
             let desc =
                 ctx.get_meta_str("console_description").or_else(|| ctx.get_meta_str("console_command")).unwrap_or("?");
             let status = ctx.get_meta_str("console_status").unwrap_or("?");
-            Some(format!("{} ({})", desc, status))
+            Some(format!("{desc} ({status})"))
         } else {
             None
         }

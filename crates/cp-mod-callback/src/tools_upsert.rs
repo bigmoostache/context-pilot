@@ -36,16 +36,16 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Validate glob pattern compiles
     if let Err(e) = Glob::new(&chart_pattern) {
-        return ToolResult::new(tool.id.clone(), format!("Invalid glob pattern '{}': {}", chart_pattern, e), true);
+        return ToolResult::new(tool.id.clone(), format!("Invalid glob pattern '{chart_pattern}': {e}"), true);
     }
 
     // Extract optional params
     let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let blocking = tool.input.get("blocking").and_then(|v| v.as_bool()).unwrap_or(false);
-    let timeout_secs = tool.input.get("timeout").and_then(|v| v.as_u64());
-    let success_message = tool.input.get("success_message").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let one_at_a_time = tool.input.get("one_at_a_time").and_then(|v| v.as_bool()).unwrap_or(false);
+    let blocking = tool.input.get("blocking").and_then(serde_json::Value::as_bool).unwrap_or(false);
+    let timeout_secs = tool.input.get("timeout").and_then(serde_json::Value::as_u64);
+    let success_message = tool.input.get("success_message").and_then(|v| v.as_str()).map(ToString::to_string);
+    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(ToString::to_string);
+    let one_at_a_time = tool.input.get("one_at_a_time").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
     // Blocking callbacks require a timeout
     if blocking && timeout_secs.is_none() {
@@ -62,8 +62,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(
             tool.id.clone(),
             format!(
-                "A callback named '{}' already exists. Use a different name or update the existing one.",
-                vessel_name
+                "A callback named '{vessel_name}' already exists. Use a different name or update the existing one."
             ),
             true,
         );
@@ -77,37 +76,33 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Write script file to .context-pilot/scripts/{name}.sh
     let scripts_dir = PathBuf::from(STORE_DIR).join("scripts");
     if let Err(e) = fs::create_dir_all(&scripts_dir) {
-        return ToolResult::new(tool.id.clone(), format!("Failed to create scripts directory: {}", e), true);
+        return ToolResult::new(tool.id.clone(), format!("Failed to create scripts directory: {e}"), true);
     }
 
-    let script_path = scripts_dir.join(format!("{}.sh", vessel_name));
+    let script_path = scripts_dir.join(format!("{vessel_name}.sh"));
     let full_script = format!(
         "#!/usr/bin/env bash\n\
          set -euo pipefail\n\
          \n\
-         # Callback: {name}\n\
-         # Pattern: {pattern}\n\
-         # Description: {desc}\n\
+         # Callback: {vessel_name}\n\
+         # Pattern: {chart_pattern}\n\
+         # Description: {description}\n\
          #\n\
          # Environment variables provided by Context Pilot:\n\
          #   $CP_CHANGED_FILES  — newline-separated list of changed file paths (relative to project root)\n\
          #   $CP_PROJECT_ROOT   — absolute path to project root\n\
          #   $CP_CALLBACK_NAME  — name of this callback rule\n\
          \n\
-         {script}",
-        name = vessel_name,
-        pattern = chart_pattern,
-        desc = description,
-        script = cargo_script,
+         {cargo_script}",
     );
 
     if let Err(e) = fs::write(&script_path, &full_script) {
-        return ToolResult::new(tool.id.clone(), format!("Failed to write script file: {}", e), true);
+        return ToolResult::new(tool.id.clone(), format!("Failed to write script file: {e}"), true);
     }
 
     // chmod +x
     if let Err(e) = fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755)) {
-        return ToolResult::new(tool.id.clone(), format!("Failed to make script executable: {}", e), true);
+        return ToolResult::new(tool.id.clone(), format!("Failed to make script executable: {e}"), true);
     }
 
     // Create the definition
@@ -132,16 +127,15 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Build success message
     let mut msg = format!(
-        "Created callback {} [{}]:\n  Pattern: {}\n  Blocking: {}\n  Script: .context-pilot/scripts/{}.sh",
-        anchor_id, vessel_name, chart_pattern, blocking, vessel_name,
+        "Created callback {anchor_id} [{vessel_name}]:\n  Pattern: {chart_pattern}\n  Blocking: {blocking}\n  Script: .context-pilot/scripts/{vessel_name}.sh",
     );
     if let Some(ref sm) = success_message {
-        msg.push_str(&format!("\n  Success message: {}", sm));
+        msg.push_str(&format!("\n  Success message: {sm}"));
     }
     if let Some(t) = timeout_secs {
-        msg.push_str(&format!("\n  Timeout: {}s", t));
+        msg.push_str(&format!("\n  Timeout: {t}s"));
     }
-    msg.push_str(&format!("\n  One at a time: {}", one_at_a_time));
+    msg.push_str(&format!("\n  One at a time: {one_at_a_time}"));
     msg.push_str("\n  Status: active ✓");
 
     ToolResult::new(tool.id.clone(), msg, false)
@@ -162,7 +156,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let cs = CallbackState::get(state);
     let Some(def_idx) = cs.definitions.iter().position(|d| d.id == anchor_id) else {
-        return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
+        return ToolResult::new(tool.id.clone(), format!("Callback '{anchor_id}' not found"), true);
     };
 
     // Check for diff-based script update (old_string / new_string)
@@ -185,8 +179,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult::new(
                 tool.id.clone(),
                 format!(
-                    "Diff-based script editing requires the editor to be open. Use Callback_open_editor with id='{}' first to view current script content.",
-                    anchor_id
+                    "Diff-based script editing requires the editor to be open. Use Callback_open_editor with id='{anchor_id}' first to view current script content."
                 ),
                 true,
             );
@@ -201,7 +194,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Update metadata fields if provided
     if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
         def.name = name.to_string();
-        changes.push(format!("name → {}", name));
+        changes.push(format!("name → {name}"));
     }
     if let Some(desc) = tool.input.get("description").and_then(|v| v.as_str()) {
         def.description = desc.to_string();
@@ -209,18 +202,18 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     if let Some(pattern) = tool.input.get("pattern").and_then(|v| v.as_str()) {
         if let Err(e) = Glob::new(pattern) {
-            return ToolResult::new(tool.id.clone(), format!("Invalid glob pattern '{}': {}", pattern, e), true);
+            return ToolResult::new(tool.id.clone(), format!("Invalid glob pattern '{pattern}': {e}"), true);
         }
         def.pattern = pattern.to_string();
-        changes.push(format!("pattern → {}", pattern));
+        changes.push(format!("pattern → {pattern}"));
     }
-    if let Some(blocking) = tool.input.get("blocking").and_then(|v| v.as_bool()) {
+    if let Some(blocking) = tool.input.get("blocking").and_then(serde_json::Value::as_bool) {
         def.blocking = blocking;
-        changes.push(format!("blocking → {}", blocking));
+        changes.push(format!("blocking → {blocking}"));
     }
-    if let Some(timeout) = tool.input.get("timeout").and_then(|v| v.as_u64()) {
+    if let Some(timeout) = tool.input.get("timeout").and_then(serde_json::Value::as_u64) {
         def.timeout_secs = Some(timeout);
-        changes.push(format!("timeout → {}s", timeout));
+        changes.push(format!("timeout → {timeout}s"));
     }
     if let Some(msg) = tool.input.get("success_message").and_then(|v| v.as_str()) {
         def.success_message = Some(msg.to_string());
@@ -228,16 +221,16 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     if let Some(cwd) = tool.input.get("cwd").and_then(|v| v.as_str()) {
         def.cwd = Some(cwd.to_string());
-        changes.push(format!("cwd → {}", cwd));
+        changes.push(format!("cwd → {cwd}"));
     }
-    if let Some(oaat) = tool.input.get("one_at_a_time").and_then(|v| v.as_bool()) {
+    if let Some(oaat) = tool.input.get("one_at_a_time").and_then(serde_json::Value::as_bool) {
         def.one_at_a_time = oaat;
-        changes.push(format!("one_at_a_time → {}", oaat));
+        changes.push(format!("one_at_a_time → {oaat}"));
     }
 
     // Handle script updates
     let scripts_dir = PathBuf::from(STORE_DIR).join("scripts");
-    let script_path = scripts_dir.join(format!("{}.sh", vessel_name));
+    let script_path = scripts_dir.join(format!("{vessel_name}.sh"));
 
     if has_full_script {
         // Full script replacement
@@ -249,7 +242,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             script = cargo_script,
         );
         if let Err(e) = fs::write(&script_path, &full_script) {
-            return ToolResult::new(tool.id.clone(), format!("Failed to write script: {}", e), true);
+            return ToolResult::new(tool.id.clone(), format!("Failed to write script: {e}"), true);
         }
         changes.push("script replaced".to_string());
     } else if has_diff {
@@ -260,7 +253,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         let current_script = match fs::read_to_string(&script_path) {
             Ok(s) => s,
             Err(e) => {
-                return ToolResult::new(tool.id.clone(), format!("Failed to read script file: {}", e), true);
+                return ToolResult::new(tool.id.clone(), format!("Failed to read script file: {e}"), true);
             }
         };
 
@@ -274,7 +267,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let updated_script = current_script.replacen(old_str, new_str, 1);
         if let Err(e) = fs::write(&script_path, &updated_script) {
-            return ToolResult::new(tool.id.clone(), format!("Failed to write script: {}", e), true);
+            return ToolResult::new(tool.id.clone(), format!("Failed to write script: {e}"), true);
         }
         changes.push("script edited (diff)".to_string());
     }
@@ -283,8 +276,8 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(new_name) = tool.input.get("name").and_then(|v| v.as_str())
         && new_name != vessel_name
     {
-        let old_path = scripts_dir.join(format!("{}.sh", vessel_name));
-        let new_path = scripts_dir.join(format!("{}.sh", new_name));
+        let old_path = scripts_dir.join(format!("{vessel_name}.sh"));
+        let new_path = scripts_dir.join(format!("{new_name}.sh"));
         if old_path.exists() {
             let _ = fs::rename(&old_path, &new_path).ok();
         }
@@ -293,7 +286,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     if changes.is_empty() {
         return ToolResult::new(
             tool.id.clone(),
-            format!("Callback {} updated (no changes specified)", anchor_id),
+            format!("Callback {anchor_id} updated (no changes specified)"),
             false,
         );
     }
@@ -316,7 +309,7 @@ pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let cs = CallbackState::get(state);
     let Some(def_idx) = cs.definitions.iter().position(|d| d.id == anchor_id) else {
-        return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
+        return ToolResult::new(tool.id.clone(), format!("Callback '{anchor_id}' not found"), true);
     };
 
     // Remove definition and get the name for script cleanup

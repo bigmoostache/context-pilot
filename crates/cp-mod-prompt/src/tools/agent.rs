@@ -27,7 +27,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if PromptState::get(state).agents.iter().any(|a| a.id == id) {
-        return ToolResult::new(tool.id.clone(), format!("Agent with ID '{}' already exists", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Agent with ID '{id}' already exists"), true);
     }
 
     let item = PromptItem {
@@ -45,7 +45,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::SYSTEM));
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    ToolResult::new(tool.id.clone(), format!("Created agent '{}' with ID '{}'", name, id), false)
+    ToolResult::new(tool.id.clone(), format!("Created agent '{name}' with ID '{id}'"), false)
 }
 
 pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -57,12 +57,12 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(agent) = PromptState::get(state).agents.iter().find(|a| a.id == id)
         && agent.is_builtin
     {
-        return ToolResult::new(tool.id.clone(), format!("Cannot delete built-in agent '{}'", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Cannot delete built-in agent '{id}'"), true);
     }
 
     let ps = PromptState::get_mut(state);
     let Some(idx) = ps.agents.iter().position(|a| a.id == id) else {
-        return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Agent '{id}' not found"), true);
     };
 
     let agent = ps.agents.remove(idx);
@@ -83,7 +83,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = tool.input.get("id").and_then(|v| v.as_str());
 
     // If id is None or empty, switch to default agent
-    if id.is_none_or(|s| s.is_empty()) {
+    if id.is_none_or(str::is_empty) {
         PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_string());
         state.touch_panel(ContextType::new(ContextType::SYSTEM));
         state.touch_panel(ContextType::new(ContextType::LIBRARY));
@@ -97,7 +97,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = id.unwrap();
 
     if !PromptState::get(state).agents.iter().any(|a| a.id == id) {
-        return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
+        return ToolResult::new(tool.id.clone(), format!("Agent '{id}' not found"), true);
     }
 
     PromptState::get_mut(state).active_agent_id = Some(id.to_string());
@@ -106,5 +106,5 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let name = PromptState::get(state).agents.iter().find(|a| a.id == id).map_or("unknown", |a| a.name.as_str());
 
-    ToolResult::new(tool.id.clone(), format!("Loaded agent '{}' ({})", name, id), false)
+    ToolResult::new(tool.id.clone(), format!("Loaded agent '{name}' ({id})"), false)
 }

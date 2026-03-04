@@ -77,7 +77,7 @@ pub(super) fn prepare_stream_context(
             })
             .collect();
 
-        let new_hash_list: Vec<String> = panel_hashes.iter().map(|(id, h, _)| format!("{}:{}", id, h)).collect();
+        let new_hash_list: Vec<String> = panel_hashes.iter().map(|(id, h, _)| format!("{id}:{h}")).collect();
 
         // Find max prefix match index
         let prev = &state.previous_panel_hash_list;

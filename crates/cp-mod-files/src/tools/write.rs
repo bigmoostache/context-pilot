@@ -32,7 +32,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Write the file
     if let Err(e) = fs::write(path, contents) {
-        return ToolResult::new(tool.id.clone(), format!("Failed to write file '{}': {}", path_str, e), true);
+        return ToolResult::new(tool.id.clone(), format!("Failed to write file '{path_str}': {e}"), true);
     }
 
     let token_count = estimate_tokens(contents);
@@ -84,7 +84,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let action = if is_new { "Created" } else { "Wrote" };
-    let mut result_msg = format!("{} '{}' ({} lines, {} tokens)\n", action, path_str, line_count, token_count);
+    let mut result_msg = format!("{action} '{path_str}' ({line_count} lines, {token_count} tokens)\n");
 
     // Add diff-style preview of written content (truncated for large files)
     result_msg.push_str("```diff\n");
@@ -93,7 +93,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             result_msg.push_str(&format!("+ ... ({} more lines)\n", line_count - 20));
             break;
         }
-        result_msg.push_str(&format!("+ {}\n", line));
+        result_msg.push_str(&format!("+ {line}\n"));
     }
     result_msg.push_str("```");
 

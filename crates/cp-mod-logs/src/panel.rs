@@ -124,14 +124,14 @@ fn render_log_entry(
 
         let mut spans = vec![
             Span::styled(indent, Style::default()),
-            Span::styled(format!("{} ", icon), Style::default().fg(theme::accent())),
+            Span::styled(format!("{icon} "), Style::default().fg(theme::accent())),
             Span::styled(format!("{} ", entry.id), Style::default().fg(theme::accent_dim())),
-            Span::styled(format!("{} ", time_str), Style::default().fg(theme::text_muted())),
+            Span::styled(format!("{time_str} "), Style::default().fg(theme::text_muted())),
             Span::styled(entry.content.clone(), Style::default().fg(theme::text())),
         ];
 
         if !is_open {
-            spans.push(Span::styled(format!(" ({} children)", child_count), Style::default().fg(theme::text_muted())));
+            spans.push(Span::styled(format!(" ({child_count} children)"), Style::default().fg(theme::text_muted())));
         }
 
         lines.push(Line::from(spans));
@@ -147,7 +147,7 @@ fn render_log_entry(
         lines.push(Line::from(vec![
             Span::styled(indent, Style::default()),
             Span::styled(format!("{} ", entry.id), Style::default().fg(theme::accent_dim())),
-            Span::styled(format!("{} ", time_str), Style::default().fg(theme::text_muted())),
+            Span::styled(format!("{time_str} "), Style::default().fg(theme::text_muted())),
             Span::styled(entry.content.clone(), Style::default().fg(theme::text())),
         ]));
     }
@@ -160,5 +160,5 @@ fn format_timestamp(ms: u64) -> String {
     Local
         .timestamp_opt(secs, 0)
         .single()
-        .map_or_else(|| format!("{}ms", ms), |dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+        .map_or_else(|| format!("{ms}ms"), |dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
 }

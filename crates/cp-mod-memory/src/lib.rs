@@ -71,7 +71,7 @@ impl Module for MemoryModule {
         {
             ms.memories = v;
         }
-        if let Some(v) = data.get("next_memory_id").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("next_memory_id").and_then(serde_json::Value::as_u64) {
             ms.next_memory_id = v.to_usize();
         }
         if let Some(arr) = data.get("open_memory_ids")
@@ -154,7 +154,7 @@ impl Module for MemoryModule {
                         if let Some(id) = update.get("id").and_then(|v| v.as_str())
                             && !ms.memories.iter().any(|m| m.id == id)
                         {
-                            pf.errors.push(format!("Memory '{}' not found", id));
+                            pf.errors.push(format!("Memory '{id}' not found"));
                         }
                     }
                 }

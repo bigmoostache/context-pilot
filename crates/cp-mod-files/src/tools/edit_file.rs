@@ -8,7 +8,7 @@ use super::diff::generate_unified_diff;
 
 /// Normalize a string for matching: trim trailing whitespace per line, normalize line endings
 fn normalize_for_match(s: &str) -> String {
-    s.replace("\r\n", "\n").lines().map(|l| l.trim_end()).collect::<Vec<_>>().join("\n")
+    s.replace("\r\n", "\n").lines().map(str::trim_end).collect::<Vec<_>>().join("\n")
 }
 
 /// Find the best match for `needle` in `haystack` using normalized comparison.
@@ -112,7 +112,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Get replace_all (optional, default false)
-    let replace_all = tool.input.get("replace_all").and_then(|v| v.as_bool()).unwrap_or(false);
+    let replace_all = tool.input.get("replace_all").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
     // Check if file is open in context
     let is_open = state
@@ -126,7 +126,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut content = match fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) => {
-            return ToolResult::new(tool.id.clone(), format!("Failed to read file: {}", e), true);
+            return ToolResult::new(tool.id.clone(), format!("Failed to read file: {e}"), true);
         }
     };
 
@@ -147,7 +147,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     if replaced == 0 {
         // Provide helpful error with closest match
         let hint = if let Some((line, preview)) = find_closest_match(&content, old_string) {
-            format!(" (closest match at line {}: \"{}\")", line, preview)
+            format!(" (closest match at line {line}: \"{preview}\")")
         } else {
             String::new()
         };
@@ -158,12 +158,12 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             old_string.to_string()
         };
 
-        return ToolResult::new(tool.id.clone(), format!("No match found for \"{}\"{}", needle_preview, hint), true);
+        return ToolResult::new(tool.id.clone(), format!("No match found for \"{needle_preview}\"{hint}"), true);
     }
 
     // Write file
     if let Err(e) = fs::write(path, &content) {
-        return ToolResult::new(tool.id.clone(), format!("Failed to write file: {}", e), true);
+        return ToolResult::new(tool.id.clone(), format!("Failed to write file: {e}"), true);
     }
 
     // Update the context element's token count
@@ -184,19 +184,17 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Warn if file was not open in context (edit still succeeded via unique match)
     if !is_open {
         result_msg.push_str(&format!(
-            "Warning: File '{}' was not open in context. Edit succeeded (unique match found) but open the file to verify.\n",
-            path_str
+            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify.\n"
         ));
     }
 
     // Header line
     if replace_all && replaced > 1 {
         result_msg.push_str(&format!(
-            "Edited '{}': {} replacements (~{} lines changed each)\n",
-            path_str, replaced, lines_changed
+            "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)\n"
         ));
     } else {
-        result_msg.push_str(&format!("Edited '{}': ~{} lines changed\n", path_str, lines_changed));
+        result_msg.push_str(&format!("Edited '{path_str}': ~{lines_changed} lines changed\n"));
     }
 
     // Add diff markers for UI rendering
@@ -262,11 +260,10 @@ mod tests {
 
         if replace_all && replaced > 1 {
             result_msg.push_str(&format!(
-                "Edited '{}': {} replacements (~{} lines changed each)\n",
-                path_str, replaced, lines_changed
+                "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)\n"
             ));
         } else {
-            result_msg.push_str(&format!("Edited '{}': ~{} lines changed\n", path_str, lines_changed));
+            result_msg.push_str(&format!("Edited '{path_str}': ~{lines_changed} lines changed\n"));
         }
 
         result_msg.push_str("`diff\n");

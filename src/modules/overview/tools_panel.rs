@@ -66,7 +66,7 @@ fn generate_tools_context(state: &State) -> String {
     let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
     let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
 
-    let mut output = format!("Tools ({} enabled, {} disabled):\n\n", enabled_count, disabled_count);
+    let mut output = format!("Tools ({enabled_count} enabled, {disabled_count} disabled):\n\n");
     output.push_str("| Category | Tool | Status | Description |\n");
     output.push_str("|----------|------|--------|-------------|\n");
     for tool in &state.tools {

@@ -49,7 +49,7 @@ fn expand_paste_sentinels(
                     let display_text = if let Some(cmd_name) = label {
                         // Command: show full content
                         let content = paste_buffers.get(idx).map_or("", |s| s.as_str());
-                        format!("{}⚡/{}\n{}{}", PASTE_PLACEHOLDER_START, cmd_name, content, PASTE_PLACEHOLDER_END)
+                        format!("{PASTE_PLACEHOLDER_START}⚡/{cmd_name}\n{content}{PASTE_PLACEHOLDER_END}")
                     } else {
                         // Paste: show line/token stats
                         let (token_count, line_count) = paste_buffers
@@ -125,7 +125,7 @@ pub(super) fn render_input(
 
     // Insert cursor character at cursor position
     let input_with_cursor = if cursor >= input.len() {
-        format!("{}{}", input, cursor_char)
+        format!("{input}{cursor_char}")
     } else {
         format!("{}{}{}", &input[..cursor], cursor_char, &input[cursor..])
     };
@@ -398,7 +398,7 @@ fn build_command_hints(clean_line: &str, command_ids: &[String]) -> Vec<Span<'st
         return vec![];
     }
 
-    let hint_text = matches.iter().map(|id| format!("/{}", id)).collect::<Vec<_>>().join("  ");
+    let hint_text = matches.iter().map(|id| format!("/{id}")).collect::<Vec<_>>().join("  ");
     vec![
         Span::styled("  ", Style::default()),
         Span::styled(hint_text, Style::default().fg(theme::text_muted()).italic()),

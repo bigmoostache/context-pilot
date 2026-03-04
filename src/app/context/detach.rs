@@ -161,12 +161,12 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
                 let secs = ms / 1000;
                 let hours = (secs % 86400) / 3600;
                 let minutes = (secs % 3600) / 60;
-                format!("{:02}:{:02}", hours, minutes)
+                format!("{hours:02}:{minutes:02}")
             }
             if first_timestamp > 0 && last_timestamp > 0 {
                 format!("Chat {}–{}", ms_to_short_time(first_timestamp), ms_to_short_time(last_timestamp))
             } else {
-                format!("Chat ({})", active_seen)
+                format!("Chat ({active_seen})")
             }
         };
 

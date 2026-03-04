@@ -86,7 +86,7 @@ impl Module for SpineModule {
         {
             SpineState::get_mut(state).notifications = v;
         }
-        if let Some(v) = data.get("next_notification_id").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("next_notification_id").and_then(serde_json::Value::as_u64) {
             SpineState::get_mut(state).next_notification_id = v.to_usize();
         }
         if let Some(cfg) = data.get("spine_config")
@@ -165,7 +165,7 @@ impl Module for SpineModule {
                         if let Some(id) = id_val.as_str()
                             && !ss.notifications.iter().any(|n| n.id == id)
                         {
-                            pf.warnings.push(format!("Notification '{}' not found", id));
+                            pf.warnings.push(format!("Notification '{id}' not found"));
                         }
                     }
                 }

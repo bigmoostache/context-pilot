@@ -72,7 +72,7 @@ impl Session {
     fn status_str(&self) -> String {
         match &self.status {
             SessionStatus::Running => "running".to_string(),
-            SessionStatus::Exited(code) => format!("exited({})", code),
+            SessionStatus::Exited(code) => format!("exited({code})"),
         }
     }
 
@@ -114,11 +114,11 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
 
     let log_file = match std::fs::File::create(&log) {
         Ok(f) => f,
-        Err(e) => return Response::err(format!("Failed to create log: {}", e)),
+        Err(e) => return Response::err(format!("Failed to create log: {e}")),
     };
     let log_err = match log_file.try_clone() {
         Ok(f) => f,
-        Err(e) => return Response::err(format!("Failed to clone log fd: {}", e)),
+        Err(e) => return Response::err(format!("Failed to clone log fd: {e}")),
     };
 
     let mut cmd = Command::new("sh");
@@ -131,7 +131,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
-        Err(e) => return Response::err(format!("Spawn failed: {}", e)),
+        Err(e) => return Response::err(format!("Spawn failed: {e}")),
     };
 
     let pid = child.id();
@@ -164,18 +164,18 @@ fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     let bytes = interpret_escapes(input);
     let mut map = sessions.lock().unwrap();
     let Some(session) = map.get_mut(key) else {
-        return Response::err(format!("Session '{}' not found", key));
+        return Response::err(format!("Session '{key}' not found"));
     };
     if session.is_terminal() {
-        return Response::err(format!("Session '{}' already exited", key));
+        return Response::err(format!("Session '{key}' already exited"));
     }
     match &mut session.stdin {
         Some(stdin) => {
             if let Err(e) = stdin.write_all(&bytes) {
-                return Response::err(format!("Write failed: {}", e));
+                return Response::err(format!("Write failed: {e}"));
             }
             if let Err(e) = stdin.flush() {
-                return Response::err(format!("Flush failed: {}", e));
+                return Response::err(format!("Flush failed: {e}"));
             }
             Response::ok()
         }
@@ -186,7 +186,7 @@ fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
 fn handle_kill(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     let Some(session) = map.get_mut(key) else {
-        return Response::err(format!("Session '{}' not found", key));
+        return Response::err(format!("Session '{key}' not found"));
     };
     if !session.is_terminal() {
         // SIGTERM to script PID only — PTY teardown propagates SIGHUP to children
@@ -220,7 +220,7 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
 fn handle_status(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     let Some(session) = map.get_mut(key) else {
-        return Response::err(format!("Session '{}' not found", key));
+        return Response::err(format!("Session '{key}' not found"));
     };
     session.poll_status();
     Response::ok_status(session.status_str(), session.exit_code())
@@ -263,7 +263,7 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
         let req: Request = match serde_json::from_str(&line) {
             Ok(r) => r,
             Err(e) => {
-                let resp = Response::err(format!("Invalid JSON: {}", e));
+                let resp = Response::err(format!("Invalid JSON: {e}"));
                 drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()));
                 continue;
             }
@@ -313,7 +313,7 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
                 drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()));
                 std::process::exit(0);
             }
-            other => Response::err(format!("Unknown command: {}", other)),
+            other => Response::err(format!("Unknown command: {other}")),
         };
 
         if writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()).is_err() {
@@ -343,7 +343,7 @@ fn main() {
     let listener = match UnixListener::bind(&socket_path) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("Failed to bind {}: {}", socket_path, e);
+            eprintln!("Failed to bind {socket_path}: {e}");
             std::process::exit(1);
         }
     };

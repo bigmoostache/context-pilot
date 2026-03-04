@@ -83,7 +83,7 @@ impl Panel for GithubResultPanel {
                 } else if stdout.trim().is_empty() {
                     stderr.to_string()
                 } else {
-                    format!("{}\n{}", stdout, stderr)
+                    format!("{stdout}\n{stderr}")
                 };
                 // Redact token if accidentally in output
                 let content = if req.github_token.len() >= 8 && content.contains(&req.github_token) {
@@ -96,7 +96,7 @@ impl Panel for GithubResultPanel {
                 Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
             }
             Err(e) => {
-                let content = format!("Error executing gh: {}", e);
+                let content = format!("Error executing gh: {e}");
                 let token_count = estimate_tokens(&content);
                 Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
             }

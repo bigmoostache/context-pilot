@@ -43,6 +43,7 @@ pub(crate) struct StreamFunctionDelta {
 }
 
 #[derive(Debug, Deserialize)]
+#[expect(clippy::struct_field_names, reason = "Field names mirror the OpenAI API response")]
 pub(crate) struct StreamUsage {
     pub prompt_tokens: Option<usize>,
     pub completion_tokens: Option<usize>,
@@ -126,6 +127,6 @@ impl ToolCallAccumulator {
 pub(crate) fn dump_request<T: Serialize>(worker_id: &str, provider: &str, request: &T) {
     let dir = ".context-pilot/last_requests";
     let _r = std::fs::create_dir_all(dir);
-    let path = format!("{}/{}_{}_last_request.json", dir, worker_id, provider);
+    let path = format!("{dir}/{worker_id}_{provider}_last_request.json");
     let _r = std::fs::write(path, serde_json::to_string_pretty(request).unwrap_or_default());
 }

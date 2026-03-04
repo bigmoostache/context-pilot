@@ -79,20 +79,20 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
         if ch.is_ascii_digit() {
             current_num.push(ch);
         } else {
-            let val: u64 = current_num.parse().map_err(|_| format!("Invalid number in duration: '{}'", s))?;
+            let val: u64 = current_num.parse().map_err(|_| format!("Invalid number in duration: '{s}'"))?;
             current_num.clear();
             match ch {
                 'h' | 'H' => total_ms += val * 3_600_000,
                 'm' | 'M' => total_ms += val * 60_000,
                 's' | 'S' => total_ms += val * 1_000,
-                _ => return Err(format!("Unknown duration unit '{}'. Use h/m/s.", ch)),
+                _ => return Err(format!("Unknown duration unit '{ch}'. Use h/m/s.")),
             }
         }
     }
 
     // Trailing number without unit → seconds
     if !current_num.is_empty() {
-        let val: u64 = current_num.parse().map_err(|_| format!("Invalid number in duration: '{}'", s))?;
+        let val: u64 = current_num.parse().map_err(|_| format!("Invalid number in duration: '{s}'"))?;
         total_ms += val * 1_000;
     }
 
@@ -168,17 +168,17 @@ fn format_duration(ms: u64) -> String {
     let secs = total_secs % 60;
 
     if hours > 0 && minutes > 0 && secs > 0 {
-        format!("{}h{}m{}s", hours, minutes, secs)
+        format!("{hours}h{minutes}m{secs}s")
     } else if hours > 0 && minutes > 0 {
-        format!("{}h{}m", hours, minutes)
+        format!("{hours}h{minutes}m")
     } else if hours > 0 {
-        format!("{}h", hours)
+        format!("{hours}h")
     } else if minutes > 0 && secs > 0 {
-        format!("{}m{}s", minutes, secs)
+        format!("{minutes}m{secs}s")
     } else if minutes > 0 {
-        format!("{}m", minutes)
+        format!("{minutes}m")
     } else {
-        format!("{}s", secs)
+        format!("{secs}s")
     }
 }
 
@@ -298,7 +298,7 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
                     delay_desc = format!("in {}", format_duration(delay_ms));
                 }
                 Err(e) => {
-                    return ToolResult::new(tool.id.clone(), format!("Invalid delay '{}': {}", delay_str, e), true);
+                    return ToolResult::new(tool.id.clone(), format!("Invalid delay '{delay_str}': {e}"), true);
                 }
             }
         }
@@ -316,37 +316,37 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
                     if target_ms <= now {
                         return ToolResult::new(
                             tool.id.clone(),
-                            format!("DateTime '{}' is in the past!", dt_str),
+                            format!("DateTime '{dt_str}' is in the past!"),
                             true,
                         );
                     }
                     fire_at_ms = target_ms;
                     let remaining = format_duration(target_ms - now);
-                    delay_desc = format!("at {} ({})", dt_str, remaining);
+                    delay_desc = format!("at {dt_str} ({remaining})");
                 }
                 Err(e) => {
-                    return ToolResult::new(tool.id.clone(), format!("Invalid datetime '{}': {}", dt_str, e), true);
+                    return ToolResult::new(tool.id.clone(), format!("Invalid datetime '{dt_str}': {e}"), true);
                 }
             }
         }
         _ => {
             return ToolResult::new(
                 tool.id.clone(),
-                format!("Unknown mode '{}'. Use 'timer' or 'datetime'.", mode),
+                format!("Unknown mode '{mode}'. Use 'timer' or 'datetime'."),
                 true,
             );
         }
     }
 
     let counter = COUCOU_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let watcher_id = format!("coucou_{}", counter);
-    let desc = format!("🔔 Coucou {}: \"{}\"", delay_desc, message);
+    let watcher_id = format!("coucou_{counter}");
+    let desc = format!("🔔 Coucou {delay_desc}: \"{message}\"");
 
     let watcher = CoucouWatcher { watcher_id, message: message.clone(), registered_at_ms: now, fire_at_ms, desc };
 
     WatcherRegistry::get_mut(state).register(Box::new(watcher));
 
-    ToolResult::new(tool.id.clone(), format!("Coucou scheduled {}!\nMessage: \"{}\"", delay_desc, message), false)
+    ToolResult::new(tool.id.clone(), format!("Coucou scheduled {delay_desc}!\nMessage: \"{message}\""), false)
 }
 
 #[cfg(test)]

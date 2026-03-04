@@ -47,7 +47,7 @@ pub(crate) fn generate_tree_string(
     }
 
     // Build tree recursively - directly show contents without root folder line
-    build_tree_new(&root, ".", "", &gitignore, &open_set, &desc_map, &mut output);
+    build_tree_new(&root, ".", "", gitignore.as_ref(), &open_set, &desc_map, &mut output);
 
     output
 }
@@ -56,7 +56,7 @@ pub(crate) fn generate_tree_string(
 fn compute_file_hash(path: &Path) -> Option<String> {
     let content = fs::read(path).ok()?;
     let hash = Sha256::digest(&content);
-    Some(format!("{:x}", hash)[..8].to_string()) // First 8 chars
+    Some(format!("{hash:x}")[..8].to_string()) // First 8 chars
 }
 
 /// Execute `tree_toggle_folders` tool - open or close folders
@@ -85,7 +85,7 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
 
         // Verify it's a directory
         if !path.is_dir() && normalized != "." {
-            errors.push(format!("{}: not a directory", path_str));
+            errors.push(format!("{path_str}: not a directory"));
             continue;
         }
 
@@ -109,7 +109,7 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
                     let ts = TreeState::get_mut(state);
                     ts.tree_open_folders.retain(|p| p != &normalized);
                     // Also close all children
-                    let prefix = format!("{}/", normalized);
+                    let prefix = format!("{normalized}/");
                     ts.tree_open_folders.retain(|p| !p.starts_with(&prefix));
                     closed.push(normalized);
                 }
@@ -119,7 +119,7 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
                 if is_open && normalized != "." {
                     let ts = TreeState::get_mut(state);
                     ts.tree_open_folders.retain(|p| p != &normalized);
-                    let prefix = format!("{}/", normalized);
+                    let prefix = format!("{normalized}/");
                     ts.tree_open_folders.retain(|p| !p.starts_with(&prefix));
                     closed.push(normalized);
                 } else if !is_open {
@@ -176,7 +176,7 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
         let normalized = normalize_path(&path);
 
         // Check if delete is requested
-        if desc_obj.get("delete").and_then(|v| v.as_bool()).unwrap_or(false) {
+        if desc_obj.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false) {
             if TreeState::get(state).tree_descriptions.iter().any(|d| d.path == normalized) {
                 TreeState::get_mut(state).tree_descriptions.retain(|d| d.path != normalized);
                 removed.push(normalized);
@@ -187,13 +187,13 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
         let description = if let Some(d) = desc_obj.get("description").and_then(|v| v.as_str()) {
             d.to_string()
         } else {
-            errors.push(format!("{}: missing 'description'", path_str));
+            errors.push(format!("{path_str}: missing 'description'"));
             continue;
         };
 
         // Verify path exists (file or folder)
         if !path.exists() {
-            errors.push(format!("{}: path not found", path_str));
+            errors.push(format!("{path_str}: path not found"));
             continue;
         }
 
@@ -249,7 +249,7 @@ pub(crate) fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResu
     // Invalidate tree cache to trigger refresh
     invalidate_tree_cache(state);
 
-    ToolResult::new(tool.id.clone(), format!("Updated tree filter:\n{}", filter), false)
+    ToolResult::new(tool.id.clone(), format!("Updated tree filter:\n{filter}"), false)
 }
 
 /// Normalize a path to a consistent format
@@ -327,7 +327,7 @@ fn build_tree_new(
     dir: &Path,
     dir_path_str: &str,
     prefix: &str,
-    gitignore: &Option<ignore::gitignore::Gitignore>,
+    gitignore: Option<&ignore::gitignore::Gitignore>,
     open_set: &HashSet<String>,
     desc_map: &std::collections::HashMap<String, &TreeFileDescription>,
     output: &mut String,
@@ -335,7 +335,7 @@ fn build_tree_new(
     let Ok(entries) = fs::read_dir(dir) else { return };
 
     let mut items: Vec<_> = entries
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
         .filter(|e| {
             let path = e.path();
             let is_dir = path.is_dir();
@@ -366,7 +366,7 @@ fn build_tree_new(
 
         // Build path string for this entry
         let entry_path =
-            if dir_path_str == "." { name_str.to_string() } else { format!("{}/{}", dir_path_str, name_str) };
+            if dir_path_str == "." { name_str.to_string() } else { format!("{dir_path_str}/{name_str}") };
 
         if is_dir {
             let is_open = open_set.contains(&entry_path);
@@ -377,23 +377,23 @@ fn build_tree_new(
             let triangle = if is_open { "▼ " } else { "▶ " };
             if is_open {
                 if let Some(desc) = folder_desc {
-                    output.push_str(&format!("{}{}{}{}/  - {}\n", prefix, connector, triangle, name_str, desc));
+                    output.push_str(&format!("{prefix}{connector}{triangle}{name_str}/  - {desc}\n"));
                 } else {
-                    output.push_str(&format!("{}{}{}{}/\n", prefix, connector, triangle, name_str));
+                    output.push_str(&format!("{prefix}{connector}{triangle}{name_str}/\n"));
                 }
                 build_tree_new(
                     &entry.path(),
                     &entry_path,
-                    &format!("{}{}", prefix, child_prefix),
+                    &format!("{prefix}{child_prefix}"),
                     gitignore,
                     open_set,
                     desc_map,
                     output,
                 );
             } else if let Some(desc) = folder_desc {
-                output.push_str(&format!("{}{}{}{}/ - {}\n", prefix, connector, triangle, name_str, desc));
+                output.push_str(&format!("{prefix}{connector}{triangle}{name_str}/ - {desc}\n"));
             } else {
-                output.push_str(&format!("{}{}{}{}/ \n", prefix, connector, triangle, name_str));
+                output.push_str(&format!("{prefix}{connector}{triangle}{name_str}/ \n"));
             }
         } else if let Some(desc) = desc_map.get(&entry_path) {
             // Check if description is stale
@@ -403,7 +403,7 @@ fn build_tree_new(
             let stale_marker = if is_stale { " [!]" } else { "" };
             output.push_str(&format!("{}{}{}{} - {}\n", prefix, connector, name_str, stale_marker, desc.description));
         } else {
-            output.push_str(&format!("{}{}{}\n", prefix, connector, name_str));
+            output.push_str(&format!("{prefix}{connector}{name_str}\n"));
         }
     }
 }

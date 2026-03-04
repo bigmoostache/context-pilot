@@ -108,7 +108,7 @@ pub fn fire_callback(
         callback_tag: format!("callback_{}", def.id),
         success_message: def.success_message.clone(),
         blocking: is_blocking,
-        tool_use_id: blocking_tool_use_id.map(|s| s.to_string()),
+        tool_use_id: blocking_tool_use_id.map(ToString::to_string),
         registered_at_ms: now,
         deadline_ms,
         desc: watcher_desc,
@@ -269,7 +269,7 @@ impl Watcher for CallbackWatcher {
                 "· {} FAILED (exit {})\n{}",
                 self.callback_name,
                 exit_code,
-                last_lines.lines().map(|l| format!("    {}", l)).collect::<Vec<_>>().join("\n"),
+                last_lines.lines().map(|l| format!("    {l}")).collect::<Vec<_>>().join("\n"),
             );
             Some(WatcherResult {
                 description: msg,

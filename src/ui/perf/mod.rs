@@ -156,7 +156,7 @@ impl PerfMetrics {
             return;
         }
 
-        let mut ops = self.ops.write().unwrap_or_else(|e| e.into_inner());
+        let mut ops = self.ops.write().unwrap_or_else(std::sync::PoisonError::into_inner);
         let stats = ops.entry(name).or_default();
         let _r = stats.count.fetch_add(1, Ordering::Relaxed);
         let _r = stats.total_us.fetch_add(duration_us, Ordering::Relaxed);
@@ -171,7 +171,7 @@ impl PerfMetrics {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-        self.frame_state.write().unwrap_or_else(|e| e.into_inner()).frame_start = Some(Instant::now());
+        self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner).frame_start = Some(Instant::now());
     }
 
     /// End frame and record frame time
@@ -179,24 +179,26 @@ impl PerfMetrics {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-        if let Some(start) = self.frame_state.read().unwrap_or_else(|e| e.into_inner()).frame_start {
+        if let Some(start) = self.frame_state.read().unwrap_or_else(std::sync::PoisonError::into_inner).frame_start {
             let frame_time = start.elapsed().as_micros().to_u64();
-            self.frame_times.write().unwrap_or_else(|e| e.into_inner()).push(frame_time);
+            self.frame_times.write().unwrap_or_else(std::sync::PoisonError::into_inner).push(frame_time);
             let _r = self.frame_count.fetch_add(1, Ordering::Relaxed);
         }
 
         // Check if stats need refresh (time-based, not frame-based)
-        let last_refresh = self.frame_state.read().unwrap_or_else(|e| e.into_inner()).last_stats_refresh;
+        let last_refresh =
+            self.frame_state.read().unwrap_or_else(std::sync::PoisonError::into_inner).last_stats_refresh;
         if last_refresh.elapsed().as_millis() >= u128::from(PERF_STATS_REFRESH_MS) {
             self.refresh_system_stats();
-            self.frame_state.write().unwrap_or_else(|e| e.into_inner()).last_stats_refresh = Instant::now();
+            self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner).last_stats_refresh =
+                Instant::now();
         }
     }
 
     /// Refresh CPU and memory stats
     fn refresh_system_stats(&self) {
         if let Some((cpu_ticks, mem_bytes)) = read_proc_stat() {
-            let mut state = self.frame_state.write().unwrap_or_else(|e| e.into_inner());
+            let mut state = self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner);
             let now = Instant::now();
             let elapsed = now.duration_since(state.last_cpu_measure.0).as_secs_f32();
 
@@ -216,13 +218,13 @@ impl PerfMetrics {
 
     /// Get snapshot of metrics for display
     pub(crate) fn snapshot(&self) -> PerfSnapshot {
-        let ops = self.ops.read().unwrap_or_else(|e| e.into_inner());
-        let frame_times = self.frame_times.read().unwrap_or_else(|e| e.into_inner());
+        let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let mut op_snapshots: Vec<OpSnapshot> = ops
             .iter()
             .map(|(name, stats)| {
-                let samples = stats.samples.read().unwrap_or_else(|e| e.into_inner());
+                let samples = stats.samples.read().unwrap_or_else(std::sync::PoisonError::into_inner);
                 let recent = samples.recent(SAMPLE_RING_SIZE);
                 let count = recent.len();
 
@@ -277,8 +279,8 @@ impl PerfMetrics {
 
     /// Reset all metrics
     pub(crate) fn reset(&self) {
-        *self.ops.write().unwrap_or_else(|e| e.into_inner()) = HashMap::new();
-        *self.frame_times.write().unwrap_or_else(|e| e.into_inner()) = RingBuffer::default();
+        *self.ops.write().unwrap_or_else(std::sync::PoisonError::into_inner) = HashMap::new();
+        *self.frame_times.write().unwrap_or_else(std::sync::PoisonError::into_inner) = RingBuffer::default();
         self.frame_count.store(0, Ordering::Relaxed);
     }
 

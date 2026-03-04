@@ -31,17 +31,17 @@ pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 fn open_single_file(path: &str, state: &mut State) -> String {
     // Check if file is already open
     if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(path)) {
-        return format!("File '{}' is already open in context", path);
+        return format!("File '{path}' is already open in context");
     }
 
     // Check if file exists (quick metadata check, not a full read)
     let path_obj = Path::new(path);
     if !path_obj.exists() {
-        return format!("Error: File '{}' not found", path);
+        return format!("Error: File '{path}' not found");
     }
 
     if !path_obj.is_file() {
-        return format!("Error: '{}' is not a file", path);
+        return format!("Error: '{path}' is not a file");
     }
 
     let file_name = path_obj.file_name().map_or_else(|| path.to_string(), |n| n.to_string_lossy().to_string());
@@ -76,5 +76,5 @@ fn open_single_file(path: &str, state: &mut State) -> String {
     elem.set_meta("file_path", &path.to_string());
     state.context.push(elem);
 
-    format!("Opened '{}' as {}", path, context_id)
+    format!("Opened '{path}' as {context_id}")
 }

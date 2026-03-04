@@ -171,7 +171,7 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
     }
 
     // Calculate max width for each column (using display width, not raw length)
-    let num_cols = rows.iter().map(|r| r.len()).max().unwrap_or(0);
+    let num_cols = rows.iter().map(Vec::len).max().unwrap_or(0);
     let mut col_widths: Vec<usize> = vec![0; num_cols];
 
     for (i, row) in rows.iter().enumerate() {
@@ -269,7 +269,7 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
                     if is_header {
                         // Header: single styled span with content + padding baked in
                         spans.push(Span::styled(
-                            format!("{}{}", cell_text, padding),
+                            format!("{cell_text}{padding}"),
                             Style::default().fg(theme::accent()).bold(),
                         ));
                     } else if cell_text.is_empty() {

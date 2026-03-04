@@ -9,7 +9,7 @@ impl InvalidationRule {
     fn new(trigger: &str, invalidates: &[&str]) -> Self {
         Self {
             trigger: Regex::new(trigger).expect("invalid trigger regex"),
-            invalidates: invalidates.iter().map(|p| p.to_string()).collect(),
+            invalidates: invalidates.iter().map(ToString::to_string).collect(),
         }
     }
 }
@@ -94,7 +94,7 @@ mod tests {
             "git blame src/main.rs",
         ];
         for cmd in ro_commands {
-            assert!(inv.iter().any(|re| re.is_match(cmd)), "checkout should invalidate {}", cmd);
+            assert!(inv.iter().any(|re| re.is_match(cmd)), "checkout should invalidate {cmd}");
         }
     }
 

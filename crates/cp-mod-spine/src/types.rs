@@ -254,7 +254,7 @@ impl SpineState {
     /// Check if there are any unprocessed notifications
     #[must_use]
     pub fn has_unprocessed_notifications(state: &State) -> bool {
-        Self::get(state).notifications.iter().any(|n| n.is_unprocessed())
+        Self::get(state).notifications.iter().any(Notification::is_unprocessed)
     }
 
     /// Mark ALL unprocessed notifications as blocked (by guard rails).

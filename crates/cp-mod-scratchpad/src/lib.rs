@@ -65,7 +65,7 @@ impl Module for ScratchpadModule {
         {
             ss.scratchpad_cells = v;
         }
-        if let Some(v) = data.get("next_scratchpad_id").and_then(|v| v.as_u64()) {
+        if let Some(v) = data.get("next_scratchpad_id").and_then(serde_json::Value::as_u64) {
             ss.next_scratchpad_id = v.to_usize();
         }
     }
@@ -119,7 +119,7 @@ impl Module for ScratchpadModule {
                 if let Some(cell_id) = tool.input.get("cell_id").and_then(|v| v.as_str()) {
                     let ss = ScratchpadState::get(state);
                     if !ss.scratchpad_cells.iter().any(|c| c.id == cell_id) {
-                        pf.errors.push(format!("Cell '{}' not found", cell_id));
+                        pf.errors.push(format!("Cell '{cell_id}' not found"));
                     }
                 }
                 Some(pf)
@@ -134,7 +134,7 @@ impl Module for ScratchpadModule {
                         if let Some(id) = id_val.as_str()
                             && !ss.scratchpad_cells.iter().any(|c| c.id == id)
                         {
-                            pf.warnings.push(format!("Cell '{}' not found — will be skipped", id));
+                            pf.warnings.push(format!("Cell '{id}' not found — will be skipped"));
                         }
                     }
                 }

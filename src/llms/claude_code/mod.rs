@@ -187,7 +187,7 @@ fn dump_last_request(worker_id: &str, api_request: &Value) {
         "request_body": api_request,
     });
     let _r = fs::create_dir_all(LAST_REQUESTS_DIR);
-    let path = format!("{}/{}_last_request.json", LAST_REQUESTS_DIR, worker_id);
+    let path = format!("{LAST_REQUESTS_DIR}/{worker_id}_last_request.json");
     let _r = fs::write(path, serde_json::to_string_pretty(&debug).unwrap_or_default());
 }
 
@@ -281,6 +281,7 @@ struct StreamMessage {
 }
 
 #[derive(Debug, Deserialize)]
+#[expect(clippy::struct_field_names, reason = "Field names mirror the Anthropic API response")]
 struct StreamUsage {
     input_tokens: Option<usize>,
     output_tokens: Option<usize>,

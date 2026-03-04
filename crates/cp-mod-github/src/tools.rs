@@ -41,7 +41,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
     let args = match validate_gh_command(command) {
         Ok(a) => a,
         Err(e) => {
-            return ToolResult::new(tool.id.clone(), format!("Validation error: {}", e), true);
+            return ToolResult::new(tool.id.clone(), format!("Validation error: {e}"), true);
         }
     };
 
@@ -59,7 +59,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                 // Reuse existing panel — mark deprecated to trigger re-fetch
                 state.context[idx].cache_deprecated = true;
                 let panel_id = state.context[idx].id.clone();
-                ToolResult::new(tool.id.clone(), format!("Panel updated: {}", panel_id), false)
+                ToolResult::new(tool.id.clone(), format!("Panel updated: {panel_id}"), false)
             } else {
                 // Create new GithubResult panel
                 let panel_id = state.next_available_context_id();
@@ -76,7 +76,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                 elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);
 
-                ToolResult::new(tool.id.clone(), format!("Panel created: {}", panel_id), false)
+                ToolResult::new(tool.id.clone(), format!("Panel created: {panel_id}"), false)
             }
         }
         CommandClass::Mutating => {
@@ -137,7 +137,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                     let content = if e.kind() == std::io::ErrorKind::NotFound {
                         "gh CLI not found. Install: https://cli.github.com".to_string()
                     } else {
-                        format!("Error running gh: {}", e)
+                        format!("Error running gh: {e}")
                     };
                     ToolResult::new(tool.id.clone(), content, true)
                 }

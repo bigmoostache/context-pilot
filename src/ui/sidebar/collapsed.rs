@@ -108,7 +108,7 @@ fn render_collapsed_line(
 
     // Badge or short ID for dynamic panels
     let label = if let Some(b) = badge {
-        format!("{:>3}", b)
+        format!("{b:>3}")
     } else if ctx.context_type.is_fixed() {
         "   ".to_string()
     } else {
@@ -121,10 +121,10 @@ fn render_collapsed_line(
     let tokens_color = theme::accent_dim();
 
     lines.push(Line::from(vec![
-        Span::styled(format!(" {}", arrow), Style::default().fg(arrow_color)),
+        Span::styled(format!(" {arrow}"), Style::default().fg(arrow_color)),
         Span::styled(icon, Style::default().fg(icon_color)),
         Span::styled(label, Style::default().fg(label_color)),
-        Span::styled(format!("{:>5}", tokens), Style::default().fg(tokens_color)),
+        Span::styled(format!("{tokens:>5}"), Style::default().fg(tokens_color)),
         Span::styled(" ", base_style),
     ]));
 }

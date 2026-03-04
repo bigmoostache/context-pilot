@@ -30,7 +30,7 @@ use cp_base::cast::SafeCast;
 pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf>), String> {
     let abs_path = PathBuf::from(source_path)
         .canonicalize()
-        .map_err(|e| format!("Cannot resolve path '{}': {}", source_path, e))?;
+        .map_err(|e| format!("Cannot resolve path '{source_path}': {e}"))?;
 
     let root = abs_path.parent().ok_or_else(|| "Source file has no parent directory".to_string())?.to_path_buf();
 
@@ -73,7 +73,7 @@ pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf
             for diag in &errors {
                 msg.push_str(&format!("error: {}\n", diag.message));
                 for hint in &diag.hints {
-                    msg.push_str(&format!("  hint: {}\n", hint));
+                    msg.push_str(&format!("  hint: {hint}\n"));
                 }
             }
             if !warnings.is_empty() {
@@ -98,7 +98,7 @@ pub fn compile_and_write(source_path: &str, output_path: &str) -> Result<String,
     if let Some(parent) = Path::new(output_path).parent() {
         fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {}", parent.display(), e))?;
     }
-    fs::write(output_path, &pdf_bytes).map_err(|e| format!("write {}: {}", output_path, e))?;
+    fs::write(output_path, &pdf_bytes).map_err(|e| format!("write {output_path}: {e}"))?;
 
     let mut msg = format!("✓ Compiled {} ({} bytes)", output_path, pdf_bytes.len());
     if !warnings.is_empty() {
@@ -198,7 +198,7 @@ impl ContextPilotWorld {
 
         // Local file — resolve relative to project root
         let vpath = id.vpath();
-        let path = vpath.resolve(&self.root).ok_or_else(|| format!("cannot resolve virtual path: {:?}", vpath))?;
+        let path = vpath.resolve(&self.root).ok_or_else(|| format!("cannot resolve virtual path: {vpath:?}"))?;
         Ok(path)
     }
 
