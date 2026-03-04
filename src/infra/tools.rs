@@ -46,12 +46,12 @@ pub(crate) fn perform_reload(state: &mut State) {
             // Add the field before the final }
             json.trim_end().trim_end_matches('}').to_string() + ",\n  \"reload_requested\": true\n}"
         };
-        let _ = fs::write(config_path, updated);
+        let _r = fs::write(config_path, updated);
     }
 
     // Clean up terminal
-    let _ = disable_raw_mode();
-    let _ = execute!(stdout(), LeaveAlternateScreen);
+    let _r = disable_raw_mode();
+    let _r = execute!(stdout(), LeaveAlternateScreen);
 
     // Exit - the run.sh supervisor will see reload_requested and restart
     std::process::exit(0);

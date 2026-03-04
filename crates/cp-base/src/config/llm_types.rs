@@ -5,41 +5,51 @@
 
 use crate::tools::ToolUse;
 
-/// Events emitted during streaming
+/// Events emitted by the LLM during streaming.
 #[derive(Debug)]
 pub enum StreamEvent {
-    /// Text chunk from the response
+    /// Text chunk from the response.
     Chunk(String),
-    /// Tool use request from the LLM
+    /// Tool use request from the LLM.
     ToolUse(ToolUse),
-    /// Stream completed with token usage
+    /// Stream completed with token usage.
     Done {
+        /// Tokens consumed by the input prompt.
         input_tokens: usize,
+        /// Tokens generated in the response.
         output_tokens: usize,
+        /// Input tokens served from provider cache.
         cache_hit_tokens: usize,
+        /// Input tokens that missed the cache (written on this call).
         cache_miss_tokens: usize,
+        /// Provider stop reason (e.g., `"end_turn"`, `"tool_use"`).
         stop_reason: Option<String>,
     },
-    /// Error occurred
+    /// Unrecoverable error during streaming.
     Error(String),
 }
 
-/// Result of API check
+/// Result of an LLM provider API connectivity check.
 #[derive(Debug, Clone)]
 pub struct ApiCheckResult {
+    /// Whether authentication (API key / OAuth) succeeded.
     pub auth_ok: bool,
+    /// Whether streaming responses work.
     pub streaming_ok: bool,
+    /// Whether tool-use / function-calling works.
     pub tools_ok: bool,
+    /// Human-readable error message, if any check failed.
     pub error: Option<String>,
 }
 
 impl ApiCheckResult {
+    /// `true` only when auth, streaming, and tool-use all passed.
     pub fn all_ok(&self) -> bool {
         self.auth_ok && self.streaming_ok && self.tools_ok
     }
 }
 
-/// Model metadata trait for context window and pricing info
+/// Model metadata trait for context window and pricing info.
 pub trait ModelInfo {
     /// API model identifier
     fn api_name(&self) -> &'static str;
@@ -63,28 +73,38 @@ pub trait ModelInfo {
     fn max_output_tokens(&self) -> u32;
 }
 
-/// Available LLM providers
+/// Supported LLM provider backends. Each variant maps to a distinct
+/// API client, auth flow, and model roster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LlmProvider {
+    /// Direct Anthropic Messages API (API-key auth).
     #[default]
     Anthropic,
+    /// Claude Code CLI backend (OAuth-based, pipes through `cc` process).
     #[serde(alias = "claudecode")]
     ClaudeCode,
+    /// Claude Code with explicit API key (bypasses OAuth).
     #[serde(alias = "claudecodeapikey")]
     ClaudeCodeApiKey,
+    /// xAI Grok models (OpenAI-compatible API).
     Grok,
+    /// Groq inference platform (OpenAI-compatible, very fast).
     Groq,
+    /// DeepSeek models (OpenAI-compatible API).
     DeepSeek,
 }
 
-/// Available models for Anthropic
+/// Anthropic model variants with per-model pricing and context limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum AnthropicModel {
+    /// Claude Opus 4.5 — highest capability, largest output window.
     #[default]
     ClaudeOpus45,
+    /// Claude Sonnet 4.5 — balanced cost / capability.
     ClaudeSonnet45,
+    /// Claude Haiku 4.5 — fast and cheap.
     ClaudeHaiku45,
 }
 
@@ -150,12 +170,14 @@ impl ModelInfo for AnthropicModel {
     }
 }
 
-/// Available models for Grok (fast models optimized for tool calling)
+/// xAI Grok model variants (fast models optimized for tool calling).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum GrokModel {
+    /// Grok 4.1 Fast — latest iteration, 2M context.
     #[default]
     Grok41Fast,
+    /// Grok 4 Fast — previous generation, same 2M context.
     Grok4Fast,
 }
 
@@ -199,15 +221,20 @@ impl ModelInfo for GrokModel {
         128_000
     }
 }
+/// Groq-hosted model variants.
 /// - GPT-OSS models: Support BOTH custom tools AND built-in tools (browser search, code exec)
 /// - Llama models: Custom tools only
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum GroqModel {
+    /// GPT-OSS 120B — large, with built-in web search.
     #[default]
     GptOss120b,
+    /// GPT-OSS 20B — small, with built-in web search.
     GptOss20b,
+    /// Llama 3.3 70B Versatile — open-source, custom tools only.
     Llama33_70b,
+    /// Llama 3.1 8B Instant — fastest, custom tools only.
     Llama31_8b,
 }
 
@@ -257,12 +284,14 @@ impl ModelInfo for GroqModel {
     }
 }
 
-/// Available models for DeepSeek
+/// DeepSeek model variants (OpenAI-compatible API, budget-friendly).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DeepSeekModel {
+    /// DeepSeek Chat — general-purpose, 128K context.
     #[default]
     DeepseekChat,
+    /// DeepSeek Reasoner — chain-of-thought, larger output.
     DeepseekReasoner,
 }
 

@@ -38,10 +38,10 @@ impl Watchlist {
     /// Save to disk.
     pub fn save(&self) {
         if let Some(parent) = Path::new(WATCHLIST_PATH).parent() {
-            let _ = fs::create_dir_all(parent);
+            let _r = fs::create_dir_all(parent);
         }
         if let Ok(json) = serde_json::to_string_pretty(self) {
-            let _ = fs::write(WATCHLIST_PATH, json);
+            let _r = fs::write(WATCHLIST_PATH, json);
         }
     }
 

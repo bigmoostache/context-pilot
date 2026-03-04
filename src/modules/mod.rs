@@ -49,7 +49,7 @@ pub(crate) fn init_registry() {
 pub(crate) fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'static str, bool)> {
     // Build a lookup from context_type to module defaults
     let modules = all_modules();
-    let mut lookup: std::collections::HashMap<ContextType, (&str, bool, &str, bool)> = std::collections::HashMap::new();
+    let mut lookup: HashMap<ContextType, (&str, bool, &str, bool)> = HashMap::new();
     for module in &modules {
         for (ct, name, cache_dep) in module.fixed_panel_defaults() {
             lookup.insert(ct, (module.id(), module.is_core(), name, cache_dep));

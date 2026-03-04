@@ -206,7 +206,7 @@ impl ClaudeCodeClient {
                             match delta.delta_type.as_deref() {
                                 Some("text_delta") => {
                                     if let Some(text) = delta.text {
-                                        let _ = tx.send(StreamEvent::Chunk(text));
+                                        let _r = tx.send(StreamEvent::Chunk(text));
                                     }
                                 }
                                 Some("input_json_delta") => {
@@ -224,7 +224,7 @@ impl ClaudeCodeClient {
                         if let Some((id, name, input_json)) = current_tool.take() {
                             let input: Value = serde_json::from_str(&input_json)
                                 .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                            let _ = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
+                            let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
                         }
                     }
                     "message_start" => {
@@ -267,7 +267,7 @@ impl ClaudeCodeClient {
             }
         }
 
-        let _ = tx.send(StreamEvent::Done {
+        let _r = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
             cache_hit_tokens,

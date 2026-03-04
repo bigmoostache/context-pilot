@@ -211,7 +211,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,
-            timestamp_ms: crate::app::panels::now_ms(),
+            timestamp_ms: now_ms(),
         };
         self.save_message_async(&result_msg);
         self.state.messages.push(result_msg);
@@ -237,7 +237,7 @@ impl App {
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
-            timestamp_ms: crate::app::panels::now_ms(),
+            timestamp_ms: now_ms(),
         };
         self.state.messages.push(new_assistant_msg);
 
@@ -365,8 +365,12 @@ pub(super) fn execute_queue_flush(
         };
         let result = execute_tool(&queued_tool, state);
         let status = if result.is_error { "ERROR" } else { "ok" };
-        let short =
-            if result.content.len() > 100 { format!("{}...", &result.content[..97]) } else { result.content.clone() };
+        let short = if result.content.len() > 100 {
+            let end = result.content.floor_char_boundary(97);
+            format!("{}...", &result.content[..end])
+        } else {
+            result.content.clone()
+        };
         summary.push_str(&format!("{}. {} → {} ({})\n", call.index, call.tool_name, status, short));
     }
     crate::infra::tools::ToolResult::new(tool.id.clone(), summary, false)

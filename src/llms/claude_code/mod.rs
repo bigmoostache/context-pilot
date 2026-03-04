@@ -187,9 +187,9 @@ fn dump_last_request(worker_id: &str, api_request: &Value) {
         },
         "request_body": api_request,
     });
-    let _ = std::fs::create_dir_all(LAST_REQUESTS_DIR);
+    let _r = fs::create_dir_all(LAST_REQUESTS_DIR);
     let path = format!("{}/{}_last_request.json", LAST_REQUESTS_DIR, worker_id);
-    let _ = std::fs::write(path, serde_json::to_string_pretty(&debug).unwrap_or_default());
+    let _r = fs::write(path, serde_json::to_string_pretty(&debug).unwrap_or_default());
 }
 
 /// Claude Code OAuth client

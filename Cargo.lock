@@ -643,13 +643,9 @@ name = "cp-mod-typst"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "comemo",
  "cp-base",
  "cp-mod-callback",
- "cp-mod-tree",
- "crossterm",
  "flate2",
- "ratatui",
  "reqwest",
  "serde",
  "serde_json",
@@ -4034,8 +4030,6 @@ dependencies = [
  "cp-mod-typst",
  "crossterm",
  "dotenvy",
- "globset",
- "ignore",
  "notify",
  "ratatui",
  "regex",
@@ -4044,7 +4038,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "sha2",
  "syntect",
  "unicode-width",
 ]

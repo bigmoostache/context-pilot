@@ -163,7 +163,7 @@ impl ContextPilotWorld {
         };
 
         // Pre-load the main source
-        let _ = world.load_source(main_id)?;
+        let _src = world.load_source(main_id)?;
 
         Ok(world)
     }

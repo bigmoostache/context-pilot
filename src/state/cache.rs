@@ -40,7 +40,7 @@ impl CachePool {
                                 if let Some(panel) = crate::modules::create_panel(&context_type)
                                     && let Some(update) = panel.refresh_cache(request)
                                 {
-                                    let _ = tx.send(update);
+                                    let _r = tx.send(update);
                                 }
                             }
                             Err(_) => break, // Channel closed, pool shutting down
@@ -55,7 +55,7 @@ impl CachePool {
 
     /// Submit a cache request to the pool.
     pub(crate) fn submit(&self, request: CacheRequest, tx: Sender<CacheUpdate>) {
-        let _ = self.job_tx.send((request, tx));
+        let _r = self.job_tx.send((request, tx));
     }
 }
 

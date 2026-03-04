@@ -275,7 +275,7 @@ mod tests {
 
     /// Initialize a minimal registry for tests.
     fn init_test_registry() {
-        let _ = CONTEXT_TYPE_REGISTRY.set(vec![
+        let _r = CONTEXT_TYPE_REGISTRY.set(vec![
             ContextTypeMeta {
                 context_type: "todo",
                 icon_id: "todo",

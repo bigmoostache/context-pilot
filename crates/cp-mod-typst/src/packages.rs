@@ -96,7 +96,7 @@ pub fn download_package(spec: &PackageSpec) -> Result<(), String> {
 
     if !response.status().is_success() {
         // Clean up empty cache dir on failure
-        let _ = fs::remove_dir(&cache_dir);
+        let _r = fs::remove_dir(&cache_dir);
         return Err(format!(
             "Package {} not found (HTTP {}). Check the package name and version at https://typst.app/universe/",
             spec.to_spec_string(),
@@ -122,11 +122,11 @@ pub fn download_package(spec: &PackageSpec) -> Result<(), String> {
         let target = cache_dir.join(&entry_path);
 
         if entry.header().entry_type().is_dir() {
-            let _ = fs::create_dir_all(&target);
+            let _r = fs::create_dir_all(&target);
         } else {
             // Ensure parent directory exists
             if let Some(parent) = target.parent() {
-                let _ = fs::create_dir_all(parent);
+                let _r = fs::create_dir_all(parent);
             }
             let mut content = Vec::new();
             entry

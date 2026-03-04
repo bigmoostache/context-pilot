@@ -41,18 +41,18 @@ fn main() -> io::Result<()> {
     // which corrupts the SSH session and the error is lost.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        let _ = disable_raw_mode();
-        let _ = io::stdout().execute(DisableBracketedPaste);
-        let _ = io::stdout().execute(LeaveAlternateScreen);
+        let _r = disable_raw_mode();
+        let _r = io::stdout().execute(DisableBracketedPaste);
+        let _r = io::stdout().execute(LeaveAlternateScreen);
 
         // Write panic info to .context-pilot/errors/panic.log
         let error_dir = std::path::Path::new(".context-pilot").join("errors");
-        let _ = std::fs::create_dir_all(&error_dir);
+        let _r = std::fs::create_dir_all(&error_dir);
         let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
         let backtrace = std::backtrace::Backtrace::force_capture();
         let msg = format!("[{}] {}\n\n{}\n\n---\n", ts, info, backtrace);
         let log_path = error_dir.join("panic.log");
-        let _ = std::fs::OpenOptions::new().create(true).append(true).open(&log_path).and_then(|mut f| {
+        let _r = std::fs::OpenOptions::new().create(true).append(true).open(&log_path).and_then(|mut f| {
             use std::io::Write;
             f.write_all(msg.as_bytes())
         });

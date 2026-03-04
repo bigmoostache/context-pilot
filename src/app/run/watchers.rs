@@ -172,7 +172,7 @@ impl App {
         // (editors like vim/vscode save via rename, which invalidates the inotify watch)
         if let Some(watcher) = &mut self.file_watcher {
             for path in rewatch_paths {
-                let _ = watcher.rewatch_file(&path);
+                let _r = watcher.rewatch_file(&path);
             }
         }
     }

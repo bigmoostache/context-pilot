@@ -141,7 +141,7 @@ pub(super) fn parse_sse_stream(
                         match delta.delta_type.as_deref() {
                             Some("text_delta") => {
                                 if let Some(text) = delta.text {
-                                    let _ = tx.send(StreamEvent::Chunk(text));
+                                    let _r = tx.send(StreamEvent::Chunk(text));
                                 }
                             }
                             Some("input_json_delta") => {
@@ -159,7 +159,7 @@ pub(super) fn parse_sse_stream(
                     if let Some((id, name, input_json)) = current_tool.take() {
                         let input: Value =
                             serde_json::from_str(&input_json).unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                        let _ = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
+                        let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
                     }
                 }
                 "message_start" => {
@@ -214,7 +214,7 @@ fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lin
     use std::io::Write;
 
     let dir = std::path::Path::new(".context-pilot").join("errors");
-    let _ = std::fs::create_dir_all(&dir);
+    let _r = std::fs::create_dir_all(&dir);
     let path = dir.join("sse_errors.log");
 
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
@@ -228,7 +228,7 @@ fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lin
         ts, total_bytes, line_count, json_str, recent
     );
 
-    let _ = std::fs::OpenOptions::new()
+    let _r = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(&path)

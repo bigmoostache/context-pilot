@@ -46,7 +46,7 @@ impl FileWatcher {
                         if let Ok(files) = files_clone.lock()
                             && let Some(original_path) = files.get(&canonical)
                         {
-                            let _ = tx.send(WatchEvent::FileChanged(original_path.clone()));
+                            let _r = tx.send(WatchEvent::FileChanged(original_path.clone()));
                             continue;
                         }
 
@@ -55,7 +55,7 @@ impl FileWatcher {
                             && let Some(parent) = canonical.parent()
                             && let Some(original_path) = dirs.get(&parent.to_path_buf())
                         {
-                            let _ = tx.send(WatchEvent::DirChanged(original_path.clone()));
+                            let _r = tx.send(WatchEvent::DirChanged(original_path.clone()));
                         }
                     }
                 }
@@ -133,7 +133,7 @@ impl FileWatcher {
         let canonical = path_buf.canonicalize().unwrap_or_else(|_| path_buf.clone());
 
         // Unwatch the old inode (may already be gone after kernel removed it)
-        let _ = self.watcher.unwatch(&canonical);
+        let _r = self.watcher.unwatch(&canonical);
 
         // Re-watch the path (now points to the new inode)
         self.watcher.watch(&canonical, RecursiveMode::NonRecursive)?;

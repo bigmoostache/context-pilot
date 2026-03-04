@@ -138,9 +138,9 @@ impl LlmClient for AnthropicClient {
         // Dump last request for debugging
         {
             let dir = ".context-pilot/last_requests";
-            let _ = std::fs::create_dir_all(dir);
+            let _r = std::fs::create_dir_all(dir);
             let path = format!("{}/{}_anthropic_last_request.json", dir, request.worker_id);
-            let _ = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
+            let _r = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
         }
 
         let response = client
@@ -218,7 +218,7 @@ impl LlmClient for AnthropicClient {
                             match delta.delta_type.as_deref() {
                                 Some("text_delta") => {
                                     if let Some(text) = delta.text {
-                                        let _ = tx.send(StreamEvent::Chunk(text));
+                                        let _r = tx.send(StreamEvent::Chunk(text));
                                     }
                                 }
                                 Some("input_json_delta") => {
@@ -236,7 +236,7 @@ impl LlmClient for AnthropicClient {
                         if let Some((id, name, input_json)) = current_tool.take() {
                             let input: Value = serde_json::from_str(&input_json)
                                 .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                            let _ = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
+                            let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
                         }
                     }
                     "message_delta" => {
@@ -264,7 +264,7 @@ impl LlmClient for AnthropicClient {
             }
         }
 
-        let _ = tx.send(StreamEvent::Done {
+        let _r = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
             cache_hit_tokens: 0,

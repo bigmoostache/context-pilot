@@ -73,7 +73,7 @@ impl Module for QuestionsModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "ask_user_question" => Some(self::ask_question::execute(tool, state)),
+            "ask_user_question" => Some(ask_question::execute(tool, state)),
             _ => None,
         }
     }

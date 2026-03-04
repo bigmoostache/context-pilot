@@ -130,7 +130,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
         let (input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason) =
             streaming::parse_sse_stream(response, &resp_headers, &tx)?;
 
-        let _ = tx.send(StreamEvent::Done {
+        let _r = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
             cache_hit_tokens,

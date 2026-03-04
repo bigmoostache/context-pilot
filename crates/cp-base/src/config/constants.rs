@@ -200,7 +200,7 @@ mod tests {
             std::fs::write(&gitignore_path, content).unwrap();
         }
 
-        let _ = std::fs::create_dir_all(&shared_path);
+        let _r = std::fs::create_dir_all(&shared_path);
         ensure_gitignore_exception_at(&gitignore_path);
 
         let final_content = if gitignore_path.exists() {

@@ -202,7 +202,7 @@ impl App {
             } else {
                 50 // 50ms when idle — still responsive for typing, much less CPU
             };
-            let _ = event::poll(Duration::from_millis(poll_ms))?;
+            let _r = event::poll(Duration::from_millis(poll_ms))?;
         }
 
         Ok(())

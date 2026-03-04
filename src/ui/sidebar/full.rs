@@ -289,7 +289,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
         // Helper: format cost in dollars with appropriate precision
         let format_cost = |tokens: usize, price_per_mtok: f32| -> String {
-            let cost = crate::state::State::token_cost(tokens, price_per_mtok);
+            let cost = State::token_cost(tokens, price_per_mtok);
             if cost < 0.001 {
                 String::new()
             } else if cost < 0.01 {
@@ -385,9 +385,9 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
         lines.extend(render_table(&header, &rows, None, 1));
 
         // Total cost below the table
-        let total_cost = crate::state::State::token_cost(state.cache_hit_tokens, hit_price)
-            + crate::state::State::token_cost(state.cache_miss_tokens, miss_price)
-            + crate::state::State::token_cost(state.total_output_tokens, out_price);
+        let total_cost = State::token_cost(state.cache_hit_tokens, hit_price)
+            + State::token_cost(state.cache_miss_tokens, miss_price)
+            + State::token_cost(state.total_output_tokens, out_price);
         if total_cost >= 0.001 {
             let total_str =
                 if total_cost < 0.01 { format!("${:.3}", total_cost) } else { format!("${:.2}", total_cost) };

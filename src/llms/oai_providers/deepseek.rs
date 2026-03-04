@@ -187,7 +187,7 @@ impl LlmClient for DeepSeekClient {
                         if let Some(content) = delta.content
                             && !content.is_empty()
                         {
-                            let _ = tx.send(StreamEvent::Chunk(content));
+                            let _r = tx.send(StreamEvent::Chunk(content));
                         }
                         if let Some(calls) = delta.tool_calls {
                             for call in &calls {
@@ -198,14 +198,14 @@ impl LlmClient for DeepSeekClient {
                     if let Some(ref reason) = choice.finish_reason {
                         stop_reason = Some(super::super::openai_streaming::normalize_stop_reason(reason));
                         for tool_use in tool_acc.drain() {
-                            let _ = tx.send(StreamEvent::ToolUse(tool_use));
+                            let _r = tx.send(StreamEvent::ToolUse(tool_use));
                         }
                     }
                 }
             }
         }
 
-        let _ = tx.send(StreamEvent::Done {
+        let _r = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,
             cache_hit_tokens,

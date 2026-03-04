@@ -86,8 +86,6 @@ pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
 /// Count how many lines a Line will take when wrapped to a given width
 /// Uses unicode width for accurate display width calculation
 pub(crate) fn count_wrapped_lines(line: &ratatui::prelude::Line<'_>, max_width: usize) -> usize {
-    use unicode_width::UnicodeWidthStr;
-
     if max_width == 0 {
         return 1;
     }

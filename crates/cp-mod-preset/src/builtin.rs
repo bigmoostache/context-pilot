@@ -37,7 +37,7 @@ pub fn ensure_builtin_presets() {
         if !path.exists()
             && let Ok(json) = serde_json::to_string_pretty(&preset)
         {
-            let _ = fs::write(&path, json);
+            let _r = fs::write(&path, json);
         }
     }
 }

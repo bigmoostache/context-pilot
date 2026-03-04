@@ -293,7 +293,7 @@ fn exec_update(tool: &ToolUse, package: Option<&str>) -> ToolResult {
         // Remove cached version and re-download
         let cache_dir = spec.cache_dir();
         if cache_dir.exists() {
-            let _ = fs::remove_dir_all(&cache_dir);
+            let _r = fs::remove_dir_all(&cache_dir);
         }
 
         match packages::download_package(&spec) {
@@ -352,7 +352,7 @@ fn copy_template_files(src: &Path, dst: &Path, files: &mut Vec<String>) {
 
         if path.is_dir() {
             let sub_dst = dst.join(&name);
-            let _ = fs::create_dir_all(&sub_dst);
+            let _r = fs::create_dir_all(&sub_dst);
             copy_template_files(&path, &sub_dst, files);
         } else {
             let dst_file = dst.join(&name);

@@ -125,7 +125,7 @@ impl ToolCallAccumulator {
 /// Dump an API request to disk for debugging.
 pub(crate) fn dump_request<T: Serialize>(worker_id: &str, provider: &str, request: &T) {
     let dir = ".context-pilot/last_requests";
-    let _ = std::fs::create_dir_all(dir);
+    let _r = std::fs::create_dir_all(dir);
     let path = format!("{}/{}_{}_last_request.json", dir, worker_id, provider);
-    let _ = std::fs::write(path, serde_json::to_string_pretty(request).unwrap_or_default());
+    let _r = std::fs::write(path, serde_json::to_string_pretty(request).unwrap_or_default());
 }

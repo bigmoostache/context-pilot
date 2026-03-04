@@ -77,12 +77,12 @@ impl PersistenceWriter {
 
     /// Queue a batch of writes (debounced — may be coalesced with subsequent batches)
     pub(crate) fn send_batch(&self, batch: WriteBatch) {
-        let _ = self.tx.send(WriterMsg::Batch(batch));
+        let _r = self.tx.send(WriterMsg::Batch(batch));
     }
 
     /// Queue a single message write (not debounced — written on next iteration)
     pub(crate) fn send_message(&self, op: WriteOp) {
-        let _ = self.tx.send(WriterMsg::Message(op));
+        let _r = self.tx.send(WriterMsg::Message(op));
     }
 
     /// Flush all pending writes synchronously. Blocks until complete.
@@ -96,7 +96,7 @@ impl PersistenceWriter {
         }
 
         // Send flush request
-        let _ = self.tx.send(WriterMsg::Flush);
+        let _r = self.tx.send(WriterMsg::Flush);
 
         // Wait for the writer to signal completion
         let (lock, cvar) = &*self.flush_sync;
@@ -113,9 +113,9 @@ impl PersistenceWriter {
 
     /// Shutdown the writer thread gracefully
     pub(crate) fn shutdown(&mut self) {
-        let _ = self.tx.send(WriterMsg::Shutdown);
+        let _r = self.tx.send(WriterMsg::Shutdown);
         if let Some(handle) = self.handle.take() {
-            let _ = handle.join();
+            let _r = handle.join();
         }
     }
 }

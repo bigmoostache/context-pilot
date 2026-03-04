@@ -6,15 +6,11 @@ edition = "2024"
 [dependencies]
 cp-base.workspace = true
 cp-mod-callback = { path = "../cp-mod-callback" }
-cp-mod-tree = { path = "../cp-mod-tree" }
-ratatui.workspace = true
-crossterm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
 typst = "0.13"
 typst-pdf = "0.13"
-comemo = "0.4"
 reqwest = { workspace = true }
 flate2 = "1"
 tar = "0.4"

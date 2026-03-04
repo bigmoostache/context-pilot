@@ -39,7 +39,7 @@ impl Drop for ProfileGuard {
         if ms as u128 >= THRESHOLD_MS
             && let Ok(mut file) = OpenOptions::new().create(true).append(true).open(LOG_FILE)
         {
-            let _ = writeln!(file, "{:>6}ms  {}", ms, self.name);
+            let _r = writeln!(file, "{:>6}ms  {}", ms, self.name);
         }
     }
 }

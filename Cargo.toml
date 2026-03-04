@@ -157,10 +157,7 @@ ratatui.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-sha2.workspace = true
 chrono.workspace = true
-ignore.workspace = true
-globset.workspace = true
 regex.workspace = true
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 dotenvy = "0.15"

@@ -338,7 +338,7 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
             spans: &mut Vec<Span<'static>>,
             text: &str,
             cursor_char: &str,
-            color: ratatui::style::Color,
+            color: Color,
         ) {
             if text.contains(cursor_char) {
                 let parts: Vec<&str> = text.splitn(2, cursor_char).collect();

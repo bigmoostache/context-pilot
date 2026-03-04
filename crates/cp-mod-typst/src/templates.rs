@@ -6,14 +6,14 @@ const TEMPLATES_DIR: &str = ".context-pilot/shared/typst-templates";
 
 /// Seed built-in templates to .context-pilot/shared/typst-templates/ if they don't already exist.
 pub fn seed_templates() {
-    let _ = fs::create_dir_all(TEMPLATES_DIR);
+    let _r = fs::create_dir_all(TEMPLATES_DIR);
 
     let templates = [("report", REPORT_TEMPLATE), ("invoice", INVOICE_TEMPLATE), ("letter", LETTER_TEMPLATE)];
 
     for (name, content) in &templates {
         let path = format!("{}/{}.typ", TEMPLATES_DIR, name);
         if !Path::new(&path).exists() {
-            let _ = fs::write(&path, content);
+            let _r = fs::write(&path, content);
         }
     }
 }

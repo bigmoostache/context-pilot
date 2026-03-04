@@ -67,7 +67,7 @@ pub(crate) fn execute_snapshot(
                     true,
                 );
             }
-            let _ = fs::remove_file(&replace_path);
+            let _r = fs::remove_file(&replace_path);
         }
     } else if file_path.exists() {
         return ToolResult::new(

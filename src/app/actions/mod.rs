@@ -376,7 +376,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::TmuxSendKeys { pane_id, keys } => {
             use std::process::Command;
-            let _ = Command::new("tmux").args(["send-keys", "-t", &pane_id, &keys]).output();
+            let _r = Command::new("tmux").args(["send-keys", "-t", &pane_id, &keys]).output();
             if let Some(ctx) = state.context.iter_mut().find(|c| c.get_meta_str("tmux_pane_id") == Some(&pane_id)) {
                 ctx.set_meta("tmux_last_keys", &keys);
                 ctx.cache_deprecated = true;

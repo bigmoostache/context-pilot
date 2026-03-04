@@ -76,7 +76,7 @@ pub(crate) fn start_api_check(provider: LlmProvider, model: String, tx: Sender<A
     let client = get_client(provider);
     std::thread::spawn(move || {
         let result = client.check_api(&model);
-        let _ = tx.send(result);
+        let _r = tx.send(result);
     });
 }
 
@@ -122,7 +122,7 @@ pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
         };
 
         if let Err(e) = client.stream(request, tx.clone()) {
-            let _ = tx.send(StreamEvent::Error(e.to_string()));
+            let _r = tx.send(StreamEvent::Error(e.to_string()));
         }
     });
 }
@@ -307,7 +307,7 @@ pub(crate) fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakeP
 /// tool_result positions for prefix-based cache optimization.
 ///
 /// Shared between `claude_code` and `claude_code_api_key` providers.
-pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<serde_json::Value> {
+pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value> {
     // Find all panel tool_result indices for cache breakpoints
     let panel_result_indices: Vec<usize> = api_messages
         .iter()
@@ -330,10 +330,10 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<serde_
         }
     }
 
-    let mut json_messages: Vec<serde_json::Value> = Vec::new();
+    let mut json_messages: Vec<Value> = Vec::new();
 
     for (msg_idx, msg) in api_messages.iter().enumerate() {
-        let content_blocks: Vec<serde_json::Value> = msg
+        let content_blocks: Vec<Value> = msg
             .content
             .iter()
             .map(|block| match block {
@@ -375,7 +375,7 @@ pub(crate) fn log_sse_error(
     use std::io::Write;
 
     let dir = std::path::Path::new(".context-pilot").join("errors");
-    let _ = std::fs::create_dir_all(&dir);
+    let _r = std::fs::create_dir_all(&dir);
     let path = dir.join("sse_errors.log");
 
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
@@ -389,7 +389,7 @@ pub(crate) fn log_sse_error(
         ts, provider, total_bytes, line_count, json_str, recent
     );
 
-    let _ = std::fs::OpenOptions::new()
+    let _r = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(&path)

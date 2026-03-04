@@ -6,8 +6,6 @@
 //!
 //! Usage: `use cp_base::cast::SafeCast;` then `value.to_u16()`, etc.
 
-#![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss, clippy::cast_lossless, trivial_numeric_casts, trivial_casts)]
-
 /// Trait for safe saturating casts between numeric types.
 pub trait SafeCast {
     fn to_u8(self) -> u8;

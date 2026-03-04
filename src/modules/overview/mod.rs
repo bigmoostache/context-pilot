@@ -341,14 +341,14 @@ impl Module for OverviewModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             // Context tools
-            "Close_panel" => Some(self::tools::close_context::execute(tool, state)),
-            "panel_goto_page" => Some(self::tools::panel_goto_page::execute(tool, state)),
+            "Close_panel" => Some(tools::close_context::execute(tool, state)),
+            "panel_goto_page" => Some(tools::panel_goto_page::execute(tool, state)),
 
             // System tools (reload stays in core)
             "system_reload" => Some(crate::infra::tools::execute_reload_tui(tool, state)),
 
             // Meta tools
-            "tool_manage" => Some(self::tools::manage_tools::execute(tool, state)),
+            "tool_manage" => Some(tools::manage_tools::execute(tool, state)),
 
             // module_toggle is handled in dispatch_tool() directly
             _ => None,
@@ -357,10 +357,10 @@ impl Module for OverviewModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("Close_panel", visualize_core_output as ToolVisualizer),
-            ("tool_manage", visualize_core_output as ToolVisualizer),
-            ("system_reload", visualize_core_output as ToolVisualizer),
-            ("panel_goto_page", visualize_core_output as ToolVisualizer),
+            ("Close_panel", visualize_core_output),
+            ("tool_manage", visualize_core_output),
+            ("system_reload", visualize_core_output),
+            ("panel_goto_page", visualize_core_output),
         ]
     }
 }

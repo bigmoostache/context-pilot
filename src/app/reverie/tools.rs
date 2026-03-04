@@ -14,7 +14,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
 /// Build a human-readable text describing which tools the reverie is allowed to use.
 /// This is injected at the top of the reverie's conversation panel (P-reverie) so the
 /// LLM knows its constraints, even though it sees ALL tool definitions in the prompt.
-pub(crate) fn build_tool_restrictions_text(tools: &[crate::infra::tools::ToolDefinition]) -> String {
+pub(crate) fn build_tool_restrictions_text(tools: &[ToolDefinition]) -> String {
     let r = &REVERIE.tool_restrictions;
     let mut text = r.header.trim_end().to_string();
     text.push('\n');

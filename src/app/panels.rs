@@ -94,8 +94,8 @@ impl Panel for FallbackPanel {
     fn title(&self, _state: &State) -> String {
         "(removed)".to_string()
     }
-    fn content(&self, _state: &State, _base_style: ratatui::prelude::Style) -> Vec<ratatui::text::Line<'static>> {
-        vec![ratatui::text::Line::from("Panel module no longer available")]
+    fn content(&self, _state: &State, _base_style: Style) -> Vec<Line<'static>> {
+        vec![Line::from("Panel module no longer available")]
     }
 }
 
