@@ -130,21 +130,19 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    // Try normalized matching (handles trailing whitespace differences)
-    #[expect(clippy::option_if_let_else, reason = "map_or borrows content, preventing mutation inside closure")]
-    let replaced = match find_normalized_match(&content, old_string) {
-        Some(actual_match) => {
-            if replace_all {
-                let count = content.matches(actual_match).count();
-                content = content.replace(actual_match, new_string);
-                count
-            } else {
-                content = content.replacen(actual_match, new_string, 1);
-                1
-            }
+    // Try normalized matching (handles trailing whitespace differences).
+    // Clone the match to break the borrow on `content`, allowing mutation below.
+    let actual_match = find_normalized_match(&content, old_string).map(str::to_owned);
+    let replaced = actual_match.map_or(0, |actual_match| {
+        if replace_all {
+            let count = content.matches(actual_match.as_str()).count();
+            content = content.replace(actual_match.as_str(), new_string);
+            count
+        } else {
+            content = content.replacen(actual_match.as_str(), new_string, 1);
+            1
         }
-        None => 0,
-    };
+    });
 
     if replaced == 0 {
         // Provide helpful error with closest match

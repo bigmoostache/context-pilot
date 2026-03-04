@@ -2,12 +2,12 @@
 pub mod actions;
 /// File-path autocomplete state for @-triggered popup.
 pub mod autocomplete;
-/// Persistence structs: `SharedConfig`, `WorkerState`, `PanelData`.
-pub mod config;
 /// Context types, elements, and token estimation.
 pub mod context;
-/// Message struct and conversation formatting.
-pub mod message;
+/// Serializable data structures: config, messages, persistence types.
+pub mod data;
+/// Model/provider dispatch helpers (context window, pricing, output limits).
+mod model_helpers;
 /// Runtime state: the in-memory `State` struct with all live fields.
 pub mod runtime;
 /// Watcher trait and registry for async condition monitoring.
@@ -16,12 +16,15 @@ pub mod watchers;
 // Re-exports for convenience
 pub use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderCache, hash_values};
 pub use actions::{Action, ActionResult};
-pub use config::{ImportantPanelUids, PanelData, SharedConfig, SidebarMode, WorkerState};
+pub use data::config::{ImportantPanelUids, PanelData, SharedConfig, SidebarMode, WorkerState};
+
 pub use context::{
     ContextElement, ContextType, ContextTypeMeta, compute_total_pages, estimate_tokens, fixed_panel_order,
     get_context_type_meta, init_context_type_registry, make_default_context_element,
 };
-pub use message::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord, format_messages_to_chunk};
+pub use data::message::{
+    Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord, format_messages_to_chunk,
+};
 pub use runtime::State;
 
 // ─── Reverie State ──────────────────────────────────────────────────────────
@@ -29,7 +32,7 @@ pub use runtime::State;
 
 /// Ephemeral reverie sub-agent state (context optimizer, cartographer).
 pub mod reverie {
-    use super::message::Message;
+    use super::data::message::Message;
 
     /// The type of reverie running.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]

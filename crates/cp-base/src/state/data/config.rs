@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::context::ContextType;
+use crate::state::context::ContextType;
 
 // =============================================================================
 // Sidebar Mode

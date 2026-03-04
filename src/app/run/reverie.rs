@@ -239,7 +239,7 @@ impl App {
                         content_token_count: 0,
                         input_tokens: 0,
                         timestamp_ms: crate::app::panels::now_ms(),
-                        tool_uses: vec![crate::state::message::ToolUseRecord {
+                        tool_uses: vec![crate::state::ToolUseRecord {
                             id: tool.id.clone(),
                             name: tool.name.clone(),
                             input: tool.input.clone(),
@@ -257,7 +257,7 @@ impl App {
                         input_tokens: 0,
                         timestamp_ms: crate::app::panels::now_ms(),
                         tool_uses: Vec::new(),
-                        tool_results: vec![crate::state::message::ToolResultRecord {
+                        tool_results: vec![crate::state::ToolResultRecord {
                             tool_use_id: result.tool_use_id.clone(),
                             tool_name: result.tool_name.clone(),
                             content: result.content.clone(),
