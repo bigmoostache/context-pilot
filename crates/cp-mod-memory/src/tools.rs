@@ -68,7 +68,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if !created.is_empty() {
         output.push_str(&format!("Created {} memory(s):\n{}", created.len(), created.join("\n")));
-        state.touch_panel(ContextType::new(ContextType::MEMORY));
+        state.touch_panel(ContextType::MEMORY);
     }
 
     if !errors.is_empty() {
@@ -175,7 +175,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update Memory panel timestamp if anything changed
     if !updated.is_empty() || !deleted.is_empty() {
-        state.touch_panel(ContextType::new(ContextType::MEMORY));
+        state.touch_panel(ContextType::MEMORY);
     }
 
     let mut output = String::new();

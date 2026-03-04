@@ -75,7 +75,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if !created.is_empty() {
         output.push_str(&format!("Created {} todo(s):\n{}", created.len(), created.join("\n")));
         // Update Todo panel timestamp
-        state.touch_panel(ContextType::new(ContextType::TODO));
+        state.touch_panel(ContextType::TODO);
     }
 
     if !errors.is_empty() {
@@ -281,7 +281,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update Todo panel timestamp if anything changed
     if !updated.is_empty() || !deleted.is_empty() || !propagated.is_empty() {
-        state.touch_panel(ContextType::new(ContextType::TODO));
+        state.touch_panel(ContextType::TODO);
     }
 
     let mut output = String::new();
@@ -368,7 +368,7 @@ pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     });
 
     ts.todos.insert(insert_idx, item);
-    state.touch_panel(ContextType::new(ContextType::TODO));
+    state.touch_panel(ContextType::TODO);
 
     let position_desc = after_id.map_or_else(|| "top".to_string(), |aid| format!("after {aid}"));
 

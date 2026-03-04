@@ -204,8 +204,7 @@ pub(super) fn prepare_stream_context(
 pub(crate) use cp_mod_prompt::seed::{ensure_default_agent, get_active_agent_content};
 
 /// Assign a UID to a panel if it doesn't have one
-#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
-fn assign_panel_uid(state: &mut State, context_type: ContextType) {
+fn assign_panel_uid(state: &mut State, context_type: &str) {
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == context_type)
         && ctx.uid.is_none()
     {
@@ -248,13 +247,13 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
     }
 
     // Assign UID to Conversation (needed for panels/ storage — it holds message_uids)
-    assign_panel_uid(state, ContextType::new(ContextType::CONVERSATION));
+    assign_panel_uid(state, ContextType::CONVERSATION);
 
     // Assign UIDs to all existing fixed panels (needed for panels/ storage)
     // Library panels don't need UIDs (rendered from in-memory state)
     for (_, _, ct, _, _) in &defaults {
         if *ct != ContextType::LIBRARY && state.context.iter().any(|c| c.context_type == *ct) {
-            assign_panel_uid(state, ct.clone());
+            assign_panel_uid(state, ct.as_str());
         }
     }
 }

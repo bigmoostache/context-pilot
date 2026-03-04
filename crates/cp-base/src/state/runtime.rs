@@ -292,11 +292,7 @@ impl State {
     }
 
     /// Update the `last_refresh_ms` timestamp for a panel by its context type
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "ContextType is a lightweight string wrapper — pass by value is idiomatic"
-    )]
-    pub fn touch_panel(&mut self, context_type: ContextType) {
+    pub fn touch_panel(&mut self, context_type: &str) {
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == context_type) {
             ctx.last_refresh_ms = crate::panels::now_ms();
             ctx.cache_deprecated = true;

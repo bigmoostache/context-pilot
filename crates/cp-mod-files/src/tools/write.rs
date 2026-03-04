@@ -80,7 +80,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         state.context.push(elem);
 
         // Invalidate tree cache
-        cp_base::panels::mark_panels_dirty(state, ContextType::new(ContextType::TREE));
+        cp_base::panels::mark_panels_dirty(state, ContextType::TREE);
     }
 
     let action = if is_new { "Created" } else { "Wrote" };

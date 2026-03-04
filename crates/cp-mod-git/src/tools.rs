@@ -94,7 +94,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
             let invalidations = super::cache_invalidation::find_invalidations(command);
             if invalidations.is_empty() {
                 // Unknown mutating command -> blanket invalidation (safe default)
-                cp_base::panels::mark_panels_dirty(state, ContextType::new(ContextType::GIT_RESULT));
+                cp_base::panels::mark_panels_dirty(state, ContextType::GIT_RESULT);
             } else {
                 for ctx in &mut state.context {
                     if ctx.context_type == ContextType::GIT_RESULT

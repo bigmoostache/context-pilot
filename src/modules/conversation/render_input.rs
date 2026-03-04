@@ -285,6 +285,21 @@ fn split_paste_placeholders(line: &str) -> Vec<InputSegment> {
 
 /// Build spans for a plain text segment (no paste placeholders).
 fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full_line: &str) -> Vec<Span<'static>> {
+    fn push_with_cursor(spans: &mut Vec<Span<'static>>, text: &str, cursor_char: &str, color: Color) {
+        if text.contains(cursor_char) {
+            let parts: Vec<&str> = text.splitn(2, cursor_char).collect();
+            if !parts[0].is_empty() {
+                spans.push(Span::styled(parts[0].to_string(), Style::default().fg(color)));
+            }
+            spans.push(Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()));
+            if parts.len() > 1 && !parts[1].is_empty() {
+                spans.push(Span::styled(parts[1].to_string(), Style::default().fg(color)));
+            }
+        } else if !text.is_empty() {
+            spans.push(Span::styled(text.to_string(), Style::default().fg(color)));
+        }
+    }
+
     let mut spans: Vec<Span<'static>> = Vec::new();
 
     // Strip cursor char to get the "clean" text for analysis
@@ -336,36 +351,11 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
         }
 
         // Split cmd_part and rest_part by cursor_char for cursor rendering
-        #[expect(clippy::items_after_statements, reason = "helper scoped to calling function")]
-        fn push_with_cursor(spans: &mut Vec<Span<'static>>, text: &str, cursor_char: &str, color: Color) {
-            if text.contains(cursor_char) {
-                let parts: Vec<&str> = text.splitn(2, cursor_char).collect();
-                if !parts[0].is_empty() {
-                    spans.push(Span::styled(parts[0].to_string(), Style::default().fg(color)));
-                }
-                spans.push(Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()));
-                if parts.len() > 1 && !parts[1].is_empty() {
-                    spans.push(Span::styled(parts[1].to_string(), Style::default().fg(color)));
-                }
-            } else if !text.is_empty() {
-                spans.push(Span::styled(text.to_string(), Style::default().fg(color)));
-            }
-        }
-
         push_with_cursor(&mut spans, &cmd_part, cursor_char, theme::accent());
         push_with_cursor(&mut spans, &rest_part, cursor_char, theme::text());
     } else {
         // No command — render with normal text color + cursor
-        if text.contains(cursor_char) {
-            let parts: Vec<&str> = text.splitn(2, cursor_char).collect();
-            spans.push(Span::styled(parts.first().unwrap_or(&"").to_string(), Style::default().fg(theme::text())));
-            spans.push(Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()));
-            if let Some(rest) = parts.get(1) {
-                spans.push(Span::styled(rest.to_string(), Style::default().fg(theme::text())));
-            }
-        } else {
-            spans.push(Span::styled(text.to_string(), Style::default().fg(theme::text())));
-        }
+        push_with_cursor(&mut spans, text, cursor_char, theme::text());
     }
 
     spans

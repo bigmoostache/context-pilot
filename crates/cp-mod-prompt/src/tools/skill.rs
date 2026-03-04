@@ -41,7 +41,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Skill), &item);
     PromptState::get_mut(state).skills.push(item);
 
-    state.touch_panel(ContextType::new(ContextType::LIBRARY));
+    state.touch_panel(ContextType::LIBRARY);
 
     ToolResult::new(tool.id.clone(), format!("Created skill '{name}' with ID '{id}'"), false)
 }
@@ -71,7 +71,7 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let skill = PromptState::get_mut(state).skills.remove(idx);
     storage::delete_prompt_from_dir(&storage::dir_for(PromptType::Skill), id);
 
-    state.touch_panel(ContextType::new(ContextType::LIBRARY));
+    state.touch_panel(ContextType::LIBRARY);
 
     ToolResult::new(tool.id.clone(), format!("Deleted skill '{}' ({})", skill.name, id), false)
 }
@@ -120,7 +120,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.context.push(elem);
     PromptState::get_mut(state).loaded_skill_ids.push(id.to_string());
 
-    state.touch_panel(ContextType::new(ContextType::LIBRARY));
+    state.touch_panel(ContextType::LIBRARY);
 
     ToolResult::new(
         tool.id.clone(),
@@ -147,7 +147,7 @@ pub(crate) fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.context.retain(|c| c.get_meta_str("skill_prompt_id") != Some(id));
     PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != id);
 
-    state.touch_panel(ContextType::new(ContextType::LIBRARY));
+    state.touch_panel(ContextType::LIBRARY);
 
     let name =
         PromptState::get(state).skills.iter().find(|s| s.id == id).map_or_else(|| id.to_string(), |s| s.name.clone());

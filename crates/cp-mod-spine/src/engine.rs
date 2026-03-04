@@ -142,7 +142,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     if SpineState::get(state).config.autonomous_start_ms.is_none() {
         SpineState::get_mut(state).config.autonomous_start_ms = Some(now_ms());
     }
-    state.touch_panel(ContextType::new(ContextType::SPINE));
+    state.touch_panel(ContextType::SPINE);
 
     SpineDecision::Continue(action)
 }

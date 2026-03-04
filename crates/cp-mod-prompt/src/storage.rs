@@ -30,6 +30,14 @@ pub(crate) fn dir_for(pt: PromptType) -> PathBuf {
 /// `
 /// Returns (name, description, body).
 pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
+    #[derive(serde::Deserialize, Default)]
+    struct Frontmatter {
+        #[serde(default)]
+        name: String,
+        #[serde(default)]
+        description: String,
+    }
+
     let trimmed = content.trim_start();
     if !trimmed.starts_with("---") {
         // No frontmatter — treat entire content as body
@@ -46,16 +54,6 @@ pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
     let yaml_block = &after_first[..end];
     let body_start = end + 4; // skip \n---
     let body = after_first[body_start..].trim_start_matches('\n').to_string();
-
-    // Parse YAML frontmatter
-    #[expect(clippy::items_after_statements, reason = "local deserialization struct scoped to this function")]
-    #[derive(serde::Deserialize, Default)]
-    struct Frontmatter {
-        #[serde(default)]
-        name: String,
-        #[serde(default)]
-        description: String,
-    }
 
     let fm: Frontmatter = serde_yaml::from_str(yaml_block).unwrap_or_default();
     (fm.name, fm.description, body)

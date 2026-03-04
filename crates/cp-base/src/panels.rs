@@ -129,11 +129,7 @@ pub fn update_if_changed(ctx: &mut ContextElement, content: &str) -> bool {
 
 /// Mark all panels of a given context type as cache-deprecated (dirty).
 /// Also sets `state.dirty = true` so the UI re-renders.
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "ContextType is a lightweight string wrapper — pass by value is idiomatic"
-)]
-pub fn mark_panels_dirty(state: &mut State, context_type: ContextType) {
+pub fn mark_panels_dirty(state: &mut State, context_type: &str) {
     for ctx in &mut state.context {
         if ctx.context_type == context_type {
             ctx.cache_deprecated = true;

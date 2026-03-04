@@ -234,7 +234,7 @@ impl App {
                 for module in crate::modules::all_modules() {
                     module.on_stream_stop(&mut self.state);
                 }
-                self.state.touch_panel(ContextType::new(ContextType::SPINE));
+                self.state.touch_panel(ContextType::SPINE);
                 if let Some(msg) = self.state.messages.last()
                     && msg.role == "assistant"
                 {

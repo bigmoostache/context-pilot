@@ -418,15 +418,16 @@ impl SessionHandle {
     }
 
     /// Kill the process via the server.
-    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     pub fn kill(&self) {
         self.stop_polling.store(true, Ordering::Relaxed);
 
         let req = serde_json::json!({"cmd": "kill", "key": self.name});
         drop(server_request(&req).ok());
-        let mut status = self.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        if !status.is_terminal() {
-            *status = ProcessStatus::Killed;
+        {
+            let mut status = self.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            if !status.is_terminal() {
+                *status = ProcessStatus::Killed;
+            }
         }
         let mut fin = self.finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if fin.is_none() {

@@ -303,7 +303,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
         }
         if mem_count > 0 {
             output_parts.push(format!("Created {mem_count} memory(ies)"));
-            mark_panels_dirty(state, ContextType::new(ContextType::MEMORY));
+            mark_panels_dirty(state, ContextType::MEMORY);
         }
     }
 

@@ -114,13 +114,13 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Get replace_all (optional, default false)
     let replace_all = tool.input.get("replace_all").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
-    // Check if file is open in context
+    // Check if file is open in context (canonicalize for consistent comparison)
+    let path = Path::new(path_str);
+    let canonical = path.canonicalize().map_or_else(|_| path_str.to_string(), |p| p.to_string_lossy().to_string());
     let is_open = state
         .context
         .iter()
-        .any(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str));
-
-    let path = Path::new(path_str);
+        .any(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(&canonical));
 
     // Read file
     let mut content = match fs::read_to_string(path) {
@@ -170,7 +170,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(ctx) = state
         .context
         .iter_mut()
-        .find(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str))
+        .find(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(&canonical))
     {
         ctx.token_count = estimate_tokens(&content);
     }

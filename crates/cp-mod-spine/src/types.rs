@@ -224,7 +224,7 @@ impl SpineState {
             }
             id
         };
-        state.touch_panel(ContextType::new(ContextType::SPINE));
+        state.touch_panel(ContextType::SPINE);
         id
     }
 
@@ -240,7 +240,7 @@ impl SpineState {
             }
         };
         if found {
-            state.touch_panel(ContextType::new(ContextType::SPINE));
+            state.touch_panel(ContextType::SPINE);
         }
         found
     }
@@ -273,7 +273,7 @@ impl SpineState {
             changed
         };
         if changed {
-            state.touch_panel(ContextType::new(ContextType::SPINE));
+            state.touch_panel(ContextType::SPINE);
         }
     }
 
@@ -293,7 +293,7 @@ impl SpineState {
             changed
         };
         if changed {
-            state.touch_panel(ContextType::new(ContextType::SPINE));
+            state.touch_panel(ContextType::SPINE);
         }
     }
 
@@ -313,7 +313,7 @@ impl SpineState {
             changed
         };
         if changed {
-            state.touch_panel(ContextType::new(ContextType::SPINE));
+            state.touch_panel(ContextType::SPINE);
         }
     }
 }

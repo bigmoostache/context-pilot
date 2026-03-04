@@ -14,12 +14,6 @@ pub(crate) struct TodoPanel;
 impl TodoPanel {
     /// Format todos for LLM context
     fn format_todos_for_context(state: &State) -> String {
-        let ts = TodoState::get(state);
-        if ts.todos.is_empty() {
-            return "No todos".to_string();
-        }
-
-        #[expect(clippy::items_after_statements, reason = "scoped recursive helper used only here")]
         fn format_todo(todo: &TodoItem, todos: &[TodoItem], indent: usize) -> String {
             let prefix = "  ".repeat(indent);
             let status_char = todo.status.icon();
@@ -35,6 +29,11 @@ impl TodoPanel {
             }
 
             line
+        }
+
+        let ts = TodoState::get(state);
+        if ts.todos.is_empty() {
+            return "No todos".to_string();
         }
 
         let mut output = String::new();

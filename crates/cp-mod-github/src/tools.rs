@@ -103,7 +103,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                 }
             }
             // Always invalidate Git status (PRs/merges can affect it)
-            mark_panels_dirty(state, ContextType::new(ContextType::GIT));
+            mark_panels_dirty(state, ContextType::GIT);
 
             match result {
                 Ok(output) => {

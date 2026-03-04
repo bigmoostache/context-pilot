@@ -197,38 +197,58 @@ impl PerfMetrics {
     }
 
     /// Refresh CPU and memory stats
-    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     fn refresh_system_stats(&self) {
         if let Some((cpu_ticks, mem_bytes)) = read_proc_stat() {
-            let mut state = self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner);
-            let now = Instant::now();
-            let elapsed = now.duration_since(state.last_cpu_measure.0).as_secs_f32();
+            let cpu_pct = {
+                let mut state = self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner);
+                let now = Instant::now();
+                let elapsed = now.duration_since(state.last_cpu_measure.0).as_secs_f32();
 
-            if elapsed > 0.0 {
-                let tick_delta = cpu_ticks.saturating_sub(state.last_cpu_measure.1);
-                // Convert ticks to seconds (usually 100 ticks/sec on Linux)
-                let cpu_seconds = tick_delta.to_f32() / 100.0;
-                // CPU percentage = (cpu_time / wall_time) * 100
-                let cpu_pct = (cpu_seconds / elapsed) * 100.0;
-                self.cpu_usage.store(cpu_pct.to_bits(), Ordering::Relaxed);
-            }
+                let pct = if elapsed > 0.0 {
+                    let tick_delta = cpu_ticks.saturating_sub(state.last_cpu_measure.1);
+                    // Convert ticks to seconds (usually 100 ticks/sec on Linux)
+                    let cpu_seconds = tick_delta.to_f32() / 100.0;
+                    // CPU percentage = (cpu_time / wall_time) * 100
+                    (cpu_seconds / elapsed) * 100.0
+                } else {
+                    0.0
+                };
 
-            state.last_cpu_measure = (now, cpu_ticks);
+                state.last_cpu_measure = (now, cpu_ticks);
+                pct
+            };
+            // Atomic stores don't need the lock
+            self.cpu_usage.store(cpu_pct.to_bits(), Ordering::Relaxed);
             self.memory_bytes.store(mem_bytes, Ordering::Relaxed);
         }
     }
 
     /// Get snapshot of metrics for display
-    #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
     pub(crate) fn snapshot(&self) -> PerfSnapshot {
-        let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Extract frame data and release lock before processing ops
+        let frame_samples: Vec<f64> = {
+            let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+            frame_times.recent(40).iter().map(|&us| us.to_f64() / 1000.0).collect()
+        };
 
-        let mut op_snapshots: Vec<OpSnapshot> = ops
+        // Extract op data under lock, then process without holding it
+        let raw_ops: Vec<(&'static str, u64, Vec<u64>)> = {
+            let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+            ops.iter()
+                .map(|(name, stats)| {
+                    let recent = stats
+                        .samples
+                        .read()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .recent(SAMPLE_RING_SIZE);
+                    (*name, stats.total_us.load(Ordering::Relaxed), recent)
+                })
+                .collect()
+        };
+
+        let mut op_snapshots: Vec<OpSnapshot> = raw_ops
             .iter()
-            .map(|(name, stats)| {
-                let samples = stats.samples.read().unwrap_or_else(std::sync::PoisonError::into_inner);
-                let recent = samples.recent(SAMPLE_RING_SIZE);
+            .map(|(name, total_us, recent)| {
                 let count = recent.len();
 
                 // Calculate mean
@@ -251,7 +271,7 @@ impl PerfMetrics {
 
                 OpSnapshot {
                     name,
-                    total_ms: stats.total_us.load(Ordering::Relaxed).to_f64() / 1000.0,
+                    total_ms: total_us.to_f64() / 1000.0,
                     mean_ms: mean_us / 1000.0,
                     std_ms: std_us / 1000.0,
                 }
@@ -260,8 +280,6 @@ impl PerfMetrics {
 
         // Sort by total time descending (hotspots first)
         op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
-
-        let frame_samples: Vec<f64> = frame_times.recent(40).iter().map(|&us| us.to_f64() / 1000.0).collect();
 
         let frame_avg_ms = if frame_samples.is_empty() {
             0.0

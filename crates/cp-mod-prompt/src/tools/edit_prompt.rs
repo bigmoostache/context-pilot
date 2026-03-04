@@ -40,7 +40,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     if !is_open {
         // Auto-open the prompt and fail with a helpful message
         PromptState::get_mut(state).open_prompt_id = Some(id.to_string());
-        state.touch_panel(ContextType::new(ContextType::LIBRARY));
+        state.touch_panel(ContextType::LIBRARY);
         return ToolResult::new(
             tool.id.clone(),
             format!(
@@ -114,7 +114,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             };
             a.content = new_content;
             storage::save_prompt_to_dir(&storage::dir_for(PromptType::Agent), a);
-            state.touch_panel(ContextType::new(ContextType::SYSTEM));
+            state.touch_panel(ContextType::SYSTEM);
         }
         EntityType::Skill => {
             let Some(s) = ps.skills.iter_mut().find(|s| s.id == id) else {
@@ -146,7 +146,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
-    state.touch_panel(ContextType::new(ContextType::LIBRARY));
+    state.touch_panel(ContextType::LIBRARY);
 
     // Format result as unified diff (same format as file Edit tool)
     let lines_changed = new_string.lines().count().max(old_string.lines().count());

@@ -29,11 +29,6 @@ pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 fn open_single_file(path: &str, state: &mut State) -> String {
-    // Check if file is already open
-    if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(path)) {
-        return format!("File '{path}' is already open in context");
-    }
-
     // Check if file exists (quick metadata check, not a full read)
     let path_obj = Path::new(path);
     if !path_obj.exists() {
@@ -42,6 +37,14 @@ fn open_single_file(path: &str, state: &mut State) -> String {
 
     if !path_obj.is_file() {
         return format!("Error: '{path}' is not a file");
+    }
+
+    // Canonicalize to absolute path so lookups match regardless of relative/absolute input
+    let canonical = path_obj.canonicalize().map_or_else(|_| path.to_string(), |p| p.to_string_lossy().to_string());
+
+    // Check if file is already open (using canonical path)
+    if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
+        return format!("File '{path}' is already open in context");
     }
 
     let file_name = path_obj.file_name().map_or_else(|| path.to_string(), |n| n.to_string_lossy().to_string());
@@ -73,7 +76,7 @@ fn open_single_file(path: &str, state: &mut State) -> String {
         panel_cache_hit: false,
         panel_total_cost: 0.0,
     };
-    elem.set_meta("file_path", &path.to_string());
+    elem.set_meta("file_path", &canonical);
     state.context.push(elem);
 
     format!("Opened '{path}' as {context_id}")

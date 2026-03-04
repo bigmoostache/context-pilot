@@ -178,7 +178,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
         changes.push("reset runtime counters".to_string());
     }
 
-    state.touch_panel(ContextType::new(ContextType::SPINE));
+    state.touch_panel(ContextType::SPINE);
 
     if changes.is_empty() {
         ToolResult::new(

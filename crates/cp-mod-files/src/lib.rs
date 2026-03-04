@@ -97,8 +97,13 @@ impl Module for FilesModule {
                         pf.errors.push(format!("File '{path}' not found"));
                     } else if !p.is_file() {
                         pf.errors.push(format!("'{path}' is not a file"));
-                    } else if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(path)) {
-                        pf.warnings.push(format!("File '{path}' is already open in context"));
+                    } else {
+                        // Canonicalize for consistent comparison with stored paths
+                        let canonical =
+                            p.canonicalize().map_or_else(|_| path.clone(), |cp| cp.to_string_lossy().to_string());
+                        if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
+                            pf.warnings.push(format!("File '{path}' is already open in context"));
+                        }
                     }
                 }
                 Some(pf)
@@ -112,8 +117,12 @@ impl Module for FilesModule {
                     } else if !p.is_file() {
                         pf.errors.push(format!("'{path_str}' is not a file"));
                     } else {
+                        // Canonicalize for consistent comparison with stored paths
+                        let canonical = p
+                            .canonicalize()
+                            .map_or_else(|_| path_str.to_string(), |cp| cp.to_string_lossy().to_string());
                         let is_open = state.context.iter().any(|c| {
-                            c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str)
+                            c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(&canonical)
                         });
                         if !is_open {
                             pf.warnings.push(format!("File '{path_str}' is not open in context. Edit will proceed if old_string has a unique match, but open the file to see current content."));
