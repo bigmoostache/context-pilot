@@ -46,11 +46,11 @@ src/typst_cli.rs:
 
 # `#[expect]` Audit — Final Status
 
-**110 → 9** annotations remaining. **101 slain.**
+**110 → 8** annotations remaining. **102 slain.**
 
 ---
 
-## Remaining `#[expect]` Annotations (9 total)
+## Remaining `#[expect]` Annotations (8 total)
 
 ### 1. `cast.rs:1` — `allow_attributes`
 
@@ -88,31 +88,7 @@ pub fn yaml_invariant_panic(msg: &str) -> ! {
 
 ---
 
-### 3. `panels.rs:42` — `wildcard_enum_match_arm`
-
-```rust
-#[expect(clippy::wildcard_enum_match_arm, reason = "KeyCode is an external enum — new variants are not scroll keys")]
-pub const fn scroll_key_action(key: &KeyEvent) -> Option<Action> {
-    match key.code {
-        KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
-        KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
-        KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
-        KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
-        _ => None,
-    }
-}
-```
-
-**Justification:** `KeyCode` is an external enum from `crossterm` with 30+ variants (and growing — `KeypadBegin`, `Media`, `Modifier` were added in recent versions). Exhaustive matching would compile-break on every crossterm update that adds a new key variant. The wildcard is semantically correct: any key that isn't Up/Down/PageUp/PageDown is not a scroll key, including future keys that don't exist yet.
-
-**Strategies to eliminate:**
-- **Thin wrapper enum:** Define a local `ScrollKey { Up, Down, PageUp, PageDown }` enum. A single conversion function `fn try_from_keycode(k: &KeyCode) -> Option<ScrollKey>` absorbs the wildcard. `scroll_key_action()` then matches exhaustively on `ScrollKey`. The wildcard moves to the conversion boundary — and `try_from_keycode` can use `matches!()` instead of `match`, which doesn't trigger the lint.
-- **`matches!()` macro:** Replace the match with `matches!(key.code, KeyCode::Up | KeyCode::Down | ...)` to detect scroll keys, then a second clean match on the confirmed scroll keys. The `matches!()` macro doesn't trigger `wildcard_enum_match_arm` since it's a boolean test, not an arm-producing match.
-- **Feature-gate on crossterm version:** Use `#[cfg]` attributes to enumerate known non-scroll variants for the current crossterm version, making the match exhaustive. Requires updating on each crossterm bump, but makes the dependency explicit.
-
----
-
-### 4. `runtime.rs:19` — `struct_excessive_bools`
+### 3. `runtime.rs:19` — `struct_excessive_bools`
 
 ```rust
 #[expect(clippy::struct_excessive_bools, reason = "Runtime state legitimately needs many boolean flags")]
@@ -133,7 +109,7 @@ pub struct State {
 
 ---
 
-### 5. `runtime.rs:274` — `expect_used` (`ext()`)
+### 4. `runtime.rs:274` — `expect_used` (`ext()`)
 
 ```rust
 #[expect(clippy::expect_used, reason = "centralized panic — callers use ext() to avoid per-site #[expect]")]
@@ -151,7 +127,7 @@ pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
 
 ---
 
-### 6. `runtime.rs:284` — `expect_used` (`ext_mut()`)
+### 5. `runtime.rs:284` — `expect_used` (`ext_mut()`)
 
 ```rust
 #[expect(clippy::expect_used, reason = "centralized panic — callers use ext_mut() to avoid per-site #[expect]")]
@@ -162,11 +138,11 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 
 **Justification:** Mutable variant of #5. Same centralization rationale — 20+ call sites use this instead of scattered `.expect()` calls. Same panic condition (programming error: module state not registered).
 
-**Strategies to eliminate:** Same as #5 — any strategy applied to `ext()` would be applied identically to `ext_mut()`. These two annotations live and die together.
+**Strategies to eliminate:** Same as #4 — any strategy applied to `ext()` would be applied identically to `ext_mut()`. These two annotations live and die together.
 
 ---
 
-### 7. `server/main.rs:2` — `unused_crate_dependencies`
+### 6. `server/main.rs:2` — `unused_crate_dependencies`
 
 ```rust
 #![expect(unused_crate_dependencies, reason = "bin target shares Cargo.toml with lib — lib deps aren't used here")]
@@ -181,7 +157,7 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 
 ---
 
-### 8. `server/main.rs:359` — `unsafe_code`
+### 7. `server/main.rs:359` — `unsafe_code`
 
 ```rust
 #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
@@ -201,7 +177,7 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 
 ---
 
-### 9. `typst_cli.rs:5` — `print_stdout`, `exit`
+### 8. `typst_cli.rs:5` — `print_stdout`, `exit`
 
 ```rust
 #![expect(
@@ -226,9 +202,8 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 |---|------|------|-----------|---------------|
 | 1 | `cast.rs` | `allow_attributes` | 🟡 | `num` crate or `TryFrom` blanket impls |
 | 2 | `config/mod.rs` | `panic` | 🟢 | `build.rs` compile-time YAML validation |
-| 3 | `panels.rs` | `wildcard_enum_match_arm` | 🟢 | `matches!()` macro or thin wrapper enum |
-| 4 | `runtime.rs` | `struct_excessive_bools` | 🟡 | Domain sub-structs (scriptable, ~1000 callsites) |
-| 5–6 | `runtime.rs` | `expect_used` (×2) | 🟡 | `Default` fallback or lazy init |
-| 7 | `server/main.rs` | `unused_crate_dependencies` | 🟢 | Separate server crate |
-| 8 | `server/main.rs` | `unsafe_code` | 🟢 | `nix` crate safe wrapper |
-| 9 | `typst_cli.rs` | `print_stdout` + `exit` | 🟢 | Return `Result` from CLI functions |
+| 3 | `runtime.rs` | `struct_excessive_bools` | 🟡 | Domain sub-structs (scriptable, ~1000 callsites) |
+| 4–5 | `runtime.rs` | `expect_used` (×2) | 🟡 | `Default` fallback or lazy init |
+| 6 | `server/main.rs` | `unused_crate_dependencies` | 🟢 | Separate server crate |
+| 7 | `server/main.rs` | `unsafe_code` | 🟢 | `nix` crate safe wrapper |
+| 8 | `typst_cli.rs` | `print_stdout` + `exit` | 🟢 | Return `Result` from CLI functions |
