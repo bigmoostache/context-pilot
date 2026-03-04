@@ -7,9 +7,13 @@ use cp_base::state::ContextType;
 /// A named preset that captures a worker's full configuration state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Preset {
+    /// Preset identifier (alphanumeric + hyphens).
     pub preset_name: String,
+    /// Human-readable description of what this preset is for.
     pub description: String,
+    /// Whether this is a built-in (non-deletable) preset.
     pub built_in: bool,
+    /// Captured worker configuration.
     pub worker_state: PresetWorkerState,
 }
 
@@ -33,29 +37,41 @@ pub struct PresetWorkerState {
     pub dynamic_panels: Vec<PresetPanelConfig>,
 }
 
-/// Configuration for a dynamic panel (File, Glob, Grep, Tmux).
+/// Configuration for a dynamic panel captured by a preset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PresetPanelConfig {
+    /// Panel type (File, Glob, Grep, Tmux, Skill, etc.).
     pub panel_type: ContextType,
+    /// Display name for the panel tab.
     pub name: String,
+    /// File path (for File panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_path: Option<String>,
+    /// Glob pattern (for Glob panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub glob_pattern: Option<String>,
+    /// Search directory for glob (for Glob panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub glob_path: Option<String>,
+    /// Grep regex pattern (for Grep panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grep_pattern: Option<String>,
+    /// Search directory for grep (for Grep panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grep_path: Option<String>,
+    /// File filter pattern for grep (for Grep panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grep_file_pattern: Option<String>,
+    /// Tmux pane ID (for Tmux panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tmux_pane_id: Option<String>,
+    /// Number of lines to capture (for Tmux panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tmux_lines: Option<usize>,
+    /// Description text (for Tmux panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tmux_description: Option<String>,
+    /// Skill prompt ID (for Skill panels).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill_prompt_id: Option<String>,
 }

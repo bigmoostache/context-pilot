@@ -51,6 +51,7 @@ impl Default for AutocompleteState {
 }
 
 impl AutocompleteState {
+    /// Create a new inactive autocomplete state with all fields zeroed.
     pub fn new() -> Self {
         Self {
             active: false,

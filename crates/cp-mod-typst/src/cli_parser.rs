@@ -6,19 +6,52 @@
 #[derive(Debug)]
 pub enum TypstCommand {
     /// `typst compile <input> [-o <output>] [--root <root>]`
-    Compile { input: String, output: Option<String>, root: Option<String> },
+    Compile {
+        /// Source `.typ` file path.
+        input: String,
+        /// Output file path (defaults to input with `.pdf`).
+        output: Option<String>,
+        /// Project root directory override.
+        root: Option<String>,
+    },
     /// `typst init <template> [<directory>]`
-    Init { template: String, directory: Option<String> },
+    Init {
+        /// Template identifier (e.g., `@preview/graceful-genetics:0.2.0`).
+        template: String,
+        /// Target directory (defaults to template name).
+        directory: Option<String>,
+    },
     /// `typst query <input> <selector> [--field <field>]`
-    Query { input: String, selector: String, field: Option<String> },
+    Query {
+        /// Source `.typ` file to query.
+        input: String,
+        /// Content selector (e.g., `<heading>`).
+        selector: String,
+        /// Optional field to extract from results.
+        field: Option<String>,
+    },
     /// `typst fonts [--variants]`
-    Fonts { variants: bool },
+    Fonts {
+        /// Whether to show font variants.
+        variants: bool,
+    },
     /// `typst update [<package>]`
-    Update { package: Option<String> },
+    Update {
+        /// Optional specific package to re-download.
+        package: Option<String>,
+    },
     /// `typst watch <input> [-o <output>]` — add document to auto-compile watchlist
-    Watch { input: String, output: Option<String> },
+    Watch {
+        /// Source `.typ` file to watch.
+        input: String,
+        /// Output file path override.
+        output: Option<String>,
+    },
     /// `typst unwatch <input>` — remove document from watchlist
-    Unwatch { input: String },
+    Unwatch {
+        /// Source `.typ` file to stop watching.
+        input: String,
+    },
     /// `typst watchlist` — list all watched documents
     Watchlist,
 }

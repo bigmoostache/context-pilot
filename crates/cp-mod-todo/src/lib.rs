@@ -1,5 +1,12 @@
+//! Todo module — hierarchical task tracking with status management.
+//!
+//! Three tools: `todo_create` (with optional nesting), `todo_update` (status,
+//! name, description, delete), `todo_move` (reorder). Todos are stored per-worker
+//! and drive the spine's `continue_until_todos_done` auto-continuation mode.
+
 mod panel;
 mod tools;
+/// Todo state types: `TodoItem`, `TodoStatus`, `TodoState`.
 pub mod types;
 
 pub use types::{TodoItem, TodoState, TodoStatus};
@@ -20,7 +27,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/todo.yaml")).expect("Failed to parse todo tool YAML")
 });
 
-#[derive(Debug)]
+/// Todo module: hierarchical task tracking with status and nesting.
+#[derive(Debug, Clone, Copy)]
 pub struct TodoModule;
 
 impl Module for TodoModule {
@@ -173,9 +181,9 @@ impl Module for TodoModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "todo_create" => Some(self::tools::execute_create(tool, state)),
-            "todo_update" => Some(self::tools::execute_update(tool, state)),
-            "todo_move" => Some(self::tools::execute_move(tool, state)),
+            "todo_create" => Some(tools::execute_create(tool, state)),
+            "todo_update" => Some(tools::execute_update(tool, state)),
+            "todo_move" => Some(tools::execute_move(tool, state)),
             _ => None,
         }
     }

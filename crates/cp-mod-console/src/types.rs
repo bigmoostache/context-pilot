@@ -10,23 +10,33 @@ use crate::manager::SessionHandle;
 /// Serializable metadata for a console session (used for persistence across reloads).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMeta {
+    /// OS process ID.
     pub pid: u32,
+    /// Shell command that was executed.
     pub command: String,
+    /// Working directory (None = project root).
     pub cwd: Option<String>,
+    /// Absolute path to the log file capturing stdout/stderr.
     pub log_path: String,
+    /// Timestamp (ms since epoch) when the session was spawned.
     pub started_at: u64,
 }
 
 /// Process lifecycle status.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProcessStatus {
+    /// Process is actively running.
     Running,
+    /// Process exited normally with the given code.
     Finished(i32),
+    /// Process exited with a non-zero (failure) code.
     Failed(i32),
+    /// Process was forcefully killed (SIGKILL).
     Killed,
 }
 
 impl ProcessStatus {
+    /// Human-readable label (e.g., "running", "exited(0)", "failed(1)").
     pub fn label(&self) -> String {
         match self {
             ProcessStatus::Running => "running".to_string(),
@@ -36,10 +46,12 @@ impl ProcessStatus {
         }
     }
 
+    /// Whether the process has reached a terminal state (not running).
     pub fn is_terminal(&self) -> bool {
         !matches!(self, ProcessStatus::Running)
     }
 
+    /// Exit code if terminal (Killed → -9), None if still running.
     pub fn exit_code(&self) -> Option<i32> {
         match self {
             ProcessStatus::Finished(c) | ProcessStatus::Failed(c) => Some(*c),
@@ -53,7 +65,9 @@ impl ProcessStatus {
 /// Stored in State.module_data via TypeMap.
 #[derive(Debug)]
 pub struct ConsoleState {
+    /// Active session handles, keyed by session name (e.g., "c_42").
     pub sessions: HashMap<String, SessionHandle>,
+    /// Monotonic counter for generating unique session keys.
     pub next_session_id: usize,
 }
 
@@ -64,14 +78,17 @@ impl Default for ConsoleState {
 }
 
 impl ConsoleState {
+    /// Create an empty console state with session counter at 1.
     pub fn new() -> Self {
         Self { sessions: HashMap::new(), next_session_id: 1 }
     }
 
+    /// Get shared ref from State's TypeMap.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("ConsoleState not initialized")
     }
 
+    /// Get mutable ref from State's TypeMap.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("ConsoleState not initialized")
     }

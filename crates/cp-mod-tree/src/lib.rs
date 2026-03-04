@@ -1,5 +1,13 @@
+//! Tree module — directory tree visualization with filtering and descriptions.
+//!
+//! Three tools: `tree_filter` (gitignore-style patterns), `tree_toggle`
+//! (open/close folders), `tree_describe` (annotate files/folders). The tree
+//! panel auto-refreshes on filesystem changes and provides `@`-autocomplete
+//! with directory entries.
+
 mod panel;
 mod tools;
+/// Tree state types: `TreeState`, `TreeFileDescription`.
 pub mod types;
 
 use serde_json::json;
@@ -22,7 +30,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/tree.yaml")).expect("Failed to parse tree tool YAML")
 });
 
-#[derive(Debug)]
+/// Tree module: directory tree view with filtering, descriptions, and auto-refresh.
+#[derive(Debug, Clone, Copy)]
 pub struct TreeModule;
 
 impl Module for TreeModule {
@@ -169,9 +178,9 @@ impl Module for TreeModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "tree_filter" => Some(self::tools::execute_edit_filter(tool, state)),
-            "tree_toggle" => Some(self::tools::execute_toggle_folders(tool, state)),
-            "tree_describe" => Some(self::tools::execute_describe_files(tool, state)),
+            "tree_filter" => Some(tools::execute_edit_filter(tool, state)),
+            "tree_toggle" => Some(tools::execute_toggle_folders(tool, state)),
+            "tree_describe" => Some(tools::execute_describe_files(tool, state)),
             _ => None,
         }
     }

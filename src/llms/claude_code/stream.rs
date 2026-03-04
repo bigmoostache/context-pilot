@@ -182,7 +182,7 @@ impl ClaudeCodeClient {
 
             // Keep last 5 data lines for error context
             if last_lines.len() >= 5 {
-                last_lines.remove(0);
+                let _r = last_lines.remove(0);
             }
             last_lines.push(line.to_string());
 

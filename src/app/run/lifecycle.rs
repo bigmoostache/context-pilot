@@ -39,7 +39,7 @@ impl App {
         if self.resume_stream {
             self.resume_stream = false;
             use cp_mod_spine::{NotificationType, SpineState};
-            SpineState::create_notification(
+            let _r = SpineState::create_notification(
                 &mut self.state,
                 NotificationType::ReloadResume,
                 "reload_resume".to_string(),
@@ -65,7 +65,7 @@ impl App {
 
                     // Render immediately after input for instant feedback
                     if self.state.dirty {
-                        terminal.draw(|frame| {
+                        let _r = terminal.draw(|frame| {
                             ui::render(frame, &mut self.state);
                             self.command_palette.render(frame, &self.state);
                         })?;
@@ -84,7 +84,7 @@ impl App {
 
                     // Render immediately
                     if self.state.dirty {
-                        terminal.draw(|frame| {
+                        let _r = terminal.draw(|frame| {
                             ui::render(frame, &mut self.state);
                             self.command_palette.render(frame, &self.state);
                         })?;
@@ -103,7 +103,7 @@ impl App {
 
                     // Render immediately
                     if self.state.dirty {
-                        terminal.draw(|frame| {
+                        let _r = terminal.draw(|frame| {
                             ui::render(frame, &mut self.state);
                             self.command_palette.render(frame, &self.state);
                         })?;
@@ -130,7 +130,7 @@ impl App {
 
                 // Render immediately after input for instant feedback
                 if self.state.dirty {
-                    terminal.draw(|frame| {
+                    let _r = terminal.draw(|frame| {
                         ui::render(frame, &mut self.state);
                         self.command_palette.render(frame, &self.state);
                     })?;
@@ -188,7 +188,7 @@ impl App {
 
             // Render if dirty and enough time has passed (capped at ~28fps)
             if self.state.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
-                terminal.draw(|frame| {
+                let _r = terminal.draw(|frame| {
                     ui::render(frame, &mut self.state);
                     self.command_palette.render(frame, &self.state);
                 })?;
@@ -335,7 +335,7 @@ impl App {
             return;
         }
         let summary = ts.incomplete_todos_summary();
-        cp_mod_spine::SpineState::create_notification(
+        let _r = cp_mod_spine::SpineState::create_notification(
             &mut self.state,
             cp_mod_spine::NotificationType::Custom,
             "todo_continuation".to_string(),

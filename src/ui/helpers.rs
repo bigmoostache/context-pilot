@@ -182,7 +182,7 @@ pub(crate) fn highlight_file(path: &str, content: &str) -> Arc<HighlightResult> 
         if cache.len() > 50 {
             cache.clear();
         }
-        cache.insert(cache_key, Arc::clone(&result));
+        let _r = cache.insert(cache_key, Arc::clone(&result));
     }
 
     result

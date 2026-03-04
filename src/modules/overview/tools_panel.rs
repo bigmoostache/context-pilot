@@ -41,7 +41,7 @@ impl Panel for ToolsPanel {
         if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == "tools") {
             ctx.token_count = token_count;
             ctx.cached_content = Some(content.clone());
-            crate::app::panels::update_if_changed(ctx, &content);
+            let _r = crate::app::panels::update_if_changed(ctx, &content);
         }
     }
 

@@ -13,21 +13,21 @@ fn markdown_display_width(text: &str) -> usize {
                 // Skip to closing backtick, count content
                 while let Some(&next) = chars.peek() {
                     if next == '`' {
-                        chars.next();
+                        let _r = chars.next();
                         break;
                     }
                     width += 1;
-                    chars.next();
+                    let _r = chars.next();
                 }
             }
             '*' | '_' => {
                 // Check for double (bold) or single (italic)
                 if chars.peek() == Some(&c) {
-                    chars.next(); // consume second marker
+                    let _r = chars.next(); // consume second marker
                     // Count until closing **
                     while let Some(next) = chars.next() {
                         if next == c && chars.peek() == Some(&c) {
-                            chars.next();
+                            let _r = chars.next();
                             break;
                         }
                         width += 1;
@@ -54,7 +54,7 @@ fn markdown_display_width(text: &str) -> usize {
                     link_text_len += 1;
                 }
                 if found_bracket && chars.peek() == Some(&'(') {
-                    chars.next(); // consume (
+                    let _r = chars.next(); // consume (
                     for next in chars.by_ref() {
                         if next == ')' {
                             break;
@@ -367,7 +367,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 let mut code = String::new();
                 while let Some(&next) = chars.peek() {
                     if next == '`' {
-                        chars.next();
+                        let _r = chars.next();
                         break;
                     }
                     code.push(chars.next().unwrap());
@@ -382,7 +382,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 let is_double = chars.peek() == Some(&c);
 
                 if is_double {
-                    chars.next(); // consume second */_
+                    let _r = chars.next(); // consume second */_
 
                     if !current.is_empty() {
                         spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
@@ -392,7 +392,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                     let mut bold_text = String::new();
                     while let Some(next) = chars.next() {
                         if next == c && chars.peek() == Some(&c) {
-                            chars.next(); // consume closing **
+                            let _r = chars.next(); // consume closing **
                             break;
                         }
                         bold_text.push(next);
@@ -440,7 +440,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 }
 
                 if found_bracket && chars.peek() == Some(&'(') {
-                    chars.next(); // consume (
+                    let _r = chars.next(); // consume (
                     let mut url = String::new();
                     for next in chars.by_ref() {
                         if next == ')' {

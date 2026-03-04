@@ -87,7 +87,7 @@ impl Module for OverviewModule {
             let all_defaults = crate::modules::default_active_modules();
             for module_id in &all_defaults {
                 if !state.active_modules.contains(module_id) {
-                    state.active_modules.insert(module_id.clone());
+                    let _r = state.active_modules.insert(module_id.clone());
                 }
             }
         }

@@ -28,7 +28,7 @@ pub(crate) struct GroqClient {
 
 impl GroqClient {
     pub(crate) fn new() -> Self {
-        dotenvy::dotenv().ok();
+        let _r = dotenvy::dotenv().ok();
         Self { api_key: env::var("GROQ_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }

@@ -38,7 +38,7 @@ pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
     // Start the reverie session with the default cleaner agent
     let mut rev = ReverieState::new(ReverieType::ContextOptimizer, "cleaner".to_string(), None);
     rev.queue_active = true;
-    state.reveries.insert("cleaner".to_string(), rev);
+    let _r = state.reveries.insert("cleaner".to_string(), rev);
 
     true
 }
@@ -64,7 +64,7 @@ pub(crate) fn start_manual_reverie(state: &mut State, agent_id: String, context:
     // Start the reverie session
     let mut rev = ReverieState::new(ReverieType::ContextOptimizer, agent_id.clone(), context);
     rev.queue_active = true;
-    state.reveries.insert(agent_id, rev);
+    let _r = state.reveries.insert(agent_id, rev);
 
     true
 }

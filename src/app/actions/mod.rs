@@ -173,13 +173,13 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     } else {
                         // Not a sentinel — normal backspace
                         let prev = state.input[..state.input_cursor].char_indices().last().map(|(i, _)| i).unwrap_or(0);
-                        state.input.remove(prev);
+                        let _r = state.input.remove(prev);
                         state.input_cursor = prev;
                     }
                 } else {
                     // Normal backspace — remove one character
                     let prev = state.input[..state.input_cursor].char_indices().last().map(|(i, _)| i).unwrap_or(0);
-                    state.input.remove(prev);
+                    let _r = state.input.remove(prev);
                     state.input_cursor = prev;
                 }
             }
@@ -187,7 +187,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::InputDelete => {
             if state.input_cursor < state.input.len() {
-                state.input.remove(state.input_cursor);
+                let _r = state.input.remove(state.input_cursor);
             }
             ActionResult::Nothing
         }

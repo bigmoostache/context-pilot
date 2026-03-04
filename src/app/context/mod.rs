@@ -104,7 +104,7 @@ pub(super) fn prepare_stream_context(
     }
 
     // Check if context has breached the threshold — may activate the reverie optimizer
-    crate::app::reverie::trigger::check_threshold_trigger(state);
+    let _r = crate::app::reverie::trigger::check_threshold_trigger(state);
 
     // Dynamically enable/disable panel_goto_page based on whether any panel is paginated
     let has_paginated = state.context.iter().any(|c| c.total_pages > 1);

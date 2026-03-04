@@ -1,8 +1,11 @@
 //! Command classification for gh (GitHub CLI) commands.
 
+/// Whether a `gh` subcommand reads or mutates state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandClass {
+    /// Safe to auto-refresh in a panel (e.g., `gh pr list`).
     ReadOnly,
+    /// Modifies remote state — execute once and return output (e.g., `gh pr create`).
     Mutating,
 }
 

@@ -12,7 +12,8 @@ pub(crate) const BRAVE_PANEL_TYPE: &str = "brave_result";
 const META_CONTENT: &str = "result_content";
 
 /// Create a dynamic panel with the given title and content.
-/// Returns the panel ID string (e.g. "P15").
+///
+/// Returns the panel ID string (e.g., "P15").
 pub fn create_panel(state: &mut State, title: &str, content: &str) -> String {
     let panel_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
@@ -32,7 +33,8 @@ pub fn create_panel(state: &mut State, title: &str, content: &str) -> String {
     panel_id
 }
 
-#[derive(Debug)]
+/// Panel renderer for Brave search result panels.
+#[derive(Debug, Clone, Copy)]
 pub struct BraveResultPanel;
 
 /// Cache request for restoring content from metadata after reload

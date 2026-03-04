@@ -117,7 +117,7 @@ pub(super) fn parse_sse_stream(
         }
 
         if last_lines.len() >= 5 {
-            last_lines.remove(0);
+            let _r = last_lines.remove(0);
         }
         last_lines.push(line.to_string());
 

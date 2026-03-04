@@ -1,6 +1,15 @@
+//! Brave Search module — web search and LLM-optimized context extraction.
+//!
+//! Two tools: `brave_search` (snippet results) and `brave_llm_context` (full
+//! extracted content for LLM consumption). Results appear as dynamic panels.
+
+/// HTTP API client for Brave Search and LLM Context endpoints.
 pub mod api;
+/// Dynamic panel rendering for search results.
 pub mod panel;
+/// Tool dispatch: `brave_search` and `brave_llm_context`.
 pub mod tools;
+/// Brave API response/request serde types.
 pub mod types;
 
 use cp_base::modules::Module;
@@ -13,7 +22,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/brave.yaml")).expect("Failed to parse brave tool YAML")
 });
 
-#[derive(Debug)]
+/// Brave Search module: web search and LLM context API integration.
+#[derive(Debug, Clone, Copy)]
 pub struct BraveModule;
 
 impl Module for BraveModule {

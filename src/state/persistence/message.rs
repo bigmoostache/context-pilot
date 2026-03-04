@@ -30,17 +30,17 @@ pub(crate) fn load_message(uid: &str) -> Option<Message> {
 /// Save a message to the messages directory using its UID
 pub(crate) fn save_message(msg: &Message) {
     let dir = messages_dir();
-    fs::create_dir_all(&dir).ok();
+    let _r = fs::create_dir_all(&dir).ok();
     // Use UID if available, otherwise fall back to id
     let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
     let path = message_path(file_id);
     if let Ok(yaml) = serde_yaml::to_string(msg) {
-        fs::write(path, yaml).ok();
+        let _r = fs::write(path, yaml).ok();
     }
 }
 
 /// Delete a message file by its UID
 pub(crate) fn delete_message(uid: &str) {
     let path = message_path(uid);
-    fs::remove_file(path).ok();
+    let _r = fs::remove_file(path).ok();
 }

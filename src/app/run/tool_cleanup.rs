@@ -23,7 +23,7 @@ impl App {
             Some(boxed) => match boxed.downcast::<WatcherRegistry>() {
                 Ok(r) => *r,
                 Err(boxed) => {
-                    self.state.module_data.insert(std::any::TypeId::of::<WatcherRegistry>(), boxed);
+                    let _r = self.state.module_data.insert(std::any::TypeId::of::<WatcherRegistry>(), boxed);
                     return;
                 }
             },
@@ -85,7 +85,7 @@ impl App {
                     result.description.clone(),
                 );
                 if result.processed_already {
-                    SpineState::mark_notification_processed(&mut self.state, &nid);
+                    let _r = SpineState::mark_notification_processed(&mut self.state, &nid);
                 }
             }
 
@@ -181,8 +181,25 @@ impl App {
         // Check if any sentinels remain unresolved (multiple blocking waits in one batch)
         let still_pending = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
         if still_pending {
-            self.pending_console_wait_tool_results = Some(tool_results);
-            return;
+            // Safety valve: if no blocking watchers remain but sentinels are unresolved,
+            // force-resolve them to prevent infinite pipeline stall. This can happen when
+            // a watcher fires with a stale tool_use_id that doesn't match any pending result.
+            let registry = WatcherRegistry::get(&self.state);
+            if !registry.has_blocking_watchers() {
+                for tr in &mut tool_results {
+                    if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
+                        tr.content = "Console wait result unavailable (watcher expired or was interrupted)".to_string();
+                    } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
+                        // Callback sentinel: extract original content after sentinel+id prefix
+                        let after = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
+                        // Try to find where the original content starts (after sentinel_id)
+                        tr.content = format!("Callback result unavailable (timeout). Original: {}", after);
+                    }
+                }
+            } else {
+                self.pending_console_wait_tool_results = Some(tool_results);
+                return;
+            }
         }
 
         // All resolved — resume normal pipeline: create result message + continue streaming
@@ -259,7 +276,7 @@ impl App {
         self.save_state_async();
         self.state.dirty = true;
 
-        super::streaming::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        let _r = super::streaming::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
         if super::streaming::has_dirty_file_panels(&self.state) {
             self.state.waiting_for_panels = true;
             self.wait_started_ms = now_ms();
@@ -293,6 +310,27 @@ impl App {
 
         // Clear any accumulated blocking results from partial callback completions
         self.accumulated_blocking_results.clear();
+
+        // Scuttle stale blocking watchers whose tool_use_ids match the interrupted results.
+        // Without this, interrupted watchers linger in the registry and fire later with
+        // stale IDs, causing sentinel replacement to fail permanently on the next stream.
+        {
+            let stale_ids: Vec<String> = all_pending
+                .iter()
+                .filter(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL))
+                .map(|r| r.tool_use_id.clone())
+                .collect();
+            if !stale_ids.is_empty() {
+                let registry = WatcherRegistry::get_mut(&mut self.state);
+                registry.watchers.retain(|w| {
+                    if let Some(tid) = w.tool_use_id() {
+                        !stale_ids.contains(&tid.to_string())
+                    } else {
+                        true
+                    }
+                });
+            }
+        }
 
         if all_pending.is_empty() {
             return;

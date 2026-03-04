@@ -1,8 +1,16 @@
+//! Spine module — auto-continuation, notifications, guard rails, and scheduled reminders.
+//!
+//! Three tools: `notification_mark_processed`, `spine_configure`, and `coucou`
+//! (timer/datetime scheduling). Drives the autonomous continuation loop and
+//! manages guard rails (max tokens, cost, duration, messages, retries).
+
 pub(crate) mod coucou;
+/// Auto-continuation engine: `should_auto_continue()`, message injection, guard rail checks.
 pub mod engine;
 pub(crate) mod guard_rail;
 mod panel;
 pub(crate) mod tools;
+/// Notification, spine config, and state types.
 pub mod types;
 
 pub use types::{Notification, NotificationType, SpineConfig, SpineState};
@@ -23,7 +31,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/spine.yaml")).expect("Failed to parse spine tool YAML")
 });
 
-#[derive(Debug)]
+/// Spine module: auto-continuation, notifications, guard rails, coucou timers.
+#[derive(Debug, Clone, Copy)]
 pub struct SpineModule;
 
 impl Module for SpineModule {
@@ -168,9 +177,9 @@ impl Module for SpineModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "notification_mark_processed" => Some(self::tools::execute_mark_processed(tool, state)),
-            "spine_configure" => Some(self::tools::execute_configure(tool, state)),
-            "coucou" => Some(self::coucou::execute_coucou(tool, state)),
+            "notification_mark_processed" => Some(tools::execute_mark_processed(tool, state)),
+            "spine_configure" => Some(tools::execute_configure(tool, state)),
+            "coucou" => Some(coucou::execute_coucou(tool, state)),
             _ => None,
         }
     }

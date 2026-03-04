@@ -52,7 +52,7 @@ impl Panel for GithubResultPanel {
                 }
                 ctx.cache_deprecated = false;
                 let content_ref = ctx.cached_content.clone().unwrap_or_default();
-                update_if_changed(ctx, &content_ref);
+                let _r = update_if_changed(ctx, &content_ref);
                 true
             }
             _ => false,
@@ -66,7 +66,8 @@ impl Panel for GithubResultPanel {
         let args = super::classify::validate_gh_command(&req.command).ok()?;
 
         let mut cmd = std::process::Command::new("gh");
-        cmd.args(&args)
+        let _r = cmd
+            .args(&args)
             .env("GITHUB_TOKEN", &req.github_token)
             .env("GH_TOKEN", &req.github_token)
             .env("GH_PROMPT_DISABLED", "1")

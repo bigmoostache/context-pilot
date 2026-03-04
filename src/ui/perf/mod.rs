@@ -157,9 +157,9 @@ impl PerfMetrics {
 
         let mut ops = self.ops.write().unwrap_or_else(|e| e.into_inner());
         let stats = ops.entry(name).or_default();
-        stats.count.fetch_add(1, Ordering::Relaxed);
-        stats.total_us.fetch_add(duration_us, Ordering::Relaxed);
-        stats.max_us.fetch_max(duration_us, Ordering::Relaxed);
+        let _r = stats.count.fetch_add(1, Ordering::Relaxed);
+        let _r = stats.total_us.fetch_add(duration_us, Ordering::Relaxed);
+        let _r = stats.max_us.fetch_max(duration_us, Ordering::Relaxed);
         if let Ok(mut samples) = stats.samples.write() {
             samples.push(duration_us);
         }
@@ -181,7 +181,7 @@ impl PerfMetrics {
         if let Some(start) = self.frame_state.read().unwrap_or_else(|e| e.into_inner()).frame_start {
             let frame_time = start.elapsed().as_micros().to_u64();
             self.frame_times.write().unwrap_or_else(|e| e.into_inner()).push(frame_time);
-            self.frame_count.fetch_add(1, Ordering::Relaxed);
+            let _r = self.frame_count.fetch_add(1, Ordering::Relaxed);
         }
 
         // Check if stats need refresh (time-based, not frame-based)

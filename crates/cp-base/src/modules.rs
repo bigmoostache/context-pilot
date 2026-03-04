@@ -17,7 +17,7 @@ pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<
     let child = cmd.spawn()?;
     let (tx, rx) = std::sync::mpsc::channel();
     drop(std::thread::spawn(move || {
-        tx.send(child.wait_with_output()).ok();
+        let _r = tx.send(child.wait_with_output());
     }));
     match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
         Ok(result) => result,

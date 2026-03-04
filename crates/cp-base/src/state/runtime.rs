@@ -67,8 +67,11 @@ pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style:
 
 /// Runtime state (messages loaded in memory)
 pub struct State {
+    /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
     pub context: Vec<ContextElement>,
+    /// Conversation messages (user, assistant, tool_call, tool_result).
     pub messages: Vec<Message>,
+    /// Current user input text in the editor.
     pub input: String,
     /// Cursor position in input (byte index)
     pub input_cursor: usize,
@@ -76,7 +79,9 @@ pub struct State {
     pub paste_buffers: Vec<String>,
     /// Labels for paste buffers: None = paste, Some(name) = command
     pub paste_buffer_labels: Vec<Option<String>>,
+    /// Index of the currently selected context panel in the sidebar.
     pub selected_context: usize,
+    /// Whether a stream is actively receiving tokens from the LLM.
     pub is_streaming: bool,
     /// Whether the system is currently executing tool calls (between stream ticks).
     /// True when tools are being dispatched, panels loading, console waits, or sleep timers.
@@ -84,7 +89,9 @@ pub struct State {
     pub is_tooling: bool,
     /// Stop reason from last completed stream (e.g., "end_turn", "max_tokens", "tool_use")
     pub last_stop_reason: Option<String>,
+    /// Vertical scroll offset in the conversation view (fractional lines).
     pub scroll_offset: f32,
+    /// Whether the user has manually scrolled (disables auto-scroll to bottom).
     pub user_scrolled: bool,
     /// Scroll acceleration (increases when holding scroll keys)
     pub scroll_accel: f32,
@@ -122,17 +129,25 @@ pub struct State {
     pub active_theme: String,
     /// Selected LLM provider
     pub llm_provider: crate::llm_types::LlmProvider,
+    /// Active Anthropic model variant.
     pub anthropic_model: crate::llm_types::AnthropicModel,
+    /// Active Grok model variant.
     pub grok_model: crate::llm_types::GrokModel,
+    /// Active Groq model variant.
     pub groq_model: crate::llm_types::GroqModel,
+    /// Active DeepSeek model variant.
     pub deepseek_model: crate::llm_types::DeepSeekModel,
     /// Whether config overlay is showing secondary model selection (Tab toggles)
     pub config_secondary_mode: bool,
     /// Secondary LLM provider (for reveries / sub-agents)
     pub secondary_provider: crate::llm_types::LlmProvider,
+    /// Secondary Anthropic model variant.
     pub secondary_anthropic_model: crate::llm_types::AnthropicModel,
+    /// Secondary Grok model variant.
     pub secondary_grok_model: crate::llm_types::GrokModel,
+    /// Secondary Groq model variant.
     pub secondary_groq_model: crate::llm_types::GroqModel,
+    /// Secondary DeepSeek model variant.
     pub secondary_deepseek_model: crate::llm_types::DeepSeekModel,
     /// Whether the reverie system is enabled (auto-trigger on threshold breach)
     pub reverie_enabled: bool,
@@ -149,11 +164,15 @@ pub struct State {
     pub total_output_tokens: usize,
     /// Current stream token accumulators (runtime-only, reset per user input)
     pub stream_cache_hit_tokens: usize,
+    /// Cache misses in current stream.
     pub stream_cache_miss_tokens: usize,
+    /// Output tokens in current stream.
     pub stream_output_tokens: usize,
     /// Last tick token accumulators (runtime-only, set per StreamDone)
     pub tick_cache_hit_tokens: usize,
+    /// Cache misses in last completed tick.
     pub tick_cache_miss_tokens: usize,
+    /// Output tokens in last completed tick.
     pub tick_output_tokens: usize,
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     pub cleaning_threshold: f32,
@@ -180,6 +199,7 @@ pub struct State {
     pub tool_sleep_until_ms: u64,
 
     // === Render Cache (runtime-only) ===
+    /// Last viewport width used for render cache invalidation.
     pub last_viewport_width: u16,
     /// Cached rendered lines per message ID
     pub message_cache: HashMap<String, MessageRenderCache>,
@@ -189,8 +209,8 @@ pub struct State {
     pub full_content_cache: Option<FullContentCache>,
 
     // === Callback hooks (set by binary, used by extracted module crates) ===
-    /// Syntax highlighting function (provided by binary's highlight module)
-    /// Takes (file_path, content) and returns highlighted spans per line
+    /// Syntax highlighting function (provided by binary's highlight module).
+    /// Takes `(file_path, content)` and returns highlighted spans per line.
     pub highlight_fn: Option<HighlightFn>,
 
     // === Module extension data (TypeMap pattern) ===

@@ -1,3 +1,9 @@
+//! Context Pilot — AI-powered TUI coding assistant.
+//!
+//! Entry point: sets up the terminal, loads state, initializes modules,
+//! and runs the main event loop. Also handles `typst-compile` and
+//! `typst-recompile-watched` subcommands for callback scripts.
+
 mod app;
 mod infra;
 mod llms;
@@ -61,8 +67,8 @@ fn main() -> io::Result<()> {
     }));
 
     enable_raw_mode()?;
-    io::stdout().execute(EnterAlternateScreen)?;
-    io::stdout().execute(EnableBracketedPaste)?;
+    let _r = io::stdout().execute(EnterAlternateScreen)?;
+    let _r = io::stdout().execute(EnableBracketedPaste)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut state = load_state();
@@ -109,8 +115,8 @@ fn main() -> io::Result<()> {
 
     // Cleanup
     disable_raw_mode()?;
-    io::stdout().execute(DisableBracketedPaste)?;
-    io::stdout().execute(LeaveAlternateScreen)?;
+    let _r = io::stdout().execute(DisableBracketedPaste)?;
+    let _r = io::stdout().execute(LeaveAlternateScreen)?;
     Ok(())
 }
 

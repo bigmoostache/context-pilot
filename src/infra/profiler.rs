@@ -44,6 +44,10 @@ impl Drop for ProfileGuard {
     }
 }
 
+/// Create a profiling guard that logs slow operations on drop.
+///
+/// Records timing to the in-memory perf system, and writes to `.context-pilot/perf.log`
+/// if the operation exceeds 5 ms.
 #[macro_export]
 macro_rules! profile {
     ($name:expr) => {

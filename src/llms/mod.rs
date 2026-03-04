@@ -74,7 +74,7 @@ pub(crate) fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
 /// Start API check in background
 pub(crate) fn start_api_check(provider: LlmProvider, model: String, tx: Sender<ApiCheckResult>) {
     let client = get_client(provider);
-    std::thread::spawn(move || {
+    let _r = std::thread::spawn(move || {
         let result = client.check_api(&model);
         let _r = tx.send(result);
     });
@@ -97,7 +97,7 @@ pub(crate) struct StreamParams {
 pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
     let client = get_client(params.provider);
 
-    std::thread::spawn(move || {
+    let _r = std::thread::spawn(move || {
         // Assemble the prompt (panels + seed + conversation → api_messages)
         let include_tool_uses = false; // No pending tool results on first stream
         let api_messages = crate::app::prompt_builder::assemble_prompt(
@@ -326,7 +326,7 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value>
     if panel_count > 0 {
         for quarter in 1..=4usize {
             let pos = (panel_count * quarter).div_ceil(4);
-            cache_breakpoints.insert(pos.saturating_sub(1));
+            let _r = cache_breakpoints.insert(pos.saturating_sub(1));
         }
     }
 

@@ -1,9 +1,16 @@
+/// Action and result types for the event-driven dispatch loop.
 pub mod actions;
+/// File-path autocomplete state for @-triggered popup.
 pub mod autocomplete;
+/// Persistence structs: SharedConfig, WorkerState, PanelData.
 pub mod config;
+/// Context types, elements, and token estimation.
 pub mod context;
+/// Message struct and conversation formatting.
 pub mod message;
+/// Runtime state: the in-memory `State` struct with all live fields.
 pub mod runtime;
+/// Watcher trait and registry for async condition monitoring.
 pub mod watchers;
 
 // Re-exports for convenience
@@ -19,6 +26,7 @@ pub use runtime::{FullContentCache, InputRenderCache, MessageRenderCache, State,
 // ─── Reverie State ──────────────────────────────────────────────────────────
 // Ephemeral sub-agent state — lives as Option<ReverieState> on the main State.
 
+/// Ephemeral reverie sub-agent state (context optimizer, cartographer).
 pub mod reverie {
     use super::message::Message;
 

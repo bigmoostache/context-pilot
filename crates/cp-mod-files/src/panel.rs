@@ -67,7 +67,7 @@ impl Panel for FilePanel {
         let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
-        ctx.source_hash = Some(cp_base::panels::hash_content(&content));
+        ctx.source_hash = Some(hash_content(&content));
         ctx.cached_content = Some(content);
         ctx.full_token_count = token_count;
         ctx.total_pages = compute_total_pages(token_count);

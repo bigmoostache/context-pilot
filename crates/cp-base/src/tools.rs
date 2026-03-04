@@ -10,13 +10,16 @@ use serde_json::{Value, json};
 /// Root structure of a tool YAML file.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ToolTexts {
+    /// Map of tool ID → tool text (description + parameter descriptions).
     pub tools: HashMap<String, ToolText>,
 }
 
 /// LLM-facing text for a single tool: description + parameter descriptions.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ToolText {
+    /// Full tool description shown to the LLM.
     pub description: String,
+    /// Parameter name → description map (keys match `ToolParam::name`).
     #[serde(default)]
     pub parameters: HashMap<String, String>,
 }
@@ -334,7 +337,6 @@ impl ToolDefBuilder<'_> {
     }
 
     /// Add a parameter. Description is auto-pulled from YAML by param name.
-    /// Add a parameter. Description is auto-pulled from YAML by param name.
     pub fn param(mut self, name: &str, param_type: ParamType, required: bool) -> Self {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, param_type);
@@ -346,7 +348,6 @@ impl ToolDefBuilder<'_> {
         self
     }
 
-    /// Add a parameter with enum values. Description from YAML.
     /// Add a parameter with enum values. Description from YAML.
     pub fn param_enum(mut self, name: &str, values: &[&str], required: bool) -> Self {
         let desc = self.param_descs.get(name).cloned();
@@ -361,7 +362,6 @@ impl ToolDefBuilder<'_> {
     }
 
     /// Add a parameter with a default value. Description from YAML.
-    /// Add a parameter with a default value. Description from YAML.
     pub fn param_with_default(mut self, name: &str, param_type: ParamType, default: &str) -> Self {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, param_type);
@@ -371,7 +371,6 @@ impl ToolDefBuilder<'_> {
         self
     }
 
-    /// Add a parameter with array type. Description from YAML.
     /// Add a parameter with array type. Description from YAML.
     pub fn param_array(mut self, name: &str, items: ParamType, required: bool) -> Self {
         let desc = self.param_descs.get(name).cloned();
@@ -385,7 +384,6 @@ impl ToolDefBuilder<'_> {
     }
 
     /// Add a parameter with object type (nested params). Description from YAML.
-    /// Add a parameter with object type (nested params). Description from YAML.
     pub fn param_object(mut self, name: &str, fields: Vec<ToolParam>, required: bool) -> Self {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, ParamType::Object(fields));
@@ -397,7 +395,6 @@ impl ToolDefBuilder<'_> {
         self
     }
 
-    /// Finalize the builder into a ToolDefinition.
     /// Finalize the builder into a [`ToolDefinition`].
     pub fn build(self) -> ToolDefinition {
         ToolDefinition {

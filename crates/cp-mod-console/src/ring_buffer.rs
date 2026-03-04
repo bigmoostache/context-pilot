@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+/// Maximum ring buffer size in bytes (256 KB).
 pub const RING_BUFFER_CAPACITY: usize = 256 * 1024;
 
 #[derive(Debug)]
@@ -27,6 +28,7 @@ impl Default for RingBuffer {
 }
 
 impl RingBuffer {
+    /// Create a new ring buffer with default capacity (256KB).
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(RingBufferInner {

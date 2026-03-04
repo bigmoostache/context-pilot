@@ -182,7 +182,7 @@ impl ConversationPanel {
 
                 // Store in per-message cache (but not for streaming message)
                 if !is_streaming_this {
-                    state.message_cache.insert(
+                    let _r = state.message_cache.insert(
                         msg.id.clone(),
                         MessageRenderCache { lines: Rc::new(lines.clone()), content_hash: hash, viewport_width },
                     );

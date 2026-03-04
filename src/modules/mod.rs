@@ -52,7 +52,7 @@ pub(crate) fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType
     let mut lookup: HashMap<ContextType, (&str, bool, &str, bool)> = HashMap::new();
     for module in &modules {
         for (ct, name, cache_dep) in module.fixed_panel_defaults() {
-            lookup.insert(ct, (module.id(), module.is_core(), name, cache_dep));
+            let _r = lookup.insert(ct, (module.id(), module.is_core(), name, cache_dep));
         }
     }
 
@@ -115,7 +115,7 @@ pub(crate) fn build_visualizer_registry() -> HashMap<String, ToolVisualizer> {
     let mut registry = HashMap::new();
     for module in all_modules() {
         for (tool_id, visualizer) in module.tool_visualizers() {
-            registry.insert(tool_id.to_string(), visualizer);
+            let _r = registry.insert(tool_id.to_string(), visualizer);
         }
     }
     registry
@@ -258,7 +258,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                 if state.active_modules.contains(module_id) {
                     successes.push(format!("'{}' already active", module_id));
                 } else {
-                    state.active_modules.insert(module_id.to_string());
+                    let _r = state.active_modules.insert(module_id.to_string());
                     // Rebuild tools list
                     rebuild_tools(state);
                     let module = all_mods
@@ -287,7 +287,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                                 !fixed_types.contains(&ctx.context_type) && !dynamic_types.contains(&ctx.context_type)
                             });
 
-                            state.active_modules.remove(module_id);
+                            let _r = state.active_modules.remove(module_id);
                             // Rebuild tools list
                             rebuild_tools(state);
                             successes.push(format!("deactivated '{}'", module_id));

@@ -1,5 +1,12 @@
+//! Memory module — persistent knowledge items across conversations.
+//!
+//! Two tools: `memory_create` and `memory_update` (modify/delete). Memories
+//! survive across sessions and workers. Each has a tl;dr summary (capped at
+//! 80 tokens) shown in the panel, with optional rich body text shown when opened.
+
 mod panel;
 mod tools;
+/// Memory state types: `MemoryItem`, `MemoryImportance`, `MemoryState`.
 pub mod types;
 
 use cp_base::cast::SafeCast;
@@ -23,7 +30,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/memory.yaml")).expect("Failed to parse memory tool YAML")
 });
 
-#[derive(Debug)]
+/// Memory module: persistent knowledge items across conversations.
+#[derive(Debug, Clone, Copy)]
 pub struct MemoryModule;
 
 impl Module for MemoryModule {
@@ -158,8 +166,8 @@ impl Module for MemoryModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "memory_create" => Some(self::tools::execute_create(tool, state)),
-            "memory_update" => Some(self::tools::execute_update(tool, state)),
+            "memory_create" => Some(tools::execute_create(tool, state)),
+            "memory_update" => Some(tools::execute_update(tool, state)),
             _ => None,
         }
     }

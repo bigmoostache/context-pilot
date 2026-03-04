@@ -110,7 +110,7 @@ pub(crate) fn handle_clear_conversation(state: &mut State) -> ActionResult {
 /// This is the primary trigger for starting a stream — the spine engine
 /// will detect the unprocessed notification and launch streaming.
 fn create_user_notification(state: &mut State, user_id: &str, content_preview: &str) {
-    SpineState::create_notification(
+    let _r = SpineState::create_notification(
         state,
         NotificationType::UserMessage,
         user_id.to_string(),

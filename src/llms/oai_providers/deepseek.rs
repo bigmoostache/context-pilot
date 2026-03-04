@@ -26,7 +26,7 @@ pub(crate) struct DeepSeekClient {
 
 impl DeepSeekClient {
     pub(crate) fn new() -> Self {
-        dotenvy::dotenv().ok();
+        let _r = dotenvy::dotenv().ok();
         Self { api_key: env::var("DEEPSEEK_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }

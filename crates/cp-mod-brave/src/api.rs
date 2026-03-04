@@ -9,34 +9,52 @@ const TIMEOUT_SECS: u64 = 10;
 /// Parameters for a Brave web search request.
 #[derive(Debug)]
 pub struct SearchParams<'a> {
+    /// Search query string.
     pub query: &'a str,
+    /// Number of results to return (1-20).
     pub count: u32,
+    /// Recency filter (e.g., "pd", "pw", "pm", "py", or date range).
     pub freshness: Option<&'a str>,
+    /// Two-letter ISO country code.
     pub country: &'a str,
+    /// Result language ISO 639-1 code.
     pub search_lang: &'a str,
+    /// Safe search level: "off", "moderate", or "strict".
     pub safe_search: &'a str,
+    /// Brave Goggle URL for domain re-ranking.
     pub goggles_id: Option<&'a str>,
 }
 
 /// Parameters for a Brave LLM context request.
 #[derive(Debug)]
 pub struct LLMContextParams<'a> {
+    /// Search query string.
     pub query: &'a str,
+    /// Approximate max tokens in response (1024-32768).
     pub max_tokens: u32,
+    /// Max search results to consider (1-50).
     pub count: u32,
+    /// Relevance threshold: "strict", "balanced", "lenient", or "disabled".
     pub threshold_mode: &'a str,
+    /// Recency filter.
     pub freshness: Option<&'a str>,
+    /// Two-letter ISO country code.
     pub country: &'a str,
+    /// Brave Goggle URL or inline definition.
     pub goggles: Option<&'a str>,
 }
 
+/// HTTP client for the Brave Search API.
 #[derive(Debug)]
 pub struct BraveClient {
+    /// Reusable reqwest HTTP client with timeout.
     client: Client,
+    /// Brave API subscription token.
     api_key: String,
 }
 
 impl BraveClient {
+    /// Create a new client with the given API key (10s request timeout).
     pub fn new(api_key: String) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(TIMEOUT_SECS))

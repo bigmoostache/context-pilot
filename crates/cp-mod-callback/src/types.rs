@@ -55,14 +55,17 @@ impl Default for CallbackState {
 }
 
 impl CallbackState {
+    /// Create an empty callback state with ID counter at 1.
     pub fn new() -> Self {
         Self { definitions: Vec::new(), next_id: 1, active_set: HashSet::new(), editor_open: None }
     }
 
+    /// Get shared ref from State's TypeMap.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("CallbackState not initialized")
     }
 
+    /// Get mutable ref from State's TypeMap.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("CallbackState not initialized")
     }

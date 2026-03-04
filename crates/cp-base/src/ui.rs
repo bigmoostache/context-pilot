@@ -12,22 +12,29 @@ use crate::config::theme;
 #[derive(Debug, Clone, Copy, Default)]
 pub enum Align {
     #[default]
+    /// Align text to the left, padding with trailing spaces.
     Left,
+    /// Align text to the right, padding with leading spaces.
     Right,
 }
 
 /// A single table cell with text, style, and alignment
 #[derive(Debug)]
 pub struct Cell {
+    /// Display text content.
     pub text: String,
+    /// Ratatui style (fg/bg/modifiers).
     pub style: Style,
+    /// Column alignment.
     pub align: Align,
 }
 
 impl Cell {
+    /// Create a left-aligned cell with the given text and style.
     pub fn new(text: impl Into<String>, style: Style) -> Self {
         Self { text: text.into(), style, align: Align::Left }
     }
+    /// Create a right-aligned cell with the given text and style.
     pub fn right(text: impl Into<String>, style: Style) -> Self {
         Self { text: text.into(), style, align: Align::Right }
     }
@@ -138,14 +145,18 @@ pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Ce
 /// Simple text-cell for `render_table_text`. Style-free, just text + alignment.
 #[derive(Debug)]
 pub struct TextCell {
+    /// Display text content.
     pub text: String,
+    /// Column alignment.
     pub align: Align,
 }
 
 impl TextCell {
+    /// Create a left-aligned text cell.
     pub fn left(text: impl Into<String>) -> Self {
         Self { text: text.into(), align: Align::Left }
     }
+    /// Create a right-aligned text cell.
     pub fn right(text: impl Into<String>) -> Self {
         Self { text: text.into(), align: Align::Right }
     }
@@ -268,29 +279,35 @@ pub fn find_children_pattern(line: &str) -> Option<(usize, usize)> {
 /// A single option the user can choose.
 #[derive(Debug, Clone)]
 pub struct QuestionOption {
+    /// Short label text (1-5 words).
     pub label: String,
+    /// Explanation of what this option means.
     pub description: String,
 }
 
 /// A single question with its options.
 #[derive(Debug, Clone)]
 pub struct Question {
+    /// The complete question text.
     pub question: String,
+    /// Very short label (max 12 chars) for compact display.
     pub header: String,
+    /// Available choices (an "Other" free-text option is appended automatically).
     pub options: Vec<QuestionOption>,
+    /// Whether the user can select multiple options.
     pub multi_select: bool,
 }
 
 /// Per-question answer state tracked during form interaction.
 #[derive(Debug, Clone)]
 pub struct QuestionAnswer {
-    /// Index of the currently highlighted option (0-based, includes "Other" at end)
+    /// Index of the currently highlighted option (0-based, includes "Other" at end).
     pub cursor: usize,
-    /// Which option indices are selected (for single-select: at most one)
+    /// Which option indices are selected (for single-select: at most one).
     pub selected: Vec<usize>,
-    /// If "Other" is selected, the user's typed text
+    /// If "Other" is selected, the user's typed text.
     pub other_text: String,
-    /// Whether the user is currently typing in the "Other" field
+    /// Whether the user is currently typing in the "Other" field.
     pub typing_other: bool,
 }
 
@@ -301,6 +318,7 @@ impl Default for QuestionAnswer {
 }
 
 impl QuestionAnswer {
+    /// Create a blank answer state (no selection, cursor at top).
     pub fn new() -> Self {
         Self { cursor: 0, selected: Vec::new(), other_text: String::new(), typing_other: false }
     }
@@ -324,6 +342,7 @@ pub struct PendingQuestionForm {
 }
 
 impl PendingQuestionForm {
+    /// Create a new question form from a tool call and its questions.
     pub fn new(tool_use_id: String, questions: Vec<Question>) -> Self {
         let answers = questions.iter().map(|_| QuestionAnswer::new()).collect();
         Self { tool_use_id, questions, current_question: 0, answers, resolved: false, result_json: None }

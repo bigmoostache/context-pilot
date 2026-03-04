@@ -1,5 +1,13 @@
+//! Queue module — batch tool calls and execute them atomically.
+//!
+//! Five tools: `Queue_activate`, `Queue_pause`, `Queue_execute` (flush),
+//! `Queue_undo` (remove by index), `Queue_empty` (discard all). The queue
+//! intercepts tool calls in the pipeline, stores them, and replays on flush.
+//! Reverie sub-agents get their own activation flag sharing the same queue storage.
+
 mod panel;
 mod tools;
+/// Queue state types: `QueueState`, `QueuedToolCall`.
 pub mod types;
 
 pub use types::{QueueState, QueuedToolCall};
@@ -17,7 +25,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/queue.yaml")).expect("Failed to parse queue tool YAML")
 });
 
-#[derive(Debug)]
+/// Queue module: batch tool calls and flush them atomically.
+#[derive(Debug, Clone, Copy)]
 pub struct QueueModule;
 
 impl Module for QueueModule {

@@ -1,9 +1,19 @@
+//! GitHub module — PR/issue management via the `gh` CLI.
+//!
+//! One tool: `gh_execute`. Read-only commands create auto-refreshing panels;
+//! mutating commands execute directly. Depends on the git module and requires
+//! `GITHUB_TOKEN` in the environment.
+
 pub(crate) mod cache_invalidation;
+/// Command classification: read-only vs mutating `gh` subcommands.
 pub mod classify;
 mod panel;
+/// Output parsing: extract PR/issue data from `gh` CLI output.
 pub mod parse;
 mod tools;
+/// GitHub state types: `GithubState`, `GhCommand`, `GhWatch`.
 pub mod types;
+/// Background watcher: polls `gh` for PR/issue updates, auto-refreshes panels.
 pub mod watcher;
 
 pub use types::GithubState;
@@ -24,7 +34,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/github.yaml")).expect("Failed to parse github tool YAML")
 });
 
-#[derive(Debug)]
+/// GitHub module: PR/issue management via `gh` CLI.
+#[derive(Debug, Clone, Copy)]
 pub struct GithubModule;
 
 impl Module for GithubModule {
@@ -74,7 +85,7 @@ impl Module for GithubModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "gh_execute" => Some(self::tools::execute_gh_command(tool, state)),
+            "gh_execute" => Some(tools::execute_gh_command(tool, state)),
             _ => None,
         }
     }
@@ -97,7 +108,7 @@ impl Module for GithubModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
-        if ctx.context_type.as_str() == cp_base::state::ContextType::GITHUB_RESULT {
+        if ctx.context_type.as_str() == ContextType::GITHUB_RESULT {
             Some(ctx.get_meta_str("result_command").unwrap_or("").to_string())
         } else {
             None

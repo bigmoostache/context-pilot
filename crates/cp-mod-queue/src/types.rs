@@ -36,6 +36,7 @@ impl Default for QueueState {
 pub const QUEUE_TOOL_PREFIX: &str = "Queue_";
 
 impl QueueState {
+    /// Create an empty inactive queue with index counter at 1.
     pub fn new() -> Self {
         Self { active: false, queued_calls: Vec::new(), next_index: 1 }
     }

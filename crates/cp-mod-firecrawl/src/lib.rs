@@ -1,6 +1,16 @@
+//! Firecrawl module — web scraping, search+scrape, and URL discovery.
+//!
+//! Three tools: `firecrawl_scrape` (single-URL extraction), `firecrawl_search`
+//! (search and scrape in one call), `firecrawl_map` (site URL discovery).
+//! Results appear as dynamic panels with full markdown content.
+
+/// HTTP API client for Firecrawl scrape/search/map endpoints.
 pub mod api;
+/// Dynamic panel rendering for scraped content.
 pub mod panel;
+/// Tool dispatch: `firecrawl_scrape`, `firecrawl_search`, `firecrawl_map`.
 pub mod tools;
+/// Firecrawl API response/request serde types.
 pub mod types;
 
 use cp_base::modules::Module;
@@ -14,7 +24,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
         .expect("Failed to parse firecrawl tool YAML")
 });
 
-#[derive(Debug)]
+/// Firecrawl module: web scraping and content extraction via Firecrawl API.
+#[derive(Debug, Clone, Copy)]
 pub struct FirecrawlModule;
 
 impl Module for FirecrawlModule {

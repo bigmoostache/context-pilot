@@ -69,6 +69,7 @@ fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> 
         .ok_or_else(|| format!("Console panel '{}' not found", panel_id))
 }
 
+/// Handle `console_create`: spawn a child process and create a panel for its output.
 pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),
@@ -124,6 +125,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Console created in {}", panel_id), false)
 }
 
+/// Handle `console_send_keys`: write input text to a running process's stdin.
 pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
@@ -167,6 +169,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Sent input to console '{}'", panel_id), false)
 }
 
+/// Handle `console_wait`: register a blocking watcher for exit or pattern match.
 pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
@@ -253,6 +256,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(), false)
 }
 
+/// Handle `console_watch`: register an async (non-blocking) watcher with spine notification.
 pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
@@ -342,6 +346,7 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
     )
 }
 
+/// Handle `console_easy_bash`: spawn, block until exit or 10s timeout, return output summary.
 pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),

@@ -26,7 +26,7 @@ pub(crate) struct AnthropicClient {
 
 impl AnthropicClient {
     pub(crate) fn new() -> Self {
-        dotenvy::dotenv().ok();
+        let _r = dotenvy::dotenv().ok();
         Self { api_key: env::var("ANTHROPIC_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }
@@ -194,7 +194,7 @@ impl LlmClient for AnthropicClient {
             }
 
             if last_lines.len() >= 5 {
-                last_lines.remove(0);
+                let _r = last_lines.remove(0);
             }
             last_lines.push(line.to_string());
 

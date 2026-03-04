@@ -50,7 +50,7 @@ impl App {
                         model,
                         e
                     );
-                    crate::state::persistence::log_error(&log_msg);
+                    let _r = crate::state::persistence::log_error(&log_msg);
 
                     // Check if we should retry
                     if will_retry {
@@ -63,7 +63,7 @@ impl App {
                         let spine = cp_mod_spine::SpineState::get_mut(&mut self.state);
                         spine.config.consecutive_continuation_errors += 1;
                         spine.config.last_continuation_error_ms = Some(crate::app::panels::now_ms());
-                        apply_action(&mut self.state, Action::StreamError(e));
+                        let _r = apply_action(&mut self.state, Action::StreamError(e));
                     }
                 }
             }
@@ -108,7 +108,7 @@ impl App {
         if self.state.is_streaming
             && let Some(chars) = self.typewriter.take_chars()
         {
-            apply_action(&mut self.state, Action::AppendChars(chars));
+            let _r = apply_action(&mut self.state, Action::AppendChars(chars));
             self.state.dirty = true;
         }
     }

@@ -24,6 +24,7 @@ pub fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String)
     (etag, poll_interval, body.to_string())
 }
 
+/// Extract a specific HTTP header value (case-insensitive key match).
 pub fn extract_header(headers: &str, name: &str) -> Option<String> {
     let prefix = format!("{}:", name);
     headers.lines().find_map(|line| {
@@ -36,12 +37,14 @@ pub fn extract_poll_interval(stdout: &str) -> Option<u64> {
     extract_header(stdout, "x-poll-interval").and_then(|v| v.parse::<u64>().ok())
 }
 
+/// SHA-256 hex digest of a string — used for change detection.
 pub fn sha256_hex(input: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());
     format!("{:064x}", hasher.finalize())
 }
 
+/// Replace a GitHub token in output with `[REDACTED]` for safe display.
 pub fn redact_token(output: &str, token: &str) -> String {
     if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_string() }
 }
@@ -54,17 +57,18 @@ pub fn poll_branch_pr(
     last_hash: Option<&str>,
 ) -> Option<(String, Option<crate::types::BranchPrInfo>)> {
     let mut cmd = Command::new("gh");
-    cmd.args([
-        "pr",
-        "view",
-        branch,
-        "--json",
-        "number,title,state,url,additions,deletions,reviewDecision,statusCheckRollup",
-    ])
-    .env("GITHUB_TOKEN", github_token)
-    .env("GH_TOKEN", github_token)
-    .env("GH_PROMPT_DISABLED", "1")
-    .env("NO_COLOR", "1");
+    let _r = cmd
+        .args([
+            "pr",
+            "view",
+            branch,
+            "--json",
+            "number,title,state,url,additions,deletions,reviewDecision,statusCheckRollup",
+        ])
+        .env("GITHUB_TOKEN", github_token)
+        .env("GH_TOKEN", github_token)
+        .env("GH_PROMPT_DISABLED", "1")
+        .env("NO_COLOR", "1");
 
     let Ok(output) = run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS) else { return None };
 

@@ -1,5 +1,14 @@
+//! Preset module — save and load named worker configuration snapshots.
+//!
+//! Two tools: `preset_snapshot_myself` (capture current config) and
+//! `preset_load` (restore a saved config). Built-in presets ship with the
+//! binary; custom presets are stored as JSON in `.context-pilot/presets/`.
+
+/// Built-in preset definitions (admin, worker, planner, etc.).
 pub mod builtin;
+/// Tool implementations: `execute_snapshot`, `execute_load`, preset listing.
 pub mod tools;
+/// Serde types: `PresetData`, `PresetPanelConfig`, `PresetInfo`.
 pub mod types;
 
 /// Presets subdirectory
@@ -19,7 +28,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
 
 /// Function pointers for module-registry operations that live in the binary.
 /// Injected at construction time so the crate doesn't depend on the binary.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct PresetModule {
     pub(crate) all_modules_fn: fn() -> Vec<Box<dyn Module>>,
     pub(crate) active_tool_defs_fn: fn(&HashSet<String>) -> Vec<ToolDefinition>,
@@ -27,6 +36,7 @@ pub struct PresetModule {
 }
 
 impl PresetModule {
+    /// Create a new `PresetModule` with injected function pointers for module registry access.
     pub fn new(
         all_modules_fn: fn() -> Vec<Box<dyn Module>>,
         active_tool_defs_fn: fn(&HashSet<String>) -> Vec<ToolDefinition>,

@@ -8,19 +8,29 @@
 
 /// Trait for safe saturating casts between numeric types.
 pub trait SafeCast {
+    /// Saturating cast to `u8` — clamps to `0..=255`.
     fn to_u8(self) -> u8;
+    /// Saturating cast to `u16` — clamps to `0..=65535`.
     fn to_u16(self) -> u16;
+    /// Saturating cast to `u32`.
     fn to_u32(self) -> u32;
+    /// Saturating cast to `u64`.
     fn to_u64(self) -> u64;
+    /// Saturating cast to `usize`.
     fn to_usize(self) -> usize;
+    /// Saturating cast to `i32` — clamps to `i32::MIN..=i32::MAX`.
     fn to_i32(self) -> i32;
+    /// Saturating cast to `i64`.
     fn to_i64(self) -> i64;
+    /// Lossy cast to `f32` (may lose precision for large integers).
     fn to_f32(self) -> f32;
+    /// Lossy cast to `f64` (may lose precision for very large integers).
     fn to_f64(self) -> f64;
 }
 
 macro_rules! impl_safe_cast_unsigned {
     ($t:ty) => {
+        #[allow(trivial_numeric_casts, trivial_casts, reason = "macro-generated identity casts (e.g. u32 as u32) are unavoidable — expect() would fail on non-identity expansions")]
         impl SafeCast for $t {
             #[inline]
             fn to_u8(self) -> u8 {
@@ -64,6 +74,7 @@ macro_rules! impl_safe_cast_unsigned {
 
 macro_rules! impl_safe_cast_signed {
     ($t:ty) => {
+        #[allow(trivial_numeric_casts, trivial_casts)]
         impl SafeCast for $t {
             #[inline]
             fn to_u8(self) -> u8 {

@@ -16,7 +16,9 @@ pub struct ScratchpadCell {
 /// Module-owned state for the Scratchpad module
 #[derive(Debug)]
 pub struct ScratchpadState {
+    /// All scratchpad cells, ordered by creation.
     pub scratchpad_cells: Vec<ScratchpadCell>,
+    /// Counter for generating unique IDs (C1, C2, ...).
     pub next_scratchpad_id: usize,
 }
 
@@ -27,12 +29,15 @@ impl Default for ScratchpadState {
 }
 
 impl ScratchpadState {
+    /// Create an empty scratchpad state with ID counter at 1.
     pub fn new() -> Self {
         Self { scratchpad_cells: vec![], next_scratchpad_id: 1 }
     }
+    /// Get shared ref from State's TypeMap.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("ScratchpadState not initialized")
     }
+    /// Get mutable ref from State's TypeMap.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("ScratchpadState not initialized")
     }

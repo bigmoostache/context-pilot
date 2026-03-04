@@ -26,7 +26,7 @@ impl CachePool {
 
         for i in 0..CACHE_POOL_SIZE {
             let rx = std::sync::Arc::clone(&job_rx);
-            thread::Builder::new()
+            let _r = thread::Builder::new()
                 .name(format!("cache-worker-{}", i))
                 .spawn(move || {
                     loop {

@@ -9,41 +9,61 @@ const TIMEOUT_SECS: u64 = 30;
 /// Parameters for firecrawl_scrape.
 #[derive(Debug)]
 pub struct ScrapeParams<'a> {
+    /// Target URL to scrape.
     pub url: &'a str,
+    /// Output formats: "markdown", "html", "links", "summary", "images".
     pub formats: Vec<&'a str>,
+    /// ISO country code for geo-targeted scraping.
     pub country: Option<&'a str>,
+    /// Preferred response languages.
     pub languages: Option<Vec<&'a str>>,
 }
 
 /// Parameters for firecrawl_search.
 #[derive(Debug)]
 pub struct SearchParams<'a> {
+    /// Search query string.
     pub query: &'a str,
+    /// Max pages to scrape (1-10).
     pub limit: u32,
+    /// Source types: "web", "news", "images".
     pub sources: Vec<&'a str>,
+    /// Target categories: "github", "research", "pdf".
     pub categories: Option<Vec<&'a str>>,
+    /// Time filter: "qdr:h", "qdr:d", "qdr:w", "qdr:m", "qdr:y".
     pub tbs: Option<&'a str>,
+    /// Location string (e.g., "Germany", "San Francisco,California").
     pub location: Option<&'a str>,
 }
 
 /// Parameters for firecrawl_map.
 #[derive(Debug)]
 pub struct MapParams<'a> {
+    /// Root domain or subdomain to map.
     pub url: &'a str,
+    /// Max URLs to return (1-5000).
     pub limit: u32,
+    /// Optional keyword filter on discovered URLs.
     pub search: Option<&'a str>,
+    /// Whether to include subdomains.
     pub include_subdomains: bool,
+    /// ISO country code for geo-targeted mapping.
     pub country: Option<&'a str>,
+    /// Preferred response languages.
     pub languages: Option<Vec<&'a str>>,
 }
 
+/// HTTP client for the Firecrawl API (v2).
 #[derive(Debug)]
 pub struct FirecrawlClient {
+    /// Reusable reqwest HTTP client with 30s timeout.
     client: Client,
+    /// Firecrawl API key for Bearer auth.
     api_key: String,
 }
 
 impl FirecrawlClient {
+    /// Create a new client with the given API key.
     pub fn new(api_key: String) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(TIMEOUT_SECS))

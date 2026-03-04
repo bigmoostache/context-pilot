@@ -6,7 +6,7 @@ fn default_true() -> bool {
 }
 
 /// Notification type -- what triggered this notification
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationType {
     /// User sent a message
@@ -18,6 +18,7 @@ pub enum NotificationType {
 }
 
 impl NotificationType {
+    /// Human-readable label (e.g., "User Message", "Reload Resume").
     pub fn label(&self) -> &'static str {
         match self {
             NotificationType::UserMessage => "User Message",
@@ -28,7 +29,7 @@ impl NotificationType {
 }
 
 /// Status of a notification in the spine system
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationStatus {
     /// Not yet handled — triggers auto-continuation
@@ -70,10 +71,12 @@ impl Notification {
         }
     }
 
+    /// Whether this notification has been handled.
     pub fn is_processed(&self) -> bool {
         self.status == NotificationStatus::Processed
     }
 
+    /// Whether this notification is still awaiting action.
     pub fn is_unprocessed(&self) -> bool {
         self.status == NotificationStatus::Unprocessed
     }
@@ -89,7 +92,7 @@ pub enum ContinuationAction {
 }
 
 /// Configuration for spine module (per-worker, persisted)
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct SpineConfig {
     /// Whether to continue until all todos are done
     #[serde(default)]
@@ -148,8 +151,11 @@ pub struct SpineConfig {
 /// Module-owned state for the Spine module
 #[derive(Debug)]
 pub struct SpineState {
+    /// All notifications (unprocessed, blocked, and processed).
     pub notifications: Vec<Notification>,
+    /// Counter for generating unique IDs (N1, N2, ...).
     pub next_notification_id: usize,
+    /// Per-worker spine configuration (guard rails, auto-continuation settings).
     pub config: SpineConfig,
 }
 
@@ -160,14 +166,17 @@ impl Default for SpineState {
 }
 
 impl SpineState {
+    /// Create an empty spine state with default configuration.
     pub fn new() -> Self {
         Self { notifications: vec![], next_notification_id: 1, config: SpineConfig::default() }
     }
 
+    /// Get shared ref from State's TypeMap.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("SpineState not initialized")
     }
 
+    /// Get mutable ref from State's TypeMap.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("SpineState not initialized")
     }

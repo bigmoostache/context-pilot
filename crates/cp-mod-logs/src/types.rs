@@ -3,10 +3,14 @@ use cp_base::state::State;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// A timestamped log entry, optionally nested under a summary parent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
+    /// Log ID (L1, L2, ...).
     pub id: String,
+    /// Timestamp (ms since UNIX epoch) when the entry was created.
     pub timestamp_ms: u64,
+    /// Short, atomic log text.
     pub content: String,
     /// If this log was summarized into a parent, the parent's ID.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -17,6 +21,7 @@ pub struct LogEntry {
 }
 
 impl LogEntry {
+    /// Create a log entry timestamped to now.
     pub fn new(id: String, content: String) -> Self {
         let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis().to_u64()).unwrap_or(0);
         Self { id, timestamp_ms, content, parent_id: None, children_ids: vec![] }
@@ -41,8 +46,11 @@ impl LogEntry {
 /// Module-owned state for the Logs module
 #[derive(Debug)]
 pub struct LogsState {
+    /// All log entries (top-level + children), ordered by creation.
     pub logs: Vec<LogEntry>,
+    /// Counter for generating unique IDs (L1, L2, ...).
     pub next_log_id: usize,
+    /// IDs of summary logs currently expanded (showing children).
     pub open_log_ids: Vec<String>,
 }
 
@@ -53,14 +61,17 @@ impl Default for LogsState {
 }
 
 impl LogsState {
+    /// Create an empty state with ID counter at 1.
     pub fn new() -> Self {
         Self { logs: vec![], next_log_id: 1, open_log_ids: vec![] }
     }
 
+    /// Get shared ref from State's TypeMap.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("LogsState not initialized")
     }
 
+    /// Get mutable ref from State's TypeMap.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("LogsState not initialized")
     }

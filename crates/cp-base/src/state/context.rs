@@ -73,10 +73,12 @@ pub fn fixed_panel_order() -> Vec<&'static str> {
 pub struct ContextType(String);
 
 impl ContextType {
+    /// Create a new context type from a string ID.
     pub fn new(id: &str) -> Self {
         Self(id.to_string())
     }
 
+    /// Return the raw string ID.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -86,28 +88,51 @@ impl ContextType {
     // Modules also export their own constants; these exist for convenience
     // and will be gradually removed as module-specific code moves out.
 
+    /// System prompt panel.
     pub const SYSTEM: &str = "system";
+    /// Active conversation panel.
     pub const CONVERSATION: &str = "conversation";
+    /// Opened file panel.
     pub const FILE: &str = "file";
+    /// Directory tree panel.
     pub const TREE: &str = "tree";
+    /// Glob search results.
     pub const GLOB: &str = "glob";
+    /// Grep search results.
     pub const GREP: &str = "grep";
+    /// Tmux pane panel (legacy).
     pub const TMUX: &str = "tmux";
+    /// Todo list panel.
     pub const TODO: &str = "todo";
+    /// Memory items panel.
     pub const MEMORY: &str = "memory";
+    /// Overview / stats panel.
     pub const OVERVIEW: &str = "overview";
+    /// Git status / diff panel.
     pub const GIT: &str = "git";
+    /// Git command result panel.
     pub const GIT_RESULT: &str = "git_result";
+    /// GitHub CLI result panel.
     pub const GITHUB_RESULT: &str = "github_result";
+    /// Scratchpad cells panel.
     pub const SCRATCHPAD: &str = "scratchpad";
+    /// Prompt library panel.
     pub const LIBRARY: &str = "library";
+    /// Loaded skill panel.
     pub const SKILL: &str = "skill";
+    /// Detached conversation history panel.
     pub const CONVERSATION_HISTORY: &str = "conversation_history";
+    /// Spine / notifications panel.
     pub const SPINE: &str = "spine";
+    /// Log entries panel.
     pub const LOGS: &str = "logs";
+    /// Console process output panel.
     pub const CONSOLE: &str = "console";
+    /// Callback definitions panel.
     pub const CALLBACK: &str = "callback";
+    /// Tools overview panel.
     pub const TOOLS: &str = "tools";
+    /// Queue status panel.
     pub const QUEUE: &str = "queue";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
@@ -148,6 +173,8 @@ impl PartialEq<ContextType> for &str {
     }
 }
 
+/// A single context panel in the LLM prompt — the core unit of the context window.
+/// Fixed panels (P1–P7) are always present; dynamic panels (P8+) are created by tools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextElement {
     /// Display ID (e.g., P1, P2, ... for UI/LLM)
@@ -155,8 +182,11 @@ pub struct ContextElement {
     /// UID for dynamic panels (None for fixed P1-P7, Some for P8+)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
+    /// What kind of panel this is (e.g., `"todo"`, `"file"`, `"console"`).
     pub context_type: ContextType,
+    /// Human-readable panel name shown in sidebar and LLM header.
     pub name: String,
+    /// Token count for this panel (current page if paginated).
     pub token_count: usize,
     /// Generic metadata bag for module-specific panel data.
     /// Keys are module-defined strings (e.g., "file_path", "tmux_pane_id").

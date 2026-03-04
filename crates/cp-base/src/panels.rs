@@ -35,11 +35,26 @@ use crate::state::{Action, ContextElement, ContextType, State};
 /// Result of a background cache operation
 pub enum CacheUpdate {
     /// Generic content update (used by File, Tree, Glob, Grep, Tmux, GitResult, GithubResult)
-    Content { context_id: String, content: String, token_count: usize },
+    Content {
+        /// Context element ID (e.g., "P7").
+        context_id: String,
+        /// New panel content string.
+        content: String,
+        /// Estimated token count for the new content.
+        token_count: usize,
+    },
     /// Content unchanged — clear cache_in_flight without updating content
-    Unchanged { context_id: String },
+    Unchanged {
+        /// Context element ID.
+        context_id: String,
+    },
     /// Module-specific update requiring downcast (e.g., git status populating GitState)
-    ModuleSpecific { context_type: ContextType, data: Box<dyn Any + Send> },
+    ModuleSpecific {
+        /// Panel type to match against.
+        context_type: ContextType,
+        /// Type-erased module data (downcast by the module's `apply_cache_update`).
+        data: Box<dyn Any + Send>,
+    },
 }
 
 impl fmt::Debug for CacheUpdate {
@@ -59,7 +74,9 @@ impl fmt::Debug for CacheUpdate {
 /// Generic request for background cache operations.
 /// Each module defines its own request data struct and wraps it in `data`.
 pub struct CacheRequest {
+    /// Panel type that originated this request.
     pub context_type: ContextType,
+    /// Type-erased request payload (downcast by the module's `refresh_cache`).
     pub data: Box<dyn Any + Send>,
 }
 
@@ -170,6 +187,7 @@ pub struct ContextItem {
 }
 
 impl ContextItem {
+    /// Create a context item from its components.
     pub fn new(
         id: impl Into<String>,
         header: impl Into<String>,

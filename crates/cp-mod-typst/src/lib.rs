@@ -1,9 +1,20 @@
+//! Typst PDF module — embedded compiler for document generation.
+//!
+//! Provides `typst_execute` tool (compile, watch, init, query, fonts).
+//! Automatically seeds shared templates and registers a file-change callback
+//! that recompiles watched documents when any dependency changes.
+
 // Silent callback test
+/// Parses typst CLI subcommands into structured arguments.
 pub mod cli_parser;
+/// Embedded Typst compiler (World implementation, font loading, package resolution).
 pub mod compiler;
+/// Package management: download and cache `@preview/` packages from Typst Universe.
 pub mod packages;
+/// Template seeding: copy built-in templates into `.context-pilot/shared/typst-templates/`.
 pub mod templates;
 mod tools_execute;
+/// Watchlist: tracked documents and their full dependency trees for auto-recompilation.
 pub mod watchlist;
 
 use cp_base::modules::Module;
@@ -16,7 +27,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/typst.yaml")).expect("Failed to parse typst tool YAML")
 });
 
-#[derive(Debug)]
+/// Typst PDF module: embedded compiler, watch mode, template management.
+#[derive(Debug, Clone, Copy)]
 pub struct TypstModule;
 
 /// Templates live here — in the shared (version-controlled) folder.

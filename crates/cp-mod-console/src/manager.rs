@@ -185,15 +185,25 @@ pub fn kill_orphaned_processes(known_keys: &HashSet<String>) {
 /// The TUI polls the log file for output into a RingBuffer.
 #[derive(Debug)]
 pub struct SessionHandle {
+    /// Unique session key (e.g., "c_42").
     pub name: String,
+    /// Shell command that was executed.
     pub command: String,
+    /// Working directory (None = project root).
     pub cwd: Option<String>,
+    /// Current process status (shared with status poller thread).
     pub status: Arc<Mutex<ProcessStatus>>,
+    /// Ring buffer capturing stdout/stderr output.
     pub buffer: RingBuffer,
+    /// Absolute path to the log file.
     pub log_path: String,
+    /// Server-reported PID (shared with poller).
     child_id: Arc<Mutex<Option<u32>>>,
+    /// Timestamp (ms since epoch) when spawned.
     pub started_at: u64,
+    /// Timestamp when process exited (shared with status poller).
     pub finished_at: Arc<Mutex<Option<u64>>>,
+    /// Signal to stop background poller threads.
     stop_polling: Arc<AtomicBool>,
 }
 

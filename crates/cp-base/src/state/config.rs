@@ -12,8 +12,11 @@ use super::context::ContextType;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum SidebarMode {
     #[default]
+    /// Full sidebar with panel names and details.
     Normal,
+    /// Icons-only sidebar (narrow).
     Collapsed,
+    /// Sidebar completely hidden.
     Hidden,
 }
 
@@ -72,10 +75,12 @@ pub struct SharedConfig {
     #[serde(default)]
     pub draft_cursor: usize,
     /// Sidebar display mode (Normal/Collapsed/Hidden)
+    /// Sidebar display mode (Normal/Collapsed/Hidden)
     #[serde(default)]
     pub sidebar_mode: SidebarMode,
 
     // === Module data (keyed by module ID) ===
+    /// Per-module persistent data, keyed by module ID string.
     #[serde(default)]
     pub modules: HashMap<String, serde_json::Value>,
 }
@@ -123,6 +128,7 @@ pub struct WorkerState {
     pub next_result_id: usize,
 
     // === Module data (keyed by module ID) ===
+    /// Per-module persistent worker data, keyed by module ID string.
     #[serde(default)]
     pub modules: HashMap<String, serde_json::Value>,
 }

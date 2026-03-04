@@ -1,8 +1,18 @@
+//! Console module — spawn and manage child processes via a background Unix socket server.
+//!
+//! Provides 5 tools: `console_create`, `console_send_keys`, `console_wait`,
+//! `console_watch`, and `console_easy_bash`. Each session gets a panel showing
+//! its ring-buffered output, and survives TUI reloads via server reconnection.
+
+/// Session management: spawn/reconnect via Unix socket server, kill, orphan cleanup.
 pub mod manager;
 mod panel;
 mod pollers;
+/// Thread-safe ring buffer for capturing process output.
 pub mod ring_buffer;
+/// Tool implementations: create, send_keys, wait, watch, easy_bash.
 pub mod tools;
+/// Console state types: `ConsoleState`, `SessionMeta`, `ProcessStatus`, `ConsoleWatcher`.
 pub mod types;
 
 /// Subdirectory under STORE_DIR for console log files.
@@ -29,7 +39,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/console.yaml")).expect("Failed to parse console tool YAML")
 });
 
-#[derive(Debug)]
+/// Console module: spawns child processes, manages sessions, provides interactive I/O.
+#[derive(Debug, Clone, Copy)]
 pub struct ConsoleModule;
 
 impl Module for ConsoleModule {
@@ -331,6 +342,7 @@ impl Module for ConsoleModule {
 }
 
 /// Visualizer for console tool results.
+/// Visualizer for console tool results — color-codes success/error/info lines.
 fn visualize_console_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
     use ratatui::prelude::*;
 

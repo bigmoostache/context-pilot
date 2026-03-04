@@ -45,7 +45,7 @@ impl TypewriterBuffer {
         if let Some(last_time) = self.last_chunk_time {
             let interval = now.duration_since(last_time);
             if self.chunk_intervals.len() >= TYPEWRITER_MOVING_AVG_SIZE {
-                self.chunk_intervals.pop_front();
+                let _r = self.chunk_intervals.pop_front();
             }
             self.chunk_intervals.push_back(interval);
         }
@@ -53,7 +53,7 @@ impl TypewriterBuffer {
 
         let char_count = text.chars().count();
         if self.chunk_sizes.len() >= TYPEWRITER_MOVING_AVG_SIZE {
-            self.chunk_sizes.pop_front();
+            let _r = self.chunk_sizes.pop_front();
         }
         self.chunk_sizes.push_back(char_count);
 

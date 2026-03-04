@@ -82,7 +82,8 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
         CommandClass::Mutating => {
             // Execute directly with timeout
             let mut cmd = Command::new("gh");
-            cmd.args(&args)
+            let _r = cmd
+                .args(&args)
                 .env("GITHUB_TOKEN", &token)
                 .env("GH_TOKEN", &token)
                 .env("GH_PROMPT_DISABLED", "1")

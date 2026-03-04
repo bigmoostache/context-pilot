@@ -1,3 +1,9 @@
+//! Files module — read, edit, and write project files.
+//!
+//! Three tools: `Open` (read file into context panel with syntax highlighting),
+//! `Edit` (old_string/new_string diff replacement), `Write` (create or fully
+//! overwrite). File panels auto-refresh on filesystem changes via the watcher.
+
 mod panel;
 mod tools;
 
@@ -15,7 +21,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/files.yaml")).expect("Failed to parse files tool YAML")
 });
 
-#[derive(Debug)]
+/// Files module: Open, Edit, Write tools for file manipulation.
+#[derive(Debug, Clone, Copy)]
 pub struct FilesModule;
 
 impl Module for FilesModule {
@@ -145,9 +152,9 @@ impl Module for FilesModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "Open" => Some(self::tools::file::execute_open(tool, state)),
-            "Edit" => Some(self::tools::edit_file::execute_edit(tool, state)),
-            "Write" => Some(self::tools::write::execute(tool, state)),
+            "Open" => Some(tools::file::execute_open(tool, state)),
+            "Edit" => Some(tools::edit_file::execute_edit(tool, state)),
+            "Write" => Some(tools::write::execute(tool, state)),
 
             _ => None,
         }
@@ -171,7 +178,7 @@ impl Module for FilesModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
-        if ctx.context_type.as_str() == cp_base::state::ContextType::FILE {
+        if ctx.context_type.as_str() == ContextType::FILE {
             Some(ctx.get_meta_str("file_path").unwrap_or("").to_string())
         } else {
             None

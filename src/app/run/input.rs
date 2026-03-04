@@ -75,7 +75,7 @@ impl App {
                     // Query was empty — remove the '@' and deactivate
                     ac.deactivate();
                     if anchor < self.state.input.len() {
-                        self.state.input.remove(anchor);
+                        let _r = self.state.input.remove(anchor);
                         self.state.input_cursor = anchor;
                     }
                 } else {

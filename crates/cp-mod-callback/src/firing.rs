@@ -178,17 +178,29 @@ fn shell_escape(s: &str) -> String {
 /// On exit != 0: returns error output + deferred panel info for tool_cleanup to create.
 #[derive(Debug)]
 pub struct CallbackWatcher {
+    /// Unique watcher ID (e.g., "callback_CB3_cb_42").
     pub watcher_id: String,
+    /// Console session key for the spawned script.
     pub session_name: String,
+    /// Human-readable callback name.
     pub callback_name: String,
+    /// Source tag for watcher registry filtering (e.g., "callback_CB3").
     pub callback_tag: String,
+    /// Custom message to display on success (exit 0).
     pub success_message: Option<String>,
+    /// Whether this watcher blocks the tool pipeline (sentinel replacement).
     pub blocking: bool,
+    /// Tool use ID for sentinel matching (blocking watchers only).
     pub tool_use_id: Option<String>,
+    /// Timestamp (ms) when this watcher was created.
     pub registered_at_ms: u64,
+    /// Timeout deadline (ms since epoch). None = no timeout.
     pub deadline_ms: Option<u64>,
+    /// Description shown in the Spine panel's active watchers list.
     pub desc: String,
+    /// Files that triggered this callback (for env var injection).
     pub matched_files: Vec<String>,
+    /// Panel creation info (deferred until failure/timeout).
     pub deferred_panel: DeferredPanel,
 }
 

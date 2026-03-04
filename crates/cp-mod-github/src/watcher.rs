@@ -36,6 +36,7 @@ type DueWatch = (String, Vec<String>, Arc<SecretBox<String>>, bool, Option<Strin
 /// Update sent when branch PR info changes
 #[derive(Debug)]
 pub struct BranchPrUpdate {
+    /// Latest PR info, or `None` if no PR exists for the branch.
     pub pr_info: Option<crate::types::BranchPrInfo>,
 }
 
@@ -115,7 +116,7 @@ impl GhWatcher {
             let is_api_command = is_api_command(&args);
 
             let token = Arc::new(SecretBox::new(Box::new(github_token.clone())));
-            watches.insert(
+            let _r = watches.insert(
                 context_id.clone(),
                 GhWatch {
                     context_id: context_id.clone(),
@@ -209,10 +210,10 @@ fn poll_loop(
 
                 // Send update if content changed
                 if let Some((_, pr_info)) = result {
-                    cache_tx.send(CacheUpdate::ModuleSpecific {
+                    let _r = cache_tx.send(CacheUpdate::ModuleSpecific {
                         context_type: cp_base::state::ContextType::new(cp_base::state::ContextType::GITHUB_RESULT),
                         data: Box::new(BranchPrUpdate { pr_info }),
-                    }).ok();
+                    });
                 }
             }
         }
@@ -261,7 +262,7 @@ fn poll_loop(
                     let body = truncate_output(&body, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&body);
 
-                    cache_tx.send(CacheUpdate::Content { context_id, content: body, token_count }).ok();
+                    let _r = cache_tx.send(CacheUpdate::Content { context_id, content: body, token_count });
                 }
             } else {
                 let result = poll_cli_command(&args, token_str, last_hash.as_deref());
@@ -281,7 +282,7 @@ fn poll_loop(
                     let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&content);
 
-                    cache_tx.send(CacheUpdate::Content { context_id, content, token_count }).ok();
+                    let _r = cache_tx.send(CacheUpdate::Content { context_id, content, token_count });
                 }
             }
         }
@@ -307,7 +308,8 @@ fn poll_api_command(args: &[String], github_token: &str, current_etag: Option<&s
     }
 
     let mut cmd = Command::new("gh");
-    cmd.args(&cmd_args)
+    let _r = cmd
+        .args(&cmd_args)
         .env("GITHUB_TOKEN", github_token)
         .env("GH_TOKEN", github_token)
         .env("GH_PROMPT_DISABLED", "1")
@@ -336,7 +338,8 @@ fn poll_api_command(args: &[String], github_token: &str, current_etag: Option<&s
 /// Poll a non-API `gh` command using output hash comparison.
 fn poll_cli_command(args: &[String], github_token: &str, last_hash: Option<&str>) -> Option<(String, String)> {
     let mut cmd = Command::new("gh");
-    cmd.args(args)
+    let _r = cmd
+        .args(args)
         .env("GITHUB_TOKEN", github_token)
         .env("GH_TOKEN", github_token)
         .env("GH_PROMPT_DISABLED", "1")

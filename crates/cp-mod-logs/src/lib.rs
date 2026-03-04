@@ -1,5 +1,13 @@
+//! Logs module — timestamped entries, summarization, and conversation history.
+//!
+//! Four tools: `log_create`, `log_summarize` (collapse multiple into parent),
+//! `log_toggle` (expand/collapse summaries), `Close_conversation_history`
+//! (archive a history panel with log/memory extraction). Logs are stored
+//! globally in chunked JSON files under `.context-pilot/logs/`.
+
 mod panel;
 mod tools;
+/// Log state types: `LogEntry`, `LogsState`.
 pub mod types;
 
 use cp_base::cast::SafeCast;
@@ -112,7 +120,8 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
     (all_logs, next_log_id)
 }
 
-#[derive(Debug)]
+/// Logs module: timestamped entries, summarization, and conversation history management.
+#[derive(Debug, Clone, Copy)]
 pub struct LogsModule;
 
 impl Module for LogsModule {

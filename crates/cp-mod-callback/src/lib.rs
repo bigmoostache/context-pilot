@@ -1,10 +1,20 @@
-// Arr! Callback module — auto-fires scripts when files walk the plank! ⚓🏴‍☠️
-// Tested by the pirate crew on this fine day
+//! Callback module — auto-fire bash scripts when files matching a glob are edited.
+//!
+//! Four tools: `Callback_upsert` (create/update/delete), `Callback_toggle`
+//! (per-worker activation), `Callback_open_editor` / `Callback_close_editor`
+//! (inline script editing). Callbacks run as child processes via the console
+//! module, with optional blocking and timeout.
+
+// Arr! Tested by the pirate crew on this fine day
+/// Script execution: spawn callback processes, capture output, handle timeouts.
 pub mod firing;
 mod panel;
+/// Tool dispatch: upsert, toggle, open/close editor.
 pub mod tools;
 mod tools_upsert;
+/// Glob matching and callback trigger on file edits.
 pub mod trigger;
+/// Callback state types: `CallbackDefinition`, `CallbackState`.
 pub mod types;
 
 use serde_json::json;
@@ -24,7 +34,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
         .expect("Failed to parse callback tool YAML")
 });
 
-#[derive(Debug)]
+/// Callback module: auto-fire bash scripts on file edits matching glob patterns.
+#[derive(Debug, Clone, Copy)]
 pub struct CallbackModule;
 
 impl Module for CallbackModule {
@@ -204,10 +215,10 @@ impl Module for CallbackModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "Callback_upsert" => Some(self::tools::execute_upsert(tool, state)),
-            "Callback_toggle" => Some(self::tools::execute_toggle(tool, state)),
-            "Callback_open_editor" => Some(self::tools::execute_open_editor(tool, state)),
-            "Callback_close_editor" => Some(self::tools::execute_close_editor(tool, state)),
+            "Callback_upsert" => Some(tools::execute_upsert(tool, state)),
+            "Callback_toggle" => Some(tools::execute_toggle(tool, state)),
+            "Callback_open_editor" => Some(tools::execute_open_editor(tool, state)),
+            "Callback_close_editor" => Some(tools::execute_close_editor(tool, state)),
             _ => None,
         }
     }

@@ -1,5 +1,12 @@
+//! Scratchpad module — temporary cells for notes, code snippets, and working data.
+//!
+//! Three tools: `scratchpad_create_cell`, `scratchpad_edit_cell`, `scratchpad_wipe`.
+//! Cells are stored per-worker and shown in a fixed panel. Useful for the AI to
+//! maintain intermediate state during multi-step tasks.
+
 mod panel;
 mod tools;
+/// Scratchpad state types: `ScratchpadCell`, `ScratchpadState`.
 pub mod types;
 
 pub use types::{ScratchpadCell, ScratchpadState};
@@ -21,7 +28,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
         .expect("Failed to parse scratchpad tool YAML")
 });
 
-#[derive(Debug)]
+/// Scratchpad module: temporary note cells for working data during a session.
+#[derive(Debug, Clone, Copy)]
 pub struct ScratchpadModule;
 
 impl Module for ScratchpadModule {
@@ -138,9 +146,9 @@ impl Module for ScratchpadModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "scratchpad_create_cell" => Some(self::tools::execute_create(tool, state)),
-            "scratchpad_edit_cell" => Some(self::tools::execute_edit(tool, state)),
-            "scratchpad_wipe" => Some(self::tools::execute_wipe(tool, state)),
+            "scratchpad_create_cell" => Some(tools::execute_create(tool, state)),
+            "scratchpad_edit_cell" => Some(tools::execute_edit(tool, state)),
+            "scratchpad_wipe" => Some(tools::execute_wipe(tool, state)),
             _ => None,
         }
     }

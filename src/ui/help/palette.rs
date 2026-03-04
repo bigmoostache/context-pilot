@@ -91,7 +91,7 @@ impl CommandPalette {
         if self.cursor > 0 {
             // Find the previous character boundary
             let prev_boundary = self.query[..self.cursor].char_indices().last().map(|(i, _)| i).unwrap_or(0);
-            self.query.remove(prev_boundary);
+            let _r = self.query.remove(prev_boundary);
             self.cursor = prev_boundary;
             self.selected = 0;
             self.update_filtered(state);
@@ -101,7 +101,7 @@ impl CommandPalette {
     /// Delete character at cursor
     pub(crate) fn delete(&mut self, state: &State) {
         if self.cursor < self.query.len() {
-            self.query.remove(self.cursor);
+            let _r = self.query.remove(self.cursor);
             self.selected = 0;
             self.update_filtered(state);
         }

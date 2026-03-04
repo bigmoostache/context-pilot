@@ -348,8 +348,11 @@ fn list_available_presets() -> Vec<String> {
 /// Summary info for a preset, used by the overview panel.
 #[derive(Debug)]
 pub struct PresetInfo {
+    /// Preset name (alphanumeric + hyphens).
     pub name: String,
+    /// Human-readable description.
     pub description: String,
+    /// Whether this preset ships with the binary.
     pub built_in: bool,
 }
 

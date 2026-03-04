@@ -1,11 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+/// Discriminator for the three message shapes in a conversation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageType {
+    /// Plain text (user or assistant).
     #[default]
     TextMessage,
+    /// Assistant requesting a tool invocation.
     ToolCall,
+    /// Result returned after executing a tool.
     ToolResult,
 }
 
@@ -13,23 +17,34 @@ pub enum MessageType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageStatus {
+    /// Included in full in the LLM prompt.
     #[default]
     Full,
+    /// Removed from context (freed budget).
     Deleted,
+    /// Archived into a conversation history panel.
     Detached,
 }
 
+/// Record of a single tool invocation inside a [`Message`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolUseRecord {
+    /// Unique tool-use ID assigned by the LLM.
     pub id: String,
+    /// Tool name (e.g., `"Open"`, `"git_execute"`).
     pub name: String,
+    /// JSON parameter object passed to the tool.
     pub input: serde_json::Value,
 }
 
+/// Record of a tool execution result inside a [`Message`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolResultRecord {
+    /// Correlates with [`ToolUseRecord::id`].
     pub tool_use_id: String,
+    /// Human-readable output (success, error, or data).
     pub content: String,
+    /// `true` if the tool execution failed.
     #[serde(default)]
     pub is_error: bool,
     /// Name of the tool that produced this result (for visualization dispatch)
@@ -37,6 +52,8 @@ pub struct ToolResultRecord {
     pub tool_name: String,
 }
 
+/// A single message in the conversation — user text, assistant text,
+/// tool call, or tool result. The atomic unit of the message history.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     /// Display ID (e.g., U1, A1, T1 - for UI/LLM)
@@ -44,25 +61,29 @@ pub struct Message {
     /// Internal UID (e.g., UID_42_U - never shown to UI/LLM)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
+    /// Role string (`"user"` or `"assistant"`).
     pub role: String,
+    /// Discriminator for message shape.
     #[serde(default)]
     pub message_type: MessageType,
+    /// Text content (user input, assistant response, or empty for pure tool messages).
     pub content: String,
+    /// Estimated token count for `content`.
     #[serde(default)]
     pub content_token_count: usize,
-    /// Message status for context management
+    /// Message status for context management.
     #[serde(default)]
     pub status: MessageStatus,
-    /// Tool uses in this message (for assistant messages)
+    /// Tool uses in this message (for assistant messages).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_uses: Vec<ToolUseRecord>,
-    /// Tool results in this message (for ToolResult messages)
+    /// Tool results in this message (for ToolResult messages).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_results: Vec<ToolResultRecord>,
-    /// Input tokens used for this response (from API, for assistant messages)
+    /// Input tokens used for this response (from API, for assistant messages).
     #[serde(default)]
     pub input_tokens: usize,
-    /// Timestamp when this message was created (ms since UNIX epoch)
+    /// Timestamp when this message was created (ms since UNIX epoch).
     #[serde(default)]
     pub timestamp_ms: u64,
 }
@@ -112,10 +133,12 @@ pub mod test_helpers {
     /// Auto-increments IDs per role prefix (U1, A1, T1, R1).
     #[derive(Debug)]
     pub struct MessageBuilder {
+        /// The message under construction.
         msg: Message,
     }
 
     impl MessageBuilder {
+        /// Internal base constructor — sets role, type, and empty content.
         fn base(id: String, role: &str, message_type: MessageType) -> Self {
             Self {
                 msg: Message {
@@ -134,6 +157,7 @@ pub mod test_helpers {
             }
         }
 
+        /// Create a user text message with auto-incremented ID.
         pub fn user(content: &str) -> Self {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -143,6 +167,7 @@ pub mod test_helpers {
             b
         }
 
+        /// Create an assistant text message with auto-incremented ID.
         pub fn assistant(content: &str) -> Self {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -152,6 +177,7 @@ pub mod test_helpers {
             b
         }
 
+        /// Create an assistant tool-call message with auto-incremented ID.
         pub fn tool_call(name: &str, input: serde_json::Value) -> Self {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -162,6 +188,7 @@ pub mod test_helpers {
             b
         }
 
+        /// Create a tool-result message with auto-incremented ID.
         pub fn tool_result(tool_use_id: &str, content: &str) -> Self {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -176,11 +203,13 @@ pub mod test_helpers {
             b
         }
 
+        /// Override the message status (builder pattern).
         pub fn status(mut self, s: MessageStatus) -> Self {
             self.msg.status = s;
             self
         }
 
+        /// Consume the builder and return the finished [`Message`].
         pub fn build(self) -> Message {
             self.msg
         }

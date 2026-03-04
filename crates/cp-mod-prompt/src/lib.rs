@@ -1,8 +1,16 @@
+//! Prompt library module — agents, skills, and commands.
+//!
+//! Eleven tools covering CRUD for agents (system prompts), skills (knowledge
+//! panels), and commands (input shortcuts), plus a library editor for inline
+//! content editing.
+
 mod library_panel;
+/// Built-in agent and skill definitions seeded on first run.
 pub mod seed;
 mod skill_panel;
 pub(crate) mod storage;
 mod tools;
+/// Prompt item types: `PromptItem`, `PromptState`, `PromptType`.
 pub mod types;
 
 pub use types::{PromptItem, PromptState, PromptType};
@@ -23,7 +31,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/prompt.yaml")).expect("Failed to parse prompt tool YAML")
 });
 
-#[derive(Debug)]
+/// Prompt library module: agents, skills, commands — the ship's charter.
+#[derive(Debug, Clone, Copy)]
 pub struct PromptModule;
 
 impl Module for PromptModule {
@@ -322,7 +331,7 @@ impl Module for PromptModule {
         ctx: &cp_base::state::ContextElement,
         state: &mut State,
     ) -> Option<Result<String, String>> {
-        if ctx.context_type.as_str() != cp_base::state::ContextType::SKILL {
+        if ctx.context_type.as_str() != ContextType::SKILL {
             return None;
         }
         let name = ctx.name.clone();

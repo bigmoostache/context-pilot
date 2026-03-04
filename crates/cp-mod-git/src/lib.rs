@@ -1,7 +1,14 @@
+//! Git module — version control integration via the `git` CLI.
+//!
+//! One tool: `git_execute`. Read-only commands (log, diff, status, etc.) create
+//! auto-refreshing dynamic panels. Mutating commands (commit, push, merge, etc.)
+//! execute directly and return output. Shell operators are blocked for safety.
+
 pub(crate) mod cache_invalidation;
 mod classify;
 mod result_panel;
 mod tools;
+/// Git state types: `GitState`, `GitFileChange`, `GitChangeType`.
 pub mod types;
 
 use cp_base::cast::SafeCast;
@@ -139,7 +146,8 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/git.yaml")).expect("Failed to parse git tool YAML")
 });
 
-#[derive(Debug)]
+/// Git module: version control tools, status tracking, and result panels.
+#[derive(Debug, Clone, Copy)]
 pub struct GitModule;
 
 impl Module for GitModule {
@@ -206,7 +214,7 @@ impl Module for GitModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "git_execute" => Some(self::tools::execute_git_command(tool, state)),
+            "git_execute" => Some(tools::execute_git_command(tool, state)),
             _ => None,
         }
     }
@@ -229,7 +237,7 @@ impl Module for GitModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
-        if ctx.context_type.as_str() == cp_base::state::ContextType::GIT_RESULT {
+        if ctx.context_type.as_str() == ContextType::GIT_RESULT {
             Some(ctx.get_meta_str("result_command").unwrap_or("").to_string())
         } else {
             None

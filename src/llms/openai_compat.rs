@@ -96,7 +96,7 @@ pub(crate) fn collect_included_tool_ids(messages: &[Message], pending_tool_resul
 
         if has_result {
             for id in tool_use_ids {
-                included.insert(id.to_string());
+                let _r = included.insert(id.to_string());
             }
         }
     }

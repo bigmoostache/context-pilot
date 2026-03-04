@@ -221,7 +221,7 @@ fn load_state_new() -> State {
     }
 
     // Load GitHub token from environment
-    dotenvy::dotenv().ok();
+    let _r = dotenvy::dotenv().ok();
     cp_mod_github::GithubState::get_mut(&mut state).github_token = std::env::var("GITHUB_TOKEN").ok();
 
     // Set the global active theme
@@ -253,14 +253,14 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         let data = module.save_module_data(state);
         if !data.is_null() {
             if module.is_global() {
-                global_modules.insert(module.id().to_string(), data);
+                let _r = global_modules.insert(module.id().to_string(), data);
             } else {
-                worker_modules.insert(module.id().to_string(), data);
+                let _r = worker_modules.insert(module.id().to_string(), data);
             }
         }
         let worker_data = module.save_worker_data(state);
         if !worker_data.is_null() {
-            worker_modules.insert(format!("{}_worker", module.id()), worker_data);
+            let _r = worker_modules.insert(format!("{}_worker", module.id()), worker_data);
         }
     }
 
@@ -295,7 +295,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
             && ctx.context_type != ContextType::SYSTEM
             && ctx.context_type != ContextType::LIBRARY;
         if dominated && let Some(uid) = &ctx.uid {
-            important_uids.insert(ctx.context_type.clone(), uid.clone());
+            let _r = important_uids.insert(ctx.context_type.clone(), uid.clone());
         }
     }
 
@@ -333,7 +333,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
             continue;
         }
         if let Some(uid) = &ctx.uid {
-            known_uids.insert(uid.clone());
+            let _r = known_uids.insert(uid.clone());
             let panel_data = PanelData {
                 uid: uid.clone(),
                 panel_type: ctx.context_type.clone(),
@@ -450,7 +450,7 @@ pub(crate) fn check_ownership() -> bool {
 /// Log an error to .context-pilot/errors/ and return the file path
 pub(crate) fn log_error(error: &str) -> String {
     let errors_dir = PathBuf::from(STORE_DIR).join(ERRORS_DIR);
-    fs::create_dir_all(&errors_dir).ok();
+    let _r = fs::create_dir_all(&errors_dir).ok();
 
     // Count existing error files to determine next number
     let error_count = fs::read_dir(&errors_dir)
@@ -477,7 +477,7 @@ pub(crate) fn log_error(error: &str) -> String {
         error_num, timestamp, error
     );
 
-    fs::write(&filepath, content).ok();
+    let _r = fs::write(&filepath, content).ok();
 
     filepath.to_string_lossy().to_string()
 }

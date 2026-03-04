@@ -31,12 +31,19 @@ pub struct WatcherResult {
 /// Info needed to create a console panel after a watcher fires.
 #[derive(Debug)]
 pub struct DeferredPanel {
+    /// Console session key for reconnection.
     pub session_key: String,
+    /// Human-readable name for the panel tab.
     pub display_name: String,
+    /// Shell command that was executed.
     pub command: String,
+    /// Short description for the panel header.
     pub description: String,
+    /// Working directory (None = project root).
     pub cwd: Option<String>,
+    /// ID of the callback that created this panel.
     pub callback_id: String,
+    /// Display name of the callback.
     pub callback_name: String,
 }
 
@@ -117,6 +124,7 @@ pub trait Watcher: Send + Sync {
 /// Initialized by the spine module, accessed by any module that
 /// registers watchers.
 pub struct WatcherRegistry {
+    /// Active watchers, polled each tick by the event loop.
     pub watchers: Vec<Box<dyn Watcher>>,
 }
 
@@ -133,6 +141,7 @@ impl Default for WatcherRegistry {
 }
 
 impl WatcherRegistry {
+    /// Create an empty watcher registry.
     pub fn new() -> Self {
         Self { watchers: Vec::new() }
     }

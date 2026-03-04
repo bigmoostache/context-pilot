@@ -8,12 +8,16 @@ use std::str::FromStr;
 #[serde(rename_all = "snake_case")]
 pub enum TodoStatus {
     #[default]
+    /// Not started.
     Pending, // ' '
+    /// Work in progress.
     InProgress, // '~'
+    /// Completed.
     Done,       // 'x'
 }
 
 impl TodoStatus {
+    /// Theme icon for this status (e.g., "○ ", "◐ ", "● ").
     pub fn icon(&self) -> String {
         match self {
             TodoStatus::Pending => icons::todo_pending(),
@@ -57,7 +61,9 @@ pub struct TodoItem {
 /// Module-owned state for the Todo module
 #[derive(Debug)]
 pub struct TodoState {
+    /// All todo items (top-level + nested children).
     pub todos: Vec<TodoItem>,
+    /// Counter for generating unique IDs (X1, X2, ...).
     pub next_todo_id: usize,
 }
 
@@ -68,14 +74,17 @@ impl Default for TodoState {
 }
 
 impl TodoState {
+    /// Create an empty todo state with ID counter at 1.
     pub fn new() -> Self {
         Self { todos: vec![], next_todo_id: 1 }
     }
 
+    /// Get shared ref from State's TypeMap.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("TodoState not initialized")
     }
 
+    /// Get mutable ref from State's TypeMap.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("TodoState not initialized")
     }
