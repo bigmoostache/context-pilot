@@ -36,13 +36,14 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 mod protocol;
 use protocol::{Request, Response, SessionInfo, interpret_escapes};
 
 /// Global flag set by signal handler to trigger graceful shutdown.
-static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
+/// Wrapped in `Arc` so `signal-hook` can register it directly.
+static SHUTDOWN_REQUESTED: LazyLock<Arc<AtomicBool>> = LazyLock::new(|| Arc::new(AtomicBool::new(false)));
 
 // ---------------------------------------------------------------------------
 // Session management
@@ -399,24 +400,15 @@ fn main() {
     let _ = std::fs::remove_file(&pid_path).ok();
 }
 
-/// Install SIGTERM and SIGINT handlers that set `SHUTDOWN_REQUESTED`.
-#[expect(
-    unsafe_code,
-    reason = "libc::signal requires unsafe — signal handler is async-signal-safe (atomic store only)"
-)]
+/// Register SIGINT and SIGHUP handlers via `signal-hook`.
+///
+/// Each handler atomically sets [`SHUTDOWN_REQUESTED`] — the main accept loop
+/// polls it and breaks cleanly.
 fn install_signal_handlers() {
-    // SAFETY: libc::signal() is async-signal-safe (POSIX). The handler function
-    // `signal_handler` only sets an atomic flag — no allocations or locks.
-    // The fn-pointer → *const() → usize cast chain is required by the libc::signal() ABI.
-    unsafe {
-        let handler = signal_handler as *const () as libc::sighandler_t;
-        let _ = libc::signal(libc::SIGINT, handler);
-        let _ = libc::signal(libc::SIGHUP, handler);
+    // signal-hook's flag::register is safe — it sets an Arc<AtomicBool> on signal delivery
+    for sig in [signal_hook::consts::SIGINT, signal_hook::consts::SIGHUP] {
+        drop(signal_hook::flag::register(sig, Arc::clone(&SHUTDOWN_REQUESTED)));
     }
-}
-
-extern "C" fn signal_handler(_sig: libc::c_int) {
-    SHUTDOWN_REQUESTED.store(true, Ordering::Relaxed);
 }
 
 /// Kill all sessions — used during shutdown.
