@@ -271,31 +271,31 @@ src/ui/perf/mod.rs:
 | B17 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
 | B18 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
 | B19 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
-| B20 | significant_drop_tightening | manager.rs | 20 | 🔴 ALIVE |
-| B21 | branches_sharing_code | manager.rs | 40 | 🔴 ALIVE |
+| B20 | significant_drop_tightening | manager.rs | 20 | 💀 SLAIN |
+| B21 | branches_sharing_code | manager.rs | 40 | 💀 SLAIN |
 | B22 | significant_drop_tightening | manager.rs | 20 | 💀 SLAIN |
 | B23 | needless_pass_by_value | pollers.rs | 15 | 🔴 ALIVE |
 | B24 | needless_pass_by_value | pollers.rs | 15 | 🔴 ALIVE |
-| B25 | significant_drop_tightening | pollers.rs | 20 | 🔴 ALIVE |
-| B26 | unwrap_used | server/main.rs | 10 | 🔴 ALIVE |
+| B25 | significant_drop_tightening | pollers.rs | 20 | 💀 SLAIN |
+| B26 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B27 | significant_drop_tightening | server/main.rs | 20 | 🔴 ALIVE |
-| B28 | unwrap_used | server/main.rs | 10 | 🔴 ALIVE |
+| B28 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B29 | significant_drop_tightening | server/main.rs | 20 | 🔴 ALIVE |
-| B30 | unwrap_used | server/main.rs | 10 | 🔴 ALIVE |
+| B30 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B31 | significant_drop_tightening | server/main.rs | 20 | 💀 SLAIN |
-| B32 | unwrap_used | server/main.rs | 10 | 🔴 ALIVE |
-| B33 | significant_drop_tightening | server/main.rs | 20 | 🔴 ALIVE |
-| B34 | unwrap_used | server/main.rs | 10 | 🔴 ALIVE |
-| B35 | significant_drop_tightening | server/main.rs | 20 | 🔴 ALIVE |
-| B36 | unwrap_used | server/main.rs | 10 | 🔴 ALIVE |
+| B32 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
+| B33 | significant_drop_tightening | server/main.rs | 20 | 💀 SLAIN |
+| B34 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
+| B35 | significant_drop_tightening | server/main.rs | 20 | 💀 SLAIN |
+| B36 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B37 | needless_pass_by_value | server/main.rs | 15 | 🔴 ALIVE |
-| B38 | significant_drop_tightening | server/main.rs | 20 | 🔴 ALIVE |
-| B39 | unwrap_used | server/main.rs | 10 | 🔴 ALIVE |
+| B38 | significant_drop_tightening | server/main.rs | 20 | 💀 SLAIN |
+| B39 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B40 | exit | server/main.rs | 10 | 🔴 ALIVE |
 | B41 | print_stderr | server/main.rs | 5 | 🔴 ALIVE |
 | B42 | expect_used | server/main.rs | 5 | 🔴 ALIVE |
 | B43 | unsafe_code | server/main.rs | 25 | 🔴 ALIVE |
-| B44 | unwrap_used | server/main.rs | 10 | 🔴 ALIVE |
+| B44 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B45 | wildcard_enum_match_arm | files/panel.rs | 5 | 🔴 ALIVE |
 | B46 | expect_used | firecrawl/api.rs | 5 | 🔴 ALIVE |
 | B47 | expect_used | firecrawl/lib.rs | 5 | 🔴 ALIVE |
@@ -332,7 +332,7 @@ src/ui/perf/mod.rs:
 | B78 | expect_used | actions/helpers.rs | 5 | 🔴 ALIVE |
 | B79 | needless_pass_by_value | context/mod.rs | 15 | 💀 SLAIN |
 | B80 | wildcard_enum_match_arm | run/input.rs | 5 | 🔴 ALIVE |
-| B81 | branches_sharing_code | run/input.rs | 40 | 🔴 ALIVE |
+| B81 | branches_sharing_code | run/input.rs | 40 | 💀 SLAIN |
 | B82 | wildcard_enum_match_arm | run/input.rs | 5 | 🔴 ALIVE |
 | B83 | wildcard_enum_match_arm | run/input.rs | 5 | 🔴 ALIVE |
 | B84 | needless_pass_by_value | run/lifecycle.rs | 15 | 🔴 ALIVE |
@@ -348,7 +348,7 @@ src/ui/perf/mod.rs:
 | B94 | expect_used | modules/mod.rs | 5 | 🔴 ALIVE |
 | B95 | wildcard_enum_match_arm | conversation/panel.rs | 5 | 🔴 ALIVE |
 | B96 | wildcard_enum_match_arm | conversation/render.rs | 5 | 🔴 ALIVE |
-| B97 | branches_sharing_code | conversation/render.rs | 40 | 🔴 ALIVE |
+| B97 | branches_sharing_code | conversation/render.rs | 40 | 💀 SLAIN |
 | B98 | wildcard_enum_match_arm | overview/panel.rs | 5 | 🔴 ALIVE |
 | B99 | wildcard_enum_match_arm | overview/tools_panel.rs | 5 | 🔴 ALIVE |
 | B100 | expect_used | questions/mod.rs | 5 | 🔴 ALIVE |
@@ -376,6 +376,6 @@ src/ui/perf/mod.rs:
 
 ### Score
 ```
-Slain: 6 / 110
-XP earned: 110 / 1210
+Slain: 22 / 110
+XP earned: 410 / 1210
 ```

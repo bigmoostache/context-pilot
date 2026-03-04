@@ -89,28 +89,30 @@ pub(crate) fn render_message(
                 registry.get(&result.tool_name).map(|visualizer| visualizer(&result.content, wrap_width))
             };
 
-            #[expect(clippy::branches_sharing_code, reason = "factoring out shared code would reduce clarity")]
+            let mut is_first = true;
+            let mut push_with_prefix = |line_spans: Vec<Span<'static>>, lines: &mut Vec<Line<'static>>| {
+                if is_first {
+                    let mut full = vec![
+                        Span::styled(status_icon.clone(), Style::default().fg(status_color)),
+                        Span::styled(" ".to_string(), base_style),
+                    ];
+                    full.extend(line_spans);
+                    lines.push(Line::from(full));
+                    is_first = false;
+                } else {
+                    let mut full = vec![Span::styled(" ".repeat(prefix_width), base_style)];
+                    full.extend(line_spans);
+                    lines.push(Line::from(full));
+                }
+            };
+
             if let Some(vis_lines) = custom_lines {
                 // Use module-provided visualization
-                let mut is_first = true;
                 for vis_line in vis_lines {
-                    if is_first {
-                        let mut line_spans = vec![
-                            Span::styled(status_icon.clone(), Style::default().fg(status_color)),
-                            Span::styled(" ".to_string(), base_style),
-                        ];
-                        line_spans.extend(vis_line.spans);
-                        lines.push(Line::from(line_spans));
-                        is_first = false;
-                    } else {
-                        let mut line_spans = vec![Span::styled(" ".repeat(prefix_width), base_style)];
-                        line_spans.extend(vis_line.spans);
-                        lines.push(Line::from(line_spans));
-                    }
+                    push_with_prefix(vis_line.spans, &mut lines);
                 }
             } else {
                 // Fallback: plain text rendering with wrapping
-                let mut is_first = true;
                 for line in result.content.lines() {
                     if line.is_empty() {
                         lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
@@ -119,19 +121,10 @@ pub(crate) fn render_message(
 
                     let wrapped = wrap_text(line, wrap_width);
                     for wrapped_line in wrapped {
-                        if is_first {
-                            lines.push(Line::from(vec![
-                                Span::styled(status_icon.clone(), Style::default().fg(status_color)),
-                                Span::styled(" ".to_string(), base_style),
-                                Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
-                            ]));
-                            is_first = false;
-                        } else {
-                            lines.push(Line::from(vec![
-                                Span::styled(" ".repeat(prefix_width), base_style),
-                                Span::styled(wrapped_line, Style::default().fg(theme::text_secondary())),
-                            ]));
-                        }
+                        push_with_prefix(
+                            vec![Span::styled(wrapped_line, Style::default().fg(theme::text_secondary()))],
+                            &mut lines,
+                        );
                     }
                 }
             }

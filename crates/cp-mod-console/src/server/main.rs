@@ -36,7 +36,7 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 
 mod protocol;
 use protocol::{Request, Response, SessionInfo, interpret_escapes};
@@ -104,7 +104,6 @@ type Sessions = Arc<Mutex<HashMap<String, Session>>>;
 // Command handlers
 // ---------------------------------------------------------------------------
 
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str>, log_path: &str) -> Response {
     let log = PathBuf::from(log_path);
 
@@ -153,16 +152,15 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
     }
 
     let session = Session { pid, stdin, status: SessionStatus::Running };
-    drop(sessions.lock().unwrap().insert(key.to_string(), session));
+    drop(sessions.lock().unwrap_or_else(PoisonError::into_inner).insert(key.to_string(), session));
 
     Response::ok_pid(pid)
 }
 
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     let bytes = interpret_escapes(input);
-    let mut map = sessions.lock().unwrap();
+    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
     let Some(session) = map.get_mut(key) else {
         return Response::err(format!("Session '{key}' not found"));
     };
@@ -184,9 +182,8 @@ fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
 }
 
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_kill(sessions: &Sessions, key: &str) -> Response {
-    let mut map = sessions.lock().unwrap();
+    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
     let Some(session) = map.get_mut(key) else {
         return Response::err(format!("Session '{key}' not found"));
     };
@@ -204,9 +201,8 @@ fn handle_kill(sessions: &Sessions, key: &str) -> Response {
     Response::ok()
 }
 
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_remove(sessions: &Sessions, key: &str) -> Response {
-    let removed = sessions.lock().unwrap().remove(key);
+    let removed = sessions.lock().unwrap_or_else(PoisonError::into_inner).remove(key);
     if let Some(mut session) = removed {
         if !session.is_terminal() {
             drop(Command::new("kill").args([&session.pid.to_string()]).output());
@@ -220,9 +216,8 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     Response::ok()
 }
 
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_status(sessions: &Sessions, key: &str) -> Response {
-    let mut map = sessions.lock().unwrap();
+    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
     let Some(session) = map.get_mut(key) else {
         return Response::err(format!("Session '{key}' not found"));
     };
@@ -233,10 +228,9 @@ fn handle_status(sessions: &Sessions, key: &str) -> Response {
     Response::ok_status(status, exit_code)
 }
 
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_list(sessions: &Sessions) -> Response {
     let infos: Vec<SessionInfo> = {
-        let mut map = sessions.lock().unwrap();
+        let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
         map.iter_mut()
             .map(|(key, session)| {
                 session.poll_status();
@@ -257,10 +251,12 @@ fn handle_list(sessions: &Sessions) -> Response {
 // ---------------------------------------------------------------------------
 
 #[expect(clippy::needless_pass_by_value, reason = "thread entry point — Arc is moved from spawn closure")]
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 #[expect(clippy::exit, reason = "process exit is intentional here")]
 fn handle_connection(stream: UnixStream, sessions: Sessions) {
-    let reader = BufReader::new(stream.try_clone().unwrap());
+    let Ok(cloned) = stream.try_clone() else {
+        return;
+    };
+    let reader = BufReader::new(cloned);
     let mut writer = stream;
 
     for line in reader.lines() {
@@ -275,7 +271,7 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
             Ok(r) => r,
             Err(e) => {
                 let resp = Response::err(format!("Invalid JSON: {e}"));
-                drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()));
+                drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
                 continue;
             }
         };
@@ -312,7 +308,7 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
             "ping" => Response::ok(),
             "shutdown" => {
                 // Kill all sessions and exit
-                let mut map = sessions.lock().unwrap();
+                let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
                 for (_, session) in map.iter_mut() {
                     if !session.is_terminal() {
                         drop(Command::new("kill").args([&session.pid.to_string()]).output());
@@ -321,13 +317,13 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
                 }
                 map.clear();
                 let resp = Response::ok();
-                drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()));
+                drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
                 std::process::exit(0);
             }
             other => Response::err(format!("Unknown command: {other}")),
         };
 
-        if writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()).is_err() {
+        if writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()).is_err() {
             break; // Connection lost
         }
     }
@@ -421,8 +417,9 @@ fn install_signal_handlers() {
     // SAFETY: libc::signal() is async-signal-safe (POSIX). The handler function
     // `signal_handler` only sets an atomic flag — no allocations or locks.
     unsafe {
-        let _ = libc::signal(libc::SIGINT, signal_handler as libc::sighandler_t);
-        let _ = libc::signal(libc::SIGHUP, signal_handler as libc::sighandler_t);
+        let handler = signal_handler as *const () as libc::sighandler_t;
+        let _ = libc::signal(libc::SIGINT, handler);
+        let _ = libc::signal(libc::SIGHUP, handler);
     }
 }
 
@@ -431,9 +428,8 @@ extern "C" fn signal_handler(_sig: libc::c_int) {
 }
 
 /// Kill all sessions — used during shutdown.
-#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn kill_all_sessions(sessions: &Sessions) {
-    let mut map = sessions.lock().unwrap();
+    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
     for (_, session) in map.iter_mut() {
         if !session.is_terminal() {
             drop(Command::new("kill").args([&session.pid.to_string()]).output());

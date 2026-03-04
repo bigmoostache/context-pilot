@@ -59,7 +59,6 @@ pub(crate) fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: A
 
 /// Periodically poll the server for process status.
 #[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
-#[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 pub(crate) fn poll_server_status(
     key: String,
     status: Arc<Mutex<ProcessStatus>>,
@@ -76,26 +75,34 @@ pub(crate) fn poll_server_status(
             let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
             if st.starts_with("exited") {
                 let code = resp.get("exit_code").and_then(serde_json::Value::as_i64).unwrap_or(-1).to_i32();
-                let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                if !s.is_terminal() {
-                    *s = if code == 0 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };
+                {
+                    let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                    if !s.is_terminal() {
+                        *s = if code == 0 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };
+                    }
                 }
-                let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                if fin.is_none() {
-                    *fin = Some(now_ms());
+                {
+                    let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                    if fin.is_none() {
+                        *fin = Some(now_ms());
+                    }
                 }
                 stop_polling.store(true, Ordering::Relaxed);
                 break;
             }
         } else {
             // Server unreachable — mark as dead
-            let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            if !s.is_terminal() {
-                *s = ProcessStatus::Failed(-1);
+            {
+                let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                if !s.is_terminal() {
+                    *s = ProcessStatus::Failed(-1);
+                }
             }
-            let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            if fin.is_none() {
-                *fin = Some(now_ms());
+            {
+                let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                if fin.is_none() {
+                    *fin = Some(now_ms());
+                }
             }
             stop_polling.store(true, Ordering::Relaxed);
             break;
