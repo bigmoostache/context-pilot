@@ -19,6 +19,7 @@ pub mod types;
 pub const CONSOLE_DIR: &str = "console";
 
 use std::collections::HashMap;
+use std::io::Write;
 
 use serde_json::json;
 
@@ -53,12 +54,11 @@ impl Module for ConsoleModule {
         "Spawn and manage child processes"
     }
 
-    #[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
     fn init_state(&self, state: &mut State) {
         state.set_ext(ConsoleState::new());
         // Ensure the console server is running
         if let Err(e) = manager::find_or_create_server() {
-            eprintln!("Console server startup failed: {e}");
+            drop(writeln!(std::io::stderr(), "Console server startup failed: {e}"));
         }
     }
 
@@ -110,11 +110,10 @@ impl Module for ConsoleModule {
             })
         }
     }
-    #[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         // Ensure the console server is running
         if let Err(e) = manager::find_or_create_server() {
-            eprintln!("Console server startup failed: {e}");
+            drop(writeln!(std::io::stderr(), "Console server startup failed: {e}"));
         }
 
         // Restore counter

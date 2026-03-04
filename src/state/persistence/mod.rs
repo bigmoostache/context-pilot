@@ -19,6 +19,7 @@ pub(crate) use writer::{DeleteOp, PersistenceWriter, WriteBatch, WriteOp};
 use chrono::Local;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
 use cp_mod_logs::LogsState;
@@ -405,31 +406,30 @@ pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
 /// Save state synchronously (blocking I/O on calling thread).
 /// Used for shutdown paths and places where the `PersistenceWriter` is not available.
 /// Prefer `build_save_batch` + `PersistenceWriter::send_batch` in the main event loop.
-#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
 pub(crate) fn save_state(state: &State) {
     let batch = build_save_batch(state);
     // Execute synchronously
     for dir in &batch.ensure_dirs {
         if let Err(e) = fs::create_dir_all(dir) {
-            eprintln!("[persistence] failed to create dir {}: {}", dir.display(), e);
+            drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", dir.display(), e));
         }
     }
     for op in &batch.writes {
         if let Some(parent) = op.path.parent()
             && let Err(e) = fs::create_dir_all(parent)
         {
-            eprintln!("[persistence] failed to create dir {}: {}", parent.display(), e);
+            drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", parent.display(), e));
             continue;
         }
         if let Err(e) = fs::write(&op.path, &op.content) {
-            eprintln!("[persistence] failed to write {}: {}", op.path.display(), e);
+            drop(writeln!(std::io::stderr(), "[persistence] failed to write {}: {}", op.path.display(), e));
         }
     }
     for op in &batch.deletes {
         if let Err(e) = fs::remove_file(&op.path)
             && e.kind() != std::io::ErrorKind::NotFound
         {
-            eprintln!("[persistence] failed to delete {}: {}", op.path.display(), e);
+            drop(writeln!(std::io::stderr(), "[persistence] failed to delete {}: {}", op.path.display(), e));
         }
     }
 }

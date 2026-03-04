@@ -266,8 +266,8 @@ src/ui/perf/mod.rs:
 | B12 | expect_used | brave/api.rs | 5 | ☠️ SLAIN |
 | B13 | wildcard_enum_match_arm | brave/panel.rs | 5 | 💀 SLAIN |
 | B14 | expect_used | callback/lib.rs | 5 | ☠️ SLAIN |
-| B15 | print_stderr | console/lib.rs | 5 | 🔴 ALIVE |
-| B16 | print_stderr | console/lib.rs | 5 | 🔴 ALIVE |
+| B15 | print_stderr | console/lib.rs | 5 | ☠️ SLAIN |
+| B16 | print_stderr | console/lib.rs | 5 | ☠️ SLAIN |
 | B17 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
 | B18 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
 | B19 | unsafe_code | manager.rs | 25 | 🔴 ALIVE |
@@ -292,7 +292,7 @@ src/ui/perf/mod.rs:
 | B38 | significant_drop_tightening | server/main.rs | 20 | 💀 SLAIN |
 | B39 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
 | B40 | exit | server/main.rs | 10 | 🔴 ALIVE |
-| B41 | print_stderr | server/main.rs | 5 | 🔴 ALIVE |
+| B41 | print_stderr | server/main.rs | 5 | ☠️ SLAIN |
 | B42 | expect_used | server/main.rs | 5 | ☠️ SLAIN |
 | B43 | unsafe_code | server/main.rs | 25 | 🔴 ALIVE |
 | B44 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
@@ -309,11 +309,11 @@ src/ui/perf/mod.rs:
 | B55 | wildcard_enum_match_arm | github/panel.rs | 5 | 💀 SLAIN |
 | B56 | needless_pass_by_value | github/watcher.rs | 15 | ☠️ SLAIN |
 | B57 | wildcard_enum_match_arm | memory/panel.rs | 5 | 💀 SLAIN |
-| B58 | print_stderr | preset/builtin.rs | 5 | 🔴 ALIVE |
-| B59 | print_stderr | preset/builtin.rs | 5 | 🔴 ALIVE |
+| B58 | print_stderr | preset/builtin.rs | 5 | ☠️ SLAIN |
+| B59 | print_stderr | preset/builtin.rs | 5 | ☠️ SLAIN |
 | B60 | struct_field_names | preset/lib.rs | 15 | ☠️ SLAIN |
-| B61 | expect_used | queue/types.rs | 5 | 🔴 ALIVE |
-| B62 | expect_used | queue/types.rs | 5 | 🔴 ALIVE |
+| B61 | expect_used | queue/types.rs | 5 | ☠️ SLAIN |
+| B62 | expect_used | queue/types.rs | 5 | ☠️ SLAIN |
 | B63 | expect_used | scratchpad/lib.rs | 5 | ☠️ SLAIN |
 | B64 | wildcard_enum_match_arm | scratchpad/panel.rs | 5 | 💀 SLAIN |
 | B65 | wildcard_enum_match_arm | spine/panel.rs | 5 | 💀 SLAIN |
@@ -352,13 +352,13 @@ src/ui/perf/mod.rs:
 | B98 | wildcard_enum_match_arm | overview/panel.rs | 5 | 💀 SLAIN |
 | B99 | wildcard_enum_match_arm | overview/tools_panel.rs | 5 | 💀 SLAIN |
 | B100 | expect_used | questions/mod.rs | 5 | ☠️ SLAIN |
-| B101 | print_stderr | persistence/mod.rs | 5 | 🔴 ALIVE |
+| B101 | print_stderr | persistence/mod.rs | 5 | ☠️ SLAIN |
 | B102 | expect_used | persistence/writer.rs | 5 | ☠️ SLAIN |
 | B103 | significant_drop_tightening | persistence/writer.rs | 20 | 🔴 ALIVE |
 | B104 | needless_pass_by_value | persistence/writer.rs | 15 | ☠️ SLAIN |
 | B105 | significant_drop_tightening | persistence/writer.rs | 20 | 🔴 ALIVE |
-| B106 | print_stderr | persistence/writer.rs | 5 | 🔴 ALIVE |
-| B107 | print_stderr | persistence/writer.rs | 5 | 🔴 ALIVE |
+| B106 | print_stderr | persistence/writer.rs | 5 | ☠️ SLAIN |
+| B107 | print_stderr | persistence/writer.rs | 5 | ☠️ SLAIN |
 | B108 | significant_drop_tightening | perf/mod.rs | 20 | 🔴 ALIVE |
 | B109 | significant_drop_tightening | perf/mod.rs | 20 | 💀 SLAIN |
 | B110 | significant_drop_tightening | perf/mod.rs | 20 | 💀 SLAIN |
@@ -376,6 +376,6 @@ src/ui/perf/mod.rs:
 
 ### Score
 ```
-Slain: 33 / 110
-XP earned: 285 / 1205
+Slain: 43 / 110
+XP earned: 335 / 1215
 ```

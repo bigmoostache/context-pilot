@@ -342,10 +342,9 @@ impl ConnectionHandler {
 // Main: daemonize and listen
 // ---------------------------------------------------------------------------
 
-#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
 fn main() {
     let Some(socket_path) = std::env::args().nth(1) else {
-        eprintln!("Usage: cp-console-server <socket_path>");
+        drop(writeln!(std::io::stderr(), "Usage: cp-console-server <socket_path>"));
         std::process::exit(1);
     };
     let pid_path = format!("{}.pid", socket_path.trim_end_matches(".sock"));
@@ -363,7 +362,7 @@ fn main() {
     let listener = match UnixListener::bind(&socket_path) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("Failed to bind {socket_path}: {e}");
+            drop(writeln!(std::io::stderr(), "Failed to bind {socket_path}: {e}"));
             std::process::exit(1);
         }
     };

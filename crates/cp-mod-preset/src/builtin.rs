@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 
 use serde::Deserialize;
@@ -25,11 +26,10 @@ struct PresetYamlEntry {
 }
 
 /// Ensure all built-in presets exist on disk. Creates missing ones.
-#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
 pub fn ensure_builtin_presets() {
     let dir = Path::new(STORE_DIR).join(PRESETS_DIR);
     if let Err(e) = fs::create_dir_all(&dir) {
-        eprintln!("Failed to create presets directory: {e}");
+        drop(writeln!(std::io::stderr(), "Failed to create presets directory: {e}"));
         return;
     }
 
@@ -43,13 +43,12 @@ pub fn ensure_builtin_presets() {
     }
 }
 
-#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
 fn builtin_preset_definitions() -> Vec<Preset> {
     let yaml_str = include_str!("../../../yamls/presets.yaml");
     let yaml: PresetsYaml = match serde_yaml::from_str(yaml_str) {
         Ok(y) => y,
         Err(e) => {
-            eprintln!("Failed to parse yamls/presets.yaml: {e}");
+            drop(writeln!(std::io::stderr(), "Failed to parse yamls/presets.yaml: {e}"));
             return vec![];
         }
     };

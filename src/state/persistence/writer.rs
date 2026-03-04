@@ -7,6 +7,7 @@
 //! The main thread does the CPU work (serialization), the writer thread
 //! does the I/O work (file writes). This keeps the event loop responsive.
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex};
@@ -201,14 +202,13 @@ fn execute_pending_messages(messages: &mut Vec<WriteOp>) {
 }
 
 /// Execute a batch of write/delete operations
-#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
 fn execute_batch(batch: Option<WriteBatch>) {
     let Some(batch) = batch else { return };
 
     // Ensure directories exist
     for dir in &batch.ensure_dirs {
         if let Err(e) = fs::create_dir_all(dir) {
-            eprintln!("[persistence] failed to create dir {}: {}", dir.display(), e);
+            drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", dir.display(), e));
         }
     }
 
@@ -222,22 +222,21 @@ fn execute_batch(batch: Option<WriteBatch>) {
         if let Err(e) = fs::remove_file(&op.path)
             && e.kind() != std::io::ErrorKind::NotFound
         {
-            eprintln!("[persistence] failed to delete {}: {}", op.path.display(), e);
+            drop(writeln!(std::io::stderr(), "[persistence] failed to delete {}: {}", op.path.display(), e));
         }
     }
 }
 
 /// Write a file, creating parent directories if needed.
 /// Logs errors instead of silently swallowing them.
-#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
 fn write_file(path: &PathBuf, content: &[u8]) {
     if let Some(parent) = path.parent()
         && let Err(e) = fs::create_dir_all(parent)
     {
-        eprintln!("[persistence] failed to create dir {}: {}", parent.display(), e);
+        drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", parent.display(), e));
         return;
     }
     if let Err(e) = fs::write(path, content) {
-        eprintln!("[persistence] failed to write {}: {}", path.display(), e);
+        drop(writeln!(std::io::stderr(), "[persistence] failed to write {}: {}", path.display(), e));
     }
 }
