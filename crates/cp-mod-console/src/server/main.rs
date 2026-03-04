@@ -355,11 +355,14 @@ fn main() {
 
     // Become a session leader so children get SIGHUP when the server dies.
     // Previously done in the TUI's pre_exec hook — now the server owns its lifecycle.
+    #[cfg(unix)]
+    #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
     // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
     // and is called once at startup before any child processes are spawned.
-    #[cfg(unix)]
-    unsafe {
-        let _ = libc::setsid();
+    {
+        unsafe {
+            let _ = libc::setsid();
+        }
     }
 
     // Write PID file
