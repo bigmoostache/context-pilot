@@ -107,14 +107,16 @@ fn render_collapsed_line(
     let icon_color = if is_selected { theme::accent() } else { theme::text_muted() };
 
     // Badge or short ID for dynamic panels
-    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-    let label = if let Some(b) = badge {
-        format!("{b:>3}")
-    } else if ctx.context_type.is_fixed() {
-        "   ".to_string()
-    } else {
-        format!("{:>3}", &ctx.id.strip_prefix('P').unwrap_or(&ctx.id))
-    };
+    let label = badge.map_or_else(
+        || {
+            if ctx.context_type.is_fixed() {
+                "   ".to_string()
+            } else {
+                format!("{:>3}", &ctx.id.strip_prefix('P').unwrap_or(&ctx.id))
+            }
+        },
+        |b| format!("{b:>3}"),
+    );
     let label_color = if is_selected { theme::accent() } else { theme::text_muted() };
 
     // Token count (compact)

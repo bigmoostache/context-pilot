@@ -57,13 +57,13 @@ fn exec_compile(
     _root: Option<&str>,
 ) -> ToolResult {
     // Default output: same name with .pdf extension
-    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-    let output_path = if let Some(o) = output {
-        o.to_string()
-    } else {
-        let p = Path::new(input);
-        p.with_extension("pdf").to_string_lossy().to_string()
-    };
+    let output_path = output.map_or_else(
+        || {
+            let p = Path::new(input);
+            p.with_extension("pdf").to_string_lossy().to_string()
+        },
+        ToString::to_string,
+    );
 
     match crate::compiler::compile_and_write(input, &output_path) {
         Ok(msg) => ok_result(tool, msg),
@@ -393,13 +393,13 @@ fn collect_font_info(dir: &Path, entries: &mut Vec<(String, String, String)>) {
 /// Compiles immediately and records dependency tree for future change detection.
 fn exec_watch(tool: &ToolUse, input: &str, output: Option<&str>) -> ToolResult {
     // Default output: same name with .pdf extension
-    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-    let output_path = if let Some(o) = output {
-        o.to_string()
-    } else {
-        let p = Path::new(input);
-        p.with_extension("pdf").to_string_lossy().to_string()
-    };
+    let output_path = output.map_or_else(
+        || {
+            let p = Path::new(input);
+            p.with_extension("pdf").to_string_lossy().to_string()
+        },
+        ToString::to_string,
+    );
 
     // Compile + update deps in the watchlist
     match crate::watchlist::compile_and_update_deps(input, &output_path) {

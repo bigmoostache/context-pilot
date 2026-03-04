@@ -143,11 +143,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
         let sessions = Arc::clone(sessions);
         let key = key.to_string();
         drop(std::thread::spawn(move || {
-            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-            let code = match child.wait() {
-                Ok(status) => status.code().unwrap_or(-1),
-                Err(_) => -1,
-            };
+            let code = child.wait().map_or(-1, |status| status.code().unwrap_or(-1));
             if let Ok(mut map) = sessions.lock()
                 && let Some(session) = map.get_mut(&key)
             {

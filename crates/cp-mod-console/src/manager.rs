@@ -321,42 +321,41 @@ impl SessionHandle {
         let stop_polling = Arc::new(AtomicBool::new(false));
 
         // Load existing log file contents into ring buffer
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        let file_offset = if let Ok(content) = fs::read(&log_path) {
+        let file_offset = fs::read(&log_path).map_or(0, |content| {
             if !content.is_empty() {
                 buffer.write(&content);
             }
             content.len().to_u64()
-        } else {
-            0
-        };
+        });
 
         // Check if server knows about this session
         let server_alive = {
             let req = serde_json::json!({"cmd": "status", "key": name});
-            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-            if let Ok(resp) = server_request(&req) {
-                let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                if st.starts_with("exited") {
-                    let code = resp.get("exit_code").and_then(serde_json::Value::as_i64).unwrap_or(-1).to_i32();
+            server_request(&req).map_or_else(
+                |_| {
+                    // Server doesn't know about this session — mark dead
                     let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                    *s = ProcessStatus::Finished(code);
+                    *s = ProcessStatus::Finished(-1);
                     let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     *fin = Some(now_ms());
                     stop_polling.store(true, Ordering::Relaxed);
                     false
-                } else {
-                    true // running
-                }
-            } else {
-                // Server doesn't know about this session — mark dead
-                let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                *s = ProcessStatus::Finished(-1);
-                let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                *fin = Some(now_ms());
-                stop_polling.store(true, Ordering::Relaxed);
-                false
-            }
+                },
+                |resp| {
+                    let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                    if st.starts_with("exited") {
+                        let code = resp.get("exit_code").and_then(serde_json::Value::as_i64).unwrap_or(-1).to_i32();
+                        let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                        *s = ProcessStatus::Finished(code);
+                        let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                        *fin = Some(now_ms());
+                        stop_polling.store(true, Ordering::Relaxed);
+                        false
+                    } else {
+                        true // running
+                    }
+                },
+            )
         };
 
         if server_alive {

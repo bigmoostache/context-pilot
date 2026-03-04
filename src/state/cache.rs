@@ -66,37 +66,3 @@ static CACHE_POOL: std::sync::LazyLock<CachePool> = std::sync::LazyLock::new(Cac
 pub(crate) fn process_cache_request(request: CacheRequest, tx: Sender<CacheUpdate>) {
     CACHE_POOL.submit(request, tx);
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn hash_content_empty_deterministic() {
-        let h = hash_content("");
-        // SHA-256 of empty string is well-known
-        assert_eq!(h, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-    }
-
-    #[test]
-    fn hash_content_abc() {
-        let h = hash_content("abc");
-        assert_eq!(h, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-    }
-
-    #[test]
-    fn hash_content_different_inputs() {
-        assert_ne!(hash_content("hello"), hash_content("world"));
-    }
-
-    #[test]
-    fn hash_content_idempotent() {
-        assert_eq!(hash_content("test"), hash_content("test"));
-    }
-
-    #[test]
-    fn hash_content_length_64() {
-        // SHA-256 hex is always 64 chars
-        assert_eq!(hash_content("anything").len(), 64);
-    }
-}

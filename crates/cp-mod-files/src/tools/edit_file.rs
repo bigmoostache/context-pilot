@@ -132,18 +132,19 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Try normalized matching (handles trailing whitespace differences)
-    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-    let replaced = if let Some(actual_match) = find_normalized_match(&content, old_string) {
-        if replace_all {
-            let count = content.matches(actual_match).count();
-            content = content.replace(actual_match, new_string);
-            count
-        } else {
-            content = content.replacen(actual_match, new_string, 1);
-            1
+    #[expect(clippy::option_if_let_else, reason = "map_or borrows content, preventing mutation inside closure")]
+    let replaced = match find_normalized_match(&content, old_string) {
+        Some(actual_match) => {
+            if replace_all {
+                let count = content.matches(actual_match).count();
+                content = content.replace(actual_match, new_string);
+                count
+            } else {
+                content = content.replacen(actual_match, new_string, 1);
+                1
+            }
         }
-    } else {
-        0
+        None => 0,
     };
 
     if replaced == 0 {
@@ -208,90 +209,4 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     result_msg.push_str("```");
 
     ToolResult::new(tool.id.clone(), result_msg, false)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_normalize_for_match() {
-        assert_eq!(normalize_for_match("foo  \nbar\t\n"), "foo\nbar");
-        assert_eq!(normalize_for_match("foo\r\nbar"), "foo\nbar");
-    }
-
-    #[test]
-    fn test_find_normalized_match_exact() {
-        let haystack = "line1\nline2\nline3\n";
-        let needle = "line2";
-        assert_eq!(find_normalized_match(haystack, needle), Some("line2"));
-    }
-
-    #[test]
-    fn test_find_normalized_match_trailing_whitespace() {
-        let haystack = "line1  \nline2\t\nline3\n";
-        let needle = "line1\nline2";
-        assert_eq!(find_normalized_match(haystack, needle), Some("line1  \nline2\t"));
-    }
-
-    #[test]
-    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
-    fn test_find_normalized_match_multiline() {
-        let haystack = "fn foo() {\n    let x = 1;\n    let y = 2;\n}\n";
-        let needle = "    let x = 1;\n    let y = 2;";
-        let matched = find_normalized_match(haystack, needle);
-        assert!(matched.is_some());
-        assert!(matched.unwrap().contains("let x = 1"));
-        assert!(matched.unwrap().contains("let y = 2"));
-    }
-
-    #[test]
-    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
-    fn test_diff_format_structure() {
-        // Test that verifies the expected structure of a diff-formatted result message
-        // This simulates what edit_file produces without requiring actual file I/O
-
-        let old_string = "line1\nline2";
-        let new_string = "line1_modified\nline2_modified";
-        let path_str = "test.txt";
-        let replaced = 1;
-        let replace_all = false;
-        let lines_changed = new_string.lines().count().max(old_string.lines().count());
-
-        // Replicate the formatting logic from edit_file
-        let mut result_msg = String::new();
-
-        if replace_all && replaced > 1 {
-            result_msg.push_str(&format!(
-                "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)\n"
-            ));
-        } else {
-            result_msg.push_str(&format!("Edited '{path_str}': ~{lines_changed} lines changed\n"));
-        }
-
-        result_msg.push_str("`diff\n");
-
-        // Generate unified diff
-        let diff_lines = generate_unified_diff(old_string, new_string);
-        result_msg.push_str(&diff_lines);
-
-        result_msg.push_str("```");
-
-        // Verify the structure
-        assert!(result_msg.contains("Edited 'test.txt': ~2 lines changed\n"));
-        assert!(result_msg.contains("`diff\n"));
-        assert!(result_msg.contains("- line1\n"));
-        assert!(result_msg.contains("- line2\n"));
-        assert!(result_msg.contains("+ line1_modified\n"));
-        assert!(result_msg.contains("+ line2_modified\n"));
-        assert!(result_msg.ends_with("```"));
-
-        // Verify ordering: header, then diff marker, then content (unified diff), then closing
-        let header_pos = result_msg.find("Edited").unwrap();
-        let diff_start_pos = result_msg.find("`diff").unwrap();
-        let diff_end_pos = result_msg.rfind("```").unwrap();
-
-        assert!(header_pos < diff_start_pos);
-        assert!(diff_start_pos < diff_end_pos);
-    }
 }

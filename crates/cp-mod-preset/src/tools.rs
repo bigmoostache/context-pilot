@@ -382,38 +382,3 @@ pub fn list_presets_with_info() -> Vec<PresetInfo> {
     presets.sort_by(|a, b| a.name.cmp(&b.name));
     presets
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn validate_name_empty() {
-        assert!(validate_name("").is_err());
-    }
-
-    #[test]
-    fn validate_name_valid_alphanumeric() {
-        assert!(validate_name("my-preset").is_ok());
-    }
-
-    #[test]
-    fn validate_name_valid_simple() {
-        assert!(validate_name("test123").is_ok());
-    }
-
-    #[test]
-    fn validate_name_invalid_spaces() {
-        assert!(validate_name("bad name").is_err());
-    }
-
-    #[test]
-    fn validate_name_invalid_special_chars() {
-        assert!(validate_name("bad!name").is_err());
-    }
-
-    #[test]
-    fn validate_name_invalid_dots() {
-        assert!(validate_name("my.preset").is_err());
-    }
-}

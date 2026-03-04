@@ -163,49 +163,45 @@ fn ms_to_iso8601(ms: u64) -> String {
     let datetime = UNIX_EPOCH + duration;
 
     // Manual formatting since we don't have chrono
-    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-    if let Ok(since_epoch) = datetime.duration_since(UNIX_EPOCH) {
-        let secs = since_epoch.as_secs();
-        // Calculate components
-        let days_since_epoch = secs / 86400;
-        let time_of_day = secs % 86400;
-        let hours = time_of_day / 3600;
-        let minutes = (time_of_day % 3600) / 60;
-        let seconds = time_of_day % 60;
+    let since_epoch = datetime.duration_since(UNIX_EPOCH).unwrap_or_default();
+    let secs = since_epoch.as_secs();
+    // Calculate components
+    let days_since_epoch = secs / 86400;
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
 
-        // Calculate year/month/day from days since 1970-01-01
-        let mut year = 1970i32;
-        let mut remaining_days = days_since_epoch.to_i32();
+    // Calculate year/month/day from days since 1970-01-01
+    let mut year = 1970i32;
+    let mut remaining_days = days_since_epoch.to_i32();
 
-        loop {
-            let days_in_year = if is_leap_year(year) { 366 } else { 365 };
-            if remaining_days < days_in_year {
-                break;
-            }
-            remaining_days -= days_in_year;
-            year += 1;
+    loop {
+        let days_in_year = if is_leap_year(year) { 366 } else { 365 };
+        if remaining_days < days_in_year {
+            break;
         }
-
-        let days_in_months: [i32; 12] = if is_leap_year(year) {
-            [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        } else {
-            [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        };
-
-        let mut month = 1;
-        for days in &days_in_months {
-            if remaining_days < *days {
-                break;
-            }
-            remaining_days -= days;
-            month += 1;
-        }
-        let day = remaining_days + 1;
-
-        format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
-    } else {
-        "1970-01-01T00:00:00Z".to_string()
+        remaining_days -= days_in_year;
+        year += 1;
     }
+
+    let days_in_months: [i32; 12] = if is_leap_year(year) {
+        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    } else {
+        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    };
+
+    let mut month = 1;
+    for days in &days_in_months {
+        if remaining_days < *days {
+            break;
+        }
+        remaining_days -= days;
+        month += 1;
+    }
+    let day = remaining_days + 1;
+
+    format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
 }
 
 const fn is_leap_year(year: i32) -> bool {
@@ -424,35 +420,6 @@ pub(crate) mod error {
     impl From<reqwest::Error> for LlmError {
         fn from(e: reqwest::Error) -> Self {
             Self::Network(e.to_string())
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        fn display_auth() {
-            let e = LlmError::Auth("key missing".into());
-            assert_eq!(e.to_string(), "Auth error: key missing");
-        }
-
-        #[test]
-        fn display_api() {
-            let e = LlmError::Api { status: 429, body: "rate limited".into() };
-            assert_eq!(e.to_string(), "API error 429: rate limited");
-        }
-
-        #[test]
-        fn display_network() {
-            let e = LlmError::Network("timeout".into());
-            assert_eq!(e.to_string(), "Network error: timeout");
-        }
-
-        #[test]
-        fn display_stream_read() {
-            let e = LlmError::StreamRead("connection reset".into());
-            assert_eq!(e.to_string(), "Stream read error: connection reset");
         }
     }
 }

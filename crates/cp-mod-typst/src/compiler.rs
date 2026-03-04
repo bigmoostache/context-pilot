@@ -265,13 +265,13 @@ impl World for ContextPilotWorld {
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use chrono::{Datelike, Local, Timelike, Utc};
         let now = Local::now();
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        let naive = if let Some(hours) = offset {
-            let utc = Utc::now();
-            (utc + chrono::Duration::hours(hours)).naive_utc()
-        } else {
-            now.naive_local()
-        };
+        let naive = offset.map_or_else(
+            || now.naive_local(),
+            |hours| {
+                let utc = Utc::now();
+                (utc + chrono::Duration::hours(hours)).naive_utc()
+            },
+        );
         Datetime::from_ymd_hms(
             naive.year(),
             naive.month().to_u8(),

@@ -58,12 +58,8 @@ impl LlmClient for ClaudeCodeApiKeyClient {
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
         // Handle cleaner mode or custom system prompt
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        let system_text = if let Some(ref prompt) = request.system_prompt {
-            prompt.clone()
-        } else {
-            library::default_agent_content().to_string()
-        };
+        let system_text =
+            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_string(), Clone::clone);
 
         // Build messages from pre-assembled API messages or raw data
         let mut json_messages =

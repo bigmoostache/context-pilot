@@ -47,25 +47,27 @@ fn expand_paste_sentinels(
 
                 if let Ok(idx) = idx_str.parse::<usize>() {
                     let label = paste_buffer_labels.get(idx).and_then(|l| l.as_ref());
-                    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-                    let display_text = if let Some(cmd_name) = label {
-                        // Command: show full content
-                        let content = paste_buffers.get(idx).map_or("", |s| s.as_str());
-                        format!("{PASTE_PLACEHOLDER_START}⚡/{cmd_name}\n{content}{PASTE_PLACEHOLDER_END}")
-                    } else {
-                        // Paste: show line/token stats
-                        let (token_count, line_count) = paste_buffers
-                            .get(idx)
-                            .map_or((0, 0), |s| (crate::state::estimate_tokens(s), s.lines().count().max(1)));
-                        format!(
-                            "{}📋 Paste #{} ({} lines, {} tok){}",
-                            PASTE_PLACEHOLDER_START,
-                            idx + 1,
-                            line_count,
-                            token_count,
-                            PASTE_PLACEHOLDER_END
-                        )
-                    };
+                    let display_text = label.map_or_else(
+                        || {
+                            // Paste: show line/token stats
+                            let (token_count, line_count) = paste_buffers
+                                .get(idx)
+                                .map_or((0, 0), |s| (crate::state::estimate_tokens(s), s.lines().count().max(1)));
+                            format!(
+                                "{}📋 Paste #{} ({} lines, {} tok){}",
+                                PASTE_PLACEHOLDER_START,
+                                idx + 1,
+                                line_count,
+                                token_count,
+                                PASTE_PLACEHOLDER_END
+                            )
+                        },
+                        |cmd_name| {
+                            // Command: show full content
+                            let content = paste_buffers.get(idx).map_or("", |s| s.as_str());
+                            format!("{PASTE_PLACEHOLDER_START}⚡/{cmd_name}\n{content}{PASTE_PLACEHOLDER_END}")
+                        },
+                    );
                     let placeholder = &display_text;
                     let placeholder_len = placeholder.len();
 

@@ -52,12 +52,7 @@ impl GuardRailStopLogic for MaxOutputTokensGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        if let Some(max) = SpineState::get(state).config.max_output_tokens {
-            state.total_output_tokens >= max
-        } else {
-            false
-        }
+        SpineState::get(state).config.max_output_tokens.is_some_and(|max| state.total_output_tokens >= max)
     }
 
     fn block_reason(&self, state: &State) -> String {
@@ -82,13 +77,7 @@ impl GuardRailStopLogic for MaxCostGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        if let Some(max_cost) = SpineState::get(state).config.max_cost {
-            let current_cost = Self::calculate_cost(state);
-            current_cost >= max_cost
-        } else {
-            false
-        }
+        SpineState::get(state).config.max_cost.is_some_and(|max_cost| Self::calculate_cost(state) >= max_cost)
     }
 
     fn block_reason(&self, state: &State) -> String {
@@ -123,13 +112,10 @@ impl GuardRailStopLogic for MaxStreamCostGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        if let Some(max_cost) = SpineState::get(state).config.max_stream_cost {
-            let current_cost = Self::calculate_stream_cost(state);
-            current_cost >= max_cost
-        } else {
-            false
-        }
+        SpineState::get(state)
+            .config
+            .max_stream_cost
+            .is_some_and(|max_cost| Self::calculate_stream_cost(state) >= max_cost)
     }
 
     fn block_reason(&self, state: &State) -> String {
@@ -200,8 +186,7 @@ impl GuardRailStopLogic for MaxMessagesGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        if let Some(max) = SpineState::get(state).config.max_messages { state.messages.len() >= max } else { false }
+        SpineState::get(state).config.max_messages.is_some_and(|max| state.messages.len() >= max)
     }
 
     fn block_reason(&self, state: &State) -> String {
@@ -228,12 +213,10 @@ impl GuardRailStopLogic for MaxAutoRetriesGuard {
     }
 
     fn should_block(&self, state: &State) -> bool {
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        if let Some(max) = SpineState::get(state).config.max_auto_retries {
-            SpineState::get(state).config.auto_continuation_count >= max
-        } else {
-            false
-        }
+        SpineState::get(state)
+            .config
+            .max_auto_retries
+            .is_some_and(|max| SpineState::get(state).config.auto_continuation_count >= max)
     }
 
     fn block_reason(&self, state: &State) -> String {

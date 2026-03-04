@@ -189,15 +189,7 @@ impl Watcher for ConsoleWatcher {
 
         let satisfied = match self.mode.as_str() {
             "exit" => handle.get_status().is_terminal(),
-            "pattern" =>
-            {
-                #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-                if let Some(ref pat) = self.pattern {
-                    handle.buffer.contains_pattern(pat)
-                } else {
-                    false
-                }
-            }
+            "pattern" => self.pattern.as_ref().is_some_and(|pat| handle.buffer.contains_pattern(pat)),
             _ => false,
         };
 

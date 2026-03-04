@@ -95,19 +95,12 @@ impl BraveClient {
         let search_resp: BraveSearchResponse =
             serde_json::from_str(&response).map_err(|e| format!("Failed to parse search response: {e}"))?;
 
-        // Auto-fetch rich results if callback_key present
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        let rich_data = if let Some(ref rich) = search_resp.rich {
-            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-            if let Some(ref hint) = rich.hint {
-                #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-                if let Some(ref key) = hint.callback_key { self.fetch_rich_callback(key).ok() } else { None }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let rich_data = search_resp
+            .rich
+            .as_ref()
+            .and_then(|r| r.hint.as_ref())
+            .and_then(|h| h.callback_key.as_ref())
+            .and_then(|key| self.fetch_rich_callback(key).ok());
 
         Ok((search_resp, rich_data))
     }

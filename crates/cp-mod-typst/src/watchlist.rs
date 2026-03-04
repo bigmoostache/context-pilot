@@ -88,14 +88,9 @@ impl Watchlist {
 /// Normalize a path for comparison (resolve ../, remove trailing slashes).
 fn normalize_path(p: &str) -> String {
     // Use canonicalize if the file exists, otherwise just clean up the string
-    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-    if let Ok(abs) = PathBuf::from(p).canonicalize() {
-        abs.to_string_lossy().to_string()
-    } else {
-        // Fallback: just normalize slashes and dots
-        let path = PathBuf::from(p);
-        path.to_string_lossy().to_string()
-    }
+    PathBuf::from(p)
+        .canonicalize()
+        .map_or_else(|_| PathBuf::from(p).to_string_lossy().to_string(), |abs| abs.to_string_lossy().to_string())
 }
 
 /// Compile a watched document and update its dependency manifest.

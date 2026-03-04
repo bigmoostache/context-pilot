@@ -133,29 +133,31 @@ impl Panel for ConsolePanel {
     }
 
     fn title(&self, state: &State) -> String {
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        if let Some(ctx) = state.context.get(state.selected_context) {
-            let desc =
-                ctx.get_meta_str("console_description").or_else(|| ctx.get_meta_str("console_command")).unwrap_or("?");
-            let status = ctx.get_meta_str("console_status").unwrap_or("?");
-            format!("console: {desc} ({status})")
-        } else {
-            "Console".to_string()
-        }
+        state.context.get(state.selected_context).map_or_else(
+            || "Console".to_string(),
+            |ctx| {
+                let desc = ctx
+                    .get_meta_str("console_description")
+                    .or_else(|| ctx.get_meta_str("console_command"))
+                    .unwrap_or("?");
+                let status = ctx.get_meta_str("console_status").unwrap_or("?");
+                format!("console: {desc} ({status})")
+            },
+        )
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        let (content, command, status) = if let Some(ctx) = state.context.get(state.selected_context) {
-            let content = ctx.cached_content.as_ref().cloned().unwrap_or_else(|| {
-                if ctx.cache_deprecated { "Loading...".to_string() } else { "No output".to_string() }
-            });
-            let cmd = ctx.get_meta_str("console_command").unwrap_or("").to_string();
-            let st = ctx.get_meta_str("console_status").unwrap_or("?").to_string();
-            (content, cmd, st)
-        } else {
-            (String::new(), String::new(), String::new())
-        };
+        let (content, command, status) = state.context.get(state.selected_context).map_or_else(
+            || (String::new(), String::new(), String::new()),
+            |ctx| {
+                let content = ctx.cached_content.as_ref().cloned().unwrap_or_else(|| {
+                    if ctx.cache_deprecated { "Loading...".to_string() } else { "No output".to_string() }
+                });
+                let cmd = ctx.get_meta_str("console_command").unwrap_or("").to_string();
+                let st = ctx.get_meta_str("console_status").unwrap_or("?").to_string();
+                (content, cmd, st)
+            },
+        );
 
         let mut lines: Vec<Line<'_>> = Vec::new();
 

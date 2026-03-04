@@ -49,11 +49,7 @@ impl ClaudeCodeApiKeyClient {
             }))
             .send();
 
-        #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-        let auth_ok = match &auth_result {
-            Ok(resp) => resp.status().is_success(),
-            Err(_) => false,
-        };
+        let auth_ok = auth_result.as_ref().is_ok_and(|resp| resp.status().is_success());
 
         if !auth_ok {
             let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));

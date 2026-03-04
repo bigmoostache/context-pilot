@@ -38,28 +38,27 @@ pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
 
     // Find the closing ---
     let after_first = &trimmed[3..];
-    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-    if let Some(end) = after_first.find("\n---") {
-        let yaml_block = &after_first[..end];
-        let body_start = end + 4; // skip \n---
-        let body = after_first[body_start..].trim_start_matches('\n').to_string();
-
-        // Parse YAML frontmatter
-        #[expect(clippy::items_after_statements, reason = "local deserialization struct scoped to this function")]
-        #[derive(serde::Deserialize, Default)]
-        struct Frontmatter {
-            #[serde(default)]
-            name: String,
-            #[serde(default)]
-            description: String,
-        }
-
-        let fm: Frontmatter = serde_yaml::from_str(yaml_block).unwrap_or_default();
-        (fm.name, fm.description, body)
-    } else {
+    let Some(end) = after_first.find("\n---") else {
         // No closing --- found, treat as plain content
-        (String::new(), String::new(), content.to_string())
+        return (String::new(), String::new(), content.to_string());
+    };
+
+    let yaml_block = &after_first[..end];
+    let body_start = end + 4; // skip \n---
+    let body = after_first[body_start..].trim_start_matches('\n').to_string();
+
+    // Parse YAML frontmatter
+    #[expect(clippy::items_after_statements, reason = "local deserialization struct scoped to this function")]
+    #[derive(serde::Deserialize, Default)]
+    struct Frontmatter {
+        #[serde(default)]
+        name: String,
+        #[serde(default)]
+        description: String,
     }
+
+    let fm: Frontmatter = serde_yaml::from_str(yaml_block).unwrap_or_default();
+    (fm.name, fm.description, body)
 }
 
 /// Format a prompt item back to .md file with YAML frontmatter

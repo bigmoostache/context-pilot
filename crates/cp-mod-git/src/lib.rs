@@ -48,12 +48,9 @@ pub fn refresh_git_status(state: &mut State) {
 
     // Get file changes with numstat
     let diff_base = gs.git_diff_base.clone();
-    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-    let diff_args = if let Some(ref base) = diff_base {
-        vec!["diff", "--numstat", base.as_str()]
-    } else {
-        vec!["diff", "--numstat", "HEAD"]
-    };
+    let diff_args = diff_base
+        .as_ref()
+        .map_or_else(|| vec!["diff", "--numstat", "HEAD"], |base| vec!["diff", "--numstat", base.as_str()]);
 
     let mut file_changes: Vec<GitFileChange> = Vec::new();
 

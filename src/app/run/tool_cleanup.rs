@@ -129,10 +129,9 @@ impl App {
                 // Extract sentinel_id and original content, then merge with callback result
                 let after_sentinel = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
                 // Find matching watcher result by sentinel_id prefix
-                let matched_result = blocking_results.iter().find(|r| {
-                    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-                    if let Some(ref tid) = r.tool_use_id { after_sentinel.starts_with(tid.as_str()) } else { false }
-                });
+                let matched_result = blocking_results
+                    .iter()
+                    .find(|r| r.tool_use_id.as_ref().is_some_and(|tid| after_sentinel.starts_with(tid.as_str())));
                 if let Some(result) = matched_result {
                     let sentinel_id = result.tool_use_id.as_ref().unwrap();
                     let original_content = &after_sentinel[sentinel_id.len()..];
@@ -324,10 +323,7 @@ impl App {
                 .collect();
             if !stale_ids.is_empty() {
                 let registry = WatcherRegistry::get_mut(&mut self.state);
-                registry.watchers.retain(|w| {
-                    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-                    if let Some(tid) = w.tool_use_id() { !stale_ids.contains(&tid.to_string()) } else { true }
-                });
+                registry.watchers.retain(|w| w.tool_use_id().is_none_or(|tid| !stale_ids.contains(&tid.to_string())));
             }
         }
 

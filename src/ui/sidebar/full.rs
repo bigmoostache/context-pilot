@@ -133,12 +133,10 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let total_pages = if total_dynamic == 0 { 1 } else { total_dynamic.div_ceil(MAX_DYNAMIC_PER_PAGE) };
 
     // Determine current page based on selected context
-    #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-    let current_page = if let Some(selected_pos) = dynamic_indices.iter().position(|&i| i == state.selected_context) {
-        selected_pos / MAX_DYNAMIC_PER_PAGE
-    } else {
-        0 // Default to first page if a fixed context is selected
-    };
+    let current_page = dynamic_indices
+        .iter()
+        .position(|&i| i == state.selected_context)
+        .map_or(0, |selected_pos| selected_pos / MAX_DYNAMIC_PER_PAGE);
 
     // Get dynamic contexts for current page
     let page_start = current_page * MAX_DYNAMIC_PER_PAGE;

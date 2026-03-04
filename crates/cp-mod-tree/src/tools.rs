@@ -339,8 +339,7 @@ fn build_tree_new(
         .filter(|e| {
             let path = e.path();
             let is_dir = path.is_dir();
-            #[expect(clippy::option_if_let_else, reason = "if-let is clearer here")]
-            if let Some(gi) = gitignore { !gi.matched(&path, is_dir).is_ignore() } else { true }
+            gitignore.as_ref().is_none_or(|gi| !gi.matched(&path, is_dir).is_ignore())
         })
         .collect();
 
