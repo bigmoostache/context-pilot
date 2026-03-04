@@ -12,7 +12,8 @@ mod state;
 mod typst_cli;
 mod ui;
 
-use std::io;
+use std::io::{self, Write};
+use std::process::ExitCode;
 use std::sync::mpsc;
 
 use crossterm::{
@@ -27,7 +28,7 @@ use infra::api::StreamEvent;
 use state::cache::CacheUpdate;
 use state::persistence::load_state;
 
-fn main() -> io::Result<()> {
+fn main() -> ExitCode {
     // Parse CLI args
     let args: Vec<String> = std::env::args().collect();
     let resume_stream = args.iter().any(|a| a == "--resume-stream");
@@ -36,10 +37,10 @@ fn main() -> io::Result<()> {
     if args.len() >= 2 {
         match args[1].as_str() {
             // Compile a .typ → .pdf in the same directory
-            "typst-compile" => handle_cli_result(typst_cli::run_typst_compile(&args[2..])),
+            "typst-compile" => return handle_cli_result(typst_cli::run_typst_compile(&args[2..])),
             // Recompile watched documents whose dependencies changed
             "typst-recompile-watched" => {
-                handle_cli_result(typst_cli::run_typst_recompile_watched(&args[2..]));
+                return handle_cli_result(typst_cli::run_typst_recompile_watched(&args[2..]));
             }
             _ => {}
         }
@@ -61,18 +62,26 @@ fn main() -> io::Result<()> {
         let backtrace = std::backtrace::Backtrace::force_capture();
         let msg = format!("[{ts}] {info}\n\n{backtrace}\n\n---\n");
         let log_path = error_dir.join("panic.log");
-        let _r = std::fs::OpenOptions::new().create(true).append(true).open(&log_path).and_then(|mut f| {
-            use std::io::Write;
-            f.write_all(msg.as_bytes())
-        });
+        let _r = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+            .and_then(|mut f| f.write_all(msg.as_bytes()));
 
         default_hook(info);
     }));
 
-    enable_raw_mode()?;
-    let _r = io::stdout().execute(EnterAlternateScreen)?;
-    let _r = io::stdout().execute(EnableBracketedPaste)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+    let Ok(()) = enable_raw_mode() else {
+        drop(writeln!(io::stderr(), "Fatal: failed to enable raw mode"));
+        return ExitCode::FAILURE;
+    };
+    let _r = io::stdout().execute(EnterAlternateScreen);
+    let _r = io::stdout().execute(EnableBracketedPaste);
+    let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
+        let _r = disable_raw_mode();
+        drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));
+        return ExitCode::FAILURE;
+    };
 
     let mut state = load_state();
 
@@ -114,38 +123,38 @@ fn main() -> io::Result<()> {
 
     // Create and run app
     let mut app = App::new(state, cache_tx, resume_stream);
-    app.run(&mut terminal, &tx, &rx, &cache_rx)?;
+    let run_result = app.run(&mut terminal, &tx, &rx, &cache_rx);
 
     // Cleanup
-    disable_raw_mode()?;
-    let _r = io::stdout().execute(DisableBracketedPaste)?;
-    let _r = io::stdout().execute(LeaveAlternateScreen)?;
-    Ok(())
+    let _r = disable_raw_mode();
+    let _r = io::stdout().execute(DisableBracketedPaste);
+    let _r = io::stdout().execute(LeaveAlternateScreen);
+
+    if let Err(e) = run_result {
+        drop(writeln!(io::stderr(), "Fatal: {e}"));
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
 }
 
-/// Handle a CLI subcommand result: print output and exit.
+/// Handle a CLI subcommand result: write output and return an exit code.
 ///
-/// `Ok(msg)` prints to stdout (if non-empty) and exits 0.
-/// `Err((msg, code))` prints to stderr (if non-empty) and exits with `code`.
-#[expect(
-    clippy::exit,
-    clippy::print_stdout,
-    reason = "CLI entry point — printing and process::exit are the correct interface"
-)]
-fn handle_cli_result(result: Result<String, (String, i32)>) -> ! {
+/// `Ok(msg)` writes to stdout (if non-empty) and returns `SUCCESS`.
+/// `Err((msg, code))` writes to stderr (if non-empty) and returns `FAILURE`
+/// (or `SUCCESS` for exit code 0).
+fn handle_cli_result(result: Result<String, (String, i32)>) -> ExitCode {
     match result {
         Ok(msg) => {
             if !msg.is_empty() {
-                println!("{msg}");
+                drop(writeln!(io::stdout(), "{msg}"));
             }
-            std::process::exit(0);
+            ExitCode::SUCCESS
         }
         Err((msg, code)) => {
             if !msg.is_empty() {
-                use io::Write;
                 drop(writeln!(io::stderr(), "{msg}"));
             }
-            std::process::exit(code);
+            ExitCode::from(u8::try_from(code.clamp(0, 255)).unwrap_or(1))
         }
     }
 }
