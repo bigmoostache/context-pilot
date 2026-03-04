@@ -62,10 +62,9 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
     let filled = ((usage_pct / 100.0) * bar_width.to_f64()).to_usize();
     let threshold_pos = (threshold_pct.to_f64() * bar_width.to_f64()).to_usize();
 
-    #[expect(clippy::cast_precision_loss, reason = "threshold comparison — precision loss irrelevant")]
     let bar_color = if total_tokens >= threshold {
         theme::error()
-    } else if total_tokens as f64 >= threshold.to_f64() * 0.9 {
+    } else if total_tokens.to_f64() >= threshold.to_f64() * 0.9 {
         theme::warning()
     } else {
         theme::accent()

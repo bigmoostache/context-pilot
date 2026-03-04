@@ -8,8 +8,6 @@ pub(crate) use cp_base::state::*;
 
 // ── Submodule re-exports (accessed via path, e.g. crate::state::config::SCHEMA_VERSION) ──
 pub(crate) use cp_base::state::data::config;
-#[cfg(test)]
-pub(crate) use cp_base::state::data::message;
 
 // ── Local submodules ──
 pub(crate) mod cache;

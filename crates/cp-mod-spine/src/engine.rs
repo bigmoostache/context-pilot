@@ -7,6 +7,7 @@
 //!
 //! No more AutoContinuation trait — all triggers go through the watcher → notification pipeline.
 
+use cp_base::cast::SafeCast;
 use cp_base::config::{INJECTIONS, PROMPTS};
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State};
@@ -259,9 +260,8 @@ fn check_context_threshold(state: &mut State) {
     }
 
     let budget_tokens = state.effective_context_budget();
-    #[expect(clippy::cast_precision_loss, reason = "token counts ≪ 2^52, f64 mantissa is sufficient")]
     let usage_pct =
-        if budget_tokens > 0 { (total_tokens as f64 / budget_tokens as f64 * 100.0).min(100.0) } else { 0.0 };
+        if budget_tokens > 0 { (total_tokens.to_f64() / budget_tokens.to_f64() * 100.0).min(100.0) } else { 0.0 };
 
     let content = PROMPTS
         .context_threshold_notification

@@ -14,8 +14,6 @@ use crate::ui::{helpers::count_wrapped_lines, theme};
 use cp_base::cast::SafeCast;
 
 // Re-export the Panel trait, ContextItem, and utility functions from cp-base
-#[cfg(test)]
-pub(crate) use cp_base::panels::mark_panels_dirty;
 pub(crate) use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};
 
 /// Render a panel with the binary's full chrome (borders, theme, scroll, profiling).

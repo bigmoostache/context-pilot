@@ -1,3 +1,5 @@
+use cp_base::cast::SafeCast;
+
 use crate::app::panels::{ContextItem, collect_all_context, refresh_all_panels};
 use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::refresh_conversation_context;
@@ -91,8 +93,7 @@ pub(super) fn prepare_stream_context(
         for (i, (panel_id, _, token_count)) in panel_hashes.iter().enumerate() {
             let is_hit = i < prefix_len;
             let price = if is_hit { hit_price } else { miss_price };
-            #[expect(clippy::cast_precision_loss, reason = "token counts ≪ 2^52")]
-            let cost = *token_count as f64 * f64::from(price) / 1_000_000.0;
+            let cost = (*token_count).to_f64() * f64::from(price) / 1_000_000.0;
 
             if let Some(ctx) = state.context.iter_mut().find(|c| c.id == *panel_id) {
                 ctx.panel_cache_hit = is_hit;

@@ -175,12 +175,12 @@ impl PerfMetrics {
     }
 
     /// End frame and record frame time
-    #[expect(clippy::significant_drop_in_scrutinee, reason = "lock scope is intentional")]
     pub(crate) fn frame_end(&self) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-        if let Some(start) = self.frame_state.read().unwrap_or_else(std::sync::PoisonError::into_inner).frame_start {
+        let frame_start = self.frame_state.read().unwrap_or_else(std::sync::PoisonError::into_inner).frame_start;
+        if let Some(start) = frame_start {
             let frame_time = start.elapsed().as_micros().to_u64();
             self.frame_times.write().unwrap_or_else(std::sync::PoisonError::into_inner).push(frame_time);
             let _r = self.frame_count.fetch_add(1, Ordering::Relaxed);

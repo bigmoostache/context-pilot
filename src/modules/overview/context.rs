@@ -1,3 +1,5 @@
+use cp_base::cast::SafeCast;
+
 use crate::modules::all_modules;
 use crate::state::{State, estimate_tokens, get_context_type_meta};
 
@@ -45,8 +47,7 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
     let budget = state.effective_context_budget();
     let threshold = state.cleaning_threshold_tokens();
-    #[expect(clippy::cast_precision_loss, reason = "percentage display — precision loss irrelevant")]
-    let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
+    let usage_pct = (total_tokens.to_f64() / budget.to_f64() * 100.0).min(100.0);
 
     let mut output =
         format!("Context Usage: {total_tokens} / {threshold} threshold / {budget} budget ({usage_pct:.1}%)\n\n");
