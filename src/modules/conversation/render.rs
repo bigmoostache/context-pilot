@@ -21,7 +21,7 @@ fn get_visualizer_registry() -> &'static HashMap<String, ToolVisualizer> {
 }
 
 /// Render a single message to lines (without caching logic)
-#[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+/// Render a single message to lines (without caching logic)
 pub(crate) fn render_message(
     msg: &Message,
     viewport_width: u16,
@@ -48,7 +48,11 @@ pub(crate) fn render_message(
                                         format!("\"{s}\"")
                                     }
                                 }
-                                _ => v.to_string(),
+                                serde_json::Value::Null
+                                | serde_json::Value::Bool(_)
+                                | serde_json::Value::Number(_)
+                                | serde_json::Value::Array(_)
+                                | serde_json::Value::Object(_) => v.to_string(),
                             };
                             format!("{k}={val}")
                         })

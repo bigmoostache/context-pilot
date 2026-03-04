@@ -14,6 +14,7 @@ use crate::state::{
     ContextType, FullContentCache, InputRenderCache, MessageRenderCache, MessageStatus, MessageType, State, hash_values,
 };
 use crate::ui::theme;
+use cp_base::panels::scroll_key_action;
 
 use super::list::{self, ListAction};
 use super::render;
@@ -266,7 +267,6 @@ impl Panel for ConversationPanel {
         if state.is_streaming { "Conversation *".to_string() } else { "Conversation".to_string() }
     }
 
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
 
@@ -302,8 +302,23 @@ impl Panel for ConversationPanel {
             }
             KeyCode::Home => Some(Action::CursorHome),
             KeyCode::End => Some(Action::CursorEnd),
-            // Arrow keys: let global handle for scrolling
-            _ => None,
+            // Remaining variants: delegate scroll keys, ignore everything else
+            KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => scroll_key_action(key),
+            KeyCode::Tab
+            | KeyCode::BackTab
+            | KeyCode::Insert
+            | KeyCode::F(_)
+            | KeyCode::Null
+            | KeyCode::Esc
+            | KeyCode::CapsLock
+            | KeyCode::ScrollLock
+            | KeyCode::NumLock
+            | KeyCode::PrintScreen
+            | KeyCode::Pause
+            | KeyCode::Menu
+            | KeyCode::KeypadBegin
+            | KeyCode::Media(_)
+            | KeyCode::Modifier(_) => None,
         }
     }
 

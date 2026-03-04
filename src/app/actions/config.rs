@@ -2,26 +2,12 @@ use crate::state::State;
 
 use super::ActionResult;
 
-/// Handle secondary provider selection
-pub(crate) const fn handle_secondary_provider(state: &mut State, provider: crate::llms::LlmProvider) -> ActionResult {
-    state.secondary_provider = provider;
+/// Trigger an API connectivity check and save.
+pub(crate) fn api_check(state: &mut State) -> ActionResult {
+    state.api_check_in_progress = true;
+    state.api_check_result = None;
     state.dirty = true;
-    ActionResult::Save
-}
-
-/// Handle secondary model selection for all providers
-#[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
-pub(crate) const fn handle_secondary_model(state: &mut State, action: &super::Action) -> ActionResult {
-    use super::Action;
-    match action {
-        Action::ConfigSelectSecondaryAnthropicModel(model) => state.secondary_anthropic_model = *model,
-        Action::ConfigSelectSecondaryGrokModel(model) => state.secondary_grok_model = *model,
-        Action::ConfigSelectSecondaryGroqModel(model) => state.secondary_groq_model = *model,
-        Action::ConfigSelectSecondaryDeepSeekModel(model) => state.secondary_deepseek_model = *model,
-        _ => return ActionResult::Nothing,
-    }
-    state.dirty = true;
-    ActionResult::Save
+    ActionResult::StartApiCheck
 }
 
 /// Handle `ConfigIncreaseSelectedBar` action

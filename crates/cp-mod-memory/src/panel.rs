@@ -1,8 +1,7 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::prelude::*;
 use unicode_width::UnicodeWidthStr;
 
-use cp_base::config::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::Action;
@@ -10,6 +9,7 @@ use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::ui::{Cell, TextCell, render_table, render_table_text};
 
 use crate::types::{MemoryImportance, MemoryState};
+use cp_base::panels::scroll_key_action;
 
 pub(crate) struct MemoryPanel;
 
@@ -85,15 +85,8 @@ impl MemoryPanel {
 }
 
 impl Panel for MemoryPanel {
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
-        match key.code {
-            KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
-            KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
-            KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
-            KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
-            _ => None,
-        }
+        scroll_key_action(key)
     }
 
     fn title(&self, _state: &State) -> String {

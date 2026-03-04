@@ -1,8 +1,7 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::prelude::*;
 
 use cp_base::config::constants::MAX_RESULT_CONTENT_BYTES;
-use cp_base::config::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::config::theme;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{CacheRequest, CacheUpdate};
@@ -13,6 +12,7 @@ use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, es
 use super::GIT_CMD_TIMEOUT_SECS;
 use super::GIT_STATUS_REFRESH_MS;
 use crate::types::GitResultRequest;
+use cp_base::panels::scroll_key_action;
 
 pub(crate) struct GitResultPanel;
 
@@ -33,7 +33,6 @@ impl Panel for GitResultPanel {
         })
     }
 
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
         match update {
             CacheUpdate::Content { content, token_count, .. } => {
@@ -56,7 +55,7 @@ impl Panel for GitResultPanel {
                 let _ = update_if_changed(ctx, &content_ref);
                 true
             }
-            _ => false,
+            CacheUpdate::Unchanged { .. } | CacheUpdate::ModuleSpecific { .. } => false,
         }
     }
 
@@ -94,15 +93,8 @@ impl Panel for GitResultPanel {
         }
     }
 
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
-        match key.code {
-            KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
-            KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
-            KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
-            KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
-            _ => None,
-        }
+        scroll_key_action(key)
     }
 
     fn title(&self, state: &State) -> String {

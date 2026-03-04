@@ -8,7 +8,6 @@ use crate::app::App;
 impl App {
     /// Handle keyboard events when the @ autocomplete popup is active.
     /// Mutates `AutocompleteState` and state.input directly.
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     pub(super) fn handle_autocomplete_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
@@ -143,13 +142,31 @@ impl App {
                     ac.set_matches(entries);
                 }
             }
-            _ => {}
+            KeyCode::Left
+            | KeyCode::Right
+            | KeyCode::Home
+            | KeyCode::End
+            | KeyCode::PageUp
+            | KeyCode::PageDown
+            | KeyCode::BackTab
+            | KeyCode::Delete
+            | KeyCode::Insert
+            | KeyCode::F(_)
+            | KeyCode::Null
+            | KeyCode::CapsLock
+            | KeyCode::ScrollLock
+            | KeyCode::NumLock
+            | KeyCode::PrintScreen
+            | KeyCode::Pause
+            | KeyCode::Menu
+            | KeyCode::KeypadBegin
+            | KeyCode::Media(_)
+            | KeyCode::Modifier(_) => {}
         }
     }
 
     /// Handle keyboard events when a question form is active.
     /// Mutates the `PendingQuestionForm` directly in state.
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     pub(super) fn handle_question_form_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
@@ -201,13 +218,34 @@ impl App {
                     form.type_char(c);
                 }
             }
-            // Non-typing-other: any char that's not space does nothing
-            _ => {}
+            // Remaining keys do nothing in the question form
+            KeyCode::Backspace
+            | KeyCode::Up
+            | KeyCode::Down
+            | KeyCode::Home
+            | KeyCode::End
+            | KeyCode::PageUp
+            | KeyCode::PageDown
+            | KeyCode::Tab
+            | KeyCode::BackTab
+            | KeyCode::Delete
+            | KeyCode::Insert
+            | KeyCode::F(_)
+            | KeyCode::Char(_)
+            | KeyCode::Null
+            | KeyCode::CapsLock
+            | KeyCode::ScrollLock
+            | KeyCode::NumLock
+            | KeyCode::PrintScreen
+            | KeyCode::Pause
+            | KeyCode::Menu
+            | KeyCode::KeypadBegin
+            | KeyCode::Media(_)
+            | KeyCode::Modifier(_) => {}
         }
     }
 
     /// Handle keyboard events when command palette is open
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     pub(super) fn handle_palette_event(&mut self, event: &event::Event) -> Option<Action> {
         use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -300,7 +338,21 @@ impl App {
                 }
                 None
             }
-            _ => None,
+            KeyCode::PageUp
+            | KeyCode::PageDown
+            | KeyCode::BackTab
+            | KeyCode::Insert
+            | KeyCode::F(_)
+            | KeyCode::Null
+            | KeyCode::CapsLock
+            | KeyCode::ScrollLock
+            | KeyCode::NumLock
+            | KeyCode::PrintScreen
+            | KeyCode::Pause
+            | KeyCode::Menu
+            | KeyCode::KeypadBegin
+            | KeyCode::Media(_)
+            | KeyCode::Modifier(_) => None,
         }
     }
 }

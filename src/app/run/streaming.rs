@@ -148,7 +148,6 @@ impl App {
         );
     }
 
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     pub(super) fn finalize_stream(&mut self) {
         if !self.state.is_streaming {
             return;
@@ -186,7 +185,7 @@ impl App {
                     self.save_state_async();
                 }
                 ActionResult::Save => self.save_state_async(),
-                _ => {}
+                ActionResult::Nothing | ActionResult::StopStream | ActionResult::StartApiCheck => {}
             }
             // Reset auto-continuation count on each successful tick (stream completion).
             // This means MaxAutoRetries only fires on consecutive *failed* continuations,

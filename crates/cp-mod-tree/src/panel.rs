@@ -1,7 +1,6 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::prelude::*;
 
-use cp_base::config::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::config::theme;
 use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::panels::{ContextItem, Panel, paginate_content};
@@ -10,6 +9,7 @@ use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, es
 use cp_base::ui::{find_children_pattern, find_size_pattern};
 
 use crate::types::TreeState;
+use cp_base::panels::scroll_key_action;
 
 pub(crate) struct TreeCacheRequest {
     pub context_id: String,
@@ -25,15 +25,8 @@ impl Panel for TreePanel {
         true
     }
 
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
-        match key.code {
-            KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
-            KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
-            KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
-            KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
-            _ => None,
-        }
+        scroll_key_action(key)
     }
 
     fn title(&self, _state: &State) -> String {

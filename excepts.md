@@ -264,7 +264,7 @@ src/ui/perf/mod.rs:
 | B10 | expect_used | tools/mod.rs | 5 | 🔴 ALIVE |
 | B11 | panic | tools/mod.rs | 10 | 🔴 ALIVE |
 | B12 | expect_used | brave/api.rs | 5 | 🔴 ALIVE |
-| B13 | wildcard_enum_match_arm | brave/panel.rs | 5 | 🔴 ALIVE |
+| B13 | wildcard_enum_match_arm | brave/panel.rs | 5 | 💀 SLAIN |
 | B14 | expect_used | callback/lib.rs | 5 | 🔴 ALIVE |
 | B15 | print_stderr | console/lib.rs | 5 | 🔴 ALIVE |
 | B16 | print_stderr | console/lib.rs | 5 | 🔴 ALIVE |
@@ -296,47 +296,47 @@ src/ui/perf/mod.rs:
 | B42 | expect_used | server/main.rs | 5 | 🔴 ALIVE |
 | B43 | unsafe_code | server/main.rs | 25 | 🔴 ALIVE |
 | B44 | unwrap_used | server/main.rs | 10 | 💀 SLAIN |
-| B45 | wildcard_enum_match_arm | files/panel.rs | 5 | 🔴 ALIVE |
+| B45 | wildcard_enum_match_arm | files/panel.rs | 5 | 💀 SLAIN |
 | B46 | expect_used | firecrawl/api.rs | 5 | 🔴 ALIVE |
 | B47 | expect_used | firecrawl/lib.rs | 5 | 🔴 ALIVE |
-| B48 | wildcard_enum_match_arm | firecrawl/panel.rs | 5 | 🔴 ALIVE |
+| B48 | wildcard_enum_match_arm | firecrawl/panel.rs | 5 | 💀 SLAIN |
 | B49 | expect_used | git/cache_invalidation.rs | 5 | 🔴 ALIVE |
 | B50 | expect_used | git/lib.rs | 5 | 🔴 ALIVE |
-| B51 | wildcard_enum_match_arm | git/result_panel.rs | 5 | 🔴 ALIVE |
-| B52 | wildcard_enum_match_arm | git/result_panel.rs | 5 | 🔴 ALIVE |
+| B51 | wildcard_enum_match_arm | git/result_panel.rs | 5 | 💀 SLAIN |
+| B52 | wildcard_enum_match_arm | git/result_panel.rs | 5 | 💀 SLAIN |
 | B53 | expect_used | github/cache_invalidation.rs | 5 | 🔴 ALIVE |
-| B54 | wildcard_enum_match_arm | github/panel.rs | 5 | 🔴 ALIVE |
-| B55 | wildcard_enum_match_arm | github/panel.rs | 5 | 🔴 ALIVE |
+| B54 | wildcard_enum_match_arm | github/panel.rs | 5 | 💀 SLAIN |
+| B55 | wildcard_enum_match_arm | github/panel.rs | 5 | 💀 SLAIN |
 | B56 | needless_pass_by_value | github/watcher.rs | 15 | 🔴 ALIVE |
-| B57 | wildcard_enum_match_arm | memory/panel.rs | 5 | 🔴 ALIVE |
+| B57 | wildcard_enum_match_arm | memory/panel.rs | 5 | 💀 SLAIN |
 | B58 | print_stderr | preset/builtin.rs | 5 | 🔴 ALIVE |
 | B59 | print_stderr | preset/builtin.rs | 5 | 🔴 ALIVE |
 | B60 | struct_field_names | preset/lib.rs | 15 | 🔴 ALIVE |
 | B61 | expect_used | queue/types.rs | 5 | 🔴 ALIVE |
 | B62 | expect_used | queue/types.rs | 5 | 🔴 ALIVE |
 | B63 | expect_used | scratchpad/lib.rs | 5 | 🔴 ALIVE |
-| B64 | wildcard_enum_match_arm | scratchpad/panel.rs | 5 | 🔴 ALIVE |
-| B65 | wildcard_enum_match_arm | spine/panel.rs | 5 | 🔴 ALIVE |
-| B66 | wildcard_enum_match_arm | todo/panel.rs | 5 | 🔴 ALIVE |
-| B67 | wildcard_enum_match_arm | tree/panel.rs | 5 | 🔴 ALIVE |
+| B64 | wildcard_enum_match_arm | scratchpad/panel.rs | 5 | 💀 SLAIN |
+| B65 | wildcard_enum_match_arm | spine/panel.rs | 5 | 💀 SLAIN |
+| B66 | wildcard_enum_match_arm | todo/panel.rs | 5 | 💀 SLAIN |
+| B67 | wildcard_enum_match_arm | tree/panel.rs | 5 | 💀 SLAIN |
 | B68 | print_stdout | main.rs | 5 | 🔴 ALIVE |
 | B69 | print_stderr | main.rs | 5 | 🔴 ALIVE |
 | B70 | exit | main.rs | 10 | 🔴 ALIVE |
 | B71 | print_stdout | main.rs | 5 | 🔴 ALIVE |
 | B72 | print_stderr | main.rs | 5 | 🔴 ALIVE |
 | B73 | exit | main.rs | 10 | 🔴 ALIVE |
-| B74 | wildcard_enum_match_arm | events.rs | 5 | 🔴 ALIVE |
-| B75 | wildcard_enum_match_arm | events.rs | 5 | 🔴 ALIVE |
-| B76 | wildcard_enum_match_arm | actions/config.rs | 5 | 🔴 ALIVE |
+| B74 | wildcard_enum_match_arm | events.rs | 5 | 💀 SLAIN |
+| B75 | wildcard_enum_match_arm | events.rs | 5 | 💀 SLAIN |
+| B76 | wildcard_enum_match_arm | actions/config.rs | 5 | 💀 SLAIN |
 | B77 | expect_used | actions/helpers.rs | 5 | 🔴 ALIVE |
 | B78 | expect_used | actions/helpers.rs | 5 | 🔴 ALIVE |
 | B79 | needless_pass_by_value | context/mod.rs | 15 | 💀 SLAIN |
-| B80 | wildcard_enum_match_arm | run/input.rs | 5 | 🔴 ALIVE |
+| B80 | wildcard_enum_match_arm | run/input.rs | 5 | 💀 SLAIN |
 | B81 | branches_sharing_code | run/input.rs | 40 | 💀 SLAIN |
-| B82 | wildcard_enum_match_arm | run/input.rs | 5 | 🔴 ALIVE |
-| B83 | wildcard_enum_match_arm | run/input.rs | 5 | 🔴 ALIVE |
+| B82 | wildcard_enum_match_arm | run/input.rs | 5 | 💀 SLAIN |
+| B83 | wildcard_enum_match_arm | run/input.rs | 5 | 💀 SLAIN |
 | B84 | needless_pass_by_value | run/lifecycle.rs | 15 | 🔴 ALIVE |
-| B85 | wildcard_enum_match_arm | run/streaming.rs | 5 | 🔴 ALIVE |
+| B85 | wildcard_enum_match_arm | run/streaming.rs | 5 | 💀 SLAIN |
 | B86 | exit | infra/tools.rs | 10 | 🔴 ALIVE |
 | B87 | struct_field_names | openai_streaming.rs | 15 | 🔴 ALIVE |
 | B88 | needless_pass_by_value | claude_code/mod.rs | 15 | 🔴 ALIVE |
@@ -346,11 +346,11 @@ src/ui/perf/mod.rs:
 | B92 | struct_field_names | claude_code_api_key/streaming.rs | 15 | 🔴 ALIVE |
 | B93 | expect_used | modules/mod.rs | 5 | 🔴 ALIVE |
 | B94 | expect_used | modules/mod.rs | 5 | 🔴 ALIVE |
-| B95 | wildcard_enum_match_arm | conversation/panel.rs | 5 | 🔴 ALIVE |
-| B96 | wildcard_enum_match_arm | conversation/render.rs | 5 | 🔴 ALIVE |
+| B95 | wildcard_enum_match_arm | conversation/panel.rs | 5 | 💀 SLAIN |
+| B96 | wildcard_enum_match_arm | conversation/render.rs | 5 | 💀 SLAIN |
 | B97 | branches_sharing_code | conversation/render.rs | 40 | 💀 SLAIN |
-| B98 | wildcard_enum_match_arm | overview/panel.rs | 5 | 🔴 ALIVE |
-| B99 | wildcard_enum_match_arm | overview/tools_panel.rs | 5 | 🔴 ALIVE |
+| B98 | wildcard_enum_match_arm | overview/panel.rs | 5 | 💀 SLAIN |
+| B99 | wildcard_enum_match_arm | overview/tools_panel.rs | 5 | 💀 SLAIN |
 | B100 | expect_used | questions/mod.rs | 5 | 🔴 ALIVE |
 | B101 | print_stderr | persistence/mod.rs | 5 | 🔴 ALIVE |
 | B102 | expect_used | persistence/writer.rs | 5 | 🔴 ALIVE |
@@ -376,6 +376,6 @@ src/ui/perf/mod.rs:
 
 ### Score
 ```
-Slain: 22 / 110
-XP earned: 410 / 1210
+Slain: 45 / 110
+XP earned: 525 / 1210
 ```

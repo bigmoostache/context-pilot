@@ -28,12 +28,6 @@ pub(crate) const DETACH_KEEP_MIN_TOKENS: usize = 1_000;
 // SCROLLING
 // =============================================================================
 
-/// Scroll amount for Ctrl+Arrow keys
-pub(crate) const SCROLL_ARROW_AMOUNT: f32 = 3.0;
-
-/// Scroll amount for PageUp/PageDown
-pub(crate) const SCROLL_PAGE_AMOUNT: f32 = 10.0;
-
 /// Scroll acceleration increment per scroll event
 pub(crate) const SCROLL_ACCEL_INCREMENT: f32 = 0.3;
 

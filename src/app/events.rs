@@ -1,12 +1,12 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
+use cp_base::panels::scroll_key_action;
+
 use crate::app::actions::{Action, find_context_by_id, parse_context_pattern};
 use crate::app::panels::get_panel;
-use crate::infra::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 use crate::state::State;
 
-#[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
 pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
     match event {
         Event::Key(key) => {
@@ -22,7 +22,34 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     KeyCode::Char('v') => return Some(Action::CycleSidebarMode),
                     KeyCode::Char('o') => return Some(Action::ResetSessionCosts),
                     KeyCode::Char('p') => return Some(Action::OpenCommandPalette),
-                    _ => {}
+                    // All other keys: fall through to normal handling
+                    KeyCode::Backspace
+                    | KeyCode::Enter
+                    | KeyCode::Left
+                    | KeyCode::Right
+                    | KeyCode::Up
+                    | KeyCode::Down
+                    | KeyCode::Home
+                    | KeyCode::End
+                    | KeyCode::PageUp
+                    | KeyCode::PageDown
+                    | KeyCode::Tab
+                    | KeyCode::BackTab
+                    | KeyCode::Delete
+                    | KeyCode::Insert
+                    | KeyCode::F(_)
+                    | KeyCode::Char(_)
+                    | KeyCode::Null
+                    | KeyCode::Esc
+                    | KeyCode::CapsLock
+                    | KeyCode::ScrollLock
+                    | KeyCode::NumLock
+                    | KeyCode::PrintScreen
+                    | KeyCode::Pause
+                    | KeyCode::Menu
+                    | KeyCode::KeypadBegin
+                    | KeyCode::Media(_)
+                    | KeyCode::Modifier(_) => {}
                 }
             }
 
@@ -67,11 +94,30 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 KeyCode::Tab if shift => Action::SelectPrevContext,
                 KeyCode::Tab => Action::SelectNextContext,
                 KeyCode::BackTab => Action::SelectPrevContext, // Shift+Tab on some terminals
-                KeyCode::Up => Action::ScrollUp(SCROLL_ARROW_AMOUNT),
-                KeyCode::Down => Action::ScrollDown(SCROLL_ARROW_AMOUNT),
-                KeyCode::PageUp => Action::ScrollUp(SCROLL_PAGE_AMOUNT),
-                KeyCode::PageDown => Action::ScrollDown(SCROLL_PAGE_AMOUNT),
-                _ => Action::None,
+                KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => {
+                    return scroll_key_action(key);
+                }
+                KeyCode::Backspace
+                | KeyCode::Enter
+                | KeyCode::Left
+                | KeyCode::Right
+                | KeyCode::Home
+                | KeyCode::End
+                | KeyCode::Insert
+                | KeyCode::Delete
+                | KeyCode::F(_)
+                | KeyCode::Char(_)
+                | KeyCode::Null
+                | KeyCode::Esc
+                | KeyCode::CapsLock
+                | KeyCode::ScrollLock
+                | KeyCode::NumLock
+                | KeyCode::PrintScreen
+                | KeyCode::Pause
+                | KeyCode::Menu
+                | KeyCode::KeypadBegin
+                | KeyCode::Media(_)
+                | KeyCode::Modifier(_) => Action::None,
             };
             Some(action)
         }
@@ -81,12 +127,11 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
             Some(Action::PasteText(normalized))
         }
-        _ => Some(Action::None),
+        Event::FocusGained | Event::FocusLost | Event::Mouse(_) | Event::Resize(_, _) => Some(Action::None),
     }
 }
 
 /// Handle key events when config view is open
-#[expect(clippy::wildcard_enum_match_arm, reason = "remaining KeyCode variants are handled uniformly")]
 const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
     let secondary = state.config_secondary_mode;
     match key.code {
@@ -178,7 +223,28 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
         KeyCode::Left => Action::ConfigDecreaseSelectedBar,
         KeyCode::Right => Action::ConfigIncreaseSelectedBar,
         // Any other key is ignored in config view
-        _ => Action::None,
+        KeyCode::Backspace
+        | KeyCode::Enter
+        | KeyCode::Up
+        | KeyCode::Home
+        | KeyCode::End
+        | KeyCode::PageUp
+        | KeyCode::PageDown
+        | KeyCode::BackTab
+        | KeyCode::Delete
+        | KeyCode::Insert
+        | KeyCode::F(_)
+        | KeyCode::Char(_)
+        | KeyCode::Null
+        | KeyCode::CapsLock
+        | KeyCode::ScrollLock
+        | KeyCode::NumLock
+        | KeyCode::PrintScreen
+        | KeyCode::Pause
+        | KeyCode::Menu
+        | KeyCode::KeypadBegin
+        | KeyCode::Media(_)
+        | KeyCode::Modifier(_) => Action::None,
     }
 }
 

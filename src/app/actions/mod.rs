@@ -281,51 +281,11 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Save
         }
         Action::SelectNextContext => {
-            if !state.context.is_empty() {
-                let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
-                sorted_indices.sort_by(|&a, &b| {
-                    let id_a = state.context[a]
-                        .id
-                        .strip_prefix('P')
-                        .and_then(|n| n.parse::<usize>().ok())
-                        .unwrap_or(usize::MAX);
-                    let id_b = state.context[b]
-                        .id
-                        .strip_prefix('P')
-                        .and_then(|n| n.parse::<usize>().ok())
-                        .unwrap_or(usize::MAX);
-                    id_a.cmp(&id_b)
-                });
-                let current_pos = sorted_indices.iter().position(|&i| i == state.selected_context).unwrap_or(0);
-                let next_pos = (current_pos + 1) % sorted_indices.len();
-                state.selected_context = sorted_indices[next_pos];
-                state.scroll_offset = 0.0;
-                state.user_scrolled = false;
-            }
+            select_context(state, true);
             ActionResult::Nothing
         }
         Action::SelectPrevContext => {
-            if !state.context.is_empty() {
-                let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
-                sorted_indices.sort_by(|&a, &b| {
-                    let id_a = state.context[a]
-                        .id
-                        .strip_prefix('P')
-                        .and_then(|n| n.parse::<usize>().ok())
-                        .unwrap_or(usize::MAX);
-                    let id_b = state.context[b]
-                        .id
-                        .strip_prefix('P')
-                        .and_then(|n| n.parse::<usize>().ok())
-                        .unwrap_or(usize::MAX);
-                    id_a.cmp(&id_b)
-                });
-                let current_pos = sorted_indices.iter().position(|&i| i == state.selected_context).unwrap_or(0);
-                let prev_pos = if current_pos == 0 { sorted_indices.len() - 1 } else { current_pos - 1 };
-                state.selected_context = sorted_indices[prev_pos];
-                state.scroll_offset = 0.0;
-                state.user_scrolled = false;
-            }
+            select_context(state, false);
             ActionResult::Nothing
         }
 
@@ -407,33 +367,21 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.dirty = true;
             ActionResult::StartApiCheck
         }
-        Action::ConfigSelectAnthropicModel(model) => {
-            state.anthropic_model = model;
-            state.api_check_in_progress = true;
-            state.api_check_result = None;
-            state.dirty = true;
-            ActionResult::StartApiCheck
+        Action::ConfigSelectAnthropicModel(m) => {
+            state.anthropic_model = m;
+            config::api_check(state)
         }
-        Action::ConfigSelectGrokModel(model) => {
-            state.grok_model = model;
-            state.api_check_in_progress = true;
-            state.api_check_result = None;
-            state.dirty = true;
-            ActionResult::StartApiCheck
+        Action::ConfigSelectGrokModel(m) => {
+            state.grok_model = m;
+            config::api_check(state)
         }
-        Action::ConfigSelectGroqModel(model) => {
-            state.groq_model = model;
-            state.api_check_in_progress = true;
-            state.api_check_result = None;
-            state.dirty = true;
-            ActionResult::StartApiCheck
+        Action::ConfigSelectGroqModel(m) => {
+            state.groq_model = m;
+            config::api_check(state)
         }
-        Action::ConfigSelectDeepSeekModel(model) => {
-            state.deepseek_model = model;
-            state.api_check_in_progress = true;
-            state.api_check_result = None;
-            state.dirty = true;
-            ActionResult::StartApiCheck
+        Action::ConfigSelectDeepSeekModel(m) => {
+            state.deepseek_model = m;
+            config::api_check(state)
         }
         Action::ConfigSelectNextBar => {
             state.config_selected_bar = (state.config_selected_bar + 1) % 4;
@@ -471,11 +419,31 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.dirty = true;
             ActionResult::Save
         }
-        Action::ConfigSelectSecondaryProvider(provider) => config::handle_secondary_provider(state, provider),
-        Action::ConfigSelectSecondaryAnthropicModel(_)
-        | Action::ConfigSelectSecondaryGrokModel(_)
-        | Action::ConfigSelectSecondaryGroqModel(_)
-        | Action::ConfigSelectSecondaryDeepSeekModel(_) => config::handle_secondary_model(state, &action),
+        Action::ConfigSelectSecondaryProvider(provider) => {
+            state.secondary_provider = provider;
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSelectSecondaryAnthropicModel(m) => {
+            state.secondary_anthropic_model = m;
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSelectSecondaryGrokModel(m) => {
+            state.secondary_grok_model = m;
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSelectSecondaryGroqModel(m) => {
+            state.secondary_groq_model = m;
+            state.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSelectSecondaryDeepSeekModel(m) => {
+            state.secondary_deepseek_model = m;
+            state.dirty = true;
+            ActionResult::Save
+        }
         Action::ConfigToggleReverie => {
             state.reverie_enabled = !state.reverie_enabled;
             state.dirty = true;
@@ -493,4 +461,29 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::None => ActionResult::Nothing,
     }
+}
+
+/// Navigate to the next (`forward=true`) or previous (`forward=false`) context panel,
+/// sorted by numeric panel ID.
+fn select_context(state: &mut State, forward: bool) {
+    if state.context.is_empty() {
+        return;
+    }
+    let mut sorted: Vec<usize> = (0..state.context.len()).collect();
+    sorted.sort_by(|&a, &b| {
+        let id_a = state.context[a].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_b = state.context[b].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        id_a.cmp(&id_b)
+    });
+    let cur = sorted.iter().position(|&i| i == state.selected_context).unwrap_or(0);
+    let next = if forward {
+        (cur + 1) % sorted.len()
+    } else if cur == 0 {
+        sorted.len() - 1
+    } else {
+        cur - 1
+    };
+    state.selected_context = sorted[next];
+    state.scroll_offset = 0.0;
+    state.user_scrolled = false;
 }

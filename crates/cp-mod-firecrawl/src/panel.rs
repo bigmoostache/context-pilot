@@ -1,8 +1,8 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::prelude::*;
 
-use cp_base::config::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::config::theme;
+use cp_base::panels::scroll_key_action;
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::Action;
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
@@ -87,15 +87,8 @@ impl Panel for FirecrawlResultPanel {
         Some(CacheUpdate::Content { context_id: req.context_id.clone(), content: req.content.clone(), token_count })
     }
 
-    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
-        match key.code {
-            KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
-            KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
-            KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
-            KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
-            _ => None,
-        }
+        scroll_key_action(key)
     }
 
     fn title(&self, state: &State) -> String {
