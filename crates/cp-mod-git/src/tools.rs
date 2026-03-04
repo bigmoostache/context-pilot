@@ -61,7 +61,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
         CommandClass::Mutating => {
             // Execute directly with timeout
             let mut cmd = Command::new("git");
-            cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
+            let _ = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
 
             // If GITHUB_TOKEN is available, create a temporary askpass script
             // so git push/pull/fetch can authenticate via HTTPS automatically.
@@ -74,9 +74,9 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                     #[cfg(unix)]
                     {
                         use std::os::unix::fs::PermissionsExt;
-                        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o700)).ok();
+                        let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o700)).ok();
                     }
-                    cmd.env("GIT_ASKPASS", &tmp);
+                    let _ = cmd.env("GIT_ASKPASS", &tmp);
                     Some(tmp) // kept alive until end of scope, then cleaned up
                 } else {
                     None
@@ -89,7 +89,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
 
             // Clean up temp askpass script
             if let Some(ref path) = _askpass_tempfile {
-                std::fs::remove_file(path).ok();
+                let _ = std::fs::remove_file(path).ok();
             }
 
             // Heuristic-based cache invalidation for GitResult panels

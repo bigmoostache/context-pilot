@@ -47,7 +47,7 @@ impl Watchlist {
 
     /// Add or update a watched document with its dependency list.
     pub fn watch(&mut self, source: &str, output: &str, deps: Vec<String>) {
-        self.entries.insert(source.to_string(), WatchEntry { output: output.to_string(), deps });
+        drop(self.entries.insert(source.to_string(), WatchEntry { output: output.to_string(), deps }));
         self.save();
     }
 

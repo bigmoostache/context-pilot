@@ -86,7 +86,7 @@ pub fn fire_callback(
 
     // Store handle in console state (NO panel created — deferred until failure/timeout)
     let cs = ConsoleState::get_mut(state);
-    cs.sessions.insert(session_key.clone(), handle);
+    drop(cs.sessions.insert(session_key.clone(), handle));
 
     // Register watcher
     let is_blocking = def.blocking && blocking_tool_use_id.is_some();

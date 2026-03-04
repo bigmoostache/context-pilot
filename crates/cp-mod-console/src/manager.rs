@@ -72,8 +72,8 @@ pub fn log_file_path(key: &str) -> PathBuf {
 pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Value, String> {
     let sock_path = server_socket_path();
     let stream = UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {}", e))?;
-    stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok();
-    stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok();
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok();
+    let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok();
 
     let mut writer = stream.try_clone().map_err(|e| format!("Clone failed: {}", e))?;
     let reader = BufReader::new(stream);
@@ -85,7 +85,7 @@ pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Valu
 
     let mut resp_line = String::new();
     let mut buf_reader = reader;
-    buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {}", e))?;
+    let _ = buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {}", e))?;
 
     let resp: serde_json::Value =
         serde_json::from_str(resp_line.trim()).map_err(|e| format!("Parse response failed: {}", e))?;
@@ -120,12 +120,12 @@ pub fn find_or_create_server() -> Result<(), String> {
     let sock_str = sock_path.to_string_lossy().to_string();
 
     // Remove stale socket/pid files
-    fs::remove_file(&sock_path).ok();
-    fs::remove_file(server_pid_path()).ok();
+    let _ = fs::remove_file(&sock_path).ok();
+    let _ = fs::remove_file(server_pid_path()).ok();
 
     let mut cmd = Command::new(&binary);
-    cmd.arg(&sock_str);
-    cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    let _ = cmd.arg(&sock_str);
+    let _ = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
 
     #[cfg(unix)]
     {
@@ -135,7 +135,7 @@ pub fn find_or_create_server() -> Result<(), String> {
         // Must be done in pre_exec (before exec), not after spawn.
         #[expect(unsafe_code, reason = "pre_exec requires unsafe — setsid() is safe to call pre-fork")]
         unsafe {
-            cmd.pre_exec(|| {
+            let _ = cmd.pre_exec(|| {
                 if libc::setsid() == -1 {
                     return Err(std::io::Error::last_os_error());
                 }
@@ -144,7 +144,7 @@ pub fn find_or_create_server() -> Result<(), String> {
         }
     }
 
-    cmd.spawn().map_err(|e| format!("Failed to spawn console server: {}", e))?;
+    drop(cmd.spawn().map_err(|e| format!("Failed to spawn console server: {}", e))?);
 
     // Wait for socket to appear (up to 3 seconds)
     for _ in 0..30 {
@@ -170,7 +170,7 @@ pub fn kill_orphaned_processes(known_keys: &HashSet<String>) {
             {
                 // Orphan — remove it from server (kills process)
                 let remove = serde_json::json!({"cmd": "remove", "key": key});
-                server_request(&remove).ok();
+                drop(server_request(&remove).ok());
             }
         }
     }
@@ -249,9 +249,9 @@ impl SessionHandle {
             let buf = buffer.clone();
             let stop = Arc::clone(&stop_polling);
             let path = log_path;
-            std::thread::spawn(move || {
+            drop(std::thread::spawn(move || {
                 file_poller(path, buf, stop);
-            });
+            }));
         }
 
         // Status poller thread — periodically ask server for status
@@ -260,9 +260,9 @@ impl SessionHandle {
             let finished_clone = Arc::clone(&finished_at);
             let stop_clone = Arc::clone(&stop_polling);
             let key = name.clone();
-            std::thread::spawn(move || {
+            drop(std::thread::spawn(move || {
                 poll_server_status(key, status_clone, finished_clone, stop_clone);
-            });
+            }));
         }
 
         Ok(Self {
@@ -338,9 +338,9 @@ impl SessionHandle {
                 let buf = buffer.clone();
                 let stop = Arc::clone(&stop_polling);
                 let path = log_path;
-                std::thread::spawn(move || {
+                drop(std::thread::spawn(move || {
                     file_poller_from_offset(path, buf, stop, file_offset);
-                });
+                }));
             }
 
             // Status poller
@@ -349,9 +349,9 @@ impl SessionHandle {
                 let finished_clone = Arc::clone(&finished_at);
                 let stop_clone = Arc::clone(&stop_polling);
                 let key = name.clone();
-                std::thread::spawn(move || {
+                drop(std::thread::spawn(move || {
                     poll_server_status(key, status_clone, finished_clone, stop_clone);
-                });
+                }));
             }
         }
 
@@ -381,7 +381,7 @@ impl SessionHandle {
         } else {
             // Server may have died — try to respawn
             find_or_create_server()?;
-            server_request(&req)?;
+            drop(server_request(&req)?);
             Ok(())
         }
     }
@@ -391,7 +391,7 @@ impl SessionHandle {
         self.stop_polling.store(true, Ordering::Relaxed);
 
         let req = serde_json::json!({"cmd": "kill", "key": self.name});
-        server_request(&req).ok();
+        drop(server_request(&req).ok());
 
         let mut status = self.status.lock().unwrap_or_else(|e| e.into_inner());
         if !status.is_terminal() {
@@ -405,7 +405,7 @@ impl SessionHandle {
 
     /// Get the current process status.
     pub fn get_status(&self) -> ProcessStatus {
-        self.status.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        *self.status.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// Get exit code (if process is terminal).

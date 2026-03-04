@@ -27,7 +27,7 @@ pub fn create_panel(state: &mut State, title: &str, content: &str) -> String {
     elem.full_token_count = elem.token_count;
     elem.total_pages = compute_total_pages(elem.token_count);
     // Store content in metadata so it persists across reloads
-    elem.metadata.insert(META_CONTENT.to_string(), serde_json::Value::String(content.to_string()));
+    drop(elem.metadata.insert(META_CONTENT.to_string(), serde_json::Value::String(content.to_string())));
 
     state.context.push(elem);
     panel_id
@@ -74,7 +74,7 @@ impl Panel for BraveResultPanel {
                 ctx.token_count = token_count;
             }
             ctx.cache_deprecated = false;
-            update_if_changed(ctx, &content);
+            let _ = update_if_changed(ctx, &content);
             true
         } else {
             false

@@ -242,7 +242,7 @@ impl Panel for LibraryPanel {
             ctx.token_count = total;
             // Build combined content for hash tracking
             let combined: String = items.iter().map(|i| i.content.as_str()).collect::<Vec<_>>().join("\n");
-            cp_base::panels::update_if_changed(ctx, &combined);
+            let _ = cp_base::panels::update_if_changed(ctx, &combined);
         }
     }
 

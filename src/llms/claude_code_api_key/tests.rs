@@ -42,7 +42,7 @@ fn test_general_kenobi() {
             .expect("HTTP request failed");
 
     let status = response.status();
-    let resp_body: serde_json::Value = response.json().expect("Failed to parse JSON response");
+    let resp_body: Value = response.json().expect("Failed to parse JSON response");
 
     assert!(status.is_success(), "API returned {}: {}", status, serde_json::to_string_pretty(&resp_body).unwrap());
 

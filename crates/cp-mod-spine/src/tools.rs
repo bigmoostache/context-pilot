@@ -26,7 +26,7 @@ pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolR
         match status {
             Some(true) => already.push(id.as_str()),
             Some(false) => {
-                SpineState::mark_notification_processed(state, id);
+                let _ = SpineState::mark_notification_processed(state, id);
                 marked.push(id.as_str());
             }
             None => not_found.push(id.as_str()),

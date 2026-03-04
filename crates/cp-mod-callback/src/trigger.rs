@@ -150,7 +150,7 @@ fn validate_skip_names(cs: &CallbackState, names: &[&str], warnings: &mut Vec<St
         if seen.contains(name) {
             continue;
         }
-        seen.insert(*name);
+        let _ = seen.insert(*name);
         if !cs.definitions.iter().any(|d| d.name == *name) {
             warnings.push(format!("skip_callbacks: '{}' does not match any defined callback", name,));
         }

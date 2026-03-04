@@ -40,7 +40,7 @@ console_guardrails:
 # Behavioral error redirects — tool results that guide the LLM to use the correct tool
 redirects:
   conversation_history_close: |
-    {id} — Cannot close conversation history with context_close. Use Close_conversation_history instead, which lets you create logs and memories to preserve important information before closing.
+    {id} — Cannot close conversation history with context_close. Use Close_conversation_history instead, which lets you create logs and memories to preserve important information before closing. Be careful, you MUST activate tool queue mode before using Close_conversation_history: this operation is very context-expensive and therefore costly: TUI forces queue mode to control costs. A better practive is to use a cleaner reverie that will clean your context in the background while you work.
 
 # Provider-shared behavioral text — deduplicated across LLM providers
 providers:

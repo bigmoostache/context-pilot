@@ -382,7 +382,7 @@ mod tests {
     fn can_deactivate_when_dependent_inactive() {
         // git can be deactivated if github is not active
         let mut active = all_active();
-        active.remove("github");
+        let _ = active.remove("github");
         let result = check_can_deactivate("git", &active);
         assert!(result.is_ok());
     }

@@ -251,7 +251,7 @@ impl App {
         for (i, request) in requests {
             process_cache_request(request, self.cache_tx.clone());
             self.state.context[i].cache_in_flight = true;
-            self.last_poll_ms.insert(self.state.context[i].id.clone(), current_ms);
+            let _ = self.last_poll_ms.insert(self.state.context[i].id.clone(), current_ms);
         }
 
         // Mutable pass: remove suicided panels (reverse order to preserve indices)
@@ -263,7 +263,7 @@ impl App {
                 } else if self.state.selected_context > i {
                     self.state.selected_context -= 1;
                 }
-                self.state.context.remove(i);
+                drop(self.state.context.remove(i));
             }
             self.state.dirty = true;
         }
@@ -281,17 +281,17 @@ impl App {
                 match spec {
                     WatchSpec::File(path) => {
                         if !self.watched_file_paths.contains(&path) && watcher.watch_file(&path).is_ok() {
-                            self.watched_file_paths.insert(path);
+                            let _ = self.watched_file_paths.insert(path);
                         }
                     }
                     WatchSpec::Dir(path) => {
                         if !self.watched_dir_paths.contains(&path) && watcher.watch_dir(&path).is_ok() {
-                            self.watched_dir_paths.insert(path);
+                            let _ = self.watched_dir_paths.insert(path);
                         }
                     }
                     WatchSpec::DirRecursive(path) => {
                         if !self.watched_dir_paths.contains(&path) && watcher.watch_dir_recursive(&path).is_ok() {
-                            self.watched_dir_paths.insert(path);
+                            let _ = self.watched_dir_paths.insert(path);
                         }
                     }
                 }

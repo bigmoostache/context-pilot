@@ -137,5 +137,5 @@ fn ensure_typst_callback(state: &mut State) {
         built_in: true,
         built_in_command: Some(script),
     });
-    cs.active_set.insert(cb_id);
+    let _ = cs.active_set.insert(cb_id);
 }

@@ -128,7 +128,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Add to state and mark active
     let cs = CallbackState::get_mut(state);
     cs.definitions.push(definition);
-    cs.active_set.insert(anchor_id.clone());
+    let _ = cs.active_set.insert(anchor_id.clone());
 
     // Build success message
     let mut msg = format!(
@@ -286,7 +286,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         let old_path = scripts_dir.join(format!("{}.sh", vessel_name));
         let new_path = scripts_dir.join(format!("{}.sh", new_name));
         if old_path.exists() {
-            fs::rename(&old_path, &new_path).ok();
+            let _ = fs::rename(&old_path, &new_path).ok();
         }
     }
 
@@ -322,7 +322,7 @@ pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Remove definition and get the name for script cleanup
     let cs = CallbackState::get_mut(state);
     let sunken_def = cs.definitions.remove(def_idx);
-    cs.active_set.remove(&anchor_id);
+    let _ = cs.active_set.remove(&anchor_id);
 
     // If editor was open for this callback, close it
     if cs.editor_open.as_deref() == Some(&anchor_id) {

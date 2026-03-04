@@ -126,10 +126,10 @@ pub fn download_package(spec: &PackageSpec) -> Result<(), String> {
         } else {
             // Ensure parent directory exists
             if let Some(parent) = target.parent() {
-                let _r = fs::create_dir_all(parent);
+                let _ = fs::create_dir_all(parent).ok();
             }
             let mut content = Vec::new();
-            entry
+            let _ = entry
                 .read_to_end(&mut content)
                 .map_err(|e| format!("Failed to extract {}: {}", entry_path.display(), e))?;
             fs::write(&target, &content).map_err(|e| format!("Failed to write {}: {}", target.display(), e))?;

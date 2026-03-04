@@ -276,7 +276,7 @@ impl App {
         self.save_state_async();
         self.state.dirty = true;
 
-        let _r = super::streaming::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        let _ = super::streaming::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
         if super::streaming::has_dirty_file_panels(&self.state) {
             self.state.waiting_for_panels = true;
             self.wait_started_ms = now_ms();
@@ -306,7 +306,7 @@ impl App {
         }
 
         // Also clean up the question form state if it was pending
-        self.state.module_data.remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>());
+        drop(self.state.module_data.remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>()));
 
         // Clear any accumulated blocking results from partial callback completions
         self.accumulated_blocking_results.clear();
@@ -323,11 +323,7 @@ impl App {
             if !stale_ids.is_empty() {
                 let registry = WatcherRegistry::get_mut(&mut self.state);
                 registry.watchers.retain(|w| {
-                    if let Some(tid) = w.tool_use_id() {
-                        !stale_ids.contains(&tid.to_string())
-                    } else {
-                        true
-                    }
+                    if let Some(tid) = w.tool_use_id() { !stale_ids.contains(&tid.to_string()) } else { true }
                 });
             }
         }

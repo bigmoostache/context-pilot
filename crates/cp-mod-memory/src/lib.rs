@@ -173,10 +173,7 @@ impl Module for MemoryModule {
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![
-            ("memory_create", visualize_memory_output),
-            ("memory_update", visualize_memory_output),
-        ]
+        vec![("memory_create", visualize_memory_output), ("memory_update", visualize_memory_output)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {

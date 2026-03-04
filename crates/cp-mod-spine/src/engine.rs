@@ -115,12 +115,12 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
                 !n.is_processed() && n.notification_type == NotificationType::Custom && n.source == source_tag
             });
             if !already_notified {
-                SpineState::create_notification(
+                drop(SpineState::create_notification(
                     state,
                     NotificationType::Custom,
                     source_tag,
                     format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
-                );
+                ));
             }
             // Mark all unprocessed notifications as processed — they were evaluated
             // and the decision was "blocked." Persistent watchers will recreate new
@@ -212,8 +212,8 @@ fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) 
 pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool {
     match action {
         ContinuationAction::SyntheticMessage(content) => {
-            state.push_user_message(content);
-            state.push_empty_assistant();
+            let _ = state.push_user_message(content);
+            let _ = state.push_empty_assistant();
             state.begin_streaming();
             true
         }
@@ -226,10 +226,10 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
                 .map(|m| m.role.as_str());
 
             if last_role != Some("user") {
-                state.push_user_message(INJECTIONS.spine.continue_msg.trim_end().to_string());
+                let _ = state.push_user_message(INJECTIONS.spine.continue_msg.trim_end().to_string());
             }
 
-            state.push_empty_assistant();
+            let _ = state.push_empty_assistant();
             state.begin_streaming();
             true
         }
@@ -268,5 +268,5 @@ fn check_context_threshold(state: &mut State) {
         .replace("{used_tokens}", &total_tokens.to_string())
         .replace("{budget_tokens}", &budget_tokens.to_string());
 
-    SpineState::create_notification(state, NotificationType::Custom, source_tag.to_string(), content);
+    drop(SpineState::create_notification(state, NotificationType::Custom, source_tag.to_string(), content));
 }

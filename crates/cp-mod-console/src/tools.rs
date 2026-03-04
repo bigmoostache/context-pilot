@@ -120,7 +120,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Store handle
     let cs = ConsoleState::get_mut(state);
-    cs.sessions.insert(session_key, handle);
+    drop(cs.sessions.insert(session_key, handle));
 
     ToolResult::new(tool.id.clone(), format!("Console created in {}", panel_id), false)
 }
@@ -391,7 +391,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Store the handle (needed for waiter to check status + read buffer)
     let cs = ConsoleState::get_mut(state);
-    cs.sessions.insert(session_key.clone(), handle);
+    drop(cs.sessions.insert(session_key.clone(), handle));
 
     // Register a blocking exit watcher via WatcherRegistry
     let now = now_ms();

@@ -26,7 +26,8 @@ impl App {
         for agent_id in needs_start {
             let (tx, rx) = mpsc::channel();
             streaming::start_reverie_stream(&mut self.state, &agent_id, tx);
-            let _r = self.reverie_streams
+            let _r = self
+                .reverie_streams
                 .insert(agent_id, super::super::ReverieStream { rx, pending_tools: Vec::new(), report_called: false });
         }
     }
@@ -346,7 +347,8 @@ impl App {
 
             let (tx, rx) = mpsc::channel();
             streaming::start_reverie_stream(&mut self.state, &agent_id, tx);
-            let _r = self.reverie_streams
+            let _r = self
+                .reverie_streams
                 .insert(agent_id, super::super::ReverieStream { rx, pending_tools: Vec::new(), report_called: false });
         }
     }

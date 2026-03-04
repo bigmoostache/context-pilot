@@ -100,17 +100,17 @@ pub(crate) fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<
 
 /// Save a prompt item to its directory as {id}.md
 pub(crate) fn save_prompt_to_dir(dir: &Path, item: &PromptItem) {
-    fs::create_dir_all(dir).ok();
+    let _ = fs::create_dir_all(dir).ok();
     let path = dir.join(format!("{}.md", item.id));
     let content = format_prompt_file(&item.name, &item.description, &item.content);
-    fs::write(path, content).ok();
+    let _ = fs::write(path, content).ok();
 }
 
 /// Delete a prompt file from its directory
 pub(crate) fn delete_prompt_from_dir(dir: &Path, id: &str) {
     let path = dir.join(format!("{}.md", id));
     if path.exists() {
-        fs::remove_file(path).ok();
+        let _ = fs::remove_file(path).ok();
     }
 }
 

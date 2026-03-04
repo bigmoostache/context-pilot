@@ -67,7 +67,7 @@ pub(crate) fn execute_snapshot(
                     true,
                 );
             }
-            let _r = fs::remove_file(&replace_path);
+            let _ = fs::remove_file(&replace_path).ok();
         }
     } else if file_path.exists() {
         return ToolResult::new(
@@ -92,7 +92,7 @@ pub(crate) fn execute_snapshot(
         if !module.is_global() {
             let data = module.save_module_data(state);
             if !data.is_null() {
-                module_data.insert(module.id().to_string(), data);
+                drop(module_data.insert(module.id().to_string(), data));
             }
         }
     }
@@ -211,7 +211,7 @@ pub(crate) fn execute_load(
     let mut new_active: HashSet<String> = ws.active_modules.iter().cloned().collect();
     // Always include core modules
     for core_id in &core_ids {
-        new_active.insert(core_id.clone());
+        let _ = new_active.insert(core_id.clone());
     }
     // Filter to only known modules
     let known_ids: HashSet<String> = modules.iter().map(|m| m.id().to_string()).collect();

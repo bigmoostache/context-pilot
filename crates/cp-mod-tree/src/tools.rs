@@ -28,7 +28,7 @@ pub(crate) fn generate_tree_string(
     for line in tree_filter.lines() {
         let line = line.trim();
         if !line.is_empty() && !line.starts_with('#') {
-            builder.add_line(None, line).ok();
+            let _ = builder.add_line(None, line).ok();
         }
     }
     let gitignore = builder.build().ok();
@@ -275,7 +275,7 @@ pub fn list_dir_entries(
     for line in tree_filter.lines() {
         let line = line.trim();
         if !line.is_empty() && !line.starts_with('#') {
-            builder.add_line(None, line).ok();
+            let _ = builder.add_line(None, line).ok();
         }
     }
     let gitignore = builder.build().ok();

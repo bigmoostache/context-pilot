@@ -52,7 +52,7 @@ impl Panel for GitResultPanel {
                 }
                 ctx.cache_deprecated = false;
                 let content_ref = ctx.cached_content.clone().unwrap_or_default();
-                update_if_changed(ctx, &content_ref);
+                let _ = update_if_changed(ctx, &content_ref);
                 true
             }
             _ => false,
@@ -67,7 +67,7 @@ impl Panel for GitResultPanel {
         let args = super::classify::validate_git_command(&command).ok()?;
 
         let mut cmd = std::process::Command::new("git");
-        cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
+        let _ = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
         let output = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
         match output {

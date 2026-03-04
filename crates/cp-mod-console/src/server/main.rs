@@ -109,7 +109,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
 
     // Create/truncate log file
     if let Some(parent) = log.parent() {
-        std::fs::create_dir_all(parent).ok();
+        let _ = std::fs::create_dir_all(parent).ok();
     }
 
     let log_file = match std::fs::File::create(&log) {
@@ -122,11 +122,11 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
     };
 
     let mut cmd = Command::new("sh");
-    cmd.args(["-c", command]);
-    cmd.stdin(Stdio::piped()).stdout(log_file).stderr(log_err);
+    let _ = cmd.args(["-c", command]);
+    let _ = cmd.stdin(Stdio::piped()).stdout(log_file).stderr(log_err);
 
     if let Some(dir) = cwd {
-        cmd.current_dir(dir);
+        let _ = cmd.current_dir(dir);
     }
 
     let mut child = match cmd.spawn() {
@@ -141,7 +141,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
     {
         let sessions = Arc::clone(sessions);
         let key = key.to_string();
-        std::thread::spawn(move || {
+        drop(std::thread::spawn(move || {
             let code = match child.wait() {
                 Ok(status) => status.code().unwrap_or(-1),
                 Err(_) => -1,
@@ -151,11 +151,11 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
             {
                 session.status = SessionStatus::Exited(code);
             }
-        });
+        }));
     }
 
     let session = Session { pid, stdin, status: SessionStatus::Running };
-    sessions.lock().unwrap().insert(key.to_string(), session);
+    drop(sessions.lock().unwrap().insert(key.to_string(), session));
 
     Response::ok_pid(pid)
 }
@@ -163,9 +163,8 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
 fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     let bytes = interpret_escapes(input);
     let mut map = sessions.lock().unwrap();
-    let session = match map.get_mut(key) {
-        Some(s) => s,
-        None => return Response::err(format!("Session '{}' not found", key)),
+    let Some(session) = map.get_mut(key) else {
+        return Response::err(format!("Session '{}' not found", key));
     };
     if session.is_terminal() {
         return Response::err(format!("Session '{}' already exited", key));
@@ -186,21 +185,20 @@ fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
 
 fn handle_kill(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
-    let session = match map.get_mut(key) {
-        Some(s) => s,
-        None => return Response::err(format!("Session '{}' not found", key)),
+    let Some(session) = map.get_mut(key) else {
+        return Response::err(format!("Session '{}' not found", key));
     };
     if !session.is_terminal() {
         // SIGTERM to script PID only — PTY teardown propagates SIGHUP to children
-        Command::new("kill").args([&session.pid.to_string()]).output().ok();
+        drop(Command::new("kill").args([&session.pid.to_string()]).output());
         std::thread::sleep(std::time::Duration::from_millis(100));
         if is_pid_alive(session.pid) {
-            Command::new("kill").args(["-9", &session.pid.to_string()]).output().ok();
+            drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
         }
         session.status = SessionStatus::Exited(-9);
     }
     // Drop stdin
-    session.stdin.take();
+    drop(session.stdin.take());
     Response::ok()
 }
 
@@ -208,22 +206,21 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     if let Some(mut session) = map.remove(key) {
         if !session.is_terminal() {
-            Command::new("kill").args([&session.pid.to_string()]).output().ok();
+            drop(Command::new("kill").args([&session.pid.to_string()]).output());
             std::thread::sleep(std::time::Duration::from_millis(100));
             if is_pid_alive(session.pid) {
-                Command::new("kill").args(["-9", &session.pid.to_string()]).output().ok();
+                drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
             }
         }
-        session.stdin.take();
+        drop(session.stdin.take());
     }
     Response::ok()
 }
 
 fn handle_status(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
-    let session = match map.get_mut(key) {
-        Some(s) => s,
-        None => return Response::err(format!("Session '{}' not found", key)),
+    let Some(session) = map.get_mut(key) else {
+        return Response::err(format!("Session '{}' not found", key));
     };
     session.poll_status();
     Response::ok_status(session.status_str(), session.exit_code())
@@ -250,14 +247,14 @@ fn handle_list(sessions: &Sessions) -> Response {
 // Connection handler
 // ---------------------------------------------------------------------------
 
+#[expect(clippy::needless_pass_by_value, reason = "thread entry point — Arc is moved from spawn closure")]
 fn handle_connection(stream: UnixStream, sessions: Sessions) {
     let reader = BufReader::new(stream.try_clone().unwrap());
     let mut writer = stream;
 
     for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => break, // Connection closed
+        let Ok(line) = line else {
+            break; // Connection closed
         };
         if line.is_empty() {
             continue;
@@ -267,7 +264,7 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
             Ok(r) => r,
             Err(e) => {
                 let resp = Response::err(format!("Invalid JSON: {}", e));
-                writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()).ok();
+                drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()));
                 continue;
             }
         };
@@ -307,13 +304,13 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
                 let mut map = sessions.lock().unwrap();
                 for (_, session) in map.iter_mut() {
                     if !session.is_terminal() {
-                        Command::new("kill").args([&session.pid.to_string()]).output().ok();
+                        drop(Command::new("kill").args([&session.pid.to_string()]).output());
                     }
-                    session.stdin.take();
+                    drop(session.stdin.take());
                 }
                 map.clear();
                 let resp = Response::ok();
-                writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()).ok();
+                drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()));
                 std::process::exit(0);
             }
             other => Response::err(format!("Unknown command: {}", other)),
@@ -334,13 +331,13 @@ fn main() {
     let pid_path = format!("{}.pid", socket_path.trim_end_matches(".sock"));
 
     // Remove stale socket
-    std::fs::remove_file(&socket_path).ok();
+    let _ = std::fs::remove_file(&socket_path).ok();
 
     // Note: setsid() is called by the TUI at spawn time (pre_exec hook).
     // The server is already a session leader when it reaches main().
 
     // Write PID file
-    std::fs::write(&pid_path, format!("{}", std::process::id())).ok();
+    let _ = std::fs::write(&pid_path, format!("{}", std::process::id())).ok();
 
     // Bind socket
     let listener = match UnixListener::bind(&socket_path) {
@@ -352,7 +349,7 @@ fn main() {
     };
 
     // Set socket to non-blocking so we can check SHUTDOWN_REQUESTED between accepts
-    listener.set_nonblocking(true).ok();
+    let _ = listener.set_nonblocking(true).ok();
 
     let sessions: Sessions = Arc::new(Mutex::new(HashMap::new()));
 
@@ -364,17 +361,17 @@ fn main() {
         let sessions = Arc::clone(&sessions);
         let socket_path = socket_path.clone();
         let pid_path = pid_path.clone();
-        std::thread::spawn(move || {
+        drop(std::thread::spawn(move || {
             loop {
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
                     kill_all_sessions(&sessions);
-                    std::fs::remove_file(&socket_path).ok();
-                    std::fs::remove_file(&pid_path).ok();
+                    let _ = std::fs::remove_file(&socket_path).ok();
+                    let _ = std::fs::remove_file(&pid_path).ok();
                     std::process::exit(0);
                 }
             }
-        });
+        }));
     }
 
     // Accept connections (one thread per connection)
@@ -382,9 +379,9 @@ fn main() {
         match listener.accept() {
             Ok((stream, _)) => {
                 let sessions = Arc::clone(&sessions);
-                std::thread::spawn(move || {
+                drop(std::thread::spawn(move || {
                     handle_connection(stream, sessions);
-                });
+                }));
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 // No pending connection — sleep briefly and retry
@@ -395,20 +392,23 @@ fn main() {
 
         if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
             kill_all_sessions(&sessions);
-            std::fs::remove_file(&socket_path).ok();
-            std::fs::remove_file(&pid_path).ok();
+            let _ = std::fs::remove_file(&socket_path).ok();
+            let _ = std::fs::remove_file(&pid_path).ok();
             std::process::exit(0);
         }
     }
 }
 
 /// Install SIGTERM and SIGINT handlers that set SHUTDOWN_REQUESTED.
-#[expect(unsafe_code, reason = "libc::signal requires unsafe — signal handler is async-signal-safe (atomic store only)")]
+#[expect(
+    unsafe_code,
+    reason = "libc::signal requires unsafe — signal handler is async-signal-safe (atomic store only)"
+)]
 fn install_signal_handlers() {
     unsafe {
-        libc::signal(libc::SIGTERM, signal_handler as *const () as libc::sighandler_t);
-        libc::signal(libc::SIGINT, signal_handler as *const () as libc::sighandler_t);
-        libc::signal(libc::SIGHUP, signal_handler as *const () as libc::sighandler_t);
+        let _ = libc::signal(libc::SIGTERM, signal_handler as *const () as libc::sighandler_t);
+        let _ = libc::signal(libc::SIGINT, signal_handler as *const () as libc::sighandler_t);
+        let _ = libc::signal(libc::SIGHUP, signal_handler as *const () as libc::sighandler_t);
     }
 }
 
@@ -421,13 +421,13 @@ fn kill_all_sessions(sessions: &Sessions) {
     let mut map = sessions.lock().unwrap();
     for (_, session) in map.iter_mut() {
         if !session.is_terminal() {
-            Command::new("kill").args([&session.pid.to_string()]).output().ok();
+            drop(Command::new("kill").args([&session.pid.to_string()]).output());
             std::thread::sleep(std::time::Duration::from_millis(50));
             if is_pid_alive(session.pid) {
-                Command::new("kill").args(["-9", &session.pid.to_string()]).output().ok();
+                drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
             }
         }
-        session.stdin.take();
+        drop(session.stdin.take());
     }
     map.clear();
 }

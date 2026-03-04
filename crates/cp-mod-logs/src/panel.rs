@@ -71,7 +71,7 @@ impl Panel for LogsPanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::LOGS {
                 ctx.token_count = token_count;
-                cp_base::panels::update_if_changed(ctx, &content);
+                let _ = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }

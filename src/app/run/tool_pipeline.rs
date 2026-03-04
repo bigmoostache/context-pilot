@@ -140,7 +140,7 @@ impl App {
                 let agent_id = lines.next().unwrap_or("cleaner").to_string();
                 let context_line = lines.next().unwrap_or("");
                 let context = if context_line.is_empty() { None } else { Some(context_line.to_string()) };
-                crate::app::reverie::trigger::start_manual_reverie(&mut self.state, agent_id, context);
+                let _ = crate::app::reverie::trigger::start_manual_reverie(&mut self.state, agent_id, context);
                 break;
             }
         }
@@ -301,7 +301,7 @@ impl App {
         }
 
         // Trigger background cache refresh for dirty file panels (non-blocking)
-        trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        let _ = trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
 
         // Check if we need to wait for panels before continuing stream
         if has_dirty_file_panels(&self.state) {
@@ -460,7 +460,7 @@ impl App {
         self.state.dirty = true;
 
         // Continue streaming
-        trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
+        let _ = trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
         if has_dirty_file_panels(&self.state) {
             self.state.waiting_for_panels = true;
             self.wait_started_ms = now_ms();

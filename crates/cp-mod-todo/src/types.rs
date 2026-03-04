@@ -13,7 +13,7 @@ pub enum TodoStatus {
     /// Work in progress.
     InProgress, // '~'
     /// Completed.
-    Done,       // 'x'
+    Done, // 'x'
 }
 
 impl TodoStatus {

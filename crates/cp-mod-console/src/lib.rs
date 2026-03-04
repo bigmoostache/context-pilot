@@ -72,7 +72,7 @@ impl Module for ConsoleModule {
         state.set_ext(ConsoleState::new());
         // Clean up log files
         for log in paths {
-            std::fs::remove_file(&log).ok();
+            let _ = std::fs::remove_file(&log).ok();
         }
     }
 
@@ -89,7 +89,7 @@ impl Module for ConsoleModule {
                 // After reload, send_keys already fails with "stdin unavailable".
                 handle.leak_stdin();
 
-                sessions_map.insert(
+                drop(sessions_map.insert(
                     name.clone(),
                     SessionMeta {
                         pid,
@@ -98,7 +98,7 @@ impl Module for ConsoleModule {
                         log_path: handle.log_path.clone(),
                         started_at: handle.started_at,
                     },
-                );
+                ));
             }
         }
         if sessions_map.is_empty() && cs.next_session_id == 1 {
@@ -160,7 +160,7 @@ impl Module for ConsoleModule {
         for (name, handle) in reconnected {
             let status_label = handle.get_status().label();
             let cs = ConsoleState::get_mut(state);
-            cs.sessions.insert(name.clone(), handle);
+            drop(cs.sessions.insert(name.clone(), handle));
 
             // Update panel metadata if panel was persisted
             if let Some(ctx) = state.context.iter_mut().find(|c| c.get_meta_str("console_name") == Some(&name)) {
@@ -316,11 +316,11 @@ impl Module for ConsoleModule {
         ConsoleState::kill_session(state, &name);
         {
             let cs = ConsoleState::get_mut(state);
-            cs.sessions.remove(&name);
+            drop(cs.sessions.remove(&name));
         }
         // Delete log file
         if !log_path.is_empty() {
-            std::fs::remove_file(&log_path).ok();
+            let _ = std::fs::remove_file(&log_path).ok();
         }
         Some(Ok(format!("console: {}", name)))
     }

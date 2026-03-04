@@ -176,7 +176,7 @@ impl ContextPilotWorld {
         let path = self.resolve_path(id)?;
         let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {}", path.display(), e))?;
         let source = Source::new(id, content);
-        self.sources.insert(id, source.clone());
+        drop(self.sources.insert(id, source.clone()));
         Ok(source)
     }
 
@@ -234,7 +234,7 @@ impl World for ContextPilotWorld {
         // Resolve via our unified path resolver (handles local + packages)
         let path = self.resolve_path(id).map_err(|_| FileError::AccessDenied)?;
         if let Ok(mut set) = self.accessed_files.lock() {
-            set.insert(path.clone());
+            let _ = set.insert(path.clone());
         }
         let content = fs::read_to_string(&path).map_err(|_| FileError::NotFound(path))?;
         Ok(Source::new(id, content))
@@ -244,7 +244,7 @@ impl World for ContextPilotWorld {
         // Resolve via our unified path resolver (handles local + packages)
         let path = self.resolve_path(id).map_err(|_| FileError::AccessDenied)?;
         if let Ok(mut set) = self.accessed_files.lock() {
-            set.insert(path.clone());
+            let _ = set.insert(path.clone());
         }
         let data = fs::read(&path).map_err(|_| FileError::NotFound(path))?;
         Ok(Bytes::new(data))

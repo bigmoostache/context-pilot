@@ -334,12 +334,7 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
         }
 
         // Split cmd_part and rest_part by cursor_char for cursor rendering
-        fn push_with_cursor(
-            spans: &mut Vec<Span<'static>>,
-            text: &str,
-            cursor_char: &str,
-            color: Color,
-        ) {
+        fn push_with_cursor(spans: &mut Vec<Span<'static>>, text: &str, cursor_char: &str, color: Color) {
             if text.contains(cursor_char) {
                 let parts: Vec<&str> = text.splitn(2, cursor_char).collect();
                 if !parts[0].is_empty() {

@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn update_if_changed_same_content_returns_false() {
         let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
-        update_if_changed(&mut ctx, "hello");
+        let _ = update_if_changed(&mut ctx, "hello");
         let ts = ctx.last_refresh_ms;
         assert!(!update_if_changed(&mut ctx, "hello"));
         assert_eq!(ctx.last_refresh_ms, ts); // Timestamp unchanged
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn update_if_changed_different_content_returns_true() {
         let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
-        update_if_changed(&mut ctx, "hello");
+        let _ = update_if_changed(&mut ctx, "hello");
         assert!(update_if_changed(&mut ctx, "world"));
     }
 

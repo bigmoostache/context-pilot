@@ -185,10 +185,7 @@ impl Module for SpineModule {
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![
-            ("notification_mark_processed", visualize_spine_output),
-            ("spine_configure", visualize_spine_output),
-        ]
+        vec![("notification_mark_processed", visualize_spine_output), ("spine_configure", visualize_spine_output)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
