@@ -1,4 +1,4 @@
-//! typst_execute tool — unified typst CLI gateway.
+//! `typst_execute` tool — unified typst CLI gateway.
 //!
 //! Handles all subcommands: compile, init, fonts, query, update.
 
@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use crate::cli_parser::{self, TypstCommand};
 use crate::packages;
 
-/// Helper to build a ToolResult from a tool and content.
+/// Helper to build a `ToolResult` from a tool and content.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: false, tool_name: tool.name.clone() }
 }
@@ -20,7 +20,7 @@ fn err_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, tool_name: tool.name.clone() }
 }
 
-/// Execute the typst_execute tool — parse command string and dispatch to subcommand handler.
+/// Execute the `typst_execute` tool — parse command string and dispatch to subcommand handler.
 pub(crate) fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),
@@ -403,7 +403,7 @@ fn exec_watch(tool: &ToolUse, input: &str, output: Option<&str>) -> ToolResult {
     match crate::watchlist::compile_and_update_deps(input, &output_path) {
         Ok(msg) => {
             let watchlist = crate::watchlist::Watchlist::load();
-            let dep_count = watchlist.entries.get(input).map(|e| e.deps.len()).unwrap_or(0);
+            let dep_count = watchlist.entries.get(input).map_or(0, |e| e.deps.len());
             ok_result(
                 tool,
                 format!(

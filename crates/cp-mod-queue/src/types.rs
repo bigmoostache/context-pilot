@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 pub struct QueuedToolCall {
     /// Index in the queue (1-based, for display and undo)
     pub index: usize,
-    /// Tool name (e.g. "Close_panel")
+    /// Tool name (e.g. "`Close_panel`")
     pub tool_name: String,
-    /// Original tool_use ID from the LLM
+    /// Original `tool_use` ID from the LLM
     pub tool_use_id: String,
     /// Tool input parameters (JSON)
     pub input: serde_json::Value,
@@ -46,12 +46,12 @@ impl QueueState {
         name.starts_with(QUEUE_TOOL_PREFIX)
     }
 
-    /// Get shared ref from State's TypeMap
+    /// Get shared ref from State's `TypeMap`
     pub fn get(state: &cp_base::state::State) -> &Self {
         state.get_ext::<Self>().expect("QueueState not initialized")
     }
 
-    /// Get mutable ref from State's TypeMap
+    /// Get mutable ref from State's `TypeMap`
     pub fn get_mut(state: &mut cp_base::state::State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("QueueState not initialized")
     }

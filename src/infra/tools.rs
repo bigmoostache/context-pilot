@@ -13,7 +13,7 @@ pub(crate) fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
     crate::modules::dispatch_tool(tool, state, &active_modules)
 }
 
-/// Execute reload_tui tool (public for module access)
+/// Execute `reload_tui` tool (public for module access)
 pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Set flag - actual reload happens in app.rs after tool result is saved
     state.reload_pending = true;

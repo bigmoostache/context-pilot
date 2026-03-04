@@ -44,7 +44,7 @@ impl SidebarMode {
 // MULTI-WORKER STATE STRUCTS
 // =============================================================================
 
-/// Current schema version for SharedConfig and WorkerState.
+/// Current schema version for `SharedConfig` and `WorkerState`.
 /// Increment when making breaking changes to the persistence format.
 pub const SCHEMA_VERSION: u32 = 1;
 
@@ -95,7 +95,7 @@ impl Default for SharedConfig {
             selected_context: 0,
             draft_input: String::new(),
             draft_cursor: 0,
-            sidebar_mode: Default::default(),
+            sidebar_mode: SidebarMode::default(),
             modules: HashMap::new(),
         }
     }
@@ -115,7 +115,7 @@ pub struct WorkerState {
     /// UIDs of important/fixed panels this worker uses
     #[serde(default)]
     pub important_panel_uids: ImportantPanelUids,
-    /// Maps panel UIDs to local display IDs (excluding chat which is in important_panel_uids)
+    /// Maps panel UIDs to local display IDs (excluding chat which is in `important_panel_uids`)
     #[serde(default)]
     pub panel_uid_to_local_id: HashMap<String, String>,
 
@@ -170,7 +170,7 @@ pub struct PanelData {
     pub message_uids: Vec<String>,
 
     // === Generic metadata bag for module-specific panel data ===
-    /// Keys are module-defined strings (e.g., "file_path", "tmux_pane_id").
+    /// Keys are module-defined strings (e.g., "`file_path`", "`tmux_pane_id`").
     /// Replaces former hardcoded Option<> fields per module.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub metadata: HashMap<String, serde_json::Value>,
@@ -184,7 +184,7 @@ pub struct PanelData {
 }
 
 /// UIDs for important/fixed panels that a worker uses.
-/// Maps ContextType to panel UID string.
+/// Maps `ContextType` to panel UID string.
 pub type ImportantPanelUids = HashMap<ContextType, String>;
 
 fn default_schema_version() -> u32 {

@@ -44,10 +44,10 @@ pub struct ScrapeMetadata {
 /// Firecrawl search API response.
 ///
 /// The `data` field can be either:
-/// - A list of SearchResult (when scrapeOptions produce full results)
+/// - A list of `SearchResult` (when scrapeOptions produce full results)
 /// - An object like `{"web": [...], "images": [...]}` (when results aren't scraped)
 ///
-/// We use serde_json::Value and parse manually.
+/// We use `serde_json::Value` and parse manually.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchResponse {
     /// Whether the search request succeeded.

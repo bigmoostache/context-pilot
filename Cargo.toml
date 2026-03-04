@@ -313,6 +313,282 @@ single_match_else = "warn"
 redundant_else = "warn"
 semicolon_if_nothing_returned = "warn"
 
+# ============================
+# Pedantic → warn
+# ============================
+# Detect `as` casts where the value could wrap (e.g. u32 → i32)
+cast_possible_wrap = "warn"
+# Detect `as` casts that lose floating-point precision (e.g. f64 → f32)
+cast_precision_loss = "warn"
+# Detect pointer casts to more-aligned types
+cast_ptr_alignment = "warn"
+# Suggest checked conversions (try_from) over raw `as`
+checked_conversions = "warn"
+# Collapse `else { if ... }` into `else if ...`
+collapsible_else_if = "warn"
+# Prefer if/else chains over match for ordered comparisons
+comparison_chain = "warn"
+# Derive Copy on iterators that can be copied
+copy_iterator = "warn"
+# Use Type::default() instead of Default::default()
+default_trait_access = "warn"
+# Detect broken intra-doc links
+doc_broken_link = "warn"
+# Detect accidental double-space linebreaks in doc comments
+doc_comment_double_space_linebreaks = "warn"
+# Detect quoted links in doc comments
+doc_link_with_quotes = "warn"
+# Detect unformatted markdown in doc comments
+doc_markdown = "warn"
+# Detect lifetimes that could be elided
+elidable_lifetime_names = "warn"
+# Detect empty enums that should be ! (never type)
+empty_enums = "warn"
+# Prefer *x over x.deref()
+explicit_deref_methods = "warn"
+# Prefer `for x in &collection` over `for x in collection.into_iter()`
+explicit_into_iter_loop = "warn"
+# Prefer `for x in &collection` over `for x in collection.iter()`
+explicit_iter_loop = "warn"
+# Prefer `find_map` over `filter_map().next()`
+filter_map_next = "warn"
+# Prefer `filter_map` over `filter().map()` with Option
+flat_map_option = "warn"
+# Warn on `==` comparison of floats (use approx comparison)
+float_cmp = "warn"
+# Flag functions with >3 bool parameters
+fn_params_excessive_bools = "warn"
+# Prefer `.collect()` over `FromIterator::from_iter()`
+from_iter_instead_of_collect = "warn"
+# Prefer `if x` over `if !x { } else { }`
+if_not_else = "warn"
+# Require reason on `#[ignore]` test attributes
+ignore_without_reason = "warn"
+# Use `_` for ignored unit patterns in match arms
+ignored_unit_patterns = "warn"
+# Prefer generic `S: BuildHasher` over concrete `HashMap`/`HashSet`
+implicit_hasher = "warn"
+# Prefer consistent field ordering matching struct definition
+inconsistent_struct_constructor = "warn"
+# Use slice patterns `[first, ..]` instead of `v[0]` on refutable slices
+index_refutable_slice = "warn"
+# Prefer `to_string()` on `&str` over `String::from()` or `.to_owned()`
+inefficient_to_string = "warn"
+# Suggest adding `iter()` method when `IntoIterator` is implemented
+into_iter_without_iter = "warn"
+# Warn on items (fn, struct, etc.) defined after statements in a block
+items_after_statements = "warn"
+# Prefer `.flatten()` over `.filter(Result::is_ok).map(Result::unwrap)`
+iter_filter_is_ok = "warn"
+# Prefer `.flatten()` over `.filter(Option::is_some).map(Option::unwrap)`
+iter_filter_is_some = "warn"
+# Iterator-returning methods should return a type named `*Iter*`
+iter_not_returning_iterator = "warn"
+# Suggest adding `into_iter()` method when `iter()` is implemented
+iter_without_into_iter = "warn"
+# Detect large futures that should be boxed
+large_futures = "warn"
+# Detect large stack arrays that should be heap-allocated
+large_stack_arrays = "warn"
+# Detect large types passed by value that should be references
+large_types_passed_by_value = "warn"
+# Prefer `assert!` over `if !cond { panic!() }`
+manual_assert = "warn"
+# Prefer `elapsed()` over `Instant::now() - start`
+manual_instant_elapsed = "warn"
+# Prefer `matches!()` over `if let Some/Ok/Err/None`
+manual_is_variant_and = "warn"
+# Prefer `String::new()` over `String::from("")` or `"".to_string()`
+manual_string_new = "warn"
+# Flag functions with many single-character variable names
+many_single_char_names = "warn"
+# Prefer `map_or`/`map_or_else` over `map().unwrap_or()`
+map_unwrap_or = "warn"
+
+# ============================
+# Suspicious → deny
+# ============================
+# Always a bug — range missing a char
+almost_complete_range = "deny"
+# Arc<T> where T is not Send+Sync is always wrong
+arc_with_non_send_sync = "deny"
+# Holding bad type across await is always a bug
+await_holding_invalid_type = "deny"
+# Holding lock across await is always a deadlock risk
+await_holding_lock = "deny"
+# RefCell borrow across await
+await_holding_refcell_ref = "deny"
+# Enabling all restriction lints is always wrong
+blanket_clippy_restriction_lints = "deny"
+# Casting enum constructor is always a bug
+cast_enum_constructor = "deny"
+# Always undefined/wrong
+cast_nan_to_int = "deny"
+# Always use correct from_raw_parts variant
+cast_slice_from_raw_parts = "deny"
+# Always a bug
+confusing_method_to_numeric_cast = "deny"
+# Checking emptiness of a const is always pointless
+const_is_empty = "deny"
+# Cross-pointer transmute is always dangerous
+crosspointer_transmute = "deny"
+# Interior mutable const is always a bug
+declare_interior_mutable_const = "deny"
+# Always fix deprecated clippy cfg attrs
+deprecated_clippy_cfg_attr = "deny"
+# Dropping something without Drop is always pointless
+drop_non_drop = "deny"
+# Duplicate module declaration is always a bug
+duplicate_mod = "deny"
+# Duplicate attributes are always a mistake
+duplicated_attributes = "deny"
+# Empty doc comment is always a mistake
+empty_docs = "deny"
+# Busy loop without yield is always wrong
+empty_loop = "deny"
+# Float comparison without abs is always wrong
+float_equality_without_abs = "deny"
+# Forgetting something without Drop is always pointless
+forget_non_drop = "deny"
+# //// instead of /// is always a typo
+four_forward_slashes = "deny"
+# Always a bug
+from_raw_with_void_ptr = "deny"
+# Using API above your MSRV is always wrong
+incompatible_msrv = "deny"
+# Open option that does nothing is always a bug
+ineffective_open_options = "deny"
+# Always a bug
+iter_out_of_bounds = "deny"
+# Path::join with absolute path discards the base — always a bug
+join_absolute_paths = "deny"
+# Dropping a future immediately is always wrong
+let_underscore_future = "deny"
+# Always use the right combinator
+lines_filter_map_ok = "deny"
+# Getter returning wrong field is always a bug
+misnamed_getters = "deny"
+# a += a + b instead of a += b — always a bug
+misrefactored_assign_op = "deny"
+# a = b = c is always confusing/wrong in Rust
+multi_assignments = "deny"
+# Mutating range bound during iteration is always a bug
+mut_range_bound = "deny"
+# Interior-mutable HashMap key is always a bug
+mutable_key_type = "deny"
+# Replace that does nothing is always a bug
+no_effect_replace = "deny"
+# Clone impl that doesn't delegate properly
+non_canonical_clone_impl = "deny"
+# PartialOrd that contradicts Ord
+non_canonical_partial_ord_impl = "deny"
+# Ambiguous octal escape is always confusing
+octal_escapes = "deny"
+# .ends_with(".ext") doesn't check extension — always a bug
+path_ends_with_ext = "deny"
+# Doesn't grant write on all platforms — always a bug
+permissions_set_readonly_false = "deny"
+# Always a constraint violation
+pointers_in_nomem_asm_block = "deny"
+# Almost always a forgotten else
+possible_missing_else = "deny"
+# Print inside Display/Debug impl is always wrong
+print_in_format_impl = "deny"
+# vec![rc.clone(); n] clones once — always a bug
+rc_clone_in_vec_init = "deny"
+# let x = x; is always pointless
+redundant_locals = "deny"
+# vec![0..n] creates vec with one Range — always a bug
+single_range_in_vec_init = "deny"
+# size_of_val(&ref) gives pointer size — always a bug
+size_of_ref = "deny"
+# Whitespace that hides a compound assignment
+suspicious_assignment_formatting = "deny"
+# Space in command arg is always wrong
+suspicious_command_arg_space = "deny"
+# Malformed doc comment
+suspicious_doc_comments = "deny"
+# Misleading else formatting
+suspicious_else_formatting = "deny"
+# .map() used for side effects — always wrong
+suspicious_map = "deny"
+# Open options that conflict
+suspicious_open_options = "deny"
+# Ambiguous to_owned call
+suspicious_to_owned = "deny"
+# Misleading unary op whitespace
+suspicious_unary_op_formatting = "deny"
+# Swapping via raw ptr instead of safe swap
+swap_ptr_to_ref = "deny"
+# Test attribute in doctest is always wrong
+test_attr_in_doctest = "deny"
+# type_id() on Box<dyn T> gives Box's type_id — always a bug
+type_id_on_box = "deny"
+# Infinite recursion is always a bug (clippy version)
+unconditional_recursion = "deny"
+# Wrong clippy cfg
+unnecessary_clippy_cfg = "deny"
+# vec![side_effect(); 0] still runs it — always a bug
+zero_repeat_side_effects = "deny"
+# Not calling wait() on child process — always a bug
+zombie_processes = "deny"
+
+# ============================
+# Suspicious → warn (intentional keeps)
+# ============================
+# Suspicious but sometimes intentional
+cast_abs_to_unsigned = "warn"
+# Can be intentional in some macro designs
+crate_in_macro_def = "warn"
+# Documentation style issue
+doc_nested_refdefs = "warn"
+# Documentation style issue
+doc_suspicious_footnotes = "warn"
+# Style, not a bug
+empty_line_after_doc_comments = "warn"
+# Style, not a bug
+empty_line_after_outer_attr = "warn"
+# Informational
+infallible_try_from = "warn"
+# Can have false positives with complex macros
+macro_metavars_in_unsafe = "warn"
+# Style preference
+manual_unwrap_or_default = "warn"
+# Good practice but not a bug
+missing_transmute_annotations = "warn"
+# Style
+needless_character_iteration = "warn"
+# Style
+needless_maybe_sized = "warn"
+# Sometimes intentional
+repeat_vec_with_capacity = "warn"
+# Worth knowing but not always a bug
+repr_packed_without_abi = "warn"
+# Has false positives with custom numeric types
+suspicious_arithmetic_impl = "warn"
+# Has false positives
+suspicious_op_assign_impl = "warn"
+# Style improvement
+unnecessary_get_then_check = "warn"
+# Style
+unnecessary_option_map_or_else = "warn"
+# Style
+unnecessary_result_map_or_else = "warn"
+
+# ============================
+# Pedantic → warn
+# ============================
+# Use clone_from when possible
+assigning_clones = "warn"
+# Use as/into instead of if bool { 1 } else { 0 }
+bool_to_int_with_if = "warn"
+# Use addr_of! instead of &x as *const
+borrow_as_ptr = "warn"
+# Always use case-insensitive extension comparison
+case_sensitive_file_extension_comparisons = "warn"
+# Use From instead of as for lossless casts
+cast_lossless = "warn"
+
 [package]
 name = "tui"
 version = "0.1.0"

@@ -57,7 +57,7 @@ impl RingBuffer {
     }
 
     /// Read the entire buffer contents as a string.
-    /// Returns (content, total_bytes_written).
+    /// Returns (content, `total_bytes_written`).
     pub fn read_all(&self) -> (String, u64) {
         let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         let total = inner.total_written;

@@ -19,15 +19,15 @@ fn truncate_str(s: &str, max_bytes: usize) -> &str {
     &s[..end]
 }
 
-/// Sentinel value returned when a blocking console_wait is registered.
+/// Sentinel value returned when a blocking `console_wait` is registered.
 /// The binary's event loop replaces this with the real result when satisfied.
 pub const CONSOLE_WAIT_BLOCKING_SENTINEL: &str = "__CONSOLE_WAIT_BLOCKING__";
 
-/// Maximum execution time for debug_bash (blocking tool — must be short).
+/// Maximum execution time for `debug_bash` (blocking tool — must be short).
 const BASH_MAX_EXECUTION_SECS: u64 = 10;
 
 /// Check if a command string contains git or gh commands.
-/// Returns Some(error_message) if blocked, None if allowed.
+/// Returns `Some(error_message)` if blocked, None if allowed.
 fn check_git_gh_guardrail(input: &str) -> Option<String> {
     // Split on shell operators to handle chained commands
     let segments: Vec<&str> = input.split(['|', ';', '&', '\n']).collect();
@@ -59,7 +59,7 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
 }
 
 /// Resolve a panel ID (e.g. "P11") to the internal session key.
-/// Returns (session_key, panel_id) or an error.
+/// Returns (`session_key`, `panel_id`) or an error.
 fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> {
     state
         .context

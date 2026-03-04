@@ -146,10 +146,10 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     SpineDecision::Continue(action)
 }
 
-/// Build a ContinuationAction directly from unprocessed notifications.
+/// Build a `ContinuationAction` directly from unprocessed notifications.
 ///
 /// Logic:
-/// - If ALL unprocessed are transparent (UserMessage / ReloadResume), handle simply
+/// - If ALL unprocessed are transparent (`UserMessage` / `ReloadResume`), handle simply
 /// - Otherwise, build a synthetic message explaining the notifications
 fn build_continuation_from_notifications(state: &State) -> ContinuationAction {
     let unprocessed = SpineState::unprocessed_notifications(state);
@@ -182,7 +182,7 @@ fn build_continuation_from_notifications(state: &State) -> ContinuationAction {
     ContinuationAction::SyntheticMessage(msg)
 }
 
-/// Handle transparent notifications (UserMessage / ReloadResume).
+/// Handle transparent notifications (`UserMessage` / `ReloadResume`).
 fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) -> ContinuationAction {
     let has_user_message = unprocessed.iter().any(|n| n.notification_type == NotificationType::UserMessage);
 
@@ -208,7 +208,7 @@ fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) 
 
 /// Apply a continuation action to state: create synthetic message, set up for streaming.
 ///
-/// Returns true if a stream should be started (caller should call start_streaming).
+/// Returns true if a stream should be started (caller should call `start_streaming`).
 pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool {
     match action {
         ContinuationAction::SyntheticMessage(content) => {
@@ -259,6 +259,7 @@ fn check_context_threshold(state: &mut State) {
     }
 
     let budget_tokens = state.effective_context_budget();
+    #[expect(clippy::cast_precision_loss, reason = "token counts ≪ 2^52, f64 mantissa is sufficient")]
     let usage_pct =
         if budget_tokens > 0 { (total_tokens as f64 / budget_tokens as f64 * 100.0).min(100.0) } else { 0.0 };
 

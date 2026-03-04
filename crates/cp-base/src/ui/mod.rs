@@ -181,6 +181,7 @@ impl TextCell {
 /// ────┼──────────────────┼────────────┼──────────
 /// M1  │ Some memory note │ high       │ arch, bug
 /// ```
+/// ```
 pub fn render_table_text(header: &[&str], rows: &[Vec<TextCell>]) -> String {
     let num_cols = header.len();
 
@@ -263,7 +264,7 @@ pub fn find_size_pattern(line: &str) -> Option<usize> {
 }
 
 /// Find children count pattern in tree output (e.g., "(5 children)" or "(1 child)")
-/// Returns (start_index, end_index) of the pattern
+/// Returns (`start_index`, `end_index`) of the pattern
 pub fn find_children_pattern(line: &str) -> Option<(usize, usize)> {
     if let Some(start) = line.find(" (") {
         let rest = &line[start + 2..];

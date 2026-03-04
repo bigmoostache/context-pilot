@@ -1,6 +1,6 @@
-//! DeepSeek API implementation.
+//! `DeepSeek` API implementation.
 //!
-//! DeepSeek uses an OpenAI-compatible API format.
+//! `DeepSeek` uses an OpenAI-compatible API format.
 //! Message building is delegated to the shared `openai_compat` module,
 //! with a thin wrapper to add `reasoning_content` for deepseek-reasoner.
 
@@ -19,7 +19,7 @@ use super::super::{LlmClient, LlmRequest, StreamEvent};
 
 const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
-/// DeepSeek client
+/// `DeepSeek` client
 pub(crate) struct DeepSeekClient {
     api_key: Option<SecretBox<String>>,
 }
@@ -41,7 +41,7 @@ impl Default for DeepSeekClient {
 // DeepSeek-specific message type (adds reasoning_content field)
 // ───────────────────────────────────────────────────────────────────
 
-/// DeepSeek message — wraps the shared OaiMessage but adds `reasoning_content`
+/// `DeepSeek` message — wraps the shared `OaiMessage` but adds `reasoning_content`
 /// which is required for deepseek-reasoner model on assistant messages.
 #[derive(Debug, Serialize)]
 struct DsMessage {
@@ -57,7 +57,7 @@ struct DsMessage {
 }
 
 impl DsMessage {
-    /// Convert from shared OaiMessage, adding reasoning_content for assistant messages.
+    /// Convert from shared `OaiMessage`, adding `reasoning_content` for assistant messages.
     fn from_oai(msg: OaiMessage, is_reasoner: bool) -> Self {
         let reasoning_content = if is_reasoner && msg.role == "assistant" { Some(String::new()) } else { None };
         Self {

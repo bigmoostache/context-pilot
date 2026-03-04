@@ -20,7 +20,7 @@ pub struct MatchedCallback {
     pub matched_files: Vec<String>,
 }
 
-/// A changed file with optional skip_callbacks names from the tool that changed it.
+/// A changed file with optional `skip_callbacks` names from the tool that changed it.
 #[derive(Debug, Clone)]
 pub struct ChangedFile {
     /// Relative path to the changed file
@@ -79,7 +79,7 @@ fn parse_skip_callbacks(input: &serde_json::Value) -> Vec<String> {
 
 /// Match changed files against active callback patterns.
 /// Returns a list of callbacks that matched, each with their matched files.
-/// Also validates skip_callbacks names and returns warnings for non-existent or non-matching ones.
+/// Also validates `skip_callbacks` names and returns warnings for non-existent or non-matching ones.
 pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<MatchedCallback>, Vec<String>) {
     if changed_files.is_empty() {
         return (Vec::new(), Vec::new());
@@ -142,7 +142,7 @@ pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<Mat
     (treasure_map, warnings)
 }
 
-/// Validate skip_callbacks names against known callback definitions.
+/// Validate `skip_callbacks` names against known callback definitions.
 /// Warns on names that don't match any defined callback.
 fn validate_skip_names(cs: &CallbackState, names: &[&str], warnings: &mut Vec<String>) {
     let mut seen = std::collections::HashSet::new();
@@ -173,7 +173,7 @@ pub fn partition_callbacks(matched: Vec<MatchedCallback>) -> (Vec<MatchedCallbac
     (blocking_fleet, async_fleet)
 }
 
-/// Build the $CP_CHANGED_FILES environment variable value (newline-separated).
+/// Build the $`CP_CHANGED_FILES` environment variable value (newline-separated).
 pub fn build_changed_files_env(files: &[String]) -> String {
     files.join("\n")
 }
@@ -199,7 +199,7 @@ mod tests {
         }
     }
 
-    /// Helper to extract just the paths from ChangedFile vec for easy assertions
+    /// Helper to extract just the paths from `ChangedFile` vec for easy assertions
     fn paths(files: &[ChangedFile]) -> Vec<&str> {
         files.iter().map(|f| f.path.as_str()).collect()
     }

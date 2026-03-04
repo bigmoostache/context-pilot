@@ -56,7 +56,7 @@ pub enum TypstCommand {
     Watchlist,
 }
 
-/// Parse a typst command string into a structured TypstCommand.
+/// Parse a typst command string into a structured `TypstCommand`.
 ///
 /// Accepts commands with or without the "typst" prefix:
 /// - "typst compile doc.typ"
@@ -68,7 +68,7 @@ pub fn parse_command(command: &str) -> Result<TypstCommand, String> {
     }
 
     // Skip leading "typst" if present
-    let start = if tokens[0] == "typst" { 1 } else { 0 };
+    let start = usize::from(tokens[0] == "typst");
     if start >= tokens.len() {
         return Err("Missing subcommand. Available: compile, init, query, fonts, update".to_string());
     }
@@ -225,7 +225,8 @@ fn parse_unwatch(args: &[String]) -> Result<TypstCommand, String> {
 }
 
 /// Basic shell-like string splitting that respects quotes.
-/// "typst compile 'my file.typ'" → ["typst", "compile", "my file.typ"]
+///
+/// `"typst compile 'my file.typ'"` → `["typst", "compile", "my file.typ"]`
 fn shell_split(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();

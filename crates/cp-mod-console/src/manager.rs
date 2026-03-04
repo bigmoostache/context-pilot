@@ -159,6 +159,7 @@ pub fn find_or_create_server() -> Result<(), String> {
 
 /// Kill orphaned processes by asking the server for its session list and
 /// comparing against known session keys.
+#[expect(clippy::implicit_hasher, reason = "internal function, single callsite — generic hasher adds noise")]
 pub fn kill_orphaned_processes(known_keys: &HashSet<String>) {
     let list = serde_json::json!({"cmd": "list"});
     if let Ok(resp) = server_request(&list)
@@ -182,10 +183,10 @@ pub fn kill_orphaned_processes(known_keys: &HashSet<String>) {
 
 /// A managed child process session.
 /// The process is owned by the console server.
-/// The TUI polls the log file for output into a RingBuffer.
+/// The TUI polls the log file for output into a `RingBuffer`.
 #[derive(Debug)]
 pub struct SessionHandle {
-    /// Unique session key (e.g., "c_42").
+    /// Unique session key (e.g., "`c_42`").
     pub name: String,
     /// Shell command that was executed.
     pub command: String,

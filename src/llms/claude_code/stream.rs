@@ -34,7 +34,7 @@ impl ClaudeCodeClient {
 
         // Build messages from pre-assembled API messages or raw data
         let mut json_messages =
-            if !request.api_messages.is_empty() { api_messages_to_cc_json(&request.api_messages) } else { Vec::new() };
+            if request.api_messages.is_empty() { Vec::new() } else { api_messages_to_cc_json(&request.api_messages) };
 
         // Handle cleaner mode extra context
         if let Some(ref context) = request.extra_context {

@@ -14,7 +14,7 @@ fn worker_path(worker_id: &str) -> PathBuf {
     states_dir().join(format!("{}.json", worker_id))
 }
 
-/// Load worker state from states/{worker_id}.json
+/// Load worker state from `states/{worker_id}.json`
 pub(crate) fn load_worker(worker_id: &str) -> Option<WorkerState> {
     let path = worker_path(worker_id);
     let json = fs::read_to_string(&path).ok()?;

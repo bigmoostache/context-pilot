@@ -1,4 +1,4 @@
-//! Reverie trigger system — threshold detection and optimize_context tool.
+//! Reverie trigger system — threshold detection and `optimize_context` tool.
 //!
 //! Two trigger paths:
 //! 1. **Automatic**: context tokens exceed cleaning threshold → fires reverie

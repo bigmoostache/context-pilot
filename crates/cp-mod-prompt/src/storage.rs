@@ -27,7 +27,7 @@ pub(crate) fn dir_for(pt: PromptType) -> PathBuf {
 /// description: Short description
 /// ---
 /// Body content here...
-/// ```
+/// `
 /// Returns (name, description, body).
 pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
     let trimmed = content.trim_start();
@@ -44,6 +44,7 @@ pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
         let body = after_first[body_start..].trim_start_matches('\n').to_string();
 
         // Parse YAML frontmatter
+        #[expect(clippy::items_after_statements, reason = "local deserialization struct scoped to this function")]
         #[derive(serde::Deserialize, Default)]
         struct Frontmatter {
             #[serde(default)]
@@ -125,7 +126,12 @@ pub(crate) fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<Promp
 
     // Merge built-in agents (from library.yaml) — don't duplicate if user has same ID on disk
     for builtin in library::agents() {
-        if !agents.iter().any(|a| a.id == builtin.id) {
+        if agents.iter().any(|a| a.id == builtin.id) {
+            // Mark disk version as builtin
+            if let Some(a) = agents.iter_mut().find(|a| a.id == builtin.id) {
+                a.is_builtin = true;
+            }
+        } else {
             agents.push(PromptItem {
                 id: builtin.id.clone(),
                 name: builtin.name.clone(),
@@ -134,17 +140,16 @@ pub(crate) fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<Promp
                 prompt_type: PromptType::Agent,
                 is_builtin: true,
             });
-        } else {
-            // Mark disk version as builtin
-            if let Some(a) = agents.iter_mut().find(|a| a.id == builtin.id) {
-                a.is_builtin = true;
-            }
         }
     }
 
     // Merge built-in skills
     for builtin in library::skills() {
-        if !skills.iter().any(|s| s.id == builtin.id) {
+        if skills.iter().any(|s| s.id == builtin.id) {
+            if let Some(s) = skills.iter_mut().find(|s| s.id == builtin.id) {
+                s.is_builtin = true;
+            }
+        } else {
             skills.push(PromptItem {
                 id: builtin.id.clone(),
                 name: builtin.name.clone(),
@@ -153,14 +158,16 @@ pub(crate) fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<Promp
                 prompt_type: PromptType::Skill,
                 is_builtin: true,
             });
-        } else if let Some(s) = skills.iter_mut().find(|s| s.id == builtin.id) {
-            s.is_builtin = true;
         }
     }
 
     // Merge built-in commands
     for builtin in library::commands() {
-        if !commands.iter().any(|c| c.id == builtin.id) {
+        if commands.iter().any(|c| c.id == builtin.id) {
+            if let Some(c) = commands.iter_mut().find(|c| c.id == builtin.id) {
+                c.is_builtin = true;
+            }
+        } else {
             commands.push(PromptItem {
                 id: builtin.id.clone(),
                 name: builtin.name.clone(),
@@ -169,8 +176,6 @@ pub(crate) fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<Promp
                 prompt_type: PromptType::Command,
                 is_builtin: true,
             });
-        } else if let Some(c) = commands.iter_mut().find(|c| c.id == builtin.id) {
-            c.is_builtin = true;
         }
     }
 

@@ -98,7 +98,7 @@ impl Module for TypstModule {
     }
 }
 
-/// Ensure the typst watchlist callback exists in CallbackState.
+/// Ensure the typst watchlist callback exists in `CallbackState`.
 /// Single callback that watches ALL files (*) and checks against the watchlist's dependency trees.
 fn ensure_typst_callback(state: &mut State) {
     use cp_mod_callback::types::{CallbackDefinition, CallbackState};

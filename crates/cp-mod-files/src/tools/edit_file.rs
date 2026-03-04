@@ -200,7 +200,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Add diff markers for UI rendering
-    result_msg.push_str("```diff\n");
+    result_msg.push_str("`diff\n");
 
     // Generate unified diff by comparing old and new line by line
     let diff_lines = generate_unified_diff(old_string, new_string);
@@ -269,7 +269,7 @@ mod tests {
             result_msg.push_str(&format!("Edited '{}': ~{} lines changed\n", path_str, lines_changed));
         }
 
-        result_msg.push_str("```diff\n");
+        result_msg.push_str("`diff\n");
 
         // Generate unified diff
         let diff_lines = generate_unified_diff(old_string, new_string);
@@ -279,7 +279,7 @@ mod tests {
 
         // Verify the structure
         assert!(result_msg.contains("Edited 'test.txt': ~2 lines changed\n"));
-        assert!(result_msg.contains("```diff\n"));
+        assert!(result_msg.contains("`diff\n"));
         assert!(result_msg.contains("- line1\n"));
         assert!(result_msg.contains("- line2\n"));
         assert!(result_msg.contains("+ line1_modified\n"));
@@ -288,7 +288,7 @@ mod tests {
 
         // Verify ordering: header, then diff marker, then content (unified diff), then closing
         let header_pos = result_msg.find("Edited").unwrap();
-        let diff_start_pos = result_msg.find("```diff").unwrap();
+        let diff_start_pos = result_msg.find("`diff").unwrap();
         let diff_end_pos = result_msg.rfind("```").unwrap();
 
         assert!(header_pos < diff_start_pos);

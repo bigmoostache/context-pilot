@@ -58,7 +58,7 @@ pub(crate) struct App {
     resume_stream: bool,
     /// Command palette state
     pub command_palette: CommandPalette,
-    /// Timestamp (ms) when wait_for_panels started (for timeout)
+    /// Timestamp (ms) when `wait_for_panels` started (for timeout)
     wait_started_ms: u64,
     /// Deferred tool results waiting for sleep timer to expire
     deferred_tool_sleep_until_ms: u64,
@@ -67,16 +67,16 @@ pub(crate) struct App {
     /// Background persistence writer — offloads file I/O to a dedicated thread
     writer: PersistenceWriter,
     /// Last poll time per panel ID — tracks when we last submitted a cache request
-    /// for timer-based panels (Tmux, Git, GitResult, GithubResult, Glob, Grep).
-    /// Separate from ContextElement.last_refresh_ms which tracks actual content changes.
+    /// for timer-based panels (Tmux, Git, `GitResult`, `GithubResult`, Glob, Grep).
+    /// Separate from `ContextElement.last_refresh_ms` which tracks actual content changes.
     last_poll_ms: std::collections::HashMap<String, u64>,
-    /// Pending tool results when a question form is blocking (ask_user_question)
+    /// Pending tool results when a question form is blocking (`ask_user_question`)
     pending_question_tool_results: Option<Vec<ToolResult>>,
     /// Pending tool results when a console blocking wait is active
     pending_console_wait_tool_results: Option<Vec<ToolResult>>,
     /// Accumulated blocking watcher results — collects partial results until ALL blocking watchers complete
     accumulated_blocking_results: Vec<cp_base::watchers::WatcherResult>,
-    /// Active reverie streams keyed by agent_id (one per agent type)
+    /// Active reverie streams keyed by `agent_id` (one per agent type)
     reverie_streams: std::collections::HashMap<String, ReverieStream>,
 }
 

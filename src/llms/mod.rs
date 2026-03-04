@@ -192,7 +192,7 @@ fn ms_to_iso8601(ms: u64) -> String {
         };
 
         let mut month = 1;
-        for days in days_in_months.iter() {
+        for days in &days_in_months {
             if remaining_days < *days {
                 break;
             }
@@ -254,7 +254,9 @@ pub(crate) fn panel_footer_text(messages: &[Message], current_ms: u64) -> String
     let recent_messages: Vec<&Message> = messages.iter().filter(|m| m.timestamp_ms > 0).rev().take(25).collect();
 
     // Build message timestamps section
-    let message_timestamps = if !recent_messages.is_empty() {
+    let message_timestamps = if recent_messages.is_empty() {
+        String::new()
+    } else {
         let mut lines = String::from(prompts::panel_footer_msg_header());
         lines.push('\n');
         for msg in recent_messages.iter().rev() {
@@ -272,8 +274,6 @@ pub(crate) fn panel_footer_text(messages: &[Message], current_ms: u64) -> String
             lines.push('\n');
         }
         lines
-    } else {
-        String::new()
     };
 
     prompts::panel_footer()
@@ -283,8 +283,8 @@ pub(crate) fn panel_footer_text(messages: &[Message], current_ms: u64) -> String
 
 /// Prepare context items for injection as fake tool call/result pairs.
 /// - Filters out Conversation (id="chat") -- it's sent as actual messages, not a panel
-/// - Items are assumed to be pre-sorted by last_refresh_ms (done in prepare_stream_context)
-/// - Returns FakePanelMessage structs that providers can convert to their format
+/// - Items are assumed to be pre-sorted by `last_refresh_ms` (done in `prepare_stream_context`)
+/// - Returns `FakePanelMessage` structs that providers can convert to their format
 pub(crate) fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMessage> {
     // Filter out Conversation panel (id="chat") -- it's the live message feed, not a context panel
     let filtered: Vec<&ContextItem> =
@@ -304,7 +304,7 @@ pub(crate) fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakeP
 ///
 /// Claude Code requires raw `serde_json::Value` messages (not typed structs).
 /// This also injects `cache_control` breakpoints at 25/50/75/100% of panel
-/// tool_result positions for prefix-based cache optimization.
+/// `tool_result` positions for prefix-based cache optimization.
 ///
 /// Shared between `claude_code` and `claude_code_api_key` providers.
 pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value> {

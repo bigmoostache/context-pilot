@@ -57,11 +57,11 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                     }
                 }
                 "disable" => {
-                    if !t.enabled {
-                        successes.push(format!("'{}' already disabled", tool_name));
-                    } else {
+                    if t.enabled {
                         t.enabled = false;
                         successes.push(format!("disabled '{}'", tool_name));
+                    } else {
+                        successes.push(format!("'{}' already disabled", tool_name));
                     }
                 }
                 _ => {

@@ -255,39 +255,38 @@ mod tests {
 
     #[test]
     fn test_is_api_command_basic() {
-        let args: Vec<String> = vec!["api", "/repos/foo/bar"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["api", "/repos/foo/bar"].iter().map(|s| s.to_string()).collect();
         assert!(crate::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_with_jq() {
-        let args: Vec<String> = vec!["api", "/repos/foo/bar", "--jq", ".x"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["api", "/repos/foo/bar", "--jq", ".x"].iter().map(|s| s.to_string()).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_with_short_jq() {
-        let args: Vec<String> = vec!["api", "/repos/foo/bar", "-q", ".x"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["api", "/repos/foo/bar", "-q", ".x"].iter().map(|s| s.to_string()).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_with_template() {
         let args: Vec<String> =
-            vec!["api", "/repos/foo/bar", "--template", "{{.name}}"].iter().map(|s| s.to_string()).collect();
+            ["api", "/repos/foo/bar", "--template", "{{.name}}"].iter().map(|s| s.to_string()).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_with_short_template() {
-        let args: Vec<String> =
-            vec!["api", "/repos/foo/bar", "-t", "{{.name}}"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["api", "/repos/foo/bar", "-t", "{{.name}}"].iter().map(|s| s.to_string()).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 
     #[test]
     fn test_is_api_command_non_api() {
-        let args: Vec<String> = vec!["pr", "list"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["pr", "list"].iter().map(|s| s.to_string()).collect();
         assert!(!super::super::watcher::is_api_command(&args));
     }
 

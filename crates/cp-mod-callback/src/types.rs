@@ -35,7 +35,7 @@ pub struct CallbackDefinition {
 }
 
 /// Module-owned state for the Callback module.
-/// Stored in State.module_data via TypeMap.
+/// Stored in `State.module_data` via `TypeMap`.
 #[derive(Debug)]
 pub struct CallbackState {
     /// All callback definitions (loaded from global config.json)
@@ -60,12 +60,12 @@ impl CallbackState {
         Self { definitions: Vec::new(), next_id: 1, active_set: HashSet::new(), editor_open: None }
     }
 
-    /// Get shared ref from State's TypeMap.
+    /// Get shared ref from State's `TypeMap`.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("CallbackState not initialized")
     }
 
-    /// Get mutable ref from State's TypeMap.
+    /// Get mutable ref from State's `TypeMap`.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("CallbackState not initialized")
     }

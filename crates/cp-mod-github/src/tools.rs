@@ -18,7 +18,7 @@ fn redact_token(output: &str, token: &str) -> String {
 }
 
 /// Execute a raw gh (GitHub CLI) command.
-/// Read-only commands create/reuse GithubResult panels.
+/// Read-only commands create/reuse `GithubResult` panels.
 /// Mutating commands execute and return output directly.
 pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Check for GitHub token
@@ -96,8 +96,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                 if ctx.context_type == ContextType::GITHUB_RESULT {
                     let matches = ctx
                         .get_meta_str("result_command")
-                        .map(|cmd| invalidations.iter().any(|re| re.is_match(cmd)))
-                        .unwrap_or(false);
+                        .is_some_and(|cmd| invalidations.iter().any(|re| re.is_match(cmd)));
                     if matches {
                         ctx.cache_deprecated = true;
                     }

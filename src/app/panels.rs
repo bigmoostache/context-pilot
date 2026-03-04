@@ -133,7 +133,7 @@ mod tests {
     use crate::state::ContextElement;
     use crate::state::cache::CacheUpdate;
 
-    /// Helper: create a minimal ContextElement for testing
+    /// Helper: create a minimal `ContextElement` for testing
     fn test_ctx(id: &str, ct: ContextType) -> ContextElement {
         crate::modules::make_default_context_element(id, ct, "test", true)
     }

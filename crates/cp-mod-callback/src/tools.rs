@@ -7,7 +7,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::tools_upsert;
 use crate::types::CallbackState;
 
-/// Execute the Callback_upsert tool (create/update/delete callbacks).
+/// Execute the `Callback_upsert` tool (create/update/delete callbacks).
 pub fn execute_upsert(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(action) = tool.input.get("action").and_then(|v| v.as_str()) else {
         return ToolResult::new(
@@ -107,7 +107,7 @@ pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     )
 }
 
-/// Execute the Callback_toggle tool (activate/deactivate per worker).
+/// Execute the `Callback_toggle` tool (activate/deactivate per worker).
 pub fn execute_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),

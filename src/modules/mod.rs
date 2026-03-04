@@ -36,7 +36,7 @@ pub(crate) use cp_mod_typst::TypstModule;
 // Re-export Module trait and helpers from cp-base
 pub(crate) use cp_base::modules::{Module, ToolVisualizer};
 
-/// Initialize the global ContextType registry from all modules.
+/// Initialize the global `ContextType` registry from all modules.
 /// Must be called once at startup, before any `is_fixed()` / `icon()` / `needs_cache()` calls.
 pub(crate) fn init_registry() {
     let modules = all_modules();
@@ -45,7 +45,7 @@ pub(crate) fn init_registry() {
 }
 
 /// Collect all fixed panel defaults in canonical order (derived from the registry).
-/// Returns (module_id, is_core, context_type, display_name, cache_deprecated) for each fixed panel.
+/// Returns (`module_id`, `is_core`, `context_type`, `display_name`, `cache_deprecated`) for each fixed panel.
 pub(crate) fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'static str, bool)> {
     // Build a lookup from context_type to module defaults
     let modules = all_modules();
@@ -66,7 +66,7 @@ pub(crate) fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType
         .collect()
 }
 
-/// Create a default ContextElement for a fixed panel
+/// Create a default `ContextElement` for a fixed panel
 pub(crate) fn make_default_context_element(
     id: &str,
     context_type: ContextType,
@@ -109,7 +109,7 @@ pub(crate) fn default_active_modules() -> HashSet<String> {
 }
 
 /// Build a registry of tool visualizers from all modules.
-/// Maps tool_id -> visualizer function. Used by conversation_render to
+/// Maps `tool_id` -> visualizer function. Used by `conversation_render` to
 /// dispatch custom rendering for tool results.
 pub(crate) fn build_visualizer_registry() -> HashMap<String, ToolVisualizer> {
     let mut registry = HashMap::new();
@@ -143,7 +143,7 @@ pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &
             && let Some(mut result) = module.execute_tool(tool, state)
         {
             // Ensure tool_name is set for visualization dispatch
-            result.tool_name = tool.name.clone();
+            result.tool_name.clone_from(&tool.name);
             return result;
         }
     }
@@ -198,7 +198,7 @@ pub(crate) fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result
     Ok(())
 }
 
-/// Returns the module_toggle tool definition (added by core module).
+/// Returns the `module_toggle` tool definition (added by core module).
 pub(crate) fn module_toggle_tool_definition() -> ToolDefinition {
     let t = &*CORE_TOOL_TEXTS;
     ToolDefinition::from_yaml("module_toggle", t)
@@ -220,7 +220,7 @@ pub(crate) fn module_toggle_tool_definition() -> ToolDefinition {
         .build()
 }
 
-/// Execute the module_toggle tool.
+/// Execute the `module_toggle` tool.
 fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(changes) = tool.input.get("changes").and_then(|v| v.as_array()) else {
         return ToolResult {
@@ -269,9 +269,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             }
             "deactivate" => {
-                if !state.active_modules.contains(module_id) {
-                    successes.push(format!("'{}' already inactive", module_id));
-                } else {
+                if state.active_modules.contains(module_id) {
                     match check_can_deactivate(module_id, &state.active_modules) {
                         Ok(()) => {
                             // Find panel types to remove
@@ -296,6 +294,8 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                             failures.push(format!("Change {}: {}", i + 1, msg));
                         }
                     }
+                } else {
+                    successes.push(format!("'{}' already inactive", module_id));
                 }
             }
             _ => {
@@ -324,7 +324,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
-/// Rebuild the tools list from active modules and preserved disabled_tools.
+/// Rebuild the tools list from active modules and preserved `disabled_tools`.
 fn rebuild_tools(state: &mut State) {
     // Preserve currently disabled tool IDs
     let disabled: HashSet<String> = state.tools.iter().filter(|t| !t.enabled).map(|t| t.id.clone()).collect();

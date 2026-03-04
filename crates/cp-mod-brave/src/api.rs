@@ -64,7 +64,7 @@ impl BraveClient {
     }
 
     /// Search the web via Brave Search API.
-    /// Always sends extra_snippets=true and enable_rich_callback=1.
+    /// Always sends `extra_snippets=true` and `enable_rich_callback=1`.
     pub fn search(&self, p: &SearchParams<'_>) -> Result<(BraveSearchResponse, Option<serde_json::Value>), String> {
         let mut url = format!("{}/web/search?q={}", BRAVE_BASE_URL, urlenc(p.query));
         url.push_str(&format!("&count={}", p.count));

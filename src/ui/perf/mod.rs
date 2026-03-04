@@ -6,6 +6,7 @@
 mod overlay;
 pub(crate) use overlay::render_perf_overlay;
 
+use crate::infra::constants::PERF_STATS_REFRESH_MS;
 use cp_base::cast::SafeCast;
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -95,11 +96,11 @@ pub(crate) struct PerfMetrics {
     ops: RwLock<HashMap<&'static str, OpStats>>,
     /// Frame time ring buffer (microseconds)
     frame_times: RwLock<RingBuffer<u64>>,
-    /// Frame and system stats state (single lock replaces 3 separate RwLocks)
+    /// Frame and system stats state (single lock replaces 3 separate `RwLocks`)
     frame_state: RwLock<FrameState>,
     /// Total frames counted
     pub frame_count: AtomicU64,
-    /// CPU usage percentage (0-100), stored.to_f32() bits
+    /// CPU usage percentage (0-100), `stored.to_f32()` bits
     cpu_usage: AtomicU32,
     /// Memory usage in bytes
     memory_bytes: AtomicU64,
@@ -185,9 +186,8 @@ impl PerfMetrics {
         }
 
         // Check if stats need refresh (time-based, not frame-based)
-        use crate::infra::constants::PERF_STATS_REFRESH_MS;
         let last_refresh = self.frame_state.read().unwrap_or_else(|e| e.into_inner()).last_stats_refresh;
-        if last_refresh.elapsed().as_millis() >= PERF_STATS_REFRESH_MS as u128 {
+        if last_refresh.elapsed().as_millis() >= u128::from(PERF_STATS_REFRESH_MS) {
             self.refresh_system_stats();
             self.frame_state.write().unwrap_or_else(|e| e.into_inner()).last_stats_refresh = Instant::now();
         }

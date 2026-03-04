@@ -211,7 +211,6 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 #[cfg(test)]
 mod tests {
-    use super::MEMORY_TLDR_MAX_TOKENS;
     use super::*;
 
     #[test]

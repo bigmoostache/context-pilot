@@ -253,7 +253,7 @@ impl LlmClient for GroqClient {
 }
 
 /// Convert tool definitions to Groq format.
-/// For GPT-OSS models, also adds built-in tools (browser_search, code_interpreter).
+/// For GPT-OSS models, also adds built-in tools (`browser_search`, `code_interpreter`).
 fn tools_to_groq(tools: &[ToolDefinition], model: &str) -> Vec<Value> {
     let mut groq_tools: Vec<Value> = tools
         .iter()

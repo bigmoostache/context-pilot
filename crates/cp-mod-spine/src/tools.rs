@@ -4,7 +4,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::types::SpineState;
 use cp_base::cast::SafeCast;
 
-/// Execute the notification_mark_processed tool
+/// Execute the `notification_mark_processed` tool
 pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
     let all_ids: Vec<String> = match tool.input.get("ids").and_then(|v| v.as_array()) {
         Some(arr) => arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect(),
@@ -47,7 +47,7 @@ pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolR
     ToolResult::new(tool.id.clone(), parts.join("\n"), !not_found.is_empty())
 }
 
-/// Execute the spine_configure tool — update spine auto-continuation and guard rail settings
+/// Execute the `spine_configure` tool — update spine auto-continuation and guard rail settings
 pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut changes: Vec<String> = Vec::new();
 

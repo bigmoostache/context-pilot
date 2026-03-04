@@ -149,12 +149,8 @@ pub(crate) fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    let name = PromptState::get(state)
-        .skills
-        .iter()
-        .find(|s| s.id == id)
-        .map(|s| s.name.clone())
-        .unwrap_or_else(|| id.to_string());
+    let name =
+        PromptState::get(state).skills.iter().find(|s| s.id == id).map_or_else(|| id.to_string(), |s| s.name.clone());
 
     ToolResult::new(
         tool.id.clone(),

@@ -171,12 +171,12 @@ impl SpineState {
         Self { notifications: vec![], next_notification_id: 1, config: SpineConfig::default() }
     }
 
-    /// Get shared ref from State's TypeMap.
+    /// Get shared ref from State's `TypeMap`.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("SpineState not initialized")
     }
 
-    /// Get mutable ref from State's TypeMap.
+    /// Get mutable ref from State's `TypeMap`.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("SpineState not initialized")
     }
@@ -281,7 +281,7 @@ impl SpineState {
         }
     }
 
-    /// Mark all "transparent" notifications (UserMessage, ReloadResume) as processed.
+    /// Mark all "transparent" notifications (`UserMessage`, `ReloadResume`) as processed.
     pub fn mark_user_message_notifications_processed(state: &mut State) {
         let changed = {
             let ss = Self::get_mut(state);

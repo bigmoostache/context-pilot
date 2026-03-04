@@ -9,7 +9,7 @@ use std::sync::OnceLock;
 
 use crate::modules::{ToolVisualizer, build_visualizer_registry};
 
-/// Lazily built registry of tool_name -> visualizer function.
+/// Lazily built registry of `tool_name` -> visualizer function.
 static VISUALIZER_REGISTRY: OnceLock<HashMap<String, ToolVisualizer>> = OnceLock::new();
 
 fn get_visualizer_registry() -> &'static HashMap<String, ToolVisualizer> {
@@ -78,10 +78,10 @@ pub(crate) fn render_message(
 
             // Check if a module registered a custom visualizer for this tool
             let registry = get_visualizer_registry();
-            let custom_lines = if !result.tool_name.is_empty() {
-                registry.get(&result.tool_name).map(|visualizer| visualizer(&result.content, wrap_width))
-            } else {
+            let custom_lines = if result.tool_name.is_empty() {
                 None
+            } else {
+                registry.get(&result.tool_name).map(|visualizer| visualizer(&result.content, wrap_width))
             };
 
             if let Some(vis_lines) = custom_lines {
@@ -242,7 +242,7 @@ pub(crate) fn render_message(
                 // User message - wrap without markdown
                 let wrapped = wrap_text(line, wrap_width);
 
-                for line_text in wrapped.iter() {
+                for line_text in &wrapped {
                     if is_first_line {
                         lines.push(Line::from(vec![
                             Span::styled(role_icon.clone(), Style::default().fg(role_color)),

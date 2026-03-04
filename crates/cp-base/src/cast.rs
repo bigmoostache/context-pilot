@@ -30,7 +30,7 @@ pub trait SafeCast {
 
 macro_rules! impl_safe_cast_unsigned {
     ($t:ty) => {
-        #[allow(trivial_numeric_casts, trivial_casts, reason = "macro-generated identity casts (e.g. u32 as u32) are unavoidable — expect() would fail on non-identity expansions")]
+        #[allow(trivial_numeric_casts, trivial_casts, clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_precision_loss, reason = "macro-generated identity casts (e.g. u32 as u32) are unavoidable — expect() would fail on non-identity expansions")]
         impl SafeCast for $t {
             #[inline]
             fn to_u8(self) -> u8 {
@@ -74,7 +74,15 @@ macro_rules! impl_safe_cast_unsigned {
 
 macro_rules! impl_safe_cast_signed {
     ($t:ty) => {
-        #[allow(trivial_numeric_casts, trivial_casts)]
+        #[allow(
+            trivial_numeric_casts,
+            trivial_casts,
+            clippy::cast_lossless,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_possible_wrap,
+            clippy::cast_precision_loss
+        )]
         impl SafeCast for $t {
             #[inline]
             fn to_u8(self) -> u8 {
@@ -150,6 +158,13 @@ impl_safe_cast_signed!(i32);
 impl_safe_cast_signed!(i64);
 impl_safe_cast_signed!(isize);
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss
+)]
 impl SafeCast for f64 {
     #[inline]
     fn to_u8(self) -> u8 {
@@ -207,6 +222,13 @@ impl SafeCast for f64 {
     }
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss
+)]
 impl SafeCast for f32 {
     #[inline]
     fn to_u8(self) -> u8 {
@@ -295,6 +317,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::float_cmp, reason = "exact representable values — 100.0 and -5.0 fit perfectly in f32")]
     fn to_f32_works() {
         assert_eq!(100_usize.to_f32(), 100.0_f32);
         assert_eq!((-5_i32).to_f32(), -5.0_f32);

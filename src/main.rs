@@ -121,7 +121,7 @@ fn main() -> io::Result<()> {
 }
 
 /// Run the typst-compile subcommand: compile a .typ file to PDF in the same directory.
-/// Used by the typst-compile callback via $CP_CHANGED_FILES.
+/// Used by the typst-compile callback via $`CP_CHANGED_FILES`.
 /// Usage: cpilot typst-compile <source.typ>
 fn run_typst_compile(args: &[String]) -> io::Result<()> {
     if args.is_empty() {
@@ -150,8 +150,8 @@ fn run_typst_compile(args: &[String]) -> io::Result<()> {
 }
 
 /// Recompile all watched .typ documents whose dependencies include any of the changed files.
-/// Used by the typst-watchlist callback via $CP_CHANGED_FILES.
-/// Usage: cpilot typst-recompile-watched <changed_file1> [changed_file2 ...]
+/// Used by the typst-watchlist callback via $`CP_CHANGED_FILES`.
+/// Usage: cpilot typst-recompile-watched <`changed_file1`> [`changed_file2` ...]
 fn run_typst_recompile_watched(args: &[String]) -> io::Result<()> {
     if args.is_empty() {
         return Ok(());

@@ -1,6 +1,6 @@
 //! Shared OpenAI-compatible message builder.
 //!
-//! Grok, Groq, and DeepSeek all use the OpenAI chat completions format.
+//! Grok, Groq, and `DeepSeek` all use the `OpenAI` chat completions format.
 //! This module extracts the common message-building logic so each provider
 //! only needs to handle its own quirks (request struct, endpoint, headers).
 
@@ -65,9 +65,9 @@ pub(crate) struct OaiFunctionDef {
 // Shared tool-pairing helper (used by ALL providers)
 // ───────────────────────────────────────────────────────────────────
 
-/// Collect the set of tool_use IDs that have matching tool_result messages.
+/// Collect the set of `tool_use` IDs that have matching `tool_result` messages.
 ///
-/// Tool calls without results (e.g. truncated by max_tokens) must be excluded
+/// Tool calls without results (e.g. truncated by `max_tokens`) must be excluded
 /// to avoid provider-specific "insufficient tool messages" API errors.
 ///
 /// `pending_tool_result_ids` are IDs from the current tool loop that haven't
@@ -123,7 +123,7 @@ pub(crate) struct BuildOptions {
 /// Build the full OpenAI-compatible message list.
 ///
 /// When pre-assembled API messages are available, converts them to OAI format.
-/// Falls back to building from raw data (for api_check etc.).
+/// Falls back to building from raw data (for `api_check` etc.).
 pub(crate) fn build_messages(
     messages: &[Message],
     context_items: &[crate::app::panels::ContextItem],
@@ -237,7 +237,7 @@ fn build_from_api_messages(api_messages: &[super::ApiMessage], opts: &BuildOptio
     out
 }
 
-/// Build from raw messages + context_items (legacy fallback path).
+/// Build from raw messages + `context_items` (legacy fallback path).
 fn build_from_raw(
     messages: &[Message],
     context_items: &[crate::app::panels::ContextItem],
@@ -326,7 +326,7 @@ fn build_from_raw(
     let included_tool_ids = collect_included_tool_ids(messages, &opts.pending_tool_result_ids);
 
     // ── Conversation messages ───────────────────────────────────
-    for msg in messages.iter() {
+    for msg in messages {
         if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
             continue;
         }

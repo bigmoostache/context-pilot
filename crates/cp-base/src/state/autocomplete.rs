@@ -2,7 +2,7 @@
 //!
 //! Works like shell tab-completion:
 //! - Shows entries (files + folders) in the current directory
-//! - Prefix-matches the partial name typed after the last `/`
+//! - Prefix-matches the partial name typed after the last `
 //! - Tab on a folder → completes to `folder/` and shows its contents
 //! - Tab on a file → inserts the full path and closes
 //!
@@ -176,7 +176,7 @@ impl AutocompleteState {
         &self.name_prefix
     }
 
-    /// Split query into dir_prefix and name_prefix at the last '/'.
+    /// Split query into `dir_prefix` and `name_prefix` at the last '/'.
     fn split_query(&mut self) {
         if let Some(last_slash) = self.query.rfind('/') {
             self.dir_prefix = self.query[..last_slash].to_string();

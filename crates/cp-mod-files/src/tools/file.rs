@@ -44,7 +44,7 @@ fn open_single_file(path: &str, state: &mut State) -> String {
         return format!("Error: '{}' is not a file", path);
     }
 
-    let file_name = path_obj.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
+    let file_name = path_obj.file_name().map_or_else(|| path.to_string(), |n| n.to_string_lossy().to_string());
 
     // Generate context ID (fills gaps) and UID
     let context_id = state.next_available_context_id();

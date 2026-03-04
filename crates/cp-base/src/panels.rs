@@ -34,7 +34,7 @@ use crate::state::{Action, ContextElement, ContextType, State};
 
 /// Result of a background cache operation
 pub enum CacheUpdate {
-    /// Generic content update (used by File, Tree, Glob, Grep, Tmux, GitResult, GithubResult)
+    /// Generic content update (used by File, Tree, Glob, Grep, Tmux, `GitResult`, `GithubResult`)
     Content {
         /// Context element ID (e.g., "P7").
         context_id: String,
@@ -43,12 +43,12 @@ pub enum CacheUpdate {
         /// Estimated token count for the new content.
         token_count: usize,
     },
-    /// Content unchanged — clear cache_in_flight without updating content
+    /// Content unchanged — clear `cache_in_flight` without updating content
     Unchanged {
         /// Context element ID.
         context_id: String,
     },
-    /// Module-specific update requiring downcast (e.g., git status populating GitState)
+    /// Module-specific update requiring downcast (e.g., git status populating `GitState`)
     ModuleSpecific {
         /// Panel type to match against.
         context_type: ContextType,
@@ -113,7 +113,7 @@ pub fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis().to_u64()).unwrap_or(0)
 }
 
-/// Update last_refresh_ms only if content actually changed (hash differs).
+/// Update `last_refresh_ms` only if content actually changed (hash differs).
 /// Returns true if content changed.
 pub fn update_if_changed(ctx: &mut ContextElement, content: &str) -> bool {
     let new_hash = hash_content(content);
@@ -138,7 +138,7 @@ pub fn mark_panels_dirty(state: &mut State, context_type: ContextType) {
 }
 
 /// Paginate content for LLM context output.
-/// Returns the original content unchanged when total_pages <= 1.
+/// Returns the original content unchanged when `total_pages` <= 1.
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
 /// and prepends a page header.
 pub fn paginate_content(full_content: &str, current_page: usize, total_pages: usize) -> String {
@@ -158,7 +158,7 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
         full_content.len()
     } else {
         // Find next newline after start_char
-        full_content[start_char..].find('\n').map(|pos| start_char + pos + 1).unwrap_or(full_content.len())
+        full_content[start_char..].find('\n').map_or(full_content.len(), |pos| start_char + pos + 1)
     };
 
     let end_char = start + chars_per_page.to_usize();
@@ -166,7 +166,7 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
         full_content.len()
     } else {
         // Find next newline after end_char to snap to line boundary
-        full_content[end_char..].find('\n').map(|pos| end_char + pos + 1).unwrap_or(full_content.len())
+        full_content[end_char..].find('\n').map_or(full_content.len(), |pos| end_char + pos + 1)
     };
 
     let page_content = &full_content[start..end];
@@ -212,7 +212,7 @@ pub trait Panel {
         None // Default: use global key handling
     }
 
-    /// Whether this panel uses background caching (cached_content from background loading)
+    /// Whether this panel uses background caching (`cached_content` from background loading)
     fn needs_cache(&self) -> bool {
         false
     }
@@ -256,8 +256,8 @@ pub trait Panel {
     /// Called every ~100ms for ALL panels. Implementations must be fast:
     ///
     /// - Default: instant `false`
-    /// - FilePanel: only checks disk if still loading (no cached_content)
-    /// - ConsolePanel: callback consoles check for newer siblings; others only check when loading
+    /// - `FilePanel`: only checks disk if still loading (no `cached_content`)
+    /// - `ConsolePanel`: callback consoles check for newer siblings; others only check when loading
     ///
     /// Return `true` to kill the panel.
     fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
@@ -271,9 +271,8 @@ pub trait Panel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::ContextType;
 
-    /// Helper: create a minimal ContextElement for testing
+    /// Helper: create a minimal `ContextElement` for testing
     fn test_ctx(id: &str, ct: ContextType) -> ContextElement {
         ContextElement {
             id: id.to_string(),
@@ -311,7 +310,7 @@ mod tests {
     #[test]
     fn update_if_changed_same_content_returns_false() {
         let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
-        update_if_changed(&mut ctx, "hello");
+        let _r = update_if_changed(&mut ctx, "hello");
         let ts = ctx.last_refresh_ms;
         assert!(!update_if_changed(&mut ctx, "hello"));
         assert_eq!(ctx.last_refresh_ms, ts); // Timestamp unchanged
@@ -320,7 +319,7 @@ mod tests {
     #[test]
     fn update_if_changed_different_content_returns_true() {
         let mut ctx = test_ctx("P0", ContextType::new(ContextType::FILE));
-        update_if_changed(&mut ctx, "hello");
+        let _r = update_if_changed(&mut ctx, "hello");
         assert!(update_if_changed(&mut ctx, "world"));
     }
 }

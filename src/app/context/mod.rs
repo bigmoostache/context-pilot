@@ -30,7 +30,7 @@ pub(super) struct ReverieContext {
 ///
 /// Every call to this function means the LLM is about to see the full
 /// conversation history (including any user messages that arrived during
-/// streaming). We therefore mark all UserMessage notifications as processed
+/// streaming). We therefore mark all `UserMessage` notifications as processed
 /// here — the LLM has "seen" them via the rebuilt context.
 pub(super) fn prepare_stream_context(
     state: &mut State,
@@ -91,7 +91,8 @@ pub(super) fn prepare_stream_context(
         for (i, (panel_id, _, token_count)) in panel_hashes.iter().enumerate() {
             let is_hit = i < prefix_len;
             let price = if is_hit { hit_price } else { miss_price };
-            let cost = *token_count as f64 * price as f64 / 1_000_000.0;
+            #[expect(clippy::cast_precision_loss, reason = "token counts ≪ 2^52")]
+            let cost = *token_count as f64 * f64::from(price) / 1_000_000.0;
 
             if let Some(ctx) = state.context.iter_mut().find(|c| c.id == *panel_id) {
                 ctx.panel_cache_hit = is_hit;

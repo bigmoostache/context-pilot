@@ -1,7 +1,7 @@
 //! Reverie streaming — prompt construction and LLM stream management.
 //!
-//! Uses the EXACT SAME prepare_stream_context() as the main worker, passing
-//! a ReverieContext to branch only at the conversation section. This preserves
+//! Uses the EXACT SAME `prepare_stream_context()` as the main worker, passing
+//! a `ReverieContext` to branch only at the conversation section. This preserves
 //! prompt prefix cache hits (panels + tools identical).
 
 use std::sync::mpsc::Sender;

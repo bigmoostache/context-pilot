@@ -21,7 +21,7 @@ use cp_base::cast::SafeCast;
 /// Compile a `.typ` file to PDF bytes.
 ///
 /// `source_path` is relative to the project root (which is the current directory).
-/// Returns Ok((pdf_bytes, warnings_text, accessed_files)) or Err(error_message).
+/// Returns `Ok((pdf_bytes`, `warnings_text`, `accessed_files`)) or `Err(error_message)`.
 pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf>), String> {
     let abs_path = PathBuf::from(source_path)
         .canonicalize()
@@ -48,7 +48,7 @@ pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf
         Ok(document) => {
             let pdf_bytes = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).map_err(|errors| {
                 let mut msg = String::new();
-                for diag in errors.iter() {
+                for diag in &errors {
                     msg.push_str(&format!("pdf error: {}\n", diag.message));
                 }
                 msg
@@ -65,7 +65,7 @@ pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf
         }
         Err(errors) => {
             let mut msg = String::new();
-            for diag in errors.iter() {
+            for diag in &errors {
                 msg.push_str(&format!("error: {}\n", diag.message));
                 for hint in &diag.hints {
                     msg.push_str(&format!("  hint: {}\n", hint));

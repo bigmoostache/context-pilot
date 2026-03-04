@@ -35,7 +35,7 @@ impl CallbackPanel {
         for def in &cs.definitions {
             let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
             let blocking = if def.blocking { "yes" } else { "no" };
-            let timeout = def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string());
+            let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{}s", t));
             let success = def.success_message.as_deref().unwrap_or("—");
             let cwd = def.cwd.as_deref().unwrap_or("project root");
             let one_at = if def.one_at_a_time { "yes" } else { "no" };
@@ -60,7 +60,7 @@ impl CallbackPanel {
                 "Pattern: {} | Blocking: {} | Timeout: {}",
                 def.pattern,
                 if def.blocking { "yes" } else { "no" },
-                def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string()),
+                def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{}s", t)),
             ));
             lines.push(String::new());
 
@@ -69,7 +69,7 @@ impl CallbackPanel {
                 Ok(content) => {
                     lines.push("```bash".to_string());
                     lines.push(content);
-                    lines.push("```".to_string());
+                    lines.push("`".to_string());
                 }
                 Err(e) => {
                     lines.push(format!("Error reading script: {}", e));
@@ -155,7 +155,7 @@ impl Panel for CallbackPanel {
         for (i, def) in cs.definitions.iter().enumerate() {
             let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
             let blocking = if def.blocking { "yes" } else { "no" };
-            let timeout = def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string());
+            let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{}s", t));
             let one_at = if def.one_at_a_time { "yes" } else { "no" };
             let wrapped = wrap_text_simple(&def.description, desc_max);
 
@@ -234,7 +234,7 @@ impl Panel for CallbackPanel {
                     "Pattern: {} | Blocking: {} | Timeout: {}",
                     def.pattern,
                     if def.blocking { "yes" } else { "no" },
-                    def.timeout_secs.map(|t| format!("{}s", t)).unwrap_or_else(|| "—".to_string()),
+                    def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{}s", t)),
                 ),
                 Style::default().fg(theme::text_secondary()),
             )));
@@ -281,14 +281,13 @@ impl Panel for CallbackPanel {
             .context
             .iter()
             .find(|c| c.context_type == ContextType::CALLBACK)
-            .map(|c| (c.id.as_str(), c.last_refresh_ms))
-            .unwrap_or(("", 0));
+            .map_or(("", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Callbacks", content, last_refresh_ms)]
     }
 }
 
-/// Simple word-wrap: break text at word boundaries to fit within max_width.
-/// Uses UnicodeWidthStr for correct display width measurement.
+/// Simple word-wrap: break text at word boundaries to fit within `max_width`.
+/// Uses `UnicodeWidthStr` for correct display width measurement.
 fn wrap_text_simple(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
         return vec![text.to_string()];

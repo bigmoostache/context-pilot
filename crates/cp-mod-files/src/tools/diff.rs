@@ -72,7 +72,7 @@ fn compute_diff<'a>(old_lines: &[&'a str], new_lines: &[&'a str]) -> Vec<DiffOp<
 }
 
 /// Find the Longest Common Subsequence (LCS) between two sequences.
-/// Returns pairs of (old_index, new_index) for matching lines in ascending order.
+/// Returns pairs of (`old_index`, `new_index`) for matching lines in ascending order.
 ///
 /// Note: O(m*n) space. Acceptable for typical file edits.
 fn lcs<'a>(old: &[&'a str], new: &[&'a str]) -> Vec<(usize, usize)> {

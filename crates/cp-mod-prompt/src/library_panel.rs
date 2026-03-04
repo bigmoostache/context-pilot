@@ -90,8 +90,7 @@ impl Panel for LibraryPanel {
             .active_agent_id
             .as_ref()
             .and_then(|id| ps.agents.iter().find(|a| &a.id == id))
-            .map(|a| a.name.as_str())
-            .unwrap_or("(none)");
+            .map_or("(none)", |a| a.name.as_str());
 
         lines.push(Line::from(vec![
             Span::styled(" ", base_style),

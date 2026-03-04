@@ -51,10 +51,10 @@ impl QuestionAnswer {
     }
 }
 
-/// The full pending question form state, stored in State.module_data via ext.
+/// The full pending question form state, stored in `State.module_data` via ext.
 #[derive(Debug, Clone)]
 pub struct PendingQuestionForm {
-    /// The tool_use_id this form was created for (needed to produce ToolResult)
+    /// The `tool_use_id` this form was created for (needed to produce `ToolResult`)
     pub tool_use_id: String,
     /// The questions to present
     pub questions: Vec<Question>,

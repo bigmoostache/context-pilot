@@ -91,7 +91,7 @@ pub enum LlmProvider {
     Grok,
     /// Groq inference platform (OpenAI-compatible, very fast).
     Groq,
-    /// DeepSeek models (OpenAI-compatible API).
+    /// `DeepSeek` models (OpenAI-compatible API).
     DeepSeek,
 }
 
@@ -284,14 +284,14 @@ impl ModelInfo for GroqModel {
     }
 }
 
-/// DeepSeek model variants (OpenAI-compatible API, budget-friendly).
+/// `DeepSeek` model variants (OpenAI-compatible API, budget-friendly).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DeepSeekModel {
-    /// DeepSeek Chat — general-purpose, 128K context.
+    /// `DeepSeek` Chat — general-purpose, 128K context.
     #[default]
     DeepseekChat,
-    /// DeepSeek Reasoner — chain-of-thought, larger output.
+    /// `DeepSeek` Reasoner — chain-of-thought, larger output.
     DeepseekReasoner,
 }
 

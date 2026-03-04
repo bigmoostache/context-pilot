@@ -11,7 +11,7 @@ use super::helpers::*;
 /// Minimal request matching working Python exactly.
 /// No panels, no tools, no message prefixes — just raw API call.
 #[test]
-#[ignore] // Requires API key — run with `cargo test -- --ignored`
+#[ignore = "requires API key"]
 fn test_general_kenobi() {
     let token = ClaudeCodeApiKeyClient::load_api_key().expect("ANTHROPIC_API_KEY not found in environment");
 
@@ -51,9 +51,9 @@ fn test_general_kenobi() {
     assert!(text.to_lowercase().contains("general kenobi"), "Expected 'General Kenobi' in response, got: {}", text);
 }
 
-/// Same as above but with tools and streaming — matches what stream() actually sends.
+/// Same as above but with tools and streaming — matches what `stream()` actually sends.
 #[test]
-#[ignore] // Requires API key — run with `cargo test -- --ignored`
+#[ignore = "requires API key"]
 fn test_general_kenobi_with_tools_streaming() {
     let token = ClaudeCodeApiKeyClient::load_api_key().expect("ANTHROPIC_API_KEY not found in environment");
 
@@ -123,7 +123,7 @@ fn test_general_kenobi_with_tools_streaming() {
     );
 }
 
-/// Test inject_system_reminder: verify it skips tool_result messages
+/// Test `inject_system_reminder`: verify it skips `tool_result` messages
 /// and injects into the first regular user message.
 #[test]
 fn test_inject_system_reminder_skips_tool_results() {
@@ -160,7 +160,7 @@ fn test_inject_system_reminder_skips_tool_results() {
     assert_eq!(arr[1]["text"].as_str().unwrap(), "Hello there");
 }
 
-/// Test inject_system_reminder: when no eligible message, prepends fallback pair
+/// Test `inject_system_reminder`: when no eligible message, prepends fallback pair
 #[test]
 fn test_inject_system_reminder_no_eligible() {
     // Only tool_result user messages — triggers fallback
@@ -188,8 +188,8 @@ fn test_inject_system_reminder_no_eligible() {
     assert!(messages[3]["content"][0]["type"] == "tool_result");
 }
 
-/// Test ensure_message_alternation: merges consecutive text user messages,
-/// but separates tool_result user from text user with a placeholder assistant.
+/// Test `ensure_message_alternation`: merges consecutive text user messages,
+/// but separates `tool_result` user from text user with a placeholder assistant.
 #[test]
 fn test_ensure_message_alternation() {
     // Simulate the actual failure scenario: panel footer (tool_result user)

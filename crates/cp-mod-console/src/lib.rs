@@ -10,12 +10,12 @@ mod panel;
 mod pollers;
 /// Thread-safe ring buffer for capturing process output.
 pub mod ring_buffer;
-/// Tool implementations: create, send_keys, wait, watch, easy_bash.
+/// Tool implementations: create, `send_keys`, wait, watch, `easy_bash`.
 pub mod tools;
 /// Console state types: `ConsoleState`, `SessionMeta`, `ProcessStatus`, `ConsoleWatcher`.
 pub mod types;
 
-/// Subdirectory under STORE_DIR for console log files.
+/// Subdirectory under `STORE_DIR` for console log files.
 pub const CONSOLE_DIR: &str = "console";
 
 use std::collections::HashMap;

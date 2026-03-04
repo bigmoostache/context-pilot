@@ -63,8 +63,7 @@ impl Panel for ScratchpadPanel {
             .context
             .iter()
             .find(|c| c.context_type == ContextType::SCRATCHPAD)
-            .map(|c| (c.id.as_str(), c.last_refresh_ms))
-            .unwrap_or(("P7", 0));
+            .map_or(("P7", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Scratchpad", content, last_refresh_ms)]
     }
 
@@ -116,7 +115,7 @@ impl Panel for ScratchpadPanel {
                 }
 
                 // Blank line between cells
-                text.push(Line::from(vec![Span::styled("".to_string(), base_style)]));
+                text.push(Line::from(vec![Span::styled(String::new(), base_style)]));
             }
         }
 

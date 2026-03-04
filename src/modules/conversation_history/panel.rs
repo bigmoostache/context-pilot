@@ -6,7 +6,7 @@ use crate::state::{ContextType, State};
 use crate::ui::theme;
 
 /// Panel for frozen conversation history chunks.
-/// Content is set once at creation (via detach_conversation_chunks) and never refreshed.
+/// Content is set once at creation (via `detach_conversation_chunks`) and never refreshed.
 pub(super) struct ConversationHistoryPanel;
 
 impl Panel for ConversationHistoryPanel {

@@ -16,8 +16,8 @@ use cp_base::watchers::{Watcher, WatcherRegistry, WatcherResult};
 // Persistable coucou data — saved in worker JSON via SpineState
 // ============================================================
 
-/// Serializable coucou record. Stored in SpineState.pending_coucous
-/// and re-registered into WatcherRegistry on load.
+/// Serializable coucou record. Stored in `SpineState.pending_coucous`
+/// and re-registered into `WatcherRegistry` on load.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct CoucouData {
     pub watcher_id: String,
@@ -27,7 +27,7 @@ pub(crate) struct CoucouData {
 }
 
 impl CoucouData {
-    /// Convert into a live CoucouWatcher and register in WatcherRegistry.
+    /// Convert into a live `CoucouWatcher` and register in `WatcherRegistry`.
     pub(crate) fn into_watcher(self) -> CoucouWatcher {
         let desc = format!("🔔 Coucou: \"{}\"", self.message);
         CoucouWatcher {
@@ -40,8 +40,8 @@ impl CoucouData {
     }
 }
 
-/// Collect all active CoucouWatcher data from the WatcherRegistry
-/// for persistence. Filters by source_tag == "coucou".
+/// Collect all active `CoucouWatcher` data from the `WatcherRegistry`
+/// for persistence. Filters by `source_tag` == "coucou".
 pub(crate) fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
     let registry = WatcherRegistry::get(state);
     registry

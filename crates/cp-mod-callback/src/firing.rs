@@ -146,7 +146,7 @@ pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) ->
 }
 
 /// Fire all matched blocking callbacks.
-/// Each gets a sentinel tool_use_id so tool_pipeline can track them.
+/// Each gets a sentinel `tool_use_id` so `tool_pipeline` can track them.
 /// Returns one summary line per callback: "· name running (blocking)"
 pub fn fire_blocking_callbacks(state: &mut State, callbacks: &[MatchedCallback], tool_use_id: &str) -> Vec<String> {
     let mut summaries = Vec::new();
@@ -173,18 +173,18 @@ fn shell_escape(s: &str) -> String {
 // ============================================================
 
 /// A watcher that monitors a callback's console session.
-/// NO panel is created upfront — only on failure/timeout via `create_panel` in WatcherResult.
-/// On exit 0: returns success_message + log file path, kills session.
-/// On exit != 0: returns error output + deferred panel info for tool_cleanup to create.
+/// NO panel is created upfront — only on failure/timeout via `create_panel` in `WatcherResult`.
+/// On exit 0: returns `success_message` + log file path, kills session.
+/// On exit != 0: returns error output + deferred panel info for `tool_cleanup` to create.
 #[derive(Debug)]
 pub struct CallbackWatcher {
-    /// Unique watcher ID (e.g., "callback_CB3_cb_42").
+    /// Unique watcher ID (e.g., "`callback_CB3_cb_42`").
     pub watcher_id: String,
     /// Console session key for the spawned script.
     pub session_name: String,
     /// Human-readable callback name.
     pub callback_name: String,
-    /// Source tag for watcher registry filtering (e.g., "callback_CB3").
+    /// Source tag for watcher registry filtering (e.g., "`callback_CB3`").
     pub callback_tag: String,
     /// Custom message to display on success (exit 0).
     pub success_message: Option<String>,

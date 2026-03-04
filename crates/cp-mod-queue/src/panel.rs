@@ -36,8 +36,7 @@ impl Panel for QueuePanel {
             .context
             .iter()
             .find(|c| c.context_type == ContextType::QUEUE)
-            .map(|c| (c.id.as_str(), c.last_refresh_ms))
-            .unwrap_or(("P11", 0));
+            .map_or(("P11", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Queue", content, last_refresh_ms)]
     }
 
@@ -99,7 +98,7 @@ impl Panel for QueuePanel {
 }
 
 impl QueuePanel {
-    /// Shared text builder for both refresh() and context()
+    /// Shared text builder for both `refresh()` and `context()`
     fn format_context_text(state: &State) -> String {
         let qs = QueueState::get(state);
         let mut text = String::new();

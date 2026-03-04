@@ -5,7 +5,7 @@ use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
 
 /// Unified diff-based edit tool for agents, skills, and commands.
-/// Uses the same old_string/new_string pattern as the file Edit tool.
+/// Uses the same `old_string/new_string` pattern as the file Edit tool.
 /// Routes to agent/skill/command based on the provided ID.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {

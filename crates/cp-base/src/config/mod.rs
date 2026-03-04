@@ -234,7 +234,7 @@ pub struct ToolCategories {
     pub tree: String,
     /// Label for console/process tools.
     pub console: String,
-    /// Label for context management tools (Close_panel, etc.).
+    /// Label for context management tools (`Close_panel`, etc.).
     pub context: String,
     /// Label for todo/task tools.
     pub todo: String,
@@ -266,7 +266,7 @@ pub struct MessageIcons {
 }
 
 /// Context panel icons — a string-keyed map loaded from theme YAML.
-/// Keys match module icon_ids (e.g., "tree", "todo", "git").
+/// Keys match module `icon_ids` (e.g., "tree", "todo", "git").
 #[derive(Debug, Deserialize, Clone)]
 #[serde(transparent)]
 pub struct ContextIcons(pub HashMap<String, String>);
@@ -418,8 +418,8 @@ pub fn get_theme(theme_id: &str) -> &'static Theme {
 
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-/// Cached pointer to the active theme. Updated by set_active_theme().
-/// Points into the static THEMES LazyLock, so the reference is always valid.
+/// Cached pointer to the active theme. Updated by `set_active_theme()`.
+/// Points into the static THEMES `LazyLock`, so the reference is always valid.
 static CACHED_THEME: AtomicPtr<Theme> = AtomicPtr::new(std::ptr::null_mut());
 
 /// Set the active theme ID (call when state is loaded or theme changes)
@@ -432,15 +432,15 @@ pub fn set_active_theme(theme_id: &str) {
 #[expect(unsafe_code, reason = "atomic pointer deref from static LazyLock — always valid")]
 pub fn active_theme() -> &'static Theme {
     let ptr = CACHED_THEME.load(Ordering::Acquire);
-    if !ptr.is_null() {
-        // SAFETY: ptr was set from a &'static Theme reference stored in LazyLock THEMES.
-        // The Theme data is never mutated or freed after initialization.
-        unsafe { &*ptr }
-    } else {
+    if ptr.is_null() {
         // First call before set_active_theme — initialize from default
         let theme = get_theme(DEFAULT_THEME);
         CACHED_THEME.store(std::ptr::from_ref(theme).cast_mut(), Ordering::Release);
         theme
+    } else {
+        // SAFETY: ptr was set from a &'static Theme reference stored in LazyLock THEMES.
+        // The Theme data is never mutated or freed after initialization.
+        unsafe { &*ptr }
     }
 }
 

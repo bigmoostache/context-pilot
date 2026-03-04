@@ -162,7 +162,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         // Pre-validate parent_id if specified (normalize "none", "null", "" to None)
         let normalized_parent = if update_value.get("parent_id").is_some() {
             let raw = update_value.get("parent_id");
-            if raw.map(|v| v.is_null()).unwrap_or(false) {
+            if raw.is_some_and(|v| v.is_null()) {
                 Some(None) // explicitly set to None
             } else if let Some(pid) = raw.and_then(|v| v.as_str()) {
                 let lower = pid.to_lowercase();
@@ -233,7 +233,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
                 // Handle parent_id - use normalized value (already validated above)
                 if let Some(new_parent) = &normalized_parent {
-                    t.parent_id = new_parent.clone();
+                    t.parent_id.clone_from(new_parent);
                     changes.push("parent");
                 }
 
@@ -265,13 +265,13 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             let ts = TodoState::get_mut(state);
             // Walk up parent chain
             let mut current_id = ts.todos.iter().find(|t| t.id == id).and_then(|t| t.parent_id.clone());
-            while let Some(pid) = current_id {
-                if let Some(parent) = ts.todos.iter_mut().find(|t| t.id == pid) {
+            while let Some(ref pid) = current_id {
+                if let Some(parent) = ts.todos.iter_mut().find(|t| t.id == *pid) {
                     if parent.status == TodoStatus::Pending {
                         parent.status = TodoStatus::InProgress;
                         propagated.push(parent.id.clone());
                     }
-                    current_id = parent.parent_id.clone();
+                    current_id.clone_from(&parent.parent_id);
                 } else {
                     break;
                 }

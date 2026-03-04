@@ -14,14 +14,14 @@ use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderC
 // =============================================================================
 
 /// Type alias for the syntax highlighting callback function.
-/// Takes (file_path, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>
+/// Takes (`file_path`, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>
 pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>;
 
 /// Runtime state (messages loaded in memory)
 pub struct State {
     /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
     pub context: Vec<ContextElement>,
-    /// Conversation messages (user, assistant, tool_call, tool_result).
+    /// Conversation messages (user, assistant, `tool_call`, `tool_result`).
     pub messages: Vec<Message>,
     /// Current user input text in the editor.
     pub input: String,
@@ -39,7 +39,7 @@ pub struct State {
     /// True when tools are being dispatched, panels loading, console waits, or sleep timers.
     /// The LLM is not receiving tokens during this phase.
     pub is_tooling: bool,
-    /// Stop reason from last completed stream (e.g., "end_turn", "max_tokens", "tool_use")
+    /// Stop reason from last completed stream (e.g., "`end_turn`", "`max_tokens`", "`tool_use`")
     pub last_stop_reason: Option<String>,
     /// Vertical scroll offset in the conversation view (fractional lines).
     pub scroll_offset: f32,
@@ -87,7 +87,7 @@ pub struct State {
     pub grok_model: crate::llm_types::GrokModel,
     /// Active Groq model variant.
     pub groq_model: crate::llm_types::GroqModel,
-    /// Active DeepSeek model variant.
+    /// Active `DeepSeek` model variant.
     pub deepseek_model: crate::llm_types::DeepSeekModel,
     /// Whether config overlay is showing secondary model selection (Tab toggles)
     pub config_secondary_mode: bool,
@@ -99,18 +99,18 @@ pub struct State {
     pub secondary_grok_model: crate::llm_types::GrokModel,
     /// Secondary Groq model variant.
     pub secondary_groq_model: crate::llm_types::GroqModel,
-    /// Secondary DeepSeek model variant.
+    /// Secondary `DeepSeek` model variant.
     pub secondary_deepseek_model: crate::llm_types::DeepSeekModel,
     /// Whether the reverie system is enabled (auto-trigger on threshold breach)
     pub reverie_enabled: bool,
     /// Sidebar display mode: Normal (full), Collapsed (icons only), Hidden
     pub sidebar_mode: SidebarMode,
-    /// Active reverie sessions keyed by agent_id (e.g., "cleaner", "cartographer").
+    /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
     pub reveries: HashMap<String, super::reverie::ReverieState>,
-    /// Accumulated prompt_cache_hit_tokens across all API calls (persisted)
+    /// Accumulated `prompt_cache_hit_tokens` across all API calls (persisted)
     pub cache_hit_tokens: usize,
-    /// Accumulated prompt_cache_miss_tokens across all API calls (persisted)
+    /// Accumulated `prompt_cache_miss_tokens` across all API calls (persisted)
     pub cache_miss_tokens: usize,
     /// Accumulated output tokens across all API calls (persisted)
     pub total_output_tokens: usize,
@@ -120,7 +120,7 @@ pub struct State {
     pub stream_cache_miss_tokens: usize,
     /// Output tokens in current stream.
     pub stream_output_tokens: usize,
-    /// Last tick token accumulators (runtime-only, set per StreamDone)
+    /// Last tick token accumulators (runtime-only, set per `StreamDone`)
     pub tick_cache_hit_tokens: usize,
     /// Cache misses in last completed tick.
     pub tick_cache_miss_tokens: usize,
@@ -141,7 +141,7 @@ pub struct State {
     pub api_retry_count: u32,
     /// Guard rail block reason (set when spine blocks, cleared when streaming starts)
     pub guard_rail_blocked: Option<String>,
-    /// Reload pending (set by system_reload, triggers reload after tool result saved)
+    /// Reload pending (set by `system_reload`, triggers reload after tool result saved)
     pub reload_pending: bool,
     /// Waiting for file panels to load before continuing stream
     pub waiting_for_panels: bool,
@@ -166,8 +166,8 @@ pub struct State {
     pub highlight_fn: Option<HighlightFn>,
 
     // === Module extension data (TypeMap pattern) ===
-    /// Module-owned state stored by TypeId. Each module registers its own state struct
-    /// at startup via `Module::init_state()`. Accessed via `get_ext<T>()`/`get_ext_mut<T>()`.
+    /// Module-owned state stored by `TypeId`. Each module registers its own state struct
+    /// at startup via `Module::init_state()`. Accessed via `get_ext::<T>()` / `get_ext_mut::<T>()`.
     pub module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
@@ -267,7 +267,7 @@ impl State {
         drop(self.module_data.insert(TypeId::of::<T>(), Box::new(val)));
     }
 
-    /// Update the last_refresh_ms timestamp for a panel by its context type
+    /// Update the `last_refresh_ms` timestamp for a panel by its context type
     #[expect(clippy::needless_pass_by_value)]
     pub fn touch_panel(&mut self, context_type: ContextType) {
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == context_type) {
@@ -324,7 +324,7 @@ impl State {
         }
     }
 
-    /// Get the cleaning target as absolute proportion (threshold * target_proportion)
+    /// Get the cleaning target as absolute proportion (threshold * `target_proportion`)
     pub fn cleaning_target(&self) -> f32 {
         self.cleaning_threshold * self.cleaning_target_proportion
     }
@@ -396,7 +396,7 @@ impl State {
         }
     }
 
-    /// Calculate cost in USD for a given token count and price per MTok
+    /// Calculate cost in USD for a given token count and price per `MTok`
     pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
         tokens.to_f64() * price_per_mtok.to_f64() / 1_000_000.0
     }
@@ -422,7 +422,7 @@ impl State {
     }
 
     /// Create a user message and add it to the conversation.
-    /// NOTE: Caller is responsible for persistence (save_message).
+    /// NOTE: Caller is responsible for persistence (`save_message`).
     /// Returns the index into self.messages.
     pub fn push_user_message(&mut self, content: String) -> usize {
         let token_count = super::estimate_tokens(&content);
@@ -446,7 +446,7 @@ impl State {
         self.messages.len() - 1
     }
 
-    /// Prepare state for a new stream: set is_streaming, clear stop reason, reset tick counters.
+    /// Prepare state for a new stream: set `is_streaming`, clear stop reason, reset tick counters.
     pub fn begin_streaming(&mut self) {
         self.is_streaming = true;
         self.last_stop_reason = None;

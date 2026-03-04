@@ -33,7 +33,7 @@ pub(crate) fn build_tool_restrictions_text(tools: &[ToolDefinition]) -> String {
     text
 }
 ///
-/// Build the optimize_context tool definition for the main AI.
+/// Build the `optimize_context` tool definition for the main AI.
 ///
 /// This tool lets the main AI explicitly invoke a reverie sub-agent
 /// with an optional directive and agent selection.
@@ -49,7 +49,7 @@ pub(crate) fn optimize_context_tool_definition() -> ToolDefinition {
 
 /// Execute the Report tool: create a spine notification and signal reverie destruction.
 ///
-/// Returns the ToolResult. The caller (event loop) is responsible for actually
+/// Returns the `ToolResult`. The caller (event loop) is responsible for actually
 /// destroying the reverie state after processing this result.
 pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
     // Block report if queue has unflushed actions
@@ -76,7 +76,7 @@ pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
     }
 }
 
-/// Execute the optimize_context tool from the main AI.
+/// Execute the `optimize_context` tool from the main AI.
 ///
 /// Validates preconditions and returns an ack. The actual reverie start
 /// happens in the event loop when it processes this result.

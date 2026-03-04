@@ -110,7 +110,7 @@ pub fn classify_gh(args: &[String]) -> CommandClass {
     }
 
     let group = args[0].as_str();
-    let action = args.get(1).map(|s| s.as_str()).unwrap_or("");
+    let action = args.get(1).map_or("", |s| s.as_str());
     let rest: Vec<&str> = args.iter().skip(1).map(|s| s.as_str()).collect();
 
     match group {

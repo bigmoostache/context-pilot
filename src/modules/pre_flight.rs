@@ -74,7 +74,7 @@ fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut
 
 // Here be dragons (and type mismatches)
 
-/// Check if a JSON value matches the expected ParamType.
+/// Check if a JSON value matches the expected `ParamType`.
 fn check_type(value: &serde_json::Value, expected: &ParamType) -> bool {
     match expected {
         ParamType::String => value.is_string(),
@@ -86,7 +86,7 @@ fn check_type(value: &serde_json::Value, expected: &ParamType) -> bool {
     }
 }
 
-/// Human-readable name for a ParamType.
+/// Human-readable name for a `ParamType`.
 fn type_name(pt: &ParamType) -> &'static str {
     match pt {
         ParamType::String => "string",

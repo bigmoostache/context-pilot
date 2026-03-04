@@ -7,7 +7,7 @@ use crate::app::App;
 
 impl App {
     /// Handle keyboard events when the @ autocomplete popup is active.
-    /// Mutates AutocompleteState and state.input directly.
+    /// Mutates `AutocompleteState` and state.input directly.
     pub(super) fn handle_autocomplete_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
@@ -71,14 +71,7 @@ impl App {
                 let pop_result = ac.pop_char();
                 let anchor = ac.anchor_pos;
 
-                if !pop_result {
-                    // Query was empty — remove the '@' and deactivate
-                    ac.deactivate();
-                    if anchor < self.state.input.len() {
-                        let _r = self.state.input.remove(anchor);
-                        self.state.input_cursor = anchor;
-                    }
-                } else {
+                if pop_result {
                     let query_len = ac.query.len();
                     let query = ac.query.clone();
                     // Update cursor position to match shortened query
@@ -102,6 +95,13 @@ impl App {
                     let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
                     let ac = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>().unwrap();
                     ac.set_matches(entries);
+                } else {
+                    // Query was empty — remove the '@' and deactivate
+                    ac.deactivate();
+                    if anchor < self.state.input.len() {
+                        let _r = self.state.input.remove(anchor);
+                        self.state.input_cursor = anchor;
+                    }
                 }
             }
             KeyCode::Char(c) => {
@@ -135,7 +135,7 @@ impl App {
     }
 
     /// Handle keyboard events when a question form is active.
-    /// Mutates the PendingQuestionForm directly in state.
+    /// Mutates the `PendingQuestionForm` directly in state.
     pub(super) fn handle_question_form_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };

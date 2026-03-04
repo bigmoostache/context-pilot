@@ -120,7 +120,7 @@ impl Module for GithubModule {
     }
 }
 
-/// Visualizer for gh_execute tool results.
+/// Visualizer for `gh_execute` tool results.
 /// Color-codes PR/issue output with status badges, labels, authors, and highlights URLs and PR numbers.
 fn visualize_gh_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
     use ratatui::prelude::*;

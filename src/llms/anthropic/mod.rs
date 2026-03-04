@@ -92,9 +92,7 @@ impl LlmClient for AnthropicClient {
         // Build API messages
         let include_tool_uses = request.tool_results.is_some();
         // Use pre-assembled API messages from prompt_builder (centralized assembly)
-        let mut api_messages = if !request.api_messages.is_empty() {
-            request.api_messages.clone()
-        } else {
+        let mut api_messages = if request.api_messages.is_empty() {
             // Fallback: build from raw data (should only happen for api_check etc.)
             messages_to_api(
                 &request.messages,
@@ -102,6 +100,8 @@ impl LlmClient for AnthropicClient {
                 include_tool_uses,
                 request.seed_content.as_deref(),
             )
+        } else {
+            request.api_messages.clone()
         };
 
         // Add tool results if present

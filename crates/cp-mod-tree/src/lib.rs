@@ -2,7 +2,7 @@
 //!
 //! Three tools: `tree_filter` (gitignore-style patterns), `tree_toggle`
 //! (open/close folders), `tree_describe` (annotate files/folders). The tree
-//! panel auto-refreshes on filesystem changes and provides `@`-autocomplete
+//! panel auto-refreshes on filesystem changes and provides @-autocomplete
 //! with directory entries.
 
 mod panel;

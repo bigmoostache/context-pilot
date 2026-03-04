@@ -1,7 +1,7 @@
 //! Files module — read, edit, and write project files.
 //!
 //! Three tools: `Open` (read file into context panel with syntax highlighting),
-//! `Edit` (old_string/new_string diff replacement), `Write` (create or fully
+//! `Edit` (`old_string/new_string` diff replacement), `Write` (create or fully
 //! overwrite). File panels auto-refresh on filesystem changes via the watcher.
 
 mod panel;
@@ -212,8 +212,8 @@ impl Module for FilesModule {
 }
 
 /// Visualizer for Edit and Write tool results.
-/// Also reused by cp-mod-prompt for Edit_prompt.
-/// Parses ```diff blocks and renders deleted lines in red, added lines in green.
+/// Also reused by cp-mod-prompt for `Edit_prompt`.
+/// Parses diff blocks and renders deleted lines in red, added lines in green.
 /// Callback summary blocks get compact styled rendering (only status word colored).
 /// Non-diff content is rendered in secondary text color.
 pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
@@ -234,7 +234,7 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'s
             in_diff_block = true;
             continue;
         }
-        if line.trim() == "```" && in_diff_block {
+        if line.trim() == "`" && in_diff_block {
             in_diff_block = false;
             continue;
         }

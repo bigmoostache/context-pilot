@@ -13,7 +13,7 @@ use cp_mod_spine::{NotificationType, SpineState};
 use crate::app::App;
 
 impl App {
-    /// Non-blocking check: poll WatcherRegistry for satisfied conditions.
+    /// Non-blocking check: poll `WatcherRegistry` for satisfied conditions.
     /// - Blocking watchers: replace sentinel tool results and resume pipeline.
     /// - Async watchers: create spine notifications.
     pub(super) fn check_watchers(&mut self, tx: &Sender<StreamEvent>) {
@@ -185,20 +185,20 @@ impl App {
             // force-resolve them to prevent infinite pipeline stall. This can happen when
             // a watcher fires with a stale tool_use_id that doesn't match any pending result.
             let registry = WatcherRegistry::get(&self.state);
-            if !registry.has_blocking_watchers() {
-                for tr in &mut tool_results {
-                    if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
-                        tr.content = "Console wait result unavailable (watcher expired or was interrupted)".to_string();
-                    } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
-                        // Callback sentinel: extract original content after sentinel+id prefix
-                        let after = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
-                        // Try to find where the original content starts (after sentinel_id)
-                        tr.content = format!("Callback result unavailable (timeout). Original: {}", after);
-                    }
-                }
-            } else {
+            if registry.has_blocking_watchers() {
                 self.pending_console_wait_tool_results = Some(tool_results);
                 return;
+            }
+
+            for tr in &mut tool_results {
+                if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
+                    tr.content = "Console wait result unavailable (watcher expired or was interrupted)".to_string();
+                } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
+                    // Callback sentinel: extract original content after sentinel+id prefix
+                    let after = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
+                    // Try to find where the original content starts (after sentinel_id)
+                    tr.content = format!("Callback result unavailable (timeout). Original: {}", after);
+                }
             }
         }
 
@@ -286,12 +286,12 @@ impl App {
     }
 
     /// When the user interrupts streaming (Esc), any pending blocking tool calls
-    /// (console_wait, ask_user_question, or tools mid-execution) have their
-    /// tool_use messages already saved but no matching tool_result. This creates
-    /// orphaned tool_use blocks that cause API 400 errors on the next stream.
+    /// (`console_wait`, `ask_user_question`, or tools mid-execution) have their
+    /// `tool_use` messages already saved but no matching `tool_result`. This creates
+    /// orphaned `tool_use` blocks that cause API 400 errors on the next stream.
     ///
-    /// This method creates fake tool_result messages for all pending tools so
-    /// every tool_use is properly paired.
+    /// This method creates fake `tool_result` messages for all pending tools so
+    /// every `tool_use` is properly paired.
     pub(super) fn flush_pending_tool_results_as_interrupted(&mut self) {
         let interrupted_msg = "Tool execution interrupted by user.";
 

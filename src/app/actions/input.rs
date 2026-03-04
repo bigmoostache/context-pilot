@@ -7,7 +7,7 @@ use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};
 use crate::modules::all_modules;
 
-/// Handle InputSubmit action — context switching, message creation, stream start
+/// Handle `InputSubmit` action — context switching, message creation, stream start
 pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     if state.input.is_empty() {
         return ActionResult::Nothing;
@@ -89,7 +89,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Handle ClearConversation action
+/// Handle `ClearConversation` action
 pub(crate) fn handle_clear_conversation(state: &mut State) -> ActionResult {
     for msg in &state.messages {
         // Delete by UID if available, otherwise by id
@@ -106,7 +106,7 @@ pub(crate) fn handle_clear_conversation(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Create a UserMessage notification in the spine system.
+/// Create a `UserMessage` notification in the spine system.
 /// This is the primary trigger for starting a stream — the spine engine
 /// will detect the unprocessed notification and launch streaming.
 fn create_user_notification(state: &mut State, user_id: &str, content_preview: &str) {

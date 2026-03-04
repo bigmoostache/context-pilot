@@ -153,7 +153,7 @@ fn inject_panel_messages(
     }
 }
 
-/// Build ContentBlocks for a ToolCall message, if it has a matching ToolResult.
+/// Build `ContentBlocks` for a `ToolCall` message, if it has a matching `ToolResult`.
 fn build_tool_call_blocks(msg: &Message, messages: &[Message], idx: usize) -> Option<Vec<ContentBlock>> {
     let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
 
@@ -170,7 +170,7 @@ fn build_tool_call_blocks(msg: &Message, messages: &[Message], idx: usize) -> Op
     Some(msg.tool_uses.iter().map(tool_use_block).collect())
 }
 
-/// Convert a ToolUseRecord into a ContentBlock, ensuring input is never null.
+/// Convert a `ToolUseRecord` into a `ContentBlock`, ensuring input is never null.
 fn tool_use_block(tool_use: &crate::state::ToolUseRecord) -> ContentBlock {
     let input = if tool_use.input.is_null() { Value::Object(serde_json::Map::new()) } else { tool_use.input.clone() };
     ContentBlock::ToolUse { id: tool_use.id.clone(), name: tool_use.name.clone(), input }

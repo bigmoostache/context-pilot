@@ -17,6 +17,8 @@ use crate::ui;
 
 use crate::app::App;
 use crate::app::context::{get_active_agent_content, prepare_stream_context};
+use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
+use cp_mod_spine::{NotificationType, SpineState};
 
 impl App {
     #[expect(clippy::needless_pass_by_value)]
@@ -38,7 +40,6 @@ impl App {
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
-            use cp_mod_spine::{NotificationType, SpineState};
             let _r = SpineState::create_notification(
                 &mut self.state,
                 NotificationType::ReloadResume,
@@ -266,8 +267,6 @@ impl App {
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
     fn check_spine(&mut self, tx: &Sender<StreamEvent>) {
-        use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
-
         // Check if incomplete todos should trigger auto-continuation
         self.check_todo_continuation();
 
@@ -316,14 +315,14 @@ impl App {
     /// Check if todos need auto-continuation. Creates a single deduplicated
     /// notification — the spine's normal flow handles the rest.
     fn check_todo_continuation(&mut self) {
-        if !cp_mod_spine::SpineState::get(&self.state).config.continue_until_todos_done {
+        if !SpineState::get(&self.state).config.continue_until_todos_done {
             return;
         }
         if self.state.is_streaming {
             return;
         }
         // Deduplicate: don't create if one already exists unprocessed
-        let already = cp_mod_spine::SpineState::get(&self.state)
+        let already = SpineState::get(&self.state)
             .notifications
             .iter()
             .any(|n| !n.is_processed() && n.source == "todo_continuation");
@@ -335,9 +334,9 @@ impl App {
             return;
         }
         let summary = ts.incomplete_todos_summary();
-        let _r = cp_mod_spine::SpineState::create_notification(
+        let _r = SpineState::create_notification(
             &mut self.state,
-            cp_mod_spine::NotificationType::Custom,
+            NotificationType::Custom,
             "todo_continuation".to_string(),
             format!("{} todo(s) remaining: {}", summary.len(), summary.join(", ")),
         );

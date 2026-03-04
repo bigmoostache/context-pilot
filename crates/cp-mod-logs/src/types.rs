@@ -66,12 +66,12 @@ impl LogsState {
         Self { logs: vec![], next_log_id: 1, open_log_ids: vec![] }
     }
 
-    /// Get shared ref from State's TypeMap.
+    /// Get shared ref from State's `TypeMap`.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("LogsState not initialized")
     }
 
-    /// Get mutable ref from State's TypeMap.
+    /// Get mutable ref from State's `TypeMap`.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("LogsState not initialized")
     }

@@ -1,6 +1,6 @@
 //! Claude Code API Key implementation.
 //!
-//! Uses ANTHROPIC_API_KEY from environment with Bearer authentication.
+//! Uses `ANTHROPIC_API_KEY` from environment with Bearer authentication.
 //! Replicates Claude Code's request signature to access Claude 4.5 models.
 
 mod check;
@@ -63,7 +63,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
 
         // Build messages from pre-assembled API messages or raw data
         let mut json_messages =
-            if !request.api_messages.is_empty() { api_messages_to_cc_json(&request.api_messages) } else { Vec::new() };
+            if request.api_messages.is_empty() { Vec::new() } else { api_messages_to_cc_json(&request.api_messages) };
 
         // Handle cleaner mode extra context
         if let Some(ref context) = request.extra_context {

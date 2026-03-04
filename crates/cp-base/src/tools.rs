@@ -169,7 +169,7 @@ impl PreFlightResult {
         self
     }
 
-    /// Merge another PreFlightResult into this one.
+    /// Merge another `PreFlightResult` into this one.
     pub fn merge(&mut self, other: PreFlightResult) {
         self.errors.extend(other.errors);
         self.warnings.extend(other.warnings);

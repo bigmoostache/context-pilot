@@ -32,8 +32,8 @@ pub(crate) fn map_model_name(model: &str) -> &str {
 
 /// Inject the system-reminder text block into the first non-tool-result user message.
 /// Claude Code's server validates that messages contain this marker.
-/// Must skip tool_result user messages (from panel injection) since mixing text blocks
-/// into tool_result messages breaks the API's tool_use/tool_result pairing.
+/// Must skip `tool_result` user messages (from panel injection) since mixing text blocks
+/// into `tool_result` messages breaks the API's `tool_use/tool_result` pairing.
 pub(crate) fn inject_system_reminder(messages: &mut Vec<Value>) {
     let reminder = serde_json::json!({"type": "text", "text": SYSTEM_REMINDER});
 
@@ -86,9 +86,9 @@ pub(crate) fn inject_system_reminder(messages: &mut Vec<Value>) {
 
 /// Ensure strict user/assistant message alternation as required by the API.
 /// - Consecutive text-only user messages are merged into one.
-/// - Between a tool_result user message and a text user message, a placeholder
-///   assistant message is inserted (can't merge these — tool_result + text mixing
-///   breaks inject_system_reminder and API validation).
+/// - Between a `tool_result` user message and a text user message, a placeholder
+///   assistant message is inserted (can't merge these — `tool_result` + text mixing
+///   breaks `inject_system_reminder` and API validation).
 /// - Consecutive assistant messages are merged.
 pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
     if messages.len() <= 1 {
@@ -111,7 +111,13 @@ pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
         let curr_has_tool_result =
             msg["content"].as_array().is_some_and(|arr| arr.iter().any(|b| b["type"] == "tool_result"));
 
-        if prev_has_tool_result != curr_has_tool_result {
+        if prev_has_tool_result == curr_has_tool_result {
+            // Same content type — safe to merge
+            let new_blocks = content_to_blocks(msg["content"].clone());
+            if let Some(arr) = result.last_mut().and_then(|last| last["content"].as_array_mut()) {
+                arr.extend(new_blocks);
+            }
+        } else {
             // Different content types — insert placeholder assistant to separate them
             result.push(serde_json::json!({
                 "role": "assistant",
@@ -119,12 +125,6 @@ pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
             }));
             let blocks = content_to_blocks(msg["content"].clone());
             result.push(serde_json::json!({"role": msg["role"], "content": blocks}));
-        } else {
-            // Same content type — safe to merge
-            let new_blocks = content_to_blocks(msg["content"].clone());
-            if let Some(arr) = result.last_mut().and_then(|last| last["content"].as_array_mut()) {
-                arr.extend(new_blocks);
-            }
         }
     }
 

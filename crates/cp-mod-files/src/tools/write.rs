@@ -54,8 +54,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let uid = format!("UID_{}_P", state.global_next_uid);
         state.global_next_uid += 1;
 
-        let file_name =
-            path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path_str.to_string());
+        let file_name = path.file_name().map_or_else(|| path_str.to_string(), |n| n.to_string_lossy().to_string());
 
         let mut elem = ContextElement {
             id: context_id,

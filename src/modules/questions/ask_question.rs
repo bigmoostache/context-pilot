@@ -2,8 +2,8 @@ use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::State;
 use cp_base::ui::{PendingQuestionForm, Question, QuestionOption};
 
-/// Execute the ask_user_question tool.
-/// Parses input, validates constraints, stores PendingQuestionForm in state.
+/// Execute the `ask_user_question` tool.
+/// Parses input, validates constraints, stores `PendingQuestionForm` in state.
 /// Returns a placeholder result — the real result is produced when the user
 /// submits or dismisses the form (handled by app.rs).
 pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {

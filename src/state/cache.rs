@@ -13,13 +13,13 @@ pub(crate) use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 const CACHE_POOL_SIZE: usize = 6;
 
 /// Bounded thread pool for cache operations.
-/// Workers pull (CacheRequest, Sender<CacheUpdate>) pairs from a shared channel.
+/// Workers pull (`CacheRequest`, Sender<CacheUpdate>) pairs from a shared channel.
 pub(crate) struct CachePool {
     job_tx: Sender<(CacheRequest, Sender<CacheUpdate>)>,
 }
 
 impl CachePool {
-    /// Create a new pool with CACHE_POOL_SIZE worker threads.
+    /// Create a new pool with `CACHE_POOL_SIZE` worker threads.
     pub(crate) fn new() -> Self {
         let (job_tx, job_rx) = mpsc::channel::<(CacheRequest, Sender<CacheUpdate>)>();
         let job_rx = std::sync::Arc::new(std::sync::Mutex::new(job_rx));

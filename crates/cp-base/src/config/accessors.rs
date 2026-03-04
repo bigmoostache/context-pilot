@@ -170,7 +170,7 @@ pub mod library {
     /// Content body of the default agent.
     pub fn default_agent_content() -> &'static str {
         let id = &LIBRARY.default_agent_id;
-        LIBRARY.agents.iter().find(|a| a.id == *id).map(|a| a.content.as_str()).unwrap_or("")
+        LIBRARY.agents.iter().find(|a| a.id == *id).map_or("", |a| a.content.as_str())
     }
     /// All built-in agent definitions.
     pub fn agents() -> &'static [crate::config::SeedEntry] {

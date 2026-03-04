@@ -174,11 +174,8 @@ impl GuardRailStopLogic for MaxDurationGuard {
     }
 
     fn block_reason(&self, state: &State) -> String {
-        let elapsed_secs = SpineState::get(state)
-            .config
-            .autonomous_start_ms
-            .map(|start| now_ms().saturating_sub(start) / 1000)
-            .unwrap_or(0);
+        let elapsed_secs =
+            SpineState::get(state).config.autonomous_start_ms.map_or(0, |start| now_ms().saturating_sub(start) / 1000);
         format!(
             "Duration limit reached: {}s / {}s",
             elapsed_secs,

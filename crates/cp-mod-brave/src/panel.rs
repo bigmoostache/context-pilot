@@ -98,11 +98,7 @@ impl Panel for BraveResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        state
-            .context
-            .get(state.selected_context)
-            .map(|ctx| ctx.name.clone())
-            .unwrap_or_else(|| "Brave Result".to_string())
+        state.context.get(state.selected_context).map_or_else(|| "Brave Result".to_string(), |ctx| ctx.name.clone())
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {

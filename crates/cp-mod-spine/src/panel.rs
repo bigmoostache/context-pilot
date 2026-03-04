@@ -36,13 +36,13 @@ impl SpinePanel {
 
         let mut output = String::new();
 
-        if !unprocessed.is_empty() {
+        if unprocessed.is_empty() {
+            output.push_str("No unprocessed notifications.\n");
+        } else {
             for n in &unprocessed {
                 let ts = format_timestamp(n.timestamp_ms);
                 output.push_str(&format!("[{}] {} {} — {}\n", n.id, ts, n.notification_type.label(), n.content));
             }
-        } else {
-            output.push_str("No unprocessed notifications.\n");
         }
 
         if !blocked.is_empty() {
@@ -125,8 +125,7 @@ impl Panel for SpinePanel {
             .context
             .iter()
             .find(|c| c.context_type == ContextType::SPINE)
-            .map(|c| (c.id.as_str(), c.last_refresh_ms))
-            .unwrap_or(("P9", 0));
+            .map_or(("P9", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Spine", content, last_refresh_ms)]
     }
 
@@ -158,7 +157,7 @@ impl Panel for SpinePanel {
                     Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
                     Span::styled(n.notification_type.label().to_string(), Style::default().fg(type_color)),
                     Span::styled(
-                        format!(" — {}", wrapped.first().map(|s| s.as_str()).unwrap_or("")),
+                        format!(" — {}", wrapped.first().map_or("", |s| s.as_str())),
                         Style::default().fg(theme::text()),
                     ),
                 ]));
@@ -202,7 +201,7 @@ impl Panel for SpinePanel {
                     Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
                     Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::warning())),
                     Span::styled(
-                        format!(" — {}", wrapped.first().map(|s| s.as_str()).unwrap_or("")),
+                        format!(" — {}", wrapped.first().map_or("", |s| s.as_str())),
                         Style::default().fg(theme::text_muted()),
                     ),
                 ]));
@@ -243,7 +242,7 @@ impl Panel for SpinePanel {
                     Span::styled(format!("{} ", ts), Style::default().fg(theme::text_muted())),
                     Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::text_muted())),
                     Span::styled(
-                        format!(" — {}", wrapped.first().map(|s| s.as_str()).unwrap_or("")),
+                        format!(" — {}", wrapped.first().map_or("", |s| s.as_str())),
                         Style::default().fg(theme::text_muted()),
                     ),
                 ]));
@@ -311,8 +310,8 @@ fn notification_type_color(nt: &NotificationType) -> Color {
     }
 }
 
-/// Simple word-wrap: break text at word boundaries to fit within max_width.
-/// Uses UnicodeWidthStr for correct display width measurement.
+/// Simple word-wrap: break text at word boundaries to fit within `max_width`.
+/// Uses `UnicodeWidthStr` for correct display width measurement.
 fn wrap_text_simple(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
         return vec![text.to_string()];

@@ -1,9 +1,9 @@
 //! Persistence module for multi-worker state management
 //!
 //! This module handles the file-based persistence of:
-//! - SharedConfig (config.json) - Global settings shared across workers
-//! - WorkerState (states/{worker}.json) - Worker-specific state
-//! - PanelData (panels/{uid}.json) - Dynamic panel metadata
+//! - `SharedConfig` (config.json) - Global settings shared across workers
+//! - `WorkerState` (states/{worker}.json) - Worker-specific state
+//! - `PanelData` (panels/{uid}.json) - Dynamic panel metadata
 //! - Messages (messages/{uid}.yaml) - Conversation messages
 pub(crate) mod config;
 pub(crate) mod message;
@@ -58,7 +58,7 @@ pub(crate) fn load_state() -> State {
 }
 
 /// Load state from the new multi-file format
-/// Convert PanelData to ContextElement
+/// Convert `PanelData` to `ContextElement`
 fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
     ContextElement {
         id: local_id.to_string(),
@@ -168,17 +168,12 @@ fn load_state_new() -> State {
         .filter(|m| m.id.starts_with('U'))
         .filter_map(|m| m.id[1..].parse::<usize>().ok())
         .max()
-        .map(|n| n + 1)
-        .unwrap_or(1);
-    let next_assistant_id = messages
+        .map_or_or(1, 1, |n| n + 1)nt_id = messages
         .iter()
         .filter(|m| m.id.starts_with('A'))
         .filter_map(|m| m.id[1..].parse::<usize>().ok())
         .max()
-        .map(|n| n + 1)
-        .unwrap_or(1);
-
-    // Start with default state, then apply infrastructure + module data
+        .map_or_or(1, 1, |n| n + 1)efault state, then apply infrastructure + module data
     let mut state = State {
         context,
         messages,
@@ -229,7 +224,7 @@ fn load_state_new() -> State {
     state
 }
 
-/// Build a WriteBatch from the current state (CPU work only — no I/O).
+/// Build a `WriteBatch` from the current state (CPU work only — no I/O).
 /// This serializes all config, worker state, panels, and history messages
 /// into a batch of file write/delete operations.
 pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
@@ -328,7 +323,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let panels_dir = dir.join(crate::infra::constants::PANELS_DIR);
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    for ctx in state.context.iter() {
+    for ctx in &state.context {
         if ctx.context_type == ContextType::SYSTEM || ctx.context_type == ContextType::LIBRARY {
             continue;
         }
@@ -396,7 +391,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     WriteBatch { writes, deletes, ensure_dirs }
 }
 
-/// Build a WriteOp for a single message (CPU work only — no I/O).
+/// Build a `WriteOp` for a single message (CPU work only — no I/O).
 pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
     let dir = PathBuf::from(STORE_DIR).join(crate::infra::constants::MESSAGES_DIR);
     let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
@@ -405,7 +400,7 @@ pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
 }
 
 /// Save state synchronously (blocking I/O on calling thread).
-/// Used for shutdown paths and places where the PersistenceWriter is not available.
+/// Used for shutdown paths and places where the `PersistenceWriter` is not available.
 /// Prefer `build_save_batch` + `PersistenceWriter::send_batch` in the main event loop.
 pub(crate) fn save_state(state: &State) {
     let batch = build_save_batch(state);
@@ -457,8 +452,7 @@ pub(crate) fn log_error(error: &str) -> String {
         .map(|entries| {
             entries
                 .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().map(|ext| ext == "txt").unwrap_or(false))
-                .count()
+                .filter(|e| e.path().extension().is_some_andsome_and(|ext| ext == "txt") .count()
         })
         .unwrap_or(0);
 

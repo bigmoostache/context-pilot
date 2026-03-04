@@ -23,7 +23,7 @@ pub(crate) fn handle_secondary_model(state: &mut State, action: &super::Action) 
     ActionResult::Save
 }
 
-/// Handle ConfigIncreaseSelectedBar action
+/// Handle `ConfigIncreaseSelectedBar` action
 pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
     match state.config_selected_bar {
         0 => {
@@ -53,7 +53,7 @@ pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Handle ConfigDecreaseSelectedBar action
+/// Handle `ConfigDecreaseSelectedBar` action
 pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
     match state.config_selected_bar {
         0 => {
@@ -85,7 +85,7 @@ pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Handle ConfigNextTheme action
+/// Handle `ConfigNextTheme` action
 pub(crate) fn handle_config_next_theme(state: &mut State) -> ActionResult {
     use crate::infra::config::THEME_ORDER;
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
@@ -96,7 +96,7 @@ pub(crate) fn handle_config_next_theme(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Handle ConfigPrevTheme action
+/// Handle `ConfigPrevTheme` action
 pub(crate) fn handle_config_prev_theme(state: &mut State) -> ActionResult {
     use crate::infra::config::THEME_ORDER;
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);

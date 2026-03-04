@@ -3,6 +3,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
+use crate::infra::config::{THEME_ORDER, get_theme};
 use crate::infra::constants::{chars, theme};
 use crate::state::State;
 use cp_base::cast::SafeCast;
@@ -330,7 +331,6 @@ fn render_theme_section(lines: &mut Vec<Line<'_>>, state: &State) {
     lines.push(Line::from(vec![Span::styled("  Theme", Style::default().fg(theme::text_secondary()).bold())]));
     lines.push(Line::from(""));
 
-    use crate::infra::config::{THEME_ORDER, get_theme};
     let current_theme = get_theme(&state.active_theme);
     let fallback_icon = "📄".to_string();
 

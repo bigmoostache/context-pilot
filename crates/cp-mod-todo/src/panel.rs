@@ -19,6 +19,7 @@ impl TodoPanel {
             return "No todos".to_string();
         }
 
+        #[expect(clippy::items_after_statements, reason = "scoped recursive helper used only here")]
         fn format_todo(todo: &TodoItem, todos: &[TodoItem], indent: usize) -> String {
             let prefix = "  ".repeat(indent);
             let status_char = todo.status.icon();
@@ -80,8 +81,7 @@ impl Panel for TodoPanel {
             .context
             .iter()
             .find(|c| c.context_type == ContextType::TODO)
-            .map(|c| (c.id.as_str(), c.last_refresh_ms))
-            .unwrap_or(("P3", 0));
+            .map_or(("P3", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Todo List", content, last_refresh_ms)]
     }
 

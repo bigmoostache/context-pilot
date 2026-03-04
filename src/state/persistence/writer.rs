@@ -2,7 +2,7 @@
 //!
 //! Receives serialized write operations from the main thread and executes
 //! them on a dedicated I/O thread. Debounces rapid saves (coalesces writes
-//! within 50ms) to reduce disk I/O during high-frequency save_state calls.
+//! within 50ms) to reduce disk I/O during high-frequency `save_state` calls.
 //!
 //! The main thread does the CPU work (serialization), the writer thread
 //! does the I/O work (file writes). This keeps the event loop responsive.

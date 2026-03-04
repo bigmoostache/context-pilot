@@ -1,7 +1,7 @@
 //! Simple profiler for identifying slow operations.
 //!
 //! Usage:
-//!   let _guard = profile!("operation_name");
+//!   let _guard = `profile!("operation_name`");
 //!   // ... code to measure ...
 //!   // automatically logs when guard drops if > threshold
 //!
@@ -36,7 +36,7 @@ impl Drop for ProfileGuard {
         crate::ui::perf::PERF.record_op(self.name, us);
 
         // Log to file only for slow operations
-        if ms as u128 >= THRESHOLD_MS
+        if u128::from(ms) >= THRESHOLD_MS
             && let Ok(mut file) = OpenOptions::new().create(true).append(true).open(LOG_FILE)
         {
             let _r = writeln!(file, "{:>6}ms  {}", ms, self.name);

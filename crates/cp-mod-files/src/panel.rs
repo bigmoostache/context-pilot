@@ -48,7 +48,7 @@ impl Panel for FilePanel {
     }
 
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map(|ctx| ctx.name.clone()).unwrap_or_else(|| "File".to_string())
+        state.context.get(state.selected_context).map_or_else(|| "File".to_string(), |ctx| ctx.name.clone())
     }
 
     fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
@@ -147,10 +147,10 @@ impl Panel for FilePanel {
         };
 
         // Get syntax highlighting
-        let highlighted = if !file_path.is_empty() {
-            state.highlight_fn.map(|f| f(&file_path, &content)).unwrap_or_else(|| std::sync::Arc::new(Vec::new()))
-        } else {
+        let highlighted = if file_path.is_empty() {
             std::sync::Arc::new(Vec::new())
+        } else {
+            state.highlight_fn.map_or_else(|| std::sync::Arc::new(Vec::new()), |f| f(&file_path, &content))
         };
 
         let mut text: Vec<Line<'_>> = Vec::new();

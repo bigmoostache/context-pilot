@@ -6,7 +6,7 @@ use crate::types::{MapResponse, ScrapeResponse, SearchResponse};
 const FIRECRAWL_BASE_URL: &str = "https://api.firecrawl.dev/v2";
 const TIMEOUT_SECS: u64 = 30;
 
-/// Parameters for firecrawl_scrape.
+/// Parameters for `firecrawl_scrape`.
 #[derive(Debug)]
 pub struct ScrapeParams<'a> {
     /// Target URL to scrape.
@@ -19,7 +19,7 @@ pub struct ScrapeParams<'a> {
     pub languages: Option<Vec<&'a str>>,
 }
 
-/// Parameters for firecrawl_search.
+/// Parameters for `firecrawl_search`.
 #[derive(Debug)]
 pub struct SearchParams<'a> {
     /// Search query string.
@@ -36,7 +36,7 @@ pub struct SearchParams<'a> {
     pub location: Option<&'a str>,
 }
 
-/// Parameters for firecrawl_map.
+/// Parameters for `firecrawl_map`.
 #[derive(Debug)]
 pub struct MapParams<'a> {
     /// Root domain or subdomain to map.

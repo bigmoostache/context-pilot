@@ -58,7 +58,7 @@ pub struct ToolResultRecord {
 pub struct Message {
     /// Display ID (e.g., U1, A1, T1 - for UI/LLM)
     pub id: String,
-    /// Internal UID (e.g., UID_42_U - never shown to UI/LLM)
+    /// Internal UID (e.g., `UID_42_U` - never shown to UI/LLM)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
     /// Role string (`"user"` or `"assistant"`).
@@ -77,7 +77,7 @@ pub struct Message {
     /// Tool uses in this message (for assistant messages).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_uses: Vec<ToolUseRecord>,
-    /// Tool results in this message (for ToolResult messages).
+    /// Tool results in this message (for `ToolResult` messages).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_results: Vec<ToolResultRecord>,
     /// Input tokens used for this response (from API, for assistant messages).
@@ -216,7 +216,7 @@ pub mod test_helpers {
     }
 }
 
-/// Format a slice of messages into a text chunk for ConversationHistory panels.
+/// Format a slice of messages into a text chunk for `ConversationHistory` panels.
 /// Skips Deleted/Detached messages. Uses the same format the LLM sees:
 /// tool calls as `tool_call name(json)`, tool results as raw content,
 /// and text messages as `[role]: content`.

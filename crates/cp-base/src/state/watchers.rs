@@ -19,9 +19,9 @@ pub struct WatcherResult {
     /// If true, the panel should be auto-closed (removed from context).
     /// Used by callback watchers to clean up console panels on success.
     pub close_panel: bool,
-    /// If set, tool_cleanup should create a console panel for this session.
+    /// If set, `tool_cleanup` should create a console panel for this session.
     /// Used by callback watchers that defer panel creation until failure.
-    /// Contains (session_key, display_name, command, description, cwd).
+    /// Contains (`session_key`, `display_name`, command, description, cwd).
     pub create_panel: Option<DeferredPanel>,
     /// If true, the spine notification is created already processed (no auto-continuation).
     /// Used for success notifications that don't need attention.
@@ -55,7 +55,7 @@ pub struct DeferredPanel {
 /// - Blocking: the sentinel tool result is replaced with the real result
 /// - Async: a spine notification is created
 pub trait Watcher: Send + Sync {
-    /// Unique identifier for this watcher instance (e.g., "console_c_42_exit").
+    /// Unique identifier for this watcher instance (e.g., "`console_c_42_exit`").
     fn id(&self) -> &str;
 
     /// Human-readable description shown in the Spine panel (e.g., "Waiting for cargo build to exit").
@@ -73,7 +73,7 @@ pub trait Watcher: Send + Sync {
     /// Called every poll cycle (~50ms). Must be non-blocking.
     ///
     /// The `state` reference is read-only. Watchers should read from
-    /// module_data (e.g., ConsoleState session buffers) to check conditions.
+    /// `module_data` (e.g., `ConsoleState` session buffers) to check conditions.
     fn check(&self, state: &State) -> Option<WatcherResult>;
 
     /// Check if this watcher has timed out. Returns Some(result) with
@@ -93,7 +93,7 @@ pub trait Watcher: Send + Sync {
         false
     }
 
-    /// Whether this watcher was created by easy_bash (needs special result formatting).
+    /// Whether this watcher was created by `easy_bash` (needs special result formatting).
     fn is_easy_bash(&self) -> bool {
         false
     }
@@ -120,7 +120,7 @@ pub trait Watcher: Send + Sync {
     }
 }
 
-/// Registry holding active watchers. Stored in State via TypeMap.
+/// Registry holding active watchers. Stored in State via `TypeMap`.
 /// Initialized by the spine module, accessed by any module that
 /// registers watchers.
 pub struct WatcherRegistry {
@@ -154,7 +154,7 @@ impl WatcherRegistry {
     /// Poll all watchers and return satisfied results.
     /// One-shot watchers are removed when they fire.
     /// Persistent watchers stay in the registry and can fire again.
-    /// Returns (blocking_results, async_results).
+    /// Returns (`blocking_results`, `async_results`).
     pub fn poll_all(&mut self, state: &State) -> (Vec<WatcherResult>, Vec<WatcherResult>) {
         let mut blocking = Vec::new();
         let mut async_results = Vec::new();
@@ -217,12 +217,12 @@ impl WatcherRegistry {
         self.watchers.retain(|w| w.source_tag() != tag);
     }
 
-    /// Get from State via TypeMap.
+    /// Get from State via `TypeMap`.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("WatcherRegistry not initialized")
     }
 
-    /// Get mutable from State via TypeMap.
+    /// Get mutable from State via `TypeMap`.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("WatcherRegistry not initialized")
     }

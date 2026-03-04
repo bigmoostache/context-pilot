@@ -6,7 +6,7 @@
 //! pattern to a list of panel command patterns that should be invalidated.
 //!
 //! The mutating command regex is matched against the full command string.
-//! The invalidation regexes are matched against each GithubResult panel's
+//! The invalidation regexes are matched against each `GithubResult` panel's
 //! `result_command` field.
 
 use regex::Regex;

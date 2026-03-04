@@ -87,7 +87,7 @@ pub enum Action {
     ConfigSelectGrokModel(crate::llm_types::GrokModel),
     /// Select primary Groq model.
     ConfigSelectGroqModel(crate::llm_types::GroqModel),
-    /// Select primary DeepSeek model.
+    /// Select primary `DeepSeek` model.
     ConfigSelectDeepSeekModel(crate::llm_types::DeepSeekModel),
     /// Move config bar selection forward (→).
     ConfigSelectNextBar,
@@ -113,7 +113,7 @@ pub enum Action {
     ConfigSelectSecondaryGrokModel(crate::llm_types::GrokModel),
     /// Select secondary Groq model.
     ConfigSelectSecondaryGroqModel(crate::llm_types::GroqModel),
-    /// Select secondary DeepSeek model.
+    /// Select secondary `DeepSeek` model.
     ConfigSelectSecondaryDeepSeekModel(crate::llm_types::DeepSeekModel),
     /// Toggle reverie (background optimizer) on/off.
     ConfigToggleReverie,

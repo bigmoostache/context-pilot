@@ -30,7 +30,7 @@ const GH_WATCHER_TICK_SECS: u64 = 5;
 /// GitHub's typical X-Poll-Interval is 60s; we use the same default.
 const GH_DEFAULT_POLL_INTERVAL_SECS: u64 = 60;
 
-/// Snapshot of a due watch for polling (context_id, args, token, is_api, etag, last_hash)
+/// Snapshot of a due watch for polling (`context_id`, args, token, `is_api`, etag, `last_hash`)
 type DueWatch = (String, Vec<String>, Arc<SecretBox<String>>, bool, Option<String>, Option<String>);
 
 /// Update sent when branch PR info changes
@@ -56,7 +56,7 @@ struct GhWatch {
     args: Vec<String>,
     /// true if args[0] == "api" && no --jq/--template flags
     is_api_command: bool,
-    /// ETag from last 200 response (api commands only)
+    /// `ETag` from last 200 response (api commands only)
     etag: Option<String>,
     /// SHA-256 of last output (non-api commands)
     last_output_hash: Option<String>,
@@ -66,7 +66,7 @@ struct GhWatch {
     last_poll_ms: u64,
 }
 
-/// Background watcher that polls GithubResult panels for changes.
+/// Background watcher that polls `GithubResult` panels for changes.
 pub struct GhWatcher {
     watches: Arc<Mutex<HashMap<String, GhWatch>>>,
     branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,
@@ -81,7 +81,7 @@ impl std::fmt::Debug for GhWatcher {
 }
 
 impl GhWatcher {
-    /// Create a new GhWatcher with a background polling thread.
+    /// Create a new `GhWatcher` with a background polling thread.
     pub fn new(cache_tx: Sender<CacheUpdate>) -> Self {
         let watches: Arc<Mutex<HashMap<String, GhWatch>>> = Arc::new(Mutex::new(HashMap::new()));
         let branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>> = Arc::new(Mutex::new(None));
@@ -95,7 +95,7 @@ impl GhWatcher {
         Self { watches, branch_pr_watch, _thread: thread }
     }
 
-    /// Reconcile the watch list with current GithubResult panels.
+    /// Reconcile the watch list with current `GithubResult` panels.
     /// Args: `(context_id, command, github_token)`.
     /// Adds missing watches, removes stale ones, preserves etag/hash/interval state on existing.
     pub fn sync_watches(&self, panels: &[(String, String, String)]) {
@@ -162,7 +162,7 @@ impl GhWatcher {
     }
 }
 
-/// Classify whether args represent a `gh api` command eligible for ETag polling.
+/// Classify whether args represent a `gh api` command eligible for `ETag` polling.
 pub fn is_api_command(args: &[String]) -> bool {
     args.first().map(|s| s.as_str()) == Some("api")
         && !args.iter().any(|a| a == "--jq" || a == "-q" || a == "--template" || a == "-t")
@@ -252,7 +252,7 @@ fn poll_loop(
                             watch.poll_interval_secs = interval;
                         }
                         if let Some((ref new_etag, _)) = outcome.content {
-                            watch.etag = new_etag.clone();
+                            watch.etag.clone_from(new_etag);
                         }
                     }
                 }

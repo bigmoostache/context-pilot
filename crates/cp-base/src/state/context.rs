@@ -15,9 +15,9 @@ use crate::config::{active_theme, normalize_icon};
 /// Metadata for a context type, provided by the owning module.
 #[derive(Debug, Clone, Copy)]
 pub struct ContextTypeMeta {
-    /// The context type string (e.g., "todo", "git_result")
+    /// The context type string (e.g., "todo", "`git_result`")
     pub context_type: &'static str,
-    /// Key into the theme's context icon HashMap (e.g., "todo", "git")
+    /// Key into the theme's context icon `HashMap` (e.g., "todo", "git")
     pub icon_id: &'static str,
     /// Whether this is a fixed/sidebar panel
     pub is_fixed: bool,
@@ -137,19 +137,19 @@ impl ContextType {
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
     pub fn is_fixed(&self) -> bool {
-        get_context_type_meta(self.0.as_str()).map(|m| m.is_fixed).unwrap_or(false)
+        get_context_type_meta(self.0.as_str()).is_some_and(|m| m.is_fixed)
     }
 
     /// Get icon for this context type (normalized to 2 cells, looked up from registry + theme).
     pub fn icon(&self) -> String {
-        let icon_id = get_context_type_meta(self.0.as_str()).map(|m| m.icon_id).unwrap_or("file");
+        let icon_id = get_context_type_meta(self.0.as_str()).map_or("file", |m| m.icon_id);
         let raw = active_theme().context.get(icon_id).unwrap_or("📄");
         normalize_icon(raw)
     }
 
-    /// Returns true if this context type uses cached_content from background loading.
+    /// Returns true if this context type uses `cached_content` from background loading.
     pub fn needs_cache(&self) -> bool {
-        get_context_type_meta(self.0.as_str()).map(|m| m.needs_cache).unwrap_or(false)
+        get_context_type_meta(self.0.as_str()).is_some_and(|m| m.needs_cache)
     }
 }
 
@@ -189,7 +189,7 @@ pub struct ContextElement {
     /// Token count for this panel (current page if paginated).
     pub token_count: usize,
     /// Generic metadata bag for module-specific panel data.
-    /// Keys are module-defined strings (e.g., "file_path", "tmux_pane_id").
+    /// Keys are module-defined strings (e.g., "`file_path`", "`tmux_pane_id`").
     /// Replaces former hardcoded Option<> fields per module.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub metadata: HashMap<String, serde_json::Value>,
@@ -198,7 +198,7 @@ pub struct ContextElement {
     /// Cached content for LLM context and UI rendering
     #[serde(skip)]
     pub cached_content: Option<String>,
-    /// Frozen Message objects for ConversationHistory panels (UI rendering)
+    /// Frozen Message objects for `ConversationHistory` panels (UI rendering)
     #[serde(skip)]
     pub history_messages: Option<Vec<super::Message>>,
     /// Cache is deprecated - source data changed, needs regeneration
@@ -222,7 +222,7 @@ pub struct ContextElement {
     /// Total pages for LLM context pagination
     #[serde(skip)]
     pub total_pages: usize,
-    /// Full content token count (before pagination). token_count reflects current page.
+    /// Full content token count (before pagination). `token_count` reflects current page.
     #[serde(skip)]
     pub full_token_count: usize,
     /// Whether this panel was a cache hit on the last LLM tick (prefix match)
@@ -252,24 +252,24 @@ impl ContextElement {
         self.metadata.get(key).and_then(|v| v.as_str())
     }
 
-    /// Fast path: get a metadata value.to_usize().
+    /// Fast path: get a metadata `value.to_usize()`.
     pub fn get_meta_usize(&self, key: &str) -> Option<usize> {
         self.metadata.get(key).and_then(|v| v.as_u64()).map(|n| n.to_usize())
     }
 }
 
-/// Estimate tokens from text (uses CHARS_PER_TOKEN constant)
+/// Estimate tokens from text (uses `CHARS_PER_TOKEN` constant)
 pub fn estimate_tokens(text: &str) -> usize {
     (text.len().to_f32() / CHARS_PER_TOKEN).ceil().to_usize()
 }
 
-/// Compute total pages for a given token count using PANEL_PAGE_TOKENS
+/// Compute total pages for a given token count using `PANEL_PAGE_TOKENS`
 pub fn compute_total_pages(token_count: usize) -> usize {
     let max = crate::config::constants::PANEL_PAGE_TOKENS;
     if token_count <= max { 1 } else { token_count.div_ceil(max) }
 }
 
-/// Create a default ContextElement for a fixed or dynamic panel.
+/// Create a default `ContextElement` for a fixed or dynamic panel.
 pub fn make_default_context_element(
     id: &str,
     context_type: ContextType,
@@ -301,7 +301,7 @@ pub fn make_default_context_element(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
+    use crate::config::constants::PANEL_PAGE_TOKENS;
 
     /// Initialize a minimal registry for tests.
     fn init_test_registry() {

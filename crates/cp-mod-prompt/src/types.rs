@@ -55,7 +55,7 @@ pub struct PromptState {
     /// All known commands (built-in + user-created).
     pub commands: Vec<PromptItem>,
     /// ID of the prompt currently open in the Library editor (for editing).
-    /// Max one at a time. Edit_prompt requires this to be set.
+    /// Max one at a time. `Edit_prompt` requires this to be set.
     pub open_prompt_id: Option<String>,
 }
 
@@ -77,11 +77,11 @@ impl PromptState {
             open_prompt_id: None,
         }
     }
-    /// Get shared ref from State's TypeMap.
+    /// Get shared ref from State's `TypeMap`.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("PromptState not initialized")
     }
-    /// Get mutable ref from State's TypeMap.
+    /// Get mutable ref from State's `TypeMap`.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("PromptState not initialized")
     }

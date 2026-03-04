@@ -37,7 +37,7 @@ pub struct GitFileChange {
 pub struct GitState {
     /// Current branch name (None if detached HEAD).
     pub git_branch: Option<String>,
-    /// All local branches: (name, is_current).
+    /// All local branches: (name, `is_current`).
     pub git_branches: Vec<(String, bool)>,
     /// Whether the project root is inside a git repository.
     pub git_is_repo: bool,
@@ -64,11 +64,11 @@ impl GitState {
             git_diff_base: None,
         }
     }
-    /// Get shared ref from State's TypeMap.
+    /// Get shared ref from State's `TypeMap`.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("GitState not initialized")
     }
-    /// Get mutable ref from State's TypeMap.
+    /// Get mutable ref from State's `TypeMap`.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("GitState not initialized")
     }

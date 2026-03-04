@@ -14,7 +14,7 @@ pub mod types;
 use cp_base::cast::SafeCast;
 pub use types::{GitChangeType, GitFileChange, GitState};
 
-/// Refresh git status (branch, file changes) into GitState.
+/// Refresh git status (branch, file changes) into `GitState`.
 /// Called periodically by the overview panel to keep stats up to date.
 pub fn refresh_git_status(state: &mut State) {
     use std::process::Command;
@@ -68,11 +68,8 @@ pub fn refresh_git_status(state: &mut State) {
                 let path = parts[2].to_string();
 
                 // Check if file exists to determine if deleted
-                let change_type = if !std::path::Path::new(&path).exists() {
-                    GitChangeType::Deleted
-                } else {
-                    GitChangeType::Modified
-                };
+                let change_type =
+                    if std::path::Path::new(&path).exists() { GitChangeType::Modified } else { GitChangeType::Deleted };
 
                 file_changes.push(GitFileChange { path, additions, deletions, change_type });
             }
@@ -313,7 +310,7 @@ impl Module for GitModule {
     }
 }
 
-/// Visualizer for git_execute tool results.
+/// Visualizer for `git_execute` tool results.
 /// Color-codes git command output with branch names in cyan, status indicators,
 /// diff hunks with +/- in green/red, file names in yellow.
 fn visualize_git_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {

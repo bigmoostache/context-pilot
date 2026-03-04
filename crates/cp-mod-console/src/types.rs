@@ -62,10 +62,10 @@ impl ProcessStatus {
 }
 
 /// Module-owned state for the Console module.
-/// Stored in State.module_data via TypeMap.
+/// Stored in `State.module_data` via `TypeMap`.
 #[derive(Debug)]
 pub struct ConsoleState {
-    /// Active session handles, keyed by session name (e.g., "c_42").
+    /// Active session handles, keyed by session name (e.g., "`c_42`").
     pub sessions: HashMap<String, SessionHandle>,
     /// Monotonic counter for generating unique session keys.
     pub next_session_id: usize,
@@ -83,12 +83,12 @@ impl ConsoleState {
         Self { sessions: HashMap::new(), next_session_id: 1 }
     }
 
-    /// Get shared ref from State's TypeMap.
+    /// Get shared ref from State's `TypeMap`.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("ConsoleState not initialized")
     }
 
-    /// Get mutable ref from State's TypeMap.
+    /// Get mutable ref from State's `TypeMap`.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("ConsoleState not initialized")
     }
@@ -112,7 +112,7 @@ impl ConsoleState {
 
 /// Format a wait result message for the LLM.
 pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, last_lines: &str) -> String {
-    let code_str = exit_code.map(|c| c.to_string()).unwrap_or_else(|| "?".to_string());
+    let code_str = exit_code.map_or_else(|| "?".to_string(), |c| c.to_string());
     let now = now_ms();
     format!(
         "Console '{}' condition met (exit_code={}, panel={}, time={}ms)\nLast output:\n{}",
@@ -127,9 +127,9 @@ pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, la
 /// A watcher that monitors a console session for a condition.
 #[derive(Debug)]
 pub struct ConsoleWatcher {
-    /// Unique ID for this watcher (e.g., "console_c_42_exit").
+    /// Unique ID for this watcher (e.g., "`console_c_42_exit`").
     pub watcher_id: String,
-    /// Session key in ConsoleState (e.g., "c_42").
+    /// Session key in `ConsoleState` (e.g., "`c_42`").
     pub session_name: String,
     /// Watch mode: "exit" or "pattern".
     pub mode: String,
@@ -143,7 +143,7 @@ pub struct ConsoleWatcher {
     pub registered_at_ms: u64,
     /// Deadline for timeout (ms since epoch). None = no timeout.
     pub deadline_ms: Option<u64>,
-    /// If true, format result as easy_bash output summary.
+    /// If true, format result as `easy_bash` output summary.
     pub easy_bash: bool,
     /// Panel ID for this console session.
     pub panel_id: String,
@@ -190,7 +190,7 @@ impl Watcher for ConsoleWatcher {
 
         if self.easy_bash {
             let output =
-                std::fs::read_to_string(cs.sessions.get(&self.session_name).map(|h| h.log_path.as_str()).unwrap_or(""))
+                std::fs::read_to_string(cs.sessions.get(&self.session_name).map_or("", |h| h.log_path.as_str()))
                     .unwrap_or_default();
             let exit_code = handle.get_status().exit_code().unwrap_or(-1);
             let line_count = output.lines().count();

@@ -83,7 +83,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = tool.input.get("id").and_then(|v| v.as_str());
 
     // If id is None or empty, switch to default agent
-    if id.is_none() || id.map(|s| s.is_empty()).unwrap_or(true) {
+    if id.is_none_or(|s| s.is_empty()) {
         PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_string());
         state.touch_panel(ContextType::new(ContextType::SYSTEM));
         state.touch_panel(ContextType::new(ContextType::LIBRARY));
@@ -104,7 +104,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(ContextType::new(ContextType::SYSTEM));
     state.touch_panel(ContextType::new(ContextType::LIBRARY));
 
-    let name = PromptState::get(state).agents.iter().find(|a| a.id == id).map(|a| a.name.as_str()).unwrap_or("unknown");
+    let name = PromptState::get(state).agents.iter().find(|a| a.id == id).map_or("unknown", |a| a.name.as_str());
 
     ToolResult::new(tool.id.clone(), format!("Loaded agent '{}' ({})", name, id), false)
 }

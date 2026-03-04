@@ -11,7 +11,7 @@ use crate::tools::{PreFlightResult, ToolResult, ToolUse};
 /// Used by modules to register custom visualizations for their tool results.
 pub type ToolVisualizer = fn(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>>;
 
-/// Run a Command with a timeout. Returns TimedOut error if the command exceeds the limit.
+/// Run a Command with a timeout. Returns `TimedOut` error if the command exceeds the limit.
 pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<Output> {
     _ = cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
     let child = cmd.spawn()?;
@@ -27,7 +27,7 @@ pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<
     }
 }
 
-/// Truncate output to max_bytes, respecting UTF-8 char boundaries.
+/// Truncate output to `max_bytes`, respecting UTF-8 char boundaries.
 pub fn truncate_output(output: &str, max_bytes: usize) -> String {
     if output.len() <= max_bytes {
         output.to_string()
@@ -72,23 +72,23 @@ pub trait Module: Send + Sync {
     fn reset_state(&self, _state: &mut State) {}
 
     /// Serialize this module's data from State into a JSON value for persistence.
-    /// Returns Value::Null if this module has no data to persist.
-    /// Stored in SharedConfig (if is_global) or WorkerState (if !is_global).
+    /// Returns `Value::Null` if this module has no data to persist.
+    /// Stored in `SharedConfig` (if `is_global`) or `WorkerState` (if !`is_global`).
     fn save_module_data(&self, _state: &State) -> serde_json::Value {
         serde_json::Value::Null
     }
 
     /// Deserialize this module's data from a JSON value and apply it to State.
-    /// Data comes from SharedConfig (if is_global) or WorkerState (if !is_global).
+    /// Data comes from `SharedConfig` (if `is_global`) or `WorkerState` (if !`is_global`).
     fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
     /// Serialize worker-specific data for modules that are global but also need per-worker state.
-    /// Returns Value::Null if no worker-specific data. Always stored in WorkerState.
+    /// Returns `Value::Null` if no worker-specific data. Always stored in `WorkerState`.
     fn save_worker_data(&self, _state: &State) -> serde_json::Value {
         serde_json::Value::Null
     }
 
-    /// Deserialize worker-specific data. Always loaded from WorkerState.
+    /// Deserialize worker-specific data. Always loaded from `WorkerState`.
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
     /// Tool definitions provided by this module
@@ -116,8 +116,8 @@ pub trait Module: Send + Sync {
         vec![]
     }
 
-    /// Default settings for fixed panels: (context_type, display_name, cache_deprecated).
-    /// Used by ensure_default_contexts to create missing panels generically.
+    /// Default settings for fixed panels: (`context_type`, `display_name`, `cache_deprecated`).
+    /// Used by `ensure_default_contexts` to create missing panels generically.
     fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
         vec![]
     }
@@ -129,7 +129,7 @@ pub trait Module: Send + Sync {
     }
 
     /// Return tool result visualizers owned by this module.
-    /// Each entry maps a tool_id to a function that transforms the tool result
+    /// Each entry maps a `tool_id` to a function that transforms the tool result
     /// content into styled terminal lines. If no visualizer is registered for a
     /// tool, the core renderer falls back to plain text display.
     ///
@@ -162,7 +162,7 @@ pub trait Module: Send + Sync {
     }
 
     /// Return TUI-rendered overview section(s) for this module.
-    /// Each element is (section_order, rendered_lines). Sections are sorted by order.
+    /// Each element is (`section_order`, `rendered_lines`). Sections are sorted by order.
     fn overview_render_sections(
         &self,
         _state: &State,
@@ -184,7 +184,7 @@ pub trait Module: Send + Sync {
     }
 
     /// Return tool category descriptions for tools owned by this module.
-    /// Each entry is (category_id, description). Used in the Overview panel's tool listing.
+    /// Each entry is (`category_id`, description). Used in the Overview panel's tool listing.
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![]
     }
@@ -210,7 +210,7 @@ pub trait Module: Send + Sync {
 
     /// Check if a filesystem change event should invalidate a specific context element.
     /// `is_dir_event`: true for directory changes, false for file changes.
-    /// Returns true if the element should be marked cache_deprecated.
+    /// Returns true if the element should be marked `cache_deprecated`.
     fn should_invalidate_on_fs_change(
         &self,
         _ctx: &crate::state::ContextElement,

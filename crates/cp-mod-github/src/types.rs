@@ -15,7 +15,7 @@ pub struct BranchPrInfo {
     pub additions: Option<u64>,
     /// Total lines removed (from diff stats).
     pub deletions: Option<u64>,
-    /// Review decision: "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED", etc.
+    /// Review decision: "APPROVED", "`CHANGES_REQUESTED`", "`REVIEW_REQUIRED`", etc.
     pub review_decision: Option<String>,
     /// CI checks status: "SUCCESS", "FAILURE", "PENDING", etc.
     pub checks_status: Option<String>,
@@ -24,7 +24,7 @@ pub struct BranchPrInfo {
 /// Runtime state for the GitHub module.
 #[derive(Debug)]
 pub struct GithubState {
-    /// GitHub personal access token (from GITHUB_TOKEN env).
+    /// GitHub personal access token (from `GITHUB_TOKEN` env).
     pub github_token: Option<String>,
     /// PR info for the current git branch (if any)
     pub branch_pr: Option<BranchPrInfo>,
@@ -41,11 +41,11 @@ impl GithubState {
     pub fn new() -> Self {
         Self { github_token: None, branch_pr: None }
     }
-    /// Get shared ref from State's TypeMap.
+    /// Get shared ref from State's `TypeMap`.
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("GithubState not initialized")
     }
-    /// Get mutable ref from State's TypeMap.
+    /// Get mutable ref from State's `TypeMap`.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("GithubState not initialized")
     }

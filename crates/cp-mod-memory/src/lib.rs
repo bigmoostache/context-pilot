@@ -12,7 +12,7 @@ pub mod types;
 use cp_base::cast::SafeCast;
 pub use types::{MemoryImportance, MemoryItem, MemoryState};
 
-/// Maximum token length for memory tl_dr field (enforced on create/update)
+/// Maximum token length for memory `tl_dr` field (enforced on create/update)
 pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
 
 use serde_json::json;

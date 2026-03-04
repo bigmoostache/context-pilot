@@ -83,8 +83,7 @@ impl Panel for LogsPanel {
             .context
             .iter()
             .find(|c| c.context_type == ContextType::LOGS)
-            .map(|c| (c.id.as_str(), c.last_refresh_ms))
-            .unwrap_or(("P10", 0));
+            .map_or(("P10", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Logs", content, last_refresh_ms)]
     }
 
@@ -156,10 +155,10 @@ fn render_log_entry(
 
 fn format_timestamp(ms: u64) -> String {
     use chrono::{Local, TimeZone};
+    #[expect(clippy::cast_possible_wrap, reason = "ms/1000 won't exceed i64::MAX until year 292 billion")]
     let secs = (ms / 1000) as i64;
     Local
         .timestamp_opt(secs, 0)
         .single()
-        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-        .unwrap_or_else(|| format!("{}ms", ms))
+        .map_or_else(|| format!("{}ms", ms), |dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
 }

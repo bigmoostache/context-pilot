@@ -8,12 +8,12 @@ use crate::state::{ContextType, State};
 use crate::app::App;
 
 impl App {
-    /// Set up file watchers from all modules' watch_paths().
+    /// Set up file watchers from all modules' `watch_paths()`.
     pub(super) fn setup_file_watchers(&mut self) {
         self.sync_file_watchers();
     }
 
-    /// Sync GhWatcher with current GithubResult panels
+    /// Sync `GhWatcher` with current `GithubResult` panels
     pub(super) fn sync_gh_watches(&self) {
         let token = match &cp_mod_github::GithubState::get(&self.state).github_token {
             Some(t) => t.clone(),
@@ -34,8 +34,8 @@ impl App {
     }
 
     /// Schedule initial cache refreshes for fixed context elements only.
-    /// Dynamic panels (File, Glob, Grep, Tmux, GitResult, GithubResult) will be
-    /// populated gradually by check_timer_based_deprecation via its `needs_initial`
+    /// Dynamic panels (File, Glob, Grep, Tmux, `GitResult`, `GithubResult`) will be
+    /// populated gradually by `check_timer_based_deprecation` via its `needs_initial`
     /// path, staggered by the `cache_in_flight` guard — preventing a massive burst
     /// of concurrent background threads on startup when many panels are persisted.
     pub(super) fn schedule_initial_cache_refreshes(&mut self) {
@@ -58,7 +58,7 @@ impl App {
         Self::process_cache_updates_static(&mut self.state, cache_rx);
     }
 
-    /// Static version of process_cache_updates for use in wait module
+    /// Static version of `process_cache_updates` for use in wait module
     fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpdate>) {
         let _guard = crate::profile!("app::cache_updates");
         while let Ok(update) = cache_rx.try_recv() {
@@ -269,7 +269,7 @@ impl App {
         }
     }
 
-    /// Sync file watchers from all modules' watch_paths().
+    /// Sync file watchers from all modules' `watch_paths()`.
     /// Called periodically to catch panels created during tool execution.
     fn sync_file_watchers(&mut self) {
         use cp_base::panels::WatchSpec;

@@ -8,6 +8,7 @@ use crate::ui::{
     theme,
 };
 use cp_base::cast::SafeCast;
+use cp_mod_git::GitChangeType;
 
 /// Horizontal separator line.
 pub(super) fn separator() -> Vec<Line<'static>> {
@@ -63,7 +64,7 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
 
     let bar_color = if total_tokens >= threshold {
         theme::error()
-    } else if total_tokens as f64 >= threshold.to_f64() * 0.9 {
+    } else if total_tokens.to_f64() >= threshold.to_f64() * 0.9 {
         theme::warning()
     } else {
         theme::accent()
@@ -127,8 +128,6 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
     } else {
         text.push(Line::from(""));
 
-        use cp_mod_git::GitChangeType;
-
         let mut total_add: i32 = 0;
         let mut total_del: i32 = 0;
 
@@ -161,12 +160,10 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
                     format!("{} {}", type_char, file.path)
                 };
 
-                let net_color = if net > 0 {
-                    theme::success()
-                } else if net < 0 {
-                    theme::error()
-                } else {
-                    theme::text_muted()
+                let net_color = match net.cmp(&0) {
+                    std::cmp::Ordering::Greater => theme::success(),
+                    std::cmp::Ordering::Less => theme::error(),
+                    std::cmp::Ordering::Equal => theme::text_muted(),
                 };
                 let net_str = if net > 0 { format!("+{}", net) } else { format!("{}", net) };
 
@@ -180,12 +177,10 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
             .collect();
 
         let total_net = total_add - total_del;
-        let total_net_color = if total_net > 0 {
-            theme::success()
-        } else if total_net < 0 {
-            theme::error()
-        } else {
-            theme::text_muted()
+        let total_net_color = match total_net.cmp(&0) {
+            std::cmp::Ordering::Greater => theme::success(),
+            std::cmp::Ordering::Less => theme::error(),
+            std::cmp::Ordering::Equal => theme::text_muted(),
         };
         let total_net_str = if total_net > 0 { format!("+{}", total_net) } else { format!("{}", total_net) };
 
@@ -271,11 +266,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
     for ctx in &panels {
         // Look up display_name from registry, fallback to raw context type string
         let type_name = get_context_type_meta(ctx.context_type.as_str())
-            .map(|m| m.display_name)
-            .unwrap_or(ctx.context_type.as_str());
-
-        // Ask modules for detail string
-        let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
+            .map_or_or(ctx.context_type.as_str(), ctx.context_type.as_str(), |m| m.display_name)  let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
         let truncated_details =
             if details.len() > 30 { format!("{}...", &details[..details.floor_char_boundary(27)]) } else { details };

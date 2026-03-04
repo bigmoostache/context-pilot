@@ -93,7 +93,7 @@ impl Panel for ConsolePanel {
             while cut < buffer_content.len() && !buffer_content.is_char_boundary(cut) {
                 cut += 1;
             }
-            let start = buffer_content[cut..].find('\n').map(|p| cut + p + 1).unwrap_or(cut);
+            let start = buffer_content[cut..].find('\n').map_or(cut, |p| cut + p + 1);
             format!(
                 "[...truncated, showing last {}B of {}B...]\n{}",
                 buffer_content.len() - start,

@@ -84,7 +84,7 @@ impl ConversationPanel {
         std::hash::Hasher::finish(&hasher)
     }
 
-    /// Build content with caching - called from render() which has &mut State
+    /// Build content with caching - called from `render()` which has &mut State
     fn build_content_cached(state: &mut State, base_style: Style) -> Vec<Line<'static>> {
         let _guard = crate::profile!("panel::conversation::content");
         let viewport_width = state.last_viewport_width;
@@ -103,8 +103,7 @@ impl ConversationPanel {
         // Cache miss - need to rebuild
         // Check if viewport width changed - invalidate per-message caches
         let width_changed =
-            state.message_cache.values().next().map(|c| c.viewport_width != viewport_width).unwrap_or(false);
-        if width_changed {
+            state.message_cache.values().next().is_some_andsome_and(|c| c.viewport_width != viewport_width)h_changed {
             state.message_cache.clear();
             state.input_cache = None;
         }
@@ -286,9 +285,7 @@ impl Panel for ConversationPanel {
                 // Send if: cursor at end AND (input empty OR ends with empty line)
                 let at_end = state.input_cursor >= state.input.len();
                 let ends_with_empty_line = state.input.ends_with('\n')
-                    || state.input.lines().last().map(|l| l.trim().is_empty()).unwrap_or(true);
-
-                if at_end && ends_with_empty_line {
+                    || state.input.lines().last().map_or_or(true, true, |l| l.trim().is_empty())   if at_end && ends_with_empty_line {
                     // Send message
                     Some(Action::InputSubmit)
                 } else {

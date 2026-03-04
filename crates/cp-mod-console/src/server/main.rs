@@ -399,7 +399,7 @@ fn main() {
     }
 }
 
-/// Install SIGTERM and SIGINT handlers that set SHUTDOWN_REQUESTED.
+/// Install SIGTERM and SIGINT handlers that set `SHUTDOWN_REQUESTED`.
 #[expect(
     unsafe_code,
     reason = "libc::signal requires unsafe — signal handler is async-signal-safe (atomic store only)"

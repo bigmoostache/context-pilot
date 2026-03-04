@@ -15,7 +15,7 @@ pub(crate) struct MemoryPanel;
 
 impl MemoryPanel {
     /// Format memories for LLM context.
-    /// Closed memories: table with ID, tl_dr, importance, labels.
+    /// Closed memories: table with ID, `tl_dr`, importance, labels.
     /// Open memories: YAML-formatted complete information.
     fn format_memories_for_context(state: &State) -> String {
         let ms = MemoryState::get(state);
@@ -118,8 +118,7 @@ impl Panel for MemoryPanel {
             .context
             .iter()
             .find(|c| c.context_type == ContextType::MEMORY)
-            .map(|c| (c.id.as_str(), c.last_refresh_ms))
-            .unwrap_or(("P4", 0));
+            .map_or(("P4", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Memories", content, last_refresh_ms)]
     }
 
@@ -285,8 +284,8 @@ impl Panel for MemoryPanel {
     }
 }
 
-/// Simple word-wrap: break text at word boundaries to fit within max_width.
-/// Uses UnicodeWidthStr for correct display width measurement.
+/// Simple word-wrap: break text at word boundaries to fit within `max_width`.
+/// Uses `UnicodeWidthStr` for correct display width measurement.
 fn wrap_text_simple(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
         return vec![text.to_string()];

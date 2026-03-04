@@ -38,12 +38,10 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Parse formats: default ["markdown", "links"]
-    let formats_val: Vec<String> = tool
-        .input
-        .get("formats")
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-        .unwrap_or_else(|| vec!["markdown".to_string(), "links".to_string()]);
+    let formats_val: Vec<String> = tool.input.get("formats").and_then(|v| v.as_array()).map_or_else(
+        || vec!["markdown".to_string(), "links".to_string()],
+        |arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
+    );
     let formats: Vec<&str> = formats_val.iter().map(|s| s.as_str()).collect();
 
     // Parse location
@@ -130,12 +128,10 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let limit = tool.input.get("limit").and_then(|v| v.as_u64()).unwrap_or(3).to_u32();
 
-    let sources_val: Vec<String> = tool
-        .input
-        .get("sources")
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-        .unwrap_or_else(|| vec!["web".to_string()]);
+    let sources_val: Vec<String> = tool.input.get("sources").and_then(|v| v.as_array()).map_or_else(
+        || vec!["web".to_string()],
+        |arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
+    );
     let sources: Vec<&str> = sources_val.iter().map(|s| s.as_str()).collect();
 
     let cats_val: Option<Vec<String>> = tool

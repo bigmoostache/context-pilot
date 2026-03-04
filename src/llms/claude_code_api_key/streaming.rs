@@ -51,7 +51,7 @@ pub(super) struct StreamUsage {
 }
 
 /// Parse an SSE stream from a Claude API response, sending events to the channel.
-/// Returns (input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason).
+/// Returns (`input_tokens`, `output_tokens`, `cache_hit_tokens`, `cache_miss_tokens`, `stop_reason`).
 pub(super) fn parse_sse_stream(
     response: reqwest::blocking::Response,
     resp_headers: &str,

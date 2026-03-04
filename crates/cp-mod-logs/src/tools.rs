@@ -23,7 +23,7 @@ fn push_log_with_timestamp(state: &mut State, content: String, timestamp_ms: u64
     ls.logs.push(LogEntry::with_timestamp(id, content, timestamp_ms));
 }
 
-/// Helper: touch logs panel to update last_refresh_ms and recalculate token count.
+/// Helper: touch logs panel to update `last_refresh_ms` and recalculate token count.
 fn touch_logs_panel(state: &mut State) {
     let content = panel::LogsPanel::format_logs_tree(state);
     let token_count = estimate_tokens(&content);
@@ -231,8 +231,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
         .history_messages
         .as_ref()
         .and_then(|msgs| msgs.last())
-        .map(|msg| msg.timestamp_ms)
-        .unwrap_or(0);
+        .map_or(0, |msg| msg.timestamp_ms);
 
     // 3. Validate that logs are provided (at least one non-empty entry)
     let logs_array = tool.input.get("logs").and_then(|v| v.as_array());

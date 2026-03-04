@@ -4,7 +4,7 @@ use crate::state::{ContextType, State, estimate_tokens};
 use super::ActionResult;
 use super::helpers::clean_llm_id_prefix;
 
-/// Handle AppendChars action — append streaming text to assistant message
+/// Handle `AppendChars` action — append streaming text to assistant message
 pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
     if let Some(msg) = state.messages.last_mut()
         && msg.role == "assistant"
@@ -25,7 +25,7 @@ pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult
     ActionResult::Nothing
 }
 
-/// Handle StreamDone action — finalize streaming, correct token counts
+/// Handle `StreamDone` action — finalize streaming, correct token counts
 pub(crate) fn handle_stream_done(
     state: &mut State,
     _input_tokens: usize,
@@ -35,7 +35,7 @@ pub(crate) fn handle_stream_done(
     stop_reason: &Option<String>,
 ) -> ActionResult {
     state.is_streaming = false;
-    state.last_stop_reason = stop_reason.clone();
+    state.last_stop_reason.clone_from(stop_reason);
 
     // Set tick stats (this tick only)
     state.tick_cache_hit_tokens = cache_hit_tokens;
@@ -75,7 +75,7 @@ pub(crate) fn handle_stream_done(
     ActionResult::Save
 }
 
-/// Handle StreamError action — clean up streaming state, log error
+/// Handle `StreamError` action — clean up streaming state, log error
 pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
     state.is_streaming = false;
 

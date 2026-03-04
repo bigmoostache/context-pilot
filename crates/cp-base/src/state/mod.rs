@@ -2,7 +2,7 @@
 pub mod actions;
 /// File-path autocomplete state for @-triggered popup.
 pub mod autocomplete;
-/// Persistence structs: SharedConfig, WorkerState, PanelData.
+/// Persistence structs: `SharedConfig`, `WorkerState`, `PanelData`.
 pub mod config;
 /// Context types, elements, and token estimation.
 pub mod context;
