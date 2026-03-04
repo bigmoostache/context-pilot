@@ -16,7 +16,7 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
 
 fn get_client() -> Result<FirecrawlClient, String> {
     let key = std::env::var("FIRECRAWL_API_KEY").map_err(|_| "FIRECRAWL_API_KEY not set".to_string())?;
-    Ok(FirecrawlClient::new(key))
+    FirecrawlClient::new(key)
 }
 
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {

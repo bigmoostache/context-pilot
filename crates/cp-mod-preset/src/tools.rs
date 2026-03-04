@@ -31,11 +31,7 @@ fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn execute_snapshot(
-    tool: &ToolUse,
-    state: &State,
-    all_modules: fn() -> Vec<Box<dyn Module>>,
-) -> ToolResult {
+pub(crate) fn execute_snapshot(tool: &ToolUse, state: &State, all_modules: fn() -> Vec<Box<dyn Module>>) -> ToolResult {
     let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
     };

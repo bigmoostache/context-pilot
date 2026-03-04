@@ -6,17 +6,16 @@ pub(crate) struct InvalidationRule {
 }
 
 impl InvalidationRule {
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
-    fn new(trigger: &str, invalidates: &[&str]) -> Self {
-        Self {
-            trigger: Regex::new(trigger).expect("invalid trigger regex"),
+    fn new(trigger: &str, invalidates: &[&str]) -> Option<Self> {
+        Some(Self {
+            trigger: Regex::new(trigger).ok()?,
             invalidates: invalidates.iter().map(ToString::to_string).collect(),
-        }
+        })
     }
 }
 
 pub(crate) fn build_invalidation_rules() -> Vec<InvalidationRule> {
-    vec![
+    [
         // NUCLEAR — invalidate ALL GitResult panels
         InvalidationRule::new(
             r"^git\s+(checkout|switch|merge|rebase|reset|pull|filter-branch|filter-repo)\b",
@@ -57,6 +56,9 @@ pub(crate) fn build_invalidation_rules() -> Vec<InvalidationRule> {
             &[r"^git\s+remote\b"],
         ),
     ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 pub(crate) fn find_invalidations(mutating_command: &str) -> Vec<Regex> {

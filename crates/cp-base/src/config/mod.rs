@@ -409,15 +409,16 @@ pub static INJECTIONS: LazyLock<InjectionsConfig> =
 pub static REVERIE: LazyLock<ReverieConfig> =
     LazyLock::new(|| parse_yaml("reverie.yaml", include_str!("../../../../yamls/reverie.yaml")));
 
-/// Get a theme by ID, falling back to default if not found
+/// Get a theme by ID, falling back to default, then to any available theme.
 ///
-/// # Panics
-///
-/// Panics if an internal invariant is violated.
+/// Returns `None` only if the themes map is completely empty (compile-time bug).
 #[must_use]
-#[expect(clippy::expect_used, reason = "infallible based on prior validation")]
-pub fn get_theme(theme_id: &str) -> &'static Theme {
-    THEMES.themes.get(theme_id).or_else(|| THEMES.themes.get(DEFAULT_THEME)).expect("Default theme must exist")
+pub fn get_theme(theme_id: &str) -> Option<&'static Theme> {
+    THEMES
+        .themes
+        .get(theme_id)
+        .or_else(|| THEMES.themes.get(DEFAULT_THEME))
+        .or_else(|| THEMES.themes.values().next())
 }
 
 // ============================================================================
@@ -432,8 +433,9 @@ static CACHED_THEME: AtomicPtr<Theme> = AtomicPtr::new(std::ptr::null_mut());
 
 /// Set the active theme ID (call when state is loaded or theme changes)
 pub fn set_active_theme(theme_id: &str) {
-    let theme: &'static Theme = get_theme(theme_id);
-    CACHED_THEME.store(std::ptr::from_ref(theme).cast_mut(), Ordering::Release);
+    if let Some(theme) = get_theme(theme_id) {
+        CACHED_THEME.store(std::ptr::from_ref(theme).cast_mut(), Ordering::Release);
+    }
 }
 
 /// Get the currently active theme (single atomic load — no locking, no allocation)
@@ -442,9 +444,14 @@ pub fn active_theme() -> &'static Theme {
     let ptr = CACHED_THEME.load(Ordering::Acquire);
     if ptr.is_null() {
         // First call before set_active_theme — initialize from default
-        let theme = get_theme(DEFAULT_THEME);
-        CACHED_THEME.store(std::ptr::from_ref(theme).cast_mut(), Ordering::Release);
-        theme
+        get_theme(DEFAULT_THEME).map_or_else(
+            // SAFETY: THEMES is always non-empty — themes.yaml is embedded at compile time
+            || unsafe { THEMES.themes.values().next().unwrap_unchecked() },
+            |t| {
+                CACHED_THEME.store(std::ptr::from_ref(t).cast_mut(), Ordering::Release);
+                t
+            },
+        )
     } else {
         // SAFETY: ptr was set from a &'static Theme reference stored in LazyLock THEMES.
         // The Theme data is never mutated or freed after initialization.

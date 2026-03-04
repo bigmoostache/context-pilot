@@ -334,9 +334,11 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
 // ---------------------------------------------------------------------------
 
 #[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
-#[expect(clippy::expect_used, reason = "infallible based on prior validation")]
 fn main() {
-    let socket_path = std::env::args().nth(1).expect("Usage: cp-console-server <socket_path>");
+    let Some(socket_path) = std::env::args().nth(1) else {
+        eprintln!("Usage: cp-console-server <socket_path>");
+        std::process::exit(1);
+    };
     let pid_path = format!("{}.pid", socket_path.trim_end_matches(".sock"));
 
     // Remove stale socket

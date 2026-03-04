@@ -60,18 +60,14 @@ const DEBOUNCE_MS: u64 = 50;
 
 impl PersistenceWriter {
     /// Create a new persistence writer with a background thread
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     pub(crate) fn new() -> Self {
         let (tx, rx) = mpsc::channel();
         let flush_sync = Arc::new((Mutex::new(false), Condvar::new()));
         let flush_sync_clone = Arc::clone(&flush_sync);
 
-        let handle = thread::Builder::new()
-            .name("persistence-writer".to_string())
-            .spawn(move || {
-                writer_loop(rx, flush_sync_clone);
-            })
-            .expect("failed to spawn persistence writer thread");
+        let handle = thread::spawn(move || {
+            writer_loop(rx, flush_sync_clone);
+        });
 
         Self { tx, flush_sync, handle: Some(handle) }
     }

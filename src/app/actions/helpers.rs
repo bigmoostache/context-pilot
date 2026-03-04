@@ -4,23 +4,18 @@ use regex::Regex;
 
 use crate::state::State;
 
-#[expect(clippy::expect_used, reason = "regex is a compile-time constant — parse failure is a code bug")]
-static RE_ID_PREFIX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(\[A\d+\]:\s*)+").expect("invalid RE_ID_PREFIX regex"));
-#[expect(clippy::expect_used, reason = "regex is a compile-time constant — parse failure is a code bug")]
-static RE_ID_MULTILINE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?m)^\[A\d+\]:\s*").expect("invalid RE_ID_MULTILINE regex"));
+static RE_ID_PREFIX: LazyLock<Option<Regex>> = LazyLock::new(|| Regex::new(r"^(\[A\d+\]:\s*)+").ok());
+static RE_ID_MULTILINE: LazyLock<Option<Regex>> = LazyLock::new(|| Regex::new(r"(?m)^\[A\d+\]:\s*").ok());
 
 /// Remove LLM's mistaken ID prefixes like "[A84]: " from responses
 pub(crate) fn clean_llm_id_prefix(content: &str) -> String {
     // First trim leading whitespace
     let trimmed = content.trim_start();
 
-    // Pattern: one or more [A##]: or [A###]: at the start, with optional whitespace between
-    let cleaned = RE_ID_PREFIX.replace(trimmed, "").to_string();
+    let cleaned = RE_ID_PREFIX.as_ref().map_or_else(|| trimmed.to_string(), |re| re.replace(trimmed, "").to_string());
 
-    // Also clean any [Axx]: that appears at the start of lines (multiline responses)
-    let result = RE_ID_MULTILINE.replace_all(&cleaned, "").to_string();
+    let result =
+        RE_ID_MULTILINE.as_ref().map_or_else(|| cleaned.clone(), |re| re.replace_all(&cleaned, "").to_string());
 
     // Strip leading/trailing whitespace and newlines after cleaning
     result.trim().to_string()

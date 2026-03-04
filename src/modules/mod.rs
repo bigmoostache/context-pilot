@@ -224,7 +224,6 @@ pub(crate) fn module_toggle_tool_definition() -> ToolDefinition {
 }
 
 /// Execute the `module_toggle` tool.
-#[expect(clippy::expect_used, reason = "infallible based on prior validation")]
 fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(changes) = tool.input.get("changes").and_then(|v| v.as_array()) else {
         return ToolResult {
@@ -265,11 +264,11 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                     let _r = state.active_modules.insert(module_id.to_string());
                     // Rebuild tools list
                     rebuild_tools(state);
-                    let module = all_mods
+                    let description = all_mods
                         .iter()
                         .find(|m| m.id() == module_id)
-                        .expect("module_id was validated against known_ids but not found");
-                    successes.push(format!("activated '{}' ({})", module.name(), module.description()));
+                        .map_or_else(|| "unknown".to_string(), |m| format!("'{}' ({})", m.name(), m.description()));
+                    successes.push(format!("activated {description}"));
                 }
             }
             "deactivate" => {
@@ -277,12 +276,13 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                     match check_can_deactivate(module_id, &state.active_modules) {
                         Ok(()) => {
                             // Find panel types to remove
-                            let module = all_mods
+                            let (fixed_types, dynamic_types) = all_mods
                                 .iter()
                                 .find(|m| m.id() == module_id)
-                                .expect("module_id was validated against known_ids but not found");
-                            let fixed_types = module.fixed_panel_types();
-                            let dynamic_types = module.dynamic_panel_types();
+                                .map_or_else(
+                                    || (Vec::new(), Vec::new()),
+                                    |m| (m.fixed_panel_types(), m.dynamic_panel_types()),
+                                );
 
                             // Remove panels owned by this module
                             state.context.retain(|ctx| {

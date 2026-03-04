@@ -56,17 +56,15 @@ pub struct BraveClient {
 impl BraveClient {
     /// Create a new client with the given API key (10s request timeout).
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if an internal invariant is violated.
-    #[must_use]
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
-    pub fn new(api_key: String) -> Self {
+    /// Returns `Err` if the HTTP client fails to build.
+    pub fn new(api_key: String) -> Result<Self, String> {
         let client = Client::builder()
             .timeout(Duration::from_secs(TIMEOUT_SECS))
             .build()
-            .expect("failed to build reqwest client");
-        Self { client, api_key }
+            .map_err(|e| format!("failed to build HTTP client: {e}"))?;
+        Ok(Self { client, api_key })
     }
 
     /// Search the web via Brave Search API.

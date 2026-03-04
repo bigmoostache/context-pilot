@@ -112,13 +112,9 @@ impl Module for PresetModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "preset_snapshot_myself" => Some(tools::execute_snapshot(tool, state, self.all_modules)),
-            "preset_load" => Some(tools::execute_load(
-                tool,
-                state,
-                self.all_modules,
-                self.active_tool_defs,
-                self.ensure_defaults,
-            )),
+            "preset_load" => {
+                Some(tools::execute_load(tool, state, self.all_modules, self.active_tool_defs, self.ensure_defaults))
+            }
             _ => None,
         }
     }

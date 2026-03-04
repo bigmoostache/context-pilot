@@ -15,7 +15,7 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
 
 fn get_client() -> Result<BraveClient, String> {
     let api_key = std::env::var("BRAVE_API_KEY").map_err(|_| "BRAVE_API_KEY not set".to_string())?;
-    Ok(BraveClient::new(api_key))
+    BraveClient::new(api_key)
 }
 
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
