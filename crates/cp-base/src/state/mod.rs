@@ -14,6 +14,7 @@ pub mod runtime;
 pub mod watchers;
 
 // Re-exports for convenience
+pub use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderCache, hash_values};
 pub use actions::{Action, ActionResult};
 pub use config::{ImportantPanelUids, PanelData, SharedConfig, SidebarMode, WorkerState};
 pub use context::{
@@ -21,7 +22,7 @@ pub use context::{
     get_context_type_meta, init_context_type_registry, make_default_context_element,
 };
 pub use message::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord, format_messages_to_chunk};
-pub use runtime::{FullContentCache, InputRenderCache, MessageRenderCache, State, hash_values};
+pub use runtime::State;
 
 // ─── Reverie State ──────────────────────────────────────────────────────────
 // Ephemeral sub-agent state — lives as Option<ReverieState> on the main State.
