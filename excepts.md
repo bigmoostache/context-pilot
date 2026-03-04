@@ -1,52 +1,234 @@
+crates/cp-base/src/cast.rs:
+  1: #![expect(
+  2      clippy::allow_attributes,
+
+crates/cp-base/src/panels.rs:
+  41  #[must_use]
+  42: #[expect(clippy::wildcard_enum_match_arm, reason = "KeyCode is an external enum — new variants are not scroll keys")]
+  43  pub const fn scroll_key_action(key: &KeyEvent) -> Option<Action> {
+
+crates/cp-base/src/config/mod.rs:
+  387  /// invariant panics route through here. One `#[expect]` to rule them all.
+  388: #[expect(clippy::panic, reason = "invariant violation is unrecoverable — validated by tests")]
+  389  pub fn yaml_invariant_panic(msg: &str) -> ! {
+
+crates/cp-base/src/state/runtime.rs:
+   18  /// Runtime state (messages loaded in memory)
+   19: #[expect(clippy::struct_excessive_bools, reason = "Runtime state legitimately needs many boolean flags")]
+   20  pub struct State {
+
+  267      /// Prefer this over `get_ext().expect()` — the panic lives here once,
+  268:     /// so callers don't need `#[expect(clippy::expect_used)]`.
+  269      ///
+
+  273      #[must_use]
+  274:     #[expect(clippy::expect_used, reason = "centralized panic — callers use ext() to avoid per-site #[expect]")]
+  275      pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
+
+  283      /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
+  284:     #[expect(clippy::expect_used, reason = "centralized panic — callers use ext_mut() to avoid per-site #[expect]")]
+  285      pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
+
+crates/cp-mod-console/src/server/main.rs:
+    1  //! Console Server: persistent daemon that owns child processes.
+    2: #![expect(unused_crate_dependencies, reason = "bin target shares Cargo.toml with lib — lib deps aren't used here")]
+    3  //!
+
+  358      #[cfg(unix)]
+  359:     #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
+  360      // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
+
+src/typst_cli.rs:
+  4  //! printing and `process::exit` are the expected interface.
+  5: #![expect(
+  6      clippy::print_stdout,
+
+
 # `#[expect]` Audit — Final Status
 
-**110 → 9** annotations remaining. **101 slain, 1210 XP earned.**
+**110 → 9** annotations remaining. **101 slain.**
 
 ---
 
 ## Remaining `#[expect]` Annotations (9 total)
 
-| # | File | Line | Lint | Reason | Killable? |
-|---|------|------|------|--------|-----------|
-| 1 | `cast.rs` | 1 | `allow_attributes` | Macro-generated `#[allow]` can't use `#[expect]` — lint triggers depend on which type the macro expands for | ❌ Language limitation |
-| 2 | `config/mod.rs` | 392 | `panic` | `yaml_invariant_panic()` — THE ONE centralized panic for all YAML/config invariant violations. Validated by tests in `lib.rs`. | ❌ Intentional design |
-| 3 | `panels.rs` | 42 | `wildcard_enum_match_arm` | `scroll_key_action()` — `KeyCode` is an external enum from `crossterm`. Exhaustive matching would break on upstream updates. | ❌ External enum |
-| 4 | `runtime.rs` | 19 | `struct_excessive_bools` | `State` has 12+ independent boolean flags. Decomposition possible but touches ~1000 callsites. | 🟡 Possible (B5 — State decomposition) |
-| 5 | `runtime.rs` | 274 | `expect_used` | `ext()` — centralized panic for module TypeMap access. Callers don't need per-site `#[expect]`. | ❌ Intentional design |
-| 6 | `runtime.rs` | 284 | `expect_used` | `ext_mut()` — same as above, mutable variant. | ❌ Intentional design |
-| 7 | `server/main.rs` | 2 | `unused_crate_dependencies` | Binary target shares `Cargo.toml` with library — lib deps aren't used in the bin. | ❌ Cargo limitation |
-| 8 | `server/main.rs` | 359 | `unsafe_code` | `libc::setsid()` — POSIX requirement, async-signal-safe, no preconditions. Server owns its session lifecycle. | ❌ OS requirement |
-| 9 | `typst_cli.rs` | 5 | `print_stdout`, `print_stderr`, `exit` | CLI subcommands — printing and `process::exit` are the expected interface for `typst compile`/`typst recompile-watched`. Module-level annotation covers 2 functions. | ❌ CLI convention |
+### 1. `cast.rs:1` — `allow_attributes`
 
----
-
-## Summary by Justification
-
-| Category | Count | Details |
-|----------|-------|---------|
-| **Intentional design** | 3 | `yaml_invariant_panic` (centralized), `ext()`/`ext_mut()` (centralized TypeMap panics) |
-| **Language/tooling limitation** | 3 | `allow_attributes` (macro), `unused_crate_dependencies` (Cargo bin/lib), `wildcard_enum_match_arm` (external enum) |
-| **OS/platform requirement** | 1 | `unsafe_code` (libc::setsid) |
-| **CLI convention** | 1 | `print_stdout`/`print_stderr`/`exit` (typst CLI) |
-| **Possible future kill** | 1 | `struct_excessive_bools` (State decomposition — ~1000 callsite refactor) |
-
----
-
-## Infrastructure Improvements
-
-- **YAML validation tests** (3 tests in `cp-base/lib.rs`): All 6 config YAMLs + all 20 tool YAMLs validated at `cargo test` time. Schema drift caught before production.
-- **`yaml_invariant_panic()`**: Single centralized panic function for all YAML/config invariants. Was 3 scattered `#[expect]` → 1.
-- **`signal-hook` crate**: Replaced hand-rolled `libc::signal()` with safe, community-maintained signal handling.
-- **Server self-daemonization**: `setsid()` moved from TUI `pre_exec` hook to server `main()`. Server owns its lifecycle.
-- **`ToolTexts::parse()`**: Delegates to `parse_yaml()` — no more per-module serde_yaml dependency.
-
----
-
-## ☠️ BOUNTY BOARD — Final Score
-
+```rust
+#![expect(
+    clippy::allow_attributes,
+    reason = "macro-generated #[allow] can't use #[expect] — some lint triggers depend on which type the macro expands for"
+)]
 ```
-Started:  110 bosses
-Slain:    101
-Survived:   9 (all justified)
-XP:       1210 / 1210
+
+**Justification:** The `SafeCast` trait uses macros (`impl_safe_cast_unsigned!`, `impl_safe_cast_signed!`) that expand into `#[allow(trivial_numeric_casts, cast_possible_truncation, ...)]` on each impl block. These `#[allow]` annotations can't be `#[expect]` because whether a given lint fires depends on the concrete type the macro expands for — e.g. `u32 as u32` triggers `trivial_numeric_casts` but `u32 as u64` doesn't. An `#[expect]` on the non-triggering expansion would itself become a lint violation ("unfulfilled expectation"). This is a fundamental Rust language limitation with macro-generated lint attributes.
+
+**Strategies to eliminate:**
+- **Proc macro with per-type conditionals:** Write a proc macro that introspects the source and target types at compile time and only emits `#[expect]` on the specific cast expressions that actually trigger each lint. Complex, but precisely targets the root cause.
+- **`num` crate or `TryFrom`-based casts:** Replace the hand-rolled `SafeCast` macros with `num::cast::NumCast` or blanket `TryFrom` impls with saturating fallbacks. Eliminates macro-generated casts entirely — no raw `as` means no lint to suppress.
+- **Wait for Rust RFC:** There are open discussions about allowing `#[expect]` to tolerate unfulfilled expectations in macro expansions. If stabilized, a one-line change removes this annotation.
+
+---
+
+### 2. `config/mod.rs:392` — `panic`
+
+```rust
+#[expect(clippy::panic, reason = "invariant violation is unrecoverable — validated by tests")]
+pub fn yaml_invariant_panic(msg: &str) -> ! {
+    panic!("{msg}")
+}
 ```
+
+**Justification:** This is THE centralized panic for all YAML/config invariant violations across the entire codebase. All config YAMLs are compile-time embedded via `include_str!()` and validated by 3 tests in `cp-base/lib.rs` (6 config YAMLs + 20 tool YAMLs). If this panic fires, it means a developer broke a YAML schema — a bug that should be caught in CI before any binary is produced. The function signature `-> !` (never returns) makes it impossible to accidentally ignore. Having ONE suppression instead of scattered panics across all config call sites is the correct centralization.
+
+**Strategies to eliminate:**
+- **`build.rs` compile-time validation:** Move YAML parsing into a `build.rs` script that runs `serde_yaml::from_str()` at compile time. If any YAML is malformed, compilation fails with `compile_error!()`. The runtime `yaml_invariant_panic()` function becomes dead code and can be deleted — the invariant is enforced at build time, not runtime.
+- **`const fn` parsing (future Rust):** Once `const fn` supports enough of the serde machinery, YAML validation could happen at const-eval time. Currently blocked by Rust's const-eval limitations, but on the roadmap.
+- **Return `Result` everywhere:** Thread `Result<T, ConfigError>` through all config access paths. Each call site handles the error explicitly. Eliminates panics entirely but adds `?` boilerplate to ~50+ call sites that currently rely on LazyLock infallibility.
+
+---
+
+### 3. `panels.rs:42` — `wildcard_enum_match_arm`
+
+```rust
+#[expect(clippy::wildcard_enum_match_arm, reason = "KeyCode is an external enum — new variants are not scroll keys")]
+pub const fn scroll_key_action(key: &KeyEvent) -> Option<Action> {
+    match key.code {
+        KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),
+        KeyCode::Down => Some(Action::ScrollDown(SCROLL_ARROW_AMOUNT)),
+        KeyCode::PageUp => Some(Action::ScrollUp(SCROLL_PAGE_AMOUNT)),
+        KeyCode::PageDown => Some(Action::ScrollDown(SCROLL_PAGE_AMOUNT)),
+        _ => None,
+    }
+}
+```
+
+**Justification:** `KeyCode` is an external enum from `crossterm` with 30+ variants (and growing — `KeypadBegin`, `Media`, `Modifier` were added in recent versions). Exhaustive matching would compile-break on every crossterm update that adds a new key variant. The wildcard is semantically correct: any key that isn't Up/Down/PageUp/PageDown is not a scroll key, including future keys that don't exist yet.
+
+**Strategies to eliminate:**
+- **Thin wrapper enum:** Define a local `ScrollKey { Up, Down, PageUp, PageDown }` enum. A single conversion function `fn try_from_keycode(k: &KeyCode) -> Option<ScrollKey>` absorbs the wildcard. `scroll_key_action()` then matches exhaustively on `ScrollKey`. The wildcard moves to the conversion boundary — and `try_from_keycode` can use `matches!()` instead of `match`, which doesn't trigger the lint.
+- **`matches!()` macro:** Replace the match with `matches!(key.code, KeyCode::Up | KeyCode::Down | ...)` to detect scroll keys, then a second clean match on the confirmed scroll keys. The `matches!()` macro doesn't trigger `wildcard_enum_match_arm` since it's a boolean test, not an arm-producing match.
+- **Feature-gate on crossterm version:** Use `#[cfg]` attributes to enumerate known non-scroll variants for the current crossterm version, making the match exhaustive. Requires updating on each crossterm bump, but makes the dependency explicit.
+
+---
+
+### 4. `runtime.rs:19` — `struct_excessive_bools`
+
+```rust
+#[expect(clippy::struct_excessive_bools, reason = "Runtime state legitimately needs many boolean flags")]
+pub struct State {
+    // ... 60+ fields, 12+ booleans:
+    // is_streaming, is_tooling, user_scrolled, dirty, dev_mode, perf_enabled,
+    // config_view, config_secondary_mode, reverie_enabled, api_check_in_progress,
+    // reload_pending, waiting_for_panels
+}
+```
+
+**Justification:** `State` is the God struct — the single mutable root for all runtime state. Its 12+ boolean flags are genuinely independent status bits: `is_streaming` (LLM active), `dirty` (UI redraw needed), `dev_mode` (debug overlay), `reload_pending` (hot-reload queued), etc. They don't encode a hidden enum (the classic bool-smell). They're independent toggles checked in different subsystems. The struct is large because it's the root of a TUI application, not because of poor design.
+
+**Strategies to eliminate:**
+- **Domain sub-structs:** Decompose State into `StreamState { is_streaming, is_tooling, last_stop_reason, streaming_estimated_tokens }`, `UiState { dirty, dev_mode, perf_enabled, config_view, user_scrolled, scroll_offset, ... }`, `LifecycleState { reload_pending, waiting_for_panels, api_check_in_progress }`. Each sub-struct has ≤3 bools (under clippy's threshold). State becomes a composition of typed domains. Touches ~1000 call sites (`state.is_streaming` → `state.stream.is_streaming`) but is scriptable.
+- **Bitflags crate:** Replace independent bools with a `bitflags! { struct StateFlags: u32 { const STREAMING = 0x01; const DIRTY = 0x02; ... } }`. Single field, no bool count. Access via `state.flags.contains(StateFlags::STREAMING)`. Slightly less readable at call sites but eliminates the lint entirely.
+- **ECS-style components:** Move boolean flags into the `module_data` TypeMap as typed marker structs (e.g., `state.set_ext(Streaming)` / `state.get_ext::<Streaming>().is_some()`). Radical decomposition that leverages existing infrastructure. Probably over-engineered for simple flags.
+
+---
+
+### 5. `runtime.rs:274` — `expect_used` (`ext()`)
+
+```rust
+#[expect(clippy::expect_used, reason = "centralized panic — callers use ext() to avoid per-site #[expect]")]
+pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
+    self.get_ext::<T>().expect("module state not initialized — was init_state() called?")
+}
+```
+
+**Justification:** This is the centralized TypeMap accessor that 24+ call sites use instead of `get_ext().expect()`. Without this helper, every single module state access would need its own `#[expect(clippy::expect_used)]`. The panic message is specific ("was init_state() called?") and only fires on a programming error (module forgot to register its state during initialization). The `get_ext()` fallible alternative exists for cases where absence is expected.
+
+**Strategies to eliminate:**
+- **Init-time registration with compile-time proof:** Use a type-state pattern where `Module::init_state()` returns a `Registered<T>` token. `ext::<T>()` requires `Registered<T>` as a parameter, making it impossible to call without prior registration. The token proves initialization happened — no runtime check needed. Complex lifetime/generics work.
+- **`Default` fallback:** Change `ext<T>()` to `ext<T: Default>()` that calls `get_ext::<T>().unwrap_or_default()`. Never panics. Requires all module state types to implement `Default` (most already do since they derive it). Silently returns empty state on programming errors instead of crashing — trades safety for debuggability.
+- **Lazy initialization:** Replace `ext()` with `ext_or_init<T: Default>()` that inserts `T::default()` if missing, then returns the reference. Combines accessor + initialization. Eliminates the panic at the cost of masking forgotten `init_state()` calls.
+
+---
+
+### 6. `runtime.rs:284` — `expect_used` (`ext_mut()`)
+
+```rust
+#[expect(clippy::expect_used, reason = "centralized panic — callers use ext_mut() to avoid per-site #[expect]")]
+pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
+    self.get_ext_mut::<T>().expect("module state not initialized — was init_state() called?")
+}
+```
+
+**Justification:** Mutable variant of #5. Same centralization rationale — 20+ call sites use this instead of scattered `.expect()` calls. Same panic condition (programming error: module state not registered).
+
+**Strategies to eliminate:** Same as #5 — any strategy applied to `ext()` would be applied identically to `ext_mut()`. These two annotations live and die together.
+
+---
+
+### 7. `server/main.rs:2` — `unused_crate_dependencies`
+
+```rust
+#![expect(unused_crate_dependencies, reason = "bin target shares Cargo.toml with lib — lib deps aren't used here")]
+```
+
+**Justification:** `cp-mod-console` has a single `Cargo.toml` that defines both a library (`lib.rs`) and a binary (`cp-console-server` from `server/main.rs`). The library depends on `serde`, `serde_json`, `ratatui`, `sha2`, etc. The server binary only uses `serde`, `serde_json`, `libc`, and `signal-hook`. Cargo's `unused_crate_dependencies` lint fires on the server binary for every lib-only dependency because Cargo doesn't distinguish per-target dependencies.
+
+**Strategies to eliminate:**
+- **Separate crate for server:** Extract `server/main.rs` + `server/protocol.rs` into a dedicated `cp-console-server` crate with its own `Cargo.toml` that declares only the deps it actually uses (`serde`, `serde_json`, `libc`, `signal-hook`). The lib crate keeps its own deps. Clean dependency boundaries, zero lint suppression. Requires adding a workspace member and adjusting build scripts.
+- **Per-target dependency syntax (Cargo RFC):** Cargo has open RFCs for `[bin-dependencies]` or target-specific dependency scoping. If stabilized, deps could be declared per-target within one `Cargo.toml`. Not yet available.
+- **`cfg` gating:** Conditionally compile the binary behind a feature flag (`feature = "server"`). Deps used only by the lib are gated behind `not(feature = "server")`. Hacky, adds maintenance burden, and inverts the natural dependency model.
+
+---
+
+### 8. `server/main.rs:359` — `unsafe_code`
+
+```rust
+#[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
+// SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
+// and is called once at startup before any child processes are spawned.
+{
+    unsafe { let _ = libc::setsid(); }
+}
+```
+
+**Justification:** `setsid()` creates a new POSIX session so spawned child processes get SIGHUP when the server dies — essential for process cleanup. The `libc` crate exposes it as `unsafe` because it's a raw FFI call, even though `setsid()` has zero preconditions and is async-signal-safe. There's no safe wrapper in the Rust ecosystem because it's too trivial to warrant one.
+
+**Strategies to eliminate:**
+- **`nix` crate:** The `nix` crate provides a safe wrapper: `nix::unistd::setsid()` returns `Result<Pid>`. No unsafe block needed — the crate handles the FFI boundary. Adds a dependency but it's a well-maintained, widely-used POSIX abstraction layer.
+- **`command-group` or `process-group` crate:** Higher-level crates that manage process groups/sessions. Overkill for a single `setsid()` call but eliminate the need for raw libc entirely.
+- **Pre-exec on child processes:** Instead of making the server a session leader, use `Command::pre_exec()` on each spawned child to call `setsid()` there. This moves the unsafe to child setup — but `pre_exec` itself is unsafe, so it doesn't eliminate the annotation, just moves it.
+
+---
+
+### 9. `typst_cli.rs:5` — `print_stdout`, `exit`
+
+```rust
+#![expect(
+    clippy::print_stdout,
+    clippy::exit,
+    reason = "CLI subcommands — stdout output and process::exit are the normal interface"
+)]
+```
+
+**Justification:** `typst_cli.rs` contains two functions (`run_typst_compile`, `run_typst_recompile_watched`) that run as one-shot CLI subcommands — they're invoked via `cpilot typst-compile <file>`, not within the TUI. Printing to stdout/stderr and calling `process::exit()` is the correct interface for CLI tools. The module-level annotation covers both functions cleanly.
+
+**Strategies to eliminate:**
+- **Return `ExitCode` from main:** Refactor both functions to return `Result<String, (String, i32)>` (ok message + err message/code). The caller in `main.rs` handles printing and exit. `typst_cli.rs` becomes a pure logic module with no I/O — no `println!`, no `process::exit()`. Clean separation of concerns.
+- **Separate binary:** Make `cpilot typst-compile` a standalone binary crate (`cp-typst-cli`) instead of a subcommand of the main `cpilot` binary. A CLI binary is naturally expected to print and exit — and being its own crate, it can have its own lint configuration without affecting the main workspace.
+- **`std::io::Write` injection:** Pass a `&mut dyn Write` parameter to both functions. They write to the provided sink instead of stdout. In production, main passes `std::io::stdout()`. In tests, pass a `Vec<u8>`. Eliminates `print_stdout` but still needs `exit` unless combined with the `Result` return strategy.
+
+---
+
+## Summary
+
+| # | File | Lint | Killable? | Best Strategy |
+|---|------|------|-----------|---------------|
+| 1 | `cast.rs` | `allow_attributes` | 🟡 | `num` crate or `TryFrom` blanket impls |
+| 2 | `config/mod.rs` | `panic` | 🟢 | `build.rs` compile-time YAML validation |
+| 3 | `panels.rs` | `wildcard_enum_match_arm` | 🟢 | `matches!()` macro or thin wrapper enum |
+| 4 | `runtime.rs` | `struct_excessive_bools` | 🟡 | Domain sub-structs (scriptable, ~1000 callsites) |
+| 5–6 | `runtime.rs` | `expect_used` (×2) | 🟡 | `Default` fallback or lazy init |
+| 7 | `server/main.rs` | `unused_crate_dependencies` | 🟢 | Separate server crate |
+| 8 | `server/main.rs` | `unsafe_code` | 🟢 | `nix` crate safe wrapper |
+| 9 | `typst_cli.rs` | `print_stdout` + `exit` | 🟢 | Return `Result` from CLI functions |
