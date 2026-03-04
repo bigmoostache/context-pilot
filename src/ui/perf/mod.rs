@@ -6,6 +6,7 @@
 mod overlay;
 pub(crate) use overlay::render_perf_overlay;
 
+use cp_base::cast::SafeCast;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -98,7 +99,7 @@ pub(crate) struct PerfMetrics {
     frame_state: RwLock<FrameState>,
     /// Total frames counted
     pub frame_count: AtomicU64,
-    /// CPU usage percentage (0-100), stored as f32 bits
+    /// CPU usage percentage (0-100), stored.to_f32() bits
     cpu_usage: AtomicU32,
     /// Memory usage in bytes
     memory_bytes: AtomicU64,
@@ -173,13 +174,12 @@ impl PerfMetrics {
     }
 
     /// End frame and record frame time
-    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn frame_end(&self) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
         if let Some(start) = self.frame_state.read().unwrap_or_else(|e| e.into_inner()).frame_start {
-            let frame_time = start.elapsed().as_micros() as u64;
+            let frame_time = start.elapsed().as_micros().to_u64();
             self.frame_times.write().unwrap_or_else(|e| e.into_inner()).push(frame_time);
             self.frame_count.fetch_add(1, Ordering::Relaxed);
         }
@@ -203,7 +203,7 @@ impl PerfMetrics {
             if elapsed > 0.0 {
                 let tick_delta = cpu_ticks.saturating_sub(state.last_cpu_measure.1);
                 // Convert ticks to seconds (usually 100 ticks/sec on Linux)
-                let cpu_seconds = tick_delta as f32 / 100.0;
+                let cpu_seconds = tick_delta.to_f32() / 100.0;
                 // CPU percentage = (cpu_time / wall_time) * 100
                 let cpu_pct = (cpu_seconds / elapsed) * 100.0;
                 self.cpu_usage.store(cpu_pct.to_bits(), Ordering::Relaxed);
@@ -227,18 +227,18 @@ impl PerfMetrics {
                 let count = recent.len();
 
                 // Calculate mean
-                let mean_us = if count > 0 { recent.iter().sum::<u64>() as f64 / count as f64 } else { 0.0 };
+                let mean_us = if count > 0 { recent.iter().sum::<u64>().to_f64() / count.to_f64() } else { 0.0 };
 
                 // Calculate standard deviation
                 let std_us = if count > 1 {
                     let variance = recent
                         .iter()
                         .map(|&x| {
-                            let diff = x as f64 - mean_us;
+                            let diff = x.to_f64() - mean_us;
                             diff * diff
                         })
                         .sum::<f64>()
-                        / (count - 1) as f64;
+                        / (count - 1).to_f64();
                     variance.sqrt()
                 } else {
                     0.0
@@ -246,7 +246,7 @@ impl PerfMetrics {
 
                 OpSnapshot {
                     name,
-                    total_ms: stats.total_us.load(Ordering::Relaxed) as f64 / 1000.0,
+                    total_ms: stats.total_us.load(Ordering::Relaxed).to_f64() / 1000.0,
                     mean_ms: mean_us / 1000.0,
                     std_ms: std_us / 1000.0,
                 }
@@ -256,10 +256,13 @@ impl PerfMetrics {
         // Sort by total time descending (hotspots first)
         op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
 
-        let frame_samples: Vec<f64> = frame_times.recent(40).iter().map(|&us| us as f64 / 1000.0).collect();
+        let frame_samples: Vec<f64> = frame_times.recent(40).iter().map(|&us| us.to_f64() / 1000.0).collect();
 
-        let frame_avg_ms =
-            if frame_samples.is_empty() { 0.0 } else { frame_samples.iter().sum::<f64>() / frame_samples.len() as f64 };
+        let frame_avg_ms = if frame_samples.is_empty() {
+            0.0
+        } else {
+            frame_samples.iter().sum::<f64>() / frame_samples.len().to_f64()
+        };
         let frame_max_ms = frame_samples.iter().copied().fold(0.0, f64::max);
 
         PerfSnapshot {
@@ -268,7 +271,7 @@ impl PerfMetrics {
             frame_avg_ms,
             frame_max_ms,
             cpu_usage: f32::from_bits(self.cpu_usage.load(Ordering::Relaxed)),
-            memory_mb: self.memory_bytes.load(Ordering::Relaxed) as f64 / (1024.0 * 1024.0),
+            memory_mb: self.memory_bytes.load(Ordering::Relaxed).to_f64() / (1024.0 * 1024.0),
         }
     }
 

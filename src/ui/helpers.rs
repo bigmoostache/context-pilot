@@ -1,3 +1,4 @@
+use cp_base::cast::SafeCast;
 use unicode_width::UnicodeWidthStr;
 
 pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
@@ -21,9 +22,9 @@ pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
 
 pub(crate) fn format_number(n: usize) -> String {
     if n >= 1_000_000 {
-        format!("{:.1}M", n as f64 / 1_000_000.0)
+        format!("{:.1}M", n.to_f64() / 1_000_000.0)
     } else if n >= 1_000 {
-        format!("{:.1}K", n as f64 / 1_000.0)
+        format!("{:.1}K", n.to_f64() / 1_000.0)
     } else {
         n.to_string()
     }
@@ -133,9 +134,8 @@ pub(crate) use cp_base::ui::{Cell, render_table};
 const SPINNER_BRAILLE: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /// Get a braille spinner frame (default spinner)
-#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn spinner(frame: u64) -> &'static str {
-    let index = (frame as usize) % SPINNER_BRAILLE.len();
+    let index = (frame.to_usize()) % SPINNER_BRAILLE.len();
     SPINNER_BRAILLE[index]
 }
 

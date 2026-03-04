@@ -17,6 +17,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::CallbackPanel;
 use self::types::CallbackState;
+use cp_base::cast::SafeCast;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
     serde_yaml::from_str(include_str!("../../../yamls/tools/callback.yaml"))
@@ -60,8 +61,6 @@ impl Module for CallbackModule {
             "next_id": cs.next_id,
         })
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(defs) = data.get("definitions")
             && let Ok(v) = serde_json::from_value(defs.clone())
@@ -69,7 +68,7 @@ impl Module for CallbackModule {
             CallbackState::get_mut(state).definitions = v;
         }
         if let Some(v) = data.get("next_id").and_then(|v| v.as_u64()) {
-            CallbackState::get_mut(state).next_id = v as usize;
+            CallbackState::get_mut(state).next_id = v.to_usize();
         }
     }
 

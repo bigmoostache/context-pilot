@@ -9,6 +9,7 @@ use ratatui::text::Line;
 use super::config::SidebarMode;
 use super::context::{ContextElement, ContextType};
 use super::message::Message;
+use crate::cast::SafeCast;
 use crate::llm_types::ModelInfo;
 use crate::tools::ToolDefinition;
 
@@ -295,7 +296,7 @@ impl State {
     }
 
     /// Update the last_refresh_ms timestamp for a panel by its context type
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub fn touch_panel(&mut self, context_type: ContextType) {
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == context_type) {
             ctx.last_refresh_ms = crate::panels::now_ms();
@@ -375,15 +376,13 @@ impl State {
     }
 
     /// Get cleaning threshold in tokens
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn cleaning_threshold_tokens(&self) -> usize {
-        (self.effective_context_budget() as f32 * self.cleaning_threshold) as usize
+        (self.effective_context_budget().to_f32() * self.cleaning_threshold).to_usize()
     }
 
     /// Get cleaning target in tokens
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn cleaning_target_tokens(&self) -> usize {
-        (self.effective_context_budget() as f32 * self.cleaning_target()) as usize
+        (self.effective_context_budget().to_f32() * self.cleaning_target()).to_usize()
     }
 
     /// Get cache hit price per million tokens for the current model
@@ -427,7 +426,7 @@ impl State {
 
     /// Calculate cost in USD for a given token count and price per MTok
     pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
-        tokens as f64 * price_per_mtok as f64 / 1_000_000.0
+        tokens.to_f64() * price_per_mtok.to_f64() / 1_000_000.0
     }
 
     // === Message Creation Helpers ===

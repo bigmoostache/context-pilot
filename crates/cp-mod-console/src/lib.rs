@@ -23,6 +23,7 @@ use self::panel::ConsolePanel;
 use self::types::{ConsoleState, SessionMeta};
 
 pub use self::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
+use cp_base::cast::SafeCast;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
     serde_yaml::from_str(include_str!("../../../yamls/tools/console.yaml")).expect("Failed to parse console tool YAML")
@@ -98,8 +99,6 @@ impl Module for ConsoleModule {
             })
         }
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         // Ensure the console server is running
         if let Err(e) = manager::find_or_create_server() {
@@ -109,7 +108,7 @@ impl Module for ConsoleModule {
         // Restore counter
         if let Some(v) = data.get("next_session_id").and_then(|v| v.as_u64()) {
             let cs = ConsoleState::get_mut(state);
-            cs.next_session_id = v as usize;
+            cs.next_session_id = v.to_usize();
         }
 
         let sessions_map: HashMap<String, SessionMeta> = match data.get("sessions") {

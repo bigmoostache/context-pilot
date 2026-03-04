@@ -1,4 +1,5 @@
 use super::theme;
+use cp_base::cast::SafeCast;
 use ratatui::prelude::*;
 
 /// Calculate the display width of text after stripping markdown markers
@@ -151,7 +152,6 @@ fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
 /// Strategy: compute fixed column widths → for each row, wrap cell text to fit
 /// → render each display line as a sequence of fixed-width cells separated by │.
 /// Vertical separators are always at the same character positions.
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_width: usize) -> Vec<Vec<Span<'static>>> {
     // Parse all rows into cells
     let mut rows: Vec<Vec<String>> = Vec::new();
@@ -197,7 +197,7 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
         let mut new_widths: Vec<usize> = col_widths
             .iter()
             .map(|&w| {
-                let proportional = (w as f64 / total_content_width as f64 * available as f64) as usize;
+                let proportional = (w.to_f64() / total_content_width.to_f64() * available.to_f64()).to_usize();
                 proportional.max(3) // minimum 3 chars per column
             })
             .collect();

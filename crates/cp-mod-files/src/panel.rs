@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 
+use cp_base::cast::SafeCast;
 use cp_base::config::constants::{PANEL_MAX_LOAD_BYTES, SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use cp_base::config::theme;
 use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
@@ -88,8 +89,6 @@ impl Panel for FilePanel {
     fn refresh(&self, _state: &mut State) {
         // File refresh is handled by background cache system via refresh_cache
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<FileCacheRequest>().ok()?;
         let FileCacheRequest { context_id, file_path, current_source_hash } = *req;
@@ -99,7 +98,7 @@ impl Panel for FilePanel {
         }
         // Hard byte limit: refuse to load oversized files
         if let Ok(meta) = fs::metadata(&path)
-            && meta.len() as usize > PANEL_MAX_LOAD_BYTES
+            && meta.len().to_usize() > PANEL_MAX_LOAD_BYTES
         {
             let msg = format!(
                 "[File too large to load: {} bytes (limit: {} bytes). Close this panel and use grep or other tools to inspect portions of the file.]",

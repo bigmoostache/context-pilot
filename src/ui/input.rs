@@ -7,6 +7,7 @@ use super::{helpers::spinner, theme};
 use crate::llms::{LlmProvider, ModelInfo};
 use crate::state::State;
 
+use cp_base::cast::SafeCast;
 use cp_mod_prompt::PromptState;
 use cp_mod_queue::QueueState;
 
@@ -233,7 +234,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 
     let left_width: usize = spans.iter().map(|s| s.content.chars().count()).sum();
     let right_width = right_info.len();
-    let padding = (area.width as usize).saturating_sub(left_width + right_width);
+    let padding = (area.width.to_usize()).saturating_sub(left_width + right_width);
 
     spans.push(Span::styled(" ".repeat(padding), base_style));
     spans.push(Span::styled(&right_info, base_style));
@@ -243,11 +244,10 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 }
 
 /// Calculate the height needed for the question form
-#[allow(clippy::cast_possible_truncation)]
 pub(super) fn calculate_question_form_height(form: &cp_base::ui::PendingQuestionForm) -> u16 {
     let q = &form.questions[form.current_question];
     // Header line + question text + blank + options (including Other) + blank + nav hint
-    let option_lines = q.options.len() as u16 + 1; // +1 for "Other"
+    let option_lines = q.options.len().to_u16() + 1; // +1 for "Other"
     let header_lines = 2u16; // header + question text
     let chrome = 4u16; // borders (2) + spacing + nav hint
     (header_lines + option_lines * 2 + chrome).min(20) // each option: label + description
@@ -392,9 +392,8 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
 }
 
 /// Calculate the height needed for the autocomplete popup
-#[allow(clippy::cast_possible_truncation)]
 pub(super) fn calculate_autocomplete_height(ac: &cp_base::autocomplete::AutocompleteState) -> u16 {
-    let visible = ac.visible_matches().len() as u16;
+    let visible = ac.visible_matches().len().to_u16();
     // matches + border chrome (2)
     (visible + 2).clamp(4, 12)
 }

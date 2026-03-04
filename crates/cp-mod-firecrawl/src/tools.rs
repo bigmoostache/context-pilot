@@ -2,6 +2,7 @@ use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::api::{FirecrawlClient, MapParams, ScrapeParams, SearchParams};
+use cp_base::cast::SafeCast;
 
 /// Dispatch firecrawl tool calls.
 pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
@@ -117,8 +118,6 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => err_result(tool, e),
     }
 }
-
-#[allow(clippy::cast_possible_truncation)]
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
@@ -129,7 +128,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         return err_result(tool, "Missing required parameter 'query'".to_string());
     };
 
-    let limit = tool.input.get("limit").and_then(|v| v.as_u64()).unwrap_or(3) as u32;
+    let limit = tool.input.get("limit").and_then(|v| v.as_u64()).unwrap_or(3).to_u32();
 
     let sources_val: Vec<String> = tool
         .input
@@ -222,8 +221,6 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => err_result(tool, e),
     }
 }
-
-#[allow(clippy::cast_possible_truncation)]
 fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
@@ -234,7 +231,7 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
         return err_result(tool, "Missing required parameter 'url'".to_string());
     };
 
-    let limit = tool.input.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as u32;
+    let limit = tool.input.get("limit").and_then(|v| v.as_u64()).unwrap_or(50).to_u32();
     let search_val = tool.input.get("search").and_then(|v| v.as_str()).map(String::from);
     let include_subdomains = tool.input.get("include_subdomains").and_then(|v| v.as_bool()).unwrap_or(false);
 

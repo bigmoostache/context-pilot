@@ -13,6 +13,7 @@ use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::ScratchpadPanel;
+use cp_base::cast::SafeCast;
 use cp_base::modules::Module;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
@@ -49,8 +50,6 @@ impl Module for ScratchpadModule {
             "next_scratchpad_id": ss.next_scratchpad_id,
         })
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ss = ScratchpadState::get_mut(state);
         if let Some(arr) = data.get("scratchpad_cells")
@@ -59,7 +58,7 @@ impl Module for ScratchpadModule {
             ss.scratchpad_cells = v;
         }
         if let Some(v) = data.get("next_scratchpad_id").and_then(|v| v.as_u64()) {
-            ss.next_scratchpad_id = v as usize;
+            ss.next_scratchpad_id = v.to_usize();
         }
     }
 

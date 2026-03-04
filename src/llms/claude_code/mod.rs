@@ -20,6 +20,7 @@ use serde_json::Value;
 
 use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent};
+use cp_base::cast::SafeCast;
 
 /// API endpoint with beta flag required for Claude 4.5 access
 const CLAUDE_CODE_ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
@@ -159,7 +160,7 @@ fn ensure_message_alternation(messages: &mut Vec<Value>) {
 }
 
 /// Convert content (string or array) to an array of content blocks.
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 fn content_to_blocks(content: Value) -> Vec<Value> {
     if content.is_string() {
         vec![serde_json::json!({"type": "text", "text": content.as_str().unwrap_or("")})]
@@ -215,8 +216,6 @@ impl ClaudeCodeClient {
         let access_token = Self::load_oauth_token();
         Self { access_token }
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn load_oauth_token() -> Option<SecretBox<String>> {
         let home = env::var("HOME").ok()?;
         let home_path = PathBuf::from(&home);
@@ -234,7 +233,7 @@ impl ClaudeCodeClient {
         let creds: CredentialsFile = serde_json::from_str(&content).ok()?;
 
         // Check if token is expired
-        let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
+        let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis().to_u64();
 
         if now_ms > creds.claude_ai_oauth.expires_at {
             return None; // Token expired

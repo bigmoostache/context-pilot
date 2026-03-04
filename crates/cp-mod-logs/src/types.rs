@@ -1,3 +1,4 @@
+use cp_base::cast::SafeCast;
 use cp_base::state::State;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -16,9 +17,8 @@ pub struct LogEntry {
 }
 
 impl LogEntry {
-    #[allow(clippy::cast_possible_truncation)]
     pub fn new(id: String, content: String) -> Self {
-        let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
+        let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis().to_u64()).unwrap_or(0);
         Self { id, timestamp_ms, content, parent_id: None, children_ids: vec![] }
     }
 

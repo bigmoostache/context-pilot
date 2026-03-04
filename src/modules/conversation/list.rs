@@ -1,11 +1,12 @@
 /// Actions for list continuation behavior
+use cp_base::cast::SafeCast;
+
 pub(super) enum ListAction {
     Continue(String), // Insert list continuation (e.g., "\n- " or "\n2. ")
     RemoveItem,       // Remove empty list item but keep the newline
 }
 
 /// Increment alphabetical list marker: a->b, z->aa, A->B, Z->AA
-#[allow(clippy::cast_possible_truncation)]
 fn next_alpha_marker(marker: &str) -> String {
     let chars: Vec<char> = marker.chars().collect();
     let is_upper = chars[0].is_ascii_uppercase();
@@ -22,7 +23,7 @@ fn next_alpha_marker(marker: &str) -> String {
     let mut result = String::new();
     let mut n = num;
     loop {
-        result.insert(0, (base + (n % 26) as u8) as char);
+        result.insert(0, (base + (n % 26).to_u8()) as char);
         n /= 26;
         if n == 0 {
             break;

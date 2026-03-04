@@ -17,6 +17,7 @@ use crate::ui::theme;
 
 use super::list::{self, ListAction};
 use super::render;
+use cp_base::cast::SafeCast;
 
 pub(super) struct ConversationPanel;
 
@@ -36,7 +37,12 @@ impl ConversationPanel {
             msg.content.as_str(),
             &format!(
                 "{}{}{}{}{}{}",
-                status_num, viewport_width, dev_mode as u8, tool_uses_len, tool_results_len, msg.input_tokens
+                status_num,
+                viewport_width,
+                u8::from(dev_mode),
+                tool_uses_len,
+                tool_results_len,
+                msg.input_tokens
             ),
         ])
     }
@@ -79,7 +85,6 @@ impl ConversationPanel {
     }
 
     /// Build content with caching - called from render() which has &mut State
-    #[allow(clippy::cast_possible_truncation)]
     fn build_content_cached(state: &mut State, base_style: Style) -> Vec<Line<'static>> {
         let _guard = crate::profile!("panel::conversation::content");
         let viewport_width = state.last_viewport_width;
@@ -197,7 +202,7 @@ impl ConversationPanel {
                 text.extend(cached.lines.iter().cloned());
                 // Update autocomplete with input visual line count
                 if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
-                    ac.input_visual_lines = line_count as u16;
+                    ac.input_visual_lines = line_count.to_u16();
                 }
             } else {
                 // Cache miss
@@ -216,7 +221,7 @@ impl ConversationPanel {
                 text.extend(input_lines);
                 // Update autocomplete with input visual line count
                 if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
-                    ac.input_visual_lines = line_count as u16;
+                    ac.input_visual_lines = line_count.to_u16();
                 }
             }
         } else {
@@ -236,7 +241,7 @@ impl ConversationPanel {
             text.extend(input_lines);
             // Update autocomplete with input visual line count
             if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
-                ac.input_visual_lines = line_count as u16;
+                ac.input_visual_lines = line_count.to_u16();
             }
         }
 
@@ -309,7 +314,6 @@ impl Panel for ConversationPanel {
     }
 
     /// Override render to add scrollbar and auto-scroll behavior
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn render(&self, frame: &mut Frame<'_>, state: &mut State, area: Rect) {
         let base_style = Style::default().bg(theme::bg_surface());
         let title = self.title(state);
@@ -333,10 +337,10 @@ impl Panel for ConversationPanel {
         let text = Self::build_content_cached(state, base_style);
 
         // Since we pre-wrap in content(), each Line = 1 visual line
-        let viewport_height = content_area.height as usize;
+        let viewport_height = content_area.height.to_usize();
         let content_height = text.len();
 
-        let max_scroll = content_height.saturating_sub(viewport_height) as f32;
+        let max_scroll = content_height.saturating_sub(viewport_height).to_f32();
         state.max_scroll = max_scroll;
 
         // Auto-scroll to bottom when not manually scrolled
@@ -353,7 +357,7 @@ impl Panel for ConversationPanel {
             Paragraph::new(text)
                 .style(base_style)
                 // NO .wrap() - we pre-wrap in content() for performance
-                .scroll((state.scroll_offset.round() as u16, 0))
+                .scroll((state.scroll_offset.round().to_u16(), 0))
         };
 
         {
@@ -369,7 +373,7 @@ impl Panel for ConversationPanel {
                 .thumb_style(Style::default().fg(theme::accent_dim()));
 
             let mut scrollbar_state =
-                ScrollbarState::new(max_scroll as usize).position(state.scroll_offset.round() as usize);
+                ScrollbarState::new(max_scroll.to_usize()).position(state.scroll_offset.round().to_usize());
 
             frame.render_stateful_widget(
                 scrollbar,

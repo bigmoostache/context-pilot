@@ -18,6 +18,7 @@ use crate::app::panels::ContextItem;
 use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::ToolResult;
 use crate::state::Message;
+use cp_base::cast::SafeCast;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
 pub(crate) use cp_base::llm_types::{
@@ -156,7 +157,6 @@ pub(crate) struct FakePanelMessage {
 }
 
 /// Convert milliseconds since UNIX epoch to ISO 8601 format
-#[allow(clippy::cast_possible_truncation)]
 fn ms_to_iso8601(ms: u64) -> String {
     use std::time::{Duration, UNIX_EPOCH};
     let duration = Duration::from_millis(ms);
@@ -174,7 +174,7 @@ fn ms_to_iso8601(ms: u64) -> String {
 
         // Calculate year/month/day from days since 1970-01-01
         let mut year = 1970i32;
-        let mut remaining_days = days_since_epoch as i32;
+        let mut remaining_days = days_since_epoch.to_i32();
 
         loop {
             let days_in_year = if is_leap_year(year) { 366 } else { 365 };

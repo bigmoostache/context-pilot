@@ -3,6 +3,7 @@ use ratatui::{prelude::*, widgets::Paragraph};
 use super::super::{chars, helpers::*, theme};
 use crate::infra::constants::SIDEBAR_HELP_HEIGHT;
 use crate::state::{ContextType, State};
+use cp_base::cast::SafeCast;
 
 /// Returns a count badge for fixed panels, replacing the panel ID (P1, P2, etc.)
 /// with a meaningful number that reflects the panel's content.
@@ -32,8 +33,6 @@ pub(super) fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String>
 
 /// Maximum number of dynamic contexts (P7+) to show per page
 const MAX_DYNAMIC_PER_PAGE: usize = 10;
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let _guard = crate::profile!("ui::sidebar");
     let base_style = Style::default().bg(theme::bg_base());
@@ -188,12 +187,12 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     ]));
 
     // Calculate bar segment positions
-    let hit_pct = if max_tokens > 0 { hit_tokens as f64 / max_tokens as f64 } else { 0.0 };
-    let miss_pct = if max_tokens > 0 { miss_tokens as f64 / max_tokens as f64 } else { 0.0 };
-    let hit_filled = (hit_pct * bar_width as f64) as usize;
-    let miss_filled = (miss_pct * bar_width as f64) as usize;
+    let hit_pct = if max_tokens > 0 { hit_tokens.to_f64() / max_tokens.to_f64() } else { 0.0 };
+    let miss_pct = if max_tokens > 0 { miss_tokens.to_f64() / max_tokens.to_f64() } else { 0.0 };
+    let hit_filled = (hit_pct * bar_width.to_f64()).to_usize();
+    let miss_filled = (miss_pct * bar_width.to_f64()).to_usize();
     let total_filled = (hit_filled + miss_filled).min(bar_width);
-    let threshold_pos = (threshold_pct as f64 * bar_width as f64) as usize;
+    let threshold_pos = (threshold_pct.to_f64() * bar_width.to_f64()).to_usize();
 
     // Build bar: [green hit][orange miss][empty]
     let mut bar_spans = vec![Span::styled(" ", base_style)];

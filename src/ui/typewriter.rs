@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use crate::infra::constants::{
     TYPEWRITER_DEFAULT_DELAY_MS, TYPEWRITER_MAX_DELAY_MS, TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MOVING_AVG_SIZE,
 };
+use cp_base::cast::SafeCast;
 
 pub(crate) struct TypewriterBuffer {
     pub pending_chars: VecDeque<char>,
@@ -69,10 +70,10 @@ impl TypewriterBuffer {
         }
 
         let total_interval_ms: f64 = self.chunk_intervals.iter().map(|d| d.as_secs_f64() * 1000.0).sum();
-        let avg_interval_ms = total_interval_ms / self.chunk_intervals.len() as f64;
+        let avg_interval_ms = total_interval_ms / self.chunk_intervals.len().to_f64();
 
         let total_chars: usize = self.chunk_sizes.iter().sum();
-        let avg_chunk_size = total_chars as f64 / self.chunk_sizes.len() as f64;
+        let avg_chunk_size = total_chars.to_f64() / self.chunk_sizes.len().to_f64();
 
         if avg_interval_ms > 0.0 && avg_chunk_size > 0.0 {
             let calculated_delay = avg_interval_ms / avg_chunk_size;
@@ -84,8 +85,6 @@ impl TypewriterBuffer {
     pub(crate) fn mark_done(&mut self) {
         self.stream_done = true;
     }
-
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub(crate) fn take_chars(&mut self) -> Option<String> {
         if self.pending_chars.is_empty() {
             return None;
@@ -93,7 +92,7 @@ impl TypewriterBuffer {
 
         let now = Instant::now();
         let elapsed_ms = now.duration_since(self.last_char_time).as_secs_f64() * 1000.0;
-        let chars_to_release = (elapsed_ms * self.chars_per_ms).floor() as usize;
+        let chars_to_release = (elapsed_ms * self.chars_per_ms).floor().to_usize();
 
         if chars_to_release == 0 {
             return None;

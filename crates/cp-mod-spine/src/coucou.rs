@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use cp_base::cast::SafeCast;
 use cp_base::panels::now_ms;
 use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
@@ -104,7 +105,6 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
 
 /// Parse an ISO 8601 datetime string into milliseconds since epoch.
 /// Supports: "2026-02-20T08:00:00", "2026-02-20 08:00:00", "2026-02-20T08:00"
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn parse_datetime_ms(s: &str) -> Result<u64, String> {
     // Try parsing with chrono-like manual parsing (we don't have chrono in this crate)
     // Format: YYYY-MM-DDTHH:MM:SS or YYYY-MM-DD HH:MM:SS or YYYY-MM-DDTHH:MM
@@ -140,11 +140,11 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
         days += if is_leap_year(y) { 366 } else { 365 };
     }
     let month_days = [31, if is_leap_year(year) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    for day_count in month_days.iter().take((month - 1) as usize) {
+    for day_count in month_days.iter().take((month - 1).to_usize()) {
         if month > 12 {
             break;
         }
-        days += *day_count as i64;
+        days += (*day_count).to_i64();
     }
     days += day - 1;
 
@@ -153,7 +153,7 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
         return Err("DateTime is before epoch".to_string());
     }
 
-    Ok(total_secs as u64 * 1000)
+    Ok(total_secs.to_u64() * 1000)
 }
 
 fn is_leap_year(y: i64) -> bool {

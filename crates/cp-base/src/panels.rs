@@ -25,6 +25,7 @@ use sha2::{Digest, Sha256};
 
 use crossterm::event::KeyEvent;
 
+use crate::cast::SafeCast;
 use crate::state::{Action, ContextElement, ContextType, State};
 
 // =============================================================================
@@ -91,9 +92,8 @@ pub enum WatchSpec {
 }
 
 /// Get current time in milliseconds since UNIX epoch
-#[allow(clippy::cast_possible_truncation)]
 pub fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis().to_u64()).unwrap_or(0)
 }
 
 /// Update last_refresh_ms only if content actually changed (hash differs).
@@ -110,7 +110,7 @@ pub fn update_if_changed(ctx: &mut ContextElement, content: &str) -> bool {
 
 /// Mark all panels of a given context type as cache-deprecated (dirty).
 /// Also sets `state.dirty = true` so the UI re-renders.
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 pub fn mark_panels_dirty(state: &mut State, context_type: ContextType) {
     for ctx in &mut state.context {
         if ctx.context_type == context_type {
@@ -124,7 +124,6 @@ pub fn mark_panels_dirty(state: &mut State, context_type: ContextType) {
 /// Returns the original content unchanged when total_pages <= 1.
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
 /// and prepends a page header.
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn paginate_content(full_content: &str, current_page: usize, total_pages: usize) -> String {
     use crate::config::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
@@ -132,8 +131,8 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
         return full_content.to_string();
     }
 
-    let chars_per_page = PANEL_PAGE_TOKENS as f32 * CHARS_PER_TOKEN;
-    let start_char = (current_page as f32 * chars_per_page) as usize;
+    let chars_per_page = PANEL_PAGE_TOKENS.to_f32() * CHARS_PER_TOKEN;
+    let start_char = (current_page.to_f32() * chars_per_page).to_usize();
 
     // Snap start to next line boundary
     let start = if start_char == 0 {
@@ -145,7 +144,7 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
         full_content[start_char..].find('\n').map(|pos| start_char + pos + 1).unwrap_or(full_content.len())
     };
 
-    let end_char = start + chars_per_page as usize;
+    let end_char = start + chars_per_page.to_usize();
     let end = if end_char >= full_content.len() {
         full_content.len()
     } else {

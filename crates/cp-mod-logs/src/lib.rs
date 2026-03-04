@@ -2,6 +2,7 @@ mod panel;
 mod tools;
 pub mod types;
 
+use cp_base::cast::SafeCast;
 pub use types::{LogEntry, LogsState};
 
 /// Logs subdirectory (chunked JSON files, global across workers)
@@ -69,7 +70,6 @@ pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<(PathBu
 }
 
 /// Load all logs from chunked JSON files in .context-pilot/logs/
-#[allow(clippy::cast_possible_truncation)]
 fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
     let dir = logs_dir();
     let mut all_logs: Vec<LogEntry> = Vec::new();
@@ -81,7 +81,7 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
         && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
         && let Some(v) = val.get("next_log_id").and_then(|v| v.as_u64())
     {
-        next_log_id = v as usize;
+        next_log_id = v.to_usize();
     }
 
     // Load all chunk files

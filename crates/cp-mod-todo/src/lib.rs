@@ -13,6 +13,7 @@ use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolParam, Tool
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TodoPanel;
+use cp_base::cast::SafeCast;
 use cp_base::modules::Module;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
@@ -48,8 +49,6 @@ impl Module for TodoModule {
             "next_todo_id": ts.next_todo_id,
         })
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ts = TodoState::get_mut(state);
         if let Some(arr) = data.get("todos")
@@ -58,7 +57,7 @@ impl Module for TodoModule {
             ts.todos = v;
         }
         if let Some(v) = data.get("next_todo_id").and_then(|v| v.as_u64()) {
-            ts.next_todo_id = v as usize;
+            ts.next_todo_id = v.to_usize();
         }
     }
 

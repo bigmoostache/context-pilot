@@ -16,6 +16,7 @@ use typst::utils::LazyHash;
 use typst::{Library, World};
 
 use crate::packages;
+use cp_base::cast::SafeCast;
 
 /// Compile a `.typ` file to PDF bytes.
 ///
@@ -252,8 +253,6 @@ impl World for ContextPilotWorld {
     fn font(&self, index: usize) -> Option<Font> {
         self.fonts.get(index).cloned()
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use chrono::{Datelike, Local, Timelike, Utc};
         let now = Local::now();
@@ -265,17 +264,16 @@ impl World for ContextPilotWorld {
         };
         Datetime::from_ymd_hms(
             naive.year(),
-            naive.month() as u8,
-            naive.day() as u8,
-            naive.hour() as u8,
-            naive.minute() as u8,
-            naive.second() as u8,
+            naive.month().to_u8(),
+            naive.day().to_u8(),
+            naive.hour().to_u8(),
+            naive.minute().to_u8(),
+            naive.second().to_u8(),
         )
     }
 }
 
 /// Load fonts from a directory recursively.
-#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn load_fonts_from_dir(dir: &Path, book: &mut FontBook, fonts: &mut Vec<Font>) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
@@ -288,7 +286,7 @@ pub(crate) fn load_fonts_from_dir(dir: &Path, book: &mut FontBook, fonts: &mut V
             let bytes = Bytes::new(data);
             for (i, info) in FontInfo::iter(&bytes).enumerate() {
                 book.push(info);
-                if let Some(font) = Font::new(bytes.clone(), i as u32) {
+                if let Some(font) = Font::new(bytes.clone(), i.to_u32()) {
                     fonts.push(font);
                 }
             }

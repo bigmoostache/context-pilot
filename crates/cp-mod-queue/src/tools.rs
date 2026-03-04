@@ -2,6 +2,7 @@ use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::QueueState;
+use cp_base::cast::SafeCast;
 
 /// Execute Queue_activate: start intercepting tool calls.
 pub(crate) fn execute_activate(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -47,10 +48,9 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute Queue_undo: remove specific queued action(s) by index.
-#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
     let indices: Vec<usize> = match tool.input.get("indices").and_then(|v| v.as_array()) {
-        Some(arr) => arr.iter().filter_map(|v| v.as_u64().map(|n| n as usize)).collect(),
+        Some(arr) => arr.iter().filter_map(|v| v.as_u64().map(|n| n.to_usize())).collect(),
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),

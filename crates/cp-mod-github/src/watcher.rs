@@ -168,7 +168,7 @@ pub fn is_api_command(args: &[String]) -> bool {
 }
 
 /// Background polling loop.
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 fn poll_loop(
     watches: Arc<Mutex<HashMap<String, GhWatch>>>,
     branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,

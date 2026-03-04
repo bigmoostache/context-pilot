@@ -7,6 +7,7 @@
 //!
 //! View results: tail -f .context-pilot/perf.log
 
+use cp_base::cast::SafeCast;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::time::Instant;
@@ -26,10 +27,9 @@ impl ProfileGuard {
 }
 
 impl Drop for ProfileGuard {
-    #[allow(clippy::cast_possible_truncation)]
     fn drop(&mut self) {
         let elapsed = self.start.elapsed();
-        let us = elapsed.as_micros() as u64;
+        let us = elapsed.as_micros().to_u64();
         let ms = us / 1000;
 
         // Always record to in-memory perf system

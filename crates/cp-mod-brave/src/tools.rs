@@ -2,6 +2,7 @@ use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::api::{BraveClient, LLMContextParams, SearchParams};
+use cp_base::cast::SafeCast;
 
 /// Dispatch brave tool calls.
 pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
@@ -24,8 +25,6 @@ fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, tool_name: tool.name.clone() }
 }
-
-#[allow(clippy::cast_possible_truncation)]
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
@@ -36,7 +35,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         return err_result(tool, "Missing required parameter 'query'".to_string());
     };
 
-    let count = tool.input.get("count").and_then(|v| v.as_u64()).unwrap_or(5) as u32;
+    let count = tool.input.get("count").and_then(|v| v.as_u64()).unwrap_or(5).to_u32();
     let freshness_val = tool.input.get("freshness").and_then(|v| v.as_str()).map(String::from);
     let country_val = tool.input.get("country").and_then(|v| v.as_str()).unwrap_or("US");
     let search_lang = tool.input.get("search_lang").and_then(|v| v.as_str()).unwrap_or("en");
@@ -87,8 +86,6 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => err_result(tool, e),
     }
 }
-
-#[allow(clippy::cast_possible_truncation)]
 fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
@@ -99,8 +96,8 @@ fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
         return err_result(tool, "Missing required parameter 'query'".to_string());
     };
 
-    let max_tokens = tool.input.get("maximum_number_of_tokens").and_then(|v| v.as_u64()).unwrap_or(8192) as u32;
-    let count = tool.input.get("count").and_then(|v| v.as_u64()).unwrap_or(20) as u32;
+    let max_tokens = tool.input.get("maximum_number_of_tokens").and_then(|v| v.as_u64()).unwrap_or(8192).to_u32();
+    let count = tool.input.get("count").and_then(|v| v.as_u64()).unwrap_or(20).to_u32();
     let threshold_mode = tool.input.get("context_threshold_mode").and_then(|v| v.as_str()).unwrap_or("balanced");
     let freshness_val = tool.input.get("freshness").and_then(|v| v.as_str()).map(String::from);
     let country_val = tool.input.get("country").and_then(|v| v.as_str()).unwrap_or("US");

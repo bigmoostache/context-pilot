@@ -19,10 +19,10 @@ pub(crate) const DETACH_CHUNK_MIN_MESSAGES: usize = 25;
 pub(crate) const DETACH_CHUNK_MIN_TOKENS: usize = 5_000;
 
 /// Minimum messages to keep in the live conversation after detachment.
-pub(crate) const DETACH_KEEP_MIN_MESSAGES: usize = 20;
+pub(crate) const DETACH_KEEP_MIN_MESSAGES: usize = 10;
 
 /// Minimum tokens to keep in the live conversation after detachment.
-pub(crate) const DETACH_KEEP_MIN_TOKENS: usize = 3_500;
+pub(crate) const DETACH_KEEP_MIN_TOKENS: usize = 1_000;
 
 // =============================================================================
 // SCROLLING

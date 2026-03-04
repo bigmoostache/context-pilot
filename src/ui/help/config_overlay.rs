@@ -5,6 +5,7 @@ use ratatui::{
 
 use crate::infra::constants::{chars, theme};
 use crate::state::State;
+use cp_base::cast::SafeCast;
 
 pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Center the overlay, clamped to available area
@@ -154,12 +155,10 @@ fn render_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
         }
     }
 }
-
-#[allow(clippy::cast_possible_truncation)]
 fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
     if state.api_check_in_progress {
         let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-        let spinner = spinner_chars[(state.spinner_frame as usize) % spinner_chars.len()];
+        let spinner = spinner_chars[(state.spinner_frame.to_usize()) % spinner_chars.len()];
         lines.push(Line::from(vec![
             Span::styled(format!("  {} ", spinner), Style::default().fg(theme::accent())),
             Span::styled("Checking API...", Style::default().fg(theme::text_muted())),
@@ -179,12 +178,10 @@ fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
         ]));
     }
 }
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let format_tokens = |tokens: usize| -> String {
         if tokens >= 1_000_000 {
-            format!("{:.1}M", tokens as f64 / 1_000_000.0)
+            format!("{:.1}M", tokens.to_f64() / 1_000_000.0)
         } else if tokens >= 1_000 {
             format!("{}K", tokens / 1_000)
         } else {
@@ -198,8 +195,8 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let selected = state.config_selected_bar;
 
     // 1. Context Budget
-    let budget_pct = (effective_budget as f64 / max_budget as f64 * 100.0) as usize;
-    let budget_filled = ((effective_budget as f64 / max_budget as f64) * bar_width as f64) as usize;
+    let budget_pct = (effective_budget.to_f64() / max_budget.to_f64() * 100.0).to_usize();
+    let budget_filled = ((effective_budget.to_f64() / max_budget.to_f64()) * bar_width.to_f64()).to_usize();
     render_bar(
         lines,
         &BarConfig {
@@ -216,9 +213,9 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     );
 
     // 2. Cleaning Threshold
-    let threshold_pct = (state.cleaning_threshold * 100.0) as usize;
+    let threshold_pct = (state.cleaning_threshold * 100.0).to_usize();
     let threshold_tokens = state.cleaning_threshold_tokens();
-    let threshold_filled = ((state.cleaning_threshold * bar_width as f32) as usize).min(bar_width);
+    let threshold_filled = ((state.cleaning_threshold * bar_width.to_f32()).to_usize()).min(bar_width);
     render_bar(
         lines,
         &BarConfig {
@@ -235,10 +232,10 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     );
 
     // 3. Target Cleaning
-    let target_pct = (state.cleaning_target_proportion * 100.0) as usize;
+    let target_pct = (state.cleaning_target_proportion * 100.0).to_usize();
     let target_tokens = state.cleaning_target_tokens();
-    let target_abs_pct = (state.cleaning_target() * 100.0) as usize;
-    let target_filled = ((state.cleaning_target_proportion * bar_width as f32) as usize).min(bar_width);
+    let target_abs_pct = (state.cleaning_target() * 100.0).to_usize();
+    let target_filled = ((state.cleaning_target_proportion * bar_width.to_f32()).to_usize()).min(bar_width);
     let extra = format!(" ({}%)", target_abs_pct);
     render_bar(
         lines,
@@ -259,7 +256,7 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let spine_cfg = &cp_mod_spine::SpineState::get(state).config;
     let max_cost = spine_cfg.max_cost.unwrap_or(0.0);
     let max_display = 20.0f64;
-    let cost_filled = ((max_cost / max_display) * bar_width as f64).min(bar_width as f64) as usize;
+    let cost_filled = ((max_cost / max_display) * bar_width.to_f64()).min(bar_width.to_f64()).to_usize();
     let cost_label = if max_cost <= 0.0 { "disabled".to_string() } else { format!("${:.2}", max_cost) };
     let is_selected = selected == 3;
     let indicator = if is_selected { ">" } else { " " };

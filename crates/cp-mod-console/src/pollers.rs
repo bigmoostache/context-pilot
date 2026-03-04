@@ -9,13 +9,14 @@ use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 
 use super::manager::server_request;
+use cp_base::cast::SafeCast;
 
 /// File poller: reads new bytes from a log file into a ring buffer.
 pub(crate) fn file_poller(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>) {
     file_poller_from_offset(path, buffer, stop, 0);
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 pub(crate) fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>, mut offset: u64) {
     use std::io::{Read, Seek, SeekFrom};
 
@@ -46,7 +47,7 @@ pub(crate) fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: A
                     Ok(0) => break,
                     Ok(n) => {
                         buffer.write(&buf[..n]);
-                        offset += n as u64;
+                        offset += n.to_u64();
                     }
                     Err(_) => break,
                 }
@@ -58,8 +59,7 @@ pub(crate) fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: A
 }
 
 /// Periodically poll the server for process status.
-#[allow(clippy::needless_pass_by_value)]
-#[allow(clippy::cast_possible_truncation)]
+#[expect(clippy::needless_pass_by_value)]
 pub(crate) fn poll_server_status(
     key: String,
     status: Arc<Mutex<ProcessStatus>>,
@@ -75,7 +75,7 @@ pub(crate) fn poll_server_status(
         if let Ok(resp) = server_request(&req) {
             let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
             if st.starts_with("exited") {
-                let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1) as i32;
+                let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1).to_i32();
                 let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
                 if !s.is_terminal() {
                     *s = if code == 0 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };

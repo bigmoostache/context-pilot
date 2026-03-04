@@ -11,6 +11,7 @@ use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::QueuePanel;
+use cp_base::cast::SafeCast;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
     serde_yaml::from_str(include_str!("../../../yamls/tools/queue.yaml")).expect("Failed to parse queue tool YAML")
@@ -46,8 +47,6 @@ impl Module for QueueModule {
             "next_index": qs.next_index,
         })
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let qs = QueueState::get_mut(state);
         if let Some(active) = data.get("active").and_then(|v| v.as_bool()) {
@@ -59,7 +58,7 @@ impl Module for QueueModule {
             qs.queued_calls = v;
         }
         if let Some(v) = data.get("next_index").and_then(|v| v.as_u64()) {
-            qs.next_index = v as usize;
+            qs.next_index = v.to_usize();
         }
     }
 
@@ -109,8 +108,6 @@ impl Module for QueueModule {
                 .build(),
         ]
     }
-
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
         let qs = QueueState::get(state);
         match tool.name.as_str() {
@@ -140,7 +137,7 @@ impl Module for QueueModule {
                 if let Some(indices) = tool.input.get("indices").and_then(|v| v.as_array()) {
                     for idx_val in indices {
                         if let Some(idx) = idx_val.as_i64()
-                            && !qs.queued_calls.iter().any(|c| c.index == idx as usize)
+                            && !qs.queued_calls.iter().any(|c| c.index == idx.to_usize())
                         {
                             pf.errors.push(format!("Queue index {} not found", idx));
                         }

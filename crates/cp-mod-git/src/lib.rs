@@ -4,11 +4,11 @@ mod result_panel;
 mod tools;
 pub mod types;
 
+use cp_base::cast::SafeCast;
 pub use types::{GitChangeType, GitFileChange, GitState};
 
 /// Refresh git status (branch, file changes) into GitState.
 /// Called periodically by the overview panel to keep stats up to date.
-#[allow(clippy::cast_possible_truncation)]
 pub fn refresh_git_status(state: &mut State) {
     use std::process::Command;
     use types::GitChangeType;
@@ -104,7 +104,7 @@ pub fn refresh_git_status(state: &mut State) {
                 continue;
             }
             // Count lines for untracked files
-            let line_count = std::fs::read_to_string(&path).map(|c| c.lines().count() as i32).unwrap_or(0);
+            let line_count = std::fs::read_to_string(&path).map(|c| c.lines().count().to_i32()).unwrap_or(0);
 
             file_changes.push(GitFileChange {
                 path,

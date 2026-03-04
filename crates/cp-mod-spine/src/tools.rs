@@ -2,6 +2,7 @@ use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::SpineState;
+use cp_base::cast::SafeCast;
 
 /// Execute the notification_mark_processed tool
 pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -47,7 +48,6 @@ pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolR
 }
 
 /// Execute the spine_configure tool — update spine auto-continuation and guard rail settings
-#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut changes: Vec<String> = Vec::new();
 
@@ -72,7 +72,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
                     true,
                 );
             }
-            SpineState::get_mut(state).config.max_output_tokens = Some(n as usize);
+            SpineState::get_mut(state).config.max_output_tokens = Some(n.to_usize());
             changes.push(format!("max_output_tokens = {}", n));
         }
     }
@@ -144,7 +144,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
                     true,
                 );
             }
-            SpineState::get_mut(state).config.max_messages = Some(n as usize);
+            SpineState::get_mut(state).config.max_messages = Some(n.to_usize());
             changes.push(format!("max_messages = {}", n));
         }
     }
@@ -162,7 +162,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
                     true,
                 );
             }
-            SpineState::get_mut(state).config.max_auto_retries = Some(n as usize);
+            SpineState::get_mut(state).config.max_auto_retries = Some(n.to_usize());
             changes.push(format!("max_auto_retries = {}", n));
         }
     }

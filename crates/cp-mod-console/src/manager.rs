@@ -14,6 +14,7 @@ use crate::CONSOLE_DIR;
 use crate::pollers::{file_poller, file_poller_from_offset, poll_server_status};
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
+use cp_base::cast::SafeCast;
 
 /// Socket path for the console server.
 fn server_socket_path() -> PathBuf {
@@ -200,7 +201,6 @@ unsafe impl Sync for SessionHandle {}
 
 impl SessionHandle {
     /// Spawn a new child process via the console server.
-    #[allow(clippy::cast_possible_truncation)]
     pub fn spawn(name: String, command: String, cwd: Option<String>) -> Result<Self, String> {
         let log_path = log_file_path(&name);
         let log_path_str = log_path.to_string_lossy().to_string();
@@ -223,7 +223,7 @@ impl SessionHandle {
             find_or_create_server()?;
             server_request(&req)?
         };
-        let pid = resp.get("pid").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        let pid = resp.get("pid").and_then(|v| v.as_u64()).unwrap_or(0).to_u32();
 
         let status = Arc::new(Mutex::new(ProcessStatus::Running));
         let buffer = RingBuffer::new();
@@ -267,7 +267,6 @@ impl SessionHandle {
     }
 
     /// Reconnect to a server-managed session after TUI reload.
-    #[allow(clippy::cast_possible_truncation)]
     pub fn reconnect(
         name: String,
         command: String,
@@ -288,7 +287,7 @@ impl SessionHandle {
             if !content.is_empty() {
                 buffer.write(&content);
             }
-            content.len() as u64
+            content.len().to_u64()
         } else {
             0
         };
@@ -299,7 +298,7 @@ impl SessionHandle {
             if let Ok(resp) = server_request(&req) {
                 let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
                 if st.starts_with("exited") {
-                    let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1) as i32;
+                    let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1).to_i32();
                     let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
                     *s = ProcessStatus::Finished(code);
                     let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());

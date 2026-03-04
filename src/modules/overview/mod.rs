@@ -16,6 +16,7 @@ use crate::state::{ContextType, ContextTypeMeta, State};
 use self::panel::OverviewPanel;
 use self::tools_panel::ToolsPanel;
 use super::Module;
+use cp_base::cast::SafeCast;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
     serde_yaml::from_str(include_str!("../../../yamls/tools/core.yaml")).expect("Failed to parse core tool YAML")
@@ -77,8 +78,6 @@ impl Module for OverviewModule {
             "disabled_tools": state.tools.iter().filter(|t| !t.enabled).map(|t| &t.id).collect::<Vec<_>>(),
         })
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("active_modules").and_then(|v| v.as_array()) {
             state.active_modules = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
@@ -149,25 +148,25 @@ impl Module for OverviewModule {
             state.reverie_enabled = v;
         }
         if let Some(v) = data.get("cleaning_threshold").and_then(|v| v.as_f64()) {
-            state.cleaning_threshold = v as f32;
+            state.cleaning_threshold = v.to_f32();
         }
         if let Some(v) = data.get("cleaning_target_proportion").and_then(|v| v.as_f64()) {
-            state.cleaning_target_proportion = v as f32;
+            state.cleaning_target_proportion = v.to_f32();
         }
         if let Some(v) = data.get("context_budget") {
-            state.context_budget = v.as_u64().map(|n| n as usize);
+            state.context_budget = v.as_u64().map(|n| n.to_usize());
         }
         if let Some(v) = data.get("global_next_uid").and_then(|v| v.as_u64()) {
-            state.global_next_uid = v as usize;
+            state.global_next_uid = v.to_usize();
         }
         if let Some(v) = data.get("cache_hit_tokens").and_then(|v| v.as_u64()) {
-            state.cache_hit_tokens = v as usize;
+            state.cache_hit_tokens = v.to_usize();
         }
         if let Some(v) = data.get("cache_miss_tokens").and_then(|v| v.as_u64()) {
-            state.cache_miss_tokens = v as usize;
+            state.cache_miss_tokens = v.to_usize();
         }
         if let Some(v) = data.get("total_output_tokens").and_then(|v| v.as_u64()) {
-            state.total_output_tokens = v as usize;
+            state.total_output_tokens = v.to_usize();
         }
         if let Some(arr) = data.get("disabled_tools").and_then(|v| v.as_array()) {
             let disabled: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
@@ -325,7 +324,7 @@ impl Module for OverviewModule {
                         None => pf.errors.push(format!("Panel '{}' not found", panel_id)),
                         Some(ctx) => {
                             if let Some(page) = tool.input.get("page").and_then(|v| v.as_i64()) {
-                                let total = ctx.total_pages as i64;
+                                let total = ctx.total_pages.to_i64();
                                 if total > 0 && (page < 1 || page > total) {
                                     pf.errors.push(format!("Page {} out of range (1-{})", page, total));
                                 }

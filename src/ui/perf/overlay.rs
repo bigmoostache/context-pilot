@@ -6,6 +6,7 @@
 use super::super::helpers::Cell;
 use super::super::{chars, theme};
 use super::{FRAME_BUDGET_30FPS, FRAME_BUDGET_60FPS, PERF};
+use cp_base::cast::SafeCast;
 use ratatui::{
     prelude::*,
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
@@ -145,12 +146,10 @@ fn frame_time_color(ms: f64) -> Color {
         theme::error()
     }
 }
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn render_budget_bar(current_ms: f64, label: &str, budget_ms: f64) -> Line<'static> {
     let pct = (current_ms / budget_ms * 100.0).min(150.0);
     let bar_width = 30usize;
-    let filled = ((pct / 100.0) * bar_width as f64) as usize;
+    let filled = ((pct / 100.0) * bar_width.to_f64()).to_usize();
 
     let color = if pct <= 80.0 {
         theme::success()
@@ -170,8 +169,6 @@ fn render_budget_bar(current_ms: f64, label: &str, budget_ms: f64) -> Line<'stat
         Span::styled(format!(" {:>5.0}%", pct), Style::default().fg(color)),
     ])
 }
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn render_sparkline(values: &[f64]) -> Line<'static> {
     const SPARK_CHARS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
@@ -186,7 +183,7 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
     let sparkline: String = values
         .iter()
         .map(|&v| {
-            let idx = ((v / max_val) * (SPARK_CHARS.len() - 1) as f64) as usize;
+            let idx = ((v / max_val) * (SPARK_CHARS.len() - 1).to_f64()).to_usize();
             SPARK_CHARS[idx.min(SPARK_CHARS.len() - 1)]
         })
         .collect();

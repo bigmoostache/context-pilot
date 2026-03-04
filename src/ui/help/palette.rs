@@ -7,6 +7,7 @@ use crate::state::State;
 use crate::ui::theme;
 
 use super::commands::{PaletteCommand, get_available_commands};
+use cp_base::cast::SafeCast;
 
 /// State for the command palette
 #[derive(Debug, Clone, Default)]
@@ -146,7 +147,6 @@ impl CommandPalette {
     }
 
     /// Render the command palette
-    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn render(&self, frame: &mut Frame<'_>, _state: &State) {
         if !self.is_open {
             return;
@@ -157,7 +157,7 @@ impl CommandPalette {
         // Palette dimensions - full width, at top
         let width = area.width;
         let max_visible_items = 8usize;
-        let items_height = self.filtered_commands.len().min(max_visible_items) as u16;
+        let items_height = self.filtered_commands.len().min(max_visible_items).to_u16();
         let height = 2 + items_height; // Input line + items + border
 
         let palette_area = Rect::new(0, 0, width, height);
@@ -181,7 +181,7 @@ impl CommandPalette {
 
         // Render input line with cursor and Esc hint
         let esc_hint = "  Esc to close";
-        let available_width = width as usize - 4 - esc_hint.len(); // Account for "> " prefix and hint
+        let available_width = width.to_usize() - 4 - esc_hint.len(); // Account for "> " prefix and hint
 
         let input_display = if self.query.is_empty() {
             vec![
@@ -231,7 +231,7 @@ impl CommandPalette {
 
             // Pad to full width for consistent highlight
             let content_len = prefix.len() + cmd.label.len() + 2 + cmd.description.len();
-            let padding = (width as usize).saturating_sub(content_len);
+            let padding = (width.to_usize()).saturating_sub(content_len);
 
             result_lines.push(Line::from(vec![
                 Span::styled(prefix, style),
@@ -257,7 +257,7 @@ impl CommandPalette {
         frame.render_widget(results, chunks[1]);
 
         // Bottom border
-        let border_line = "─".repeat(width as usize);
+        let border_line = "─".repeat(width.to_usize());
         let border = Paragraph::new(Line::from(Span::styled(border_line, Style::default().fg(theme::border()))))
             .style(Style::default().bg(theme::bg_surface()));
         frame.render_widget(border, chunks[2]);

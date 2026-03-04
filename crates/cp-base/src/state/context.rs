@@ -4,6 +4,7 @@ use std::sync::OnceLock;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
+use crate::cast::SafeCast;
 use crate::config::constants::CHARS_PER_TOKEN;
 use crate::config::{active_theme, normalize_icon};
 
@@ -221,17 +222,15 @@ impl ContextElement {
         self.metadata.get(key).and_then(|v| v.as_str())
     }
 
-    /// Fast path: get a metadata value as usize.
-    #[allow(clippy::cast_possible_truncation)]
+    /// Fast path: get a metadata value.to_usize().
     pub fn get_meta_usize(&self, key: &str) -> Option<usize> {
-        self.metadata.get(key).and_then(|v| v.as_u64()).map(|n| n as usize)
+        self.metadata.get(key).and_then(|v| v.as_u64()).map(|n| n.to_usize())
     }
 }
 
 /// Estimate tokens from text (uses CHARS_PER_TOKEN constant)
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn estimate_tokens(text: &str) -> usize {
-    (text.len() as f32 / CHARS_PER_TOKEN).ceil() as usize
+    (text.len().to_f32() / CHARS_PER_TOKEN).ceil().to_usize()
 }
 
 /// Compute total pages for a given token count using PANEL_PAGE_TOKENS
@@ -363,7 +362,7 @@ mod tests {
     #[test]
     fn estimate_tokens_short_text() {
         let text = "hello world";
-        let expected = (text.len() as f32 / CHARS_PER_TOKEN).ceil() as usize;
+        let expected = (text.len().to_f32() / CHARS_PER_TOKEN).ceil().to_usize();
         assert_eq!(estimate_tokens(text), expected);
     }
 

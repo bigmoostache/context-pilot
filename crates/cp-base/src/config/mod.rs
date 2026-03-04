@@ -253,6 +253,7 @@ fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
 // ============================================================================
 
 pub mod constants;
+pub mod llm_types;
 
 pub static PROMPTS: LazyLock<PromptsConfig> =
     LazyLock::new(|| parse_yaml("prompts.yaml", include_str!("../../../../yamls/prompts.yaml")));

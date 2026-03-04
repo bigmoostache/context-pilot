@@ -128,7 +128,7 @@ impl Drop for PersistenceWriter {
 }
 
 /// The writer thread's main loop
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 fn writer_loop(rx: Receiver<WriterMsg>, flush_sync: Arc<(Mutex<bool>, Condvar)>) {
     let mut pending_batch: Option<WriteBatch> = None;
     let mut pending_messages: Vec<WriteOp> = Vec::new();

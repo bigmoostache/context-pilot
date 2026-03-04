@@ -11,6 +11,7 @@ use ratatui::{
 
 use crate::state::{ContextType, State};
 use crate::ui::{helpers::count_wrapped_lines, theme};
+use cp_base::cast::SafeCast;
 
 // Re-export the Panel trait, ContextItem, and utility functions from cp-base
 #[cfg(test)]
@@ -19,7 +20,6 @@ pub(crate) use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, u
 
 /// Render a panel with the binary's full chrome (borders, theme, scroll, profiling).
 /// This is NOT part of the Panel trait — it uses binary-specific deps (theme, profile!, UI helpers).
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub(crate) fn render_panel_default(panel: &dyn Panel, frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let base_style = Style::default().bg(theme::bg_surface());
     let title = panel.title(state);
@@ -57,13 +57,13 @@ pub(crate) fn render_panel_default(panel: &dyn Panel, frame: &mut Frame<'_>, sta
     let text = panel.content(state, base_style);
 
     // Calculate and set max scroll (accounting for wrapped lines)
-    let viewport_width = content_area.width as usize;
-    let viewport_height = content_area.height as usize;
+    let viewport_width = content_area.width.to_usize();
+    let viewport_height = content_area.height.to_usize();
     let content_height: usize = {
         let _guard = crate::profile!("panel::scroll_calc");
         text.iter().map(|line| count_wrapped_lines(line, viewport_width)).sum()
     };
-    let max_scroll = content_height.saturating_sub(viewport_height) as f32;
+    let max_scroll = content_height.saturating_sub(viewport_height).to_f32();
     state.max_scroll = max_scroll;
     state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
 
@@ -72,7 +72,7 @@ pub(crate) fn render_panel_default(panel: &dyn Panel, frame: &mut Frame<'_>, sta
         Paragraph::new(text)
             .style(base_style)
             .wrap(Wrap { trim: false })
-            .scroll((state.scroll_offset.round() as u16, 0))
+            .scroll((state.scroll_offset.round().to_u16(), 0))
     };
 
     {

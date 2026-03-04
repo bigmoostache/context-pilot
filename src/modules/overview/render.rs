@@ -7,6 +7,7 @@ use crate::ui::{
     helpers::{Cell, format_number, render_table},
     theme,
 };
+use cp_base::cast::SafeCast;
 
 /// Horizontal separator line.
 pub(super) fn separator() -> Vec<Line<'static>> {
@@ -21,7 +22,6 @@ pub(super) fn separator() -> Vec<Line<'static>> {
 }
 
 /// Render the TOKEN USAGE section with progress bar.
-#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line<'_>> = Vec::new();
 
@@ -32,7 +32,7 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
     let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
     let budget = state.effective_context_budget();
     let threshold = state.cleaning_threshold_tokens();
-    let usage_pct = (total_tokens as f64 / budget as f64 * 100.0).min(100.0);
+    let usage_pct = (total_tokens.to_f64() / budget.to_f64() * 100.0).min(100.0);
 
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
@@ -58,12 +58,12 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
     // Progress bar with threshold marker
     let bar_width = 60usize;
     let threshold_pct = state.cleaning_threshold;
-    let filled = ((usage_pct / 100.0) * bar_width as f64) as usize;
-    let threshold_pos = (threshold_pct as f64 * bar_width as f64) as usize;
+    let filled = ((usage_pct / 100.0) * bar_width.to_f64()).to_usize();
+    let threshold_pos = (threshold_pct.to_f64() * bar_width.to_f64()).to_usize();
 
     let bar_color = if total_tokens >= threshold {
         theme::error()
-    } else if total_tokens as f64 >= threshold as f64 * 0.9 {
+    } else if total_tokens as f64 >= threshold.to_f64() * 0.9 {
         theme::warning()
     } else {
         theme::accent()

@@ -16,6 +16,7 @@ use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::SpinePanel;
+use cp_base::cast::SafeCast;
 use cp_base::modules::Module;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
@@ -70,8 +71,6 @@ impl Module for SpineModule {
             "pending_coucous": pending_coucous,
         })
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("notifications")
             && let Ok(v) = serde_json::from_value(arr.clone())
@@ -79,7 +78,7 @@ impl Module for SpineModule {
             SpineState::get_mut(state).notifications = v;
         }
         if let Some(v) = data.get("next_notification_id").and_then(|v| v.as_u64()) {
-            SpineState::get_mut(state).next_notification_id = v as usize;
+            SpineState::get_mut(state).next_notification_id = v.to_usize();
         }
         if let Some(cfg) = data.get("spine_config")
             && let Ok(v) = serde_json::from_value(cfg.clone())

@@ -2,6 +2,7 @@ mod panel;
 mod tools;
 pub mod types;
 
+use cp_base::cast::SafeCast;
 pub use types::{MemoryImportance, MemoryItem, MemoryState};
 
 /// Maximum token length for memory tl_dr field (enforced on create/update)
@@ -55,8 +56,6 @@ impl Module for MemoryModule {
             "open_memory_ids": ms.open_memory_ids,
         })
     }
-
-    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ms = MemoryState::get_mut(state);
         if let Some(arr) = data.get("memories")
@@ -65,7 +64,7 @@ impl Module for MemoryModule {
             ms.memories = v;
         }
         if let Some(v) = data.get("next_memory_id").and_then(|v| v.as_u64()) {
-            ms.next_memory_id = v as usize;
+            ms.next_memory_id = v.to_usize();
         }
         if let Some(arr) = data.get("open_memory_ids")
             && let Ok(v) = serde_json::from_value(arr.clone())
