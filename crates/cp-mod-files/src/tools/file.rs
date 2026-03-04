@@ -3,7 +3,7 @@ use std::path::Path;
 use cp_base::state::{ContextElement, ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
 
-pub fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Accept both a single string and an array of strings
     let paths: Vec<String> = match tool.input.get("path") {
         Some(serde_json::Value::String(s)) => vec![s.clone()],

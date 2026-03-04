@@ -3,119 +3,119 @@
 // =============================================================================
 
 /// Anthropic API endpoint
-pub const API_ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
+pub(crate) const API_ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
 
 /// Anthropic API version
-pub const API_VERSION: &str = "2023-06-01";
+pub(crate) const API_VERSION: &str = "2023-06-01";
 
 // =============================================================================
 // CONTEXT & TOKEN MANAGEMENT
 // =============================================================================
 
 /// Minimum active messages in a chunk before it can be detached.
-pub const DETACH_CHUNK_MIN_MESSAGES: usize = 25;
+pub(crate) const DETACH_CHUNK_MIN_MESSAGES: usize = 25;
 
 /// Minimum token count in a chunk before it can be detached.
-pub const DETACH_CHUNK_MIN_TOKENS: usize = 5_000;
+pub(crate) const DETACH_CHUNK_MIN_TOKENS: usize = 5_000;
 
 /// Minimum messages to keep in the live conversation after detachment.
-pub const DETACH_KEEP_MIN_MESSAGES: usize = 20;
+pub(crate) const DETACH_KEEP_MIN_MESSAGES: usize = 20;
 
 /// Minimum tokens to keep in the live conversation after detachment.
-pub const DETACH_KEEP_MIN_TOKENS: usize = 3_500;
+pub(crate) const DETACH_KEEP_MIN_TOKENS: usize = 3_500;
 
 // =============================================================================
 // SCROLLING
 // =============================================================================
 
 /// Scroll amount for Ctrl+Arrow keys
-pub const SCROLL_ARROW_AMOUNT: f32 = 3.0;
+pub(crate) const SCROLL_ARROW_AMOUNT: f32 = 3.0;
 
 /// Scroll amount for PageUp/PageDown
-pub const SCROLL_PAGE_AMOUNT: f32 = 10.0;
+pub(crate) const SCROLL_PAGE_AMOUNT: f32 = 10.0;
 
 /// Scroll acceleration increment per scroll event
-pub const SCROLL_ACCEL_INCREMENT: f32 = 0.3;
+pub(crate) const SCROLL_ACCEL_INCREMENT: f32 = 0.3;
 
 /// Maximum scroll acceleration multiplier
-pub const SCROLL_ACCEL_MAX: f32 = 2.5;
+pub(crate) const SCROLL_ACCEL_MAX: f32 = 2.5;
 
 // =============================================================================
 // TYPEWRITER EFFECT
 // =============================================================================
 
 /// Size of moving average for chunk timing
-pub const TYPEWRITER_MOVING_AVG_SIZE: usize = 10;
+pub(crate) const TYPEWRITER_MOVING_AVG_SIZE: usize = 10;
 
 /// Minimum character delay in milliseconds
-pub const TYPEWRITER_MIN_DELAY_MS: f64 = 5.0;
+pub(crate) const TYPEWRITER_MIN_DELAY_MS: f64 = 5.0;
 
 /// Maximum character delay in milliseconds
-pub const TYPEWRITER_MAX_DELAY_MS: f64 = 50.0;
+pub(crate) const TYPEWRITER_MAX_DELAY_MS: f64 = 50.0;
 
 /// Default character delay in milliseconds
-pub const TYPEWRITER_DEFAULT_DELAY_MS: f64 = 15.0;
+pub(crate) const TYPEWRITER_DEFAULT_DELAY_MS: f64 = 15.0;
 
 // =============================================================================
 // UI LAYOUT
 // =============================================================================
 
 /// Height of the status bar
-pub const STATUS_BAR_HEIGHT: u16 = 1;
+pub(crate) const STATUS_BAR_HEIGHT: u16 = 1;
 
 /// Height of the help hints section in sidebar
-pub const SIDEBAR_HELP_HEIGHT: u16 = 9;
+pub(crate) const SIDEBAR_HELP_HEIGHT: u16 = 9;
 
 // =============================================================================
 // EVENT LOOP
 // =============================================================================
 
 /// Poll interval for events in milliseconds
-pub const EVENT_POLL_MS: u64 = 8;
+pub(crate) const EVENT_POLL_MS: u64 = 8;
 
 /// Minimum time between renders (ms) - caps at ~28fps
-pub const RENDER_THROTTLE_MS: u64 = 36;
+pub(crate) const RENDER_THROTTLE_MS: u64 = 36;
 
 /// Interval for CPU/RAM stats refresh in perf overlay (ms)
-pub const PERF_STATS_REFRESH_MS: u64 = 500;
+pub(crate) const PERF_STATS_REFRESH_MS: u64 = 500;
 
 /// Maximum number of retries for API errors
-pub const MAX_API_RETRIES: u32 = 3;
+pub(crate) const MAX_API_RETRIES: u32 = 3;
 
 // =============================================================================
 // REVERIE (CONTEXT OPTIMIZER SUB-AGENT)
 // =============================================================================
 
 /// Maximum tool calls per reverie run before force-stopping
-pub const REVERIE_TOOL_CAP: usize = 50;
+pub(crate) const REVERIE_TOOL_CAP: usize = 50;
 
 // =============================================================================
 // PERSISTENCE
 // =============================================================================
 
 /// Directory for storing state and messages
-pub const STORE_DIR: &str = "./.context-pilot";
+pub(crate) const STORE_DIR: &str = "./.context-pilot";
 
 /// Messages subdirectory
-pub const MESSAGES_DIR: &str = "messages";
+pub(crate) const MESSAGES_DIR: &str = "messages";
 
 /// Shared config file name (new multi-worker format)
-pub const CONFIG_FILE: &str = "config.json";
+pub(crate) const CONFIG_FILE: &str = "config.json";
 
 /// Worker states subdirectory
-pub const STATES_DIR: &str = "states";
+pub(crate) const STATES_DIR: &str = "states";
 
 /// Panel data subdirectory (for dynamic panels)
-pub const PANELS_DIR: &str = "panels";
+pub(crate) const PANELS_DIR: &str = "panels";
 
 /// Default worker ID
-pub const DEFAULT_WORKER_ID: &str = "main_worker";
+pub(crate) const DEFAULT_WORKER_ID: &str = "main_worker";
 
 // =============================================================================
 // THEME COLORS (loaded from active theme in yamls/themes.yaml)
 // =============================================================================
 
-pub mod theme {
+pub(crate) mod theme {
     use crate::infra::config::active_theme;
     use ratatui::style::Color;
 
@@ -124,57 +124,57 @@ pub mod theme {
     }
 
     // Primary brand colors
-    pub fn accent() -> Color {
+    pub(crate) fn accent() -> Color {
         rgb(active_theme().colors.accent)
     }
-    pub fn accent_dim() -> Color {
+    pub(crate) fn accent_dim() -> Color {
         rgb(active_theme().colors.accent_dim)
     }
-    pub fn success() -> Color {
+    pub(crate) fn success() -> Color {
         rgb(active_theme().colors.success)
     }
-    pub fn warning() -> Color {
+    pub(crate) fn warning() -> Color {
         rgb(active_theme().colors.warning)
     }
-    pub fn error() -> Color {
+    pub(crate) fn error() -> Color {
         rgb(active_theme().colors.error)
     }
 
     // Text colors
-    pub fn text() -> Color {
+    pub(crate) fn text() -> Color {
         rgb(active_theme().colors.text)
     }
-    pub fn text_secondary() -> Color {
+    pub(crate) fn text_secondary() -> Color {
         rgb(active_theme().colors.text_secondary)
     }
-    pub fn text_muted() -> Color {
+    pub(crate) fn text_muted() -> Color {
         rgb(active_theme().colors.text_muted)
     }
 
     // Background colors
-    pub fn bg_base() -> Color {
+    pub(crate) fn bg_base() -> Color {
         rgb(active_theme().colors.bg_base)
     }
-    pub fn bg_surface() -> Color {
+    pub(crate) fn bg_surface() -> Color {
         rgb(active_theme().colors.bg_surface)
     }
-    pub fn bg_elevated() -> Color {
+    pub(crate) fn bg_elevated() -> Color {
         rgb(active_theme().colors.bg_elevated)
     }
 
     // Border colors
-    pub fn border() -> Color {
+    pub(crate) fn border() -> Color {
         rgb(active_theme().colors.border)
     }
-    pub fn border_muted() -> Color {
+    pub(crate) fn border_muted() -> Color {
         rgb(active_theme().colors.border_muted)
     }
 
     // Role-specific colors
-    pub fn user() -> Color {
+    pub(crate) fn user() -> Color {
         rgb(active_theme().colors.user)
     }
-    pub fn assistant() -> Color {
+    pub(crate) fn assistant() -> Color {
         rgb(active_theme().colors.assistant)
     }
 }
@@ -183,14 +183,14 @@ pub mod theme {
 // UI CHARACTERS
 // =============================================================================
 
-pub mod chars {
-    pub const HORIZONTAL: &str = "─";
-    pub const BLOCK_FULL: &str = "█";
-    pub const BLOCK_LIGHT: &str = "░";
-    pub const ARROW_RIGHT: &str = "▸";
-    pub const ARROW_UP: &str = "↑";
-    pub const ARROW_DOWN: &str = "↓";
-    pub const CROSS: &str = "✗";
+pub(crate) mod chars {
+    pub(crate) const HORIZONTAL: &str = "─";
+    pub(crate) const BLOCK_FULL: &str = "█";
+    pub(crate) const BLOCK_LIGHT: &str = "░";
+    pub(crate) const ARROW_RIGHT: &str = "▸";
+    pub(crate) const ARROW_UP: &str = "↑";
+    pub(crate) const ARROW_DOWN: &str = "↓";
+    pub(crate) const CROSS: &str = "✗";
 }
 
 // =============================================================================
@@ -198,31 +198,31 @@ pub mod chars {
 // All icons are normalized to 2 display cells width for consistent alignment
 // =============================================================================
 
-pub mod icons {
+pub(crate) mod icons {
     use crate::infra::config::{active_theme, normalize_icon};
 
     // Message types - accessor functions for active theme (normalized to 2 cells)
-    pub fn msg_user() -> String {
+    pub(crate) fn msg_user() -> String {
         normalize_icon(&active_theme().messages.user)
     }
-    pub fn msg_assistant() -> String {
+    pub(crate) fn msg_assistant() -> String {
         normalize_icon(&active_theme().messages.assistant)
     }
-    pub fn msg_tool_call() -> String {
+    pub(crate) fn msg_tool_call() -> String {
         normalize_icon(&active_theme().messages.tool_call)
     }
-    pub fn msg_tool_result() -> String {
+    pub(crate) fn msg_tool_result() -> String {
         normalize_icon(&active_theme().messages.tool_result)
     }
-    pub fn msg_error() -> String {
+    pub(crate) fn msg_error() -> String {
         normalize_icon(&active_theme().messages.error)
     }
 
     // Message status (normalized to 2 cells)
-    pub fn status_full() -> String {
+    pub(crate) fn status_full() -> String {
         normalize_icon(&active_theme().status.full)
     }
-    pub fn status_deleted() -> String {
+    pub(crate) fn status_deleted() -> String {
         normalize_icon(&active_theme().status.deleted)
     }
 }
@@ -231,37 +231,37 @@ pub mod icons {
 // PROMPTS (loaded from yamls/prompts.yaml via config module)
 // =============================================================================
 
-pub mod library {
+pub(crate) mod library {
     use crate::infra::config::LIBRARY;
 
-    pub fn default_agent_content() -> &'static str {
+    pub(crate) fn default_agent_content() -> &'static str {
         let id = &LIBRARY.default_agent_id;
         LIBRARY.agents.iter().find(|a| a.id == *id).map(|a| a.content.as_str()).unwrap_or("")
     }
 }
 
-pub mod prompts {
+pub(crate) mod prompts {
     use crate::infra::config::PROMPTS;
 
-    pub fn panel_header() -> &'static str {
+    pub(crate) fn panel_header() -> &'static str {
         &PROMPTS.panel.header
     }
-    pub fn panel_timestamp() -> &'static str {
+    pub(crate) fn panel_timestamp() -> &'static str {
         &PROMPTS.panel.timestamp
     }
-    pub fn panel_timestamp_unknown() -> &'static str {
+    pub(crate) fn panel_timestamp_unknown() -> &'static str {
         &PROMPTS.panel.timestamp_unknown
     }
-    pub fn panel_footer() -> &'static str {
+    pub(crate) fn panel_footer() -> &'static str {
         &PROMPTS.panel.footer
     }
-    pub fn panel_footer_msg_line() -> &'static str {
+    pub(crate) fn panel_footer_msg_line() -> &'static str {
         &PROMPTS.panel.footer_msg_line
     }
-    pub fn panel_footer_msg_header() -> &'static str {
+    pub(crate) fn panel_footer_msg_header() -> &'static str {
         &PROMPTS.panel.footer_msg_header
     }
-    pub fn panel_footer_ack() -> &'static str {
+    pub(crate) fn panel_footer_ack() -> &'static str {
         &PROMPTS.panel.footer_ack
     }
 }

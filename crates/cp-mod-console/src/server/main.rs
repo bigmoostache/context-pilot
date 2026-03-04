@@ -62,11 +62,9 @@ enum SessionStatus {
 impl Session {
     /// Check if the process has exited (non-blocking).
     fn poll_status(&mut self) {
-        if matches!(self.status, SessionStatus::Running) {
-            if !is_pid_alive(self.pid) {
-                // Try to get exit code from /proc/{pid}/status or fall back to -1
-                self.status = SessionStatus::Exited(-1);
-            }
+        if matches!(self.status, SessionStatus::Running) && !is_pid_alive(self.pid) {
+            // Try to get exit code from /proc/{pid}/status or fall back to -1
+            self.status = SessionStatus::Exited(-1);
         }
     }
 
@@ -147,10 +145,10 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
                 Ok(status) => status.code().unwrap_or(-1),
                 Err(_) => -1,
             };
-            if let Ok(mut map) = sessions.lock() {
-                if let Some(session) = map.get_mut(&key) {
-                    session.status = SessionStatus::Exited(code);
-                }
+            if let Ok(mut map) = sessions.lock()
+                && let Some(session) = map.get_mut(&key)
+            {
+                session.status = SessionStatus::Exited(code);
             }
         });
     }

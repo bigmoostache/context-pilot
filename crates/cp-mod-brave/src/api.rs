@@ -7,6 +7,7 @@ const BRAVE_BASE_URL: &str = "https://api.search.brave.com/res/v1";
 const TIMEOUT_SECS: u64 = 10;
 
 /// Parameters for a Brave web search request.
+#[derive(Debug)]
 pub struct SearchParams<'a> {
     pub query: &'a str,
     pub count: u32,
@@ -18,6 +19,7 @@ pub struct SearchParams<'a> {
 }
 
 /// Parameters for a Brave LLM context request.
+#[derive(Debug)]
 pub struct LLMContextParams<'a> {
     pub query: &'a str,
     pub max_tokens: u32,
@@ -28,6 +30,7 @@ pub struct LLMContextParams<'a> {
     pub goggles: Option<&'a str>,
 }
 
+#[derive(Debug)]
 pub struct BraveClient {
     client: Client,
     api_key: String,
@@ -44,7 +47,7 @@ impl BraveClient {
 
     /// Search the web via Brave Search API.
     /// Always sends extra_snippets=true and enable_rich_callback=1.
-    pub fn search(&self, p: &SearchParams) -> Result<(BraveSearchResponse, Option<serde_json::Value>), String> {
+    pub fn search(&self, p: &SearchParams<'_>) -> Result<(BraveSearchResponse, Option<serde_json::Value>), String> {
         let mut url = format!("{}/web/search?q={}", BRAVE_BASE_URL, urlenc(p.query));
         url.push_str(&format!("&count={}", p.count));
         url.push_str("&extra_snippets=true");
@@ -79,7 +82,7 @@ impl BraveClient {
     }
 
     /// Get LLM-optimized context from Brave LLM Context API.
-    pub fn llm_context(&self, p: &LLMContextParams) -> Result<LLMContextResponse, String> {
+    pub fn llm_context(&self, p: &LLMContextParams<'_>) -> Result<LLMContextResponse, String> {
         let mut url = format!("{}/llm/context?q={}", BRAVE_BASE_URL, urlenc(p.query));
         url.push_str(&format!("&maximum_number_of_tokens={}", p.max_tokens));
         url.push_str(&format!("&count={}", p.count));

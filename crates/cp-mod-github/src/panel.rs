@@ -29,11 +29,7 @@ impl Panel for GithubResultPanel {
         let token = GithubState::get(state).github_token.as_ref()?;
         Some(CacheRequest {
             context_type: ContextType::new(ContextType::GITHUB_RESULT),
-            data: Box::new(GithubResultRequest {
-                context_id: ctx.id.clone(),
-                command: command.clone(),
-                github_token: token.clone(),
-            }),
+            data: Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone() }),
         })
     }
 
@@ -143,7 +139,7 @@ impl Panel for GithubResultPanel {
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let mut text: Vec<Line> = Vec::new();
+        let mut text: Vec<Line<'_>> = Vec::new();
 
         let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GITHUB_RESULT);
 

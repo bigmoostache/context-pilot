@@ -155,15 +155,15 @@ pub(crate) fn render_message(
     if content.trim().is_empty() {
         if msg.role == "assistant" && is_streaming_this {
             lines.push(Line::from(vec![
-                Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
+                Span::styled(role_icon, Style::default().fg(role_color)),
+                Span::styled(status_icon, Style::default().fg(theme::text_muted())),
                 Span::styled(" ".to_string(), base_style),
                 Span::styled("...".to_string(), Style::default().fg(theme::text_muted()).italic()),
             ]));
         } else {
             lines.push(Line::from(vec![
-                Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
+                Span::styled(role_icon, Style::default().fg(role_color)),
+                Span::styled(status_icon, Style::default().fg(theme::text_muted())),
             ]));
         }
     } else {
@@ -201,7 +201,7 @@ pub(crate) fn render_message(
                         if is_first_line && idx == 0 {
                             let mut line_spans = vec![
                                 Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                                Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
+                                Span::styled(status_icon.clone(), Style::default().fg(theme::text_muted())),
                                 Span::styled(" ".to_string(), base_style),
                             ];
                             line_spans.extend(row_spans);
@@ -226,7 +226,7 @@ pub(crate) fn render_message(
                     if is_first_line {
                         let mut line_spans = vec![
                             Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                            Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
+                            Span::styled(status_icon.clone(), Style::default().fg(theme::text_muted())),
                             Span::styled(" ".to_string(), base_style),
                         ];
                         line_spans.extend(md_spans);
@@ -246,7 +246,7 @@ pub(crate) fn render_message(
                     if is_first_line {
                         lines.push(Line::from(vec![
                             Span::styled(role_icon.clone(), Style::default().fg(role_color)),
-                            Span::styled(status_icon.to_string(), Style::default().fg(theme::text_muted())),
+                            Span::styled(status_icon.clone(), Style::default().fg(theme::text_muted())),
                             Span::styled(" ".to_string(), base_style),
                             Span::styled(line_text.clone(), Style::default().fg(theme::text())),
                         ]));

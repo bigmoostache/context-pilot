@@ -16,6 +16,40 @@ globset = "0.4"
 unicode-width = "0.2"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 
+[workspace.lints.rust]
+# Visibility hygiene — flag pub items that don't need to be pub
+unreachable_pub = "warn"
+# Dead code in the workspace (redundant with default, but explicit)
+dead_code = "warn"
+# Unused imports, variables, mut bindings
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+# Missing Debug impls on public types (good for inspectability)
+missing_debug_implementations = "warn"
+# Elided lifetimes in impl blocks — forces explicit 'a where it matters
+elided_lifetimes_in_paths = "warn"
+
+[workspace.lints.clippy]
+# Performance
+needless_pass_by_value = "warn"
+cloned_instead_of_copied = "warn"
+redundant_clone = "warn"
+large_enum_variant = "warn"
+# Clarity
+needless_return = "warn"
+manual_let_else = "warn"
+match_wildcard_for_single_variants = "warn"
+implicit_clone = "warn"
+# Safety / correctness
+cast_possible_truncation = "warn"
+cast_sign_loss = "warn"
+# Style consistency
+enum_glob_use = "warn"
+single_match_else = "warn"
+redundant_else = "warn"
+semicolon_if_nothing_returned = "warn"
+
 [package]
 name = "tui"
 version = "0.1.0"
@@ -56,3 +90,6 @@ unicode-width.workspace = true
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "default-themes", "regex-onig"] }
 secrecy = { version = "0.10", features = ["serde"] }
 notify = "6.1"
+
+[lints]
+workspace = true

@@ -16,6 +16,7 @@ use crate::llms::{LlmRequest, StreamEvent, api_messages_to_cc_json};
 use cp_base::config::INJECTIONS;
 
 impl ClaudeCodeClient {
+    #[allow(clippy::needless_pass_by_value)]
     pub(super) fn do_stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let access_token = self
             .access_token

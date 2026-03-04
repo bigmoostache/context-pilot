@@ -3,14 +3,14 @@ use crate::state::State;
 use super::ActionResult;
 
 /// Handle secondary provider selection
-pub fn handle_secondary_provider(state: &mut State, provider: crate::llms::LlmProvider) -> ActionResult {
+pub(crate) fn handle_secondary_provider(state: &mut State, provider: crate::llms::LlmProvider) -> ActionResult {
     state.secondary_provider = provider;
     state.dirty = true;
     ActionResult::Save
 }
 
 /// Handle secondary model selection for all providers
-pub fn handle_secondary_model(state: &mut State, action: &super::Action) -> ActionResult {
+pub(crate) fn handle_secondary_model(state: &mut State, action: &super::Action) -> ActionResult {
     use super::Action;
     match action {
         Action::ConfigSelectSecondaryAnthropicModel(model) => state.secondary_anthropic_model = *model,
@@ -24,7 +24,7 @@ pub fn handle_secondary_model(state: &mut State, action: &super::Action) -> Acti
 }
 
 /// Handle ConfigIncreaseSelectedBar action
-pub fn handle_config_increase_bar(state: &mut State) -> ActionResult {
+pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
     match state.config_selected_bar {
         0 => {
             // Context budget
@@ -54,7 +54,7 @@ pub fn handle_config_increase_bar(state: &mut State) -> ActionResult {
 }
 
 /// Handle ConfigDecreaseSelectedBar action
-pub fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
+pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
     match state.config_selected_bar {
         0 => {
             // Context budget
@@ -86,7 +86,7 @@ pub fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
 }
 
 /// Handle ConfigNextTheme action
-pub fn handle_config_next_theme(state: &mut State) -> ActionResult {
+pub(crate) fn handle_config_next_theme(state: &mut State) -> ActionResult {
     use crate::infra::config::THEME_ORDER;
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
     let next_idx = (current_idx + 1) % THEME_ORDER.len();
@@ -97,7 +97,7 @@ pub fn handle_config_next_theme(state: &mut State) -> ActionResult {
 }
 
 /// Handle ConfigPrevTheme action
-pub fn handle_config_prev_theme(state: &mut State) -> ActionResult {
+pub(crate) fn handle_config_prev_theme(state: &mut State) -> ActionResult {
     use crate::infra::config::THEME_ORDER;
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
     let prev_idx = if current_idx == 0 { THEME_ORDER.len() - 1 } else { current_idx - 1 };

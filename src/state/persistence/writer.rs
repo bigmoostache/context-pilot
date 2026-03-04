@@ -15,20 +15,20 @@ use std::time::Duration;
 
 /// A single file write operation
 #[derive(Debug, Clone)]
-pub struct WriteOp {
+pub(crate) struct WriteOp {
     pub path: PathBuf,
     pub content: Vec<u8>,
 }
 
 /// A single file delete operation
 #[derive(Debug, Clone)]
-pub struct DeleteOp {
+pub(crate) struct DeleteOp {
     pub path: PathBuf,
 }
 
 /// A batch of persistence operations to execute atomically
 #[derive(Debug, Clone)]
-pub struct WriteBatch {
+pub(crate) struct WriteBatch {
     pub writes: Vec<WriteOp>,
     pub deletes: Vec<DeleteOp>,
     /// Directories to ensure exist before writing
@@ -48,7 +48,7 @@ enum WriterMsg {
 }
 
 /// Handle to the background persistence writer
-pub struct PersistenceWriter {
+pub(crate) struct PersistenceWriter {
     tx: Sender<WriterMsg>,
     /// Shared state for flush synchronization
     flush_sync: Arc<(Mutex<bool>, Condvar)>,
@@ -60,7 +60,7 @@ const DEBOUNCE_MS: u64 = 50;
 
 impl PersistenceWriter {
     /// Create a new persistence writer with a background thread
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let (tx, rx) = mpsc::channel();
         let flush_sync = Arc::new((Mutex::new(false), Condvar::new()));
         let flush_sync_clone = flush_sync.clone();
@@ -76,18 +76,18 @@ impl PersistenceWriter {
     }
 
     /// Queue a batch of writes (debounced — may be coalesced with subsequent batches)
-    pub fn send_batch(&self, batch: WriteBatch) {
+    pub(crate) fn send_batch(&self, batch: WriteBatch) {
         let _ = self.tx.send(WriterMsg::Batch(batch));
     }
 
     /// Queue a single message write (not debounced — written on next iteration)
-    pub fn send_message(&self, op: WriteOp) {
+    pub(crate) fn send_message(&self, op: WriteOp) {
         let _ = self.tx.send(WriterMsg::Message(op));
     }
 
     /// Flush all pending writes synchronously. Blocks until complete.
     /// Used on app exit to ensure all state is persisted.
-    pub fn flush(&self) {
+    pub(crate) fn flush(&self) {
         // Reset the flush flag
         {
             let (lock, _) = &*self.flush_sync;
@@ -112,7 +112,7 @@ impl PersistenceWriter {
     }
 
     /// Shutdown the writer thread gracefully
-    pub fn shutdown(&mut self) {
+    pub(crate) fn shutdown(&mut self) {
         let _ = self.tx.send(WriterMsg::Shutdown);
         if let Some(handle) = self.handle.take() {
             let _ = handle.join();
@@ -128,6 +128,7 @@ impl Drop for PersistenceWriter {
 }
 
 /// The writer thread's main loop
+#[allow(clippy::needless_pass_by_value)]
 fn writer_loop(rx: Receiver<WriterMsg>, flush_sync: Arc<(Mutex<bool>, Condvar)>) {
     let mut pending_batch: Option<WriteBatch> = None;
     let mut pending_messages: Vec<WriteOp> = Vec::new();

@@ -1,13 +1,13 @@
-pub mod agent;
-pub mod command;
-pub mod edit_prompt;
-pub mod library_editor;
-pub mod skill;
+pub(crate) mod agent;
+pub(crate) mod command;
+pub(crate) mod edit_prompt;
+pub(crate) mod library_editor;
+pub(crate) mod skill;
 
 use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
-pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
+pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     match tool.name.as_str() {
         "agent_create" => Some(agent::create(tool, state)),
         "agent_delete" => Some(agent::delete(tool, state)),

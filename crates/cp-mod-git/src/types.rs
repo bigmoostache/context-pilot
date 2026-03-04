@@ -21,6 +21,7 @@ pub struct GitFileChange {
 
 // === Module-owned state ===
 
+#[derive(Debug)]
 pub struct GitState {
     pub git_branch: Option<String>,
     pub git_branches: Vec<(String, bool)>,
@@ -54,6 +55,7 @@ impl GitState {
 }
 
 /// Data for CacheRequest when refreshing git result panels
+#[derive(Debug)]
 pub struct GitResultRequest {
     pub context_id: String,
     pub command: String,

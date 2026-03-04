@@ -16,8 +16,8 @@ use crate::ui::{
 use super::render::separator;
 
 /// Render the STATISTICS section.
-pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>> {
-    let mut text: Vec<Line> = Vec::new();
+pub(super) fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>> {
+    let mut text: Vec<Line<'_>> = Vec::new();
 
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
@@ -96,8 +96,8 @@ pub fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'static>>
 }
 
 /// Render the AGENTS section (system prompts table).
-pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
-    let mut text: Vec<Line> = Vec::new();
+pub(super) fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
+    let mut text: Vec<Line<'_>> = Vec::new();
     let ps = PromptState::get(state);
 
     text.push(Line::from(vec![
@@ -219,8 +219,8 @@ pub fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static>> {
 }
 
 /// Render the PRESETS section.
-pub fn render_presets(base_style: Style) -> Vec<Line<'static>> {
-    let mut text: Vec<Line> = Vec::new();
+pub(super) fn render_presets(base_style: Style) -> Vec<Line<'static>> {
+    let mut text: Vec<Line<'_>> = Vec::new();
 
     let presets = cp_mod_preset::tools::list_presets_with_info();
     if presets.is_empty() {
@@ -272,8 +272,8 @@ pub fn render_presets(base_style: Style) -> Vec<Line<'static>> {
 }
 
 /// Render the TOOLS section (grouped by category).
-pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
-    let mut text: Vec<Line> = Vec::new();
+pub(super) fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
+    let mut text: Vec<Line<'_>> = Vec::new();
 
     let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
     let disabled_count = state.tools.iter().filter(|t| !t.enabled).count();
@@ -308,7 +308,7 @@ pub fn render_tools(state: &State, base_style: Style) -> Vec<Line<'static>> {
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
-            Span::styled(cat_name.to_string(), Style::default().fg(theme::accent()).bold()),
+            Span::styled(cat_name.clone(), Style::default().fg(theme::accent()).bold()),
             Span::styled(format!("  {}", cat_desc), Style::default().fg(theme::text_muted())),
         ]));
 

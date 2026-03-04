@@ -7,6 +7,7 @@ const FIRECRAWL_BASE_URL: &str = "https://api.firecrawl.dev/v2";
 const TIMEOUT_SECS: u64 = 30;
 
 /// Parameters for firecrawl_scrape.
+#[derive(Debug)]
 pub struct ScrapeParams<'a> {
     pub url: &'a str,
     pub formats: Vec<&'a str>,
@@ -15,6 +16,7 @@ pub struct ScrapeParams<'a> {
 }
 
 /// Parameters for firecrawl_search.
+#[derive(Debug)]
 pub struct SearchParams<'a> {
     pub query: &'a str,
     pub limit: u32,
@@ -25,6 +27,7 @@ pub struct SearchParams<'a> {
 }
 
 /// Parameters for firecrawl_map.
+#[derive(Debug)]
 pub struct MapParams<'a> {
     pub url: &'a str,
     pub limit: u32,
@@ -34,6 +37,7 @@ pub struct MapParams<'a> {
     pub languages: Option<Vec<&'a str>>,
 }
 
+#[derive(Debug)]
 pub struct FirecrawlClient {
     client: Client,
     api_key: String,
@@ -49,7 +53,7 @@ impl FirecrawlClient {
     }
 
     /// Scrape a single URL for full content extraction.
-    pub fn scrape(&self, p: &ScrapeParams) -> Result<ScrapeResponse, String> {
+    pub fn scrape(&self, p: &ScrapeParams<'_>) -> Result<ScrapeResponse, String> {
         let mut body = serde_json::json!({
             "url": p.url,
             "formats": p.formats,
@@ -66,7 +70,7 @@ impl FirecrawlClient {
     }
 
     /// Search and scrape in one API call.
-    pub fn search(&self, p: &SearchParams) -> Result<SearchResponse, String> {
+    pub fn search(&self, p: &SearchParams<'_>) -> Result<SearchResponse, String> {
         let mut body = serde_json::json!({
             "query": p.query,
             "limit": p.limit,
@@ -92,7 +96,7 @@ impl FirecrawlClient {
     }
 
     /// Map a domain to discover all URLs.
-    pub fn map(&self, p: &MapParams) -> Result<MapResponse, String> {
+    pub fn map(&self, p: &MapParams<'_>) -> Result<MapResponse, String> {
         let mut body = serde_json::json!({
             "url": p.url,
             "limit": p.limit,

@@ -56,7 +56,7 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
 /// 2. Chunk has >= DETACH_CHUNK_MIN_TOKENS estimated tokens
 /// 3. Remaining tip keeps >= DETACH_KEEP_MIN_MESSAGES active messages
 /// 4. Remaining tip keeps >= DETACH_KEEP_MIN_TOKENS estimated tokens
-pub fn detach_conversation_chunks(state: &mut crate::state::State) {
+pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
     loop {
         // 1. Count active (non-Deleted, non-Detached) messages and total tokens
         let active_count = state

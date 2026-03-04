@@ -12,7 +12,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
         .expect("Failed to parse questions tool YAML")
 });
 
-pub struct QuestionsModule;
+pub(crate) struct QuestionsModule;
 
 impl Module for QuestionsModule {
     fn id(&self) -> &'static str {

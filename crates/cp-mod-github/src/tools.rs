@@ -20,7 +20,7 @@ fn redact_token(output: &str, token: &str) -> String {
 /// Execute a raw gh (GitHub CLI) command.
 /// Read-only commands create/reuse GithubResult panels.
 /// Mutating commands execute and return output directly.
-pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Check for GitHub token
     let token = match &GithubState::get(state).github_token {
         Some(t) => t.clone(),
@@ -33,11 +33,8 @@ pub fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let command = match tool.input.get("command").and_then(|v| v.as_str()) {
-        Some(c) => c,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_string(), true);
-        }
+    let Some(command) = tool.input.get("command").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_string(), true);
     };
 
     // Validate

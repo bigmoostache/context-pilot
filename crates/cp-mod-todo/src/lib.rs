@@ -19,6 +19,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/todo.yaml")).expect("Failed to parse todo tool YAML")
 });
 
+#[derive(Debug)]
 pub struct TodoModule;
 
 impl Module for TodoModule {
@@ -48,6 +49,7 @@ impl Module for TodoModule {
         })
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ts = TodoState::get_mut(state);
         if let Some(arr) = data.get("todos")

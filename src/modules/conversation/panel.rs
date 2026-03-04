@@ -18,7 +18,7 @@ use crate::ui::theme;
 use super::list::{self, ListAction};
 use super::render;
 
-pub struct ConversationPanel;
+pub(super) struct ConversationPanel;
 
 impl ConversationPanel {
     /// Compute hash for message cache invalidation
@@ -79,6 +79,7 @@ impl ConversationPanel {
     }
 
     /// Build content with caching - called from render() which has &mut State
+    #[allow(clippy::cast_possible_truncation)]
     fn build_content_cached(state: &mut State, base_style: Style) -> Vec<Line<'static>> {
         let _guard = crate::profile!("panel::conversation::content");
         let viewport_width = state.last_viewport_width;
@@ -308,7 +309,8 @@ impl Panel for ConversationPanel {
     }
 
     /// Override render to add scrollbar and auto-scroll behavior
-    fn render(&self, frame: &mut Frame, state: &mut State, area: Rect) {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    fn render(&self, frame: &mut Frame<'_>, state: &mut State, area: Rect) {
         let base_style = Style::default().bg(theme::bg_surface());
         let title = self.title(state);
 

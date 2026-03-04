@@ -4,7 +4,7 @@ use cp_base::config::library;
 use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
 
-pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let name = tool.input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let content = tool.input.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -48,12 +48,9 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created agent '{}' with ID '{}'", name, id), false)
 }
 
-pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let id = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(id) => id,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
-        }
+pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
     };
 
     // Cannot delete built-in agents
@@ -64,11 +61,8 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let ps = PromptState::get_mut(state);
-    let idx = match ps.agents.iter().position(|a| a.id == id) {
-        Some(i) => i,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
-        }
+    let Some(idx) = ps.agents.iter().position(|a| a.id == id) else {
+        return ToolResult::new(tool.id.clone(), format!("Agent '{}' not found", id), true);
     };
 
     let agent = ps.agents.remove(idx);
@@ -85,7 +79,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Deleted agent '{}' ({})", agent.name, id), false)
 }
 
-pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = tool.input.get("id").and_then(|v| v.as_str());
 
     // If id is None or empty, switch to default agent

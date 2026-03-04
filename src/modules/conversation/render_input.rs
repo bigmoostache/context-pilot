@@ -133,7 +133,7 @@ pub(super) fn render_input(
 
     if input.is_empty() {
         lines.push(Line::from(vec![
-            Span::styled(role_icon.clone(), Style::default().fg(role_color)),
+            Span::styled(role_icon, Style::default().fg(role_color)),
             Span::styled("... ", Style::default().fg(role_color).dim()),
             Span::styled(" ", base_style),
             Span::styled(cursor_char, Style::default().fg(theme::accent())),

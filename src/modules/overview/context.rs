@@ -2,7 +2,7 @@ use crate::modules::all_modules;
 use crate::state::{State, estimate_tokens, get_context_type_meta};
 
 /// Estimate tokens for all enabled tool definitions as they'd appear in the API request.
-pub fn estimate_tool_definitions_tokens(state: &State) -> usize {
+pub(crate) fn estimate_tool_definitions_tokens(state: &State) -> usize {
     let mut total = 0;
     for tool in &state.tools {
         if !tool.enabled {
@@ -32,7 +32,7 @@ pub fn estimate_tool_definitions_tokens(state: &State) -> usize {
 
 /// Generates the plain-text/markdown context content sent to the LLM.
 /// This is separate from the TUI rendering (overview_render.rs).
-pub fn generate_context_content(state: &State) -> String {
+pub(crate) fn generate_context_content(state: &State) -> String {
     // Estimate system prompt tokens
     let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
     // The system prompt is sent twice: once in the system field, once as seed re-injection

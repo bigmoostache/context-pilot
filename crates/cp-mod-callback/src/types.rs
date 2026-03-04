@@ -36,6 +36,7 @@ pub struct CallbackDefinition {
 
 /// Module-owned state for the Callback module.
 /// Stored in State.module_data via TypeMap.
+#[derive(Debug)]
 pub struct CallbackState {
     /// All callback definitions (loaded from global config.json)
     pub definitions: Vec<CallbackDefinition>,

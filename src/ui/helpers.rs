@@ -1,6 +1,6 @@
 use unicode_width::UnicodeWidthStr;
 
-pub fn truncate_string(s: &str, max_width: usize) -> String {
+pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
     if s.width() <= max_width {
         s.to_string()
     } else {
@@ -19,7 +19,7 @@ pub fn truncate_string(s: &str, max_width: usize) -> String {
     }
 }
 
-pub fn format_number(n: usize) -> String {
+pub(crate) fn format_number(n: usize) -> String {
     if n >= 1_000_000 {
         format!("{:.1}M", n as f64 / 1_000_000.0)
     } else if n >= 1_000 {
@@ -30,7 +30,7 @@ pub fn format_number(n: usize) -> String {
 }
 
 /// Format a millisecond delta as a human-readable "x ago" string
-pub fn format_time_ago(delta_ms: u64) -> String {
+pub(crate) fn format_time_ago(delta_ms: u64) -> String {
     let seconds = delta_ms / 1000;
     if seconds < 60 {
         format!("{}s ago", seconds)
@@ -42,7 +42,7 @@ pub fn format_time_ago(delta_ms: u64) -> String {
 }
 
 /// Word-wrap text to fit within a given width
-pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
         return vec![text.to_string()];
     }
@@ -84,7 +84,7 @@ pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
 
 /// Count how many lines a Line will take when wrapped to a given width
 /// Uses unicode width for accurate display width calculation
-pub fn count_wrapped_lines(line: &ratatui::prelude::Line, max_width: usize) -> usize {
+pub(crate) fn count_wrapped_lines(line: &ratatui::prelude::Line<'_>, max_width: usize) -> usize {
     use unicode_width::UnicodeWidthStr;
 
     if max_width == 0 {
@@ -125,7 +125,7 @@ pub fn count_wrapped_lines(line: &ratatui::prelude::Line, max_width: usize) -> u
     line_count
 }
 // Re-export from cp-base
-pub use cp_base::ui::{Cell, render_table};
+pub(crate) use cp_base::ui::{Cell, render_table};
 
 // ─── Spinner ─────────────────────────────────────────────────────────────────
 
@@ -133,7 +133,8 @@ pub use cp_base::ui::{Cell, render_table};
 const SPINNER_BRAILLE: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /// Get a braille spinner frame (default spinner)
-pub fn spinner(frame: u64) -> &'static str {
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn spinner(frame: u64) -> &'static str {
     let index = (frame as usize) % SPINNER_BRAILLE.len();
     SPINNER_BRAILLE[index]
 }
@@ -164,7 +165,7 @@ fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {
 
 /// Get syntax-highlighted spans for a file
 /// Returns Vec of lines, where each line is Vec of (color, text) pairs
-pub fn highlight_file(path: &str, content: &str) -> Arc<HighlightResult> {
+pub(crate) fn highlight_file(path: &str, content: &str) -> Arc<HighlightResult> {
     // Check cache first (keyed by path + content hash for simplicity)
     let cache_key = format!("{}:{}", path, content.len());
     {

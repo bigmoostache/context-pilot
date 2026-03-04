@@ -17,7 +17,7 @@ use crate::tools::ToolDefinition;
 // =============================================================================
 
 /// Cached rendered lines for a message (using Rc to avoid clones)
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct MessageRenderCache {
     /// Pre-rendered lines for this message
     pub lines: Rc<Vec<Line<'static>>>,
@@ -28,7 +28,7 @@ pub struct MessageRenderCache {
 }
 
 /// Cached rendered lines for input area (using Rc to avoid clones)
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InputRenderCache {
     /// Pre-rendered lines for input
     pub lines: Rc<Vec<Line<'static>>>,
@@ -39,7 +39,7 @@ pub struct InputRenderCache {
 }
 
 /// Top-level cache for entire conversation content
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FullContentCache {
     /// Complete rendered output
     pub lines: Rc<Vec<Line<'static>>>,
@@ -295,6 +295,7 @@ impl State {
     }
 
     /// Update the last_refresh_ms timestamp for a panel by its context type
+    #[allow(clippy::needless_pass_by_value)]
     pub fn touch_panel(&mut self, context_type: ContextType) {
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == context_type) {
             ctx.last_refresh_ms = crate::panels::now_ms();
@@ -374,11 +375,13 @@ impl State {
     }
 
     /// Get cleaning threshold in tokens
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn cleaning_threshold_tokens(&self) -> usize {
         (self.effective_context_budget() as f32 * self.cleaning_threshold) as usize
     }
 
     /// Get cleaning target in tokens
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn cleaning_target_tokens(&self) -> usize {
         (self.effective_context_budget() as f32 * self.cleaning_target()) as usize
     }
@@ -480,5 +483,16 @@ impl State {
         self.tick_cache_hit_tokens = 0;
         self.tick_cache_miss_tokens = 0;
         self.tick_output_tokens = 0;
+    }
+}
+
+impl std::fmt::Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("State")
+            .field("context_len", &self.context.len())
+            .field("messages_len", &self.messages.len())
+            .field("is_streaming", &self.is_streaming)
+            .field("module_data_keys", &self.module_data.len())
+            .finish_non_exhaustive()
     }
 }

@@ -198,11 +198,7 @@ impl ContextPilotWorld {
         let name = pkg.name.as_str();
         let version = format!("{}", pkg.version);
 
-        let spec = packages::PackageSpec {
-            namespace: namespace.to_string(),
-            name: name.to_string(),
-            version: version.clone(),
-        };
+        let spec = packages::PackageSpec { namespace: namespace.to_string(), name: name.to_string(), version };
 
         let pkg_dir = packages::resolve_package(&spec)?;
 
@@ -257,6 +253,7 @@ impl World for ContextPilotWorld {
         self.fonts.get(index).cloned()
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use chrono::{Datelike, Local, Timelike, Utc};
         let now = Local::now();
@@ -278,6 +275,7 @@ impl World for ContextPilotWorld {
 }
 
 /// Load fonts from a directory recursively.
+#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn load_fonts_from_dir(dir: &Path, book: &mut FontBook, fonts: &mut Vec<Font>) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {

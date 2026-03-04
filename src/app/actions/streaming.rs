@@ -5,7 +5,7 @@ use super::ActionResult;
 use super::helpers::clean_llm_id_prefix;
 
 /// Handle AppendChars action — append streaming text to assistant message
-pub fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
+pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
     if let Some(msg) = state.messages.last_mut()
         && msg.role == "assistant"
     {
@@ -26,7 +26,7 @@ pub fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
 }
 
 /// Handle StreamDone action — finalize streaming, correct token counts
-pub fn handle_stream_done(
+pub(crate) fn handle_stream_done(
     state: &mut State,
     _input_tokens: usize,
     output_tokens: usize,
@@ -76,7 +76,7 @@ pub fn handle_stream_done(
 }
 
 /// Handle StreamError action — clean up streaming state, log error
-pub fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
+pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
     state.is_streaming = false;
 
     // Remove estimated tokens on error from Conversation context

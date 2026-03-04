@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
-pub struct Request {
+pub(crate) struct Request {
     pub cmd: String,
     pub key: Option<String>,
     pub command: Option<String>,
@@ -11,7 +11,7 @@ pub struct Request {
 }
 
 #[derive(Serialize)]
-pub struct Response {
+pub(crate) struct Response {
     pub ok: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -26,7 +26,7 @@ pub struct Response {
 }
 
 #[derive(Serialize)]
-pub struct SessionInfo {
+pub(crate) struct SessionInfo {
     pub key: String,
     pub pid: u32,
     pub status: String,
@@ -34,26 +34,26 @@ pub struct SessionInfo {
 }
 
 impl Response {
-    pub fn ok() -> Self {
+    pub(crate) fn ok() -> Self {
         Self { ok: true, error: None, pid: None, status: None, exit_code: None, sessions: None }
     }
-    pub fn ok_pid(pid: u32) -> Self {
+    pub(crate) fn ok_pid(pid: u32) -> Self {
         Self { ok: true, error: None, pid: Some(pid), status: None, exit_code: None, sessions: None }
     }
-    pub fn ok_status(status: String, exit_code: Option<i32>) -> Self {
+    pub(crate) fn ok_status(status: String, exit_code: Option<i32>) -> Self {
         Self { ok: true, error: None, pid: None, status: Some(status), exit_code, sessions: None }
     }
-    pub fn ok_sessions(sessions: Vec<SessionInfo>) -> Self {
+    pub(crate) fn ok_sessions(sessions: Vec<SessionInfo>) -> Self {
         Self { ok: true, error: None, pid: None, status: None, exit_code: None, sessions: Some(sessions) }
     }
-    pub fn err(msg: impl Into<String>) -> Self {
+    pub(crate) fn err(msg: impl Into<String>) -> Self {
         Self { ok: false, error: Some(msg.into()), pid: None, status: None, exit_code: None, sessions: None }
     }
 }
 
 /// Interpret escape sequences in input strings.
 /// Handles: \n, \r, \t, \\, \e, \0, \xHH
-pub fn interpret_escapes(input: &str) -> Vec<u8> {
+pub(crate) fn interpret_escapes(input: &str) -> Vec<u8> {
     let mut out = Vec::with_capacity(input.len());
     let bytes = input.as_bytes();
     let mut i = 0;

@@ -8,6 +8,7 @@
 use crate::state::State;
 
 /// Result of a satisfied watcher condition.
+#[derive(Debug)]
 pub struct WatcherResult {
     /// Human-readable description of what happened.
     pub description: String,
@@ -28,6 +29,7 @@ pub struct WatcherResult {
 }
 
 /// Info needed to create a console panel after a watcher fires.
+#[derive(Debug)]
 pub struct DeferredPanel {
     pub session_key: String,
     pub display_name: String,
@@ -116,6 +118,12 @@ pub trait Watcher: Send + Sync {
 /// registers watchers.
 pub struct WatcherRegistry {
     pub watchers: Vec<Box<dyn Watcher>>,
+}
+
+impl std::fmt::Debug for WatcherRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WatcherRegistry").field("watchers_count", &self.watchers.len()).finish()
+    }
 }
 
 impl Default for WatcherRegistry {

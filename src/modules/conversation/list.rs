@@ -5,6 +5,7 @@ pub(super) enum ListAction {
 }
 
 /// Increment alphabetical list marker: a->b, z->aa, A->B, Z->AA
+#[allow(clippy::cast_possible_truncation)]
 fn next_alpha_marker(marker: &str) -> String {
     let chars: Vec<char> = marker.chars().collect();
     let is_upper = chars[0].is_ascii_uppercase();

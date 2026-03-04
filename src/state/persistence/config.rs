@@ -12,12 +12,12 @@ fn config_path() -> PathBuf {
 }
 
 /// Get current process PID
-pub fn current_pid() -> u32 {
+pub(crate) fn current_pid() -> u32 {
     process::id()
 }
 
 /// Load shared configuration from config.json
-pub fn load_config() -> Option<SharedConfig> {
+pub(crate) fn load_config() -> Option<SharedConfig> {
     let path = config_path();
     let json = fs::read_to_string(&path).ok()?;
     serde_json::from_str(&json).ok()

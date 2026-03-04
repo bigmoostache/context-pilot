@@ -12,38 +12,38 @@ use serde_json::Value;
 
 /// Parsed SSE streaming response (OpenAI-compatible format).
 #[derive(Debug, Deserialize)]
-pub struct StreamResponse {
+pub(crate) struct StreamResponse {
     pub choices: Vec<StreamChoice>,
     pub usage: Option<StreamUsage>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct StreamChoice {
+pub(crate) struct StreamChoice {
     pub delta: Option<StreamDelta>,
     pub finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct StreamDelta {
+pub(crate) struct StreamDelta {
     pub content: Option<String>,
     pub tool_calls: Option<Vec<StreamToolCall>>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct StreamToolCall {
+pub(crate) struct StreamToolCall {
     pub index: Option<usize>,
     pub id: Option<String>,
     pub function: Option<StreamFunctionDelta>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct StreamFunctionDelta {
+pub(crate) struct StreamFunctionDelta {
     pub name: Option<String>,
     pub arguments: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct StreamUsage {
+pub(crate) struct StreamUsage {
     pub prompt_tokens: Option<usize>,
     pub completion_tokens: Option<usize>,
     /// DeepSeek-specific cache fields
@@ -52,7 +52,7 @@ pub struct StreamUsage {
 }
 
 /// Normalize provider-specific stop reasons to our internal format.
-pub fn normalize_stop_reason(reason: &str) -> String {
+pub(crate) fn normalize_stop_reason(reason: &str) -> String {
     match reason {
         "length" => "max_tokens".to_string(),
         "stop" => "end_turn".to_string(),
@@ -62,7 +62,7 @@ pub fn normalize_stop_reason(reason: &str) -> String {
 }
 
 /// Process a single SSE line, returning parsed StreamResponse if valid.
-pub fn parse_sse_line(line: &str) -> Option<StreamResponse> {
+pub(crate) fn parse_sse_line(line: &str) -> Option<StreamResponse> {
     if !line.starts_with("data: ") {
         return None;
     }
@@ -75,17 +75,17 @@ pub fn parse_sse_line(line: &str) -> Option<StreamResponse> {
 
 /// Accumulator for building tool calls from streaming deltas.
 #[derive(Default)]
-pub struct ToolCallAccumulator {
+pub(crate) struct ToolCallAccumulator {
     pub calls: std::collections::HashMap<usize, (String, String, String)>,
 }
 
 impl ToolCallAccumulator {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Feed a streaming tool call delta.
-    pub fn feed(&mut self, call: &StreamToolCall) {
+    pub(crate) fn feed(&mut self, call: &StreamToolCall) {
         let idx = call.index.unwrap_or(0);
         let entry = self.calls.entry(idx).or_insert_with(|| (String::new(), String::new(), String::new()));
 
@@ -103,7 +103,7 @@ impl ToolCallAccumulator {
     }
 
     /// Drain all completed tool calls into ToolUse events.
-    pub fn drain(&mut self) -> Vec<crate::infra::tools::ToolUse> {
+    pub(crate) fn drain(&mut self) -> Vec<crate::infra::tools::ToolUse> {
         self.calls
             .drain()
             .filter_map(|(_, (id, name, arguments))| {
@@ -123,7 +123,7 @@ impl ToolCallAccumulator {
 // ───────────────────────────────────────────────────────────────────
 
 /// Dump an API request to disk for debugging.
-pub fn dump_request<T: Serialize>(worker_id: &str, provider: &str, request: &T) {
+pub(crate) fn dump_request<T: Serialize>(worker_id: &str, provider: &str, request: &T) {
     let dir = ".context-pilot/last_requests";
     let _ = std::fs::create_dir_all(dir);
     let path = format!("{}/{}_{}_last_request.json", dir, worker_id, provider);

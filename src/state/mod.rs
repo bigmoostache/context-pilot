@@ -4,13 +4,13 @@
 //! existing `crate::state::X` imports throughout the binary keep working.
 
 // ── Wildcard re-export: State, ContextElement, ContextType, Message, etc. ──
-pub use cp_base::state::*;
+pub(crate) use cp_base::state::*;
 
 // ── Submodule re-exports (accessed via path, e.g. crate::state::config::SCHEMA_VERSION) ──
-pub use cp_base::state::config;
+pub(crate) use cp_base::state::config;
 #[cfg(test)]
-pub use cp_base::state::message;
+pub(crate) use cp_base::state::message;
 
 // ── Local submodules ──
-pub mod cache;
-pub mod persistence;
+pub(crate) mod cache;
+pub(crate) mod persistence;

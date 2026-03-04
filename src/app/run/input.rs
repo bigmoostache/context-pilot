@@ -12,10 +12,7 @@ impl App {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
 
-        let ac = match self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
-            Some(ac) => ac,
-            None => return,
-        };
+        let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else { return };
 
         match key.code {
             KeyCode::Esc => {
@@ -143,10 +140,7 @@ impl App {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
 
-        let form = match self.state.get_ext_mut::<cp_base::ui::PendingQuestionForm>() {
-            Some(f) => f,
-            None => return,
-        };
+        let Some(form) = self.state.get_ext_mut::<cp_base::ui::PendingQuestionForm>() else { return };
 
         // Check if currently typing in "Other" field
         let typing_other = form.answers[form.current_question].typing_other;

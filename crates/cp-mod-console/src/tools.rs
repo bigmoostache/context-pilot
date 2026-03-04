@@ -145,9 +145,8 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let cs = ConsoleState::get(state);
-    let handle = match cs.sessions.get(&session_key) {
-        Some(h) => h,
-        None => return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true),
+    let Some(handle) = cs.sessions.get(&session_key) else {
+        return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true);
     };
 
     if handle.get_status().is_terminal() {
@@ -200,9 +199,8 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Check if session exists
     let cs = ConsoleState::get(state);
-    let handle = match cs.sessions.get(&session_key) {
-        Some(h) => h,
-        None => return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true),
+    let Some(handle) = cs.sessions.get(&session_key) else {
+        return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true);
     };
 
     // Check if condition is already met
@@ -286,9 +284,8 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Check if session exists
     let cs = ConsoleState::get(state);
-    let handle = match cs.sessions.get(&session_key) {
-        Some(h) => h,
-        None => return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true),
+    let Some(handle) = cs.sessions.get(&session_key) else {
+        return ToolResult::new(tool.id.clone(), format!("Session for '{}' not found", panel_id), true);
     };
 
     // Check if condition is already met — return immediately
@@ -403,7 +400,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         registered_at_ms: now,
         deadline_ms: Some(now + BASH_MAX_EXECUTION_SECS * 1000),
         easy_bash: true,
-        panel_id: panel_id.clone(),
+        panel_id,
         desc: format!("⏳ easy_bash: {}", truncate_str(&command, 40)),
     };
 

@@ -1,5 +1,5 @@
 mod commands;
-pub mod config_overlay;
+pub(crate) mod config_overlay;
 mod palette;
 
-pub use palette::CommandPalette;
+pub(crate) use palette::CommandPalette;

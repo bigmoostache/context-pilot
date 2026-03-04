@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::config::theme;
 
 /// Column alignment for table cells
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum Align {
     #[default]
     Left,
@@ -17,6 +17,7 @@ pub enum Align {
 }
 
 /// A single table cell with text, style, and alignment
+#[derive(Debug)]
 pub struct Cell {
     pub text: String,
     pub style: Style,
@@ -73,7 +74,7 @@ pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Ce
     }
 
     let pad = " ".repeat(indent);
-    let mut lines: Vec<Line> = Vec::new();
+    let mut lines: Vec<Line<'_>> = Vec::new();
 
     let separator = || -> Line<'static> {
         let mut spans: Vec<Span<'static>> = vec![Span::raw(pad.clone())];
@@ -135,6 +136,7 @@ pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Ce
 }
 
 /// Simple text-cell for `render_table_text`. Style-free, just text + alignment.
+#[derive(Debug)]
 pub struct TextCell {
     pub text: String,
     pub align: Align,

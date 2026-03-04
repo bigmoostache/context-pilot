@@ -6,7 +6,7 @@ use cp_base::state::{ContextType, State, estimate_tokens};
 
 use crate::types::QueueState;
 
-pub struct QueuePanel;
+pub(crate) struct QueuePanel;
 
 impl Panel for QueuePanel {
     fn title(&self, state: &State) -> String {

@@ -4,8 +4,9 @@
 //! Replicates Claude Code's request signature to access Claude 4.5 models.
 
 mod check;
-pub mod helpers;
+pub(crate) mod helpers;
 mod streaming;
+#[cfg(test)]
 mod tests;
 
 use std::env;
@@ -24,12 +25,12 @@ use cp_base::config::INJECTIONS;
 use helpers::*;
 
 /// Claude Code API Key client
-pub struct ClaudeCodeApiKeyClient {
+pub(crate) struct ClaudeCodeApiKeyClient {
     api_key: Option<SecretBox<String>>,
 }
 
 impl ClaudeCodeApiKeyClient {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let api_key = Self::load_api_key();
         Self { api_key }
     }

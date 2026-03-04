@@ -36,12 +36,9 @@ fn touch_logs_panel(state: &mut State) {
     }
 }
 
-pub fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let entries = match tool.input.get("entries").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'entries' array".to_string(), true);
-        }
+pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(entries) = tool.input.get("entries").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required 'entries' array".to_string(), true);
     };
 
     if entries.is_empty() {
@@ -65,7 +62,7 @@ pub fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created {} log(s)", count), false)
 }
 
-pub fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Parse log_ids
     let log_ids: Vec<String> = match tool.input.get("log_ids").and_then(|v| v.as_array()) {
         Some(arr) => arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
@@ -143,7 +140,7 @@ pub fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created summary {} with {} children", summary_id, log_ids.len()), false)
 }
 
-pub fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
@@ -199,7 +196,7 @@ pub fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     )
 }
 
-pub fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
     // 1. Validate the panel ID
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),

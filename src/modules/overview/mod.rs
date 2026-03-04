@@ -1,4 +1,4 @@
-pub mod context;
+pub(crate) mod context;
 mod panel;
 mod render;
 mod render_details;
@@ -21,7 +21,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/core.yaml")).expect("Failed to parse core tool YAML")
 });
 
-pub struct OverviewModule;
+pub(crate) struct OverviewModule;
 
 impl Module for OverviewModule {
     fn id(&self) -> &'static str {
@@ -78,6 +78,7 @@ impl Module for OverviewModule {
         })
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("active_modules").and_then(|v| v.as_array()) {
             state.active_modules = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();

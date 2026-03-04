@@ -19,7 +19,7 @@ struct ConsoleCacheRequest {
     current_source_hash: Option<String>,
 }
 
-pub struct ConsolePanel;
+pub(crate) struct ConsolePanel;
 
 impl Panel for ConsolePanel {
     fn needs_cache(&self) -> bool {
@@ -31,10 +31,7 @@ impl Panel for ConsolePanel {
     }
 
     fn suicide(&self, ctx: &ContextElement, state: &State) -> bool {
-        let session_name = match ctx.get_meta_str("console_name") {
-            Some(n) => n,
-            None => return false,
-        };
+        let Some(session_name) = ctx.get_meta_str("console_name") else { return false };
 
         // Callback consoles: suicide if a newer console with the same callback_id exists.
         // This auto-closes stale failure panels when the callback re-fires.
@@ -158,7 +155,7 @@ impl Panel for ConsolePanel {
             (String::new(), String::new(), String::new())
         };
 
-        let mut lines: Vec<Line> = Vec::new();
+        let mut lines: Vec<Line<'_>> = Vec::new();
 
         // Header: $ command [status]
         let status_color = if status.starts_with("running") {

@@ -1,8 +1,8 @@
-pub mod conversation;
-pub mod conversation_history;
-pub mod overview;
-pub mod pre_flight;
-pub mod questions;
+pub(crate) mod conversation;
+pub(crate) mod conversation_history;
+pub(crate) mod overview;
+pub(crate) mod pre_flight;
+pub(crate) mod questions;
 
 use std::collections::{HashMap, HashSet};
 
@@ -15,30 +15,30 @@ static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::ne
     serde_yaml::from_str(include_str!("../../yamls/tools/core.yaml")).expect("Failed to parse core tool YAML")
 });
 
-pub use cp_mod_brave::BraveModule;
-pub use cp_mod_callback::CallbackModule;
-pub use cp_mod_console::ConsoleModule;
-pub use cp_mod_files::FilesModule;
-pub use cp_mod_firecrawl::FirecrawlModule;
-pub use cp_mod_git::GitModule;
-pub use cp_mod_github::GithubModule;
-pub use cp_mod_logs::LogsModule;
-pub use cp_mod_memory::MemoryModule;
-pub use cp_mod_preset::PresetModule;
-pub use cp_mod_prompt::PromptModule;
-pub use cp_mod_queue::QueueModule;
-pub use cp_mod_scratchpad::ScratchpadModule;
-pub use cp_mod_spine::SpineModule;
-pub use cp_mod_todo::TodoModule;
-pub use cp_mod_tree::TreeModule;
-pub use cp_mod_typst::TypstModule;
+pub(crate) use cp_mod_brave::BraveModule;
+pub(crate) use cp_mod_callback::CallbackModule;
+pub(crate) use cp_mod_console::ConsoleModule;
+pub(crate) use cp_mod_files::FilesModule;
+pub(crate) use cp_mod_firecrawl::FirecrawlModule;
+pub(crate) use cp_mod_git::GitModule;
+pub(crate) use cp_mod_github::GithubModule;
+pub(crate) use cp_mod_logs::LogsModule;
+pub(crate) use cp_mod_memory::MemoryModule;
+pub(crate) use cp_mod_preset::PresetModule;
+pub(crate) use cp_mod_prompt::PromptModule;
+pub(crate) use cp_mod_queue::QueueModule;
+pub(crate) use cp_mod_scratchpad::ScratchpadModule;
+pub(crate) use cp_mod_spine::SpineModule;
+pub(crate) use cp_mod_todo::TodoModule;
+pub(crate) use cp_mod_tree::TreeModule;
+pub(crate) use cp_mod_typst::TypstModule;
 
 // Re-export Module trait and helpers from cp-base
-pub use cp_base::modules::{Module, ToolVisualizer};
+pub(crate) use cp_base::modules::{Module, ToolVisualizer};
 
 /// Initialize the global ContextType registry from all modules.
 /// Must be called once at startup, before any `is_fixed()` / `icon()` / `needs_cache()` calls.
-pub fn init_registry() {
+pub(crate) fn init_registry() {
     let modules = all_modules();
     let metadata: Vec<crate::state::ContextTypeMeta> = modules.iter().flat_map(|m| m.context_type_metadata()).collect();
     crate::state::init_context_type_registry(metadata);
@@ -46,7 +46,7 @@ pub fn init_registry() {
 
 /// Collect all fixed panel defaults in canonical order (derived from the registry).
 /// Returns (module_id, is_core, context_type, display_name, cache_deprecated) for each fixed panel.
-pub fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'static str, bool)> {
+pub(crate) fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'static str, bool)> {
     // Build a lookup from context_type to module defaults
     let modules = all_modules();
     let mut lookup: std::collections::HashMap<ContextType, (&str, bool, &str, bool)> = std::collections::HashMap::new();
@@ -67,7 +67,7 @@ pub fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'sta
 }
 
 /// Create a default ContextElement for a fixed panel
-pub fn make_default_context_element(
+pub(crate) fn make_default_context_element(
     id: &str,
     context_type: ContextType,
     name: &str,
@@ -77,7 +77,7 @@ pub fn make_default_context_element(
 }
 
 /// Returns all registered modules.
-pub fn all_modules() -> Vec<Box<dyn Module>> {
+pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
     vec![
         Box::new(overview::OverviewModule),
         Box::new(conversation::ConversationModule),
@@ -104,14 +104,14 @@ pub fn all_modules() -> Vec<Box<dyn Module>> {
 }
 
 /// Returns the default set of active module IDs (all modules).
-pub fn default_active_modules() -> HashSet<String> {
+pub(crate) fn default_active_modules() -> HashSet<String> {
     all_modules().iter().map(|m| m.id().to_string()).collect()
 }
 
 /// Build a registry of tool visualizers from all modules.
 /// Maps tool_id -> visualizer function. Used by conversation_render to
 /// dispatch custom rendering for tool results.
-pub fn build_visualizer_registry() -> HashMap<String, ToolVisualizer> {
+pub(crate) fn build_visualizer_registry() -> HashMap<String, ToolVisualizer> {
     let mut registry = HashMap::new();
     for module in all_modules() {
         for (tool_id, visualizer) in module.tool_visualizers() {
@@ -122,12 +122,12 @@ pub fn build_visualizer_registry() -> HashMap<String, ToolVisualizer> {
 }
 
 /// Collect tool definitions from all active modules.
-pub fn active_tool_definitions(active_modules: &HashSet<String>) -> Vec<ToolDefinition> {
+pub(crate) fn active_tool_definitions(active_modules: &HashSet<String>) -> Vec<ToolDefinition> {
     all_modules().into_iter().filter(|m| active_modules.contains(m.id())).flat_map(|m| m.tool_definitions()).collect()
 }
 
 /// Dispatch a tool call to the appropriate active module.
-pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet<String>) -> ToolResult {
+pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet<String>) -> ToolResult {
     // Handle module_toggle specially — it's always available when core is active
     if tool.name == "module_toggle" && active_modules.contains("core") {
         return execute_module_toggle(tool, state);
@@ -157,7 +157,7 @@ pub fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet
 }
 
 /// Create a panel for the given context type by asking all modules.
-pub fn create_panel(context_type: &ContextType) -> Option<Box<dyn Panel>> {
+pub(crate) fn create_panel(context_type: &ContextType) -> Option<Box<dyn Panel>> {
     for module in all_modules() {
         if let Some(panel) = module.create_panel(context_type) {
             return Some(panel);
@@ -166,7 +166,7 @@ pub fn create_panel(context_type: &ContextType) -> Option<Box<dyn Panel>> {
     None
 }
 
-pub fn validate_dependencies(active: &HashSet<String>) {
+pub(crate) fn validate_dependencies(active: &HashSet<String>) {
     for module in all_modules() {
         if active.contains(module.id()) {
             for dep in module.dependencies() {
@@ -180,7 +180,7 @@ pub fn validate_dependencies(active: &HashSet<String>) {
 
 /// Check if a module can be deactivated without breaking dependencies.
 /// Returns Ok(()) if safe, Err(message) if blocked.
-pub fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result<(), String> {
+pub(crate) fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result<(), String> {
     // Core modules cannot be deactivated
     for module in all_modules() {
         if module.id() == id && module.is_core() {
@@ -199,7 +199,7 @@ pub fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result<(), St
 }
 
 /// Returns the module_toggle tool definition (added by core module).
-pub fn module_toggle_tool_definition() -> ToolDefinition {
+pub(crate) fn module_toggle_tool_definition() -> ToolDefinition {
     let t = &*CORE_TOOL_TEXTS;
     ToolDefinition::from_yaml("module_toggle", t)
         .short_desc("Activate/deactivate modules")
@@ -222,16 +222,13 @@ pub fn module_toggle_tool_definition() -> ToolDefinition {
 
 /// Execute the module_toggle tool.
 fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let changes = match tool.input.get("changes").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: "Missing 'changes' parameter (expected array)".to_string(),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
-        }
+    let Some(changes) = tool.input.get("changes").and_then(|v| v.as_array()) else {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: "Missing 'changes' parameter (expected array)".to_string(),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        };
     };
 
     let mut successes = Vec::new();
@@ -241,20 +238,14 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let known_ids: HashSet<&str> = all_mods.iter().map(|m| m.id()).collect();
 
     for (i, change) in changes.iter().enumerate() {
-        let module_id = match change.get("module").and_then(|v| v.as_str()) {
-            Some(id) => id,
-            None => {
-                failures.push(format!("Change {}: missing 'module' field", i + 1));
-                continue;
-            }
+        let Some(module_id) = change.get("module").and_then(|v| v.as_str()) else {
+            failures.push(format!("Change {}: missing 'module' field", i + 1));
+            continue;
         };
 
-        let action = match change.get("action").and_then(|v| v.as_str()) {
-            Some(a) => a,
-            None => {
-                failures.push(format!("Change {}: missing 'action' field", i + 1));
-                continue;
-            }
+        let Some(action) = change.get("action").and_then(|v| v.as_str()) else {
+            failures.push(format!("Change {}: missing 'action' field", i + 1));
+            continue;
         };
 
         if !known_ids.contains(module_id) {
@@ -333,6 +324,27 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
+/// Rebuild the tools list from active modules and preserved disabled_tools.
+fn rebuild_tools(state: &mut State) {
+    // Preserve currently disabled tool IDs
+    let disabled: HashSet<String> = state.tools.iter().filter(|t| !t.enabled).map(|t| t.id.clone()).collect();
+
+    // Get fresh tool definitions from active modules
+    let mut tools = active_tool_definitions(&state.active_modules);
+
+    // Add the reverie's optimize_context tool (always available for main AI)
+    tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
+
+    // Re-apply disabled state
+    for tool in &mut tools {
+        if tool.id != "tool_manage" && tool.id != "module_toggle" && disabled.contains(&tool.id) {
+            tool.enabled = false;
+        }
+    }
+
+    state.tools = tools;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,25 +386,4 @@ mod tests {
         let result = check_can_deactivate("git", &active);
         assert!(result.is_ok());
     }
-}
-
-/// Rebuild the tools list from active modules and preserved disabled_tools.
-fn rebuild_tools(state: &mut State) {
-    // Preserve currently disabled tool IDs
-    let disabled: HashSet<String> = state.tools.iter().filter(|t| !t.enabled).map(|t| t.id.clone()).collect();
-
-    // Get fresh tool definitions from active modules
-    let mut tools = active_tool_definitions(&state.active_modules);
-
-    // Add the reverie's optimize_context tool (always available for main AI)
-    tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
-
-    // Re-apply disabled state
-    for tool in &mut tools {
-        if tool.id != "tool_manage" && tool.id != "module_toggle" && disabled.contains(&tool.id) {
-            tool.enabled = false;
-        }
-    }
-
-    state.tools = tools;
 }

@@ -151,7 +151,8 @@ fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
 /// Strategy: compute fixed column widths → for each row, wrap cell text to fit
 /// → render each display line as a sequence of fixed-width cells separated by │.
 /// Vertical separators are always at the same character positions.
-pub fn render_markdown_table(lines: &[&str], _base_style: Style, max_width: usize) -> Vec<Vec<Span<'static>>> {
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_width: usize) -> Vec<Vec<Span<'static>>> {
     // Parse all rows into cells
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut is_separator_row: Vec<bool> = Vec::new();
@@ -304,7 +305,7 @@ pub fn render_markdown_table(lines: &[&str], _base_style: Style, max_width: usiz
 }
 
 /// Parse markdown text and return styled spans
-pub fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> {
+pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> {
     let trimmed = line.trim_start();
 
     // Headers: # ## ### etc.
@@ -350,7 +351,7 @@ pub fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> 
 }
 
 /// Parse inline markdown (bold, italic, code)
-pub fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
+pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
     let mut spans = Vec::new();
     let mut chars = text.chars().peekable();
     let mut current = String::new();

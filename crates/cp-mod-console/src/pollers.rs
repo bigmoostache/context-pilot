@@ -11,11 +11,12 @@ use crate::types::ProcessStatus;
 use super::manager::server_request;
 
 /// File poller: reads new bytes from a log file into a ring buffer.
-pub fn file_poller(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>) {
+pub(crate) fn file_poller(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>) {
     file_poller_from_offset(path, buffer, stop, 0);
 }
 
-pub fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>, mut offset: u64) {
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>, mut offset: u64) {
     use std::io::{Read, Seek, SeekFrom};
 
     loop {
@@ -57,7 +58,9 @@ pub fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: Arc<Atom
 }
 
 /// Periodically poll the server for process status.
-pub fn poll_server_status(
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn poll_server_status(
     key: String,
     status: Arc<Mutex<ProcessStatus>>,
     finished_at: Arc<Mutex<Option<u64>>>,
@@ -69,28 +72,13 @@ pub fn poll_server_status(
         }
 
         let req = serde_json::json!({"cmd": "status", "key": key});
-        match server_request(&req) {
-            Ok(resp) => {
-                let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                if st.starts_with("exited") {
-                    let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1) as i32;
-                    let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
-                    if !s.is_terminal() {
-                        *s = if code == 0 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };
-                    }
-                    let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
-                    if fin.is_none() {
-                        *fin = Some(now_ms());
-                    }
-                    stop_polling.store(true, Ordering::Relaxed);
-                    break;
-                }
-            }
-            Err(_) => {
-                // Server unreachable — mark as dead
+        if let Ok(resp) = server_request(&req) {
+            let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            if st.starts_with("exited") {
+                let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1) as i32;
                 let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
                 if !s.is_terminal() {
-                    *s = ProcessStatus::Failed(-1);
+                    *s = if code == 0 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };
                 }
                 let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
                 if fin.is_none() {
@@ -99,6 +87,18 @@ pub fn poll_server_status(
                 stop_polling.store(true, Ordering::Relaxed);
                 break;
             }
+        } else {
+            // Server unreachable — mark as dead
+            let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
+            if !s.is_terminal() {
+                *s = ProcessStatus::Failed(-1);
+            }
+            let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
+            if fin.is_none() {
+                *fin = Some(now_ms());
+            }
+            stop_polling.store(true, Ordering::Relaxed);
+            break;
         }
 
         std::thread::sleep(std::time::Duration::from_millis(500));

@@ -3,14 +3,14 @@
 /// or mutating (must execute and return output).
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommandClass {
+pub(crate) enum CommandClass {
     ReadOnly,
     Mutating,
 }
 
 /// Parse a command string into arguments, respecting single and double quotes.
 /// Strips the leading command name (e.g. "git") and returns all tokens.
-pub fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
+pub(crate) fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
     let mut args = Vec::new();
     let mut current = String::new();
     let mut in_single = false;
@@ -49,7 +49,7 @@ pub fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
 }
 
 /// Check for shell metacharacters outside of quoted strings.
-pub fn check_shell_operators(command: &str) -> Result<(), String> {
+pub(crate) fn check_shell_operators(command: &str) -> Result<(), String> {
     let mut in_single = false;
     let mut in_double = false;
     let chars: Vec<char> = command.chars().collect();
@@ -81,7 +81,7 @@ pub fn check_shell_operators(command: &str) -> Result<(), String> {
 
 /// Validate a raw command string intended for `git`.
 /// Returns parsed args on success, or an error message on failure.
-pub fn validate_git_command(command: &str) -> Result<Vec<String>, String> {
+pub(crate) fn validate_git_command(command: &str) -> Result<Vec<String>, String> {
     let trimmed = command.trim();
     if !trimmed.starts_with("git ") && trimmed != "git" {
         return Err("Command must start with 'git '".to_string());
@@ -101,7 +101,7 @@ pub fn validate_git_command(command: &str) -> Result<Vec<String>, String> {
 }
 
 /// Classify a git command (given as parsed args after "git") as read-only or mutating.
-pub fn classify_git(args: &[String]) -> CommandClass {
+pub(crate) fn classify_git(args: &[String]) -> CommandClass {
     if args.is_empty() {
         return CommandClass::Mutating; // safe default
     }

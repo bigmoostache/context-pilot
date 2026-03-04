@@ -1,3 +1,3 @@
-pub mod close_context;
-pub mod manage_tools;
-pub mod panel_goto_page;
+pub(super) mod close_context;
+pub(super) mod manage_tools;
+pub(super) mod panel_goto_page;

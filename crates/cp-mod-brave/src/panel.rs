@@ -32,6 +32,7 @@ pub fn create_panel(state: &mut State, title: &str, content: &str) -> String {
     panel_id
 }
 
+#[derive(Debug)]
 pub struct BraveResultPanel;
 
 /// Cache request for restoring content from metadata after reload

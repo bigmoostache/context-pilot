@@ -7,7 +7,7 @@ use super::full::fixed_panel_badge;
 
 /// Render a collapsed sidebar (icons + badges only, ~14 columns wide).
 /// Shows: selection arrow, icon, badge count. Token bar at the bottom.
-pub fn render_sidebar_collapsed(frame: &mut Frame, state: &State, area: Rect) {
+pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let _guard = crate::profile!("ui::sidebar_collapsed");
     let base_style = Style::default().bg(theme::bg_base());
 
@@ -18,7 +18,7 @@ pub fn render_sidebar_collapsed(frame: &mut Frame, state: &State, area: Rect) {
         .constraints([Constraint::Min(1), Constraint::Length(token_area_height)])
         .split(area);
 
-    let mut lines: Vec<Line> = Vec::new();
+    let mut lines: Vec<Line<'_>> = Vec::new();
     lines.push(Line::from(""));
 
     // Sort contexts by panel ID order

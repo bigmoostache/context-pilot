@@ -8,7 +8,7 @@ use super::helpers::{find_context_by_id, parse_context_pattern};
 use crate::modules::all_modules;
 
 /// Handle InputSubmit action — context switching, message creation, stream start
-pub fn handle_input_submit(state: &mut State) -> ActionResult {
+pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     if state.input.is_empty() {
         return ActionResult::Nothing;
     }
@@ -90,7 +90,7 @@ pub fn handle_input_submit(state: &mut State) -> ActionResult {
 }
 
 /// Handle ClearConversation action
-pub fn handle_clear_conversation(state: &mut State) -> ActionResult {
+pub(crate) fn handle_clear_conversation(state: &mut State) -> ActionResult {
     for msg in &state.messages {
         // Delete by UID if available, otherwise by id
         let file_id = msg.uid.as_ref().unwrap_or(&msg.id);

@@ -1,6 +1,6 @@
 use regex::Regex;
 
-pub struct InvalidationRule {
+pub(crate) struct InvalidationRule {
     pub trigger: Regex,
     pub invalidates: Vec<String>,
 }
@@ -14,7 +14,7 @@ impl InvalidationRule {
     }
 }
 
-pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
+pub(crate) fn build_invalidation_rules() -> Vec<InvalidationRule> {
     vec![
         // NUCLEAR — invalidate ALL GitResult panels
         InvalidationRule::new(
@@ -58,7 +58,7 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
     ]
 }
 
-pub fn find_invalidations(mutating_command: &str) -> Vec<Regex> {
+pub(crate) fn find_invalidations(mutating_command: &str) -> Vec<Regex> {
     let rules = build_invalidation_rules();
     let mut result = Vec::new();
     for rule in &rules {

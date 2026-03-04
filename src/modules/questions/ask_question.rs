@@ -6,16 +6,13 @@ use cp_base::ui::{PendingQuestionForm, Question, QuestionOption};
 /// Parses input, validates constraints, stores PendingQuestionForm in state.
 /// Returns a placeholder result — the real result is produced when the user
 /// submits or dismisses the form (handled by app.rs).
-pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let questions_val = match tool.input.get("questions").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(
-                tool.id.clone(),
-                "Missing 'questions' parameter (expected array of 1-4 questions)".to_string(),
-                true,
-            );
-        }
+pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(questions_val) = tool.input.get("questions").and_then(|v| v.as_array()) else {
+        return ToolResult::new(
+            tool.id.clone(),
+            "Missing 'questions' parameter (expected array of 1-4 questions)".to_string(),
+            true,
+        );
     };
 
     // Validate question count
@@ -48,11 +45,8 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let multi_select = q_val.get("multiSelect").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        let options_val = match q_val.get("options").and_then(|v| v.as_array()) {
-            Some(arr) => arr,
-            None => {
-                return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'options' field", i + 1), true);
-            }
+        let Some(options_val) = q_val.get("options").and_then(|v| v.as_array()) else {
+            return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'options' field", i + 1), true);
         };
 
         if options_val.len() < 2 || options_val.len() > 4 {

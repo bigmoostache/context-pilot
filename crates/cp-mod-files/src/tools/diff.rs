@@ -1,5 +1,5 @@
 /// Generate a unified diff showing changes between old and new strings
-pub fn generate_unified_diff(old: &str, new: &str) -> String {
+pub(crate) fn generate_unified_diff(old: &str, new: &str) -> String {
     let old_lines: Vec<&str> = old.lines().collect();
     let new_lines: Vec<&str> = new.lines().collect();
 

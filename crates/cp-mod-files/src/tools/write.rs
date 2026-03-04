@@ -4,19 +4,14 @@ use std::path::Path;
 use cp_base::state::{ContextElement, ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
 
-pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let path_str = match tool.input.get("file_path").and_then(|v| v.as_str()) {
-        Some(p) => p,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
-        }
+pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
     };
 
-    let contents = match tool.input.get("contents").or_else(|| tool.input.get("content")).and_then(|v| v.as_str()) {
-        Some(c) => c,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required parameter: contents".to_string(), true);
-        }
+    let Some(contents) = tool.input.get("contents").or_else(|| tool.input.get("content")).and_then(|v| v.as_str())
+    else {
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: contents".to_string(), true);
     };
 
     let path = Path::new(path_str);

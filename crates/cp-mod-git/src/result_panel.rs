@@ -130,7 +130,7 @@ impl Panel for GitResultPanel {
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let mut text: Vec<Line> = Vec::new();
+        let mut text: Vec<Line<'_>> = Vec::new();
 
         // Find the selected GitResult panel
         let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GIT_RESULT);

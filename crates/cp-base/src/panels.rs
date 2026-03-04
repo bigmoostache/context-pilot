@@ -80,6 +80,7 @@ pub fn hash_content(content: &str) -> String {
 // =============================================================================
 
 /// Specification for a filesystem path to watch.
+#[derive(Debug)]
 pub enum WatchSpec {
     /// Watch a single file (non-recursive)
     File(String),
@@ -90,6 +91,7 @@ pub enum WatchSpec {
 }
 
 /// Get current time in milliseconds since UNIX epoch
+#[allow(clippy::cast_possible_truncation)]
 pub fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
@@ -108,6 +110,7 @@ pub fn update_if_changed(ctx: &mut ContextElement, content: &str) -> bool {
 
 /// Mark all panels of a given context type as cache-deprecated (dirty).
 /// Also sets `state.dirty = true` so the UI re-renders.
+#[allow(clippy::needless_pass_by_value)]
 pub fn mark_panels_dirty(state: &mut State, context_type: ContextType) {
     for ctx in &mut state.context {
         if ctx.context_type == context_type {
@@ -121,6 +124,7 @@ pub fn mark_panels_dirty(state: &mut State, context_type: ContextType) {
 /// Returns the original content unchanged when total_pages <= 1.
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
 /// and prepends a page header.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn paginate_content(full_content: &str, current_page: usize, total_pages: usize) -> String {
     use crate::config::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
@@ -244,7 +248,7 @@ pub trait Panel {
     }
 
     /// Render the panel to the frame (default: no-op, override in binary)
-    fn render(&self, _frame: &mut Frame, _state: &mut State, _area: Rect) {}
+    fn render(&self, _frame: &mut Frame<'_>, _state: &mut State, _area: Rect) {}
 }
 
 #[cfg(test)]

@@ -28,6 +28,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/console.yaml")).expect("Failed to parse console tool YAML")
 });
 
+#[derive(Debug)]
 pub struct ConsoleModule;
 
 impl Module for ConsoleModule {
@@ -98,6 +99,7 @@ impl Module for ConsoleModule {
         }
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         // Ensure the console server is running
         if let Err(e) = manager::find_or_create_server() {

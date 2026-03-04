@@ -13,6 +13,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/brave.yaml")).expect("Failed to parse brave tool YAML")
 });
 
+#[derive(Debug)]
 pub struct BraveModule;
 
 impl Module for BraveModule {

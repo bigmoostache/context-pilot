@@ -60,6 +60,7 @@ pub enum Action {
     None,
 }
 
+#[derive(Debug)]
 pub enum ActionResult {
     Nothing,
     StopStream,

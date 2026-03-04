@@ -82,7 +82,7 @@ pub fn fire_callback(
     };
 
     // Spawn the process
-    let handle = SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone())?;
+    let handle = SessionHandle::spawn(session_key.clone(), command.clone(), cwd)?;
 
     // Store handle in console state (NO panel created — deferred until failure/timeout)
     let cs = ConsoleState::get_mut(state);
@@ -114,7 +114,7 @@ pub fn fire_callback(
         deferred_panel: DeferredPanel {
             session_key: session_key.clone(),
             display_name: format!("CB: {}", def.name),
-            command: command.clone(),
+            command,
             description: format!("Callback: {}", def.name),
             cwd: def.cwd.clone(),
             callback_id: def.id.clone(),
@@ -176,6 +176,7 @@ fn shell_escape(s: &str) -> String {
 /// NO panel is created upfront — only on failure/timeout via `create_panel` in WatcherResult.
 /// On exit 0: returns success_message + log file path, kills session.
 /// On exit != 0: returns error output + deferred panel info for tool_cleanup to create.
+#[derive(Debug)]
 pub struct CallbackWatcher {
     pub watcher_id: String,
     pub session_name: String,

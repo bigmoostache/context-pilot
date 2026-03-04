@@ -14,7 +14,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
 /// Build a human-readable text describing which tools the reverie is allowed to use.
 /// This is injected at the top of the reverie's conversation panel (P-reverie) so the
 /// LLM knows its constraints, even though it sees ALL tool definitions in the prompt.
-pub fn build_tool_restrictions_text(tools: &[crate::infra::tools::ToolDefinition]) -> String {
+pub(crate) fn build_tool_restrictions_text(tools: &[crate::infra::tools::ToolDefinition]) -> String {
     let r = &REVERIE.tool_restrictions;
     let mut text = r.header.trim_end().to_string();
     text.push('\n');
@@ -37,7 +37,7 @@ pub fn build_tool_restrictions_text(tools: &[crate::infra::tools::ToolDefinition
 ///
 /// This tool lets the main AI explicitly invoke a reverie sub-agent
 /// with an optional directive and agent selection.
-pub fn optimize_context_tool_definition() -> ToolDefinition {
+pub(crate) fn optimize_context_tool_definition() -> ToolDefinition {
     let t = &*TOOL_TEXTS;
     ToolDefinition::from_yaml("optimize_context", t)
         .short_desc("Invoke the reverie context optimizer")
@@ -51,7 +51,7 @@ pub fn optimize_context_tool_definition() -> ToolDefinition {
 ///
 /// Returns the ToolResult. The caller (event loop) is responsible for actually
 /// destroying the reverie state after processing this result.
-pub fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
+pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
     // Block report if queue has unflushed actions
     let qs = cp_mod_queue::QueueState::get(state);
     if !qs.queued_calls.is_empty() {
@@ -80,7 +80,7 @@ pub fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
 ///
 /// Validates preconditions and returns an ack. The actual reverie start
 /// happens in the event loop when it processes this result.
-pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
+pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
     // Guard: reverie disabled
     if !state.reverie_enabled {
         return ToolResult {
@@ -129,7 +129,7 @@ pub fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
 ///
 /// Routes Report to our handler, everything else to the normal module dispatch.
 /// Returns None if the tool should be dispatched to modules (caller handles it).
-pub fn dispatch_reverie_tool(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
+pub(crate) fn dispatch_reverie_tool(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     match tool.name.as_str() {
         "reverie_report" => Some(execute_report(tool, state)),
         _ => {

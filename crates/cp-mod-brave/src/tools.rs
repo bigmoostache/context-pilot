@@ -25,15 +25,15 @@ fn err_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, tool_name: tool.name.clone() }
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),
     };
 
-    let query = match tool.input.get("query").and_then(|v| v.as_str()) {
-        Some(q) => q,
-        None => return err_result(tool, "Missing required parameter 'query'".to_string()),
+    let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'query'".to_string());
     };
 
     let count = tool.input.get("count").and_then(|v| v.as_u64()).unwrap_or(5) as u32;
@@ -88,15 +88,15 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),
     };
 
-    let query = match tool.input.get("query").and_then(|v| v.as_str()) {
-        Some(q) => q,
-        None => return err_result(tool, "Missing required parameter 'query'".to_string()),
+    let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'query'".to_string());
     };
 
     let max_tokens = tool.input.get("maximum_number_of_tokens").and_then(|v| v.as_u64()).unwrap_or(8192) as u32;

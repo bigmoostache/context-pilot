@@ -23,6 +23,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/prompt.yaml")).expect("Failed to parse prompt tool YAML")
 });
 
+#[derive(Debug)]
 pub struct PromptModule;
 
 impl Module for PromptModule {

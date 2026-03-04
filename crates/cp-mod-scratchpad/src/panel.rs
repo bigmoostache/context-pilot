@@ -9,7 +9,7 @@ use cp_base::state::{ContextType, State, estimate_tokens};
 
 use crate::types::ScratchpadState;
 
-pub struct ScratchpadPanel;
+pub(crate) struct ScratchpadPanel;
 
 impl ScratchpadPanel {
     /// Format scratchpad cells for LLM context
@@ -70,7 +70,7 @@ impl Panel for ScratchpadPanel {
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let ss = ScratchpadState::get(state);
-        let mut text: Vec<Line> = Vec::new();
+        let mut text: Vec<Line<'_>> = Vec::new();
 
         if ss.scratchpad_cells.is_empty() {
             text.push(Line::from(vec![

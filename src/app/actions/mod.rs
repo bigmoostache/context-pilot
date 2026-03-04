@@ -5,13 +5,13 @@
 //! - `streaming` — Stream append/done/error handling
 //! - `config` — Configuration bar and theme controls
 
-pub mod config;
-pub mod helpers;
-pub mod input;
-pub mod streaming;
+pub(crate) mod config;
+pub(crate) mod helpers;
+pub(crate) mod input;
+pub(crate) mod streaming;
 
 // Re-export helpers for external use
-pub use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern};
+pub(crate) use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern};
 
 use crate::infra::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::state::{ContextElement, ContextType, State};
@@ -47,9 +47,9 @@ fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
 }
 
 // Re-export Action/ActionResult from cp-base (shared with module crates)
-pub use cp_base::state::{Action, ActionResult};
+pub(crate) use cp_base::state::{Action, ActionResult};
 
-pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
+pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
     // Reset scroll acceleration on non-scroll actions
     if !matches!(action, Action::ScrollUp(_) | Action::ScrollDown(_)) {
         state.scroll_accel = 1.0;
@@ -105,7 +105,7 @@ pub fn apply_action(state: &mut State, action: Action) -> ActionResult {
                         let label = cmd_name.to_string();
                         let idx = state.paste_buffers.len();
                         state.paste_buffers.push(content);
-                        state.paste_buffer_labels.push(Some(label.clone()));
+                        state.paste_buffer_labels.push(Some(label));
                         let sentinel = format!("\x00{}\x00", idx);
                         // Replace /command<space> with sentinel
                         state.input = format!(

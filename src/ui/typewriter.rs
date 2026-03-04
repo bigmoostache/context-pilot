@@ -5,7 +5,7 @@ use crate::infra::constants::{
     TYPEWRITER_DEFAULT_DELAY_MS, TYPEWRITER_MAX_DELAY_MS, TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MOVING_AVG_SIZE,
 };
 
-pub struct TypewriterBuffer {
+pub(crate) struct TypewriterBuffer {
     pub pending_chars: VecDeque<char>,
     chunk_intervals: VecDeque<Duration>,
     chunk_sizes: VecDeque<usize>,
@@ -16,7 +16,7 @@ pub struct TypewriterBuffer {
 }
 
 impl TypewriterBuffer {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             pending_chars: VecDeque::new(),
             chunk_intervals: VecDeque::new(),
@@ -28,7 +28,7 @@ impl TypewriterBuffer {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.pending_chars.clear();
         self.chunk_intervals.clear();
         self.chunk_sizes.clear();
@@ -38,7 +38,7 @@ impl TypewriterBuffer {
         self.stream_done = false;
     }
 
-    pub fn add_chunk(&mut self, text: &str) {
+    pub(crate) fn add_chunk(&mut self, text: &str) {
         let now = Instant::now();
 
         if let Some(last_time) = self.last_chunk_time {
@@ -81,11 +81,12 @@ impl TypewriterBuffer {
         }
     }
 
-    pub fn mark_done(&mut self) {
+    pub(crate) fn mark_done(&mut self) {
         self.stream_done = true;
     }
 
-    pub fn take_chars(&mut self) -> Option<String> {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    pub(crate) fn take_chars(&mut self) -> Option<String> {
         if self.pending_chars.is_empty() {
             return None;
         }

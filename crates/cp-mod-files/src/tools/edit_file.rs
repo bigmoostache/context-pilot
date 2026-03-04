@@ -95,29 +95,20 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
     best_match.map(|(line, _, preview)| (line, preview))
 }
 
-pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Get file_path (required)
-    let path_str = match tool.input.get("file_path").and_then(|v| v.as_str()) {
-        Some(p) => p,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
-        }
+    let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
     };
 
     // Get old_string (required)
-    let old_string = match tool.input.get("old_string").and_then(|v| v.as_str()) {
-        Some(s) => s,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required parameter: old_string".to_string(), true);
-        }
+    let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: old_string".to_string(), true);
     };
 
     // Get new_string (required)
-    let new_string = match tool.input.get("new_string").and_then(|v| v.as_str()) {
-        Some(s) => s,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required parameter: new_string".to_string(), true);
-        }
+    let Some(new_string) = tool.input.get("new_string").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: new_string".to_string(), true);
     };
 
     // Get replace_all (optional, default false)

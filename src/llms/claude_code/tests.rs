@@ -131,12 +131,11 @@ fn test_general_kenobi_with_tools_streaming() {
         if json_str == "[DONE]" {
             break;
         }
-        if let Ok(event) = serde_json::from_str::<serde_json::Value>(json_str) {
-            if event["type"] == "content_block_delta" {
-                if let Some(text) = event["delta"]["text"].as_str() {
-                    full_text.push_str(text);
-                }
-            }
+        if let Ok(event) = serde_json::from_str::<serde_json::Value>(json_str)
+            && event["type"] == "content_block_delta"
+            && let Some(text) = event["delta"]["text"].as_str()
+        {
+            full_text.push_str(text);
         }
     }
 

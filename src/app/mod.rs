@@ -1,12 +1,12 @@
-pub mod actions;
+pub(crate) mod actions;
 mod context;
-pub mod events;
-pub mod panels;
-pub mod prompt_builder;
-pub mod reverie;
+pub(crate) mod events;
+pub(crate) mod panels;
+pub(crate) mod prompt_builder;
+pub(crate) mod reverie;
 mod run;
 
-pub use context::{ensure_default_agent, ensure_default_contexts};
+pub(crate) use context::{ensure_default_agent, ensure_default_contexts};
 
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -28,7 +28,7 @@ struct ReverieStream {
     report_called: bool,
 }
 
-pub struct App {
+pub(crate) struct App {
     pub state: State,
     typewriter: TypewriterBuffer,
     pending_done: Option<(usize, usize, usize, usize, Option<String>)>,
@@ -81,7 +81,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(state: State, cache_tx: Sender<CacheUpdate>, resume_stream: bool) -> Self {
+    pub(crate) fn new(state: State, cache_tx: Sender<CacheUpdate>, resume_stream: bool) -> Self {
         let file_watcher = FileWatcher::new().ok();
         let gh_watcher = GhWatcher::new(cache_tx.clone());
 

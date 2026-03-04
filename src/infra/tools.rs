@@ -1,20 +1,20 @@
-pub use cp_base::tools::*;
-pub use cp_base::tools::{ToolResult, ToolUse};
+pub(crate) use cp_base::tools::*;
+pub(crate) use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::state::State;
 
 // Re-export from conversation module for backwards compatibility
-pub use crate::modules::conversation::refresh::refresh_conversation_context;
+pub(crate) use crate::modules::conversation::refresh::refresh_conversation_context;
 
 /// Execute a tool and return the result.
 /// Delegates to the module system for dispatch.
-pub fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
     let active_modules = state.active_modules.clone();
     crate::modules::dispatch_tool(tool, state, &active_modules)
 }
 
 /// Execute reload_tui tool (public for module access)
-pub fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Set flag - actual reload happens in app.rs after tool result is saved
     state.reload_pending = true;
 
@@ -22,7 +22,7 @@ pub fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Perform the actual TUI reload (called from app.rs after tool result is saved)
-pub fn perform_reload(state: &mut State) {
+pub(crate) fn perform_reload(state: &mut State) {
     use crate::state::persistence::save_state;
     use crossterm::{
         execute,
@@ -37,21 +37,16 @@ pub fn perform_reload(state: &mut State) {
     save_state(state);
 
     // Read config, set reload_requested to true, and save
-    match fs::read_to_string(config_path) {
-        Ok(json) => {
-            // Simple string replacement to set reload_requested: true
-            let updated = if json.contains("\"reload_requested\":") {
-                json.replace("\"reload_requested\": false", "\"reload_requested\": true")
-                    .replace("\"reload_requested\":false", "\"reload_requested\":true")
-            } else {
-                // Add the field before the final }
-                json.trim_end().trim_end_matches('}').to_string() + ",\n  \"reload_requested\": true\n}"
-            };
-            let _ = fs::write(config_path, updated);
-        }
-        Err(_) => {
-            // If we can't read config, just try to reload anyway
-        }
+    if let Ok(json) = fs::read_to_string(config_path) {
+        // Simple string replacement to set reload_requested: true
+        let updated = if json.contains("\"reload_requested\":") {
+            json.replace("\"reload_requested\": false", "\"reload_requested\": true")
+                .replace("\"reload_requested\":false", "\"reload_requested\":true")
+        } else {
+            // Add the field before the final }
+            json.trim_end().trim_end_matches('}').to_string() + ",\n  \"reload_requested\": true\n}"
+        };
+        let _ = fs::write(config_path, updated);
     }
 
     // Clean up terminal

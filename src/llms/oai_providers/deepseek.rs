@@ -20,12 +20,12 @@ use super::super::{LlmClient, LlmRequest, StreamEvent};
 const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
 /// DeepSeek client
-pub struct DeepSeekClient {
+pub(crate) struct DeepSeekClient {
     api_key: Option<SecretBox<String>>,
 }
 
 impl DeepSeekClient {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         dotenvy::dotenv().ok();
         Self { api_key: env::var("DEEPSEEK_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
@@ -216,16 +216,13 @@ impl LlmClient for DeepSeekClient {
     }
 
     fn check_api(&self, model: &str) -> super::super::ApiCheckResult {
-        let api_key = match self.api_key.as_ref() {
-            Some(k) => k,
-            None => {
-                return super::super::ApiCheckResult {
-                    auth_ok: false,
-                    streaming_ok: false,
-                    tools_ok: false,
-                    error: Some("DEEPSEEK_API_KEY not set".to_string()),
-                };
-            }
+        let Some(api_key) = self.api_key.as_ref() else {
+            return super::super::ApiCheckResult {
+                auth_ok: false,
+                streaming_ok: false,
+                tools_ok: false,
+                error: Some("DEEPSEEK_API_KEY not set".to_string()),
+            };
         };
 
         let client = Client::new();

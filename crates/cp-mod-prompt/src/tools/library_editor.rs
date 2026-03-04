@@ -4,7 +4,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 /// Opens a prompt's content in the Library panel editor for reading/editing.
 /// Max one prompt open at a time — opening a new one replaces the previous.
-pub fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) if !id.is_empty() => id.to_string(),
         _ => return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true),
@@ -37,7 +37,7 @@ pub fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Closes the prompt editor in the Library panel.
-pub fn close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     let previous = PromptState::get(state).open_prompt_id.clone();
 
     if previous.is_none() {

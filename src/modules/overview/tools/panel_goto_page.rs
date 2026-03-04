@@ -2,27 +2,19 @@ use crate::app::panels::paginate_content;
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{State, estimate_tokens};
 
-pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let panel_id = match tool.input.get("panel_id").and_then(|v| v.as_str()) {
-        Some(id) => id,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'panel_id' parameter".to_string(), true);
-        }
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(panel_id) = tool.input.get("panel_id").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'panel_id' parameter".to_string(), true);
     };
 
-    let page = match tool.input.get("page").and_then(|v| v.as_i64()) {
-        Some(p) => p,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'page' parameter (expected integer)".to_string(), true);
-        }
+    let Some(page) = tool.input.get("page").and_then(|v| v.as_i64()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'page' parameter (expected integer)".to_string(), true);
     };
 
     // Find the context element by panel ID
-    let ctx = match state.context.iter_mut().find(|c| c.id == panel_id) {
-        Some(c) => c,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Panel '{}' not found", panel_id), true);
-        }
+    let Some(ctx) = state.context.iter_mut().find(|c| c.id == panel_id) else {
+        return ToolResult::new(tool.id.clone(), format!("Panel '{}' not found", panel_id), true);
     };
 
     if ctx.total_pages <= 1 {

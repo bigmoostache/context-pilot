@@ -16,7 +16,7 @@ fn invalidate_tree_cache(state: &mut State) {
 }
 
 /// Generate tree string without mutating state (for read-only rendering)
-pub fn generate_tree_string(
+pub(crate) fn generate_tree_string(
     tree_filter: &str,
     tree_open_folders: &[String],
     tree_descriptions: &[TreeFileDescription],
@@ -60,7 +60,7 @@ fn compute_file_hash(path: &Path) -> Option<String> {
 }
 
 /// Execute tree_toggle_folders tool - open or close folders
-pub fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
     let paths = tool
         .input
         .get("paths")
@@ -154,14 +154,11 @@ pub fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute tree_describe_files tool - add/update/remove file descriptions
-pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
     let descriptions = tool.input.get("descriptions").and_then(|v| v.as_array());
 
-    let descriptions = match descriptions {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'descriptions' parameter".to_string(), true);
-        }
+    let Some(descriptions) = descriptions else {
+        return ToolResult::new(tool.id.clone(), "Missing 'descriptions' parameter".to_string(), true);
     };
 
     let mut added = Vec::new();
@@ -170,12 +167,9 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut errors = Vec::new();
 
     for desc_obj in descriptions {
-        let path_str = match desc_obj.get("path").and_then(|v| v.as_str()) {
-            Some(p) => p,
-            None => {
-                errors.push("Missing 'path' in description".to_string());
-                continue;
-            }
+        let Some(path_str) = desc_obj.get("path").and_then(|v| v.as_str()) else {
+            errors.push("Missing 'path' in description".to_string());
+            continue;
         };
 
         let path = PathBuf::from(path_str);
@@ -190,12 +184,11 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
             continue;
         }
 
-        let description = match desc_obj.get("description").and_then(|v| v.as_str()) {
-            Some(d) => d.to_string(),
-            None => {
-                errors.push(format!("{}: missing 'description'", path_str));
-                continue;
-            }
+        let description = if let Some(d) = desc_obj.get("description").and_then(|v| v.as_str()) {
+            d.to_string()
+        } else {
+            errors.push(format!("{}: missing 'description'", path_str));
+            continue;
         };
 
         // Verify path exists (file or folder)
@@ -246,12 +239,9 @@ pub fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute edit_tree_filter tool (keep existing functionality)
-pub fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let filter = match tool.input.get("filter").and_then(|v| v.as_str()) {
-        Some(f) => f,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'filter' parameter".to_string(), true);
-        }
+pub(crate) fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(filter) = tool.input.get("filter").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'filter' parameter".to_string(), true);
     };
 
     TreeState::get_mut(state).tree_filter = filter.to_string();

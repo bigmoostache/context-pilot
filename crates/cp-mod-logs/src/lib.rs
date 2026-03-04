@@ -69,6 +69,7 @@ pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<(PathBu
 }
 
 /// Load all logs from chunked JSON files in .context-pilot/logs/
+#[allow(clippy::cast_possible_truncation)]
 fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
     let dir = logs_dir();
     let mut all_logs: Vec<LogEntry> = Vec::new();
@@ -111,6 +112,7 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
     (all_logs, next_log_id)
 }
 
+#[derive(Debug)]
 pub struct LogsModule;
 
 impl Module for LogsModule {
@@ -276,6 +278,23 @@ impl Module for LogsModule {
                             ));
                         }
                         _ => {}
+                    }
+                }
+                // Validate memory content lengths before execution
+                if let Some(memories) = tool.input.get("memories").and_then(|v| v.as_array()) {
+                    let max_tokens = cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
+                    for (i, mem) in memories.iter().enumerate() {
+                        if let Some(content) = mem.get("content").and_then(|v| v.as_str()) {
+                            let approx_tokens = content.split_whitespace().count() * 4 / 3;
+                            if approx_tokens > max_tokens {
+                                pf.errors.push(format!(
+                                    "Memory #{} content too long: ~{} tokens (max {}). Shorten it.",
+                                    i + 1,
+                                    approx_tokens,
+                                    max_tokens,
+                                ));
+                            }
+                        }
                     }
                 }
                 Some(pf)

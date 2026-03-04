@@ -5,16 +5,16 @@
 //! - WorkerState (states/{worker}.json) - Worker-specific state
 //! - PanelData (panels/{uid}.json) - Dynamic panel metadata
 //! - Messages (messages/{uid}.yaml) - Conversation messages
-pub mod config;
-pub mod message;
-pub mod panel;
-pub mod worker;
-pub mod writer;
+pub(crate) mod config;
+pub(crate) mod message;
+pub(crate) mod panel;
+pub(crate) mod worker;
+pub(crate) mod writer;
 
 // Re-export commonly used functions
-pub use config::current_pid;
-pub use message::{delete_message, load_message, save_message};
-pub use writer::{DeleteOp, PersistenceWriter, WriteBatch, WriteOp};
+pub(crate) use config::current_pid;
+pub(crate) use message::{delete_message, load_message, save_message};
+pub(crate) use writer::{DeleteOp, PersistenceWriter, WriteBatch, WriteOp};
 
 use chrono::Local;
 use std::collections::HashMap;
@@ -36,7 +36,7 @@ fn new_format_exists() -> bool {
 }
 
 /// Load state using new multi-file format
-pub fn load_state() -> State {
+pub(crate) fn load_state() -> State {
     if new_format_exists() {
         load_state_new()
     } else {
@@ -232,7 +232,7 @@ fn load_state_new() -> State {
 /// Build a WriteBatch from the current state (CPU work only — no I/O).
 /// This serializes all config, worker state, panels, and history messages
 /// into a batch of file write/delete operations.
-pub fn build_save_batch(state: &State) -> WriteBatch {
+pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let _guard = crate::profile!("persist::build_save_batch");
     let dir = PathBuf::from(STORE_DIR);
     let mut writes = Vec::new();
@@ -397,7 +397,7 @@ pub fn build_save_batch(state: &State) -> WriteBatch {
 }
 
 /// Build a WriteOp for a single message (CPU work only — no I/O).
-pub fn build_message_op(msg: &Message) -> WriteOp {
+pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
     let dir = PathBuf::from(STORE_DIR).join(crate::infra::constants::MESSAGES_DIR);
     let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
     let yaml = serde_yaml::to_string(msg).unwrap_or_default();
@@ -407,7 +407,7 @@ pub fn build_message_op(msg: &Message) -> WriteOp {
 /// Save state synchronously (blocking I/O on calling thread).
 /// Used for shutdown paths and places where the PersistenceWriter is not available.
 /// Prefer `build_save_batch` + `PersistenceWriter::send_batch` in the main event loop.
-pub fn save_state(state: &State) {
+pub(crate) fn save_state(state: &State) {
     let batch = build_save_batch(state);
     // Execute synchronously
     for dir in &batch.ensure_dirs {
@@ -437,7 +437,7 @@ pub fn save_state(state: &State) {
 
 /// Check if we still own the state file (another instance may have taken over)
 /// Returns false if another process has claimed ownership
-pub fn check_ownership() -> bool {
+pub(crate) fn check_ownership() -> bool {
     if let Some(cfg) = config::load_config()
         && let Some(owner) = cfg.owner_pid
     {
@@ -448,7 +448,7 @@ pub fn check_ownership() -> bool {
 }
 
 /// Log an error to .context-pilot/errors/ and return the file path
-pub fn log_error(error: &str) -> String {
+pub(crate) fn log_error(error: &str) -> String {
     let errors_dir = PathBuf::from(STORE_DIR).join(ERRORS_DIR);
     fs::create_dir_all(&errors_dir).ok();
 

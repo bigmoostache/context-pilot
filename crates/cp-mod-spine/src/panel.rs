@@ -11,7 +11,7 @@ use cp_base::watchers::WatcherRegistry;
 
 use crate::types::{NotificationType, SpineState};
 
-pub struct SpinePanel;
+pub(crate) struct SpinePanel;
 
 /// Format a millisecond timestamp as HH:MM:SS
 fn format_timestamp(ms: u64) -> String {
@@ -131,7 +131,7 @@ impl Panel for SpinePanel {
     }
 
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        let mut lines: Vec<Line> = Vec::new();
+        let mut lines: Vec<Line<'_>> = Vec::new();
 
         // === Unprocessed Notifications ===
         let unprocessed: Vec<_> = SpineState::get(state).notifications.iter().filter(|n| n.is_unprocessed()).collect();
@@ -167,7 +167,7 @@ impl Panel for SpinePanel {
                     let indent = " ".repeat(prefix_width);
                     lines.push(Line::from(vec![
                         Span::styled(indent, Style::default()),
-                        Span::styled(line.to_string(), Style::default().fg(theme::text())),
+                        Span::styled(line.clone(), Style::default().fg(theme::text())),
                     ]));
                 }
             }
@@ -210,7 +210,7 @@ impl Panel for SpinePanel {
                     let indent = " ".repeat(prefix_width);
                     lines.push(Line::from(vec![
                         Span::styled(indent, Style::default()),
-                        Span::styled(line.to_string(), Style::default().fg(theme::text_muted())),
+                        Span::styled(line.clone(), Style::default().fg(theme::text_muted())),
                     ]));
                 }
             }
@@ -252,7 +252,7 @@ impl Panel for SpinePanel {
                     let indent = " ".repeat(prefix_width);
                     lines.push(Line::from(vec![
                         Span::styled(indent, Style::default()),
-                        Span::styled(line.to_string(), Style::default().fg(theme::text_muted())),
+                        Span::styled(line.clone(), Style::default().fg(theme::text_muted())),
                     ]));
                 }
             }

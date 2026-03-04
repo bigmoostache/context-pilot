@@ -22,7 +22,7 @@ use cp_base::config::INJECTIONS;
 
 /// OpenAI-compatible chat message.
 #[derive(Debug, Clone, Serialize)]
-pub struct OaiMessage {
+pub(crate) struct OaiMessage {
     pub role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
@@ -33,7 +33,7 @@ pub struct OaiMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OaiToolCall {
+pub(crate) struct OaiToolCall {
     pub id: String,
     #[serde(rename = "type")]
     pub call_type: String,
@@ -41,21 +41,21 @@ pub struct OaiToolCall {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OaiFunction {
+pub(crate) struct OaiFunction {
     pub name: String,
     pub arguments: String,
 }
 
 /// OpenAI-compatible tool definition wrapper.
 #[derive(Debug, Serialize)]
-pub struct OaiTool {
+pub(crate) struct OaiTool {
     #[serde(rename = "type")]
     pub tool_type: String,
     pub function: OaiFunctionDef,
 }
 
 #[derive(Debug, Serialize)]
-pub struct OaiFunctionDef {
+pub(crate) struct OaiFunctionDef {
     pub name: String,
     pub description: String,
     pub parameters: Value,
@@ -72,7 +72,7 @@ pub struct OaiFunctionDef {
 ///
 /// `pending_tool_result_ids` are IDs from the current tool loop that haven't
 /// been persisted as messages yet but will be sent as separate tool results.
-pub fn collect_included_tool_ids(messages: &[Message], pending_tool_result_ids: &[String]) -> HashSet<String> {
+pub(crate) fn collect_included_tool_ids(messages: &[Message], pending_tool_result_ids: &[String]) -> HashSet<String> {
     let mut included: HashSet<String> = pending_tool_result_ids.iter().cloned().collect();
 
     for (idx, msg) in messages.iter().enumerate() {
@@ -109,7 +109,7 @@ pub fn collect_included_tool_ids(messages: &[Message], pending_tool_result_ids: 
 // ───────────────────────────────────────────────────────────────────
 
 /// Options for customizing the shared message builder per-provider.
-pub struct BuildOptions {
+pub(crate) struct BuildOptions {
     /// System prompt text (falls back to default if None).
     pub system_prompt: Option<String>,
     /// Extra text appended to system message (e.g. Groq's built-in tools info).
@@ -124,7 +124,7 @@ pub struct BuildOptions {
 ///
 /// When pre-assembled API messages are available, converts them to OAI format.
 /// Falls back to building from raw data (for api_check etc.).
-pub fn build_messages(
+pub(crate) fn build_messages(
     messages: &[Message],
     context_items: &[crate::app::panels::ContextItem],
     opts: &BuildOptions,
@@ -411,7 +411,7 @@ fn build_from_raw(
 // ───────────────────────────────────────────────────────────────────
 
 /// Convert internal tool definitions to OpenAI-compatible format.
-pub fn tools_to_oai(tools: &[ToolDefinition]) -> Vec<OaiTool> {
+pub(crate) fn tools_to_oai(tools: &[ToolDefinition]) -> Vec<OaiTool> {
     tools
         .iter()
         .filter(|t| t.enabled)

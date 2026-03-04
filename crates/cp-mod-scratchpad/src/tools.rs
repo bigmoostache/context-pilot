@@ -4,7 +4,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::types::{ScratchpadCell, ScratchpadState};
 
 /// Create a new scratchpad cell
-pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let title = match tool.input.get("cell_title").and_then(|v| v.as_str()) {
         Some(t) => t.to_string(),
         None => {
@@ -34,12 +34,9 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Edit an existing scratchpad cell
-pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let cell_id = match tool.input.get("cell_id").and_then(|v| v.as_str()) {
-        Some(id) => id,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'cell_id' parameter".to_string(), true);
-        }
+pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(cell_id) = tool.input.get("cell_id").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'cell_id' parameter".to_string(), true);
     };
 
     let ss = ScratchpadState::get_mut(state);
@@ -72,12 +69,9 @@ pub fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Wipe scratchpad cells (delete by IDs, or all if empty array)
-pub fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let cell_ids = match tool.input.get("cell_ids").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'cell_ids' array parameter".to_string(), true);
-        }
+pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(cell_ids) = tool.input.get("cell_ids").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'cell_ids' array parameter".to_string(), true);
     };
 
     // If empty array, wipe all cells

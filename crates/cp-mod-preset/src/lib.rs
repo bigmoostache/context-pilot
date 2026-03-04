@@ -19,6 +19,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
 
 /// Function pointers for module-registry operations that live in the binary.
 /// Injected at construction time so the crate doesn't depend on the binary.
+#[derive(Debug)]
 pub struct PresetModule {
     pub(crate) all_modules_fn: fn() -> Vec<Box<dyn Module>>,
     pub(crate) active_tool_defs_fn: fn(&HashSet<String>) -> Vec<ToolDefinition>,

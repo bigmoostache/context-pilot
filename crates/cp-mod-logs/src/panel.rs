@@ -8,13 +8,13 @@ use crate::types::{LogEntry, LogsState};
 
 /// Fixed panel for timestamped log entries with tree-structured summaries.
 /// Un-deletable, always present when the logs module is active.
-pub struct LogsPanel;
+pub(crate) struct LogsPanel;
 
 impl LogsPanel {
     /// Build the text representation used for both LLM context and UI content.
     /// Shows tree structure: top-level logs, summaries with collapse/expand,
     /// and indented children when expanded.
-    pub fn format_logs_tree(state: &State) -> String {
+    pub(crate) fn format_logs_tree(state: &State) -> String {
         let ls = LogsState::get(state);
         if ls.logs.is_empty() {
             return "No logs".to_string();
@@ -124,7 +124,7 @@ fn render_log_entry(
         let child_count = entry.children_ids.len();
 
         let mut spans = vec![
-            Span::styled(indent.clone(), Style::default()),
+            Span::styled(indent, Style::default()),
             Span::styled(format!("{} ", icon), Style::default().fg(theme::accent())),
             Span::styled(format!("{} ", entry.id), Style::default().fg(theme::accent_dim())),
             Span::styled(format!("{} ", time_str), Style::default().fg(theme::text_muted())),

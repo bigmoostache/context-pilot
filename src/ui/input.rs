@@ -10,7 +10,7 @@ use crate::state::State;
 use cp_mod_prompt::PromptState;
 use cp_mod_queue::QueueState;
 
-pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
+pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let base_style = Style::default().bg(theme::bg_base()).fg(theme::text_muted());
     let spin = spinner(state.spinner_frame);
 
@@ -243,6 +243,7 @@ pub fn render_status_bar(frame: &mut Frame, state: &State, area: Rect) {
 }
 
 /// Calculate the height needed for the question form
+#[allow(clippy::cast_possible_truncation)]
 pub(super) fn calculate_question_form_height(form: &cp_base::ui::PendingQuestionForm) -> u16 {
     let q = &form.questions[form.current_question];
     // Header line + question text + blank + options (including Other) + blank + nav hint
@@ -253,18 +254,15 @@ pub(super) fn calculate_question_form_height(form: &cp_base::ui::PendingQuestion
 }
 
 /// Render the question form at the bottom of the screen
-pub(super) fn render_question_form(frame: &mut Frame, state: &State, area: Rect) {
-    let form = match state.get_ext::<cp_base::ui::PendingQuestionForm>() {
-        Some(f) => f,
-        None => return,
-    };
+pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: Rect) {
+    let Some(form) = state.get_ext::<cp_base::ui::PendingQuestionForm>() else { return };
 
     let q_idx = form.current_question;
     let q = &form.questions[q_idx];
     let ans = &form.answers[q_idx];
     let other_idx = q.options.len();
 
-    let mut lines: Vec<Line> = Vec::new();
+    let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Progress indicator
     let progress =
@@ -394,6 +392,7 @@ pub(super) fn render_question_form(frame: &mut Frame, state: &State, area: Rect)
 }
 
 /// Calculate the height needed for the autocomplete popup
+#[allow(clippy::cast_possible_truncation)]
 pub(super) fn calculate_autocomplete_height(ac: &cp_base::autocomplete::AutocompleteState) -> u16 {
     let visible = ac.visible_matches().len() as u16;
     // matches + border chrome (2)
@@ -401,7 +400,7 @@ pub(super) fn calculate_autocomplete_height(ac: &cp_base::autocomplete::Autocomp
 }
 
 /// Render the @ autocomplete popup above the input area (bottom of content panel, growing upward)
-pub(super) fn render_autocomplete_popup(frame: &mut Frame, state: &State, area: Rect) {
+pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let ac = match state.get_ext::<cp_base::autocomplete::AutocompleteState>() {
         Some(ac) if ac.active => ac,
         _ => return,
@@ -434,7 +433,7 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame, state: &State, area: 
     let x = area.x + 1; // +1 to clear the panel's left border
     let popup_area = Rect::new(x, y, popup_width, clamped_height);
 
-    let mut lines: Vec<Line> = Vec::new();
+    let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Show matches
     let visible = ac.visible_matches();

@@ -16,6 +16,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/typst.yaml")).expect("Failed to parse typst tool YAML")
 });
 
+#[derive(Debug)]
 pub struct TypstModule;
 
 /// Templates live here — in the shared (version-controlled) folder.

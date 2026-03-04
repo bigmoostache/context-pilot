@@ -11,12 +11,9 @@ use super::classify::{CommandClass, classify_git, validate_git_command};
 /// Execute a raw git command.
 /// Read-only commands create/reuse GitResult panels.
 /// Mutating commands execute and return output directly.
-pub fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let command = match tool.input.get("command").and_then(|v| v.as_str()) {
-        Some(c) => c,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_string(), true);
-        }
+pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(command) = tool.input.get("command").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_string(), true);
     };
 
     // Validate

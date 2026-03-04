@@ -8,7 +8,7 @@ use cp_base::config::INJECTIONS;
 use self::panel::ConversationHistoryPanel;
 use super::Module;
 
-pub struct ConversationHistoryModule;
+pub(crate) struct ConversationHistoryModule;
 
 impl Module for ConversationHistoryModule {
     fn id(&self) -> &'static str {

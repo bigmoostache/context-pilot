@@ -22,6 +22,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/memory.yaml")).expect("Failed to parse memory tool YAML")
 });
 
+#[derive(Debug)]
 pub struct MemoryModule;
 
 impl Module for MemoryModule {
@@ -55,6 +56,7 @@ impl Module for MemoryModule {
         })
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ms = MemoryState::get_mut(state);
         if let Some(arr) = data.get("memories")

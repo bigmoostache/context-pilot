@@ -6,7 +6,7 @@ use crate::app::panels::{ContextItem, Panel};
 use crate::infra::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::state::State;
 
-pub struct ToolsPanel;
+pub(super) struct ToolsPanel;
 
 impl Panel for ToolsPanel {
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {

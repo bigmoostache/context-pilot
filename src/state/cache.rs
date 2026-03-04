@@ -7,20 +7,20 @@ use std::sync::mpsc::{self, Sender};
 use std::thread;
 
 // Re-export shared cache types from cp-base
-pub use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
+pub(crate) use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 
 /// Maximum concurrent cache worker threads
 const CACHE_POOL_SIZE: usize = 6;
 
 /// Bounded thread pool for cache operations.
 /// Workers pull (CacheRequest, Sender<CacheUpdate>) pairs from a shared channel.
-pub struct CachePool {
+pub(crate) struct CachePool {
     job_tx: Sender<(CacheRequest, Sender<CacheUpdate>)>,
 }
 
 impl CachePool {
     /// Create a new pool with CACHE_POOL_SIZE worker threads.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let (job_tx, job_rx) = mpsc::channel::<(CacheRequest, Sender<CacheUpdate>)>();
         let job_rx = std::sync::Arc::new(std::sync::Mutex::new(job_rx));
 
@@ -54,13 +54,18 @@ impl CachePool {
     }
 
     /// Submit a cache request to the pool.
-    pub fn submit(&self, request: CacheRequest, tx: Sender<CacheUpdate>) {
+    pub(crate) fn submit(&self, request: CacheRequest, tx: Sender<CacheUpdate>) {
         let _ = self.job_tx.send((request, tx));
     }
 }
 
 /// Global cache pool instance
 static CACHE_POOL: std::sync::LazyLock<CachePool> = std::sync::LazyLock::new(CachePool::new);
+
+/// Process a cache request in the background via the bounded thread pool.
+pub(crate) fn process_cache_request(request: CacheRequest, tx: Sender<CacheUpdate>) {
+    CACHE_POOL.submit(request, tx);
+}
 
 #[cfg(test)]
 mod tests {
@@ -94,9 +99,4 @@ mod tests {
         // SHA-256 hex is always 64 chars
         assert_eq!(hash_content("anything").len(), 64);
     }
-}
-
-/// Process a cache request in the background via the bounded thread pool.
-pub fn process_cache_request(request: CacheRequest, tx: Sender<CacheUpdate>) {
-    CACHE_POOL.submit(request, tx);
 }

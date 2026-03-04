@@ -13,6 +13,7 @@ pub struct BranchPrInfo {
     pub checks_status: Option<String>,
 }
 
+#[derive(Debug)]
 pub struct GithubState {
     pub github_token: Option<String>,
     /// PR info for the current git branch (if any)
@@ -38,6 +39,7 @@ impl GithubState {
 }
 
 /// Data for CacheRequest when refreshing GitHub result panels
+#[derive(Debug)]
 pub struct GithubResultRequest {
     pub context_id: String,
     pub command: String,

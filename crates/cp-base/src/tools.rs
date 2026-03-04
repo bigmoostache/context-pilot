@@ -253,6 +253,7 @@ impl ToolDefinition {
 /// Builder for constructing a ToolDefinition from YAML text.
 /// Schema structure (types, required, enums) lives in Rust.
 /// Descriptions (sentences) come from YAML automatically.
+#[derive(Debug)]
 pub struct ToolDefBuilder<'a> {
     id: String,
     description: String,

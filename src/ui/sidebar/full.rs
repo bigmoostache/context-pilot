@@ -33,7 +33,8 @@ pub(super) fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String>
 /// Maximum number of dynamic contexts (P7+) to show per page
 const MAX_DYNAMIC_PER_PAGE: usize = 10;
 
-pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let _guard = crate::profile!("ui::sidebar");
     let base_style = Style::default().bg(theme::bg_base());
 
@@ -47,7 +48,7 @@ pub fn render_sidebar(frame: &mut Frame, state: &State, area: Rect) {
         .split(area);
 
     // Context list
-    let mut lines: Vec<Line> = vec![
+    let mut lines: Vec<Line<'_>> = vec![
         Line::from(vec![
             Span::styled("  ", base_style),
             Span::styled("CONTEXT", Style::default().fg(theme::text_muted()).bold()),

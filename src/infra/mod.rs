@@ -1,7 +1,7 @@
-pub mod api;
-pub mod config;
-pub mod constants;
-pub mod gh_watcher;
-pub mod profiler;
-pub mod tools;
-pub mod watcher;
+pub(crate) mod api;
+pub(crate) mod config;
+pub(crate) mod constants;
+pub(crate) mod gh_watcher;
+pub(crate) mod profiler;
+pub(crate) mod tools;
+pub(crate) mod watcher;

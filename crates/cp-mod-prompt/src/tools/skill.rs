@@ -3,7 +3,7 @@ use crate::types::{PromptItem, PromptState, PromptType};
 use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
 
-pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let name = tool.input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let content = tool.input.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -46,12 +46,9 @@ pub fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created skill '{}' with ID '{}'", name, id), false)
 }
 
-pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let id = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(id) => id,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
-        }
+pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
     };
 
     if let Some(skill) = PromptState::get(state).skills.iter().find(|s| s.id == id)
@@ -61,11 +58,8 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let ps = PromptState::get_mut(state);
-    let idx = match ps.skills.iter().position(|s| s.id == id) {
-        Some(i) => i,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Skill '{}' not found", id), true);
-        }
+    let Some(idx) = ps.skills.iter().position(|s| s.id == id) else {
+        return ToolResult::new(tool.id.clone(), format!("Skill '{}' not found", id), true);
     };
 
     // If loaded, unload first
@@ -82,7 +76,7 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Deleted skill '{}' ({})", skill.name, id), false)
 }
 
-pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) if !id.is_empty() => id,
         _ => {
@@ -135,7 +129,7 @@ pub fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     )
 }
 
-pub fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) if !id.is_empty() => id,
         _ => {

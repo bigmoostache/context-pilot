@@ -3,6 +3,9 @@
 //! Provides low-overhead profiling with real-time stats collection.
 //! Toggle with F12.
 
+mod overlay;
+pub(crate) use overlay::render_perf_overlay;
+
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -12,12 +15,12 @@ use std::time::Instant;
 const SAMPLE_RING_SIZE: usize = 64;
 
 /// Frame budget for 60fps (milliseconds)
-pub const FRAME_BUDGET_60FPS: f64 = 16.67;
+pub(crate) const FRAME_BUDGET_60FPS: f64 = 16.67;
 /// Frame budget for 30fps (milliseconds)
-pub const FRAME_BUDGET_30FPS: f64 = 33.33;
+pub(crate) const FRAME_BUDGET_30FPS: f64 = 33.33;
 
 /// Ring buffer for recent samples
-pub struct RingBuffer<T: Copy + Default> {
+pub(crate) struct RingBuffer<T: Copy + Default> {
     data: Vec<T>,
     write_pos: usize,
     len: usize,
@@ -30,7 +33,7 @@ impl<T: Copy + Default> Default for RingBuffer<T> {
 }
 
 impl<T: Copy + Default + Ord> RingBuffer<T> {
-    pub fn push(&mut self, value: T) {
+    pub(crate) fn push(&mut self, value: T) {
         self.data[self.write_pos] = value;
         self.write_pos = (self.write_pos + 1) % SAMPLE_RING_SIZE;
         if self.len < SAMPLE_RING_SIZE {
@@ -38,7 +41,7 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
         }
     }
 
-    pub fn recent(&self, count: usize) -> Vec<T> {
+    pub(crate) fn recent(&self, count: usize) -> Vec<T> {
         if self.len == 0 {
             return Vec::new();
         }
@@ -54,7 +57,7 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
 }
 
 /// Single operation's accumulated statistics
-pub struct OpStats {
+pub(crate) struct OpStats {
     /// Total invocation count
     pub count: AtomicU64,
     /// Total time in microseconds
@@ -84,7 +87,7 @@ struct FrameState {
 }
 
 /// Global performance metrics collector
-pub struct PerfMetrics {
+pub(crate) struct PerfMetrics {
     /// Whether performance monitoring is enabled
     pub enabled: AtomicBool,
     /// Per-operation statistics
@@ -142,11 +145,11 @@ fn read_proc_stat() -> Option<(u64, u64)> {
     Some((cpu_ticks, mem_bytes))
 }
 
-pub static PERF: std::sync::LazyLock<PerfMetrics> = std::sync::LazyLock::new(PerfMetrics::default);
+pub(crate) static PERF: std::sync::LazyLock<PerfMetrics> = std::sync::LazyLock::new(PerfMetrics::default);
 
 impl PerfMetrics {
     /// Record operation timing
-    pub fn record_op(&self, name: &'static str, duration_us: u64) {
+    pub(crate) fn record_op(&self, name: &'static str, duration_us: u64) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
@@ -162,7 +165,7 @@ impl PerfMetrics {
     }
 
     /// Start a new frame
-    pub fn frame_start(&self) {
+    pub(crate) fn frame_start(&self) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
@@ -170,7 +173,8 @@ impl PerfMetrics {
     }
 
     /// End frame and record frame time
-    pub fn frame_end(&self) {
+    #[allow(clippy::cast_possible_truncation)]
+    pub(crate) fn frame_end(&self) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
@@ -211,7 +215,7 @@ impl PerfMetrics {
     }
 
     /// Get snapshot of metrics for display
-    pub fn snapshot(&self) -> PerfSnapshot {
+    pub(crate) fn snapshot(&self) -> PerfSnapshot {
         let ops = self.ops.read().unwrap_or_else(|e| e.into_inner());
         let frame_times = self.frame_times.read().unwrap_or_else(|e| e.into_inner());
 
@@ -256,7 +260,7 @@ impl PerfMetrics {
 
         let frame_avg_ms =
             if frame_samples.is_empty() { 0.0 } else { frame_samples.iter().sum::<f64>() / frame_samples.len() as f64 };
-        let frame_max_ms = frame_samples.iter().cloned().fold(0.0, f64::max);
+        let frame_max_ms = frame_samples.iter().copied().fold(0.0, f64::max);
 
         PerfSnapshot {
             ops: op_snapshots,
@@ -269,14 +273,14 @@ impl PerfMetrics {
     }
 
     /// Reset all metrics
-    pub fn reset(&self) {
+    pub(crate) fn reset(&self) {
         *self.ops.write().unwrap_or_else(|e| e.into_inner()) = HashMap::new();
         *self.frame_times.write().unwrap_or_else(|e| e.into_inner()) = RingBuffer::default();
         self.frame_count.store(0, Ordering::Relaxed);
     }
 
     /// Toggle monitoring on/off, returns new state
-    pub fn toggle(&self) -> bool {
+    pub(crate) fn toggle(&self) -> bool {
         let new_state = !self.enabled.load(Ordering::Relaxed);
         self.enabled.store(new_state, Ordering::Relaxed);
         if new_state {
@@ -290,7 +294,7 @@ impl PerfMetrics {
 
 /// Snapshot of operation statistics for display
 #[derive(Clone)]
-pub struct OpSnapshot {
+pub(crate) struct OpSnapshot {
     pub name: &'static str,
     pub total_ms: f64,
     pub mean_ms: f64,
@@ -299,202 +303,11 @@ pub struct OpSnapshot {
 
 /// Snapshot of all metrics for display
 #[derive(Clone)]
-pub struct PerfSnapshot {
+pub(crate) struct PerfSnapshot {
     pub ops: Vec<OpSnapshot>,
     pub frame_times_ms: Vec<f64>,
     pub frame_avg_ms: f64,
     pub frame_max_ms: f64,
     pub cpu_usage: f32,
     pub memory_mb: f64,
-}
-
-use super::helpers::Cell;
-use super::{chars, theme};
-use ratatui::{
-    prelude::*,
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
-};
-
-pub(super) fn render_perf_overlay(frame: &mut Frame, area: Rect) {
-    use super::helpers::render_table;
-
-    let snapshot = PERF.snapshot();
-
-    // Overlay dimensions
-    let overlay_width = 62u16;
-    let overlay_height = 28u16;
-
-    // Position in top-right
-    let x = area.width.saturating_sub(overlay_width + 2);
-    let y = 1;
-    let overlay_area = Rect::new(x, y, overlay_width, overlay_height.min(area.height.saturating_sub(2)));
-
-    // Build content lines
-    let mut lines: Vec<Line> = Vec::new();
-
-    // FPS and frame time
-    let fps = if snapshot.frame_avg_ms > 0.0 { 1000.0 / snapshot.frame_avg_ms } else { 0.0 };
-    let fps_color = frame_time_color(snapshot.frame_avg_ms);
-
-    lines.push(Line::from(vec![
-        Span::styled(format!(" FPS: {:.0}", fps), Style::default().fg(fps_color).bold()),
-        Span::styled(
-            format!("  Frame: {:.1}ms avg  {:.1}ms max", snapshot.frame_avg_ms, snapshot.frame_max_ms),
-            Style::default().fg(theme::text_muted()),
-        ),
-    ]));
-
-    // CPU and RAM line
-    let cpu_color = if snapshot.cpu_usage < 25.0 {
-        theme::success()
-    } else if snapshot.cpu_usage < 50.0 {
-        theme::warning()
-    } else {
-        theme::error()
-    };
-    lines.push(Line::from(vec![
-        Span::styled(format!(" CPU: {:.1}%", snapshot.cpu_usage), Style::default().fg(cpu_color)),
-        Span::styled(format!("  RAM: {:.1} MB", snapshot.memory_mb), Style::default().fg(theme::text_muted())),
-    ]));
-    lines.push(Line::from(""));
-
-    // Budget bars
-    lines.push(render_budget_bar(snapshot.frame_avg_ms, "60fps", FRAME_BUDGET_60FPS));
-    lines.push(render_budget_bar(snapshot.frame_avg_ms, "30fps", FRAME_BUDGET_30FPS));
-    // Sparkline
-    lines.push(Line::from(""));
-    lines.push(render_sparkline(&snapshot.frame_times_ms));
-    lines.push(Line::from(""));
-    // Operation table using render_table
-    let total_time: f64 = snapshot.ops.iter().map(|o| o.total_ms).sum();
-
-    let header = [
-        Cell::new("Operation", Style::default()),
-        Cell::right("Mean", Style::default()),
-        Cell::right("Std", Style::default()),
-        Cell::right("Cumul", Style::default()),
-    ];
-
-    let rows: Vec<Vec<Cell>> = snapshot
-        .ops
-        .iter()
-        .take(10)
-        .map(|op| {
-            let pct = if total_time > 0.0 { op.total_ms / total_time * 100.0 } else { 0.0 };
-            let is_hotspot = pct > 30.0;
-
-            let name =
-                if op.name.len() <= 24 { op.name.to_string() } else { format!("..{}", &op.name[op.name.len() - 22..]) };
-            let name_str = if is_hotspot { format!("! {}", name) } else { format!("  {}", name) };
-
-            let name_style = if is_hotspot {
-                Style::default().fg(theme::warning()).bold()
-            } else {
-                Style::default().fg(theme::text())
-            };
-
-            let mean_color = frame_time_color(op.mean_ms);
-            let std_color = if op.std_ms < 1.0 {
-                theme::success()
-            } else if op.std_ms < 5.0 {
-                theme::warning()
-            } else {
-                theme::error()
-            };
-
-            let cumul_str = if op.total_ms >= 1000.0 {
-                format!("{:.1}s", op.total_ms / 1000.0)
-            } else {
-                format!("{:.0}ms", op.total_ms)
-            };
-
-            vec![
-                Cell::new(name_str, name_style),
-                Cell::right(format!("{:.2}ms", op.mean_ms), Style::default().fg(mean_color)),
-                Cell::right(format!("{:.2}ms", op.std_ms), Style::default().fg(std_color)),
-                Cell::right(cumul_str, Style::default().fg(theme::text_muted())),
-            ]
-        })
-        .collect();
-
-    lines.extend(render_table(&header, &rows, None, 1));
-
-    // Footer
-    lines.push(Line::from(vec![
-        Span::styled(" F12", Style::default().fg(theme::accent())),
-        Span::styled(" toggle  ", Style::default().fg(theme::text_muted())),
-        Span::styled("!", Style::default().fg(theme::warning())),
-        Span::styled(" hotspot (>30%)", Style::default().fg(theme::text_muted())),
-    ]));
-
-    // Render
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(theme::border()))
-        .style(Style::default().bg(Color::Rgb(20, 20, 28)))
-        .title(Span::styled(" Perf ", Style::default().fg(theme::accent()).bold()));
-
-    let paragraph = Paragraph::new(lines).block(block);
-    frame.render_widget(Clear, overlay_area);
-    frame.render_widget(paragraph, overlay_area);
-}
-
-fn frame_time_color(ms: f64) -> Color {
-    if ms < FRAME_BUDGET_60FPS {
-        theme::success()
-    } else if ms < FRAME_BUDGET_30FPS {
-        theme::warning()
-    } else {
-        theme::error()
-    }
-}
-
-fn render_budget_bar(current_ms: f64, label: &str, budget_ms: f64) -> Line<'static> {
-    let pct = (current_ms / budget_ms * 100.0).min(150.0);
-    let bar_width = 30usize;
-    let filled = ((pct / 100.0) * bar_width as f64) as usize;
-
-    let color = if pct <= 80.0 {
-        theme::success()
-    } else if pct <= 100.0 {
-        theme::warning()
-    } else {
-        theme::error()
-    };
-
-    Line::from(vec![
-        Span::styled(format!(" {:<6}", label), Style::default().fg(theme::text_muted())),
-        Span::styled(chars::BLOCK_FULL.repeat(filled.min(bar_width)), Style::default().fg(color)),
-        Span::styled(
-            chars::BLOCK_LIGHT.repeat(bar_width.saturating_sub(filled)),
-            Style::default().fg(theme::bg_elevated()),
-        ),
-        Span::styled(format!(" {:>5.0}%", pct), Style::default().fg(color)),
-    ])
-}
-
-fn render_sparkline(values: &[f64]) -> Line<'static> {
-    const SPARK_CHARS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-
-    if values.is_empty() {
-        return Line::from(vec![
-            Span::styled(" Recent: ", Style::default().fg(theme::text_muted())),
-            Span::styled("(collecting...)", Style::default().fg(theme::text_muted())),
-        ]);
-    }
-
-    let max_val = values.iter().cloned().fold(1.0_f64, f64::max);
-    let sparkline: String = values
-        .iter()
-        .map(|&v| {
-            let idx = ((v / max_val) * (SPARK_CHARS.len() - 1) as f64) as usize;
-            SPARK_CHARS[idx.min(SPARK_CHARS.len() - 1)]
-        })
-        .collect();
-
-    Line::from(vec![
-        Span::styled(" Recent: ", Style::default().fg(theme::text_muted())),
-        Span::styled(sparkline, Style::default().fg(theme::accent())),
-    ])
 }

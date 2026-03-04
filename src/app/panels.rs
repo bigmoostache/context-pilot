@@ -14,12 +14,13 @@ use crate::ui::{helpers::count_wrapped_lines, theme};
 
 // Re-export the Panel trait, ContextItem, and utility functions from cp-base
 #[cfg(test)]
-pub use cp_base::panels::mark_panels_dirty;
-pub use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};
+pub(crate) use cp_base::panels::mark_panels_dirty;
+pub(crate) use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};
 
 /// Render a panel with the binary's full chrome (borders, theme, scroll, profiling).
 /// This is NOT part of the Panel trait — it uses binary-specific deps (theme, profile!, UI helpers).
-pub fn render_panel_default(panel: &dyn Panel, frame: &mut Frame, state: &mut State, area: Rect) {
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub(crate) fn render_panel_default(panel: &dyn Panel, frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let base_style = Style::default().bg(theme::bg_surface());
     let title = panel.title(state);
 
@@ -82,7 +83,7 @@ pub fn render_panel_default(panel: &dyn Panel, frame: &mut Frame, state: &mut St
 
 /// Get the appropriate panel for a context type (delegates to module system).
 /// Returns a no-op fallback for orphaned context types (e.g., removed modules).
-pub fn get_panel(context_type: &ContextType) -> Box<dyn Panel> {
+pub(crate) fn get_panel(context_type: &ContextType) -> Box<dyn Panel> {
     crate::modules::create_panel(context_type).unwrap_or_else(|| Box::new(FallbackPanel))
 }
 
@@ -99,7 +100,7 @@ impl Panel for FallbackPanel {
 }
 
 /// Refresh all panels (update token counts, etc.)
-pub fn refresh_all_panels(state: &mut State) {
+pub(crate) fn refresh_all_panels(state: &mut State) {
     // Get unique context types from state
     let context_types: Vec<ContextType> = state.context.iter().map(|c| c.context_type.clone()).collect();
 
@@ -110,7 +111,7 @@ pub fn refresh_all_panels(state: &mut State) {
 }
 
 /// Collect all context items from all panels
-pub fn collect_all_context(state: &State) -> Vec<ContextItem> {
+pub(crate) fn collect_all_context(state: &State) -> Vec<ContextItem> {
     let mut items = Vec::new();
 
     // Get UNIQUE context types from state (dedup to avoid multiplying items!)
@@ -168,12 +169,11 @@ mod tests {
 
     #[test]
     fn mark_panels_dirty_targets_correct_type() {
-        let mut state = State::default();
+        let mut state = State { dirty: false, ..State::default() };
         // Clear all dirty flags first
         for ctx in &mut state.context {
             ctx.cache_deprecated = false;
         }
-        state.dirty = false;
 
         mark_panels_dirty(&mut state, ContextType::new(ContextType::GIT));
 
@@ -190,8 +190,7 @@ mod tests {
 
     #[test]
     fn mark_panels_dirty_sets_state_dirty() {
-        let mut state = State::default();
-        state.dirty = false;
+        let mut state = State { dirty: false, ..State::default() };
         mark_panels_dirty(&mut state, ContextType::new(ContextType::FILE));
         assert!(state.dirty);
     }

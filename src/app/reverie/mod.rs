@@ -5,6 +5,6 @@
 //! The first reverie type is the **Context Optimizer**, which reshapes
 //! context for relevance and budget.
 
-pub mod streaming;
-pub mod tools;
-pub mod trigger;
+pub(crate) mod streaming;
+pub(crate) mod tools;
+pub(crate) mod trigger;

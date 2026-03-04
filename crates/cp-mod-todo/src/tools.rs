@@ -3,12 +3,9 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{TodoItem, TodoState, TodoStatus};
 
-pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let todos = match tool.input.get("todos").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'todos' array parameter".to_string(), true);
-        }
+pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(todos) = tool.input.get("todos").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'todos' array parameter".to_string(), true);
     };
 
     if todos.is_empty() {
@@ -19,12 +16,11 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut errors: Vec<String> = Vec::new();
 
     for todo_value in todos {
-        let name = match todo_value.get("name").and_then(|v| v.as_str()) {
-            Some(n) => n.to_string(),
-            None => {
-                errors.push("Missing 'name' in todo".to_string());
-                continue;
-            }
+        let name = if let Some(n) = todo_value.get("name").and_then(|v| v.as_str()) {
+            n.to_string()
+        } else {
+            errors.push("Missing 'name' in todo".to_string());
+            continue;
         };
 
         let description = todo_value.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -92,12 +88,9 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), output, created.is_empty())
 }
 
-pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let updates = match tool.input.get("updates").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
-        }
+pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
     };
 
     if updates.is_empty() {
@@ -120,12 +113,9 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         .collect();
 
     for update_value in updates {
-        let id = match update_value.get("id").and_then(|v| v.as_str()) {
-            Some(i) => i,
-            None => {
-                errors.push("Missing 'id' in update".to_string());
-                continue;
-            }
+        let Some(id) = update_value.get("id").and_then(|v| v.as_str()) else {
+            errors.push("Missing 'id' in update".to_string());
+            continue;
         };
 
         // Check for deletion (support both delete:true and status:"deleted")
@@ -331,12 +321,9 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), output, updated.is_empty() && deleted.is_empty() && propagated.is_empty())
 }
 
-pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let id = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(i) => i,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'id' parameter".to_string(), true);
-        }
+pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'id' parameter".to_string(), true);
     };
 
     // Normalize after_id: treat null, "none", "null", "" as None (move to top)
@@ -356,11 +343,8 @@ pub fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Find the todo to move
     let ts = TodoState::get(state);
-    let move_idx = match ts.todos.iter().position(|t| t.id == id) {
-        Some(idx) => idx,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Todo '{}' not found", id), true);
-        }
+    let Some(move_idx) = ts.todos.iter().position(|t| t.id == id) else {
+        return ToolResult::new(tool.id.clone(), format!("Todo '{}' not found", id), true);
     };
 
     // Validate after_id exists if specified

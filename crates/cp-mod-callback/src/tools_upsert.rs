@@ -11,7 +11,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::types::{CallbackDefinition, CallbackState};
 
 /// Create a new callback with its script file.
-pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Extract required params
     let vessel_name = match tool.input.get("name").and_then(|v| v.as_str()) {
         Some(n) => n.to_string(),
@@ -114,7 +114,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let definition = CallbackDefinition {
         id: anchor_id.clone(),
         name: vessel_name.clone(),
-        description: description.clone(),
+        description,
         pattern: chart_pattern.clone(),
         blocking,
         timeout_secs,
@@ -148,7 +148,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Update an existing callback (full replace or diff-based script edit).
-pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
@@ -161,11 +161,8 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let cs = CallbackState::get(state);
-    let def_idx = match cs.definitions.iter().position(|d| d.id == anchor_id) {
-        Some(i) => i,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
-        }
+    let Some(def_idx) = cs.definitions.iter().position(|d| d.id == anchor_id) else {
+        return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
     };
 
     // Check for diff-based script update (old_string / new_string)
@@ -305,7 +302,7 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Delete a callback and its script file.
-pub fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
@@ -318,11 +315,8 @@ pub fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let cs = CallbackState::get(state);
-    let def_idx = match cs.definitions.iter().position(|d| d.id == anchor_id) {
-        Some(i) => i,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
-        }
+    let Some(def_idx) = cs.definitions.iter().position(|d| d.id == anchor_id) else {
+        return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
     };
 
     // Remove definition and get the name for script cleanup

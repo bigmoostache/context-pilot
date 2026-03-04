@@ -12,3 +12,6 @@ serde_yaml.workspace = true
 regex.workspace = true
 sha2.workspace = true
 secrecy = { version = "0.10", features = ["serde"] }
+
+[lints]
+workspace = true

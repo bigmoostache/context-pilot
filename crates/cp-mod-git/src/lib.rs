@@ -8,6 +8,7 @@ pub use types::{GitChangeType, GitFileChange, GitState};
 
 /// Refresh git status (branch, file changes) into GitState.
 /// Called periodically by the overview panel to keep stats up to date.
+#[allow(clippy::cast_possible_truncation)]
 pub fn refresh_git_status(state: &mut State) {
     use std::process::Command;
     use types::GitChangeType;
@@ -139,6 +140,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/git.yaml")).expect("Failed to parse git tool YAML")
 });
 
+#[derive(Debug)]
 pub struct GitModule;
 
 impl Module for GitModule {

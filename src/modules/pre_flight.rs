@@ -6,7 +6,7 @@ use crate::state::State;
 use super::all_modules;
 
 /// Run pre-flight validation for a tool call: global schema check + module semantic checks.
-pub fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &HashSet<String>) -> PreFlightResult {
+pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &HashSet<String>) -> PreFlightResult {
     let mut result = PreFlightResult::new();
 
     // Phase 1: Global schema validation against ToolDefinition
@@ -31,12 +31,9 @@ pub fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &HashSet<S
 /// Validate tool input JSON against the parameter schema.
 /// Checks: required params present, basic type matching.
 fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut PreFlightResult) {
-    let obj = match input.as_object() {
-        Some(o) => o,
-        None => {
-            result.errors.push("Tool input must be a JSON object".to_string());
-            return;
-        }
+    let Some(obj) = input.as_object() else {
+        result.errors.push("Tool input must be a JSON object".to_string());
+        return;
     };
 
     for param in params {

@@ -9,7 +9,7 @@ use cp_base::state::{ContextType, State, estimate_tokens};
 
 use crate::types::{TodoItem, TodoState, TodoStatus};
 
-pub struct TodoPanel;
+pub(crate) struct TodoPanel;
 
 impl TodoPanel {
     /// Format todos for LLM context
@@ -86,7 +86,7 @@ impl Panel for TodoPanel {
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let mut text: Vec<Line> = Vec::new();
+        let mut text: Vec<Line<'_>> = Vec::new();
         let ts = TodoState::get(state);
 
         if ts.todos.is_empty() {

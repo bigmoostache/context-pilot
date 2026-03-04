@@ -11,14 +11,14 @@ use cp_base::ui::{find_children_pattern, find_size_pattern};
 
 use crate::types::TreeState;
 
-pub struct TreeCacheRequest {
+pub(crate) struct TreeCacheRequest {
     pub context_id: String,
     pub tree_filter: String,
     pub tree_open_folders: Vec<String>,
     pub tree_descriptions: Vec<crate::types::TreeFileDescription>,
 }
 
-pub struct TreePanel;
+pub(crate) struct TreePanel;
 
 impl Panel for TreePanel {
     fn needs_cache(&self) -> bool {
@@ -106,9 +106,9 @@ impl Panel for TreePanel {
             .cloned()
             .unwrap_or_else(|| "Loading...".to_string());
 
-        let mut text: Vec<Line> = Vec::new();
+        let mut text: Vec<Line<'_>> = Vec::new();
         for line in tree_content.lines() {
-            let mut spans: Vec<Span> = Vec::new();
+            let mut spans: Vec<Span<'_>> = Vec::new();
             spans.push(Span::styled(" ".to_string(), Style::default().fg(theme::text())));
 
             // Check for description (after " - ")

@@ -2,14 +2,11 @@ use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::State;
 
 /// The ID of this tool - it cannot be disabled
-pub const MANAGE_TOOLS_ID: &str = "manage_tools";
+pub(crate) const MANAGE_TOOLS_ID: &str = "manage_tools";
 
-pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let changes = match tool.input.get("changes").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'changes' parameter (expected array)".to_string(), true);
-        }
+pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(changes) = tool.input.get("changes").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'changes' parameter (expected array)".to_string(), true);
     };
 
     if changes.is_empty() {
@@ -20,20 +17,14 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut failures: Vec<String> = Vec::new();
 
     for (i, change) in changes.iter().enumerate() {
-        let tool_name = match change.get("tool").and_then(|v| v.as_str()) {
-            Some(n) => n,
-            None => {
-                failures.push(format!("Change {}: missing 'tool'", i + 1));
-                continue;
-            }
+        let Some(tool_name) = change.get("tool").and_then(|v| v.as_str()) else {
+            failures.push(format!("Change {}: missing 'tool'", i + 1));
+            continue;
         };
 
-        let action = match change.get("action").and_then(|v| v.as_str()) {
-            Some(a) => a,
-            None => {
-                failures.push(format!("Change {}: missing 'action'", i + 1));
-                continue;
-            }
+        let Some(action) = change.get("action").and_then(|v| v.as_str()) else {
+            failures.push(format!("Change {}: missing 'action'", i + 1));
+            continue;
         };
 
         // Cannot disable the manage_tools tool itself

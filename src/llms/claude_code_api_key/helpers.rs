@@ -3,23 +3,24 @@
 use serde_json::Value;
 
 /// System reminder injected into first user message for Claude Code validation
-pub const SYSTEM_REMINDER: &str =
+pub(crate) const SYSTEM_REMINDER: &str =
     "<system-reminder>\nThe following skills are available for use with the Skill tool:\n</system-reminder>";
 
 /// API endpoint with beta flag required for Claude 4.5 access
-pub const CLAUDE_CODE_ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
+pub(crate) const CLAUDE_CODE_ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
 
 /// Beta header with all required flags for Claude Code access (API key mode)
-pub const OAUTH_BETA_HEADER: &str = "interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15";
+pub(crate) const OAUTH_BETA_HEADER: &str = "interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15";
 
 /// Billing header that must be included in system prompt
-pub const BILLING_HEADER: &str = "x-anthropic-billing-header: cc_version=2.1.44.fbe; cc_entrypoint=cli; cch=e5401;";
+pub(crate) const BILLING_HEADER: &str =
+    "x-anthropic-billing-header: cc_version=2.1.44.fbe; cc_entrypoint=cli; cch=e5401;";
 
 /// Directory for last-request debug dumps
-pub const LAST_REQUESTS_DIR: &str = ".context-pilot/last_requests";
+pub(crate) const LAST_REQUESTS_DIR: &str = ".context-pilot/last_requests";
 
 /// Map model names to full API model identifiers
-pub fn map_model_name(model: &str) -> &str {
+pub(crate) fn map_model_name(model: &str) -> &str {
     match model {
         "claude-opus-4-6" => "claude-opus-4-6",
         "claude-opus-4-5" => "claude-opus-4-6",
@@ -33,7 +34,7 @@ pub fn map_model_name(model: &str) -> &str {
 /// Claude Code's server validates that messages contain this marker.
 /// Must skip tool_result user messages (from panel injection) since mixing text blocks
 /// into tool_result messages breaks the API's tool_use/tool_result pairing.
-pub fn inject_system_reminder(messages: &mut Vec<Value>) {
+pub(crate) fn inject_system_reminder(messages: &mut Vec<Value>) {
     let reminder = serde_json::json!({"type": "text", "text": SYSTEM_REMINDER});
 
     for msg in messages.iter_mut() {
@@ -89,7 +90,7 @@ pub fn inject_system_reminder(messages: &mut Vec<Value>) {
 ///   assistant message is inserted (can't merge these — tool_result + text mixing
 ///   breaks inject_system_reminder and API validation).
 /// - Consecutive assistant messages are merged.
-pub fn ensure_message_alternation(messages: &mut Vec<Value>) {
+pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
     if messages.len() <= 1 {
         return;
     }
@@ -143,7 +144,8 @@ pub fn ensure_message_alternation(messages: &mut Vec<Value>) {
 }
 
 /// Convert content (string or array) to an array of content blocks.
-pub fn content_to_blocks(content: Value) -> Vec<Value> {
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn content_to_blocks(content: Value) -> Vec<Value> {
     if content.is_string() {
         vec![serde_json::json!({"type": "text", "text": content.as_str().unwrap_or("")})]
     } else if let Some(arr) = content.as_array() {
@@ -155,7 +157,7 @@ pub fn content_to_blocks(content: Value) -> Vec<Value> {
 
 /// Dump the outgoing API request to disk for debugging.
 /// Written to `.context-pilot/last_requests/{worker_id}_last_request.json`.
-pub fn dump_last_request(worker_id: &str, api_request: &Value) {
+pub(crate) fn dump_last_request(worker_id: &str, api_request: &Value) {
     let debug = serde_json::json!({
         "request_url": CLAUDE_CODE_ENDPOINT,
         "request_headers": {
@@ -172,7 +174,7 @@ pub fn dump_last_request(worker_id: &str, api_request: &Value) {
 }
 
 /// Apply standard Claude Code request headers to a reqwest builder.
-pub fn apply_claude_code_headers(
+pub(crate) fn apply_claude_code_headers(
     builder: reqwest::blocking::RequestBuilder,
     api_key: &str,
     accept: &str,

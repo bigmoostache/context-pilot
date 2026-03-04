@@ -8,7 +8,7 @@ use crate::state::{ContextType, State};
 
 use super::render;
 
-pub struct OverviewPanel;
+pub(super) struct OverviewPanel;
 
 impl Panel for OverviewPanel {
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
@@ -60,7 +60,7 @@ impl Panel for OverviewPanel {
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let _guard = crate::profile!("panel::overview::content");
-        let mut text: Vec<Line> = Vec::new();
+        let mut text: Vec<Line<'_>> = Vec::new();
 
         text.extend(render::render_token_usage(state, base_style));
         text.extend(render::separator());

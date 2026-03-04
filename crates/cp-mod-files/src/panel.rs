@@ -11,13 +11,13 @@ use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::Action;
 use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
 
-pub struct FileCacheRequest {
+pub(crate) struct FileCacheRequest {
     pub context_id: String,
     pub file_path: String,
     pub current_source_hash: Option<String>,
 }
 
-pub struct FilePanel;
+pub(crate) struct FilePanel;
 
 impl Panel for FilePanel {
     fn needs_cache(&self) -> bool {
@@ -89,6 +89,7 @@ impl Panel for FilePanel {
         // File refresh is handled by background cache system via refresh_cache
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<FileCacheRequest>().ok()?;
         let FileCacheRequest { context_id, file_path, current_source_hash } = *req;
@@ -153,7 +154,7 @@ impl Panel for FilePanel {
             std::sync::Arc::new(Vec::new())
         };
 
-        let mut text: Vec<Line> = Vec::new();
+        let mut text: Vec<Line<'_>> = Vec::new();
 
         if highlighted.is_empty() {
             for (i, line) in content.lines().enumerate() {
@@ -179,7 +180,7 @@ impl Panel for FilePanel {
                 ];
 
                 for (color, text) in spans {
-                    line_spans.push(Span::styled(text.to_string(), Style::default().fg(*color)));
+                    line_spans.push(Span::styled(text.clone(), Style::default().fg(*color)));
                 }
 
                 text.push(Line::from(line_spans));

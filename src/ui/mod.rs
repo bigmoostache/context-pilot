@@ -1,12 +1,12 @@
-pub use crate::infra::constants::chars;
-pub mod help;
-pub mod helpers;
+pub(crate) use crate::infra::constants::chars;
+pub(crate) mod help;
+pub(crate) mod helpers;
 mod input;
-pub mod markdown;
-pub mod perf;
+pub(crate) mod markdown;
+pub(crate) mod perf;
 mod sidebar;
-pub use crate::infra::constants::theme;
-pub mod typewriter;
+pub(crate) use crate::infra::constants::theme;
+pub(crate) mod typewriter;
 
 use ratatui::{prelude::*, widgets::Block};
 
@@ -15,7 +15,7 @@ use crate::infra::constants::STATUS_BAR_HEIGHT;
 use crate::state::{ContextType, State};
 use crate::ui::perf::PERF;
 
-pub fn render(frame: &mut Frame, state: &mut State) {
+pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     PERF.frame_start();
     let _guard = crate::profile!("ui::render");
     let area = frame.area();
@@ -61,7 +61,7 @@ pub fn render(frame: &mut Frame, state: &mut State) {
     PERF.frame_end();
 }
 
-fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
+fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let sw = state.sidebar_mode.width();
     if sw == 0 {
         // Hidden mode — no sidebar at all
@@ -90,7 +90,7 @@ fn render_body(frame: &mut Frame, state: &mut State, area: Rect) {
     render_main_content(frame, state, body_layout[1]);
 }
 
-fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
+fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     // Check if question form is active — render it at bottom of content area
     if let Some(form) = state.get_ext::<cp_base::ui::PendingQuestionForm>()
         && !form.resolved
@@ -116,7 +116,7 @@ fn render_main_content(frame: &mut Frame, state: &mut State, area: Rect) {
     render_content_panel(frame, state, area);
 }
 
-fn render_content_panel(frame: &mut Frame, state: &mut State, area: Rect) {
+fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let _guard = crate::profile!("ui::render_panel");
     let context_type = state
         .context

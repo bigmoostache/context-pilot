@@ -19,7 +19,8 @@ use crate::app::App;
 use crate::app::context::{get_active_agent_content, prepare_stream_context};
 
 impl App {
-    pub fn run(
+    #[allow(clippy::needless_pass_by_value)]
+    pub(crate) fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
         tx: Sender<StreamEvent>,

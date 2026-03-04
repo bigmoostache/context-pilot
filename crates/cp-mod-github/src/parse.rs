@@ -66,10 +66,7 @@ pub fn poll_branch_pr(
     .env("GH_PROMPT_DISABLED", "1")
     .env("NO_COLOR", "1");
 
-    let output = match run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS) {
-        Ok(o) => o,
-        Err(_) => return None,
-    };
+    let Ok(output) = run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS) else { return None };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);

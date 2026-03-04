@@ -9,7 +9,7 @@ use crate::ui::{
 };
 
 /// Horizontal separator line.
-pub fn separator() -> Vec<Line<'static>> {
+pub(super) fn separator() -> Vec<Line<'static>> {
     vec![
         Line::from(""),
         Line::from(vec![Span::styled(
@@ -21,8 +21,9 @@ pub fn separator() -> Vec<Line<'static>> {
 }
 
 /// Render the TOKEN USAGE section with progress bar.
-pub fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'static>> {
-    let mut text: Vec<Line> = Vec::new();
+#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'static>> {
+    let mut text: Vec<Line<'_>> = Vec::new();
 
     let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
     let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt) * 2;
@@ -94,8 +95,8 @@ pub fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'static>
 }
 
 /// Render the GIT STATUS section (branch + file changes summary table).
-pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>> {
-    let mut text: Vec<Line> = Vec::new();
+pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>> {
+    let mut text: Vec<Line<'_>> = Vec::new();
     let gs = cp_mod_git::GitState::get(state);
 
     if !gs.git_is_repo {
@@ -202,8 +203,8 @@ pub fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>>
 }
 
 /// Render the CONTEXT ELEMENTS section.
-pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'static>> {
-    let mut text: Vec<Line> = Vec::new();
+pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'static>> {
+    let mut text: Vec<Line<'_>> = Vec::new();
 
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
@@ -314,4 +315,4 @@ pub fn render_context_elements(state: &State, base_style: Style) -> Vec<Line<'st
     text
 }
 
-pub use super::render_details::render_statistics;
+pub(super) use super::render_details::render_statistics;

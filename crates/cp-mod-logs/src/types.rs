@@ -16,6 +16,7 @@ pub struct LogEntry {
 }
 
 impl LogEntry {
+    #[allow(clippy::cast_possible_truncation)]
     pub fn new(id: String, content: String) -> Self {
         let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
         Self { id, timestamp_ms, content, parent_id: None, children_ids: vec![] }
@@ -38,6 +39,7 @@ impl LogEntry {
 }
 
 /// Module-owned state for the Logs module
+#[derive(Debug)]
 pub struct LogsState {
     pub logs: Vec<LogEntry>,
     pub next_log_id: usize,

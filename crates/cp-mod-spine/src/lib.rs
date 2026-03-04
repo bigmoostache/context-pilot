@@ -22,6 +22,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/spine.yaml")).expect("Failed to parse spine tool YAML")
 });
 
+#[derive(Debug)]
 pub struct SpineModule;
 
 impl Module for SpineModule {
@@ -70,6 +71,7 @@ impl Module for SpineModule {
         })
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("notifications")
             && let Ok(v) = serde_json::from_value(arr.clone())

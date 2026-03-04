@@ -6,7 +6,7 @@ use ratatui::{
 use crate::infra::constants::{chars, theme};
 use crate::state::State;
 
-pub fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
+pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Center the overlay, clamped to available area
     let overlay_width = 56u16.min(area.width);
     let overlay_height = 38u16.min(area.height); // Reduced from 50
@@ -14,7 +14,7 @@ pub fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     let y = area.y + area.height.saturating_sub(overlay_height) / 2;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
 
-    let mut lines: Vec<Line> = Vec::new();
+    let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Tab indicator
     let showing_main = !state.config_secondary_mode;
@@ -72,7 +72,7 @@ pub fn render_config_overlay(frame: &mut Frame, state: &State, area: Rect) {
     frame.render_widget(paragraph, overlay_area);
 }
 
-fn add_separator(lines: &mut Vec<Line>) {
+fn add_separator(lines: &mut Vec<Line<'_>>) {
     lines.push(Line::from(""));
     lines.push(Line::from(vec![Span::styled(
         format!("  {}", chars::HORIZONTAL.repeat(50)),
@@ -82,7 +82,7 @@ fn add_separator(lines: &mut Vec<Line>) {
 }
 
 /// Render the provider section (always visible regardless of Tab mode)
-fn render_provider_section(lines: &mut Vec<Line>, state: &State) {
+fn render_provider_section(lines: &mut Vec<Line<'_>>, state: &State) {
     use crate::llms::LlmProvider;
 
     lines.push(Line::from(vec![Span::styled("  LLM Provider", Style::default().fg(theme::text_secondary()).bold())]));
@@ -116,7 +116,7 @@ fn render_provider_section(lines: &mut Vec<Line>, state: &State) {
     }
 }
 
-fn render_model_section(lines: &mut Vec<Line>, state: &State) {
+fn render_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
     use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 
     lines.push(Line::from(vec![Span::styled("  Model", Style::default().fg(theme::text_secondary()).bold())]));
@@ -155,7 +155,8 @@ fn render_model_section(lines: &mut Vec<Line>, state: &State) {
     }
 }
 
-fn render_api_check(lines: &mut Vec<Line>, state: &State) {
+#[allow(clippy::cast_possible_truncation)]
+fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
     if state.api_check_in_progress {
         let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
         let spinner = spinner_chars[(state.spinner_frame as usize) % spinner_chars.len()];
@@ -179,7 +180,8 @@ fn render_api_check(lines: &mut Vec<Line>, state: &State) {
     }
 }
 
-fn render_budget_bars(lines: &mut Vec<Line>, state: &State) {
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let format_tokens = |tokens: usize| -> String {
         if tokens >= 1_000_000 {
             format!("{:.1}M", tokens as f64 / 1_000_000.0)
@@ -200,7 +202,7 @@ fn render_budget_bars(lines: &mut Vec<Line>, state: &State) {
     let budget_filled = ((effective_budget as f64 / max_budget as f64) * bar_width as f64) as usize;
     render_bar(
         lines,
-        BarConfig {
+        &BarConfig {
             selected,
             idx: 0,
             label: "Context Budget",
@@ -219,7 +221,7 @@ fn render_budget_bars(lines: &mut Vec<Line>, state: &State) {
     let threshold_filled = ((state.cleaning_threshold * bar_width as f32) as usize).min(bar_width);
     render_bar(
         lines,
-        BarConfig {
+        &BarConfig {
             selected,
             idx: 1,
             label: "Clean Trigger",
@@ -240,7 +242,7 @@ fn render_budget_bars(lines: &mut Vec<Line>, state: &State) {
     let extra = format!(" ({}%)", target_abs_pct);
     render_bar(
         lines,
-        BarConfig {
+        &BarConfig {
             selected,
             idx: 2,
             label: "Clean Target",
@@ -297,7 +299,7 @@ struct BarConfig<'a> {
     extra: Option<&'a str>,
 }
 
-fn render_bar(lines: &mut Vec<Line>, cfg: BarConfig) {
+fn render_bar(lines: &mut Vec<Line<'_>>, cfg: &BarConfig<'_>) {
     let is_selected = cfg.selected == cfg.idx;
     let indicator = if is_selected { ">" } else { " " };
     let label_style = if is_selected {
@@ -327,7 +329,7 @@ fn render_bar(lines: &mut Vec<Line>, cfg: BarConfig) {
     ]));
 }
 
-fn render_theme_section(lines: &mut Vec<Line>, state: &State) {
+fn render_theme_section(lines: &mut Vec<Line<'_>>, state: &State) {
     lines.push(Line::from(vec![Span::styled("  Theme", Style::default().fg(theme::text_secondary()).bold())]));
     lines.push(Line::from(""));
 
@@ -362,7 +364,7 @@ fn render_theme_section(lines: &mut Vec<Line>, state: &State) {
     )]));
 }
 
-fn render_toggles_section(lines: &mut Vec<Line>, state: &State) {
+fn render_toggles_section(lines: &mut Vec<Line<'_>>, state: &State) {
     // Auto-continuation toggle
     let spine_cfg = &cp_mod_spine::SpineState::get(state).config;
     let auto_on = spine_cfg.continue_until_todos_done;
@@ -391,7 +393,7 @@ fn render_toggles_section(lines: &mut Vec<Line>, state: &State) {
     ]));
 }
 
-fn render_secondary_model_section(lines: &mut Vec<Line>, state: &State) {
+fn render_secondary_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
     use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 
     lines.push(Line::from(vec![Span::styled(
@@ -434,7 +436,7 @@ fn render_secondary_model_section(lines: &mut Vec<Line>, state: &State) {
 }
 
 fn render_model_line_with_info<M: crate::llms::ModelInfo>(
-    lines: &mut Vec<Line>,
+    lines: &mut Vec<Line<'_>>,
     is_selected: bool,
     key: &str,
     model: &M,

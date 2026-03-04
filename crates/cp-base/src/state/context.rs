@@ -12,6 +12,7 @@ use crate::config::{active_theme, normalize_icon};
 // =============================================================================
 
 /// Metadata for a context type, provided by the owning module.
+#[derive(Debug)]
 pub struct ContextTypeMeta {
     /// The context type string (e.g., "todo", "git_result")
     pub context_type: &'static str,
@@ -221,12 +222,14 @@ impl ContextElement {
     }
 
     /// Fast path: get a metadata value as usize.
+    #[allow(clippy::cast_possible_truncation)]
     pub fn get_meta_usize(&self, key: &str) -> Option<usize> {
         self.metadata.get(key).and_then(|v| v.as_u64()).map(|n| n as usize)
     }
 }
 
 /// Estimate tokens from text (uses CHARS_PER_TOKEN constant)
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn estimate_tokens(text: &str) -> usize {
     (text.len() as f32 / CHARS_PER_TOKEN).ceil() as usize
 }

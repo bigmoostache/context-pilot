@@ -159,6 +159,7 @@ fn ensure_message_alternation(messages: &mut Vec<Value>) {
 }
 
 /// Convert content (string or array) to an array of content blocks.
+#[allow(clippy::needless_pass_by_value)]
 fn content_to_blocks(content: Value) -> Vec<Value> {
     if content.is_string() {
         vec![serde_json::json!({"type": "text", "text": content.as_str().unwrap_or("")})]
@@ -191,7 +192,7 @@ fn dump_last_request(worker_id: &str, api_request: &Value) {
 }
 
 /// Claude Code OAuth client
-pub struct ClaudeCodeClient {
+pub(crate) struct ClaudeCodeClient {
     access_token: Option<SecretBox<String>>,
 }
 
@@ -210,11 +211,12 @@ struct OAuthCredentials {
 }
 
 impl ClaudeCodeClient {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let access_token = Self::load_oauth_token();
         Self { access_token }
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn load_oauth_token() -> Option<SecretBox<String>> {
         let home = env::var("HOME").ok()?;
         let home_path = PathBuf::from(&home);

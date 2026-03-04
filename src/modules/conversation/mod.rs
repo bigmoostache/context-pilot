@@ -1,6 +1,6 @@
 mod list;
 mod panel;
-pub mod refresh;
+pub(crate) mod refresh;
 pub(crate) mod render;
 mod render_input;
 
@@ -11,7 +11,7 @@ use crate::state::{ContextType, ContextTypeMeta, State};
 use self::panel::ConversationPanel;
 use super::Module;
 
-pub struct ConversationModule;
+pub(crate) struct ConversationModule;
 
 impl Module for ConversationModule {
     fn id(&self) -> &'static str {

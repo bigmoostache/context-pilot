@@ -16,12 +16,9 @@ fn validate_tldr(text: &str) -> Result<(), String> {
     }
 }
 
-pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let memories = match tool.input.get("memories").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'memories' array parameter".to_string(), true);
-        }
+pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(memories) = tool.input.get("memories").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'memories' array parameter".to_string(), true);
     };
 
     if memories.is_empty() {
@@ -32,12 +29,11 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut errors: Vec<String> = Vec::new();
 
     for memory_value in memories {
-        let content = match memory_value.get("content").and_then(|v| v.as_str()) {
-            Some(c) => c.to_string(),
-            None => {
-                errors.push("Missing 'content' in memory".to_string());
-                continue;
-            }
+        let content = if let Some(c) = memory_value.get("content").and_then(|v| v.as_str()) {
+            c.to_string()
+        } else {
+            errors.push("Missing 'content' in memory".to_string());
+            continue;
         };
 
         if let Err(e) = validate_tldr(&content) {
@@ -86,12 +82,9 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), output, created.is_empty())
 }
 
-pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let updates = match tool.input.get("updates").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
-        }
+pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
     };
 
     if updates.is_empty() {
@@ -104,12 +97,9 @@ pub fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut errors: Vec<String> = Vec::new();
 
     for update_value in updates {
-        let id = match update_value.get("id").and_then(|v| v.as_str()) {
-            Some(i) => i,
-            None => {
-                errors.push("Missing 'id' in update".to_string());
-                continue;
-            }
+        let Some(id) = update_value.get("id").and_then(|v| v.as_str()) else {
+            errors.push("Missing 'id' in update".to_string());
+            continue;
         };
 
         // Check for deletion

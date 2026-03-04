@@ -7,7 +7,7 @@ use crate::ui::theme;
 
 /// Panel for frozen conversation history chunks.
 /// Content is set once at creation (via detach_conversation_chunks) and never refreshed.
-pub struct ConversationHistoryPanel;
+pub(super) struct ConversationHistoryPanel;
 
 impl Panel for ConversationHistoryPanel {
     fn title(&self, state: &State) -> String {

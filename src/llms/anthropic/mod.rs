@@ -20,12 +20,12 @@ mod messages;
 use messages::{log_sse_error, messages_to_api};
 
 /// Anthropic Claude client
-pub struct AnthropicClient {
+pub(crate) struct AnthropicClient {
     api_key: Option<SecretBox<String>>,
 }
 
 impl AnthropicClient {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         dotenvy::dotenv().ok();
         Self { api_key: env::var("ANTHROPIC_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
@@ -275,16 +275,13 @@ impl LlmClient for AnthropicClient {
     }
 
     fn check_api(&self, model: &str) -> super::ApiCheckResult {
-        let api_key = match self.api_key.as_ref() {
-            Some(k) => k,
-            None => {
-                return super::ApiCheckResult {
-                    auth_ok: false,
-                    streaming_ok: false,
-                    tools_ok: false,
-                    error: Some("ANTHROPIC_API_KEY not set".to_string()),
-                };
-            }
+        let Some(api_key) = self.api_key.as_ref() else {
+            return super::ApiCheckResult {
+                auth_ok: false,
+                streaming_ok: false,
+                tools_ok: false,
+                error: Some("ANTHROPIC_API_KEY not set".to_string()),
+            };
         };
 
         let client = Client::new();

@@ -10,7 +10,7 @@ use super::commands::{PaletteCommand, get_available_commands};
 
 /// State for the command palette
 #[derive(Debug, Clone, Default)]
-pub struct CommandPalette {
+pub(crate) struct CommandPalette {
     /// Whether the palette is open
     pub is_open: bool,
     /// Current search query
@@ -24,12 +24,12 @@ pub struct CommandPalette {
 }
 
 impl CommandPalette {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Open the palette
-    pub fn open(&mut self, state: &State) {
+    pub(crate) fn open(&mut self, state: &State) {
         self.is_open = true;
         self.query.clear();
         self.cursor = 0;
@@ -38,7 +38,7 @@ impl CommandPalette {
     }
 
     /// Close the palette
-    pub fn close(&mut self) {
+    pub(crate) fn close(&mut self) {
         self.is_open = false;
         self.query.clear();
         self.cursor = 0;
@@ -47,7 +47,7 @@ impl CommandPalette {
     }
 
     /// Update the filtered commands based on query
-    pub fn update_filtered(&mut self, state: &State) {
+    pub(crate) fn update_filtered(&mut self, state: &State) {
         let all_commands = get_available_commands(state);
 
         if self.query.is_empty() {
@@ -78,7 +78,7 @@ impl CommandPalette {
     }
 
     /// Insert a character at cursor position
-    pub fn insert_char(&mut self, c: char, state: &State) {
+    pub(crate) fn insert_char(&mut self, c: char, state: &State) {
         self.query.insert(self.cursor, c);
         self.cursor += c.len_utf8();
         self.selected = 0; // Reset selection on query change
@@ -86,7 +86,7 @@ impl CommandPalette {
     }
 
     /// Delete character before cursor
-    pub fn backspace(&mut self, state: &State) {
+    pub(crate) fn backspace(&mut self, state: &State) {
         if self.cursor > 0 {
             // Find the previous character boundary
             let prev_boundary = self.query[..self.cursor].char_indices().last().map(|(i, _)| i).unwrap_or(0);
@@ -98,7 +98,7 @@ impl CommandPalette {
     }
 
     /// Delete character at cursor
-    pub fn delete(&mut self, state: &State) {
+    pub(crate) fn delete(&mut self, state: &State) {
         if self.cursor < self.query.len() {
             self.query.remove(self.cursor);
             self.selected = 0;
@@ -107,7 +107,7 @@ impl CommandPalette {
     }
 
     /// Move cursor left
-    pub fn cursor_left(&mut self) {
+    pub(crate) fn cursor_left(&mut self) {
         if self.cursor > 0 {
             let prev_boundary = self.query[..self.cursor].char_indices().last().map(|(i, _)| i).unwrap_or(0);
             self.cursor = prev_boundary;
@@ -115,7 +115,7 @@ impl CommandPalette {
     }
 
     /// Move cursor right
-    pub fn cursor_right(&mut self) {
+    pub(crate) fn cursor_right(&mut self) {
         if self.cursor < self.query.len() {
             let next_boundary = self.query[self.cursor..]
                 .char_indices()
@@ -127,26 +127,27 @@ impl CommandPalette {
     }
 
     /// Move selection up
-    pub fn select_prev(&mut self) {
+    pub(crate) fn select_prev(&mut self) {
         if !self.filtered_commands.is_empty() {
             self.selected = if self.selected == 0 { self.filtered_commands.len() - 1 } else { self.selected - 1 };
         }
     }
 
     /// Move selection down
-    pub fn select_next(&mut self) {
+    pub(crate) fn select_next(&mut self) {
         if !self.filtered_commands.is_empty() {
             self.selected = (self.selected + 1) % self.filtered_commands.len();
         }
     }
 
     /// Get the currently selected command
-    pub fn get_selected(&self) -> Option<&PaletteCommand> {
+    pub(crate) fn get_selected(&self) -> Option<&PaletteCommand> {
         self.filtered_commands.get(self.selected)
     }
 
     /// Render the command palette
-    pub fn render(&self, frame: &mut Frame, _state: &State) {
+    #[allow(clippy::cast_possible_truncation)]
+    pub(crate) fn render(&self, frame: &mut Frame<'_>, _state: &State) {
         if !self.is_open {
             return;
         }

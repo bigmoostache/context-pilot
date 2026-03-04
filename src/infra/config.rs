@@ -1,1 +1,1 @@
-pub use cp_base::config::*;
+pub(crate) use cp_base::config::*;

@@ -7,20 +7,18 @@ use cp_base::tools::{ToolResult, ToolUse};
 /// Unified diff-based edit tool for agents, skills, and commands.
 /// Uses the same old_string/new_string pattern as the file Edit tool.
 /// Routes to agent/skill/command based on the provided ID.
-pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) if !id.is_empty() => id,
         _ => return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true),
     };
 
-    let old_string = match tool.input.get("old_string").and_then(|v| v.as_str()) {
-        Some(s) => s,
-        None => return ToolResult::new(tool.id.clone(), "Missing required 'old_string' parameter".to_string(), true),
+    let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required 'old_string' parameter".to_string(), true);
     };
 
-    let new_string = match tool.input.get("new_string").and_then(|v| v.as_str()) {
-        Some(s) => s,
-        None => return ToolResult::new(tool.id.clone(), "Missing required 'new_string' parameter".to_string(), true),
+    let Some(new_string) = tool.input.get("new_string").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required 'new_string' parameter".to_string(), true);
     };
 
     let replace_all = tool.input.get("replace_all").and_then(|v| v.as_bool()).unwrap_or(false);
@@ -107,13 +105,13 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     match entity_type {
         EntityType::Agent => {
             let a = ps.agents.iter_mut().find(|a| a.id == id).unwrap();
-            a.content = new_content.clone();
+            a.content = new_content;
             storage::save_prompt_to_dir(&storage::dir_for(PromptType::Agent), a);
             state.touch_panel(ContextType::new(ContextType::SYSTEM));
         }
         EntityType::Skill => {
             let s = ps.skills.iter_mut().find(|s| s.id == id).unwrap();
-            s.content = new_content.clone();
+            s.content = new_content;
             let skill_clone = s.clone();
             storage::save_prompt_to_dir(&storage::dir_for(PromptType::Skill), &skill_clone);
 

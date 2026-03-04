@@ -4,7 +4,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::types::SpineState;
 
 /// Execute the notification_mark_processed tool
-pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
     let all_ids: Vec<String> = match tool.input.get("ids").and_then(|v| v.as_array()) {
         Some(arr) => arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect(),
         None => {
@@ -47,7 +47,8 @@ pub fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute the spine_configure tool — update spine auto-continuation and guard rail settings
-pub fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut changes: Vec<String> = Vec::new();
 
     // === Auto-continuation toggles ===

@@ -5,7 +5,7 @@ use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
 
-pub struct SkillPanel;
+pub(crate) struct SkillPanel;
 
 impl Panel for SkillPanel {
     fn title(&self, state: &State) -> String {

@@ -12,7 +12,7 @@ use cp_base::ui::{Cell, render_table};
 
 use crate::types::CallbackState;
 
-pub struct CallbackPanel;
+pub(crate) struct CallbackPanel;
 
 impl CallbackPanel {
     fn format_for_context(state: &State) -> String {

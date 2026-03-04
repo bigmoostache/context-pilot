@@ -15,7 +15,7 @@ fn subdir_for(pt: PromptType) -> &'static str {
 }
 
 /// Full path to the directory for a prompt type
-pub fn dir_for(pt: PromptType) -> PathBuf {
+pub(crate) fn dir_for(pt: PromptType) -> PathBuf {
     PathBuf::from(STORE_DIR).join(subdir_for(pt))
 }
 
@@ -29,7 +29,7 @@ pub fn dir_for(pt: PromptType) -> PathBuf {
 /// Body content here...
 /// ```
 /// Returns (name, description, body).
-pub fn parse_prompt_file(content: &str) -> (String, String, String) {
+pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
     let trimmed = content.trim_start();
     if !trimmed.starts_with("---") {
         // No frontmatter — treat entire content as body
@@ -61,17 +61,14 @@ pub fn parse_prompt_file(content: &str) -> (String, String, String) {
 }
 
 /// Format a prompt item back to .md file with YAML frontmatter
-pub fn format_prompt_file(name: &str, description: &str, content: &str) -> String {
+pub(crate) fn format_prompt_file(name: &str, description: &str, content: &str) -> String {
     format!("---\nname: {}\ndescription: {}\n---\n{}", name, description, content)
 }
 
 /// Load all .md prompt files from a directory
-pub fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<PromptItem> {
+pub(crate) fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<PromptItem> {
     let mut items = Vec::new();
-    let entries = match fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return items,
-    };
+    let Ok(entries) = fs::read_dir(dir) else { return items };
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -102,7 +99,7 @@ pub fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<PromptI
 }
 
 /// Save a prompt item to its directory as {id}.md
-pub fn save_prompt_to_dir(dir: &Path, item: &PromptItem) {
+pub(crate) fn save_prompt_to_dir(dir: &Path, item: &PromptItem) {
     fs::create_dir_all(dir).ok();
     let path = dir.join(format!("{}.md", item.id));
     let content = format_prompt_file(&item.name, &item.description, &item.content);
@@ -110,7 +107,7 @@ pub fn save_prompt_to_dir(dir: &Path, item: &PromptItem) {
 }
 
 /// Delete a prompt file from its directory
-pub fn delete_prompt_from_dir(dir: &Path, id: &str) {
+pub(crate) fn delete_prompt_from_dir(dir: &Path, id: &str) {
     let path = dir.join(format!("{}.md", id));
     if path.exists() {
         fs::remove_file(path).ok();
@@ -119,7 +116,7 @@ pub fn delete_prompt_from_dir(dir: &Path, id: &str) {
 
 /// Load all prompts from all three directories + built-ins from library.yaml.
 /// Returns (agents, skills, commands).
-pub fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<PromptItem>) {
+pub(crate) fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<PromptItem>) {
     use cp_base::config::library;
 
     let mut agents = load_prompts_from_dir(&dir_for(PromptType::Agent), PromptType::Agent);
@@ -181,7 +178,7 @@ pub fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<PromptItem>)
 }
 
 /// Generate a URL-safe slug from a name (e.g., "Code Reviewer" → "code-reviewer")
-pub fn slugify(name: &str) -> String {
+pub(crate) fn slugify(name: &str) -> String {
     name.to_lowercase()
         .chars()
         .map(|c| if c.is_alphanumeric() { c } else { '-' })

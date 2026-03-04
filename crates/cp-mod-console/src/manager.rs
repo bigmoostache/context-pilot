@@ -181,6 +181,7 @@ pub fn kill_orphaned_processes(known_keys: &HashSet<String>) {
 /// A managed child process session.
 /// The process is owned by the console server.
 /// The TUI polls the log file for output into a RingBuffer.
+#[derive(Debug)]
 pub struct SessionHandle {
     pub name: String,
     pub command: String,
@@ -199,6 +200,7 @@ unsafe impl Sync for SessionHandle {}
 
 impl SessionHandle {
     /// Spawn a new child process via the console server.
+    #[allow(clippy::cast_possible_truncation)]
     pub fn spawn(name: String, command: String, cwd: Option<String>) -> Result<Self, String> {
         let log_path = log_file_path(&name);
         let log_path_str = log_path.to_string_lossy().to_string();
@@ -214,13 +216,12 @@ impl SessionHandle {
             req["cwd"] = serde_json::Value::String(dir.clone());
         }
 
-        let resp = match server_request(&req) {
-            Ok(r) => r,
-            Err(_) => {
-                // Server may have died — try to respawn
-                find_or_create_server()?;
-                server_request(&req)?
-            }
+        let resp = if let Ok(r) = server_request(&req) {
+            r
+        } else {
+            // Server may have died — try to respawn
+            find_or_create_server()?;
+            server_request(&req)?
         };
         let pid = resp.get("pid").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
@@ -234,7 +235,7 @@ impl SessionHandle {
         {
             let buf = buffer.clone();
             let stop = Arc::clone(&stop_polling);
-            let path = log_path.clone();
+            let path = log_path;
             std::thread::spawn(move || {
                 file_poller(path, buf, stop);
             });
@@ -266,6 +267,7 @@ impl SessionHandle {
     }
 
     /// Reconnect to a server-managed session after TUI reload.
+    #[allow(clippy::cast_possible_truncation)]
     pub fn reconnect(
         name: String,
         command: String,
@@ -294,30 +296,27 @@ impl SessionHandle {
         // Check if server knows about this session
         let server_alive = {
             let req = serde_json::json!({"cmd": "status", "key": name});
-            match server_request(&req) {
-                Ok(resp) => {
-                    let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                    if st.starts_with("exited") {
-                        let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1) as i32;
-                        let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
-                        *s = ProcessStatus::Finished(code);
-                        let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
-                        *fin = Some(now_ms());
-                        stop_polling.store(true, Ordering::Relaxed);
-                        false
-                    } else {
-                        true // running
-                    }
-                }
-                Err(_) => {
-                    // Server doesn't know about this session — mark dead
+            if let Ok(resp) = server_request(&req) {
+                let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                if st.starts_with("exited") {
+                    let code = resp.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1) as i32;
                     let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
-                    *s = ProcessStatus::Finished(-1);
+                    *s = ProcessStatus::Finished(code);
                     let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
                     *fin = Some(now_ms());
                     stop_polling.store(true, Ordering::Relaxed);
                     false
+                } else {
+                    true // running
                 }
+            } else {
+                // Server doesn't know about this session — mark dead
+                let mut s = status.lock().unwrap_or_else(|e| e.into_inner());
+                *s = ProcessStatus::Finished(-1);
+                let mut fin = finished_at.lock().unwrap_or_else(|e| e.into_inner());
+                *fin = Some(now_ms());
+                stop_polling.store(true, Ordering::Relaxed);
+                false
             }
         };
 
@@ -326,7 +325,7 @@ impl SessionHandle {
             {
                 let buf = buffer.clone();
                 let stop = Arc::clone(&stop_polling);
-                let path = log_path.clone();
+                let path = log_path;
                 std::thread::spawn(move || {
                     file_poller_from_offset(path, buf, stop, file_offset);
                 });
@@ -365,14 +364,13 @@ impl SessionHandle {
             "key": self.name,
             "input": input,
         });
-        match server_request(&req) {
-            Ok(_) => Ok(()),
-            Err(_) => {
-                // Server may have died — try to respawn
-                find_or_create_server()?;
-                server_request(&req)?;
-                Ok(())
-            }
+        if server_request(&req).is_ok() {
+            Ok(())
+        } else {
+            // Server may have died — try to respawn
+            find_or_create_server()?;
+            server_request(&req)?;
+            Ok(())
         }
     }
 

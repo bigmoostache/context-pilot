@@ -16,3 +16,6 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 regex.workspace = true
 libc = "0.2"
+
+[lints]
+workspace = true

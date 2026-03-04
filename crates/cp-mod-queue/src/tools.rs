@@ -4,7 +4,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::types::QueueState;
 
 /// Execute Queue_activate: start intercepting tool calls.
-pub fn execute_activate(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_activate(tool: &ToolUse, state: &mut State) -> ToolResult {
     let qs = QueueState::get_mut(state);
     if qs.active {
         return ToolResult {
@@ -26,7 +26,7 @@ pub fn execute_activate(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute Queue_pause: stop intercepting, tools execute normally. Queue stays intact.
-pub fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
     let qs = QueueState::get_mut(state);
     if !qs.active {
         return ToolResult {
@@ -47,7 +47,8 @@ pub fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute Queue_undo: remove specific queued action(s) by index.
-pub fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
     let indices: Vec<usize> = match tool.input.get("indices").and_then(|v| v.as_array()) {
         Some(arr) => arr.iter().filter_map(|v| v.as_u64().map(|n| n as usize)).collect(),
         None => {
@@ -92,7 +93,7 @@ pub fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Execute Queue_empty: discard all queued actions without executing.
-pub fn execute_empty(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_empty(tool: &ToolUse, state: &mut State) -> ToolResult {
     let qs = QueueState::get_mut(state);
     let n = qs.queued_calls.len();
     qs.clear();

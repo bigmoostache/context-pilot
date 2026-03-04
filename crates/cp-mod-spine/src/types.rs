@@ -146,6 +146,7 @@ pub struct SpineConfig {
 }
 
 /// Module-owned state for the Spine module
+#[derive(Debug)]
 pub struct SpineState {
     pub notifications: Vec<Notification>,
     pub next_notification_id: usize,

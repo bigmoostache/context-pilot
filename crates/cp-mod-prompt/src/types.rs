@@ -30,6 +30,7 @@ pub struct PromptItem {
     pub is_builtin: bool,
 }
 
+#[derive(Debug)]
 pub struct PromptState {
     pub agents: Vec<PromptItem>,
     pub active_agent_id: Option<String>,

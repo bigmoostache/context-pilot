@@ -10,7 +10,7 @@ static RE_ID_MULTILINE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?m)^\[A\d+\]:\s*").expect("invalid RE_ID_MULTILINE regex"));
 
 /// Remove LLM's mistaken ID prefixes like "[A84]: " from responses
-pub fn clean_llm_id_prefix(content: &str) -> String {
+pub(crate) fn clean_llm_id_prefix(content: &str) -> String {
     // First trim leading whitespace
     let trimmed = content.trim_start();
 
@@ -26,7 +26,7 @@ pub fn clean_llm_id_prefix(content: &str) -> String {
 
 /// Parse context selection patterns like p1, p-1, p_1, P1, P-1, P_1
 /// Returns the context ID (e.g., "P1", "P28") if matched
-pub fn parse_context_pattern(input: &str) -> Option<String> {
+pub(crate) fn parse_context_pattern(input: &str) -> Option<String> {
     let input = input.trim();
     if input.is_empty() {
         return None;
@@ -50,6 +50,6 @@ pub fn parse_context_pattern(input: &str) -> Option<String> {
 }
 
 /// Find context index by ID
-pub fn find_context_by_id(state: &State, id: &str) -> Option<usize> {
+pub(crate) fn find_context_by_id(state: &State, id: &str) -> Option<usize> {
     state.context.iter().position(|c| c.id == id)
 }

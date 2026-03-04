@@ -37,7 +37,7 @@ fn secondary_model_string(state: &State) -> String {
 ///
 /// # Panics
 /// Only call when `state.reveries` contains the given `agent_id`.
-pub fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender<StreamEvent>) {
+pub(crate) fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender<StreamEvent>) {
     // Get the reverie's own messages (empty on first launch) and trim whitespace.
     // On first launch, inject a user kickoff message so the conversation starts
     // with a user turn — some models don't support assistant prefill.

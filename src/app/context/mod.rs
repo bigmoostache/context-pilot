@@ -8,7 +8,7 @@ use crate::state::{ContextType, Message, State, estimate_tokens};
 mod detach;
 
 /// Context data prepared for streaming
-pub struct StreamContext {
+pub(super) struct StreamContext {
     pub messages: Vec<Message>,
     pub context_items: Vec<ContextItem>,
     pub tools: Vec<ToolDefinition>,
@@ -17,7 +17,7 @@ pub struct StreamContext {
 /// Optional reverie context: when provided, replaces the conversation section
 /// with P-main-conv (main AI's conversation as a read-only panel) and the
 /// reverie's own messages. Panels and tools remain IDENTICAL for cache hits.
-pub struct ReverieContext {
+pub(super) struct ReverieContext {
     /// Agent ID driving this reverie (e.g., "cleaner", "cartographer")
     pub agent_id: String,
     /// The reverie's own conversation messages (may be empty on first run)
@@ -32,7 +32,7 @@ pub struct ReverieContext {
 /// conversation history (including any user messages that arrived during
 /// streaming). We therefore mark all UserMessage notifications as processed
 /// here — the LLM has "seen" them via the rebuilt context.
-pub fn prepare_stream_context(
+pub(super) fn prepare_stream_context(
     state: &mut State,
     include_last_message: bool,
     reverie: Option<ReverieContext>,
@@ -199,9 +199,10 @@ pub fn prepare_stream_context(
 // ─── Initialization ─────────────────────────────────────────────────────────
 
 // Re-export agent/seed functions from prompt module
-pub use cp_mod_prompt::seed::{ensure_default_agent, get_active_agent_content};
+pub(crate) use cp_mod_prompt::seed::{ensure_default_agent, get_active_agent_content};
 
 /// Assign a UID to a panel if it doesn't have one
+#[allow(clippy::needless_pass_by_value)]
 fn assign_panel_uid(state: &mut State, context_type: ContextType) {
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == context_type)
         && ctx.uid.is_none()
@@ -216,7 +217,7 @@ fn assign_panel_uid(state: &mut State, context_type: ContextType) {
 /// Conversation is special: it's always created but not numbered (no Px ID in sidebar).
 /// P1 = Todo, P2 = Library, P3 = Overview, P4 = Tree, P5 = Memory,
 /// P6 = Spine, P7 = Logs, P8 = Git, P9 = Scratchpad
-pub fn ensure_default_contexts(state: &mut State) {
+pub(crate) fn ensure_default_contexts(state: &mut State) {
     // Ensure Conversation exists (special: no numbered Px, always first in context list)
     if !state.context.iter().any(|c| c.context_type == ContextType::CONVERSATION) {
         let elem =

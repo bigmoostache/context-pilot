@@ -1,7 +1,7 @@
 use crate::state::{ContextType, MessageStatus, State, estimate_tokens};
 
 /// Estimate total tokens for a single message, including content, tool uses, and tool results.
-pub fn estimate_message_tokens(m: &crate::state::Message) -> usize {
+pub(crate) fn estimate_message_tokens(m: &crate::state::Message) -> usize {
     let content_tokens = m.content_token_count.max(estimate_tokens(&m.content));
 
     // Count tool uses (tool call name + JSON input)
@@ -21,7 +21,7 @@ pub fn estimate_message_tokens(m: &crate::state::Message) -> usize {
 }
 
 /// Refresh token count for the Conversation context element
-pub fn refresh_conversation_context(state: &mut State) {
+pub(crate) fn refresh_conversation_context(state: &mut State) {
     // Calculate total tokens from all active messages (content + tool uses + tool results)
     let total_tokens: usize = state
         .messages

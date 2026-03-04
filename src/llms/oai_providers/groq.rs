@@ -22,12 +22,12 @@ use cp_base::config::INJECTIONS;
 const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
 
 /// Groq client
-pub struct GroqClient {
+pub(crate) struct GroqClient {
     api_key: Option<SecretBox<String>>,
 }
 
 impl GroqClient {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         dotenvy::dotenv().ok();
         Self { api_key: env::var("GROQ_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
@@ -177,16 +177,13 @@ impl LlmClient for GroqClient {
     }
 
     fn check_api(&self, model: &str) -> super::super::ApiCheckResult {
-        let api_key = match self.api_key.as_ref() {
-            Some(k) => k,
-            None => {
-                return super::super::ApiCheckResult {
-                    auth_ok: false,
-                    streaming_ok: false,
-                    tools_ok: false,
-                    error: Some("GROQ_API_KEY not set".to_string()),
-                };
-            }
+        let Some(api_key) = self.api_key.as_ref() else {
+            return super::super::ApiCheckResult {
+                auth_ok: false,
+                streaming_ok: false,
+                tools_ok: false,
+                error: Some("GROQ_API_KEY not set".to_string()),
+            };
         };
 
         let client = Client::new();

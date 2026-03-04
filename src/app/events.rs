@@ -6,7 +6,7 @@ use crate::infra::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 use crate::state::State;
 
-pub fn handle_event(event: &Event, state: &State) -> Option<Action> {
+pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
     match event {
         Event::Key(key) => {
             let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);

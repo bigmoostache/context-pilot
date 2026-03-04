@@ -151,10 +151,7 @@ fn ensure_gitignore_exception_at(gitignore_path: &std::path::Path) {
         return;
     }
 
-    let content = match std::fs::read_to_string(gitignore_path) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
+    let Ok(content) = std::fs::read_to_string(gitignore_path) else { return };
 
     let ignores_cp = content.lines().any(|line| {
         let trimmed = line.trim();
@@ -180,7 +177,7 @@ fn ensure_gitignore_exception_at(gitignore_path: &std::path::Path) {
         return;
     }
 
-    let mut new_content = content.clone();
+    let mut new_content = content;
     if !new_content.ends_with('\n') {
         new_content.push('\n');
     }

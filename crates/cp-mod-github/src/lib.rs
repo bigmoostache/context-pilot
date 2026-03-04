@@ -24,6 +24,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/github.yaml")).expect("Failed to parse github tool YAML")
 });
 
+#[derive(Debug)]
 pub struct GithubModule;
 
 impl Module for GithubModule {

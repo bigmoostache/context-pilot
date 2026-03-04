@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 pub const RING_BUFFER_CAPACITY: usize = 256 * 1024;
 
+#[derive(Debug)]
 struct RingBufferInner {
     buf: Vec<u8>,
     /// Current write position in the circular buffer
@@ -14,7 +15,7 @@ struct RingBufferInner {
 
 /// Thread-safe ring buffer for capturing process output.
 /// Clone is cheap — it shares the inner buffer via Arc.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct RingBuffer {
     inner: Arc<Mutex<RingBufferInner>>,
 }

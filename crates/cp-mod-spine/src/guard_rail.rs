@@ -11,7 +11,7 @@ use crate::types::SpineState;
 ///
 /// All guard rails are parameterized via `SpineConfig` and are nullable
 /// (disabled by default).
-pub trait GuardRailStopLogic: Send + Sync {
+pub(crate) trait GuardRailStopLogic: Send + Sync {
     /// Human-readable name for logging/debugging
     fn name(&self) -> &str;
 
@@ -27,7 +27,7 @@ pub trait GuardRailStopLogic: Send + Sync {
 /// Collect all registered guard rail implementations.
 ///
 /// All guard rails are checked — if ANY blocks, continuation is prevented.
-pub fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
+pub(crate) fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
     static GUARD_RAILS: &[&dyn GuardRailStopLogic] = &[
         &MaxOutputTokensGuard,
         &MaxCostGuard,
@@ -44,7 +44,7 @@ pub fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
 // ============================================================================
 
 /// Block if total output tokens exceed the configured limit.
-pub struct MaxOutputTokensGuard;
+pub(crate) struct MaxOutputTokensGuard;
 
 impl GuardRailStopLogic for MaxOutputTokensGuard {
     fn name(&self) -> &str {
@@ -73,7 +73,7 @@ impl GuardRailStopLogic for MaxOutputTokensGuard {
 // ============================================================================
 
 /// Block if estimated session cost exceeds the configured USD limit.
-pub struct MaxCostGuard;
+pub(crate) struct MaxCostGuard;
 
 impl GuardRailStopLogic for MaxCostGuard {
     fn name(&self) -> &str {
@@ -113,7 +113,7 @@ impl MaxCostGuard {
 // ============================================================================
 
 /// Block if current stream cost exceeds the configured USD limit.
-pub struct MaxStreamCostGuard;
+pub(crate) struct MaxStreamCostGuard;
 
 impl GuardRailStopLogic for MaxStreamCostGuard {
     fn name(&self) -> &str {
@@ -154,7 +154,7 @@ impl MaxStreamCostGuard {
 
 /// Block if autonomous operation has exceeded the configured time limit.
 /// Tracks time from `autonomous_start_ms` (set when first auto-continuation fires).
-pub struct MaxDurationGuard;
+pub(crate) struct MaxDurationGuard;
 
 impl GuardRailStopLogic for MaxDurationGuard {
     fn name(&self) -> &str {
@@ -192,7 +192,7 @@ impl GuardRailStopLogic for MaxDurationGuard {
 // ============================================================================
 
 /// Block if conversation message count exceeds the configured limit.
-pub struct MaxMessagesGuard;
+pub(crate) struct MaxMessagesGuard;
 
 impl GuardRailStopLogic for MaxMessagesGuard {
     fn name(&self) -> &str {
@@ -219,7 +219,7 @@ impl GuardRailStopLogic for MaxMessagesGuard {
 /// Block if auto-continuation count exceeds the configured limit.
 /// Tracks consecutive auto-continuations without human input.
 /// The counter is reset when the user sends a message.
-pub struct MaxAutoRetriesGuard;
+pub(crate) struct MaxAutoRetriesGuard;
 
 impl GuardRailStopLogic for MaxAutoRetriesGuard {
     fn name(&self) -> &str {

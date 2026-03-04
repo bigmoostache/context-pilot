@@ -2,12 +2,9 @@ use crate::infra::tools::{ToolResult, ToolUse};
 use crate::modules::all_modules;
 use crate::state::State;
 
-pub fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let ids = match tool.input.get("ids").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'ids' array parameter".to_string(), true);
-        }
+pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(ids) = tool.input.get("ids").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'ids' array parameter".to_string(), true);
     };
 
     if ids.is_empty() {

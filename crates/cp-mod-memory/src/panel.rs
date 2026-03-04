@@ -11,7 +11,7 @@ use cp_base::ui::{Cell, TextCell, render_table, render_table_text};
 
 use crate::types::{MemoryImportance, MemoryState};
 
-pub struct MemoryPanel;
+pub(crate) struct MemoryPanel;
 
 impl MemoryPanel {
     /// Format memories for LLM context.
@@ -124,7 +124,7 @@ impl Panel for MemoryPanel {
     }
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let mut text: Vec<Line> = Vec::new();
+        let mut text: Vec<Line<'_>> = Vec::new();
         let ms = MemoryState::get(state);
 
         if ms.memories.is_empty() {

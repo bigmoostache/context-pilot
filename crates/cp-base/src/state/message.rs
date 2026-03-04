@@ -110,6 +110,7 @@ pub mod test_helpers {
 
     /// Builder for constructing test messages with sensible defaults.
     /// Auto-increments IDs per role prefix (U1, A1, T1, R1).
+    #[derive(Debug)]
     pub struct MessageBuilder {
         msg: Message,
     }

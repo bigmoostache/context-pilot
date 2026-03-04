@@ -27,7 +27,7 @@ use cp_base::config::INJECTIONS;
 /// 4. Conversation messages (with tool pairing — orphaned tool_uses excluded)
 ///
 /// Providers receive this and just serialize to their wire format.
-pub fn assemble_prompt(
+pub(crate) fn assemble_prompt(
     messages: &[Message],
     context_items: &[ContextItem],
     include_last_tool_uses: bool,

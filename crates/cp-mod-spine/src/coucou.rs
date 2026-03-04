@@ -18,7 +18,7 @@ use cp_base::watchers::{Watcher, WatcherRegistry, WatcherResult};
 /// Serializable coucou record. Stored in SpineState.pending_coucous
 /// and re-registered into WatcherRegistry on load.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoucouData {
+pub(crate) struct CoucouData {
     pub watcher_id: String,
     pub message: String,
     pub registered_at_ms: u64,
@@ -27,7 +27,7 @@ pub struct CoucouData {
 
 impl CoucouData {
     /// Convert into a live CoucouWatcher and register in WatcherRegistry.
-    pub fn into_watcher(self) -> CoucouWatcher {
+    pub(crate) fn into_watcher(self) -> CoucouWatcher {
         let desc = format!("🔔 Coucou: \"{}\"", self.message);
         CoucouWatcher {
             watcher_id: self.watcher_id,
@@ -41,7 +41,7 @@ impl CoucouData {
 
 /// Collect all active CoucouWatcher data from the WatcherRegistry
 /// for persistence. Filters by source_tag == "coucou".
-pub fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
+pub(crate) fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
     let registry = WatcherRegistry::get(state);
     registry
         .active_watchers()
@@ -104,6 +104,7 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
 
 /// Parse an ISO 8601 datetime string into milliseconds since epoch.
 /// Supports: "2026-02-20T08:00:00", "2026-02-20 08:00:00", "2026-02-20T08:00"
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn parse_datetime_ms(s: &str) -> Result<u64, String> {
     // Try parsing with chrono-like manual parsing (we don't have chrono in this crate)
     // Format: YYYY-MM-DDTHH:MM:SS or YYYY-MM-DD HH:MM:SS or YYYY-MM-DDTHH:MM
@@ -186,7 +187,7 @@ fn format_duration(ms: u64) -> String {
 // ============================================================
 
 /// A watcher that fires a notification at a specific time.
-pub struct CoucouWatcher {
+pub(crate) struct CoucouWatcher {
     /// Unique watcher ID.
     pub watcher_id: String,
     /// The user's message to deliver.
@@ -261,16 +262,13 @@ impl Watcher for CoucouWatcher {
 static COUCOU_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Execute the coucou tool — schedule a notification.
-pub fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let mode = match tool.input.get("mode").and_then(|v| v.as_str()) {
-        Some(m) => m,
-        None => {
-            return ToolResult::new(
-                tool.id.clone(),
-                "Missing required 'mode' parameter. Use 'timer' or 'datetime'.".to_string(),
-                true,
-            );
-        }
+pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(mode) = tool.input.get("mode").and_then(|v| v.as_str()) else {
+        return ToolResult::new(
+            tool.id.clone(),
+            "Missing required 'mode' parameter. Use 'timer' or 'datetime'.".to_string(),
+            true,
+        );
     };
 
     let message = match tool.input.get("message").and_then(|v| v.as_str()) {
@@ -286,15 +284,12 @@ pub fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     match mode {
         "timer" => {
-            let delay_str = match tool.input.get("delay").and_then(|v| v.as_str()) {
-                Some(d) => d,
-                None => {
-                    return ToolResult::new(
-                        tool.id.clone(),
-                        "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_string(),
-                        true,
-                    );
-                }
+            let Some(delay_str) = tool.input.get("delay").and_then(|v| v.as_str()) else {
+                return ToolResult::new(
+                    tool.id.clone(),
+                    "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_string(),
+                    true,
+                );
             };
 
             match parse_duration_ms(delay_str) {
@@ -308,15 +303,12 @@ pub fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         }
         "datetime" => {
-            let dt_str = match tool.input.get("datetime").and_then(|v| v.as_str()) {
-                Some(d) => d,
-                None => {
-                    return ToolResult::new(
-                        tool.id.clone(),
-                        "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_string(),
-                        true,
-                    );
-                }
+            let Some(dt_str) = tool.input.get("datetime").and_then(|v| v.as_str()) else {
+                return ToolResult::new(
+                    tool.id.clone(),
+                    "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_string(),
+                    true,
+                );
             };
 
             match parse_datetime_ms(dt_str) {
@@ -350,8 +342,7 @@ pub fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     let watcher_id = format!("coucou_{}", counter);
     let desc = format!("🔔 Coucou {}: \"{}\"", delay_desc, message);
 
-    let watcher =
-        CoucouWatcher { watcher_id, message: message.clone(), registered_at_ms: now, fire_at_ms, desc: desc.clone() };
+    let watcher = CoucouWatcher { watcher_id, message: message.clone(), registered_at_ms: now, fire_at_ms, desc };
 
     WatcherRegistry::get_mut(state).register(Box::new(watcher));
 

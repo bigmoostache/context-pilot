@@ -9,15 +9,12 @@ use crate::types::CallbackState;
 
 /// Execute the Callback_upsert tool (create/update/delete callbacks).
 pub fn execute_upsert(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let action = match tool.input.get("action").and_then(|v| v.as_str()) {
-        Some(a) => a,
-        None => {
-            return ToolResult::new(
-                tool.id.clone(),
-                "Missing required parameter 'action' (create/update/delete)".to_string(),
-                true,
-            );
-        }
+    let Some(action) = tool.input.get("action").and_then(|v| v.as_str()) else {
+        return ToolResult::new(
+            tool.id.clone(),
+            "Missing required parameter 'action' (create/update/delete)".to_string(),
+            true,
+        );
     };
 
     match action {
@@ -42,11 +39,8 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let cs = CallbackState::get(state);
-    let def = match cs.definitions.iter().find(|d| d.id == anchor_id) {
-        Some(d) => d,
-        None => {
-            return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
-        }
+    let Some(def) = cs.definitions.iter().find(|d| d.id == anchor_id) else {
+        return ToolResult::new(tool.id.clone(), format!("Callback '{}' not found", anchor_id), true);
     };
 
     // Read the script file so we can confirm it exists
@@ -122,15 +116,8 @@ pub fn execute_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let active = match tool.input.get("active").and_then(|v| v.as_bool()) {
-        Some(a) => a,
-        None => {
-            return ToolResult::new(
-                tool.id.clone(),
-                "Missing required parameter 'active' (true/false)".to_string(),
-                true,
-            );
-        }
+    let Some(active) = tool.input.get("active").and_then(|v| v.as_bool()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required parameter 'active' (true/false)".to_string(), true);
     };
 
     let cs = CallbackState::get(state);

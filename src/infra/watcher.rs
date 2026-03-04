@@ -9,7 +9,7 @@ use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 
 /// Events sent from the file watcher
 #[derive(Debug, Clone)]
-pub enum WatchEvent {
+pub(crate) enum WatchEvent {
     /// A watched file changed
     FileChanged(String),
     /// A watched directory changed (file added/removed)
@@ -17,7 +17,7 @@ pub enum WatchEvent {
 }
 
 /// File watcher that monitors open files and directories
-pub struct FileWatcher {
+pub(crate) struct FileWatcher {
     watcher: RecommendedWatcher,
     /// Maps canonical path -> original path (for returning original path in events)
     watched_files: Arc<Mutex<HashMap<PathBuf, String>>>,
@@ -27,7 +27,7 @@ pub struct FileWatcher {
 }
 
 impl FileWatcher {
-    pub fn new() -> notify::Result<Self> {
+    pub(crate) fn new() -> notify::Result<Self> {
         let (tx, rx) = mpsc::channel();
         let watched_files: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
         let watched_dirs: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
@@ -67,7 +67,7 @@ impl FileWatcher {
     }
 
     /// Watch a file for changes
-    pub fn watch_file(&mut self, path: &str) -> notify::Result<()> {
+    pub(crate) fn watch_file(&mut self, path: &str) -> notify::Result<()> {
         let path_buf = PathBuf::from(path);
         if !path_buf.exists() {
             return Ok(());
@@ -86,7 +86,7 @@ impl FileWatcher {
     }
 
     /// Watch a directory for changes (non-recursive, only immediate children)
-    pub fn watch_dir(&mut self, path: &str) -> notify::Result<()> {
+    pub(crate) fn watch_dir(&mut self, path: &str) -> notify::Result<()> {
         let path_buf = PathBuf::from(path);
         if !path_buf.is_dir() {
             return Ok(());
@@ -105,7 +105,7 @@ impl FileWatcher {
     }
 
     /// Watch a directory recursively (for .git/refs/ subdirs)
-    pub fn watch_dir_recursive(&mut self, path: &str) -> notify::Result<()> {
+    pub(crate) fn watch_dir_recursive(&mut self, path: &str) -> notify::Result<()> {
         let path_buf = PathBuf::from(path);
         if !path_buf.is_dir() {
             return Ok(());
@@ -124,7 +124,7 @@ impl FileWatcher {
 
     /// Re-watch a file that may have been replaced (e.g., by an editor using atomic rename).
     /// Removes the stale watch and creates a new one on the current inode at that path.
-    pub fn rewatch_file(&mut self, path: &str) -> notify::Result<()> {
+    pub(crate) fn rewatch_file(&mut self, path: &str) -> notify::Result<()> {
         let path_buf = PathBuf::from(path);
         if !path_buf.exists() {
             return Ok(());
@@ -147,7 +147,7 @@ impl FileWatcher {
     }
 
     /// Poll for watch events (non-blocking)
-    pub fn poll_events(&self) -> Vec<WatchEvent> {
+    pub(crate) fn poll_events(&self) -> Vec<WatchEvent> {
         let mut events = Vec::new();
         while let Ok(event) = self.event_rx.try_recv() {
             events.push(event);

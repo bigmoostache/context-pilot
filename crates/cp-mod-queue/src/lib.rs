@@ -16,6 +16,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
     serde_yaml::from_str(include_str!("../../../yamls/tools/queue.yaml")).expect("Failed to parse queue tool YAML")
 });
 
+#[derive(Debug)]
 pub struct QueueModule;
 
 impl Module for QueueModule {
@@ -46,6 +47,7 @@ impl Module for QueueModule {
         })
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let qs = QueueState::get_mut(state);
         if let Some(active) = data.get("active").and_then(|v| v.as_bool()) {
@@ -108,6 +110,7 @@ impl Module for QueueModule {
         ]
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
         let qs = QueueState::get(state);
         match tool.name.as_str() {

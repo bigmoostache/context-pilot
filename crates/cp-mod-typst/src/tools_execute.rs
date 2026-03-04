@@ -21,7 +21,7 @@ fn err_result(tool: &ToolUse, content: String) -> ToolResult {
 }
 
 /// Execute the typst_execute tool — parse command string and dispatch to subcommand handler.
-pub fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub(crate) fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),
         None => return err_result(tool, "Error: missing required 'command' parameter".to_string()),
@@ -57,12 +57,11 @@ fn exec_compile(
     _root: Option<&str>,
 ) -> ToolResult {
     // Default output: same name with .pdf extension
-    let output_path = match output {
-        Some(o) => o.to_string(),
-        None => {
-            let p = Path::new(input);
-            p.with_extension("pdf").to_string_lossy().to_string()
-        }
+    let output_path = if let Some(o) = output {
+        o.to_string()
+    } else {
+        let p = Path::new(input);
+        p.with_extension("pdf").to_string_lossy().to_string()
     };
 
     match crate::compiler::compile_and_write(input, &output_path) {
@@ -263,7 +262,7 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str, _f
         name: format!("Typst Query: {}", selector),
         token_count: 0,
         metadata: std::collections::HashMap::new(),
-        cached_content: Some(result.clone()),
+        cached_content: Some(result),
         history_messages: None,
         cache_deprecated: false,
         cache_in_flight: false,
@@ -381,7 +380,7 @@ fn collect_font_info(dir: &Path, entries: &mut Vec<(String, String, String)>) {
         {
             let bytes = Bytes::new(data);
             for info in FontInfo::iter(&bytes) {
-                let family = info.family.to_string();
+                let family = info.family.clone();
                 let style = format!("{:?}", info.variant);
                 entries.push((family, style, path.to_string_lossy().to_string()));
             }
@@ -393,12 +392,11 @@ fn collect_font_info(dir: &Path, entries: &mut Vec<(String, String, String)>) {
 /// Compiles immediately and records dependency tree for future change detection.
 fn exec_watch(tool: &ToolUse, input: &str, output: Option<&str>) -> ToolResult {
     // Default output: same name with .pdf extension
-    let output_path = match output {
-        Some(o) => o.to_string(),
-        None => {
-            let p = Path::new(input);
-            p.with_extension("pdf").to_string_lossy().to_string()
-        }
+    let output_path = if let Some(o) = output {
+        o.to_string()
+    } else {
+        let p = Path::new(input);
+        p.with_extension("pdf").to_string_lossy().to_string()
     };
 
     // Compile + update deps in the watchlist

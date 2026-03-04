@@ -36,18 +36,12 @@ pub(crate) fn execute_snapshot(
     state: &mut State,
     all_modules_fn: fn() -> Vec<Box<dyn Module>>,
 ) -> ToolResult {
-    let name = match tool.input.get("name").and_then(|v| v.as_str()) {
-        Some(n) => n,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
-        }
+    let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
     };
 
-    let description = match tool.input.get("description").and_then(|v| v.as_str()) {
-        Some(d) => d,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'description' parameter".to_string(), true);
-        }
+    let Some(description) = tool.input.get("description").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required 'description' parameter".to_string(), true);
     };
 
     if let Err(e) = validate_name(name) {
@@ -172,11 +166,8 @@ pub(crate) fn execute_load(
     active_tool_defs_fn: fn(&HashSet<String>) -> Vec<ToolDefinition>,
     ensure_defaults_fn: fn(&mut State),
 ) -> ToolResult {
-    let name = match tool.input.get("name").and_then(|v| v.as_str()) {
-        Some(n) => n,
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
-        }
+    let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {
+        return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
     };
 
     let file_path = preset_file_path(name);
@@ -355,6 +346,7 @@ fn list_available_presets() -> Vec<String> {
 }
 
 /// Summary info for a preset, used by the overview panel.
+#[derive(Debug)]
 pub struct PresetInfo {
     pub name: String,
     pub description: String,

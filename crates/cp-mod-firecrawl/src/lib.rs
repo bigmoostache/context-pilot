@@ -14,6 +14,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
         .expect("Failed to parse firecrawl tool YAML")
 });
 
+#[derive(Debug)]
 pub struct FirecrawlModule;
 
 impl Module for FirecrawlModule {

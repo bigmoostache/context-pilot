@@ -16,7 +16,7 @@ fn panel_path(uid: &str) -> PathBuf {
 }
 
 /// Load panel data by UID from panels/{uid}.json
-pub fn load_panel(uid: &str) -> Option<PanelData> {
+pub(crate) fn load_panel(uid: &str) -> Option<PanelData> {
     let path = panel_path(uid);
     let json = fs::read_to_string(&path).ok()?;
     serde_json::from_str(&json).ok()

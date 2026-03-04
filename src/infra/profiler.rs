@@ -14,18 +14,19 @@ use std::time::Instant;
 const THRESHOLD_MS: u128 = 5; // Only log operations taking > 5ms
 const LOG_FILE: &str = ".context-pilot/perf.log";
 
-pub struct ProfileGuard {
+pub(crate) struct ProfileGuard {
     name: &'static str,
     start: Instant,
 }
 
 impl ProfileGuard {
-    pub fn new(name: &'static str) -> Self {
+    pub(crate) fn new(name: &'static str) -> Self {
         Self { name, start: Instant::now() }
     }
 }
 
 impl Drop for ProfileGuard {
+    #[allow(clippy::cast_possible_truncation)]
     fn drop(&mut self) {
         let elapsed = self.start.elapsed();
         let us = elapsed.as_micros() as u64;

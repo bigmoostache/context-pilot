@@ -34,6 +34,7 @@ const GH_DEFAULT_POLL_INTERVAL_SECS: u64 = 60;
 type DueWatch = (String, Vec<String>, Arc<SecretBox<String>>, bool, Option<String>, Option<String>);
 
 /// Update sent when branch PR info changes
+#[derive(Debug)]
 pub struct BranchPrUpdate {
     pub pr_info: Option<crate::types::BranchPrInfo>,
 }
@@ -71,6 +72,13 @@ pub struct GhWatcher {
     _thread: JoinHandle<()>,
 }
 
+impl std::fmt::Debug for GhWatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let watch_count = self.watches.lock().map(|w| w.len()).unwrap_or(0);
+        f.debug_struct("GhWatcher").field("watch_count", &watch_count).finish()
+    }
+}
+
 impl GhWatcher {
     /// Create a new GhWatcher with a background polling thread.
     pub fn new(cache_tx: Sender<CacheUpdate>) -> Self {
@@ -102,10 +110,7 @@ impl GhWatcher {
                 continue; // Already watching — preserve etag/hash/interval state
             }
 
-            let args = match crate::classify::validate_gh_command(command) {
-                Ok(a) => a,
-                Err(_) => continue, // Skip invalid commands
-            };
+            let Ok(args) = crate::classify::validate_gh_command(command) else { continue };
 
             let is_api_command = is_api_command(&args);
 
@@ -163,6 +168,7 @@ pub fn is_api_command(args: &[String]) -> bool {
 }
 
 /// Background polling loop.
+#[allow(clippy::needless_pass_by_value)]
 fn poll_loop(
     watches: Arc<Mutex<HashMap<String, GhWatch>>>,
     branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,
@@ -307,9 +313,8 @@ fn poll_api_command(args: &[String], github_token: &str, current_etag: Option<&s
         .env("GH_PROMPT_DISABLED", "1")
         .env("NO_COLOR", "1");
 
-    let output = match run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS) {
-        Ok(o) => o,
-        Err(_) => return ApiPollOutcome { content: None, poll_interval: None },
+    let Ok(output) = run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS) else {
+        return ApiPollOutcome { content: None, poll_interval: None };
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -337,10 +342,7 @@ fn poll_cli_command(args: &[String], github_token: &str, last_hash: Option<&str>
         .env("GH_PROMPT_DISABLED", "1")
         .env("NO_COLOR", "1");
 
-    let output = match run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS) {
-        Ok(o) => o,
-        Err(_) => return None,
-    };
+    let Ok(output) = run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS) else { return None };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);

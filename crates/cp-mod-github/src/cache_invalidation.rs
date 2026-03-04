@@ -14,7 +14,7 @@ use regex::Regex;
 /// A single invalidation rule: if a mutating command matches `trigger`,
 /// then all panels whose command matches any entry in `invalidates` should
 /// be marked as cache-deprecated.
-pub struct InvalidationRule {
+pub(crate) struct InvalidationRule {
     pub trigger: Regex,
     /// Invalidation patterns as template strings. May contain backreferences
     /// like `\1`, `\2` which will be substituted with captured groups from
@@ -35,7 +35,7 @@ impl InvalidationRule {
 ///
 /// Each rule says: "if the mutating command matches this pattern,
 /// then invalidate all panels matching these patterns."
-pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
+pub(crate) fn build_invalidation_rules() -> Vec<InvalidationRule> {
     vec![
         // =====================================================================
         // Issues
@@ -122,7 +122,7 @@ pub fn build_invalidation_rules() -> Vec<InvalidationRule> {
 /// Because regex backreferences (e.g., `\1`, `\2`) are not supported by
 /// the `regex` crate, we extract capture groups from the trigger and
 /// substitute them into the invalidation patterns manually.
-pub fn find_invalidations(mutating_command: &str) -> Vec<Regex> {
+pub(crate) fn find_invalidations(mutating_command: &str) -> Vec<Regex> {
     let rules = build_invalidation_rules();
     let mut result = Vec::new();
 

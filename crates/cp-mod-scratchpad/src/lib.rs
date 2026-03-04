@@ -20,6 +20,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
         .expect("Failed to parse scratchpad tool YAML")
 });
 
+#[derive(Debug)]
 pub struct ScratchpadModule;
 
 impl Module for ScratchpadModule {
@@ -49,6 +50,7 @@ impl Module for ScratchpadModule {
         })
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ss = ScratchpadState::get_mut(state);
         if let Some(arr) = data.get("scratchpad_cells")

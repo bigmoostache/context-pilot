@@ -15,7 +15,7 @@ fn worker_path(worker_id: &str) -> PathBuf {
 }
 
 /// Load worker state from states/{worker_id}.json
-pub fn load_worker(worker_id: &str) -> Option<WorkerState> {
+pub(crate) fn load_worker(worker_id: &str) -> Option<WorkerState> {
     let path = worker_path(worker_id);
     let json = fs::read_to_string(&path).ok()?;
     serde_json::from_str(&json).ok()

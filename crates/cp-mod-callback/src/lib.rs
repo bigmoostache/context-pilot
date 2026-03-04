@@ -23,6 +23,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| 
         .expect("Failed to parse callback tool YAML")
 });
 
+#[derive(Debug)]
 pub struct CallbackModule;
 
 impl Module for CallbackModule {
@@ -60,6 +61,7 @@ impl Module for CallbackModule {
         })
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(defs) = data.get("definitions")
             && let Ok(v) = serde_json::from_value(defs.clone())

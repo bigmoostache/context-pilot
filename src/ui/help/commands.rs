@@ -2,7 +2,7 @@ use crate::state::{ContextType, State};
 
 /// A command that can be executed from the palette
 #[derive(Debug, Clone)]
-pub struct PaletteCommand {
+pub(crate) struct PaletteCommand {
     /// Unique command ID
     pub id: String,
     /// Display label shown in the palette
@@ -14,19 +14,19 @@ pub struct PaletteCommand {
 }
 
 impl PaletteCommand {
-    pub fn new(id: impl Into<String>, label: impl Into<String>, description: impl Into<String>) -> Self {
+    pub(crate) fn new(id: impl Into<String>, label: impl Into<String>, description: impl Into<String>) -> Self {
         let label = label.into();
         let keywords = vec![label.to_lowercase()];
         Self { id: id.into(), label, description: description.into(), keywords }
     }
 
-    pub fn with_keywords(mut self, keywords: Vec<&str>) -> Self {
+    pub(crate) fn with_keywords(mut self, keywords: &[&str]) -> Self {
         self.keywords.extend(keywords.iter().map(|s| s.to_lowercase()));
         self
     }
 
     /// Check if this command matches the query (fuzzy match)
-    pub fn matches(&self, query: &str) -> bool {
+    pub(crate) fn matches(&self, query: &str) -> bool {
         if query.is_empty() {
             return true;
         }
@@ -40,7 +40,7 @@ impl PaletteCommand {
     }
 
     /// Score how well this command matches (higher = better match)
-    pub fn match_score(&self, query: &str) -> i32 {
+    pub(crate) fn match_score(&self, query: &str) -> i32 {
         if query.is_empty() {
             return 0;
         }
@@ -75,17 +75,17 @@ impl PaletteCommand {
 }
 
 /// Build the list of available commands based on current state
-pub fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
+pub(super) fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
     let mut commands = Vec::new();
 
     // System commands at the top
     commands.push(
-        PaletteCommand::new("quit", "Quit", "Exit the application (Ctrl+Q)").with_keywords(vec!["exit", "close", "q"]),
+        PaletteCommand::new("quit", "Quit", "Exit the application (Ctrl+Q)").with_keywords(&["exit", "close", "q"]),
     );
 
-    commands.push(PaletteCommand::new("reload", "Reload", "Reload the TUI").with_keywords(vec!["restart", "refresh"]));
+    commands.push(PaletteCommand::new("reload", "Reload", "Reload the TUI").with_keywords(&["restart", "refresh"]));
 
-    commands.push(PaletteCommand::new("config", "Config", "Open configuration panel (Ctrl+H)").with_keywords(vec![
+    commands.push(PaletteCommand::new("config", "Config", "Open configuration panel (Ctrl+H)").with_keywords(&[
         "settings",
         "options",
         "preferences",
@@ -97,7 +97,7 @@ pub fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
     if let Some(conv) = state.context.iter().find(|c| c.context_type == ContextType::new(ContextType::CONVERSATION)) {
         let icon = conv.context_type.icon();
         commands.push(
-            PaletteCommand::new(&conv.id, format!("{} Conversation", icon), "Go to conversation").with_keywords(vec![
+            PaletteCommand::new(&conv.id, format!("{} Conversation", icon), "Go to conversation").with_keywords(&[
                 "conversation",
                 "chat",
                 "messages",
@@ -126,7 +126,7 @@ pub fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
                 format!("{} {} {}", &ctx.id, icon, &ctx.name),
                 format!("Go to {} panel", &ctx.name),
             )
-            .with_keywords(vec![&ctx.name, "panel", "go", "navigate"]),
+            .with_keywords(&[&ctx.name, "panel", "go", "navigate"]),
         );
     }
 

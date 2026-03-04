@@ -15,7 +15,7 @@ use cp_base::state::reverie::{ReverieState, ReverieType};
 /// already active, or reverie disabled).
 ///
 /// Call this after `prepare_stream_context()` has refreshed token counts.
-pub fn check_threshold_trigger(state: &mut State) -> bool {
+pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
     // Guard: reverie disabled by user
     if !state.reverie_enabled {
         return false;
@@ -49,7 +49,7 @@ pub fn check_threshold_trigger(state: &mut State) -> bool {
 /// in a tool result from `execute_optimize_context()`.
 ///
 /// Returns `true` if the reverie was started, `false` if guards prevented it.
-pub fn start_manual_reverie(state: &mut State, agent_id: String, context: Option<String>) -> bool {
+pub(crate) fn start_manual_reverie(state: &mut State, agent_id: String, context: Option<String>) -> bool {
     // Guard: this agent type is already running (one per agent)
     if state.reveries.contains_key(&agent_id) {
         return false;

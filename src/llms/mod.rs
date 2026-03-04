@@ -2,12 +2,12 @@
 //!
 //! Provides a unified interface for different LLM providers (Anthropic, Grok, Groq, Claude Code OAuth)
 
-pub mod anthropic;
-pub mod claude_code;
-pub mod claude_code_api_key;
-pub mod oai_providers;
-pub mod openai_compat;
-pub mod openai_streaming;
+pub(crate) mod anthropic;
+pub(crate) mod claude_code;
+pub(crate) mod claude_code_api_key;
+pub(crate) mod oai_providers;
+pub(crate) mod openai_compat;
+pub(crate) mod openai_streaming;
 
 use std::sync::mpsc::Sender;
 
@@ -20,7 +20,7 @@ use crate::infra::tools::ToolResult;
 use crate::state::Message;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
-pub use cp_base::llm_types::{
+pub(crate) use cp_base::llm_types::{
     AnthropicModel, ApiCheckResult, DeepSeekModel, GrokModel, GroqModel, LlmProvider, ModelInfo, StreamEvent,
 };
 
@@ -31,7 +31,7 @@ use oai_providers::groq;
 
 /// Configuration for an LLM request
 #[derive(Debug, Clone)]
-pub struct LlmRequest {
+pub(crate) struct LlmRequest {
     pub model: String,
     pub max_output_tokens: u32,
     pub messages: Vec<Message>,
@@ -50,7 +50,7 @@ pub struct LlmRequest {
 }
 
 /// Trait for LLM providers
-pub trait LlmClient: Send + Sync {
+pub(crate) trait LlmClient: Send + Sync {
     /// Start a streaming response
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), error::LlmError>;
 
@@ -59,7 +59,7 @@ pub trait LlmClient: Send + Sync {
 }
 
 /// Get the appropriate LLM client for the given provider
-pub fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
+pub(crate) fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
     match provider {
         LlmProvider::Anthropic => Box::new(anthropic::AnthropicClient::new()),
         LlmProvider::ClaudeCode => Box::new(claude_code::ClaudeCodeClient::new()),
@@ -71,7 +71,7 @@ pub fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
 }
 
 /// Start API check in background
-pub fn start_api_check(provider: LlmProvider, model: String, tx: Sender<ApiCheckResult>) {
+pub(crate) fn start_api_check(provider: LlmProvider, model: String, tx: Sender<ApiCheckResult>) {
     let client = get_client(provider);
     std::thread::spawn(move || {
         let result = client.check_api(&model);
@@ -80,7 +80,7 @@ pub fn start_api_check(provider: LlmProvider, model: String, tx: Sender<ApiCheck
 }
 
 /// Parameters for starting a streaming LLM request
-pub struct StreamParams {
+pub(crate) struct StreamParams {
     pub provider: LlmProvider,
     pub model: String,
     pub max_output_tokens: u32,
@@ -93,7 +93,7 @@ pub struct StreamParams {
 }
 
 /// Start streaming with the specified provider and model
-pub fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
+pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
     let client = get_client(params.provider);
 
     std::thread::spawn(move || {
@@ -129,7 +129,7 @@ pub fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
 // Re-export common types used by providers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum ContentBlock {
+pub(crate) enum ContentBlock {
     #[serde(rename = "text")]
     Text { text: String },
     #[serde(rename = "tool_use")]
@@ -139,14 +139,14 @@ pub enum ContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ApiMessage {
+pub(crate) struct ApiMessage {
     pub role: String,
     pub content: Vec<ContentBlock>,
 }
 
 /// Prepared panel data for injection as fake tool call/result pairs
 #[derive(Debug, Clone)]
-pub struct FakePanelMessage {
+pub(crate) struct FakePanelMessage {
     /// Panel ID (e.g., "P2", "P7")
     pub panel_id: String,
     /// Timestamp in milliseconds since UNIX epoch
@@ -156,6 +156,7 @@ pub struct FakePanelMessage {
 }
 
 /// Convert milliseconds since UNIX epoch to ISO 8601 format
+#[allow(clippy::cast_possible_truncation)]
 fn ms_to_iso8601(ms: u64) -> String {
     use std::time::{Duration, UNIX_EPOCH};
     let duration = Duration::from_millis(ms);
@@ -225,13 +226,13 @@ fn format_time_delta(delta_ms: u64) -> String {
 }
 
 /// Generate the header text for dynamic panel display
-pub fn panel_header_text() -> &'static str {
+pub(crate) fn panel_header_text() -> &'static str {
     crate::infra::constants::prompts::panel_header()
 }
 
 /// Generate the timestamp text for an individual panel
 /// Handles zero/unknown timestamps gracefully
-pub fn panel_timestamp_text(timestamp_ms: u64) -> String {
+pub(crate) fn panel_timestamp_text(timestamp_ms: u64) -> String {
     use crate::infra::constants::prompts;
 
     // Check for zero/invalid timestamp (1970-01-01 or very old)
@@ -246,7 +247,7 @@ pub fn panel_timestamp_text(timestamp_ms: u64) -> String {
 }
 
 /// Generate the footer text for dynamic panel display, including message timestamps
-pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
+pub(crate) fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
     use crate::infra::constants::prompts;
 
     // Get last 25 messages with non-zero timestamps
@@ -284,7 +285,7 @@ pub fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
 /// - Filters out Conversation (id="chat") -- it's sent as actual messages, not a panel
 /// - Items are assumed to be pre-sorted by last_refresh_ms (done in prepare_stream_context)
 /// - Returns FakePanelMessage structs that providers can convert to their format
-pub fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMessage> {
+pub(crate) fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMessage> {
     // Filter out Conversation panel (id="chat") -- it's the live message feed, not a context panel
     let filtered: Vec<&ContextItem> =
         context_items.iter().filter(|item| !item.content.is_empty()).filter(|item| item.id != "chat").collect();
@@ -306,7 +307,7 @@ pub fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMes
 /// tool_result positions for prefix-based cache optimization.
 ///
 /// Shared between `claude_code` and `claude_code_api_key` providers.
-pub fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<serde_json::Value> {
+pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<serde_json::Value> {
     // Find all panel tool_result indices for cache breakpoints
     let panel_result_indices: Vec<usize> = api_messages
         .iter()
@@ -395,12 +396,12 @@ pub(crate) fn log_sse_error(
         .and_then(|mut f| f.write_all(entry.as_bytes()));
 }
 
-pub mod error {
+pub(crate) mod error {
     use std::fmt;
 
     /// Typed error for LLM streaming operations.
     #[derive(Debug)]
-    pub enum LlmError {
+    pub(crate) enum LlmError {
         Auth(String),
         Network(String),
         Api { status: u16, body: String },

@@ -7,7 +7,7 @@ use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State};
 use cp_base::ui::{Cell, render_table};
 
-pub struct LibraryPanel;
+pub(crate) struct LibraryPanel;
 
 impl Panel for LibraryPanel {
     fn title(&self, state: &State) -> String {

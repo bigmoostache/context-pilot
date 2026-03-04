@@ -51,6 +51,7 @@ impl ProcessStatus {
 
 /// Module-owned state for the Console module.
 /// Stored in State.module_data via TypeMap.
+#[derive(Debug)]
 pub struct ConsoleState {
     pub sessions: HashMap<String, SessionHandle>,
     pub next_session_id: usize,
@@ -107,6 +108,7 @@ pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, la
 // ============================================================
 
 /// A watcher that monitors a console session for a condition.
+#[derive(Debug)]
 pub struct ConsoleWatcher {
     /// Unique ID for this watcher (e.g., "console_c_42_exit").
     pub watcher_id: String,

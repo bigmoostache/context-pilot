@@ -32,9 +32,8 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let url = match tool.input.get("url").and_then(|v| v.as_str()) {
-        Some(u) => u,
-        None => return err_result(tool, "Missing required parameter 'url'".to_string()),
+    let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'url'".to_string());
     };
 
     // Parse formats: default ["markdown", "links"]
@@ -72,10 +71,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
                 return err_result(tool, format!("Firecrawl scrape failed: {}", msg));
             }
 
-            let data = match resp.data {
-                Some(d) => d,
-                None => return err_result(tool, "Scrape returned no data".to_string()),
-            };
+            let Some(data) = resp.data else { return err_result(tool, "Scrape returned no data".to_string()) };
 
             let title = data.metadata.as_ref().and_then(|m| m.title.as_deref()).unwrap_or("untitled");
 
@@ -122,15 +118,15 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),
     };
 
-    let query = match tool.input.get("query").and_then(|v| v.as_str()) {
-        Some(q) => q,
-        None => return err_result(tool, "Missing required parameter 'query'".to_string()),
+    let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'query'".to_string());
     };
 
     let limit = tool.input.get("limit").and_then(|v| v.as_u64()).unwrap_or(3) as u32;
@@ -169,14 +165,11 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 return err_result(tool, format!("Firecrawl search failed: {}", msg));
             }
 
-            let data = match resp.data {
-                Some(d) => d,
-                None => return ok_result(tool, format!("No results found for '{}'", query)),
-            };
+            let Some(data) = resp.data else { return ok_result(tool, format!("No results found for '{}'", query)) };
 
             // Parse data — can be array (scraped results) or object (web/news/images dict)
             let results: Vec<crate::types::SearchResult> = if data.is_array() {
-                serde_json::from_value(data.clone()).unwrap_or_default()
+                serde_json::from_value(data).unwrap_or_default()
             } else if let Some(web_arr) = data.get("web").and_then(|v| v.as_array()) {
                 web_arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect()
             } else {
@@ -230,15 +223,15 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),
     };
 
-    let url = match tool.input.get("url").and_then(|v| v.as_str()) {
-        Some(u) => u,
-        None => return err_result(tool, "Missing required parameter 'url'".to_string()),
+    let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'url'".to_string());
     };
 
     let limit = tool.input.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as u32;
