@@ -278,12 +278,15 @@ struct StreamMessage {
 }
 
 #[derive(Debug, Deserialize)]
-#[expect(clippy::struct_field_names, reason = "Field names mirror the Anthropic API response")]
 struct StreamUsage {
-    input_tokens: Option<usize>,
-    output_tokens: Option<usize>,
-    cache_creation_input_tokens: Option<usize>,
-    cache_read_input_tokens: Option<usize>,
+    #[serde(rename = "input_tokens")]
+    input: Option<usize>,
+    #[serde(rename = "output_tokens")]
+    output: Option<usize>,
+    #[serde(rename = "cache_creation_input_tokens")]
+    cache_creation: Option<usize>,
+    #[serde(rename = "cache_read_input_tokens")]
+    cache_read: Option<usize>,
 }
 
 impl LlmClient for ClaudeCodeClient {

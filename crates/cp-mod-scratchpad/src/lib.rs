@@ -23,11 +23,8 @@ use self::panel::ScratchpadPanel;
 use cp_base::cast::SafeCast;
 use cp_base::modules::Module;
 
-static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
-    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
-    serde_yaml::from_str(include_str!("../../../yamls/tools/scratchpad.yaml"))
-        .expect("Failed to parse scratchpad tool YAML")
-});
+static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
+    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/scratchpad.yaml")));
 
 /// Scratchpad module: temporary note cells for working data during a session.
 #[derive(Debug, Clone, Copy)]

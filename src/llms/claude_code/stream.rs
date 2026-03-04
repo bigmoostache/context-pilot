@@ -228,13 +228,13 @@ impl ClaudeCodeClient {
                         if let Some(msg_body) = event.message
                             && let Some(usage) = msg_body.usage
                         {
-                            if let Some(hit) = usage.cache_read_input_tokens {
+                            if let Some(hit) = usage.cache_read {
                                 cache_hit_tokens = hit;
                             }
-                            if let Some(miss) = usage.cache_creation_input_tokens {
+                            if let Some(miss) = usage.cache_creation {
                                 cache_miss_tokens = miss;
                             }
-                            if let Some(inp) = usage.input_tokens {
+                            if let Some(inp) = usage.input {
                                 input_tokens = inp;
                             }
                         }
@@ -246,10 +246,10 @@ impl ClaudeCodeClient {
                             stop_reason = Some(reason.clone());
                         }
                         if let Some(usage) = event.usage {
-                            if let Some(inp) = usage.input_tokens {
+                            if let Some(inp) = usage.input {
                                 input_tokens = inp;
                             }
-                            if let Some(out) = usage.output_tokens {
+                            if let Some(out) = usage.output {
                                 output_tokens = out;
                             }
                         }

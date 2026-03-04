@@ -458,7 +458,6 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
- "serde_yaml",
  "unicode-width",
 ]
 
@@ -506,7 +505,6 @@ dependencies = [
  "ratatui",
  "regex",
  "serde_json",
- "serde_yaml",
 ]
 
 [[package]]
@@ -589,7 +587,6 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
- "serde_yaml",
 ]
 
 [[package]]

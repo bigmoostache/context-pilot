@@ -135,10 +135,10 @@ impl LlmClient for GroqClient {
 
             if let Some(resp) = super::super::openai_streaming::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
-                    if let Some(inp) = usage.prompt_tokens {
+                    if let Some(inp) = usage.prompt {
                         input_tokens = inp;
                     }
-                    if let Some(out) = usage.completion_tokens {
+                    if let Some(out) = usage.completion {
                         output_tokens = out;
                     }
                 }

@@ -43,12 +43,15 @@ pub(super) struct StreamMessage {
 }
 
 #[derive(Debug, Deserialize)]
-#[expect(clippy::struct_field_names, reason = "Field names mirror the Anthropic API response")]
 pub(super) struct StreamUsage {
-    pub input_tokens: Option<usize>,
-    pub output_tokens: Option<usize>,
-    pub cache_creation_input_tokens: Option<usize>,
-    pub cache_read_input_tokens: Option<usize>,
+    #[serde(rename = "input_tokens")]
+    pub input: Option<usize>,
+    #[serde(rename = "output_tokens")]
+    pub output: Option<usize>,
+    #[serde(rename = "cache_creation_input_tokens")]
+    pub cache_creation: Option<usize>,
+    #[serde(rename = "cache_read_input_tokens")]
+    pub cache_read: Option<usize>,
 }
 
 /// Parse an SSE stream from a Claude API response, sending events to the channel.
@@ -167,13 +170,13 @@ pub(super) fn parse_sse_stream(
                     if let Some(msg_body) = event.message
                         && let Some(usage) = msg_body.usage
                     {
-                        if let Some(hit) = usage.cache_read_input_tokens {
+                        if let Some(hit) = usage.cache_read {
                             cache_hit_tokens = hit;
                         }
-                        if let Some(miss) = usage.cache_creation_input_tokens {
+                        if let Some(miss) = usage.cache_creation {
                             cache_miss_tokens = miss;
                         }
-                        if let Some(inp) = usage.input_tokens {
+                        if let Some(inp) = usage.input {
                             input_tokens = inp;
                         }
                     }
@@ -185,10 +188,10 @@ pub(super) fn parse_sse_stream(
                         stop_reason = Some(reason.clone());
                     }
                     if let Some(usage) = event.usage {
-                        if let Some(inp) = usage.input_tokens {
+                        if let Some(inp) = usage.input {
                             input_tokens = inp;
                         }
-                        if let Some(out) = usage.output_tokens {
+                        if let Some(out) = usage.output {
                             output_tokens = out;
                         }
                     }

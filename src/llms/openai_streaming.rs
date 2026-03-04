@@ -43,13 +43,16 @@ pub(crate) struct StreamFunctionDelta {
 }
 
 #[derive(Debug, Deserialize)]
-#[expect(clippy::struct_field_names, reason = "Field names mirror the OpenAI API response")]
 pub(crate) struct StreamUsage {
-    pub prompt_tokens: Option<usize>,
-    pub completion_tokens: Option<usize>,
+    #[serde(rename = "prompt_tokens")]
+    pub prompt: Option<usize>,
+    #[serde(rename = "completion_tokens")]
+    pub completion: Option<usize>,
     /// DeepSeek-specific cache fields
-    pub prompt_cache_hit_tokens: Option<usize>,
-    pub prompt_cache_miss_tokens: Option<usize>,
+    #[serde(rename = "prompt_cache_hit_tokens")]
+    pub prompt_cache_hit: Option<usize>,
+    #[serde(rename = "prompt_cache_miss_tokens")]
+    pub prompt_cache_miss: Option<usize>,
 }
 
 /// Normalize provider-specific stop reasons to our internal format.

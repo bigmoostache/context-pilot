@@ -34,7 +34,7 @@ fn validate_name(name: &str) -> Result<(), String> {
 pub(crate) fn execute_snapshot(
     tool: &ToolUse,
     state: &State,
-    all_modules_fn: fn() -> Vec<Box<dyn Module>>,
+    all_modules: fn() -> Vec<Box<dyn Module>>,
 ) -> ToolResult {
     let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
@@ -78,7 +78,7 @@ pub(crate) fn execute_snapshot(
     }
 
     // Capture worker state
-    let modules = all_modules_fn();
+    let modules = all_modules();
 
     // Capture active_modules
     let active_modules: Vec<String> = state.active_modules.iter().cloned().collect();
@@ -162,9 +162,9 @@ pub(crate) fn execute_snapshot(
 pub(crate) fn execute_load(
     tool: &ToolUse,
     state: &mut State,
-    all_modules_fn: fn() -> Vec<Box<dyn Module>>,
-    active_tool_defs_fn: fn(&HashSet<String>) -> Vec<ToolDefinition>,
-    ensure_defaults_fn: fn(&mut State),
+    all_modules: fn() -> Vec<Box<dyn Module>>,
+    active_tool_defs: fn(&HashSet<String>) -> Vec<ToolDefinition>,
+    ensure_defaults: fn(&mut State),
 ) -> ToolResult {
     let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
@@ -206,7 +206,7 @@ pub(crate) fn execute_load(
     // If system doesn't exist, keep current active_agent_id
 
     // 2. Set active_modules — ensure core modules are always included
-    let modules = all_modules_fn();
+    let modules = all_modules();
     let core_ids: HashSet<String> = modules.iter().filter(|m| m.is_core()).map(|m| m.id().to_string()).collect();
     let mut new_active: HashSet<String> = ws.active_modules.iter().cloned().collect();
     // Always include core modules
@@ -220,7 +220,7 @@ pub(crate) fn execute_load(
 
     // 3. Rebuild tools from active modules, then apply disabled_tools
     let disabled_set: HashSet<&str> = ws.disabled_tools.iter().map(String::as_str).collect();
-    let mut new_tools = active_tool_defs_fn(&state.active_modules);
+    let mut new_tools = active_tool_defs(&state.active_modules);
     for t in &mut new_tools {
         if t.id != "tool_manage" && t.id != "module_toggle" && disabled_set.contains(t.id.as_str()) {
             t.enabled = false;
@@ -311,7 +311,7 @@ pub(crate) fn execute_load(
     }
 
     // 7. Ensure default fixed panels exist for newly activated modules
-    ensure_defaults_fn(state);
+    ensure_defaults(state);
 
     // 8. Mark all panels as cache_deprecated
     for ctx in &mut state.context {

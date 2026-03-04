@@ -167,17 +167,17 @@ impl LlmClient for DeepSeekClient {
 
             if let Some(resp) = super::super::openai_streaming::parse_sse_line(&line) {
                 if let Some(usage) = resp.usage {
-                    if let Some(inp) = usage.prompt_tokens {
+                    if let Some(inp) = usage.prompt {
                         input_tokens = inp;
                     }
-                    if let Some(out) = usage.completion_tokens {
+                    if let Some(out) = usage.completion {
                         output_tokens = out;
                     }
                     // DeepSeek-specific cache fields
-                    if let Some(hit) = usage.prompt_cache_hit_tokens {
+                    if let Some(hit) = usage.prompt_cache_hit {
                         cache_hit_tokens = hit;
                     }
-                    if let Some(miss) = usage.prompt_cache_miss_tokens {
+                    if let Some(miss) = usage.prompt_cache_miss {
                         cache_miss_tokens = miss;
                     }
                 }

@@ -25,24 +25,23 @@ use cp_base::tools::{ToolResult, ToolUse};
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/preset.yaml")));
 
-/// Function pointers for module-registry operations that live in the binary.
-/// Injected at construction time so the crate doesn't depend on the binary.
+/// Injected callbacks for module-registry operations that live in the binary.
+/// The crate doesn't depend on the binary — these function pointers bridge the gap.
 #[derive(Debug, Clone, Copy)]
-#[expect(clippy::struct_field_names, reason = "Fields are function pointers — _fn suffix is intentional")]
 pub struct PresetModule {
-    pub(crate) all_modules_fn: fn() -> Vec<Box<dyn Module>>,
-    pub(crate) active_tool_defs_fn: fn(&HashSet<String>) -> Vec<ToolDefinition>,
-    pub(crate) ensure_defaults_fn: fn(&mut State),
+    pub(crate) all_modules: fn() -> Vec<Box<dyn Module>>,
+    pub(crate) active_tool_defs: fn(&HashSet<String>) -> Vec<ToolDefinition>,
+    pub(crate) ensure_defaults: fn(&mut State),
 }
 
 impl PresetModule {
     /// Create a new `PresetModule` with injected function pointers for module registry access.
     pub fn new(
-        all_modules_fn: fn() -> Vec<Box<dyn Module>>,
-        active_tool_defs_fn: fn(&HashSet<String>) -> Vec<ToolDefinition>,
-        ensure_defaults_fn: fn(&mut State),
+        all_modules: fn() -> Vec<Box<dyn Module>>,
+        active_tool_defs: fn(&HashSet<String>) -> Vec<ToolDefinition>,
+        ensure_defaults: fn(&mut State),
     ) -> Self {
-        Self { all_modules_fn, active_tool_defs_fn, ensure_defaults_fn }
+        Self { all_modules, active_tool_defs, ensure_defaults }
     }
 }
 
@@ -112,13 +111,13 @@ impl Module for PresetModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "preset_snapshot_myself" => Some(tools::execute_snapshot(tool, state, self.all_modules_fn)),
+            "preset_snapshot_myself" => Some(tools::execute_snapshot(tool, state, self.all_modules)),
             "preset_load" => Some(tools::execute_load(
                 tool,
                 state,
-                self.all_modules_fn,
-                self.active_tool_defs_fn,
-                self.ensure_defaults_fn,
+                self.all_modules,
+                self.active_tool_defs,
+                self.ensure_defaults,
             )),
             _ => None,
         }
