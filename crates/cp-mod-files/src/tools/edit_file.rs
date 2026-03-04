@@ -120,14 +120,6 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         .iter()
         .any(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str));
 
-    if !is_open {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("File '{}' is not open in context. Use file_open first.", path_str),
-            true,
-        );
-    }
-
     let path = Path::new(path_str);
 
     // Read file
@@ -188,6 +180,14 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Format result as a unified diff for UI display
     let mut result_msg = String::new();
+
+    // Warn if file was not open in context (edit still succeeded via unique match)
+    if !is_open {
+        result_msg.push_str(&format!(
+            "Warning: File '{}' was not open in context. Edit succeeded (unique match found) but open the file to verify.\n",
+            path_str
+        ));
+    }
 
     // Header line
     if replace_all && replaced > 1 {

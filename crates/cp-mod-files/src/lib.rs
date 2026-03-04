@@ -117,7 +117,7 @@ impl Module for FilesModule {
                             c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str)
                         });
                         if !is_open {
-                            pf.warnings.push(format!("File '{}' is not open in context — open it first", path_str));
+                            pf.warnings.push(format!("File '{}' is not open in context. Edit will proceed if old_string has a unique match, but open the file to see current content.", path_str));
                         }
                         // Verify old_string actually matches file content
                         if let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str())
