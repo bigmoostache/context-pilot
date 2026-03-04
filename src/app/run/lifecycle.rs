@@ -21,7 +21,7 @@ use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::{NotificationType, SpineState};
 
 impl App {
-    #[expect(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
     pub(crate) fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,

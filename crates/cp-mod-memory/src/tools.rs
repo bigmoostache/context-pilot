@@ -233,6 +233,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn validate_tldr_way_too_long() {
         // 1000 chars / 3.3 = ~303 tokens — well over 80
         let text = "a".repeat(1000);

@@ -79,6 +79,7 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Deleted agent '{}' ({})", agent.name, id), false)
 }
 
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = tool.input.get("id").and_then(|v| v.as_str());
 

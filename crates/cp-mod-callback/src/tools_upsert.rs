@@ -142,6 +142,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Update an existing callback (full replace or diff-based script edit).
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),

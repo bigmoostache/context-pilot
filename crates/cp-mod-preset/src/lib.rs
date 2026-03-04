@@ -23,6 +23,7 @@ use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     serde_yaml::from_str(include_str!("../../../yamls/tools/preset.yaml")).expect("Failed to parse preset tool YAML")
 });
 

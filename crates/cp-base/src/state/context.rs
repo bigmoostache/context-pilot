@@ -52,6 +52,7 @@ pub fn get_context_type_meta(ct: &str) -> Option<&'static ContextTypeMeta> {
 /// # Panics
 ///
 /// Panics if an internal invariant is violated.
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub fn fixed_panel_order() -> Vec<&'static str> {
     let Some(registry) = CONTEXT_TYPE_REGISTRY.get() else { return vec![] };
     let mut fixed: Vec<_> = registry.iter().filter(|m| m.is_fixed && m.fixed_order.is_some()).collect();
@@ -365,6 +366,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn context_type_serde_roundtrip() {
         let ct = ContextType::new("todo");
         let json = serde_json::to_string(&ct).unwrap();

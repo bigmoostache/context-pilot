@@ -6,6 +6,7 @@ fn test_validate_rejects_non_gh() {
 }
 
 #[test]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn test_validate_accepts_valid() {
     let args = validate_gh_command("gh pr list --json number").unwrap();
     assert_eq!(args, vec!["pr", "list", "--json", "number"]);
@@ -72,12 +73,14 @@ fn test_variable_get_readonly() {
 }
 
 #[test]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn test_validate_quoted_args() {
     let args = validate_gh_command("gh issue create --title \"my issue\" --body \"details here\"").unwrap();
     assert_eq!(args, vec!["issue", "create", "--title", "my issue", "--body", "details here"]);
 }
 
 #[test]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn test_validate_allows_pipe_inside_quotes() {
     let args = validate_gh_command("gh api /repos --jq \".[] | .name\"").unwrap();
     assert_eq!(args, vec!["api", "/repos", "--jq", ".[] | .name"]);

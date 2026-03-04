@@ -145,6 +145,8 @@ pub fn find_or_create_server() -> Result<(), String> {
         // Children inherit this session — when the server dies, they get SIGHUP.
         // Must be done in pre_exec (before exec), not after spawn.
         #[expect(unsafe_code, reason = "pre_exec requires unsafe — setsid() is safe to call pre-fork")]
+        // SAFETY: setsid() is async-signal-safe (POSIX) and has no preconditions.
+        // Called in pre_exec (between fork and exec) to make the server a session leader.
         unsafe {
             let _ = cmd.pre_exec(|| {
                 if libc::setsid() == -1 {
@@ -220,8 +222,12 @@ pub struct SessionHandle {
 }
 
 #[expect(unsafe_code, reason = "SessionHandle fields are Arc<Mutex<T>> — safe to send across threads")]
+// SAFETY: All fields are either Arc<Mutex<T>>, Arc<AtomicBool>, String, u64, or RingBuffer
+// (which wraps Arc<Mutex<_>>). All are Send. No raw pointers or non-Send types.
 unsafe impl Send for SessionHandle {}
 #[expect(unsafe_code, reason = "SessionHandle fields are Arc<Mutex<T>> — safe to share across threads")]
+// SAFETY: All shared access goes through Arc<Mutex<T>> or Arc<AtomicBool>, providing
+// synchronized interior mutability. No unsynchronized shared state exists.
 unsafe impl Sync for SessionHandle {}
 
 impl SessionHandle {

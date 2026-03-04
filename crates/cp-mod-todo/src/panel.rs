@@ -47,6 +47,7 @@ impl TodoPanel {
 }
 
 impl Panel for TodoPanel {
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         match key.code {
             KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),

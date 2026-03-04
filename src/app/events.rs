@@ -6,6 +6,7 @@ use crate::infra::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 use crate::state::State;
 
+#[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
 pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
     match event {
         Event::Key(key) => {
@@ -85,6 +86,7 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
 }
 
 /// Handle key events when config view is open
+#[expect(clippy::wildcard_enum_match_arm, reason = "remaining KeyCode variants are handled uniformly")]
 const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
     let secondary = state.config_secondary_mode;
     match key.code {

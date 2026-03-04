@@ -129,6 +129,9 @@ fn main() -> io::Result<()> {
 /// Run the typst-compile subcommand: compile a .typ file to PDF in the same directory.
 /// Used by the typst-compile callback via $`CP_CHANGED_FILES`.
 /// Usage: cpilot typst-compile <source.typ>
+#[expect(clippy::print_stdout, reason = "CLI output is intentional")]
+#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
+#[expect(clippy::exit, reason = "process exit is intentional here")]
 fn run_typst_compile(args: &[String]) {
     if args.is_empty() {
         eprintln!("Usage: cpilot typst-compile <source.typ>");
@@ -155,6 +158,9 @@ fn run_typst_compile(args: &[String]) {
 /// Recompile all watched .typ documents whose dependencies include any of the changed files.
 /// Used by the typst-watchlist callback via $`CP_CHANGED_FILES`.
 /// Usage: cpilot typst-recompile-watched <`changed_file1`> [`changed_file2` ...]
+#[expect(clippy::print_stdout, reason = "CLI output is intentional")]
+#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
+#[expect(clippy::exit, reason = "process exit is intentional here")]
 fn run_typst_recompile_watched(args: &[String]) {
     if args.is_empty() {
         return;

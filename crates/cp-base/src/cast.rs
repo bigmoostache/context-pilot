@@ -1,3 +1,8 @@
+#![expect(
+    clippy::allow_attributes,
+    reason = "macro-generated #[allow] can't use #[expect] — some lint triggers depend on which type the macro expands for"
+)]
+
 //! Safe numeric casting helpers.
 //!
 //! Replace raw `as` casts that trigger `clippy::cast_possible_truncation`
@@ -81,7 +86,8 @@ macro_rules! impl_safe_cast_signed {
             clippy::cast_possible_truncation,
             clippy::cast_sign_loss,
             clippy::cast_possible_wrap,
-            clippy::cast_precision_loss
+            clippy::cast_precision_loss,
+            reason = "macro-generated identity casts are unavoidable — expect() would fail on non-identity expansions"
         )]
         impl SafeCast for $t {
             #[inline]
@@ -163,7 +169,8 @@ impl_safe_cast_signed!(isize);
     clippy::cast_sign_loss,
     clippy::cast_lossless,
     clippy::cast_possible_wrap,
-    clippy::cast_precision_loss
+    clippy::cast_precision_loss,
+    reason = "SafeCast implementations necessarily use raw as casts"
 )]
 impl SafeCast for f64 {
     #[inline]
@@ -227,7 +234,8 @@ impl SafeCast for f64 {
     clippy::cast_sign_loss,
     clippy::cast_lossless,
     clippy::cast_possible_wrap,
-    clippy::cast_precision_loss
+    clippy::cast_precision_loss,
+    reason = "SafeCast implementations necessarily use raw as casts"
 )]
 impl SafeCast for f32 {
     #[inline]

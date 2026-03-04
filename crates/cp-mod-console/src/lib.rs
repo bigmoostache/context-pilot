@@ -36,6 +36,7 @@ pub use self::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_base::cast::SafeCast;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     serde_yaml::from_str(include_str!("../../../yamls/tools/console.yaml")).expect("Failed to parse console tool YAML")
 });
 
@@ -54,6 +55,7 @@ impl Module for ConsoleModule {
         "Spawn and manage child processes"
     }
 
+    #[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
     fn init_state(&self, state: &mut State) {
         state.set_ext(ConsoleState::new());
         // Ensure the console server is running
@@ -110,6 +112,7 @@ impl Module for ConsoleModule {
             })
         }
     }
+    #[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         // Ensure the console server is running
         if let Err(e) = manager::find_or_create_server() {

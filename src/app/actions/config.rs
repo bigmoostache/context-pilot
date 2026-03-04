@@ -10,6 +10,7 @@ pub(crate) const fn handle_secondary_provider(state: &mut State, provider: crate
 }
 
 /// Handle secondary model selection for all providers
+#[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
 pub(crate) const fn handle_secondary_model(state: &mut State, action: &super::Action) -> ActionResult {
     use super::Action;
     match action {

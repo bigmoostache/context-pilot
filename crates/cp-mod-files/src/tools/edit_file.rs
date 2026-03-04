@@ -58,6 +58,7 @@ pub(crate) fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Opti
 }
 
 /// Find closest match for error reporting (returns line number and preview)
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
     let norm_needle = normalize_for_match(needle);
     let first_needle_line = norm_needle.lines().next()?;
@@ -234,6 +235,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_find_normalized_match_multiline() {
         let haystack = "fn foo() {\n    let x = 1;\n    let y = 2;\n}\n";
         let needle = "    let x = 1;\n    let y = 2;";
@@ -244,6 +246,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_diff_format_structure() {
         // Test that verifies the expected structure of a diff-formatted result message
         // This simulates what edit_file produces without requiring actual file I/O

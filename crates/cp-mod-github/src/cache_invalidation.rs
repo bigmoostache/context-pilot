@@ -23,6 +23,7 @@ pub(crate) struct InvalidationRule {
 }
 
 impl InvalidationRule {
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     fn new(trigger: &str, invalidates: &[&str]) -> Self {
         Self {
             trigger: Regex::new(trigger).expect("invalid trigger regex"),

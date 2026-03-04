@@ -87,6 +87,7 @@ impl Panel for BraveResultPanel {
         Some(CacheUpdate::Content { context_id: req.context_id.clone(), content: req.content.clone(), token_count })
     }
 
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         match key.code {
             KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),

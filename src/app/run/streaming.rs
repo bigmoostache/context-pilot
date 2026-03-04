@@ -148,6 +148,7 @@ impl App {
         );
     }
 
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     pub(super) fn finalize_stream(&mut self) {
         if !self.state.is_streaming {
             return;

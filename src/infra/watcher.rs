@@ -32,8 +32,8 @@ impl FileWatcher {
         let watched_files: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
         let watched_dirs: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
 
-        let files_clone = watched_files.clone();
-        let dirs_clone = watched_dirs.clone();
+        let files_clone = Arc::clone(&watched_files);
+        let dirs_clone = Arc::clone(&watched_dirs);
 
         let watcher = RecommendedWatcher::new(
             move |res: Result<Event, notify::Error>| {

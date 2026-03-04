@@ -84,6 +84,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// # Panics
 ///
 /// Panics if an internal invariant is violated.
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     let previous = CallbackState::get(state).editor_open.clone();
 

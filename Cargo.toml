@@ -754,6 +754,70 @@ unnecessary_struct_initialization = "warn"
 # Use `Self` instead of the type name inside impl blocks
 use_self = "warn"
 
+# ============================
+# Restriction → warn (carefully selected)
+# ============================
+# Flag bare #[allow(...)] — prefer #[expect(...)] which errors when lint no longer fires
+allow_attributes = "warn"
+# Require reason on all #[allow/expect] — forces documentation of suppression rationale
+allow_attributes_without_reason = "warn"
+# Flag `cfg(not(test))` — usually a code smell, prefer `cfg(test)` with inverted logic
+cfg_not_test = "warn"
+# Use `Arc::clone(&x)` instead of `x.clone()` — makes ref-count clone explicit
+clone_on_ref_ptr = "warn"
+# Flag `dbg!()` macro — should not ship to production
+dbg_macro = "warn"
+# Flag empty `Drop` impls — `impl Drop for T {}` is a no-op that prevents optimizations
+empty_drop = "warn"
+# Flag `Foo {}` on unit variants — prefer `Foo` without brackets
+empty_enum_variants_with_brackets = "warn"
+# Flag `struct Foo {}` — prefer `struct Foo;` for unit structs
+empty_structs_with_brackets = "warn"
+# Flag `Error` in error type names — `struct FooError` not `struct Error`
+error_impl_error = "warn"
+# Flag `std::process::exit()` — prefer returning from main
+exit = "warn"
+# Flag `.expect()` — prefer explicit error handling or `unwrap_or`
+expect_used = "warn"
+# Flag `fn as usize` — function-to-integer casts are suspicious
+fn_to_numeric_cast_any = "warn"
+# Flag `map[key]` indexing — prefer `.get()` which returns Option
+get_unwrap = "warn"
+# Flag infinite loops without break — `loop {}` without exit path
+infinite_loop = "warn"
+# Flag `let _ = must_use_fn()` — don't silently discard important results
+let_underscore_must_use = "warn"
+# Flag float literals that lose precision — `0.1` != exact `0.1_f64`
+lossy_float_literal = "warn"
+# Require messages on all assert! macros — `assert!(x, "reason")` not just `assert!(x)`
+missing_assert_message = "warn"
+# Flag `panic!()` — prefer returning Result or specific error types
+panic = "warn"
+# Flag `eprint!`/`eprintln!` — prefer structured logging
+print_stderr = "warn"
+# Flag `print!`/`println!` — prefer structured logging
+print_stdout = "warn"
+# Flag `..` in fully-bound struct patterns — be explicit about all fields
+rest_pat_in_fully_bound_structs = "warn"
+# Flag `String + &str` concatenation — prefer `format!()` or `push_str()`
+string_add = "warn"
+# Flag `todo!()` — should not ship to production
+todo = "warn"
+# Require `// SAFETY:` comment on all unsafe blocks
+undocumented_unsafe_blocks = "warn"
+# Flag `unimplemented!()` — should not ship to production
+unimplemented = "warn"
+# Flag `// SAFETY:` comments without nearby unsafe — stale safety docs
+unnecessary_safety_comment = "warn"
+# Flag `# Safety` doc sections without unsafe in the function
+unnecessary_safety_doc = "warn"
+# Flag `unreachable!()` — prefer compile-time guarantees or specific panics
+unreachable = "warn"
+# Flag `.unwrap()` — prefer explicit error handling
+unwrap_used = "warn"
+# Flag `_` in match on non-exhaustive enums — be explicit about variants
+wildcard_enum_match_arm = "warn"
+
 [package]
 name = "tui"
 version = "0.1.0"

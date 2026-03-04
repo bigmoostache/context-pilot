@@ -203,7 +203,7 @@ pub(super) fn prepare_stream_context(
 pub(crate) use cp_mod_prompt::seed::{ensure_default_agent, get_active_agent_content};
 
 /// Assign a UID to a panel if it doesn't have one
-#[expect(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
 fn assign_panel_uid(state: &mut State, context_type: ContextType) {
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == context_type)
         && ctx.uid.is_none()

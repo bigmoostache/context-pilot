@@ -405,6 +405,7 @@ pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
 /// Save state synchronously (blocking I/O on calling thread).
 /// Used for shutdown paths and places where the `PersistenceWriter` is not available.
 /// Prefer `build_save_batch` + `PersistenceWriter::send_batch` in the main event loop.
+#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
 pub(crate) fn save_state(state: &State) {
     let batch = build_save_batch(state);
     // Execute synchronously

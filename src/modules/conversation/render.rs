@@ -21,6 +21,7 @@ fn get_visualizer_registry() -> &'static HashMap<String, ToolVisualizer> {
 }
 
 /// Render a single message to lines (without caching logic)
+#[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
 pub(crate) fn render_message(
     msg: &Message,
     viewport_width: u16,

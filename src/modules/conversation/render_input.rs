@@ -14,6 +14,7 @@ const PASTE_PLACEHOLDER_END: char = '\u{E001}';
 
 /// Pre-process input string: replace sentinel markers with display placeholders,
 /// adjusting cursor position accordingly. Returns (`display_string`, `adjusted_cursor`).
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn expand_paste_sentinels(
     input: &str,
     cursor: usize,

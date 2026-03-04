@@ -8,6 +8,7 @@ use crate::state::State;
 use cp_base::config::REVERIE;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     serde_yaml::from_str(include_str!("../../../yamls/tools/reverie.yaml")).expect("Failed to parse reverie tool YAML")
 });
 
@@ -181,6 +182,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn dispatch_report_routes_correctly() {
         let tool = ToolUse {
             id: "t1".to_string(),
@@ -195,6 +197,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn dispatch_forbidden_tool_returns_error() {
         let tool = ToolUse { id: "t2".to_string(), name: "Edit".to_string(), input: serde_json::json!({}) };
         let mut state = State::default();
@@ -216,6 +219,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn dispatch_non_reverie_tool_rejected() {
         let tool = ToolUse { id: "t4".to_string(), name: "Edit".to_string(), input: serde_json::json!({}) };
         let mut state = State::default();

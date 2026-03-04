@@ -224,6 +224,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_collect_strips_absolute_project_root() {
         let cwd = std::env::current_dir().unwrap().to_string_lossy().to_string();
         let abs_path = format!("{cwd}/src/main.rs");

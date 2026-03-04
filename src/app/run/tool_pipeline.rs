@@ -354,6 +354,8 @@ impl App {
     /// Non-blocking check: if the user has resolved a pending question form,
     /// replace the `__QUESTION_PENDING__` placeholder with the real answer and
     /// resume the tool pipeline (create result message + continue streaming).
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     pub(super) fn check_question_form(&mut self, tx: &Sender<StreamEvent>) {
         // Only check if we have pending tool results waiting on a question
         if self.pending_question_tool_results.is_none() {

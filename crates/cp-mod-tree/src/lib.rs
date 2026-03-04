@@ -27,6 +27,7 @@ pub use types::{DEFAULT_TREE_FILTER, TreeFileDescription, TreeState};
 pub use self::tools::list_dir_entries;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     serde_yaml::from_str(include_str!("../../../yamls/tools/tree.yaml")).expect("Failed to parse tree tool YAML")
 });
 

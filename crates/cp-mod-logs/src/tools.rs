@@ -196,6 +196,7 @@ pub(crate) fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResul
     )
 }
 
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
     // 1. Validate the panel ID
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {

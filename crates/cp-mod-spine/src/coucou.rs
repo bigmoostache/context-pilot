@@ -350,18 +350,21 @@ mod tests {
     use super::*;
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_parse_duration_seconds() {
         assert_eq!(parse_duration_ms("30s").unwrap(), 30_000);
         assert_eq!(parse_duration_ms("90").unwrap(), 90_000);
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_parse_duration_minutes() {
         assert_eq!(parse_duration_ms("5m").unwrap(), 300_000);
         assert_eq!(parse_duration_ms("1m30s").unwrap(), 90_000);
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_parse_duration_hours() {
         assert_eq!(parse_duration_ms("1h").unwrap(), 3_600_000);
         assert_eq!(parse_duration_ms("1h30m").unwrap(), 5_400_000);

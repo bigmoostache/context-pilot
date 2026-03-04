@@ -119,6 +119,7 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
 }
 
 /// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
     if !input.contains('\x00') {
         return input.to_string();

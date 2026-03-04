@@ -4,8 +4,10 @@ use regex::Regex;
 
 use crate::state::State;
 
+#[expect(clippy::expect_used, reason = "regex is a compile-time constant — parse failure is a code bug")]
 static RE_ID_PREFIX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(\[A\d+\]:\s*)+").expect("invalid RE_ID_PREFIX regex"));
+#[expect(clippy::expect_used, reason = "regex is a compile-time constant — parse failure is a code bug")]
 static RE_ID_MULTILINE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?m)^\[A\d+\]:\s*").expect("invalid RE_ID_MULTILINE regex"));
 

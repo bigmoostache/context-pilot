@@ -351,6 +351,7 @@ pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'st
 }
 
 /// Parse inline markdown (bold, italic, code)
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
     let mut spans = Vec::new();
     let mut chars = text.chars().peekable();

@@ -266,6 +266,7 @@ impl Panel for ConversationPanel {
         if state.is_streaming { "Conversation *".to_string() } else { "Conversation".to_string() }
     }
 
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
 

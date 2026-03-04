@@ -60,6 +60,7 @@ impl BraveClient {
     ///
     /// Panics if an internal invariant is violated.
     #[must_use]
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     pub fn new(api_key: String) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(TIMEOUT_SECS))

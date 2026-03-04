@@ -191,6 +191,7 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn run_in_tmpdir(gitignore_content: Option<&str>) -> (TempDir, String) {
         let tmp = TempDir::new().unwrap();
         let gitignore_path = tmp.path().join(".gitignore");

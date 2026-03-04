@@ -263,6 +263,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_validate_accepts_valid() {
         let args = validate_git_command("git log --oneline -5").unwrap();
         assert_eq!(args, vec!["log", "--oneline", "-5"]);
@@ -343,12 +344,14 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_validate_quoted_commit_message() {
         let args = validate_git_command("git commit -m \"hello world\"").unwrap();
         assert_eq!(args, vec!["commit", "-m", "hello world"]);
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_validate_single_quoted_args() {
         let args = validate_git_command("git log --format='%H %s'").unwrap();
         assert_eq!(args, vec!["log", "--format=%H %s"]);
@@ -360,6 +363,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_validate_allows_pipe_inside_quotes() {
         let args = validate_git_command("git log --format=\"%H | %s\"").unwrap();
         assert_eq!(args, vec!["log", "--format=%H | %s"]);

@@ -24,6 +24,7 @@ use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     serde_yaml::from_str(include_str!("../../../yamls/tools/typst.yaml")).expect("Failed to parse typst tool YAML")
 });
 

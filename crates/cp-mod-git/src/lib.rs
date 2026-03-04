@@ -140,6 +140,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use self::result_panel::GitResultPanel;
 use cp_base::modules::Module;
 
+#[expect(clippy::expect_used, reason = "YAML is embedded at compile time — parse failure is a build-time bug")]
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
     serde_yaml::from_str(include_str!("../../../yamls/tools/git.yaml")).expect("Failed to parse git tool YAML")
 });

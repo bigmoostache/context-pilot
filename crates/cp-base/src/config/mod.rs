@@ -377,6 +377,7 @@ pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea
 // ============================================================================
 
 /// Deserialize a YAML string into `T`, panicking with a descriptive message on failure.
+#[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
 fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
     serde_yaml::from_str(content).unwrap_or_else(|e| panic!("Failed to parse {name}: {e}"))
 }
@@ -414,6 +415,7 @@ pub static REVERIE: LazyLock<ReverieConfig> =
 ///
 /// Panics if an internal invariant is violated.
 #[must_use]
+#[expect(clippy::expect_used, reason = "infallible based on prior validation")]
 pub fn get_theme(theme_id: &str) -> &'static Theme {
     THEMES.themes.get(theme_id).or_else(|| THEMES.themes.get(DEFAULT_THEME)).expect("Default theme must exist")
 }

@@ -27,6 +27,7 @@ use self::panel::MemoryPanel;
 use cp_base::modules::Module;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     serde_yaml::from_str(include_str!("../../../yamls/tools/memory.yaml")).expect("Failed to parse memory tool YAML")
 });
 

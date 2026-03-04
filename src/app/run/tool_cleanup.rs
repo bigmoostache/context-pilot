@@ -16,6 +16,7 @@ impl App {
     /// Non-blocking check: poll `WatcherRegistry` for satisfied conditions.
     /// - Blocking watchers: replace sentinel tool results and resume pipeline.
     /// - Async watchers: create spine notifications.
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     pub(super) fn check_watchers(&mut self, tx: &Sender<StreamEvent>) {
         // Take the registry out of state to avoid borrow conflict
         // (poll_all needs &mut registry + &state simultaneously)

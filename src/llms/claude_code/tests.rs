@@ -5,6 +5,8 @@ use crate::infra::constants::API_VERSION;
 /// No panels, no tools, no message prefixes — just raw API call.
 #[test]
 #[ignore = "requires OAuth token"]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+#[expect(clippy::expect_used, reason = "infallible based on prior validation")]
 fn test_general_kenobi() {
     let token = ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
 
@@ -62,6 +64,7 @@ fn test_general_kenobi() {
 /// Same as above but with tools and streaming — matches what `stream()` actually sends.
 #[test]
 #[ignore = "requires OAuth token"]
+#[expect(clippy::expect_used, reason = "infallible based on prior validation")]
 fn test_general_kenobi_with_tools_streaming() {
     let token = ClaudeCodeClient::load_oauth_token().expect("OAuth token not found or expired — run 'claude login'");
 
@@ -148,6 +151,7 @@ fn test_general_kenobi_with_tools_streaming() {
 /// Test `inject_system_reminder`: verify it skips `tool_result` messages
 /// and injects into the first regular user message.
 #[test]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn test_inject_system_reminder_skips_tool_results() {
     // Simulate panel injection: tool_result user messages first, then a regular user msg
     let mut messages = vec![
@@ -184,6 +188,7 @@ fn test_inject_system_reminder_skips_tool_results() {
 
 /// Test `inject_system_reminder`: when no eligible message, prepends fallback pair
 #[test]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn test_inject_system_reminder_no_eligible() {
     // Only tool_result user messages — triggers fallback
     let mut messages = vec![
@@ -213,6 +218,7 @@ fn test_inject_system_reminder_no_eligible() {
 /// Test `ensure_message_alternation`: merges consecutive text user messages,
 /// but separates `tool_result` user from text user with a placeholder assistant.
 #[test]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn test_ensure_message_alternation() {
     // Simulate the actual failure scenario: panel footer (tool_result user)
     // followed by consecutive text user messages
@@ -253,6 +259,7 @@ fn test_ensure_message_alternation() {
 
 /// Test that alternation + reminder injection work together on the real scenario
 #[test]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn test_alternation_then_reminder() {
     let mut messages = vec![
         serde_json::json!({"role": "assistant", "content": [{"type": "text", "text": "footer"}, {"type": "tool_use", "id": "panel_footer", "name": "dynamic_panel", "input": {}}]}),

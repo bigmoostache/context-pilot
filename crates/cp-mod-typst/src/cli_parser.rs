@@ -271,6 +271,9 @@ mod tests {
     use super::*;
 
     #[test]
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     fn test_parse_compile_basic() {
         let cmd = parse_command("typst compile doc.typ").unwrap();
         match cmd {
@@ -284,6 +287,9 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     fn test_parse_compile_with_output() {
         let cmd = parse_command("typst compile doc.typ -o out.pdf").unwrap();
         match cmd {
@@ -296,6 +302,9 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     fn test_parse_compile_without_prefix() {
         let cmd = parse_command("compile doc.typ").unwrap();
         match cmd {
@@ -305,6 +314,9 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     fn test_parse_init() {
         let cmd = parse_command("typst init @preview/graceful-genetics:0.2.0").unwrap();
         match cmd {
@@ -317,6 +329,9 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     fn test_parse_init_with_dir() {
         let cmd = parse_command("typst init @preview/graceful-genetics:0.2.0 my-poster").unwrap();
         match cmd {
@@ -329,6 +344,9 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     fn test_parse_fonts() {
         let cmd = parse_command("typst fonts").unwrap();
         match cmd {
@@ -338,6 +356,9 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     fn test_parse_fonts_variants() {
         let cmd = parse_command("typst fonts --variants").unwrap();
         match cmd {
@@ -347,6 +368,9 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     fn test_parse_watch() {
         let cmd = parse_command("typst watch doc.typ").unwrap();
         match cmd {
@@ -365,6 +389,9 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     fn test_parse_query() {
         let cmd = parse_command("typst query doc.typ '<heading>'").unwrap();
         match cmd {

@@ -12,6 +12,7 @@ use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{ContextType, State};
 
 static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     serde_yaml::from_str(include_str!("../../yamls/tools/core.yaml")).expect("Failed to parse core tool YAML")
 });
 
@@ -225,6 +226,7 @@ pub(crate) fn module_toggle_tool_definition() -> ToolDefinition {
 }
 
 /// Execute the `module_toggle` tool.
+#[expect(clippy::expect_used, reason = "infallible based on prior validation")]
 fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(changes) = tool.input.get("changes").and_then(|v| v.as_array()) else {
         return ToolResult {
@@ -358,6 +360,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn cannot_deactivate_core_module() {
         let active = all_active();
         let result = check_can_deactivate("core", &active);
@@ -366,6 +369,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn cannot_deactivate_with_dependent() {
         // github depends on git — deactivating git while github is active should fail
         let active = all_active();

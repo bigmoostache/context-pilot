@@ -94,6 +94,7 @@ impl MemoryState {
     ///
     /// Panics if an internal invariant is violated.
     #[must_use]
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("MemoryState not initialized")
     }
@@ -102,6 +103,7 @@ impl MemoryState {
     /// # Panics
     ///
     /// Panics if an internal invariant is violated.
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("MemoryState not initialized")
     }

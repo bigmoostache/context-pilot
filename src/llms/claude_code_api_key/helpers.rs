@@ -143,7 +143,7 @@ pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
 }
 
 /// Convert content (string or array) to an array of content blocks.
-#[expect(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
 pub(crate) fn content_to_blocks(content: Value) -> Vec<Value> {
     if content.is_string() {
         vec![serde_json::json!({"type": "text", "text": content.as_str().unwrap_or("")})]

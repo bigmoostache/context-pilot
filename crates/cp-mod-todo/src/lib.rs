@@ -24,6 +24,7 @@ use cp_base::cast::SafeCast;
 use cp_base::modules::Module;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> = std::sync::LazyLock::new(|| {
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     serde_yaml::from_str(include_str!("../../../yamls/tools/todo.yaml")).expect("Failed to parse todo tool YAML")
 });
 

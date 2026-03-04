@@ -8,6 +8,8 @@ use crate::app::App;
 impl App {
     /// Handle keyboard events when the @ autocomplete popup is active.
     /// Mutates `AutocompleteState` and state.input directly.
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     pub(super) fn handle_autocomplete_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
@@ -137,6 +139,7 @@ impl App {
 
     /// Handle keyboard events when a question form is active.
     /// Mutates the `PendingQuestionForm` directly in state.
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     pub(super) fn handle_question_form_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
@@ -194,6 +197,7 @@ impl App {
     }
 
     /// Handle keyboard events when command palette is open
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     pub(super) fn handle_palette_event(&mut self, event: &event::Event) -> Option<Action> {
         use crossterm::event::{KeyCode, KeyModifiers};
 

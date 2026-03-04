@@ -172,7 +172,8 @@ pub fn is_api_command(args: &[String]) -> bool {
 }
 
 /// Background polling loop.
-#[expect(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
+#[expect(clippy::infinite_loop, reason = "loop is broken externally via process signals")]
 fn poll_loop(
     watches: Arc<Mutex<HashMap<String, GhWatch>>>,
     branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,

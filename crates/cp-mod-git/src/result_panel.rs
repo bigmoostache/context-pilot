@@ -33,6 +33,7 @@ impl Panel for GitResultPanel {
         })
     }
 
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
         match update {
             CacheUpdate::Content { content, token_count, .. } => {
@@ -93,6 +94,7 @@ impl Panel for GitResultPanel {
         }
     }
 
+    #[expect(clippy::wildcard_enum_match_arm, reason = "remaining variants are handled uniformly")]
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         match key.code {
             KeyCode::Up => Some(Action::ScrollUp(SCROLL_ARROW_AMOUNT)),

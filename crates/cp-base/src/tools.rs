@@ -290,6 +290,7 @@ impl ToolDefinition {
     ///
     /// Panics if an unexpected state is encountered.
     #[must_use]
+    #[expect(clippy::panic, reason = "invariant violation is unrecoverable")]
     pub fn from_yaml<'a>(id: &str, texts: &'a ToolTexts) -> ToolDefBuilder<'a> {
         let text = texts.tools.get(id).unwrap_or_else(|| {
             panic!("Tool '{id}' not found in YAML");

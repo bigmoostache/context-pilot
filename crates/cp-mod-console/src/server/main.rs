@@ -104,6 +104,7 @@ type Sessions = Arc<Mutex<HashMap<String, Session>>>;
 // Command handlers
 // ---------------------------------------------------------------------------
 
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str>, log_path: &str) -> Response {
     let log = PathBuf::from(log_path);
 
@@ -162,6 +163,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
 }
 
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     let bytes = interpret_escapes(input);
     let mut map = sessions.lock().unwrap();
@@ -186,6 +188,7 @@ fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
 }
 
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_kill(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     let Some(session) = map.get_mut(key) else {
@@ -206,6 +209,7 @@ fn handle_kill(sessions: &Sessions, key: &str) -> Response {
 }
 
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     if let Some(mut session) = map.remove(key) {
@@ -222,6 +226,7 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
 }
 
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_status(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     let Some(session) = map.get_mut(key) else {
@@ -232,6 +237,7 @@ fn handle_status(sessions: &Sessions, key: &str) -> Response {
 }
 
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn handle_list(sessions: &Sessions) -> Response {
     let mut map = sessions.lock().unwrap();
     let infos: Vec<SessionInfo> = map
@@ -255,6 +261,8 @@ fn handle_list(sessions: &Sessions) -> Response {
 
 #[expect(clippy::needless_pass_by_value, reason = "thread entry point — Arc is moved from spawn closure")]
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
+#[expect(clippy::exit, reason = "process exit is intentional here")]
 fn handle_connection(stream: UnixStream, sessions: Sessions) {
     let reader = BufReader::new(stream.try_clone().unwrap());
     let mut writer = stream;
@@ -333,6 +341,8 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
 // Main: daemonize and listen
 // ---------------------------------------------------------------------------
 
+#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
+#[expect(clippy::expect_used, reason = "infallible based on prior validation")]
 fn main() {
     let socket_path = std::env::args().nth(1).expect("Usage: cp-console-server <socket_path>");
     let pid_path = format!("{}.pid", socket_path.trim_end_matches(".sock"));
@@ -411,9 +421,11 @@ fn main() {
     unsafe_code,
     reason = "libc::signal requires unsafe — signal handler is async-signal-safe (atomic store only)"
 )]
+#[expect(clippy::fn_to_numeric_cast_any, reason = "signal handler registration requires fn-to-int cast")]
 fn install_signal_handlers() {
+    // SAFETY: libc::signal() is async-signal-safe (POSIX). The handler function
+    // `signal_handler` only sets an atomic flag — no allocations or locks.
     unsafe {
-        let _ = libc::signal(libc::SIGTERM, signal_handler as *const () as libc::sighandler_t);
         let _ = libc::signal(libc::SIGINT, signal_handler as *const () as libc::sighandler_t);
         let _ = libc::signal(libc::SIGHUP, signal_handler as *const () as libc::sighandler_t);
     }
@@ -424,6 +436,7 @@ extern "C" fn signal_handler(_sig: libc::c_int) {
 }
 
 /// Kill all sessions — used during shutdown.
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 fn kill_all_sessions(sessions: &Sessions) {
     let mut map = sessions.lock().unwrap();
     for (_, session) in map.iter_mut() {

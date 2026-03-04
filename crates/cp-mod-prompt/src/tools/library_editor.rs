@@ -37,6 +37,7 @@ pub(crate) fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Closes the prompt editor in the Library panel.
+#[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
 pub(crate) fn close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     let previous = PromptState::get(state).open_prompt_id.clone();
 

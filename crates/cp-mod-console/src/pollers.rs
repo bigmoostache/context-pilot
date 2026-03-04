@@ -16,7 +16,7 @@ pub(crate) fn file_poller(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBoo
     file_poller_from_offset(path, buffer, stop, 0);
 }
 
-#[expect(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
 pub(crate) fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>, mut offset: u64) {
     use std::io::{Read, Seek, SeekFrom};
 
@@ -58,7 +58,7 @@ pub(crate) fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: A
 }
 
 /// Periodically poll the server for process status.
-#[expect(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 pub(crate) fn poll_server_status(
     key: String,

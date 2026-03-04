@@ -23,6 +23,7 @@ pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResul
 
 /// Perform the actual TUI reload (called from app.rs after tool result is saved)
 #[expect(clippy::needless_pass_by_ref_mut, reason = "state may need mutation in future")]
+#[expect(clippy::exit, reason = "process exit is intentional here")]
 pub(crate) fn perform_reload(state: &mut State) {
     use crate::state::persistence::save_state;
     use crossterm::{
@@ -45,7 +46,9 @@ pub(crate) fn perform_reload(state: &mut State) {
                 .replace("\"reload_requested\":false", "\"reload_requested\":true")
         } else {
             // Add the field before the final }
-            json.trim_end().trim_end_matches('}').to_string() + ",\n  \"reload_requested\": true\n}"
+            let mut s = json.trim_end().trim_end_matches('}').to_string();
+            s.push_str(",\n  \"reload_requested\": true\n}");
+            s
         };
         let _r = fs::write(config_path, updated);
     }

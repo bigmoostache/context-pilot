@@ -60,10 +60,11 @@ const DEBOUNCE_MS: u64 = 50;
 
 impl PersistenceWriter {
     /// Create a new persistence writer with a background thread
+    #[expect(clippy::expect_used, reason = "infallible based on prior validation")]
     pub(crate) fn new() -> Self {
         let (tx, rx) = mpsc::channel();
         let flush_sync = Arc::new((Mutex::new(false), Condvar::new()));
-        let flush_sync_clone = flush_sync.clone();
+        let flush_sync_clone = Arc::clone(&flush_sync);
 
         let handle = thread::Builder::new()
             .name("persistence-writer".to_string())
@@ -130,7 +131,7 @@ impl Drop for PersistenceWriter {
 }
 
 /// The writer thread's main loop
-#[expect(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value, reason = "thread::spawn requires owned values")]
 #[expect(clippy::significant_drop_tightening, reason = "lock scope is intentional")]
 fn writer_loop(rx: Receiver<WriterMsg>, flush_sync: Arc<(Mutex<bool>, Condvar)>) {
     let mut pending_batch: Option<WriteBatch> = None;
@@ -196,6 +197,7 @@ fn execute_pending_messages(messages: &mut Vec<WriteOp>) {
 }
 
 /// Execute a batch of write/delete operations
+#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
 fn execute_batch(batch: Option<WriteBatch>) {
     let Some(batch) = batch else { return };
 
@@ -223,6 +225,7 @@ fn execute_batch(batch: Option<WriteBatch>) {
 
 /// Write a file, creating parent directories if needed.
 /// Logs errors instead of silently swallowing them.
+#[expect(clippy::print_stderr, reason = "TUI stderr logging is intentional")]
 fn write_file(path: &PathBuf, content: &[u8]) {
     if let Some(parent) = path.parent()
         && let Err(e) = fs::create_dir_all(parent)

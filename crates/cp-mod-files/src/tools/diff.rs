@@ -116,6 +116,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_unified_diff_with_common_lines() {
         let old = "line1\nline2\nline3";
         let new = "line1\nline2_modified\nline3";
@@ -136,6 +137,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::unwrap_used, reason = "infallible based on prior validation")]
     fn test_unified_diff_interleaved_changes() {
         let old = "keep1\nchange1\nkeep2\nchange2\nkeep3";
         let new = "keep1\nnew1\nkeep2\nnew2\nkeep3";
