@@ -286,7 +286,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         let old_path = scripts_dir.join(format!("{}.sh", vessel_name));
         let new_path = scripts_dir.join(format!("{}.sh", new_name));
         if old_path.exists() {
-            let _ = fs::rename(&old_path, &new_path);
+            fs::rename(&old_path, &new_path).ok();
         }
     }
 

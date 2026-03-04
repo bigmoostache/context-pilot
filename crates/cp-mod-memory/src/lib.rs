@@ -166,8 +166,8 @@ impl Module for MemoryModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("memory_create", visualize_memory_output as ToolVisualizer),
-            ("memory_update", visualize_memory_output as ToolVisualizer),
+            ("memory_create", visualize_memory_output),
+            ("memory_update", visualize_memory_output),
         ]
     }
 

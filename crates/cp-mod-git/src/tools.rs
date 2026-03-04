@@ -74,7 +74,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                     #[cfg(unix)]
                     {
                         use std::os::unix::fs::PermissionsExt;
-                        let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o700));
+                        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o700)).ok();
                     }
                     cmd.env("GIT_ASKPASS", &tmp);
                     Some(tmp) // kept alive until end of scope, then cleaned up
@@ -89,7 +89,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
 
             // Clean up temp askpass script
             if let Some(ref path) = _askpass_tempfile {
-                let _ = std::fs::remove_file(path);
+                std::fs::remove_file(path).ok();
             }
 
             // Heuristic-based cache invalidation for GitResult panels

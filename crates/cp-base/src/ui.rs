@@ -386,7 +386,7 @@ impl PendingQuestionForm {
         if self.questions[q_idx].multi_select {
             // Toggle in selected list
             if let Some(pos) = ans.selected.iter().position(|&s| s == cursor) {
-                ans.selected.remove(pos);
+                _ = ans.selected.remove(pos);
             } else {
                 ans.selected.push(cursor);
             }
@@ -463,7 +463,7 @@ impl PendingQuestionForm {
     pub fn backspace(&mut self) {
         let ans = &mut self.answers[self.current_question];
         if ans.typing_other {
-            ans.other_text.pop();
+            _ = ans.other_text.pop();
         }
     }
 

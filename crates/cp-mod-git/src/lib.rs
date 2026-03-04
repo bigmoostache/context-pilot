@@ -11,7 +11,6 @@ pub use types::{GitChangeType, GitFileChange, GitState};
 /// Called periodically by the overview panel to keep stats up to date.
 pub fn refresh_git_status(state: &mut State) {
     use std::process::Command;
-    use types::GitChangeType;
 
     // Check if git repo
     let is_repo =
@@ -213,7 +212,7 @@ impl Module for GitModule {
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![("git_execute", visualize_git_output as ToolVisualizer)]
+        vec![("git_execute", visualize_git_output)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {

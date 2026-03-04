@@ -292,7 +292,7 @@ impl State {
 
     /// Set module-owned state by type. Replaces any existing value of this type.
     pub fn set_ext<T: 'static + Send + Sync>(&mut self, val: T) {
-        self.module_data.insert(TypeId::of::<T>(), Box::new(val));
+        drop(self.module_data.insert(TypeId::of::<T>(), Box::new(val)));
     }
 
     /// Update the last_refresh_ms timestamp for a panel by its context type

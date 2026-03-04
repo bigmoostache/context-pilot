@@ -61,7 +61,7 @@ impl Module for ConsoleModule {
         state.set_ext(ConsoleState::new());
         // Clean up log files
         for log in paths {
-            let _ = std::fs::remove_file(&log);
+            std::fs::remove_file(&log).ok();
         }
     }
 
@@ -281,10 +281,10 @@ impl Module for ConsoleModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("console_create", visualize_console_output as ToolVisualizer),
-            ("console_send_keys", visualize_console_output as ToolVisualizer),
-            ("console_wait", visualize_console_output as ToolVisualizer),
-            ("console_watch", visualize_console_output as ToolVisualizer),
+            ("console_create", visualize_console_output),
+            ("console_send_keys", visualize_console_output),
+            ("console_wait", visualize_console_output),
+            ("console_watch", visualize_console_output),
         ]
     }
 
@@ -309,7 +309,7 @@ impl Module for ConsoleModule {
         }
         // Delete log file
         if !log_path.is_empty() {
-            let _ = std::fs::remove_file(&log_path);
+            std::fs::remove_file(&log_path).ok();
         }
         Some(Ok(format!("console: {}", name)))
     }

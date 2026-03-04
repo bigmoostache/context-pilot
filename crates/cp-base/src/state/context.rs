@@ -13,7 +13,7 @@ use crate::config::{active_theme, normalize_icon};
 // =============================================================================
 
 /// Metadata for a context type, provided by the owning module.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ContextTypeMeta {
     /// The context type string (e.g., "todo", "git_result")
     pub context_type: &'static str,
@@ -38,7 +38,7 @@ static CONTEXT_TYPE_REGISTRY: OnceLock<Vec<ContextTypeMeta>> = OnceLock::new();
 /// Initialize the global context type registry. Called once at startup.
 /// Modules provide their metadata via `Module::context_type_metadata()`.
 pub fn init_context_type_registry(metadata: Vec<ContextTypeMeta>) {
-    CONTEXT_TYPE_REGISTRY.get_or_init(|| metadata);
+    _ = CONTEXT_TYPE_REGISTRY.get_or_init(|| metadata);
 }
 
 /// Look up metadata for a context type string.
@@ -213,7 +213,7 @@ impl ContextElement {
     /// Set a typed value in the metadata bag.
     pub fn set_meta<T: Serialize>(&mut self, key: &str, value: &T) {
         if let Ok(v) = serde_json::to_value(value) {
-            self.metadata.insert(key.to_string(), v);
+            drop(self.metadata.insert(key.to_string(), v));
         }
     }
 

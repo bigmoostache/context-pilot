@@ -426,7 +426,6 @@ dependencies = [
 name = "cp-base"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "crossterm",
  "ratatui",
  "serde",
@@ -441,7 +440,6 @@ dependencies = [
 name = "cp-mod-brave"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "cp-base",
  "crossterm",
  "ratatui",
@@ -470,7 +468,6 @@ name = "cp-mod-console"
 version = "0.1.0"
 dependencies = [
  "cp-base",
- "crossterm",
  "libc",
  "ratatui",
  "regex",
@@ -524,7 +521,6 @@ dependencies = [
  "ratatui",
  "regex",
  "secrecy",
- "serde_json",
  "serde_yaml",
  "sha2",
 ]
@@ -537,7 +533,6 @@ dependencies = [
  "cp-base",
  "cp-mod-memory",
  "cp-mod-queue",
- "crossterm",
  "ratatui",
  "serde",
  "serde_json",
@@ -575,7 +570,6 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-files",
- "crossterm",
  "ratatui",
  "serde",
  "serde_json",
@@ -587,7 +581,6 @@ name = "cp-mod-queue"
 version = "0.1.0"
 dependencies = [
  "cp-base",
- "crossterm",
  "ratatui",
  "serde",
  "serde_json",
@@ -611,7 +604,6 @@ name = "cp-mod-spine"
 version = "0.1.0"
 dependencies = [
  "cp-base",
- "cp-mod-todo",
  "crossterm",
  "ratatui",
  "serde",

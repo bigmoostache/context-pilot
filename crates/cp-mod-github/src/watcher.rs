@@ -209,10 +209,10 @@ fn poll_loop(
 
                 // Send update if content changed
                 if let Some((_, pr_info)) = result {
-                    let _ = cache_tx.send(CacheUpdate::ModuleSpecific {
+                    cache_tx.send(CacheUpdate::ModuleSpecific {
                         context_type: cp_base::state::ContextType::new(cp_base::state::ContextType::GITHUB_RESULT),
                         data: Box::new(BranchPrUpdate { pr_info }),
-                    });
+                    }).ok();
                 }
             }
         }
@@ -261,7 +261,7 @@ fn poll_loop(
                     let body = truncate_output(&body, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&body);
 
-                    let _ = cache_tx.send(CacheUpdate::Content { context_id, content: body, token_count });
+                    cache_tx.send(CacheUpdate::Content { context_id, content: body, token_count }).ok();
                 }
             } else {
                 let result = poll_cli_command(&args, token_str, last_hash.as_deref());
@@ -281,7 +281,7 @@ fn poll_loop(
                     let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
                     let token_count = estimate_tokens(&content);
 
-                    let _ = cache_tx.send(CacheUpdate::Content { context_id, content, token_count });
+                    cache_tx.send(CacheUpdate::Content { context_id, content, token_count }).ok();
                 }
             }
         }

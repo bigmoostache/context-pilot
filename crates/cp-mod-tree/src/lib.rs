@@ -178,9 +178,9 @@ impl Module for TreeModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("tree_filter", visualize_tree_output as ToolVisualizer),
-            ("tree_toggle", visualize_tree_output as ToolVisualizer),
-            ("tree_describe", visualize_tree_output as ToolVisualizer),
+            ("tree_filter", visualize_tree_output),
+            ("tree_toggle", visualize_tree_output),
+            ("tree_describe", visualize_tree_output),
         ]
     }
 

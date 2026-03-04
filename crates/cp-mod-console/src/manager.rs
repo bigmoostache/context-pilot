@@ -120,8 +120,8 @@ pub fn find_or_create_server() -> Result<(), String> {
     let sock_str = sock_path.to_string_lossy().to_string();
 
     // Remove stale socket/pid files
-    let _ = fs::remove_file(&sock_path);
-    let _ = fs::remove_file(server_pid_path());
+    fs::remove_file(&sock_path).ok();
+    fs::remove_file(server_pid_path()).ok();
 
     let mut cmd = Command::new(&binary);
     cmd.arg(&sock_str);
@@ -133,6 +133,7 @@ pub fn find_or_create_server() -> Result<(), String> {
         // setsid() makes the server a session leader with its own process group.
         // Children inherit this session — when the server dies, they get SIGHUP.
         // Must be done in pre_exec (before exec), not after spawn.
+        #[expect(unsafe_code, reason = "pre_exec requires unsafe — setsid() is safe to call pre-fork")]
         unsafe {
             cmd.pre_exec(|| {
                 if libc::setsid() == -1 {
@@ -169,7 +170,7 @@ pub fn kill_orphaned_processes(known_keys: &HashSet<String>) {
             {
                 // Orphan — remove it from server (kills process)
                 let remove = serde_json::json!({"cmd": "remove", "key": key});
-                let _ = server_request(&remove);
+                server_request(&remove).ok();
             }
         }
     }
@@ -196,7 +197,9 @@ pub struct SessionHandle {
     stop_polling: Arc<AtomicBool>,
 }
 
+#[expect(unsafe_code, reason = "SessionHandle fields are Arc<Mutex<T>> — safe to send across threads")]
 unsafe impl Send for SessionHandle {}
+#[expect(unsafe_code, reason = "SessionHandle fields are Arc<Mutex<T>> — safe to share across threads")]
 unsafe impl Sync for SessionHandle {}
 
 impl SessionHandle {
@@ -378,7 +381,7 @@ impl SessionHandle {
         self.stop_polling.store(true, Ordering::Relaxed);
 
         let req = serde_json::json!({"cmd": "kill", "key": self.name});
-        let _ = server_request(&req);
+        server_request(&req).ok();
 
         let mut status = self.status.lock().unwrap_or_else(|e| e.into_inner());
         if !status.is_terminal() {

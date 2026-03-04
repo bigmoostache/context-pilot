@@ -182,9 +182,9 @@ impl Module for TodoModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("todo_create", visualize_todo_output as ToolVisualizer),
-            ("todo_update", visualize_todo_output as ToolVisualizer),
-            ("todo_move", visualize_todo_output as ToolVisualizer),
+            ("todo_create", visualize_todo_output),
+            ("todo_update", visualize_todo_output),
+            ("todo_move", visualize_todo_output),
         ]
     }
 

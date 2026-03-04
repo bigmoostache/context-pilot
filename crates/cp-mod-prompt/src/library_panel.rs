@@ -1,5 +1,4 @@
 use ratatui::prelude::*;
-use ratatui::style::Color;
 
 use crate::types::PromptState;
 use cp_base::config::{INJECTIONS, theme};

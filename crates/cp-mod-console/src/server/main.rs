@@ -1,4 +1,5 @@
 //! Console Server: persistent daemon that owns child processes.
+#![expect(unused_crate_dependencies, reason = "bin target shares Cargo.toml with lib — lib deps aren't used here")]
 //!
 //! Spawns `sh -c` processes with stdout/stderr redirected to log files.
 //! TUI communicates via JSON lines over a Unix socket.
@@ -108,7 +109,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
 
     // Create/truncate log file
     if let Some(parent) = log.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        std::fs::create_dir_all(parent).ok();
     }
 
     let log_file = match std::fs::File::create(&log) {
@@ -191,10 +192,10 @@ fn handle_kill(sessions: &Sessions, key: &str) -> Response {
     };
     if !session.is_terminal() {
         // SIGTERM to script PID only — PTY teardown propagates SIGHUP to children
-        let _ = Command::new("kill").args([&session.pid.to_string()]).output();
+        Command::new("kill").args([&session.pid.to_string()]).output().ok();
         std::thread::sleep(std::time::Duration::from_millis(100));
         if is_pid_alive(session.pid) {
-            let _ = Command::new("kill").args(["-9", &session.pid.to_string()]).output();
+            Command::new("kill").args(["-9", &session.pid.to_string()]).output().ok();
         }
         session.status = SessionStatus::Exited(-9);
     }
@@ -207,10 +208,10 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap();
     if let Some(mut session) = map.remove(key) {
         if !session.is_terminal() {
-            let _ = Command::new("kill").args([&session.pid.to_string()]).output();
+            Command::new("kill").args([&session.pid.to_string()]).output().ok();
             std::thread::sleep(std::time::Duration::from_millis(100));
             if is_pid_alive(session.pid) {
-                let _ = Command::new("kill").args(["-9", &session.pid.to_string()]).output();
+                Command::new("kill").args(["-9", &session.pid.to_string()]).output().ok();
             }
         }
         session.stdin.take();
@@ -266,7 +267,7 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
             Ok(r) => r,
             Err(e) => {
                 let resp = Response::err(format!("Invalid JSON: {}", e));
-                let _ = writeln!(writer, "{}", serde_json::to_string(&resp).unwrap());
+                writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()).ok();
                 continue;
             }
         };
@@ -306,13 +307,13 @@ fn handle_connection(stream: UnixStream, sessions: Sessions) {
                 let mut map = sessions.lock().unwrap();
                 for (_, session) in map.iter_mut() {
                     if !session.is_terminal() {
-                        let _ = Command::new("kill").args([&session.pid.to_string()]).output();
+                        Command::new("kill").args([&session.pid.to_string()]).output().ok();
                     }
                     session.stdin.take();
                 }
                 map.clear();
                 let resp = Response::ok();
-                let _ = writeln!(writer, "{}", serde_json::to_string(&resp).unwrap());
+                writeln!(writer, "{}", serde_json::to_string(&resp).unwrap()).ok();
                 std::process::exit(0);
             }
             other => Response::err(format!("Unknown command: {}", other)),
@@ -333,13 +334,13 @@ fn main() {
     let pid_path = format!("{}.pid", socket_path.trim_end_matches(".sock"));
 
     // Remove stale socket
-    let _ = std::fs::remove_file(&socket_path);
+    std::fs::remove_file(&socket_path).ok();
 
     // Note: setsid() is called by the TUI at spawn time (pre_exec hook).
     // The server is already a session leader when it reaches main().
 
     // Write PID file
-    let _ = std::fs::write(&pid_path, format!("{}", std::process::id()));
+    std::fs::write(&pid_path, format!("{}", std::process::id())).ok();
 
     // Bind socket
     let listener = match UnixListener::bind(&socket_path) {
@@ -368,8 +369,8 @@ fn main() {
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
                     kill_all_sessions(&sessions);
-                    let _ = std::fs::remove_file(&socket_path);
-                    let _ = std::fs::remove_file(&pid_path);
+                    std::fs::remove_file(&socket_path).ok();
+                    std::fs::remove_file(&pid_path).ok();
                     std::process::exit(0);
                 }
             }
@@ -394,14 +395,15 @@ fn main() {
 
         if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
             kill_all_sessions(&sessions);
-            let _ = std::fs::remove_file(&socket_path);
-            let _ = std::fs::remove_file(&pid_path);
+            std::fs::remove_file(&socket_path).ok();
+            std::fs::remove_file(&pid_path).ok();
             std::process::exit(0);
         }
     }
 }
 
 /// Install SIGTERM and SIGINT handlers that set SHUTDOWN_REQUESTED.
+#[expect(unsafe_code, reason = "libc::signal requires unsafe — signal handler is async-signal-safe (atomic store only)")]
 fn install_signal_handlers() {
     unsafe {
         libc::signal(libc::SIGTERM, signal_handler as *const () as libc::sighandler_t);
@@ -419,10 +421,10 @@ fn kill_all_sessions(sessions: &Sessions) {
     let mut map = sessions.lock().unwrap();
     for (_, session) in map.iter_mut() {
         if !session.is_terminal() {
-            let _ = Command::new("kill").args([&session.pid.to_string()]).output();
+            Command::new("kill").args([&session.pid.to_string()]).output().ok();
             std::thread::sleep(std::time::Duration::from_millis(50));
             if is_pid_alive(session.pid) {
-                let _ = Command::new("kill").args(["-9", &session.pid.to_string()]).output();
+                Command::new("kill").args(["-9", &session.pid.to_string()]).output().ok();
             }
         }
         session.stdin.take();

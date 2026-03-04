@@ -154,7 +154,7 @@ impl Module for FilesModule {
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![("Edit", visualize_diff as ToolVisualizer), ("Write", visualize_diff as ToolVisualizer)]
+        vec![("Edit", visualize_diff), ("Write", visualize_diff)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {

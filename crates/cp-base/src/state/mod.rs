@@ -23,7 +23,7 @@ pub mod reverie {
     use super::message::Message;
 
     /// The type of reverie running.
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum ReverieType {
         /// Context optimizer — reshapes context for relevance and budget.
         ContextOptimizer,

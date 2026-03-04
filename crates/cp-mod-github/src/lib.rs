@@ -80,7 +80,7 @@ impl Module for GithubModule {
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![("gh_execute", visualize_gh_output as ToolVisualizer)]
+        vec![("gh_execute", visualize_gh_output)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {

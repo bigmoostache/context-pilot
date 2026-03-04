@@ -117,8 +117,8 @@ impl Module for PresetModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("preset_snapshot_myself", visualize_preset_output as ToolVisualizer),
-            ("preset_load", visualize_preset_output as ToolVisualizer),
+            ("preset_snapshot_myself", visualize_preset_output),
+            ("preset_load", visualize_preset_output),
         ]
     }
 

@@ -277,18 +277,18 @@ impl Module for PromptModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("agent_create", visualize_prompt_output as ToolVisualizer),
-            ("Edit_prompt", cp_mod_files::visualize_diff as ToolVisualizer),
-            ("Library_open_prompt_editor", visualize_prompt_output as ToolVisualizer),
-            ("Library_close_prompt_editor", visualize_prompt_output as ToolVisualizer),
-            ("agent_delete", visualize_prompt_output as ToolVisualizer),
-            ("agent_load", visualize_prompt_output as ToolVisualizer),
-            ("skill_create", visualize_prompt_output as ToolVisualizer),
-            ("skill_delete", visualize_prompt_output as ToolVisualizer),
-            ("skill_load", visualize_prompt_output as ToolVisualizer),
-            ("skill_unload", visualize_prompt_output as ToolVisualizer),
-            ("command_create", visualize_prompt_output as ToolVisualizer),
-            ("command_delete", visualize_prompt_output as ToolVisualizer),
+            ("agent_create", visualize_prompt_output),
+            ("Edit_prompt", cp_mod_files::visualize_diff),
+            ("Library_open_prompt_editor", visualize_prompt_output),
+            ("Library_close_prompt_editor", visualize_prompt_output),
+            ("agent_delete", visualize_prompt_output),
+            ("agent_load", visualize_prompt_output),
+            ("skill_create", visualize_prompt_output),
+            ("skill_delete", visualize_prompt_output),
+            ("skill_load", visualize_prompt_output),
+            ("skill_unload", visualize_prompt_output),
+            ("command_create", visualize_prompt_output),
+            ("command_delete", visualize_prompt_output),
         ]
     }
 

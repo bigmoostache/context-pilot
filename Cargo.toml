@@ -29,6 +29,84 @@ unused_mut = "warn"
 missing_debug_implementations = "warn"
 # Elided lifetimes in impl blocks — forces explicit 'a where it matters
 elided_lifetimes_in_paths = "warn"
+# Prefer crate-relative paths
+absolute_paths_not_starting_with_crate = "warn"
+# Ambiguous negative literals — force parens
+ambiguous_negative_literals = "warn"
+# Prefer async || over || async {}
+closure_returning_async_block = "warn"
+# 2024: deprecated safe on extern fns
+deprecated_safe_2024 = "deny"
+# Deref into dyn supertrait ambiguity
+deref_into_dyn_supertrait = "warn"
+# 2024: expr fragment specifier change
+edition_2024_expr_fragment_specifier = "deny"
+# Explicit outlives bounds that can be inferred
+explicit_outlives_requirements = "warn"
+# 2024: if-let temporary rescoping
+if_let_rescope = "deny"
+# impl Trait overcaptures lifetimes
+impl_trait_overcaptures = "warn"
+# Using 2024 keywords as identifiers
+keyword_idents_2024 = "deny"
+# Silently dropping a guard with let _ = ...
+let_underscore_drop = "deny"
+# #[macro_use] on extern crate
+macro_use_extern_crate = "deny"
+# Macro meta-variable misuse
+meta_variable_misuse = "deny"
+# Missing Copy on types that could derive it
+missing_copy_implementations = "warn"
+# Missing docs on public items
+missing_docs = "warn"
+# Missing unsafe on extern blocks (2024)
+missing_unsafe_on_extern = "deny"
+# Non-ASCII identifiers
+non_ascii_idents = "deny"
+# Redundant imports
+redundant_imports = "deny"
+# Redundant lifetime parameters
+redundant_lifetimes = "warn"
+# 2024: guarded string syntax
+rust_2024_guarded_string_incompatible_syntax = "deny"
+# 2024: incompatible patterns
+rust_2024_incompatible_pat = "deny"
+# 2024: prelude collisions
+rust_2024_prelude_collisions = "deny"
+# Single-use lifetime parameters
+single_use_lifetimes = "warn"
+# 2024: tail expression drop order
+tail_expr_drop_order = "deny"
+# Trivial casts (e.g. &T as &T)
+trivial_casts = "deny"
+# Trivial numeric casts (e.g. u32 as u32)
+trivial_numeric_casts = "deny"
+# Binding a unit value
+unit_bindings = "deny"
+# Types that can't be named by external users
+unnameable_types = "warn"
+# unsafe attribute without unsafe() wrapper (2024)
+unsafe_attr_outside_unsafe = "deny"
+# All unsafe code must be opted-in per module
+unsafe_code = "deny"
+# Unsafe operations inside unsafe fn need unsafe blocks
+unsafe_op_in_unsafe_fn = "warn"
+# Unused crate dependencies
+unused_crate_dependencies = "deny"
+# Unused extern crates
+unused_extern_crates = "deny"
+# Unnecessary braces around single import
+unused_import_braces = "deny"
+# Unused lifetime parameters
+unused_lifetimes = "deny"
+# Unused macro rules
+unused_macro_rules = "warn"
+# Unnecessary path qualifications
+unused_qualifications = "warn"
+# Unused return values
+unused_results = "warn"
+# Large variant size differences
+variant_size_differences = "warn"
 
 [workspace.lints.clippy]
 # Performance

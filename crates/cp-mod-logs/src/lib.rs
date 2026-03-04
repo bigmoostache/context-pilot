@@ -315,10 +315,10 @@ impl Module for LogsModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("log_create", visualize_logs_output as ToolVisualizer),
-            ("log_summarize", visualize_logs_output as ToolVisualizer),
-            ("log_toggle", visualize_logs_output as ToolVisualizer),
-            ("Close_conversation_history", visualize_logs_output as ToolVisualizer),
+            ("log_create", visualize_logs_output),
+            ("log_summarize", visualize_logs_output),
+            ("log_toggle", visualize_logs_output),
+            ("Close_conversation_history", visualize_logs_output),
         ]
     }
 

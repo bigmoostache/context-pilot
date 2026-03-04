@@ -8,7 +8,6 @@ cp-base.workspace = true
 cp-mod-memory = { path = "../cp-mod-memory" }
 cp-mod-queue = { path = "../cp-mod-queue" }
 ratatui.workspace = true
-crossterm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

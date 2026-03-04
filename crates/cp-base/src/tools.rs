@@ -88,7 +88,7 @@ impl ParamType {
                     if let Some(enum_vals) = &param.enum_values {
                         schema["enum"] = json!(enum_vals);
                     }
-                    properties.insert(param.name.clone(), schema);
+                    drop(properties.insert(param.name.clone(), schema));
                     if param.required {
                         required.push(param.name.clone());
                     }
@@ -265,7 +265,7 @@ pub struct ToolDefBuilder<'a> {
     reverie_allowed: bool,
 }
 
-impl<'a> ToolDefBuilder<'a> {
+impl ToolDefBuilder<'_> {
     pub fn short_desc(mut self, s: &str) -> Self {
         self.short_desc = s.to_string();
         self
@@ -374,7 +374,7 @@ impl ToolDefinition {
             if let Some(enum_vals) = &param.enum_values {
                 schema["enum"] = json!(enum_vals);
             }
-            properties.insert(param.name.clone(), schema);
+            drop(properties.insert(param.name.clone(), schema));
             if param.required {
                 required.push(param.name.clone());
             }

@@ -177,8 +177,8 @@ impl Module for SpineModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("notification_mark_processed", visualize_spine_output as ToolVisualizer),
-            ("spine_configure", visualize_spine_output as ToolVisualizer),
+            ("notification_mark_processed", visualize_spine_output),
+            ("spine_configure", visualize_spine_output),
         ]
     }
 

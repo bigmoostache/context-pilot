@@ -147,9 +147,9 @@ impl Module for ScratchpadModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("scratchpad_create_cell", visualize_scratchpad_output as ToolVisualizer),
-            ("scratchpad_edit_cell", visualize_scratchpad_output as ToolVisualizer),
-            ("scratchpad_wipe", visualize_scratchpad_output as ToolVisualizer),
+            ("scratchpad_create_cell", visualize_scratchpad_output),
+            ("scratchpad_edit_cell", visualize_scratchpad_output),
+            ("scratchpad_wipe", visualize_scratchpad_output),
         ]
     }
 

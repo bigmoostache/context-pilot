@@ -215,7 +215,7 @@ pub struct Theme {
 /// RGB color as [r, g, b] array
 pub type RgbColor = [u8; 3];
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Copy)]
 pub struct ThemeColors {
     pub accent: RgbColor,
     pub accent_dim: RgbColor,
@@ -285,10 +285,11 @@ static CACHED_THEME: AtomicPtr<Theme> = AtomicPtr::new(std::ptr::null_mut());
 /// Set the active theme ID (call when state is loaded or theme changes)
 pub fn set_active_theme(theme_id: &str) {
     let theme: &'static Theme = get_theme(theme_id);
-    CACHED_THEME.store(theme as *const Theme as *mut Theme, Ordering::Release);
+    CACHED_THEME.store(std::ptr::from_ref(theme).cast_mut(), Ordering::Release);
 }
 
 /// Get the currently active theme (single atomic load — no locking, no allocation)
+#[expect(unsafe_code, reason = "atomic pointer deref from static LazyLock — always valid")]
 pub fn active_theme() -> &'static Theme {
     let ptr = CACHED_THEME.load(Ordering::Acquire);
     if !ptr.is_null() {
@@ -298,7 +299,7 @@ pub fn active_theme() -> &'static Theme {
     } else {
         // First call before set_active_theme — initialize from default
         let theme = get_theme(DEFAULT_THEME);
-        CACHED_THEME.store(theme as *const Theme as *mut Theme, Ordering::Release);
+        CACHED_THEME.store(std::ptr::from_ref(theme).cast_mut(), Ordering::Release);
         theme
     }
 }

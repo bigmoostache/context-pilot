@@ -13,12 +13,12 @@ pub type ToolVisualizer = fn(content: &str, width: usize) -> Vec<ratatui::text::
 
 /// Run a Command with a timeout. Returns TimedOut error if the command exceeds the limit.
 pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<Output> {
-    cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
+    _ = cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
     let child = cmd.spawn()?;
     let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(child.wait_with_output());
-    });
+    drop(std::thread::spawn(move || {
+        tx.send(child.wait_with_output()).ok();
+    }));
     match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
         Ok(result) => result,
         Err(_) => {

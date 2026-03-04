@@ -141,7 +141,7 @@ pub const SHARED_DIR: &str = ".context-pilot/shared";
 ///
 /// Call this at module init time for any module that uses shared assets.
 pub fn ensure_shared_dir() {
-    let _ = std::fs::create_dir_all(SHARED_DIR);
+    std::fs::create_dir_all(SHARED_DIR).ok();
     ensure_gitignore_exception_at(std::path::Path::new(".gitignore"));
 }
 
@@ -183,7 +183,7 @@ fn ensure_gitignore_exception_at(gitignore_path: &std::path::Path) {
     }
     new_content.push_str("!.context-pilot/shared/\n");
 
-    let _ = std::fs::write(gitignore_path, new_content);
+    std::fs::write(gitignore_path, new_content).ok();
 }
 
 #[cfg(test)]
