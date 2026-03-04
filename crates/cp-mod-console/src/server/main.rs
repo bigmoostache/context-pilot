@@ -353,8 +353,14 @@ fn main() {
     // Remove stale socket
     let _ = std::fs::remove_file(&socket_path).ok();
 
-    // Note: setsid() is called by the TUI at spawn time (pre_exec hook).
-    // The server is already a session leader when it reaches main().
+    // Become a session leader so children get SIGHUP when the server dies.
+    // Previously done in the TUI's pre_exec hook — now the server owns its lifecycle.
+    // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
+    // and is called once at startup before any child processes are spawned.
+    #[cfg(unix)]
+    unsafe {
+        let _ = libc::setsid();
+    }
 
     // Write PID file
     let _ = std::fs::write(&pid_path, format!("{}", std::process::id())).ok();

@@ -139,25 +139,6 @@ pub fn find_or_create_server() -> Result<(), String> {
     let _ = cmd.arg(&sock_str);
     let _ = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        // setsid() makes the server a session leader with its own process group.
-        // Children inherit this session — when the server dies, they get SIGHUP.
-        // Must be done in pre_exec (before exec), not after spawn.
-        #[expect(unsafe_code, reason = "pre_exec requires unsafe — setsid() is safe to call pre-fork")]
-        // SAFETY: setsid() is async-signal-safe (POSIX) and has no preconditions.
-        // Called in pre_exec (between fork and exec) to make the server a session leader.
-        unsafe {
-            let _ = cmd.pre_exec(|| {
-                if libc::setsid() == -1 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                Ok(())
-            });
-        }
-    }
-
     drop(cmd.spawn().map_err(|e| format!("Failed to spawn console server: {e}"))?);
 
     // Wait for socket to appear (up to 3 seconds)

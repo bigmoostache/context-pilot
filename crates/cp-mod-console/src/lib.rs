@@ -15,8 +15,9 @@ pub mod tools;
 /// Console state types: `ConsoleState`, `SessionMeta`, `ProcessStatus`, `ConsoleWatcher`.
 pub mod types;
 
-// signal-hook is used by the cp-console-server binary (same Cargo.toml, [[bin]] target).
-// This silences unused_crate_dependencies for the lib target.
+// signal-hook and libc are used by the cp-console-server binary (same Cargo.toml, [[bin]] target).
+// These silences unused_crate_dependencies for the lib target.
+use libc as _;
 use signal_hook as _;
 
 /// Subdirectory under `STORE_DIR` for console log files.
