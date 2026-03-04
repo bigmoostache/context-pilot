@@ -80,10 +80,9 @@ pub struct CacheRequest {
     pub data: Box<dyn Any + Send>,
 }
 
-#[expect(clippy::missing_fields_in_debug, reason = "data field is Box<dyn Any> — not Debug-printable")]
 impl fmt::Debug for CacheRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CacheRequest").field("context_type", &self.context_type).finish()
+        f.debug_struct("CacheRequest").field("context_type", &self.context_type).finish_non_exhaustive()
     }
 }
 

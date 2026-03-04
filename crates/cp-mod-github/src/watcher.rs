@@ -73,11 +73,10 @@ pub struct GhWatcher {
     _thread: JoinHandle<()>,
 }
 
-#[expect(clippy::missing_fields_in_debug, reason = "watches and branch_pr_watch contain SecretBox — only show count")]
 impl std::fmt::Debug for GhWatcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let watch_count = self.watches.lock().map(|w| w.len()).unwrap_or(0);
-        f.debug_struct("GhWatcher").field("watch_count", &watch_count).finish()
+        f.debug_struct("GhWatcher").field("watch_count", &watch_count).finish_non_exhaustive()
     }
 }
 
