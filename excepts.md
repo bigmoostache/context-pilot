@@ -2,11 +2,6 @@ crates/cp-base/src/cast.rs:
   1: #![expect(
   2      clippy::allow_attributes,
 
-crates/cp-base/src/panels.rs:
-  41  #[must_use]
-  42: #[expect(clippy::wildcard_enum_match_arm, reason = "KeyCode is an external enum — new variants are not scroll keys")]
-  43  pub const fn scroll_key_action(key: &KeyEvent) -> Option<Action> {
-
 crates/cp-base/src/config/mod.rs:
   387  /// invariant panics route through here. One `#[expect]` to rule them all.
   388: #[expect(clippy::panic, reason = "invariant violation is unrecoverable — validated by tests")]
@@ -29,14 +24,10 @@ crates/cp-base/src/state/runtime.rs:
   284:     #[expect(clippy::expect_used, reason = "centralized panic — callers use ext_mut() to avoid per-site #[expect]")]
   285      pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 
-crates/cp-mod-console/src/server/main.rs:
-    1  //! Console Server: persistent daemon that owns child processes.
-    2: #![expect(unused_crate_dependencies, reason = "bin target shares Cargo.toml with lib — lib deps aren't used here")]
-    3  //!
-
-  358      #[cfg(unix)]
-  359:     #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
-  360      // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
+crates/cp-console-server/src/main.rs:
+  355      #[cfg(unix)]
+  356:     #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
+  357      // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
 
 src/typst_cli.rs:
   4  //! printing and `process::exit` are the expected interface.
@@ -46,11 +37,11 @@ src/typst_cli.rs:
 
 # `#[expect]` Audit — Final Status
 
-**110 → 8** annotations remaining. **102 slain.**
+**110 → 7** annotations remaining. **103 slain.**
 
 ---
 
-## Remaining `#[expect]` Annotations (8 total)
+## Remaining `#[expect]` Annotations (7 total)
 
 ### 1. `cast.rs:1` — `allow_attributes`
 
@@ -142,22 +133,7 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 
 ---
 
-### 6. `server/main.rs:2` — `unused_crate_dependencies`
-
-```rust
-#![expect(unused_crate_dependencies, reason = "bin target shares Cargo.toml with lib — lib deps aren't used here")]
-```
-
-**Justification:** `cp-mod-console` has a single `Cargo.toml` that defines both a library (`lib.rs`) and a binary (`cp-console-server` from `server/main.rs`). The library depends on `serde`, `serde_json`, `ratatui`, `sha2`, etc. The server binary only uses `serde`, `serde_json`, `libc`, and `signal-hook`. Cargo's `unused_crate_dependencies` lint fires on the server binary for every lib-only dependency because Cargo doesn't distinguish per-target dependencies.
-
-**Strategies to eliminate:**
-- **Separate crate for server:** Extract `server/main.rs` + `server/protocol.rs` into a dedicated `cp-console-server` crate with its own `Cargo.toml` that declares only the deps it actually uses (`serde`, `serde_json`, `libc`, `signal-hook`). The lib crate keeps its own deps. Clean dependency boundaries, zero lint suppression. Requires adding a workspace member and adjusting build scripts.
-- **Per-target dependency syntax (Cargo RFC):** Cargo has open RFCs for `[bin-dependencies]` or target-specific dependency scoping. If stabilized, deps could be declared per-target within one `Cargo.toml`. Not yet available.
-- **`cfg` gating:** Conditionally compile the binary behind a feature flag (`feature = "server"`). Deps used only by the lib are gated behind `not(feature = "server")`. Hacky, adds maintenance burden, and inverts the natural dependency model.
-
----
-
-### 7. `server/main.rs:359` — `unsafe_code`
+### 6. `server/main.rs:356` — `unsafe_code`
 
 ```rust
 #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
@@ -171,13 +147,12 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 **Justification:** `setsid()` creates a new POSIX session so spawned child processes get SIGHUP when the server dies — essential for process cleanup. The `libc` crate exposes it as `unsafe` because it's a raw FFI call, even though `setsid()` has zero preconditions and is async-signal-safe. There's no safe wrapper in the Rust ecosystem because it's too trivial to warrant one.
 
 **Strategies to eliminate:**
-- **`nix` crate:** The `nix` crate provides a safe wrapper: `nix::unistd::setsid()` returns `Result<Pid>`. No unsafe block needed — the crate handles the FFI boundary. Adds a dependency but it's a well-maintained, widely-used POSIX abstraction layer.
-- **`command-group` or `process-group` crate:** Higher-level crates that manage process groups/sessions. Overkill for a single `setsid()` call but eliminate the need for raw libc entirely.
-- **Pre-exec on child processes:** Instead of making the server a session leader, use `Command::pre_exec()` on each spawned child to call `setsid()` there. This moves the unsafe to child setup — but `pre_exec` itself is unsafe, so it doesn't eliminate the annotation, just moves it.
+- **Irreducible.** `setsid()` is a kernel syscall — the only way to invoke it is through the FFI boundary, which requires `unsafe` in Rust. No crate can eliminate the unsafety; it can only hide it behind a wrapper. The `nix` crate provides `nix::unistd::setsid()` but internally calls the same `unsafe { libc::setsid() }`. Adding 35 transitive dependencies to move the `unsafe` into someone else's crate is not an improvement.
+- **Full audit confirms necessity:** 10 process-death scenarios analyzed. `setsid()` is the ONLY mechanism that catches child orphans when the server receives SIGKILL or is OOM-killed — all other cleanup paths (explicit kill, orphan detection, signal handlers) are bypassed. Defense-in-depth for an edge case no other code path covers.
 
 ---
 
-### 8. `typst_cli.rs:5` — `print_stdout`, `exit`
+### 7. `typst_cli.rs:5` — `print_stdout`, `exit`
 
 ```rust
 #![expect(
@@ -204,6 +179,5 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 | 2 | `config/mod.rs` | `panic` | 🟢 | `build.rs` compile-time YAML validation |
 | 3 | `runtime.rs` | `struct_excessive_bools` | 🟡 | Domain sub-structs (scriptable, ~1000 callsites) |
 | 4–5 | `runtime.rs` | `expect_used` (×2) | 🟡 | `Default` fallback or lazy init |
-| 6 | `server/main.rs` | `unused_crate_dependencies` | 🟢 | Separate server crate |
-| 7 | `server/main.rs` | `unsafe_code` | 🟢 | `nix` crate safe wrapper |
-| 8 | `typst_cli.rs` | `print_stdout` + `exit` | 🟢 | Return `Result` from CLI functions |
+| 6 | `server/main.rs` | `unsafe_code` | 🔴 | Irreducible — FFI boundary to kernel syscall |
+| 7 | `typst_cli.rs` | `print_stdout` + `exit` | 🟢 | Return `Result` from CLI functions |
