@@ -36,14 +36,10 @@ fn main() -> io::Result<()> {
     if args.len() >= 2 {
         match args[1].as_str() {
             // Compile a .typ → .pdf in the same directory
-            "typst-compile" => {
-                typst_cli::run_typst_compile(&args[2..]);
-                return Ok(());
-            }
+            "typst-compile" => handle_cli_result(typst_cli::run_typst_compile(&args[2..])),
             // Recompile watched documents whose dependencies changed
             "typst-recompile-watched" => {
-                typst_cli::run_typst_recompile_watched(&args[2..]);
-                return Ok(());
+                handle_cli_result(typst_cli::run_typst_recompile_watched(&args[2..]));
             }
             _ => {}
         }
@@ -125,4 +121,31 @@ fn main() -> io::Result<()> {
     let _r = io::stdout().execute(DisableBracketedPaste)?;
     let _r = io::stdout().execute(LeaveAlternateScreen)?;
     Ok(())
+}
+
+/// Handle a CLI subcommand result: print output and exit.
+///
+/// `Ok(msg)` prints to stdout (if non-empty) and exits 0.
+/// `Err((msg, code))` prints to stderr (if non-empty) and exits with `code`.
+#[expect(
+    clippy::exit,
+    clippy::print_stdout,
+    reason = "CLI entry point — printing and process::exit are the correct interface"
+)]
+fn handle_cli_result(result: Result<String, (String, i32)>) -> ! {
+    match result {
+        Ok(msg) => {
+            if !msg.is_empty() {
+                println!("{msg}");
+            }
+            std::process::exit(0);
+        }
+        Err((msg, code)) => {
+            if !msg.is_empty() {
+                use io::Write;
+                drop(writeln!(io::stderr(), "{msg}"));
+            }
+            std::process::exit(code);
+        }
+    }
 }
