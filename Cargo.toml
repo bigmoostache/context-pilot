@@ -19,12 +19,6 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 [workspace.lints.rust]
 # Visibility hygiene — flag pub items that don't need to be pub
 unreachable_pub = "warn"
-# Dead code in the workspace (redundant with default, but explicit)
-dead_code = "warn"
-# Unused imports, variables, mut bindings
-unused_imports = "warn"
-unused_variables = "warn"
-unused_mut = "warn"
 # Missing Debug impls on public types (good for inspectability)
 missing_debug_implementations = "warn"
 # Elided lifetimes in impl blocks — forces explicit 'a where it matters
@@ -107,6 +101,197 @@ unused_qualifications = "warn"
 unused_results = "warn"
 # Large variant size differences
 variant_size_differences = "warn"
+# --- Warn-by-default promoted to deny ---
+# Two globs re-exporting the same name — always a bug
+ambiguous_glob_reexports = "deny"
+# Comparing fat pointers doesn't do what you think
+ambiguous_wide_pointer_comparisons = "deny"
+# Deprecated syntax, always wrong on edition 2024
+anonymous_parameters = "deny"
+# Edition migration footgun, always fix
+array_into_iter = "deny"
+# Always wrong on 2024, use `dyn Trait`
+bare_trait_objects = "deny"
+# Same class as array_into_iter, always fix
+boxed_slice_into_iter = "deny"
+# Ambiguous syntax, always a bug
+break_with_label_and_loop = "deny"
+# Two different signatures for same extern symbol — always a bug
+clashing_extern_declarations = "deny"
+# Soundness-adjacent, always fix
+coherence_leak_check = "deny"
+# Identifiers that look alike (latin/cyrillic) — always a bug or attack
+confusable_idents = "deny"
+# Soundness issue, always fix
+const_evaluatable_unchecked = "deny"
+# Duplicate of const_item_mutation, same reasoning
+const_item_interior_mutations = "deny"
+# Mutating a const is always a bug (you get a copy each time)
+const_item_mutation = "deny"
+# Always a bug — pointer to dropped local
+dangling_pointers_from_locals = "deny"
+# Always a bug — pointer to dropped temporary
+dangling_pointers_from_temporaries = "deny"
+# Using deprecated APIs should be fixed immediately
+deprecated = "deny"
+# Always wrong syntax, easy fix
+deprecated_where_clause_location = "deny"
+# Always confusing, always a mistake
+double_negations = "deny"
+# T: Drop bound is always wrong (not all droppable types impl Drop)
+drop_bounds = "deny"
+# drop() on a Copy type does nothing, always a bug
+dropping_copy_types = "deny"
+# drop(&x) does nothing, always a bug
+dropping_references = "deny"
+# Always a mistake
+duplicate_macro_attributes = "deny"
+# dyn Drop is almost never what you want
+dyn_drop = "deny"
+# Use ..= not ..., always wrong on modern Rust
+ellipsis_inclusive_range_patterns = "deny"
+# for x in Some(v) is always a bug
+for_loops_over_fallibles = "deny"
+# forget() on Copy type does nothing, always a bug
+forgetting_copy_types = "deny"
+# forget(&x) does nothing, always a bug
+forgetting_references = "deny"
+# Casting fn pointer to integer is always suspicious
+function_casts_as_integer = "deny"
+# Taking reference to function item instead of fn pointer — always a bug
+function_item_references = "deny"
+# A named re-export silently hides a glob re-export — always confusing
+hidden_glob_reexports = "deny"
+# FFI type mismatch is always a bug
+improper_ctypes = "deny"
+# Same for definitions
+improper_ctypes_definitions = "deny"
+# Always a bug — use ptr::from_exposed_addr instead
+integer_to_ptr_transmutes = "deny"
+# Always a bug
+invalid_from_utf8 = "deny"
+# Comparing with NaN is always wrong
+invalid_nan_comparisons = "deny"
+# Creating invalid values is always UB
+invalid_value = "deny"
+# if let on irrefutable pattern is always a logic error
+irrefutable_let_patterns = "deny"
+# Always wrong, will become a hard error
+late_bound_lifetime_arguments = "deny"
+# Always a mistake in attribute syntax
+malformed_diagnostic_attributes = "deny"
+# Always a mistake
+malformed_diagnostic_format_literals = "deny"
+# .map(f) where f returns () — always meant .for_each()
+map_unit_fn = "deny"
+# Always a mistake in attribute placement
+misplaced_diagnostic_attributes = "deny"
+# extern without ABI string — always specify "C" explicitly
+missing_abi = "deny"
+# Mixed unicode scripts in idents — always a bug or attack
+mixed_script_confusables = "deny"
+# Confusing format string usage, always fix
+named_arguments_used_positionally = "deny"
+# no_mangle on generic item does not work, always a bug
+no_mangle_generic_items = "deny"
+# Rust convention, LLMs must follow it
+non_camel_case_types = "deny"
+# Gap in range match — always a bug
+non_contiguous_range_endpoints = "deny"
+# panic!(variable) instead of panic!("{}", variable) — always fix
+non_fmt_panics = "deny"
+# impl in weird scopes — always wrong
+non_local_definitions = "deny"
+# Foo { x: x } instead of Foo { x } — always fix
+non_shorthand_field_patterns = "deny"
+# Rust convention, LLMs must follow it
+non_snake_case = "deny"
+# Rust convention, LLMs must follow it
+non_upper_case_globals = "deny"
+# Calling .clone() on &T where T: !Clone does nothing — always a bug
+noop_method_call = "deny"
+# Overlapping ranges in match — always a bug
+overlapping_range_endpoints = "deny"
+# x; as a statement with no effect — always a bug
+path_statements = "deny"
+# Public API with private bounds — always wrong
+private_bounds = "deny"
+# Public API exposing private types — always wrong
+private_interfaces = "deny"
+# Always a bug in const context
+ptr_to_integer_transmute_in_consts = "deny"
+# Always remove, never intentional
+redundant_semicolons = "deny"
+# Stale lint config — always fix
+renamed_and_removed_lints = "deny"
+# Always confusing scoping bug
+self_constructor_from_outer_item = "deny"
+# Misusing lib/main as module names — always a mistake
+special_module_name = "deny"
+# feature(x) where x is stable — always remove
+stable_features = "deny"
+# References to mutable statics are always unsound
+static_mut_refs = "deny"
+# .deref() on &&T — almost always a bug
+suspicious_double_ref_op = "deny"
+# where i32: Copy — always pointless
+trivial_bounds = "deny"
+# Bounds on type aliases are ignored — always misleading
+type_alias_bounds = "deny"
+# Will become hard error, always fix
+tyvar_behind_raw_pointer = "deny"
+# Unusual unicode in idents — always suspicious
+uncommon_codepoints = "deny"
+# Infinite recursion — always a bug
+unconditional_recursion = "deny"
+# Coherence violation — always fix
+uncovered_param_in_projection = "deny"
+# Static of uninhabited type — always a bug
+uninhabited_static = "deny"
+# Always a scoping mistake in tests
+unnameable_test_items = "deny"
+# Transmute where a safe cast exists — always fix
+unnecessary_transmutes = "deny"
+# Comparing fn pointers is never reliable — always a bug
+unpredictable_function_pointer_comparisons = "deny"
+# Always a bug
+unreachable_code = "deny"
+# Always a bug
+unreachable_patterns = "deny"
+# Your method will be shadowed by std — always fix
+unstable_name_collisions = "deny"
+# Always a bug
+unsupported_calling_conventions = "deny"
+# Unnecessary Box/Vec allocation — always fix
+unused_allocation = "deny"
+# Dead bounds — always remove
+unused_associated_type_bounds = "deny"
+# Attribute does nothing — always a mistake
+unused_attributes = "deny"
+# Always remove
+unused_braces = "deny"
+# Comparison that's always true/false — always a bug
+unused_comparisons = "deny"
+# Doc comment on non-item — always misplaced
+unused_doc_comments = "deny"
+# Feature gate not needed — always remove
+unused_features = "deny"
+# Dead label — always remove
+unused_labels = "deny"
+# Ignoring Result/#[must_use] — always a bug
+unused_must_use = "deny"
+# Unnecessary mut — always fix
+unused_mut = "deny"
+# Unnecessary parens — always remove
+unused_parens = "deny"
+# Unnecessary unsafe block — always remove
+unused_unsafe = "deny"
+# Null check on reference-derived pointer — always a bug
+useless_ptr_null_checks = "deny"
+# Always fix, will become hard error
+varargs_without_pattern = "deny"
+# while true instead of loop — always fix
+while_true = "deny"
 
 [workspace.lints.clippy]
 # Performance
