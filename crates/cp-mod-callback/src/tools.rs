@@ -80,6 +80,10 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Close the callback editor, restoring the normal table view.
+///
+/// # Panics
+///
+/// Panics if an internal invariant is violated.
 pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     let previous = CallbackState::get(state).editor_open.clone();
 

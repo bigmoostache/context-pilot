@@ -29,6 +29,7 @@ impl Default for RingBuffer {
 
 impl RingBuffer {
     /// Create a new ring buffer with default capacity (256KB).
+    #[must_use]
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(RingBufferInner {
@@ -58,6 +59,7 @@ impl RingBuffer {
 
     /// Read the entire buffer contents as a string.
     /// Returns (content, `total_bytes_written`).
+    #[must_use]
     pub fn read_all(&self) -> (String, u64) {
         let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         let total = inner.total_written;
@@ -74,6 +76,7 @@ impl RingBuffer {
     }
 
     /// Return the last N lines of buffer content.
+    #[must_use]
     pub fn last_n_lines(&self, n: usize) -> String {
         let (content, _) = self.read_all();
         let lines: Vec<&str> = content.lines().collect();
@@ -83,6 +86,7 @@ impl RingBuffer {
 
     /// Check if the buffer content matches a regex pattern.
     /// Falls back to literal substring match if the regex is invalid.
+    #[must_use]
     pub fn contains_pattern(&self, pattern: &str) -> bool {
         let (content, _) = self.read_all();
         match regex::Regex::new(pattern) {
@@ -92,6 +96,7 @@ impl RingBuffer {
     }
 
     /// Monotonic counter of total bytes written (for change detection).
+    #[must_use]
     pub fn total_written(&self) -> u64 {
         let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.total_written

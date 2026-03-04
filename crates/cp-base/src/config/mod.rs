@@ -273,6 +273,7 @@ pub struct ContextIcons(pub HashMap<String, String>);
 
 impl ContextIcons {
     /// Look up an icon by key (e.g., "tree", "git").
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&str> {
         self.0.get(key).map(|s| s.as_str())
     }
@@ -408,6 +409,11 @@ pub static REVERIE: LazyLock<ReverieConfig> =
     LazyLock::new(|| parse_yaml("reverie.yaml", include_str!("../../../../yamls/reverie.yaml")));
 
 /// Get a theme by ID, falling back to default if not found
+///
+/// # Panics
+///
+/// Panics if an internal invariant is violated.
+#[must_use]
 pub fn get_theme(theme_id: &str) -> &'static Theme {
     THEMES.themes.get(theme_id).or_else(|| THEMES.themes.get(DEFAULT_THEME)).expect("Default theme must exist")
 }
@@ -451,6 +457,7 @@ pub fn active_theme() -> &'static Theme {
 /// Return icon with trailing space for visual separation.
 /// All icons are expected to be single-width Unicode symbols; the space
 /// ensures consistent 2-cell alignment in the TUI.
+#[must_use]
 pub fn normalize_icon(icon: &str) -> String {
     format!("{} ", icon)
 }

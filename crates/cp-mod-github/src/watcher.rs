@@ -73,6 +73,7 @@ pub struct GhWatcher {
     _thread: JoinHandle<()>,
 }
 
+#[expect(clippy::missing_fields_in_debug, reason = "watches and branch_pr_watch contain SecretBox — only show count")]
 impl std::fmt::Debug for GhWatcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let watch_count = self.watches.lock().map(|w| w.len()).unwrap_or(0);
@@ -82,6 +83,7 @@ impl std::fmt::Debug for GhWatcher {
 
 impl GhWatcher {
     /// Create a new `GhWatcher` with a background polling thread.
+    #[must_use]
     pub fn new(cache_tx: Sender<CacheUpdate>) -> Self {
         let watches: Arc<Mutex<HashMap<String, GhWatch>>> = Arc::new(Mutex::new(HashMap::new()));
         let branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>> = Arc::new(Mutex::new(None));
@@ -163,6 +165,7 @@ impl GhWatcher {
 }
 
 /// Classify whether args represent a `gh api` command eligible for `ETag` polling.
+#[must_use]
 pub fn is_api_command(args: &[String]) -> bool {
     args.first().map(|s| s.as_str()) == Some("api")
         && !args.iter().any(|a| a == "--jq" || a == "-q" || a == "--template" || a == "-t")

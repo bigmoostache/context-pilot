@@ -59,6 +59,7 @@ fn server_binary_path() -> PathBuf {
 }
 
 /// Build the log file path for a given session key (always absolute).
+#[must_use]
 pub fn log_file_path(key: &str) -> PathBuf {
     let base = PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{}.log", key));
     if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
@@ -69,6 +70,11 @@ pub fn log_file_path(key: &str) -> PathBuf {
 // ---------------------------------------------------------------------------
 
 /// Send a JSON command to the server and read the response.
+///
+/// # Errors
+///
+/// Returns `Err` if the socket connection, write, read, or JSON parse fails,
+/// or if the server response indicates an error.
 pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Value, String> {
     let sock_path = server_socket_path();
     let stream = UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {}", e))?;
@@ -99,6 +105,11 @@ pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Valu
 }
 
 /// Find the running server or spawn a new one.
+///
+/// # Errors
+///
+/// Returns `Err` if the console directory cannot be created, or if the
+/// server binary fails to spawn.
 pub fn find_or_create_server() -> Result<(), String> {
     // Ensure console directory exists
     let console_dir = PathBuf::from(STORE_DIR).join(CONSOLE_DIR);
@@ -215,6 +226,11 @@ unsafe impl Sync for SessionHandle {}
 
 impl SessionHandle {
     /// Spawn a new child process via the console server.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the server is unreachable and cannot be restarted,
+    /// or if the spawn request fails.
     pub fn spawn(name: String, command: String, cwd: Option<String>) -> Result<Self, String> {
         let log_path = log_file_path(&name);
         let log_path_str = log_path.to_string_lossy().to_string();
@@ -281,6 +297,7 @@ impl SessionHandle {
     }
 
     /// Reconnect to a server-managed session after TUI reload.
+    #[must_use]
     pub fn reconnect(
         name: String,
         command: String,
@@ -371,6 +388,10 @@ impl SessionHandle {
     }
 
     /// Send input to the process via the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the server is unreachable and cannot be restarted.
     pub fn send_input(&self, input: &str) -> Result<(), String> {
         let req = serde_json::json!({
             "cmd": "send",
@@ -405,16 +426,19 @@ impl SessionHandle {
     }
 
     /// Get the current process status.
+    #[must_use]
     pub fn get_status(&self) -> ProcessStatus {
         *self.status.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// Get exit code (if process is terminal).
+    #[must_use]
     pub fn exit_code(&self) -> Option<i32> {
         self.get_status().exit_code()
     }
 
     /// Get the PID if available.
+    #[must_use]
     pub fn pid(&self) -> Option<u32> {
         *self.child_id.lock().unwrap_or_else(|e| e.into_inner())
     }

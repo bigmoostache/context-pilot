@@ -38,8 +38,7 @@ const SYSTEM_REMINDER: &str =
 /// Map model names to full API model identifiers
 fn map_model_name(model: &str) -> &str {
     match model {
-        "claude-opus-4-6" => "claude-opus-4-6",
-        "claude-opus-4-5" => "claude-opus-4-6",
+        "claude-opus-4-6" | "claude-opus-4-5" => "claude-opus-4-6",
         "claude-sonnet-4-5" => "claude-sonnet-4-5-20250929",
         "claude-haiku-4-5" => "claude-haiku-4-5-20251001",
         _ => model,

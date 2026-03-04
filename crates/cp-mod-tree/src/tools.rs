@@ -263,6 +263,7 @@ fn normalize_path(path: &Path) -> String {
 /// List directory entries (files + folders) matching a prefix, respecting the gitignore filter.
 /// Returns entries sorted: directories first, then alphabetically (case-insensitive).
 /// Used by the `@` autocomplete popup.
+#[must_use]
 pub fn list_dir_entries(
     tree_filter: &str,
     dir_prefix: &str,

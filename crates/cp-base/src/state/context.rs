@@ -48,6 +48,10 @@ pub fn get_context_type_meta(ct: &str) -> Option<&'static ContextTypeMeta> {
 
 /// Return the canonical fixed panel order, derived from the registry.
 /// Sorted by `fixed_order` for panels that declare `is_fixed = true`.
+///
+/// # Panics
+///
+/// Panics if an internal invariant is violated.
 pub fn fixed_panel_order() -> Vec<&'static str> {
     let Some(registry) = CONTEXT_TYPE_REGISTRY.get() else { return vec![] };
     let mut fixed: Vec<_> = registry.iter().filter(|m| m.is_fixed && m.fixed_order.is_some()).collect();
@@ -74,11 +78,13 @@ pub struct ContextType(String);
 
 impl ContextType {
     /// Create a new context type from a string ID.
+    #[must_use]
     pub fn new(id: &str) -> Self {
         Self(id.to_string())
     }
 
     /// Return the raw string ID.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -136,11 +142,13 @@ impl ContextType {
     pub const QUEUE: &str = "queue";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
+    #[must_use]
     pub fn is_fixed(&self) -> bool {
         get_context_type_meta(self.0.as_str()).is_some_and(|m| m.is_fixed)
     }
 
     /// Get icon for this context type (normalized to 2 cells, looked up from registry + theme).
+    #[must_use]
     pub fn icon(&self) -> String {
         let icon_id = get_context_type_meta(self.0.as_str()).map_or("file", |m| m.icon_id);
         let raw = active_theme().context.get(icon_id).unwrap_or("📄");
@@ -148,6 +156,7 @@ impl ContextType {
     }
 
     /// Returns true if this context type uses `cached_content` from background loading.
+    #[must_use]
     pub fn needs_cache(&self) -> bool {
         get_context_type_meta(self.0.as_str()).is_some_and(|m| m.needs_cache)
     }
@@ -236,6 +245,7 @@ pub struct ContextElement {
 // === ContextElement metadata helpers ===
 impl ContextElement {
     /// Get a typed value from the metadata bag.
+    #[must_use]
     pub fn get_meta<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
         self.metadata.get(key).and_then(|v| serde_json::from_value(v.clone()).ok())
     }
@@ -248,28 +258,33 @@ impl ContextElement {
     }
 
     /// Fast path: get a metadata value as &str (avoids clone/deser for the common string case).
+    #[must_use]
     pub fn get_meta_str(&self, key: &str) -> Option<&str> {
         self.metadata.get(key).and_then(|v| v.as_str())
     }
 
     /// Fast path: get a metadata `value.to_usize()`.
+    #[must_use]
     pub fn get_meta_usize(&self, key: &str) -> Option<usize> {
         self.metadata.get(key).and_then(|v| v.as_u64()).map(|n| n.to_usize())
     }
 }
 
 /// Estimate tokens from text (uses `CHARS_PER_TOKEN` constant)
+#[must_use]
 pub fn estimate_tokens(text: &str) -> usize {
     (text.len().to_f32() / CHARS_PER_TOKEN).ceil().to_usize()
 }
 
 /// Compute total pages for a given token count using `PANEL_PAGE_TOKENS`
+#[must_use]
 pub fn compute_total_pages(token_count: usize) -> usize {
     let max = crate::config::constants::PANEL_PAGE_TOKENS;
     if token_count <= max { 1 } else { token_count.div_ceil(max) }
 }
 
 /// Create a default `ContextElement` for a fixed or dynamic panel.
+#[must_use]
 pub fn make_default_context_element(
     id: &str,
     context_type: ContextType,

@@ -153,10 +153,8 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
             total_deletions += file.deletions;
             match file.change_type {
                 GitChangeType::Untracked => untracked_count += 1,
-                GitChangeType::Modified => modified_count += 1,
+                GitChangeType::Modified | GitChangeType::Added | GitChangeType::Renamed => modified_count += 1,
                 GitChangeType::Deleted => deleted_count += 1,
-                GitChangeType::Added => modified_count += 1,
-                GitChangeType::Renamed => modified_count += 1,
             }
         }
 

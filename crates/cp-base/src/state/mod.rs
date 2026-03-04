@@ -65,6 +65,7 @@ pub mod reverie {
 
     impl ReverieState {
         /// Create a new reverie session driven by the given agent.
+        #[must_use]
         pub fn new(reverie_type: ReverieType, agent_id: String, context: Option<String>) -> Self {
             Self {
                 reverie_type,

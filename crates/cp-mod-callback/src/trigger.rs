@@ -32,6 +32,7 @@ pub struct ChangedFile {
 /// Collect changed file paths from a batch of tool uses.
 /// Extracts `file_path` from Edit and Write tool inputs.
 /// Also collects `skip_callbacks` names per tool for selective skipping.
+#[must_use]
 pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<ChangedFile> {
     let mut hull: Vec<ChangedFile> = Vec::new();
     let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
@@ -80,6 +81,7 @@ fn parse_skip_callbacks(input: &serde_json::Value) -> Vec<String> {
 /// Match changed files against active callback patterns.
 /// Returns a list of callbacks that matched, each with their matched files.
 /// Also validates `skip_callbacks` names and returns warnings for non-existent or non-matching ones.
+#[must_use]
 pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<MatchedCallback>, Vec<String>) {
     if changed_files.is_empty() {
         return (Vec::new(), Vec::new());
@@ -158,6 +160,7 @@ fn validate_skip_names(cs: &CallbackState, names: &[&str], warnings: &mut Vec<St
 }
 
 /// Separate matched callbacks into blocking and non-blocking groups.
+#[must_use]
 pub fn partition_callbacks(matched: Vec<MatchedCallback>) -> (Vec<MatchedCallback>, Vec<MatchedCallback>) {
     let mut blocking_fleet = Vec::new();
     let mut async_fleet = Vec::new();
@@ -174,6 +177,7 @@ pub fn partition_callbacks(matched: Vec<MatchedCallback>) -> (Vec<MatchedCallbac
 }
 
 /// Build the $`CP_CHANGED_FILES` environment variable value (newline-separated).
+#[must_use]
 pub fn build_changed_files_env(files: &[String]) -> String {
     files.join("\n")
 }

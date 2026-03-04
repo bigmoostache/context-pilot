@@ -154,13 +154,11 @@ fn writer_loop(rx: Receiver<WriterMsg>, flush_sync: Arc<(Mutex<bool>, Condvar)>)
                 // Replace the pending batch (coalesce — only the latest state matters)
                 pending_batch = Some(batch);
                 // Don't write yet — wait for debounce timeout
-                continue;
             }
             Some(WriterMsg::Message(op)) => {
                 // Messages are not debounced — queue for immediate write
                 pending_messages.push(op);
                 // But don't interrupt the debounce loop — write when we flush
-                continue;
             }
             Some(WriterMsg::Flush) => {
                 // Write everything immediately
@@ -171,7 +169,6 @@ fn writer_loop(rx: Receiver<WriterMsg>, flush_sync: Arc<(Mutex<bool>, Condvar)>)
                 let mut flushed = lock.lock().unwrap_or_else(|e| e.into_inner());
                 *flushed = true;
                 cvar.notify_all();
-                continue;
             }
             Some(WriterMsg::Shutdown) => {
                 // Final write + exit

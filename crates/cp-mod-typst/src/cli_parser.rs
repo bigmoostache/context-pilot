@@ -61,6 +61,11 @@ pub enum TypstCommand {
 /// Accepts commands with or without the "typst" prefix:
 /// - "typst compile doc.typ"
 /// - "compile doc.typ"
+///
+/// # Errors
+///
+/// Returns `Err` if the command is empty, has an unknown subcommand, or
+/// the subcommand arguments are invalid.
 pub fn parse_command(command: &str) -> Result<TypstCommand, String> {
     let tokens = shell_split(command);
     if tokens.is_empty() {

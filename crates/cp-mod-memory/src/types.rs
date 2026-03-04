@@ -34,6 +34,7 @@ impl FromStr for MemoryImportance {
 
 impl MemoryImportance {
     /// String representation for serialization/display.
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             MemoryImportance::Low => "low",
@@ -83,14 +84,24 @@ impl Default for MemoryState {
 
 impl MemoryState {
     /// Create an empty state with ID counter at 1.
+    #[must_use]
     pub fn new() -> Self {
         Self { memories: vec![], next_memory_id: 1, open_memory_ids: vec![] }
     }
     /// Get shared ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("MemoryState not initialized")
     }
     /// Get mutable ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("MemoryState not initialized")
     }

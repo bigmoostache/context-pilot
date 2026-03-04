@@ -38,14 +38,24 @@ impl Default for GithubState {
 
 impl GithubState {
     /// Create a fresh state with no token or PR info.
+    #[must_use]
     pub fn new() -> Self {
         Self { github_token: None, branch_pr: None }
     }
     /// Get shared ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("GithubState not initialized")
     }
     /// Get mutable ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("GithubState not initialized")
     }

@@ -52,11 +52,13 @@ pub struct ToolResult {
 
 impl ToolResult {
     /// Create a `ToolResult`. The `tool_name` is left empty — populated by dispatch.
+    #[must_use]
     pub fn new(tool_use_id: String, content: String, is_error: bool) -> Self {
         Self { tool_use_id, content, is_error, tool_name: String::new() }
     }
 
     /// Create a `ToolResult` with an explicit tool name.
+    #[must_use]
     pub fn with_name(tool_use_id: String, content: String, is_error: bool, tool_name: String) -> Self {
         Self { tool_use_id, content, is_error, tool_name }
     }
@@ -138,21 +140,25 @@ pub struct PreFlightResult {
 
 impl PreFlightResult {
     /// Empty result (no errors, no warnings).
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// `true` if any blocking errors were recorded.
+    #[must_use]
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()
     }
 
     /// `true` if any warnings were recorded.
+    #[must_use]
     pub fn has_warnings(&self) -> bool {
         !self.warnings.is_empty()
     }
 
     /// `true` if both errors and warnings are empty.
+    #[must_use]
     pub fn is_clean(&self) -> bool {
         self.errors.is_empty() && self.warnings.is_empty()
     }
@@ -176,6 +182,7 @@ impl PreFlightResult {
     }
 
     /// Format errors and warnings into a human-readable string.
+    #[must_use]
     pub fn format_errors(&self) -> String {
         let mut lines = Vec::new();
         for e in &self.errors {
@@ -207,6 +214,7 @@ pub struct ToolParam {
 
 impl ToolParam {
     /// Create a parameter with name and type. Defaults to optional, no description.
+    #[must_use]
     pub fn new(name: &str, param_type: ParamType) -> Self {
         Self {
             name: name.to_string(),
@@ -219,24 +227,28 @@ impl ToolParam {
     }
 
     /// Set a description (builder pattern).
+    #[must_use]
     pub fn desc(mut self, d: &str) -> Self {
         self.description = Some(d.to_string());
         self
     }
 
     /// Mark as required (builder pattern).
+    #[must_use]
     pub fn required(mut self) -> Self {
         self.required = true;
         self
     }
 
     /// Restrict to specific allowed values (builder pattern).
+    #[must_use]
     pub fn enum_vals(mut self, vals: &[&str]) -> Self {
         self.enum_values = Some(vals.iter().map(|s| s.to_string()).collect());
         self
     }
 
     /// Set a default value hint (builder pattern).
+    #[must_use]
     pub fn default_val(mut self, val: &str) -> Self {
         self.default = Some(val.to_string());
         self
@@ -271,6 +283,11 @@ pub struct ToolDefinition {
 
 impl ToolDefinition {
     /// Start building a [`ToolDefinition`] from YAML text. Panics if the tool ID is missing.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an unexpected state is encountered.
+    #[must_use]
     pub fn from_yaml<'a>(id: &str, texts: &'a ToolTexts) -> ToolDefBuilder<'a> {
         let text = texts.tools.get(id).unwrap_or_else(|| {
             panic!("Tool '{}' not found in YAML", id);
@@ -313,30 +330,35 @@ pub struct ToolDefBuilder<'a> {
 
 impl ToolDefBuilder<'_> {
     /// Set sidebar short description.
+    #[must_use]
     pub fn short_desc(mut self, s: &str) -> Self {
         self.short_desc = s.to_string();
         self
     }
 
     /// Set tool category for grouping.
+    #[must_use]
     pub fn category(mut self, c: &str) -> Self {
         self.category = c.to_string();
         self
     }
 
     /// Allow or deny reverie sub-agents access to this tool.
+    #[must_use]
     pub fn reverie_allowed(mut self, allowed: bool) -> Self {
         self.reverie_allowed = allowed;
         self
     }
 
     /// Set enabled/disabled state.
+    #[must_use]
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     /// Add a parameter. Description is auto-pulled from YAML by param name.
+    #[must_use]
     pub fn param(mut self, name: &str, param_type: ParamType, required: bool) -> Self {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, param_type);
@@ -349,6 +371,7 @@ impl ToolDefBuilder<'_> {
     }
 
     /// Add a parameter with enum values. Description from YAML.
+    #[must_use]
     pub fn param_enum(mut self, name: &str, values: &[&str], required: bool) -> Self {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, ParamType::String);
@@ -362,6 +385,7 @@ impl ToolDefBuilder<'_> {
     }
 
     /// Add a parameter with a default value. Description from YAML.
+    #[must_use]
     pub fn param_with_default(mut self, name: &str, param_type: ParamType, default: &str) -> Self {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, param_type);
@@ -372,6 +396,7 @@ impl ToolDefBuilder<'_> {
     }
 
     /// Add a parameter with array type. Description from YAML.
+    #[must_use]
     pub fn param_array(mut self, name: &str, items: ParamType, required: bool) -> Self {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, ParamType::Array(Box::new(items)));
@@ -384,6 +409,7 @@ impl ToolDefBuilder<'_> {
     }
 
     /// Add a parameter with object type (nested params). Description from YAML.
+    #[must_use]
     pub fn param_object(mut self, name: &str, fields: Vec<ToolParam>, required: bool) -> Self {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, ParamType::Object(fields));
@@ -396,6 +422,7 @@ impl ToolDefBuilder<'_> {
     }
 
     /// Finalize the builder into a [`ToolDefinition`].
+    #[must_use]
     pub fn build(self) -> ToolDefinition {
         ToolDefinition {
             id: self.id,
@@ -412,6 +439,7 @@ impl ToolDefBuilder<'_> {
 
 impl ToolDefinition {
     /// Emit the Anthropic-compatible JSON Schema for this tool's parameters.
+    #[must_use]
     pub fn to_json_schema(&self) -> Value {
         let mut properties = serde_json::Map::new();
         let mut required = Vec::new();
@@ -439,6 +467,7 @@ impl ToolDefinition {
 }
 
 /// Build the JSON array of enabled tool schemas for the LLM API.
+#[must_use]
 pub fn build_api_tools(tools: &[ToolDefinition]) -> Value {
     let enabled: Vec<Value> = tools
         .iter()

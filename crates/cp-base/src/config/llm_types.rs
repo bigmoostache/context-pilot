@@ -44,6 +44,7 @@ pub struct ApiCheckResult {
 
 impl ApiCheckResult {
     /// `true` only when auth, streaming, and tool-use all passed.
+    #[must_use]
     pub fn all_ok(&self) -> bool {
         self.auth_ok && self.streaming_ok && self.tools_ok
     }
@@ -164,8 +165,7 @@ impl ModelInfo for AnthropicModel {
     fn max_output_tokens(&self) -> u32 {
         match self {
             AnthropicModel::ClaudeOpus45 => 128_000,
-            AnthropicModel::ClaudeSonnet45 => 64_000,
-            AnthropicModel::ClaudeHaiku45 => 64_000,
+            AnthropicModel::ClaudeSonnet45 | AnthropicModel::ClaudeHaiku45 => 64_000,
         }
     }
 }
@@ -198,22 +198,19 @@ impl ModelInfo for GrokModel {
 
     fn context_window(&self) -> usize {
         match self {
-            GrokModel::Grok41Fast => 2_000_000,
-            GrokModel::Grok4Fast => 2_000_000,
+            GrokModel::Grok41Fast | GrokModel::Grok4Fast => 2_000_000,
         }
     }
 
     fn input_price_per_mtok(&self) -> f32 {
         match self {
-            GrokModel::Grok41Fast => 0.20, // $0.20/1M input
-            GrokModel::Grok4Fast => 0.20,
+            GrokModel::Grok41Fast | GrokModel::Grok4Fast => 0.20, // $0.20/1M input
         }
     }
 
     fn output_price_per_mtok(&self) -> f32 {
         match self {
-            GrokModel::Grok41Fast => 0.50, // $0.50/1M output
-            GrokModel::Grok4Fast => 0.50,
+            GrokModel::Grok41Fast | GrokModel::Grok4Fast => 0.50, // $0.50/1M output
         }
     }
 

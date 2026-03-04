@@ -55,6 +55,7 @@ impl Default for GitState {
 
 impl GitState {
     /// Create a fresh state with no git info.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             git_branch: None,
@@ -65,10 +66,19 @@ impl GitState {
         }
     }
     /// Get shared ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("GitState not initialized")
     }
     /// Get mutable ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("GitState not initialized")
     }

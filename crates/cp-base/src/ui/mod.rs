@@ -66,6 +66,7 @@ fn pad_to_width(text: &str, target: usize, align: Align) -> String {
 /// - `indent`: number of leading spaces before each row
 ///
 /// Returns `Vec<Line>` with aligned columns using ` │ ` separators and `─┼─` header underline.
+#[must_use]
 pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Cell]>, indent: usize) -> Vec<Line<'a>> {
     let num_cols = header.len();
 
@@ -182,6 +183,7 @@ impl TextCell {
 /// M1  │ Some memory note │ high       │ arch, bug
 /// ```
 /// ```
+#[must_use]
 pub fn render_table_text(header: &[&str], rows: &[Vec<TextCell>]) -> String {
     let num_cols = header.len();
 
@@ -246,6 +248,7 @@ pub fn render_table_text(header: &[&str], rows: &[Vec<TextCell>]) -> String {
 }
 
 /// Find size pattern in tree output (e.g., "123K" at end of line)
+#[must_use]
 pub fn find_size_pattern(line: &str) -> Option<usize> {
     let trimmed = line.trim_end();
     if trimmed.is_empty() {
@@ -265,6 +268,7 @@ pub fn find_size_pattern(line: &str) -> Option<usize> {
 
 /// Find children count pattern in tree output (e.g., "(5 children)" or "(1 child)")
 /// Returns (`start_index`, `end_index`) of the pattern
+#[must_use]
 pub fn find_children_pattern(line: &str) -> Option<(usize, usize)> {
     if let Some(start) = line.find(" (") {
         let rest = &line[start + 2..];

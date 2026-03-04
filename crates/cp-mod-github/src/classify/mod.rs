@@ -84,6 +84,11 @@ fn check_shell_operators(command: &str) -> Result<(), String> {
 
 /// Validate a raw command string intended for `gh`.
 /// Returns parsed args on success, or an error message on failure.
+///
+/// # Errors
+///
+/// Returns `Err` if the command doesn't start with `gh`, contains shell operators,
+/// or has unterminated quotes.
 pub fn validate_gh_command(command: &str) -> Result<Vec<String>, String> {
     let trimmed = command.trim();
     if !trimmed.starts_with("gh ") && trimmed != "gh" {
@@ -104,6 +109,11 @@ pub fn validate_gh_command(command: &str) -> Result<Vec<String>, String> {
 }
 
 /// Classify a gh command (given as parsed args after "gh") as read-only or mutating.
+#[expect(
+    clippy::match_same_arms,
+    reason = "explicit arms document known gh subcommands — wildcard is the safe fallback"
+)]
+#[must_use]
 pub fn classify_gh(args: &[String]) -> CommandClass {
     if args.is_empty() {
         return CommandClass::Mutating;

@@ -90,6 +90,7 @@ pub struct Message {
 
 impl Message {
     /// Create a new user text message with the given ID, UID, and content.
+    #[must_use]
     pub fn new_user(id: String, uid: String, content: String, token_count: usize) -> Self {
         Self {
             id,
@@ -107,6 +108,7 @@ impl Message {
     }
 
     /// Create an empty assistant message ready for streaming.
+    #[must_use]
     pub fn new_assistant(id: String, uid: String) -> Self {
         Self {
             id,
@@ -204,12 +206,14 @@ pub mod test_helpers {
         }
 
         /// Override the message status (builder pattern).
+        #[must_use]
         pub fn status(mut self, s: MessageStatus) -> Self {
             self.msg.status = s;
             self
         }
 
         /// Consume the builder and return the finished [`Message`].
+        #[must_use]
         pub fn build(self) -> Message {
             self.msg
         }
@@ -220,6 +224,7 @@ pub mod test_helpers {
 /// Skips Deleted/Detached messages. Uses the same format the LLM sees:
 /// tool calls as `tool_call name(json)`, tool results as raw content,
 /// and text messages as `[role]: content`.
+#[must_use]
 pub fn format_messages_to_chunk(messages: &[Message]) -> String {
     let mut output = String::new();
     for msg in messages {

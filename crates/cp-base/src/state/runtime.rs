@@ -253,6 +253,7 @@ impl State {
     // === Module extension data (TypeMap) ===
 
     /// Get a reference to module-owned state by type.
+    #[must_use]
     pub fn get_ext<T: 'static + Send + Sync>(&self) -> Option<&T> {
         self.module_data.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
     }
@@ -278,6 +279,7 @@ impl State {
     }
 
     /// Find the first available context ID (fills gaps instead of always incrementing)
+    #[must_use]
     pub fn next_available_context_id(&self) -> String {
         let used_ids: std::collections::HashSet<usize> =
             self.context.iter().filter_map(|c| c.id.strip_prefix('P').and_then(|n| n.parse().ok())).collect();
@@ -286,6 +288,7 @@ impl State {
     }
 
     /// Get the API model string for the current provider/model selection
+    #[must_use]
     pub fn current_model(&self) -> String {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
@@ -299,6 +302,7 @@ impl State {
     }
 
     /// Get the max output tokens for the current provider/model selection
+    #[must_use]
     pub fn current_max_output_tokens(&self) -> u32 {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
@@ -312,6 +316,7 @@ impl State {
     }
 
     /// Get the max output tokens for the secondary provider/model selection
+    #[must_use]
     pub fn secondary_max_output_tokens(&self) -> u32 {
         use crate::llm_types::LlmProvider;
         match self.secondary_provider {
@@ -325,11 +330,13 @@ impl State {
     }
 
     /// Get the cleaning target as absolute proportion (threshold * `target_proportion`)
+    #[must_use]
     pub fn cleaning_target(&self) -> f32 {
         self.cleaning_threshold * self.cleaning_target_proportion
     }
 
     /// Get the current model's context window
+    #[must_use]
     pub fn model_context_window(&self) -> usize {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
@@ -343,21 +350,25 @@ impl State {
     }
 
     /// Get effective context budget (custom or model's full context)
+    #[must_use]
     pub fn effective_context_budget(&self) -> usize {
         self.context_budget.unwrap_or_else(|| self.model_context_window())
     }
 
     /// Get cleaning threshold in tokens
+    #[must_use]
     pub fn cleaning_threshold_tokens(&self) -> usize {
         (self.effective_context_budget().to_f32() * self.cleaning_threshold).to_usize()
     }
 
     /// Get cleaning target in tokens
+    #[must_use]
     pub fn cleaning_target_tokens(&self) -> usize {
         (self.effective_context_budget().to_f32() * self.cleaning_target()).to_usize()
     }
 
     /// Get cache hit price per million tokens for the current model
+    #[must_use]
     pub fn cache_hit_price_per_mtok(&self) -> f32 {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
@@ -371,6 +382,7 @@ impl State {
     }
 
     /// Get cache miss price per million tokens for the current model
+    #[must_use]
     pub fn cache_miss_price_per_mtok(&self) -> f32 {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
@@ -384,6 +396,7 @@ impl State {
     }
 
     /// Get output price per million tokens for the current model
+    #[must_use]
     pub fn output_price_per_mtok(&self) -> f32 {
         use crate::llm_types::LlmProvider;
         match self.llm_provider {
@@ -397,6 +410,7 @@ impl State {
     }
 
     /// Calculate cost in USD for a given token count and price per `MTok`
+    #[must_use]
     pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
         tokens.to_f64() * price_per_mtok.to_f64() / 1_000_000.0
     }

@@ -19,6 +19,7 @@ pub fn seed_templates() {
 }
 
 /// List available template names from the templates directory.
+#[must_use]
 pub fn list_template_names() -> Vec<String> {
     let templates_dir = Path::new(TEMPLATES_DIR);
     if !templates_dir.exists() {

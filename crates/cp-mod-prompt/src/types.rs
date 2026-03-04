@@ -67,6 +67,7 @@ impl Default for PromptState {
 
 impl PromptState {
     /// Create an empty prompt state with no entries loaded.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             agents: vec![],
@@ -78,10 +79,19 @@ impl PromptState {
         }
     }
     /// Get shared ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("PromptState not initialized")
     }
     /// Get mutable ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("PromptState not initialized")
     }

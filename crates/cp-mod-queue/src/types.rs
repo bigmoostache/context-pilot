@@ -37,21 +37,32 @@ pub const QUEUE_TOOL_PREFIX: &str = "Queue_";
 
 impl QueueState {
     /// Create an empty inactive queue with index counter at 1.
+    #[must_use]
     pub fn new() -> Self {
         Self { active: false, queued_calls: Vec::new(), next_index: 1 }
     }
 
     /// Returns true if the given tool name is a Queue tool (always bypasses interception).
+    #[must_use]
     pub fn is_queue_tool(name: &str) -> bool {
         name.starts_with(QUEUE_TOOL_PREFIX)
     }
 
     /// Get shared ref from State's `TypeMap`
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &cp_base::state::State) -> &Self {
         state.get_ext::<Self>().expect("QueueState not initialized")
     }
 
     /// Get mutable ref from State's `TypeMap`
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut cp_base::state::State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("QueueState not initialized")
     }

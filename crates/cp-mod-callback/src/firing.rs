@@ -15,7 +15,9 @@ use crate::trigger::{MatchedCallback, build_changed_files_env};
 /// Fire a single callback by spawning its script via the console server.
 /// Creates a console session + watcher (no panel — deferred until failure).
 ///
-/// Returns `Ok(session_key)` on success, `Err(message)` on failure.
+/// # Errors
+///
+/// Returns `Err(message)` if the script fails to execute or times out.
 pub fn fire_callback(
     state: &mut State,
     matched: &MatchedCallback,

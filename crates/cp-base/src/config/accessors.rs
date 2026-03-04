@@ -19,62 +19,77 @@ pub mod theme {
     }
 
     /// Primary accent color.
+    #[must_use]
     pub fn accent() -> Color {
         rgb(active_theme().colors.accent)
     }
     /// Dimmed accent for inactive highlights.
+    #[must_use]
     pub fn accent_dim() -> Color {
         rgb(active_theme().colors.accent_dim)
     }
     /// Success indicator color.
+    #[must_use]
     pub fn success() -> Color {
         rgb(active_theme().colors.success)
     }
     /// Warning indicator color.
+    #[must_use]
     pub fn warning() -> Color {
         rgb(active_theme().colors.warning)
     }
     /// Error indicator color.
+    #[must_use]
     pub fn error() -> Color {
         rgb(active_theme().colors.error)
     }
     /// Primary text color.
+    #[must_use]
     pub fn text() -> Color {
         rgb(active_theme().colors.text)
     }
     /// Secondary text color (labels, metadata).
+    #[must_use]
     pub fn text_secondary() -> Color {
         rgb(active_theme().colors.text_secondary)
     }
     /// Muted text color (hints, disabled).
+    #[must_use]
     pub fn text_muted() -> Color {
         rgb(active_theme().colors.text_muted)
     }
     /// Base background color.
+    #[must_use]
     pub fn bg_base() -> Color {
         rgb(active_theme().colors.bg_base)
     }
     /// Elevated surface background (panels).
+    #[must_use]
     pub fn bg_surface() -> Color {
         rgb(active_theme().colors.bg_surface)
     }
     /// Highest-elevation background (popups, overlays).
+    #[must_use]
     pub fn bg_elevated() -> Color {
         rgb(active_theme().colors.bg_elevated)
     }
     /// Primary border color.
+    #[must_use]
     pub fn border() -> Color {
         rgb(active_theme().colors.border)
     }
     /// Subtle border color (dividers).
+    #[must_use]
     pub fn border_muted() -> Color {
         rgb(active_theme().colors.border_muted)
     }
     /// User message accent color.
+    #[must_use]
     pub fn user() -> Color {
         rgb(active_theme().colors.user)
     }
     /// Assistant message accent color.
+    #[must_use]
     pub fn assistant() -> Color {
         rgb(active_theme().colors.assistant)
     }
@@ -114,42 +129,52 @@ pub mod icons {
     use crate::config::{active_theme, normalize_icon};
 
     /// User message icon (e.g., "⚔ ").
+    #[must_use]
     pub fn msg_user() -> String {
         normalize_icon(&active_theme().messages.user)
     }
     /// Assistant message icon (e.g., "🐉 ").
+    #[must_use]
     pub fn msg_assistant() -> String {
         normalize_icon(&active_theme().messages.assistant)
     }
     /// Tool-call message icon.
+    #[must_use]
     pub fn msg_tool_call() -> String {
         normalize_icon(&active_theme().messages.tool_call)
     }
     /// Tool-result message icon.
+    #[must_use]
     pub fn msg_tool_result() -> String {
         normalize_icon(&active_theme().messages.tool_result)
     }
     /// Error message icon.
+    #[must_use]
     pub fn msg_error() -> String {
         normalize_icon(&active_theme().messages.error)
     }
     /// Status icon for messages included in full.
+    #[must_use]
     pub fn status_full() -> String {
         normalize_icon(&active_theme().status.full)
     }
     /// Status icon for deleted/detached messages.
+    #[must_use]
     pub fn status_deleted() -> String {
         normalize_icon(&active_theme().status.deleted)
     }
     /// Todo icon for pending items.
+    #[must_use]
     pub fn todo_pending() -> String {
         normalize_icon(&active_theme().todo.pending)
     }
     /// Todo icon for in-progress items.
+    #[must_use]
     pub fn todo_in_progress() -> String {
         normalize_icon(&active_theme().todo.in_progress)
     }
     /// Todo icon for completed items.
+    #[must_use]
     pub fn todo_done() -> String {
         normalize_icon(&active_theme().todo.done)
     }
@@ -164,23 +189,28 @@ pub mod library {
     use crate::config::LIBRARY;
 
     /// Default agent ID (used when none is selected).
+    #[must_use]
     pub fn default_agent_id() -> &'static str {
         &LIBRARY.default_agent_id
     }
     /// Content body of the default agent.
+    #[must_use]
     pub fn default_agent_content() -> &'static str {
         let id = &LIBRARY.default_agent_id;
         LIBRARY.agents.iter().find(|a| a.id == *id).map_or("", |a| a.content.as_str())
     }
     /// All built-in agent definitions.
+    #[must_use]
     pub fn agents() -> &'static [crate::config::SeedEntry] {
         &LIBRARY.agents
     }
     /// All built-in skill definitions.
+    #[must_use]
     pub fn skills() -> &'static [crate::config::SeedEntry] {
         &LIBRARY.skills
     }
     /// All built-in command definitions.
+    #[must_use]
     pub fn commands() -> &'static [crate::config::SeedEntry] {
         &LIBRARY.commands
     }
@@ -191,30 +221,37 @@ pub mod prompts {
     use crate::config::PROMPTS;
 
     /// Panel opening header template (`{id}`, `{type}`, `{name}` placeholders).
+    #[must_use]
     pub fn panel_header() -> &'static str {
         &PROMPTS.panel.header
     }
     /// Panel timestamp template (`{timestamp}` placeholder).
+    #[must_use]
     pub fn panel_timestamp() -> &'static str {
         &PROMPTS.panel.timestamp
     }
     /// Fallback when panel has no known timestamp.
+    #[must_use]
     pub fn panel_timestamp_unknown() -> &'static str {
         &PROMPTS.panel.timestamp_unknown
     }
     /// Panel closing footer template.
+    #[must_use]
     pub fn panel_footer() -> &'static str {
         &PROMPTS.panel.footer
     }
     /// Format for a message line inside footer.
+    #[must_use]
     pub fn panel_footer_msg_line() -> &'static str {
         &PROMPTS.panel.footer_msg_line
     }
     /// Header for recent-messages section in footer.
+    #[must_use]
     pub fn panel_footer_msg_header() -> &'static str {
         &PROMPTS.panel.footer_msg_header
     }
     /// Assistant ack injected after footer.
+    #[must_use]
     pub fn panel_footer_ack() -> &'static str {
         &PROMPTS.panel.footer_ack
     }

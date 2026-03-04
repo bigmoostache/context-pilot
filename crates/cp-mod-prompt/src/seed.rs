@@ -47,6 +47,7 @@ pub fn ensure_default_agent(state: &mut State) {
 }
 
 /// Get the active agent's content (system prompt)
+#[must_use]
 pub fn get_active_agent_content(state: &State) -> String {
     let ps = PromptState::get(state);
     if let Some(active_id) = &ps.active_agent_id

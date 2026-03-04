@@ -22,6 +22,7 @@ pub enum SidebarMode {
 
 impl SidebarMode {
     /// Cycle to the next mode: Normal → Collapsed → Hidden → Normal
+    #[must_use]
     pub fn next(self) -> Self {
         match self {
             Self::Normal => Self::Collapsed,
@@ -31,6 +32,7 @@ impl SidebarMode {
     }
 
     /// Width in columns for this sidebar mode
+    #[must_use]
     pub fn width(self) -> u16 {
         match self {
             Self::Normal => 36,

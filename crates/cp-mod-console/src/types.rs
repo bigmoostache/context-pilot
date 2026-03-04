@@ -37,6 +37,7 @@ pub enum ProcessStatus {
 
 impl ProcessStatus {
     /// Human-readable label (e.g., "running", "exited(0)", "failed(1)").
+    #[must_use]
     pub fn label(&self) -> String {
         match self {
             ProcessStatus::Running => "running".to_string(),
@@ -47,11 +48,13 @@ impl ProcessStatus {
     }
 
     /// Whether the process has reached a terminal state (not running).
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         !matches!(self, ProcessStatus::Running)
     }
 
     /// Exit code if terminal (Killed → -9), None if still running.
+    #[must_use]
     pub fn exit_code(&self) -> Option<i32> {
         match self {
             ProcessStatus::Finished(c) | ProcessStatus::Failed(c) => Some(*c),
@@ -79,16 +82,26 @@ impl Default for ConsoleState {
 
 impl ConsoleState {
     /// Create an empty console state with session counter at 1.
+    #[must_use]
     pub fn new() -> Self {
         Self { sessions: HashMap::new(), next_session_id: 1 }
     }
 
     /// Get shared ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("ConsoleState not initialized")
     }
 
     /// Get mutable ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("ConsoleState not initialized")
     }
@@ -111,6 +124,7 @@ impl ConsoleState {
 }
 
 /// Format a wait result message for the LLM.
+#[must_use]
 pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, last_lines: &str) -> String {
     let code_str = exit_code.map_or_else(|| "?".to_string(), |c| c.to_string());
     let now = now_ms();

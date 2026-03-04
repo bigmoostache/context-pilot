@@ -55,6 +55,11 @@ pub struct BraveClient {
 
 impl BraveClient {
     /// Create a new client with the given API key (10s request timeout).
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn new(api_key: String) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(TIMEOUT_SECS))
@@ -65,6 +70,10 @@ impl BraveClient {
 
     /// Search the web via Brave Search API.
     /// Always sends `extra_snippets=true` and `enable_rich_callback=1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn search(&self, p: &SearchParams<'_>) -> Result<(BraveSearchResponse, Option<serde_json::Value>), String> {
         let mut url = format!("{}/web/search?q={}", BRAVE_BASE_URL, urlenc(p.query));
         url.push_str(&format!("&count={}", p.count));
@@ -100,6 +109,10 @@ impl BraveClient {
     }
 
     /// Get LLM-optimized context from Brave LLM Context API.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn llm_context(&self, p: &LLMContextParams<'_>) -> Result<LLMContextResponse, String> {
         let mut url = format!("{}/llm/context?q={}", BRAVE_BASE_URL, urlenc(p.query));
         url.push_str(&format!("&maximum_number_of_tokens={}", p.max_tokens));
@@ -155,7 +168,6 @@ impl BraveClient {
                 }
                 500..=599 if attempt < 2 => {
                     std::thread::sleep(Duration::from_secs(1));
-                    continue;
                 }
                 _ => {
                     return Err(format!("HTTP {} error: {}", status, truncate(&body, 200)));

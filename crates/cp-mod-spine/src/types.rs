@@ -19,6 +19,7 @@ pub enum NotificationType {
 
 impl NotificationType {
     /// Human-readable label (e.g., "User Message", "Reload Resume").
+    #[must_use]
     pub fn label(&self) -> &'static str {
         match self {
             NotificationType::UserMessage => "User Message",
@@ -60,6 +61,7 @@ pub struct Notification {
 
 impl Notification {
     /// Create a new notification with the given fields
+    #[must_use]
     pub fn new(id: String, notification_type: NotificationType, source: String, content: String) -> Self {
         Self {
             id,
@@ -72,11 +74,13 @@ impl Notification {
     }
 
     /// Whether this notification has been handled.
+    #[must_use]
     pub fn is_processed(&self) -> bool {
         self.status == NotificationStatus::Processed
     }
 
     /// Whether this notification is still awaiting action.
+    #[must_use]
     pub fn is_unprocessed(&self) -> bool {
         self.status == NotificationStatus::Unprocessed
     }
@@ -167,16 +171,26 @@ impl Default for SpineState {
 
 impl SpineState {
     /// Create an empty spine state with default configuration.
+    #[must_use]
     pub fn new() -> Self {
         Self { notifications: vec![], next_notification_id: 1, config: SpineConfig::default() }
     }
 
     /// Get shared ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("SpineState not initialized")
     }
 
     /// Get mutable ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("SpineState not initialized")
     }
@@ -232,11 +246,13 @@ impl SpineState {
     }
 
     /// Get references to all unprocessed notifications
+    #[must_use]
     pub fn unprocessed_notifications(state: &State) -> Vec<&Notification> {
         Self::get(state).notifications.iter().filter(|n| n.is_unprocessed()).collect()
     }
 
     /// Check if there are any unprocessed notifications
+    #[must_use]
     pub fn has_unprocessed_notifications(state: &State) -> bool {
         Self::get(state).notifications.iter().any(|n| n.is_unprocessed())
     }

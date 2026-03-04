@@ -30,14 +30,24 @@ impl Default for ScratchpadState {
 
 impl ScratchpadState {
     /// Create an empty scratchpad state with ID counter at 1.
+    #[must_use]
     pub fn new() -> Self {
         Self { scratchpad_cells: vec![], next_scratchpad_id: 1 }
     }
     /// Get shared ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("ScratchpadState not initialized")
     }
     /// Get mutable ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("ScratchpadState not initialized")
     }

@@ -47,6 +47,7 @@ fn chunk_index(log_id_num: usize) -> usize {
 /// Build write operations for chunked log persistence (CPU only — no I/O).
 /// Called from `save_module_data` to integrate with the `PersistenceWriter` batch system.
 /// Returns Vec<(path, content)> tuples that the binary converts to `WriteOps`.
+#[must_use]
 pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<(PathBuf, Vec<u8>)> {
     let dir = logs_dir();
     let mut ops = Vec::new();

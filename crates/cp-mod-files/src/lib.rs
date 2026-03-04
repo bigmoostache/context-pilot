@@ -216,6 +216,7 @@ impl Module for FilesModule {
 /// Parses diff blocks and renders deleted lines in red, added lines in green.
 /// Callback summary blocks get compact styled rendering (only status word colored).
 /// Non-diff content is rendered in secondary text color.
+#[must_use]
 pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
     use ratatui::prelude::*;
 

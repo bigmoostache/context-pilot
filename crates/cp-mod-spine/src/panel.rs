@@ -305,8 +305,7 @@ impl Panel for SpinePanel {
 fn notification_type_color(nt: &NotificationType) -> Color {
     match nt {
         NotificationType::UserMessage => theme::user(),
-        NotificationType::ReloadResume => theme::text_secondary(),
-        NotificationType::Custom => theme::text_secondary(),
+        NotificationType::ReloadResume | NotificationType::Custom => theme::text_secondary(),
     }
 }
 

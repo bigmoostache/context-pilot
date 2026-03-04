@@ -578,6 +578,51 @@ unnecessary_result_map_or_else = "warn"
 # ============================
 # Pedantic → warn
 # ============================
+# ============================
+# Pedantic → warn (C11)
+# ============================
+# Match on bool — prefer if/else
+match_bool = "warn"
+# Identical match arms that can be combined
+match_same_arms = "warn"
+# match result { Err(_) => ... } — use specific error
+match_wild_err_arm = "warn"
+# Public functions returning Result should document errors
+missing_errors_doc = "warn"
+# Custom Debug impls should include all fields
+missing_fields_in_debug = "warn"
+
+# ============================
+# Pedantic → warn (C12)
+# ============================
+# Public functions that can panic should document it
+missing_panics_doc = "warn"
+# Functions returning useful values should be #[must_use]
+must_use_candidate = "warn"
+# Prefer logical operators (&&/||) over bitwise (&/|) for bools
+needless_bitwise_bool = "warn"
+# Prefer restructuring loop over `continue`
+needless_continue = "warn"
+# Prefer iterator methods over `for` + side effects
+needless_for_each = "warn"
+
+# ============================
+# Pedantic → warn (C13)
+# ============================
+# Remove unnecessary raw string hash symbols (r#"foo"# → r"foo")
+needless_raw_string_hashes = "warn"
+# #[no_mangle] on Rust ABI functions is suspicious — usually needs extern "C"
+no_mangle_with_rust_abi = "warn"
+# Option<Option<T>> is confusing — flatten or use a custom enum
+option_option = "warn"
+# Use ptr::cast::<T>() instead of `as *const T` / `as *mut T`
+ptr_as_ptr = "warn"
+# Use ptr.cast_const() / ptr.cast_mut() instead of `as *const T` / `as *mut T`
+ptr_cast_constness = "warn"
+
+# ============================
+# Pedantic → warn (C1-C10, prior batches)
+# ============================
 # Use clone_from when possible
 assigning_clones = "warn"
 # Use as/into instead of if bool { 1 } else { 0 }

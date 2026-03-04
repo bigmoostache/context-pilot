@@ -31,6 +31,7 @@ const WATCHLIST_PATH: &str = ".context-pilot/shared/typst-watchlist.json";
 
 impl Watchlist {
     /// Load from disk, or return empty if not found.
+    #[must_use]
     pub fn load() -> Self {
         fs::read_to_string(WATCHLIST_PATH).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
     }
@@ -62,6 +63,7 @@ impl Watchlist {
 
     /// Given a changed file path (relative to project root), return all watched
     /// documents that depend on it (source path, output path).
+    #[must_use]
     pub fn find_affected(&self, changed_file: &str) -> Vec<(String, String)> {
         let changed = normalize_path(changed_file);
         self.entries
@@ -75,6 +77,7 @@ impl Watchlist {
     }
 
     /// List all watched documents.
+    #[must_use]
     pub fn list(&self) -> Vec<(&str, &WatchEntry)> {
         let mut items: Vec<_> = self.entries.iter().map(|(k, v)| (k.as_str(), v)).collect();
         items.sort_by_key(|(k, _)| k.to_string());
@@ -95,7 +98,11 @@ fn normalize_path(p: &str) -> String {
 }
 
 /// Compile a watched document and update its dependency manifest.
-/// Returns Ok(message) or Err(error).
+/// Returns `Ok(message)` or `Err(error)`.
+///
+/// # Errors
+///
+/// Returns `Err` if compilation fails, or the output PDF cannot be written.
 pub fn compile_and_update_deps(source: &str, output: &str) -> Result<String, String> {
     let (pdf_bytes, warnings, deps) = crate::compiler::compile_to_pdf(source)?;
 

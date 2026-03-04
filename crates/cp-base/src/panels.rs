@@ -80,6 +80,7 @@ pub struct CacheRequest {
     pub data: Box<dyn Any + Send>,
 }
 
+#[expect(clippy::missing_fields_in_debug, reason = "data field is Box<dyn Any> — not Debug-printable")]
 impl fmt::Debug for CacheRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CacheRequest").field("context_type", &self.context_type).finish()
@@ -87,6 +88,7 @@ impl fmt::Debug for CacheRequest {
 }
 
 /// Hash content for change detection (SHA-256, collision-resistant)
+#[must_use]
 pub fn hash_content(content: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(content.as_bytes());
@@ -109,6 +111,7 @@ pub enum WatchSpec {
 }
 
 /// Get current time in milliseconds since UNIX epoch
+#[must_use]
 pub fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis().to_u64()).unwrap_or(0)
 }
@@ -141,6 +144,7 @@ pub fn mark_panels_dirty(state: &mut State, context_type: ContextType) {
 /// Returns the original content unchanged when `total_pages` <= 1.
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
 /// and prepends a page header.
+#[must_use]
 pub fn paginate_content(full_content: &str, current_page: usize, total_pages: usize) -> String {
     use crate::config::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 

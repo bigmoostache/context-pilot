@@ -46,6 +46,7 @@ impl Default for QuestionAnswer {
 
 impl QuestionAnswer {
     /// Create a blank answer state (no selection, cursor at top).
+    #[must_use]
     pub fn new() -> Self {
         Self { cursor: 0, selected: Vec::new(), other_text: String::new(), typing_other: false }
     }
@@ -70,22 +71,26 @@ pub struct PendingQuestionForm {
 
 impl PendingQuestionForm {
     /// Create a new question form from a tool call and its questions.
+    #[must_use]
     pub fn new(tool_use_id: String, questions: Vec<Question>) -> Self {
         let answers = questions.iter().map(|_| QuestionAnswer::new()).collect();
         Self { tool_use_id, questions, current_question: 0, answers, resolved: false, result_json: None }
     }
 
     /// Total number of options for the current question (including "Other")
+    #[must_use]
     pub fn current_option_count(&self) -> usize {
         self.questions[self.current_question].options.len() + 1 // +1 for "Other"
     }
 
     /// Index of the "Other" option for the current question
+    #[must_use]
     pub fn other_index(&self) -> usize {
         self.questions[self.current_question].options.len()
     }
 
     /// Whether current question is multi-select
+    #[must_use]
     pub fn is_multi_select(&self) -> bool {
         self.questions[self.current_question].multi_select
     }
@@ -228,6 +233,7 @@ impl PendingQuestionForm {
     }
 
     /// Check if the current question has been answered (selection or other text)
+    #[must_use]
     pub fn current_question_answered(&self) -> bool {
         let ans = &self.answers[self.current_question];
         !ans.selected.is_empty() || (ans.typing_other && !ans.other_text.is_empty())

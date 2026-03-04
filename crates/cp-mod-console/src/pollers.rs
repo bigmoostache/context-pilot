@@ -44,12 +44,11 @@ pub(crate) fn file_poller_from_offset(path: PathBuf, buffer: RingBuffer, stop: A
             let mut buf = vec![0u8; 64 * 1024];
             loop {
                 match f.read(&mut buf) {
-                    Ok(0) => break,
+                    Ok(0) | Err(_) => break,
                     Ok(n) => {
                         buffer.write(&buf[..n]);
                         offset += n.to_u64();
                     }
-                    Err(_) => break,
                 }
             }
         }

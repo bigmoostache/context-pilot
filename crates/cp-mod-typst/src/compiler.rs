@@ -22,6 +22,11 @@ use cp_base::cast::SafeCast;
 ///
 /// `source_path` is relative to the project root (which is the current directory).
 /// Returns `Ok((pdf_bytes`, `warnings_text`, `accessed_files`)) or `Err(error_message)`.
+///
+/// # Errors
+///
+/// Returns `Err` if the source path cannot be resolved, compilation fails,
+/// or PDF export encounters errors.
 pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf>), String> {
     let abs_path = PathBuf::from(source_path)
         .canonicalize()
@@ -81,6 +86,11 @@ pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf
 }
 
 /// Compile a `.typ` file and write the PDF to the output path.
+///
+/// # Errors
+///
+/// Returns `Err` if compilation fails, the output directory cannot be
+/// created, or the PDF file cannot be written.
 pub fn compile_and_write(source_path: &str, output_path: &str) -> Result<String, String> {
     let (pdf_bytes, warnings, _deps) = compile_to_pdf(source_path)?;
 

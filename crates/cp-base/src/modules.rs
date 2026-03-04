@@ -12,6 +12,11 @@ use crate::tools::{PreFlightResult, ToolResult, ToolUse};
 pub type ToolVisualizer = fn(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>>;
 
 /// Run a Command with a timeout. Returns `TimedOut` error if the command exceeds the limit.
+///
+/// # Errors
+///
+/// Returns `std::io::Error` if the command fails to spawn, or
+/// `ErrorKind::TimedOut` if execution exceeds `timeout_secs`.
 pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<Output> {
     _ = cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
     let child = cmd.spawn()?;
@@ -28,6 +33,7 @@ pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<
 }
 
 /// Truncate output to `max_bytes`, respecting UTF-8 char boundaries.
+#[must_use]
 pub fn truncate_output(output: &str, max_bytes: usize) -> String {
     if output.len() <= max_bytes {
         output.to_string()

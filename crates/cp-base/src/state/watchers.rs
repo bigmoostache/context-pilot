@@ -142,6 +142,7 @@ impl Default for WatcherRegistry {
 
 impl WatcherRegistry {
     /// Create an empty watcher registry.
+    #[must_use]
     pub fn new() -> Self {
         Self { watchers: Vec::new() }
     }
@@ -198,16 +199,19 @@ impl WatcherRegistry {
     }
 
     /// Get a read-only view of active watchers (for rendering in Spine panel).
+    #[must_use]
     pub fn active_watchers(&self) -> &[Box<dyn Watcher>] {
         &self.watchers
     }
 
     /// Check if any blocking watchers are active.
+    #[must_use]
     pub fn has_blocking_watchers(&self) -> bool {
         self.watchers.iter().any(|w| w.is_blocking())
     }
 
     /// Check if a watcher with the given source tag exists.
+    #[must_use]
     pub fn has_watcher_with_tag(&self, tag: &str) -> bool {
         self.watchers.iter().any(|w| w.source_tag() == tag)
     }
@@ -218,11 +222,20 @@ impl WatcherRegistry {
     }
 
     /// Get from State via `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("WatcherRegistry not initialized")
     }
 
     /// Get mutable from State via `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("WatcherRegistry not initialized")
     }

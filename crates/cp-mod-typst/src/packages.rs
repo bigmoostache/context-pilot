@@ -22,6 +22,11 @@ pub struct PackageSpec {
 
 impl PackageSpec {
     /// Parse a package specifier string like `@preview/name:version`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the spec doesn't match `@namespace/name:version`
+    /// format, or if any component is empty.
     pub fn parse(spec: &str) -> Result<Self, String> {
         let spec = spec.trim();
         let rest =
@@ -43,21 +48,25 @@ impl PackageSpec {
     }
 
     /// The download URL on packages.typst.org.
+    #[must_use]
     pub fn download_url(&self) -> String {
         format!("https://packages.typst.org/{}/{}-{}.tar.gz", self.namespace, self.name, self.version)
     }
 
     /// The local cache directory for this package.
+    #[must_use]
     pub fn cache_dir(&self) -> PathBuf {
         package_cache_root().join(&self.namespace).join(&self.name).join(&self.version)
     }
 
     /// Check if this package is already cached.
+    #[must_use]
     pub fn is_cached(&self) -> bool {
         self.cache_dir().join("typst.toml").exists()
     }
 
     /// Display string like `@preview/name:version`.
+    #[must_use]
     pub fn to_spec_string(&self) -> String {
         format!("@{}/{}:{}", self.namespace, self.name, self.version)
     }
@@ -65,6 +74,7 @@ impl PackageSpec {
 
 /// Root of the user-global Typst package cache.
 /// Matches the typst CLI default: `~/.cache/typst/packages/`
+#[must_use]
 pub fn package_cache_root() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
     PathBuf::from(home).join(".cache").join("typst").join("packages")
@@ -72,6 +82,10 @@ pub fn package_cache_root() -> PathBuf {
 
 /// Resolve a package to its cached directory, downloading if needed.
 /// Returns the path to the package root directory.
+///
+/// # Errors
+///
+/// Returns `Err` if the package download or extraction fails.
 pub fn resolve_package(spec: &PackageSpec) -> Result<PathBuf, String> {
     let cache_dir = spec.cache_dir();
 
@@ -84,6 +98,11 @@ pub fn resolve_package(spec: &PackageSpec) -> Result<PathBuf, String> {
 }
 
 /// Download a package from Typst Universe and extract to cache.
+///
+/// # Errors
+///
+/// Returns `Err` if the HTTP request fails, the package is not found,
+/// or the tar.gz archive cannot be extracted.
 pub fn download_package(spec: &PackageSpec) -> Result<(), String> {
     let url = spec.download_url();
     let cache_dir = spec.cache_dir();
@@ -147,6 +166,11 @@ pub fn download_package(spec: &PackageSpec) -> Result<(), String> {
 
 /// Resolve a `@namespace/name:version` import path to the filesystem path.
 /// Used by the World impl to resolve package file IDs.
+///
+/// # Errors
+///
+/// Returns `Err` if the package cannot be resolved or the sub-path
+/// doesn't exist within it.
 pub fn resolve_package_path(namespace: &str, name: &str, version: &str, sub_path: &Path) -> Result<PathBuf, String> {
     let spec = PackageSpec { namespace: namespace.to_string(), name: name.to_string(), version: version.to_string() };
 
@@ -161,6 +185,7 @@ pub fn resolve_package_path(namespace: &str, name: &str, version: &str, sub_path
 }
 
 /// List all cached packages. Returns Vec<(namespace, name, version)>.
+#[must_use]
 pub fn list_cached_packages() -> Vec<(String, String, String)> {
     let root = package_cache_root();
     let mut packages = Vec::new();

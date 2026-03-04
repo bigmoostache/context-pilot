@@ -357,6 +357,7 @@ pub struct PresetInfo {
 }
 
 /// List all available presets with metadata for display.
+#[must_use]
 pub fn list_presets_with_info() -> Vec<PresetInfo> {
     let dir = presets_path();
     let mut presets = Vec::new();

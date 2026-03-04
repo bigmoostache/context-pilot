@@ -64,6 +64,11 @@ pub struct FirecrawlClient {
 
 impl FirecrawlClient {
     /// Create a new client with the given API key.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn new(api_key: String) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(TIMEOUT_SECS))
@@ -73,6 +78,10 @@ impl FirecrawlClient {
     }
 
     /// Scrape a single URL for full content extraction.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn scrape(&self, p: &ScrapeParams<'_>) -> Result<ScrapeResponse, String> {
         let mut body = serde_json::json!({
             "url": p.url,
@@ -90,6 +99,10 @@ impl FirecrawlClient {
     }
 
     /// Search and scrape in one API call.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn search(&self, p: &SearchParams<'_>) -> Result<SearchResponse, String> {
         let mut body = serde_json::json!({
             "query": p.query,
@@ -116,6 +129,10 @@ impl FirecrawlClient {
     }
 
     /// Map a domain to discover all URLs.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn map(&self, p: &MapParams<'_>) -> Result<MapResponse, String> {
         let mut body = serde_json::json!({
             "url": p.url,
@@ -168,7 +185,6 @@ impl FirecrawlClient {
                 }
                 500..=599 if attempt < 2 => {
                     std::thread::sleep(Duration::from_secs(1));
-                    continue;
                 }
                 _ => {
                     return Err(format!("HTTP {} error: {}", status, truncate(&resp_body, 200)));

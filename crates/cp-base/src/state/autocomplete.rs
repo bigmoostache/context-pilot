@@ -52,6 +52,7 @@ impl Default for AutocompleteState {
 
 impl AutocompleteState {
     /// Create a new inactive autocomplete state with all fields zeroed.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             active: false,
@@ -149,11 +150,13 @@ impl AutocompleteState {
     }
 
     /// Get the currently selected match, if any.
+    #[must_use]
     pub fn selected_match(&self) -> Option<&AutocompleteEntry> {
         self.matches.get(self.selected)
     }
 
     /// Build the full path for the selected entry.
+    #[must_use]
     pub fn selected_full_path(&self) -> Option<String> {
         self.selected_match().map(|entry| {
             if self.dir_prefix.is_empty() { entry.name.clone() } else { format!("{}/{}", self.dir_prefix, entry.name) }
@@ -161,17 +164,20 @@ impl AutocompleteState {
     }
 
     /// The visible window of matches for rendering.
+    #[must_use]
     pub fn visible_matches(&self) -> &[AutocompleteEntry] {
         let end = (self.scroll_offset + MAX_VISIBLE).min(self.matches.len());
         &self.matches[self.scroll_offset..end]
     }
 
     /// Get the directory prefix for the current query.
+    #[must_use]
     pub fn current_dir(&self) -> &str {
         &self.dir_prefix
     }
 
     /// Get the partial name being matched.
+    #[must_use]
     pub fn current_prefix(&self) -> &str {
         &self.name_prefix
     }

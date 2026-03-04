@@ -9,6 +9,7 @@ use cp_base::modules::run_with_timeout;
 use crate::GH_CMD_TIMEOUT_SECS;
 
 /// Parse a `gh api -i` response, splitting headers from body.
+#[must_use]
 pub fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String) {
     let (headers, body) = if let Some(pos) = stdout.find("\r\n\r\n") {
         (&stdout[..pos], &stdout[pos + 4..])
@@ -25,6 +26,7 @@ pub fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String)
 }
 
 /// Extract a specific HTTP header value (case-insensitive key match).
+#[must_use]
 pub fn extract_header(headers: &str, name: &str) -> Option<String> {
     let prefix = format!("{}:", name);
     headers.lines().find_map(|line| {
@@ -33,11 +35,13 @@ pub fn extract_header(headers: &str, name: &str) -> Option<String> {
 }
 
 /// Try to extract X-Poll-Interval from raw output.
+#[must_use]
 pub fn extract_poll_interval(stdout: &str) -> Option<u64> {
     extract_header(stdout, "x-poll-interval").and_then(|v| v.parse::<u64>().ok())
 }
 
 /// SHA-256 hex digest of a string — used for change detection.
+#[must_use]
 pub fn sha256_hex(input: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());
@@ -45,12 +49,14 @@ pub fn sha256_hex(input: &str) -> String {
 }
 
 /// Replace a GitHub token in output with `[REDACTED]` for safe display.
+#[must_use]
 pub fn redact_token(output: &str, token: &str) -> String {
     if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_string() }
 }
 
 /// Poll for a PR associated with the given branch.
 /// Returns `Some((hash, pr_info))` if output changed; `pr_info` is `None` when no PR exists.
+#[must_use]
 pub fn poll_branch_pr(
     branch: &str,
     github_token: &str,

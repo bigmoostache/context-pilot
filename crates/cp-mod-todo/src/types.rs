@@ -18,6 +18,7 @@ pub enum TodoStatus {
 
 impl TodoStatus {
     /// Theme icon for this status (e.g., "○ ", "◐ ", "● ").
+    #[must_use]
     pub fn icon(&self) -> String {
         match self {
             TodoStatus::Pending => icons::todo_pending(),
@@ -75,26 +76,38 @@ impl Default for TodoState {
 
 impl TodoState {
     /// Create an empty todo state with ID counter at 1.
+    #[must_use]
     pub fn new() -> Self {
         Self { todos: vec![], next_todo_id: 1 }
     }
 
     /// Get shared ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
+    #[must_use]
     pub fn get(state: &State) -> &Self {
         state.get_ext::<Self>().expect("TodoState not initialized")
     }
 
     /// Get mutable ref from State's `TypeMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.get_ext_mut::<Self>().expect("TodoState not initialized")
     }
 
     /// Check if there are any pending or in-progress todos
+    #[must_use]
     pub fn has_incomplete_todos(&self) -> bool {
         self.todos.iter().any(|t| matches!(t.status, TodoStatus::Pending | TodoStatus::InProgress))
     }
 
     /// Get a summary of incomplete todos for spine auto-continuation messages
+    #[must_use]
     pub fn incomplete_todos_summary(&self) -> Vec<String> {
         self.todos
             .iter()
