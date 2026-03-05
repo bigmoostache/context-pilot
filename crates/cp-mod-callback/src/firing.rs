@@ -5,6 +5,7 @@
 // Queue ID test marker — delete me later
 use cp_base::config::constants;
 use cp_base::panels::now_ms;
+use cp_base::panels::time_arith::ms_to_secs;
 use cp_base::state::runtime::State;
 use cp_base::state::watchers::{DeferredPanel, Watcher, WatcherRegistry, WatcherResult};
 
@@ -301,8 +302,7 @@ impl Watcher for CallbackWatcher {
         if now < deadline {
             return None;
         }
-        #[expect(clippy::integer_division_remainder_used, reason = "converting ms to seconds")]
-        let elapsed_s = now.saturating_sub(self.registered_at_ms) / 1000;
+        let elapsed_s = ms_to_secs(now.saturating_sub(self.registered_at_ms));
         Some(WatcherResult {
             description: format!("· {} TIMED OUT ({}s)", self.callback_name, elapsed_s,),
             panel_id: None,

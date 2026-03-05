@@ -80,15 +80,15 @@ pub enum Action {
 
     // === Config overlay — primary model ===
     /// Select primary LLM provider.
-    ConfigSelectProvider(crate::llm_types::LlmProvider),
+    ConfigSelectProvider(crate::config::llm_types::LlmProvider),
     /// Select primary Anthropic model.
-    ConfigSelectAnthropicModel(crate::llm_types::AnthropicModel),
+    ConfigSelectAnthropicModel(crate::config::llm_types::AnthropicModel),
     /// Select primary Grok model.
-    ConfigSelectGrokModel(crate::llm_types::GrokModel),
+    ConfigSelectGrokModel(crate::config::llm_types::GrokModel),
     /// Select primary Groq model.
-    ConfigSelectGroqModel(crate::llm_types::GroqModel),
+    ConfigSelectGroqModel(crate::config::llm_types::GroqModel),
     /// Select primary `DeepSeek` model.
-    ConfigSelectDeepSeekModel(crate::llm_types::DeepSeekModel),
+    ConfigSelectDeepSeekModel(crate::config::llm_types::DeepSeekModel),
     /// Move config bar selection forward (→).
     ConfigSelectNextBar,
     /// Move config bar selection backward (←).
@@ -106,15 +106,15 @@ pub enum Action {
 
     // === Config overlay — secondary model ===
     /// Select secondary (reverie) LLM provider.
-    ConfigSelectSecondaryProvider(crate::llm_types::LlmProvider),
+    ConfigSelectSecondaryProvider(crate::config::llm_types::LlmProvider),
     /// Select secondary Anthropic model.
-    ConfigSelectSecondaryAnthropicModel(crate::llm_types::AnthropicModel),
+    ConfigSelectSecondaryAnthropicModel(crate::config::llm_types::AnthropicModel),
     /// Select secondary Grok model.
-    ConfigSelectSecondaryGrokModel(crate::llm_types::GrokModel),
+    ConfigSelectSecondaryGrokModel(crate::config::llm_types::GrokModel),
     /// Select secondary Groq model.
-    ConfigSelectSecondaryGroqModel(crate::llm_types::GroqModel),
+    ConfigSelectSecondaryGroqModel(crate::config::llm_types::GroqModel),
     /// Select secondary `DeepSeek` model.
-    ConfigSelectSecondaryDeepSeekModel(crate::llm_types::DeepSeekModel),
+    ConfigSelectSecondaryDeepSeekModel(crate::config::llm_types::DeepSeekModel),
     /// Toggle reverie (background optimizer) on/off.
     ConfigToggleReverie,
     /// Toggle between primary and secondary model tabs.

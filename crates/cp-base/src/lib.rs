@@ -6,12 +6,7 @@
 pub mod cast;
 /// YAML config loader: prompts, library, themes, injections, constants.
 pub mod config;
-/// Re-export from `config::llm_types` for convenience.
-pub mod llm_types {
-    pub use crate::config::llm_types::{
-        AnthropicModel, ApiCheckResult, DeepSeekModel, GrokModel, GroqModel, LlmProvider, ModelInfo, StreamEvent,
-    };
-}
+
 /// Module trait: tools, panels, lifecycle hooks for pluggable functionality.
 pub mod modules;
 /// Panel trait and caching infrastructure for context elements.

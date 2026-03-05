@@ -11,7 +11,7 @@ mod tools;
 /// Memory state types: `MemoryItem`, `MemoryImportance`, `MemoryState`.
 pub mod types;
 
-use types::{MemoryImportance, MemoryItem, MemoryState};
+use types::MemoryState;
 
 use cp_base::cast::SafeCast as _;
 

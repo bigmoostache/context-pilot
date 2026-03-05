@@ -8,11 +8,11 @@
 /// Panel implementation for the directory tree view.
 mod panel;
 /// Tool implementations for tree filtering, toggling, and describing.
-mod tools;
+pub mod tools;
 /// Tree state types: `TreeState`, `TreeFileDescription`.
 pub mod types;
 
-use types::{TreeFileDescription, TreeState};
+use types::TreeState;
 
 use serde_json::json;
 

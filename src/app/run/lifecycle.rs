@@ -18,7 +18,7 @@ use crate::ui;
 use crate::app::App;
 use crate::app::context::{get_active_agent_content, prepare_stream_context};
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
-use cp_mod_spine::{NotificationType, SpineState};
+use cp_mod_spine::types::{NotificationType, SpineState};
 
 impl App {
     pub(crate) fn run(

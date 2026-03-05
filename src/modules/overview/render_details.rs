@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use ratatui::prelude::{Line, Span, Style};
 
-use cp_mod_memory::{MemoryImportance, MemoryState};
+use cp_mod_memory::types::{MemoryImportance, MemoryState};
 use cp_mod_prompt::types::PromptState;
-use cp_mod_todo::{TodoState, TodoStatus};
+use cp_mod_todo::types::{TodoState, TodoStatus};
 
 use crate::modules::all_modules;
 use crate::state::State;

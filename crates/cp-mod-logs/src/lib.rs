@@ -248,7 +248,10 @@ impl Module for LogsModule {
         ]
     }
 
-    #[expect(clippy::integer_division_remainder_used, reason = "intentional truncating arithmetic for token estimation")]
+    #[expect(
+        clippy::integer_division_remainder_used,
+        reason = "intentional truncating arithmetic for token estimation"
+    )]
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
         match tool.name.as_str() {
             "log_summarize" => {

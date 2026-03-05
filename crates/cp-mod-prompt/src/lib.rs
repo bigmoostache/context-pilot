@@ -17,7 +17,7 @@ mod tools;
 /// Prompt item types: `PromptItem`, `PromptState`, `PromptType`.
 pub mod types;
 
-use types::{PromptItem, PromptState, PromptType};
+use types::PromptState;
 
 use serde_json::json;
 

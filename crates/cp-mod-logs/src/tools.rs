@@ -3,7 +3,7 @@ use cp_base::state::context::{ContextType, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
-use cp_mod_memory::{MemoryImportance, MemoryItem, MemoryState};
+use cp_mod_memory::types::{MemoryImportance, MemoryItem, MemoryState};
 
 use crate::panel;
 use crate::types::{LogEntry, LogsState};
@@ -220,20 +220,14 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
     if panel.context_type.as_str() != ContextType::CONVERSATION_HISTORY {
         return ToolResult::new(
             tool.id.clone(),
-            format!(
-                "Panel '{}' is not a conversation history panel (type: {:?})",
-                panel_id, panel.context_type
-            ),
+            format!("Panel '{}' is not a conversation history panel (type: {:?})", panel_id, panel.context_type),
             true,
         );
     }
 
     // 2. Extract the last message timestamp from the panel
-    let last_msg_timestamp = panel
-        .history_messages
-        .as_ref()
-        .and_then(|msgs| msgs.last())
-        .map_or(0, |msg| msg.timestamp_ms);
+    let last_msg_timestamp =
+        panel.history_messages.as_ref().and_then(|msgs| msgs.last()).map_or(0, |msg| msg.timestamp_ms);
 
     // 3. Validate that logs are provided (at least one non-empty entry)
     let logs_array = tool.input.get("logs").and_then(|v| v.as_array());

@@ -506,3 +506,15 @@
 19:25:49.990163075 fmt src/llms/claude_code/mod.rs
 19:25:56.561009736 fmt src/llms/claude_code/mod.rs
 19:26:04.428205409 fmt src/llms/claude_code/mod.rs
+19:50:31.016604029 fmt crates/cp-mod-tree/src/lib.rs
+19:53:52.955964532 fmt crates/cp-mod-logs/src/tools.rs
+19:56:18.938799085 fmt crates/cp-base/src/lib.rs
+19:56:57.345965496 fmt src/llms/mod.rs
+19:57:02.887336651 fmt src/ui/help/config_overlay.rs
+19:57:07.297595635 fmt src/app/reverie/streaming.rs
+19:57:11.706138270 fmt src/app/reverie/streaming.rs
+19:57:16.790259256 fmt crates/cp-base/src/lib.rs
+19:57:16.840736447 fmt src/llms/mod.rs
+19:57:16.874038132 fmt src/ui/help/config_overlay.rs
+19:57:16.919647994 fmt src/app/reverie/streaming.rs
+19:59:31.694081476 fmt crates/cp-base/src/lib.rs

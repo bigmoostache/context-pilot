@@ -50,22 +50,24 @@ exceptions:
       Same as above — proc-macro or build.rs per-type generation.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'impl SafeCast for f64'
+    match: 'cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast"'
     reason: >
-      Concrete f64 SafeCast impl. Cannot use #[expect] because not every
-      lint fires on every method (e.g. to_f64 is identity, no cast_precision_loss).
+      Per-method #[expect] on f64 and f32 SafeCast impls. Methods casting
+      to unsigned types (to_u8..to_usize) trigger both cast_possible_truncation
+      and cast_sign_loss. Identity methods (f64::to_f64, f32::to_f32) and
+      lossless conversions (f32::to_f64 via f64::from) have no annotation.
     strategy: >
-      Split into individual method-level annotations so only the lints
-      that actually fire on each method are suppressed. Tedious but
-      precise.
+      Already at maximum precision — each method carries only the lints
+      that actually fire for that specific cast. No further reduction possible.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'impl SafeCast for f32'
+    match: 'cast_possible_truncation, reason = "SafeCast: intentional raw cast"'
     reason: >
-      Concrete f32 SafeCast impl. Same rationale as the f64 block —
-      not every lint fires on every method.
+      Per-method #[expect] on f64 and f32 SafeCast impls for signed/float
+      target casts (to_i32, to_i64, f64::to_f32) where only truncation
+      fires, not sign loss.
     strategy: >
-      Same as f64 — per-method annotations for precision.
+      Already at maximum precision — no further reduction possible.
 
   # ── config/mod.rs: invariant_panic ──────────────────────────────────
 
@@ -80,20 +82,6 @@ exceptions:
       Consider compile-time validation (const fn / build.rs assertions)
       for YAML and theme invariants. For module state, explore a type-state
       pattern where uninitialized state is unrepresentable.
-
-  # ── console-server/main.rs: setsid() ───────────────────────────────
-
-  - path: "crates/cp-console-server/src/main.rs"
-    match: '#[expect(unsafe_code'
-    reason: >
-      Server calls setsid() at startup to become a session leader
-      (detach from TUI's terminal group). setsid() is POSIX
-      async-signal-safe with no preconditions — the unsafe block is
-      minimal and well-documented with a SAFETY comment.
-    strategy: >
-      Wrap in a safe helper crate (e.g. nix::unistd::setsid()) which
-      encapsulates the unsafe. The nix crate provides safe Rust bindings
-      for POSIX — adding it would eliminate the raw libc call.
 
   # ── panels.rs: time_arith module ────────────────────────────────────
 
@@ -122,95 +110,25 @@ exceptions:
       eliminate the need for is_leap_year() entirely. Low priority —
       the current impl is correct and minimal.
 
-  # ── pub_use: module re-export shims ─────────────────────────────────
-  # Module lib.rs files re-export types from submodules so downstream
-  # crates can use short paths (e.g. cp_mod_git::classify instead of
-  # cp_mod_git::classify::classify). These are intentional API surface.
+  # ── cp-mod-logs/lib.rs: chunked persistence + token estimation ──────
 
-  - path: "crates/cp-base/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
+  - path: "crates/cp-mod-logs/src/lib.rs"
+    match: 'intentional truncating arithmetic"'
     reason: >
-      Re-export shim for llm_types — downstream crates import from
-      cp_base::llm_types rather than cp_base::config::llm_types.
+      chunk_index divides log IDs by LOGS_CHUNK_SIZE for chunked
+      persistence. Truncating integer division IS the algorithm.
     strategy: >
-      Only removable if all consumers switch to the full config path.
+      Could use a generic div_floor helper but adds no value —
+      single-use function with trivially correct arithmetic.
 
-  - path: "crates/cp-mod-console/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
+  - path: "crates/cp-mod-logs/src/lib.rs"
+    match: 'token estimation'
     reason: >
-      Re-exports SessionStatus for external use without deep path.
+      Token estimation heuristic: word_count * 4 / 3 approximates BPE
+      token count. Division IS the algorithm.
     strategy: >
-      Make submodule pub and update callers.
-
-  - path: "crates/cp-mod-git/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
-    reason: >
-      Re-exports classify and watcher types for downstream use.
-    strategy: >
-      Make submodules pub and update callers.
-
-  - path: "crates/cp-mod-github/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
-    reason: >
-      Re-exports classify and watcher types for downstream use.
-    strategy: >
-      Make submodules pub and update callers.
-
-  - path: "crates/cp-mod-memory/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
-    reason: >
-      Re-exports memory types for downstream convenience.
-    strategy: >
-      Make submodule pub and update callers.
-
-  - path: "crates/cp-mod-prompt/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
-    reason: >
-      Re-exports prompt types for downstream convenience.
-    strategy: >
-      Make submodules pub and update callers.
-
-  - path: "crates/cp-mod-queue/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
-    reason: >
-      Re-exports QueueState for downstream convenience.
-    strategy: >
-      Make submodule pub and update callers.
-
-  - path: "crates/cp-mod-scratchpad/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
-    reason: >
-      Re-exports scratchpad types for downstream convenience.
-    strategy: >
-      Make submodule pub and update callers.
-
-  - path: "crates/cp-mod-spine/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
-    reason: >
-      Re-exports spine types for downstream convenience.
-    strategy: >
-      Make submodules pub and update callers.
-
-  - path: "crates/cp-mod-todo/src/lib.rs"
-    match: '#[expect(clippy::pub_use'
-    reason: >
-      Re-exports todo types for downstream convenience.
-    strategy: >
-      Make submodule pub and update callers.
-
-  - path: "crates/cp-mod-tree/src/lib.rs"
-    match: 'TreeFileDescription, TreeState'
-    reason: >
-      Re-exports TreeState and TreeFileDescription for downstream use.
-    strategy: >
-      Make submodules pub and update callers.
-
-  - path: "crates/cp-mod-tree/src/lib.rs"
-    match: 'tools::list_dir_entries'
-    reason: >
-      Re-exports list_dir_entries for autocomplete module.
-    strategy: >
-      Make submodule pub and update callers.
+      Could extract an approx_tokens(text) helper to cp-base, but it's
+      a single-use heuristic with no reuse potential.
 
   # ── module_name_repetitions: names that include their module ────────
   # Types used via re-export where the shorter name conflicts with
@@ -297,13 +215,3 @@ exceptions:
     strategy: >
       Irreducible — std::Result conflict.
 
-  # ── indexing_slicing: LCS diff algorithm ────────────────────────────
-
-  - path: "crates/cp-mod-files/src/tools/diff.rs"
-    match: 'clippy::indexing_slicing'
-    reason: >
-      LCS algorithm with provably in-bounds indices — i in 0..=old_len
-      and j in 0..=new_len over a (old_len+1)×(new_len+1) table.
-    strategy: >
-      Bounds are mathematically proven. Could wrap in checked-index
-      newtype but low priority for a classic algorithm.

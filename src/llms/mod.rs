@@ -21,7 +21,7 @@ use crate::state::Message;
 use cp_base::cast::SafeCast as _;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
-pub(crate) use cp_base::llm_types::{
+pub(crate) use cp_base::config::llm_types::{
     AnthropicModel, ApiCheckResult, DeepSeekModel, GrokModel, GroqModel, LlmProvider, ModelInfo, StreamEvent,
 };
 

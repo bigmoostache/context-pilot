@@ -170,16 +170,9 @@ impl_safe_cast_signed!(i32);
 impl_safe_cast_signed!(i64);
 impl_safe_cast_signed!(isize);
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::cast_lossless,
-    clippy::cast_possible_wrap,
-    clippy::cast_precision_loss,
-    reason = "SafeCast implementations necessarily use raw as casts"
-)]
 impl SafeCast for f64 {
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_u8(self) -> u8 {
         if self < 0.0 {
             0
@@ -190,6 +183,7 @@ impl SafeCast for f64 {
         }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_u16(self) -> u16 {
         if self < 0.0 {
             0
@@ -200,6 +194,7 @@ impl SafeCast for f64 {
         }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_u32(self) -> u32 {
         if self < 0.0 {
             0
@@ -210,22 +205,27 @@ impl SafeCast for f64 {
         }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_u64(self) -> u64 {
         if self < 0.0 { 0 } else { self as u64 }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_usize(self) -> usize {
         if self < 0.0 { 0 } else { self as usize }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, reason = "SafeCast: intentional raw cast")]
     fn to_i32(self) -> i32 {
         self as i32
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, reason = "SafeCast: intentional raw cast")]
     fn to_i64(self) -> i64 {
         self as i64
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, reason = "SafeCast: intentional raw cast")]
     fn to_f32(self) -> f32 {
         self as f32
     }
@@ -235,16 +235,9 @@ impl SafeCast for f64 {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::cast_lossless,
-    clippy::cast_possible_wrap,
-    clippy::cast_precision_loss,
-    reason = "SafeCast implementations necessarily use raw as casts"
-)]
 impl SafeCast for f32 {
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_u8(self) -> u8 {
         if self < 0.0 {
             0
@@ -255,6 +248,7 @@ impl SafeCast for f32 {
         }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_u16(self) -> u16 {
         if self < 0.0 {
             0
@@ -265,22 +259,27 @@ impl SafeCast for f32 {
         }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_u32(self) -> u32 {
         if self < 0.0 { 0 } else { self as u32 }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_u64(self) -> u64 {
         if self < 0.0 { 0 } else { self as u64 }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast")]
     fn to_usize(self) -> usize {
         if self < 0.0 { 0 } else { self as usize }
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, reason = "SafeCast: intentional raw cast")]
     fn to_i32(self) -> i32 {
         self as i32
     }
     #[inline]
+    #[expect(clippy::cast_possible_truncation, reason = "SafeCast: intentional raw cast")]
     fn to_i64(self) -> i64 {
         self as i64
     }

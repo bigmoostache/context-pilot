@@ -167,7 +167,7 @@ fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
         ]));
     } else if let Some(result) = &state.api_check_result {
         use crate::infra::config::normalize_icon;
-        let result: &cp_base::llm_types::ApiCheckResult = result;
+        let result: &cp_base::config::llm_types::ApiCheckResult = result;
         let (icon, color, msg) = if result.all_ok() {
             (normalize_icon("✓"), theme::success(), "API OK")
         } else if let Some(err) = &result.error {

@@ -88,10 +88,6 @@ fn compute_diff<'src>(old_lines: &[&'src str], new_lines: &[&'src str]) -> Vec<D
 /// Returns pairs of (`old_index`, `new_index`) for matching lines in ascending order.
 ///
 /// Note: O(m*n) space. Acceptable for typical file edits.
-#[expect(
-    clippy::indexing_slicing,
-    reason = "indices i in 0..=old_len and j in 0..=new_len are always within bounds of the (old_len+1)x(new_len+1) lengths table and the old/new slices"
-)]
 fn lcs<'src>(old: &[&'src str], new: &[&'src str]) -> Vec<(usize, usize)> {
     let old_len = old.len();
     let new_len = new.len();
@@ -102,10 +98,17 @@ fn lcs<'src>(old: &[&'src str], new: &[&'src str]) -> Vec<(usize, usize)> {
         for j in 1..=new_len {
             let i_prev = i.saturating_sub(1);
             let j_prev = j.saturating_sub(1);
-            if old[i_prev] == new[j_prev] {
-                lengths[i][j] = lengths[i_prev][j_prev].saturating_add(1);
+            let old_eq_new = old.get(i_prev) == new.get(j_prev);
+            let prev_diag = lengths.get(i_prev).and_then(|r| r.get(j_prev)).copied().unwrap_or(0);
+            let value = if old_eq_new {
+                prev_diag.saturating_add(1)
             } else {
-                lengths[i][j] = lengths[i_prev][j].max(lengths[i][j_prev]);
+                let up = lengths.get(i_prev).and_then(|r| r.get(j)).copied().unwrap_or(0);
+                let left = lengths.get(i).and_then(|r| r.get(j_prev)).copied().unwrap_or(0);
+                up.max(left)
+            };
+            if let Some(cell) = lengths.get_mut(i).and_then(|r| r.get_mut(j)) {
+                *cell = value;
             }
         }
     }
@@ -117,14 +120,18 @@ fn lcs<'src>(old: &[&'src str], new: &[&'src str]) -> Vec<(usize, usize)> {
     while i > 0 && j > 0 {
         let i_prev = i.saturating_sub(1);
         let j_prev = j.saturating_sub(1);
-        if old[i_prev] == new[j_prev] {
+        if old.get(i_prev) == new.get(j_prev) {
             result.push((i_prev, j_prev));
             i = i_prev;
             j = j_prev;
-        } else if lengths[i_prev][j] > lengths[i][j_prev] {
-            i = i_prev;
         } else {
-            j = j_prev;
+            let up = lengths.get(i_prev).and_then(|r| r.get(j)).copied().unwrap_or(0);
+            let left = lengths.get(i).and_then(|r| r.get(j_prev)).copied().unwrap_or(0);
+            if up > left {
+                i = i_prev;
+            } else {
+                j = j_prev;
+            }
         }
     }
 

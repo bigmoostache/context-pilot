@@ -11,7 +11,7 @@ mod tools;
 /// Todo state types: `TodoItem`, `TodoStatus`, `TodoState`.
 pub mod types;
 
-use types::{TodoItem, TodoState, TodoStatus};
+use types::{TodoState, TodoStatus};
 
 use serde_json::json;
 

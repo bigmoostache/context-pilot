@@ -8,7 +8,7 @@ use crate::state::{Message, MessageStatus, MessageType, State, ToolResultRecord}
 use cp_base::state::watchers::WatcherRegistry;
 use cp_mod_console::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_mod_queue::types::QueueState;
-use cp_mod_spine::{NotificationType, SpineState};
+use cp_mod_spine::types::{NotificationType, SpineState};
 
 use crate::app::App;
 use std::fmt::Write as _;

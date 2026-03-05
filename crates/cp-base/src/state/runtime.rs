@@ -5,7 +5,7 @@ use super::context::{ContextElement, ContextType};
 use super::data::config::SidebarMode;
 use super::data::message::Message;
 use crate::cast::SafeCast as _;
-use crate::llm_types::{LlmProvider, ModelInfo as _};
+use crate::config::llm_types::{LlmProvider, ModelInfo as _};
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
@@ -191,23 +191,23 @@ pub struct State {
     /// Selected LLM provider
     pub llm_provider: LlmProvider,
     /// Active Anthropic model variant.
-    pub anthropic_model: crate::llm_types::AnthropicModel,
+    pub anthropic_model: crate::config::llm_types::AnthropicModel,
     /// Active Grok model variant.
-    pub grok_model: crate::llm_types::GrokModel,
+    pub grok_model: crate::config::llm_types::GrokModel,
     /// Active Groq model variant.
-    pub groq_model: crate::llm_types::GroqModel,
+    pub groq_model: crate::config::llm_types::GroqModel,
     /// Active `DeepSeek` model variant.
-    pub deepseek_model: crate::llm_types::DeepSeekModel,
+    pub deepseek_model: crate::config::llm_types::DeepSeekModel,
     /// Secondary LLM provider (for reveries / sub-agents)
     pub secondary_provider: LlmProvider,
     /// Secondary Anthropic model variant.
-    pub secondary_anthropic_model: crate::llm_types::AnthropicModel,
+    pub secondary_anthropic_model: crate::config::llm_types::AnthropicModel,
     /// Secondary Grok model variant.
-    pub secondary_grok_model: crate::llm_types::GrokModel,
+    pub secondary_grok_model: crate::config::llm_types::GrokModel,
     /// Secondary Groq model variant.
-    pub secondary_groq_model: crate::llm_types::GroqModel,
+    pub secondary_groq_model: crate::config::llm_types::GroqModel,
     /// Secondary `DeepSeek` model variant.
-    pub secondary_deepseek_model: crate::llm_types::DeepSeekModel,
+    pub secondary_deepseek_model: crate::config::llm_types::DeepSeekModel,
     /// Sidebar display mode: Normal (full), Collapsed (icons only), Hidden
     pub sidebar_mode: SidebarMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
@@ -239,7 +239,7 @@ pub struct State {
     pub context_budget: Option<usize>,
 
     /// Result of the last API check
-    pub api_check_result: Option<crate::llm_types::ApiCheckResult>,
+    pub api_check_result: Option<crate::config::llm_types::ApiCheckResult>,
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
     /// Guard rail block reason (set when spine blocks, cleared when streaming starts)
@@ -304,15 +304,15 @@ impl Default for State {
             config_selected_bar: 0,
             active_theme: crate::config::DEFAULT_THEME.to_string(),
             llm_provider: LlmProvider::default(),
-            anthropic_model: crate::llm_types::AnthropicModel::default(),
-            grok_model: crate::llm_types::GrokModel::default(),
-            groq_model: crate::llm_types::GroqModel::default(),
-            deepseek_model: crate::llm_types::DeepSeekModel::default(),
+            anthropic_model: crate::config::llm_types::AnthropicModel::default(),
+            grok_model: crate::config::llm_types::GrokModel::default(),
+            groq_model: crate::config::llm_types::GroqModel::default(),
+            deepseek_model: crate::config::llm_types::DeepSeekModel::default(),
             secondary_provider: LlmProvider::Anthropic,
-            secondary_anthropic_model: crate::llm_types::AnthropicModel::ClaudeHaiku45,
-            secondary_grok_model: crate::llm_types::GrokModel::default(),
-            secondary_groq_model: crate::llm_types::GroqModel::default(),
-            secondary_deepseek_model: crate::llm_types::DeepSeekModel::default(),
+            secondary_anthropic_model: crate::config::llm_types::AnthropicModel::ClaudeHaiku45,
+            secondary_grok_model: crate::config::llm_types::GrokModel::default(),
+            secondary_groq_model: crate::config::llm_types::GroqModel::default(),
+            secondary_deepseek_model: crate::config::llm_types::DeepSeekModel::default(),
             sidebar_mode: SidebarMode::Normal,
             reveries: HashMap::new(),
             cache_hit_tokens: 0,

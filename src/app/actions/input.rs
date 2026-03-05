@@ -1,7 +1,7 @@
 use crate::state::persistence::{delete_message, save_message};
 use crate::state::{ContextType, Message, State, estimate_tokens};
-use cp_mod_prompt::{PromptItem, PromptState};
-use cp_mod_spine::{NotificationType, SpineState};
+use cp_mod_prompt::types::{PromptItem, PromptState};
+use cp_mod_spine::types::{NotificationType, SpineState};
 
 use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};

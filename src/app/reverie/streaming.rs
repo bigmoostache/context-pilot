@@ -11,13 +11,13 @@ use crate::infra::api::{StreamParams, start_streaming};
 use crate::infra::constants::DEFAULT_WORKER_ID;
 use crate::state::State;
 use cp_base::config::REVERIE;
-use cp_base::llm_types::StreamEvent;
+use cp_base::config::llm_types::StreamEvent;
 
 use super::tools;
 
 /// Resolve the secondary model string from provider + model enum.
 fn secondary_model_string(state: &State) -> String {
-    use cp_base::llm_types::{LlmProvider, ModelInfo as _};
+    use cp_base::config::llm_types::{LlmProvider, ModelInfo as _};
     match state.secondary_provider {
         LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
             state.secondary_anthropic_model.api_name().to_string()
