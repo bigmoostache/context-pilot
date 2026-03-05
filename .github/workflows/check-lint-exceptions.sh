@@ -59,7 +59,7 @@ while IFS= read -r hit; do
     echo "  → Line: $trimmed" >&2
     echo "  → Add an entry to $YAML or remove the annotation." >&2
     exit_code=1
-    ((unregistered++))
+    unregistered=$((unregistered + 1))
   fi
 done < <(grep -rn '#\[expect\|#\[allow\|#!\[expect\|#!\[allow' --include='*.rs' src/ crates/ 2>/dev/null \
   | grep -v '/target/' \
