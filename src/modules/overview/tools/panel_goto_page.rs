@@ -3,7 +3,7 @@ use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{State, estimate_tokens};
 use cp_base::cast::SafeCast as _;
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let Some(panel_id) = tool.input.get("panel_id").and_then(|v| v.as_str()) else {
+    let Some(panel_id) = tool.input.get("panel_id").and_then(serde_json::Value::as_str) else {
         return ToolResult::new(tool.id.clone(), "Missing 'panel_id' parameter".to_string(), true);
     };
 

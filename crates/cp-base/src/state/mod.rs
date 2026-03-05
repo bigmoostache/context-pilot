@@ -13,22 +13,6 @@ pub mod runtime;
 /// Watcher trait and registry for async condition monitoring.
 pub mod watchers;
 
-// Re-exports for convenience
-pub use crate::ui::render_cache::{FullCache, InputCache, MessageCache, hash_values};
-pub use actions::{Action, ActionResult};
-#[expect(clippy::module_name_repetitions, reason = "Re-exporting SharedConfig — name is better with prefix")]
-pub use data::config::{ImportantPanelUids, PanelData, SharedConfig, SidebarMode, WorkerState};
-
-pub use context::{
-    ContextElement, ContextType, ContextTypeMeta, compute_total_pages, estimate_tokens, fixed_panel_order,
-    get_context_type_meta, init_context_type_registry, make_default_context_element,
-};
-pub use data::message::{
-    Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord, format_messages_to_chunk,
-};
-#[expect(clippy::module_name_repetitions, reason = "StateFlags — renaming loses clarity")]
-pub use runtime::{ConfigFlags, LifecycleFlags, State, StateFlags, StreamFlags, StreamPhase, StreamingTool, UiFlags};
-
 // ─── Reverie State ──────────────────────────────────────────────────────────
 // Ephemeral sub-agent state — lives as Option<ReverieState> on the main State.
 

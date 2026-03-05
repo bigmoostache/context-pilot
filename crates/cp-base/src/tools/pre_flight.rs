@@ -10,6 +10,10 @@
 /// Result of pre-flight validation. Errors block execution; warnings are
 /// attached to the result but the tool still runs.
 #[derive(Debug, Clone, Default)]
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "Used via re-export as PreFlightResult — 'Result' alone conflicts with std::result::Result"
+)]
 pub struct PreFlightResult {
     /// Blocking errors — tool execution will be refused.
     pub errors: Vec<String>,

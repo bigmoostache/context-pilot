@@ -53,10 +53,8 @@ fn check_shell_operators(command: &str) -> Result<(), String> {
     let mut in_single = false;
     let mut in_double = false;
     let chars: Vec<char> = command.chars().collect();
-    let len = chars.len();
 
-    for i in 0..len {
-        let c = chars[i];
+    for (i, &c) in chars.iter().enumerate() {
         match c {
             '\'' if !in_double => in_single = !in_single,
             '"' if !in_single => in_double = !in_double,
@@ -64,10 +62,10 @@ fn check_shell_operators(command: &str) -> Result<(), String> {
             '|' | ';' | '`' | '>' | '<' => {
                 return Err(format!("Shell operator '{c}' is not allowed"));
             }
-            '$' if i + 1 < len && chars[i + 1] == '(' => {
+            '$' if chars.get(i.saturating_add(1)) == Some(&'(') => {
                 return Err("Shell operator '$(' is not allowed".to_string());
             }
-            '&' if i + 1 < len && chars[i + 1] == '&' => {
+            '&' if chars.get(i.saturating_add(1)) == Some(&'&') => {
                 return Err("Shell operator '&&' is not allowed".to_string());
             }
             '\n' | '\r' => {
@@ -172,12 +170,12 @@ const READ_ONLY_ACTIONS: &[(&str, &str)] = &[
 /// [`CommandClass::Mutating`] as a safe fallback. The `api` subcommand gets special
 /// handling since its classification depends on the `--method`/`-X` flag.
 #[must_use]
-pub fn classify_gh(args: &[String]) -> CommandClass {
-    if args.is_empty() {
+pub fn classify(args: &[String]) -> CommandClass {
+    let Some(group_s) = args.first() else {
         return CommandClass::Mutating;
-    }
+    };
 
-    let group = args[0].as_str();
+    let group = group_s.as_str();
 
     // Entire group is read-only?
     if READ_ONLY_GROUPS.contains(&group) {

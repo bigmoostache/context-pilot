@@ -1,9 +1,11 @@
 use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel, scroll_key_action};
-use cp_base::state::{Action, ContextType, State, estimate_tokens};
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 
 use crate::types::ScratchpadState;
 use std::fmt::Write as _;
@@ -62,6 +64,35 @@ impl Panel for ScratchpadPanel {
         vec![ContextItem::new(id, "Scratchpad", content, last_refresh_ms)]
     }
 
+    fn needs_cache(&self) -> bool {
+        false
+    }
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+    fn build_cache_request(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+    fn suicide(&self, _ctx: &cp_base::state::context::ContextElement, _state: &State) -> bool {
+        false
+    }
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let ss = ScratchpadState::get(state);
         let mut text: Vec<Line<'_>> = Vec::new();
@@ -103,7 +134,7 @@ impl Panel for ScratchpadPanel {
                     text.push(Line::from(vec![
                         Span::styled("   ".to_string(), base_style),
                         Span::styled(
-                            format!("... ({} more lines)", total_lines - 5),
+                            format!("... ({} more lines)", total_lines.saturating_sub(5)),
                             Style::default().fg(theme::text_muted()).italic(),
                         ),
                     ]));

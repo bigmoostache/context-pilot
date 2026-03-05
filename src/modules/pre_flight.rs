@@ -59,7 +59,7 @@ fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut
             // Enum check
             if let Some(ref enum_vals) = param.enum_values
                 && let Some(s) = val.as_str()
-                && !enum_vals.iter().any(|e| e == s)
+                && !enum_vals.iter().any(|e: &String| e == s)
             {
                 result.errors.push(format!(
                     "Parameter '{}': invalid value '{}'. Expected one of: {}",

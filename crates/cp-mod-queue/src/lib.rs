@@ -14,8 +14,10 @@ pub use types::{QueueState, QueuedToolCall};
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
+use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::QueuePanel;
@@ -168,8 +170,8 @@ impl Module for QueueModule {
         }
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
-        vec![cp_base::state::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
+        vec![cp_base::state::context::ContextTypeMeta {
             context_type: "queue",
             icon_id: "queue",
             is_fixed: true,

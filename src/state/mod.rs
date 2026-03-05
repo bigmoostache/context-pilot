@@ -4,15 +4,20 @@
 //! existing `crate::state::X` imports throughout the binary keep working.
 
 // ── Re-exports from cp_base sub-modules ──
-pub(crate) use cp_base::state::{
-    ContextElement, ContextType, ContextTypeMeta, FullCache, InputCache, Message, MessageCache, MessageStatus,
-    MessageType, PanelData, SharedConfig, State, StreamPhase, StreamingTool, ToolResultRecord, ToolUseRecord,
-    WorkerState, compute_total_pages, estimate_tokens, fixed_panel_order, format_messages_to_chunk,
-    get_context_type_meta, hash_values, init_context_type_registry, make_default_context_element,
+pub(crate) use cp_base::state::context::{
+    ContextElement, ContextType, ContextTypeMeta, compute_total_pages, estimate_tokens, fixed_panel_order,
+    get_context_type_meta, init_context_type_registry, make_default_context_element,
 };
+pub(crate) use cp_base::state::data::config::{PanelData, SharedConfig, WorkerState};
+pub(crate) use cp_base::state::data::message::{Message, MessageStatus, MessageType, format_messages_to_chunk};
+pub(crate) use cp_base::state::runtime::{State, StreamPhase, StreamingTool};
+pub(crate) use cp_base::ui::render_cache::{FullCache, InputCache, MessageCache, hash_values};
 
 // ── Submodule re-exports (accessed via path, e.g. crate::state::config::SCHEMA_VERSION) ──
 pub(crate) use cp_base::state::data::config;
+
+// Records re-export (used by conversation panel and persistence)
+pub(crate) use cp_base::state::data::message::{ToolResultRecord, ToolUseRecord};
 
 // ── Local submodules ──
 pub(crate) mod cache;

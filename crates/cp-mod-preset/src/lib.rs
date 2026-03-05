@@ -16,8 +16,10 @@ pub const PRESETS_DIR: &str = "presets";
 
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
+use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =

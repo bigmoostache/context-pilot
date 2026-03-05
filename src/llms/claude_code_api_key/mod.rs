@@ -172,7 +172,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
         if let Some(results) = &request.tool_results {
             let tool_results: Vec<Value> = results
                 .iter()
-                .map(|r| {
+                .map(|r: &crate::infra::tools::ToolResult| {
                     serde_json::json!({
                         "type": "tool_result",
                         "tool_use_id": r.tool_use_id,

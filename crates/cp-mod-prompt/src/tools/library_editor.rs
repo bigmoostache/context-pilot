@@ -1,5 +1,6 @@
 use crate::types::PromptState;
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 /// Opens a prompt's content in the Library panel editor for reading/editing.

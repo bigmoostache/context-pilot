@@ -4,10 +4,12 @@ use std::path::PathBuf;
 use ratatui::prelude::{Color, Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
-use cp_base::config::constants::STORE_DIR;
-use cp_base::config::{INJECTIONS, theme};
+use cp_base::config::INJECTIONS;
+use cp_base::config::accessors::theme;
+use cp_base::config::constants;
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 use cp_base::ui::{Cell, render_table};
 
 use crate::types::CallbackState;
@@ -64,7 +66,7 @@ impl CallbackPanel {
             ));
             lines.push(String::new());
 
-            let script_path = PathBuf::from(STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
+            let script_path = PathBuf::from(constants::STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
             match fs::read_to_string(&script_path) {
                 Ok(content) => {
                     lines.push("```bash".to_string());
@@ -240,7 +242,7 @@ impl Panel for CallbackPanel {
             )));
             lines.push(Line::from(""));
 
-            let script_path = PathBuf::from(STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
+            let script_path = PathBuf::from(constants::STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
             match fs::read_to_string(&script_path) {
                 Ok(content) => {
                     for line in content.lines() {

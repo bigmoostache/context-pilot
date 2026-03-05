@@ -181,7 +181,8 @@ pub mod chars {
 
 pub mod icons {
     //! Message and context icons from the active theme.
-    use crate::config::{active_theme, normalize_icon};
+    use super::active_theme;
+    use crate::config::normalize_icon;
 
     /// User message icon (e.g., "⚔ ").
     #[must_use]

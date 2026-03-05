@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 
 /// A file description in the tree
 #[derive(Debug, Clone, Serialize, Deserialize)]

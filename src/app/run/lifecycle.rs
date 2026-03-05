@@ -76,7 +76,7 @@ impl App {
                 }
 
                 // Handle autocomplete events if popup is active
-                if let Some(ac) = self.state.get_ext::<cp_base::autocomplete::AutocompleteState>()
+                if let Some(ac) = self.state.get_ext::<cp_base::state::autocomplete::AutocompleteState>()
                     && ac.active
                 {
                     self.handle_autocomplete_event(&evt);
@@ -95,7 +95,7 @@ impl App {
                 }
 
                 // Handle question form events if form is active (mutates state directly)
-                if let Some(form) = self.state.get_ext::<cp_base::ui::PendingForm>()
+                if let Some(form) = self.state.get_ext::<cp_base::ui::question_form::PendingForm>()
                     && !form.resolved
                 {
                     self.handle_question_form_event(&evt);

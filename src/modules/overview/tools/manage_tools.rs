@@ -5,7 +5,7 @@ use crate::state::State;
 pub(crate) const MANAGE_TOOLS_ID: &str = "manage_tools";
 
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let Some(changes) = tool.input.get("changes").and_then(|v| v.as_array()) else {
+    let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) else {
         return ToolResult::new(tool.id.clone(), "Missing 'changes' parameter (expected array)".to_string(), true);
     };
 
@@ -17,12 +17,12 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut failures: Vec<String> = Vec::new();
 
     for (i, change) in changes.iter().enumerate() {
-        let Some(tool_name) = change.get("tool").and_then(|v| v.as_str()) else {
+        let Some(tool_name) = change.get("tool").and_then(serde_json::Value::as_str) else {
             failures.push(format!("Change {}: missing 'tool'", i + 1));
             continue;
         };
 
-        let Some(action) = change.get("action").and_then(|v| v.as_str()) else {
+        let Some(action) = change.get("action").and_then(serde_json::Value::as_str) else {
             failures.push(format!("Change {}: missing 'action'", i + 1));
             continue;
         };

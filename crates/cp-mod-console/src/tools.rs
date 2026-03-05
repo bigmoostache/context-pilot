@@ -1,8 +1,9 @@
 use cp_base::config::INJECTIONS;
 use cp_base::panels::now_ms;
-use cp_base::state::{ContextType, State, make_default_context_element};
+use cp_base::state::context::{ContextType, make_default_context_element};
+use cp_base::state::runtime::State;
+use cp_base::state::watchers::WatcherRegistry;
 use cp_base::tools::{ToolResult, ToolUse};
-use cp_base::watchers::WatcherRegistry;
 
 use crate::manager::SessionHandle;
 use crate::types::{ConsoleState, ConsoleWatcher, format_wait_result};
@@ -14,7 +15,7 @@ fn truncate_str(s: &str, max_bytes: usize) -> &str {
     }
     let mut end = max_bytes;
     while end > 0 && !s.is_char_boundary(end) {
-        end -= 1;
+        end = end.saturating_sub(1);
     }
     s.get(..end).unwrap_or("")
 }
@@ -88,7 +89,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let session_key = {
         let cs = ConsoleState::get_mut(state);
         let key = format!("c_{}", cs.next_session_id);
-        cs.next_session_id += 1;
+        cs.next_session_id = cs.next_session_id.saturating_add(1);
         key
     };
 
@@ -104,7 +105,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Create dynamic panel with UID for persistence
     let panel_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid += 1;
+    state.global_next_uid = state.global_next_uid.saturating_add(1);
     let mut ctx = make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
     ctx.uid = Some(uid);
     ctx.set_meta("console_name", &session_key);
@@ -164,7 +165,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Short delay for output to arrive
-    state.tool_sleep_until_ms = now_ms() + 500;
+    state.tool_sleep_until_ms = now_ms().saturating_add(500);
 
     ToolResult::new(tool.id.clone(), format!("Sent input to console '{panel_id}'"), false)
 }
@@ -234,7 +235,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         blocking: true,
         tool_use_id: Some(tool.id.clone()),
         registered_at_ms: now,
-        deadline_ms: Some(now + max_wait * 1000),
+        deadline_ms: Some(now.saturating_add(max_wait.saturating_mul(1000))),
         easy_bash: false,
         panel_id,
         desc,
@@ -344,7 +345,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     let session_key = {
         let cs = ConsoleState::get_mut(state);
         let key = format!("c_{}", cs.next_session_id);
-        cs.next_session_id += 1;
+        cs.next_session_id = cs.next_session_id.saturating_add(1);
         key
     };
 
@@ -357,7 +358,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     let display_name = truncate_str(&command, 30);
     let panel_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid += 1;
+    state.global_next_uid = state.global_next_uid.saturating_add(1);
     let mut ctx = make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
     ctx.uid = Some(uid);
     ctx.set_meta("console_name", &session_key);
@@ -383,7 +384,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         blocking: true,
         tool_use_id: Some(tool.id.clone()),
         registered_at_ms: now,
-        deadline_ms: Some(now + BASH_MAX_EXECUTION_SECS * 1000),
+        deadline_ms: Some(now.saturating_add(BASH_MAX_EXECUTION_SECS.saturating_mul(1000))),
         easy_bash: true,
         panel_id,
         desc: format!("⏳ easy_bash: {}", truncate_str(&command, 40)),

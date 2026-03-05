@@ -21,8 +21,10 @@ use serde_json::json;
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, ContextTypeMeta, State};
-use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
+use cp_base::state::context::{ContextType, ContextTypeMeta};
+use cp_base::state::runtime::State;
+use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::CallbackPanel;
@@ -221,7 +223,7 @@ impl Module for CallbackModule {
         }
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
         (ctx.context_type.as_str() == ContextType::CALLBACK).then_some("callbacks".to_string())
     }
 

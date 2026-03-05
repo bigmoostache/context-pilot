@@ -140,7 +140,7 @@ impl AutocompleteState {
     /// Move selection up.
     pub const fn select_prev(&mut self) {
         if self.selected > 0 {
-            self.selected -= 1;
+            self.selected = self.selected.saturating_sub(1);
             if self.selected < self.scroll_offset {
                 self.scroll_offset = self.selected;
             }
@@ -149,10 +149,10 @@ impl AutocompleteState {
 
     /// Move selection down.
     pub const fn select_next(&mut self) {
-        if !self.matches.is_empty() && self.selected < self.matches.len() - 1 {
-            self.selected += 1;
-            if self.selected >= self.scroll_offset + MAX_VISIBLE {
-                self.scroll_offset = self.selected + 1 - MAX_VISIBLE;
+        if !self.matches.is_empty() && self.selected < self.matches.len().saturating_sub(1) {
+            self.selected = self.selected.saturating_add(1);
+            if self.selected >= self.scroll_offset.saturating_add(MAX_VISIBLE) {
+                self.scroll_offset = self.selected.saturating_add(1).saturating_sub(MAX_VISIBLE);
             }
         }
     }
@@ -174,7 +174,7 @@ impl AutocompleteState {
     /// The visible window of matches for rendering.
     #[must_use]
     pub fn visible_matches(&self) -> &[AutocompleteEntry] {
-        let end = (self.scroll_offset + MAX_VISIBLE).min(self.matches.len());
+        let end = self.scroll_offset.saturating_add(MAX_VISIBLE).min(self.matches.len());
         self.matches.get(self.scroll_offset..end).unwrap_or_default()
     }
 
@@ -194,7 +194,7 @@ impl AutocompleteState {
     fn split_query(&mut self) {
         if let Some(last_slash) = self.query.rfind('/') {
             self.dir_prefix = self.query.get(..last_slash).unwrap_or("").to_string();
-            self.name_prefix = self.query.get(last_slash + 1..).unwrap_or("").to_string();
+            self.name_prefix = self.query.get(last_slash.saturating_add(1)..).unwrap_or("").to_string();
         } else {
             self.dir_prefix.clear();
             self.name_prefix = self.query.clone();

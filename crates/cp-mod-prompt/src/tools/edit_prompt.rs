@@ -1,7 +1,8 @@
 use crate::storage;
 use crate::types::{PromptState, PromptType};
 use cp_base::panels::now_ms;
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use std::fmt::Write as _;
 

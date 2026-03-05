@@ -2,10 +2,11 @@ use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::Action;
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 use cp_base::ui::{Cell, TextCell, render_table, render_table_text};
 
 use crate::types::{MemoryImportance, MemoryState};
@@ -157,10 +158,15 @@ impl Panel for MemoryPanel {
             let labels_width = labels.iter().map(|l| UnicodeWidthStr::width(l.as_str())).max().unwrap_or(6).max(6);
 
             let viewport = state.last_viewport_width as usize;
-            let fixed_width =
-                indent + id_width + separator_width + separator_width + imp_width + separator_width + labels_width;
-            let summary_max = if viewport > fixed_width + 20 {
-                viewport - fixed_width
+            let fixed_width = indent
+                .saturating_add(id_width)
+                .saturating_add(separator_width)
+                .saturating_add(separator_width)
+                .saturating_add(imp_width)
+                .saturating_add(separator_width)
+                .saturating_add(labels_width);
+            let summary_max = if viewport > fixed_width.saturating_add(20) {
+                viewport.saturating_sub(fixed_width)
             } else {
                 40 // minimum reasonable width
             };
@@ -174,7 +180,7 @@ impl Panel for MemoryPanel {
                     MemoryImportance::Medium => theme::text_secondary(),
                     MemoryImportance::Low => theme::text_muted(),
                 };
-                let label_str = &labels[i];
+                let Some(label_str) = labels.get(i) else { continue };
                 let wrapped = wrap_text_simple(&memory.tl_dr, summary_max);
 
                 for (line_idx, line) in wrapped.iter().enumerate() {
@@ -298,10 +304,10 @@ fn wrap_text_simple(text: &str, max_width: usize) -> Vec<String> {
         if current_width == 0 {
             current_line.push_str(word);
             current_width = word_width;
-        } else if current_width + 1 + word_width <= max_width {
+        } else if current_width.saturating_add(1).saturating_add(word_width) <= max_width {
             current_line.push(' ');
             current_line.push_str(word);
-            current_width += 1 + word_width;
+            current_width = current_width.saturating_add(1).saturating_add(word_width);
         } else {
             lines.push(current_line);
             current_line = word.to_string();

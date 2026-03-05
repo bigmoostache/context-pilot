@@ -6,15 +6,12 @@
 use ratatui::prelude::{Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
-use crate::config::theme;
+use crate::config::accessors::theme;
 
 /// Interactive question form types (ask_user_question tool).
 pub mod question_form;
 /// Render cache types for conversation panel performance.
 pub mod render_cache;
-
-pub use question_form::{PendingForm, Question, QuestionAnswer, QuestionOption};
-pub use render_cache::{FullCache, InputCache, MessageCache, hash_values};
 
 /// Column alignment for table cells
 #[derive(Debug, Clone, Copy, Default)]
@@ -259,11 +256,12 @@ pub fn find_size_pattern(line: &str) -> Option<usize> {
         return None;
     }
     let bytes = trimmed.as_bytes();
-    let mut num_start = bytes.len() - 1;
-    while num_start > 0 && bytes.get(num_start - 1).is_some_and(u8::is_ascii_digit) {
-        num_start -= 1;
+    let mut num_start = bytes.len().saturating_sub(1);
+    while num_start > 0 && bytes.get(num_start.saturating_sub(1)).is_some_and(u8::is_ascii_digit) {
+        num_start = num_start.saturating_sub(1);
     }
-    (num_start > 0 && bytes.get(num_start - 1).copied() == Some(b' ')).then(|| num_start - 1)
+    (num_start > 0 && bytes.get(num_start.saturating_sub(1)).copied() == Some(b' '))
+        .then(|| num_start.saturating_sub(1))
 }
 
 /// Find children count pattern in tree output (e.g., "(5 children)" or "(1 child)")
@@ -271,13 +269,16 @@ pub fn find_size_pattern(line: &str) -> Option<usize> {
 #[must_use]
 pub fn find_children_pattern(line: &str) -> Option<(usize, usize)> {
     if let Some(start) = line.find(" (") {
-        let rest = line.get(start + 2..).unwrap_or("");
+        let rest = line.get(start.saturating_add(2)..).unwrap_or("");
         if let Some(end_paren) = rest.find(')') {
             let inner = rest.get(..end_paren).unwrap_or("");
             if inner.ends_with(" child") || inner.ends_with(" children") {
                 let num_part = inner.split_whitespace().next()?;
                 if num_part.parse::<usize>().is_ok() {
-                    return Some((start + 1, start + 2 + end_paren + 1));
+                    return Some((
+                        start.saturating_add(1),
+                        start.saturating_add(2).saturating_add(end_paren).saturating_add(1),
+                    ));
                 }
             }
         }

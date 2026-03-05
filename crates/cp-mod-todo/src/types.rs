@@ -1,5 +1,5 @@
-use cp_base::config::icons;
-use cp_base::state::State;
+use cp_base::config::accessors::icons;
+use cp_base::state::runtime::State;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 

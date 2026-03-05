@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::Path;
 
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use super::diff::generate_unified_diff;
@@ -14,7 +15,7 @@ fn normalize_for_match(s: &str) -> String {
 
 /// Find the best match for `needle` in `haystack` using normalized comparison.
 /// Returns the actual substring from haystack that matches (preserving original whitespace).
-pub(crate) fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Option<&'a str> {
+pub(crate) fn find_normalized_match<'haystack>(haystack: &'haystack str, needle: &str) -> Option<&'haystack str> {
     let norm_needle = normalize_for_match(needle);
     let needle_lines: Vec<&str> = norm_needle.lines().collect();
 
@@ -24,12 +25,12 @@ pub(crate) fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Opti
 
     // Split haystack into lines while tracking byte positions
     let mut line_positions: Vec<(usize, usize)> = vec![]; // (start, end) for each line
-    let mut pos = 0;
+    let mut pos: usize = 0;
     for line in haystack.lines() {
         let start = pos;
-        let end = pos + line.len();
+        let end = pos.saturating_add(line.len());
         line_positions.push((start, end));
-        pos = end + 1; // +1 for newline (might overshoot at EOF, that's ok)
+        pos = end.saturating_add(1); // +1 for newline (might overshoot at EOF, that's ok)
     }
 
     let haystack_lines: Vec<&str> = haystack.lines().collect();
@@ -37,20 +38,27 @@ pub(crate) fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Opti
 
     // Try to find needle_lines sequence in haystack_lines_normalized
     'outer: for start_idx in 0..haystack_lines.len() {
-        if start_idx + needle_lines.len() > haystack_lines.len() {
+        if start_idx.saturating_add(needle_lines.len()) > haystack_lines.len() {
             break;
         }
 
         for (i, needle_line) in needle_lines.iter().enumerate() {
-            if haystack_lines_normalized[start_idx + i] != *needle_line {
+            let Some(hay_line) = haystack_lines_normalized.get(start_idx.saturating_add(i)) else {
+                continue 'outer;
+            };
+            if *hay_line != *needle_line {
                 continue 'outer;
             }
         }
 
         // Found a match! Return the original substring from haystack
-        let match_start = line_positions[start_idx].0;
-        let match_end_idx = start_idx + needle_lines.len() - 1;
-        let match_end = line_positions[match_end_idx].1;
+        let Some(&(match_start, _)) = line_positions.get(start_idx) else {
+            continue;
+        };
+        let match_end_idx = start_idx.saturating_add(needle_lines.len()).saturating_sub(1);
+        let Some(&(_, match_end)) = line_positions.get(match_end_idx) else {
+            continue;
+        };
 
         return Some(haystack.get(match_start..match_end).unwrap_or(""));
     }
@@ -89,7 +97,7 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
             } else {
                 norm_line.to_string()
             };
-            best_match = Some((idx + 1, total_score, preview));
+            best_match = Some((idx.saturating_add(1), total_score, preview));
         }
     }
 

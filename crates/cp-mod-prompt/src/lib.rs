@@ -19,8 +19,10 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
+use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::library_panel::LibraryPanel;
@@ -300,9 +302,9 @@ impl Module for PromptModule {
         ]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
         vec![
-            cp_base::state::ContextTypeMeta {
+            cp_base::state::context::ContextTypeMeta {
                 context_type: "library",
                 icon_id: "library",
                 is_fixed: true,
@@ -312,7 +314,7 @@ impl Module for PromptModule {
                 short_name: "library",
                 needs_async_wait: false,
             },
-            cp_base::state::ContextTypeMeta {
+            cp_base::state::context::ContextTypeMeta {
                 context_type: "skill",
                 icon_id: "skill",
                 is_fixed: false,
@@ -327,7 +329,7 @@ impl Module for PromptModule {
 
     fn on_close_context(
         &self,
-        ctx: &cp_base::state::ContextElement,
+        ctx: &cp_base::state::context::ContextElement,
         state: &mut State,
     ) -> Option<Result<String, String>> {
         if ctx.context_type.as_str() != ContextType::SKILL {

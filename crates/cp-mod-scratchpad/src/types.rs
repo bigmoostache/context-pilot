@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 
 /// A scratchpad cell for storing temporary notes/data
 #[derive(Debug, Clone, Serialize, Deserialize)]

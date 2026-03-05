@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use cp_base::config::constants::STORE_DIR;
-use cp_base::state::State;
+use cp_base::config::constants;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::tools_upsert;
@@ -44,7 +44,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Read the script file so we can confirm it exists
-    let script_path = PathBuf::from(STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
+    let script_path = PathBuf::from(constants::STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
     if !script_path.exists() {
         return ToolResult::new(
             tool.id.clone(),
@@ -61,7 +61,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Touch the callback panel to trigger re-render with editor content
     for ctx in &mut state.context {
-        if ctx.context_type.as_str() == cp_base::state::ContextType::CALLBACK {
+        if ctx.context_type.as_str() == cp_base::state::context::ContextType::CALLBACK {
             ctx.last_refresh_ms = 0; // Force refresh
             break;
         }
@@ -85,7 +85,7 @@ pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Touch the callback panel to trigger re-render
     for ctx in &mut state.context {
-        if ctx.context_type.as_str() == cp_base::state::ContextType::CALLBACK {
+        if ctx.context_type.as_str() == cp_base::state::context::ContextType::CALLBACK {
             ctx.last_refresh_ms = 0;
             break;
         }

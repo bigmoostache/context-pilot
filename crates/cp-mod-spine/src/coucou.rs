@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::cast::SafeCast as _;
 use cp_base::panels::now_ms;
-use cp_base::state::State;
+use cp_base::state::runtime::State;
+use cp_base::state::watchers::{Watcher, WatcherRegistry, WatcherResult};
 use cp_base::tools::{ToolResult, ToolUse};
-use cp_base::watchers::{Watcher, WatcherRegistry, WatcherResult};
 
 // ============================================================
 // Persistable coucou data — saved in worker JSON via SpineState
@@ -69,7 +69,7 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
         if secs == 0 {
             return Err("Duration must be greater than 0".to_string());
         }
-        return Ok(secs * 1000);
+        return Ok(secs.saturating_mul(1000));
     }
 
     let mut total_ms: u64 = 0;
@@ -82,9 +82,9 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
             let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{s}'"))?;
             current_num.clear();
             match ch {
-                'h' | 'H' => total_ms += val * 3_600_000,
-                'm' | 'M' => total_ms += val * 60_000,
-                's' | 'S' => total_ms += val * 1_000,
+                'h' | 'H' => total_ms = total_ms.saturating_add(val.saturating_mul(3_600_000)),
+                'm' | 'M' => total_ms = total_ms.saturating_add(val.saturating_mul(60_000)),
+                's' | 'S' => total_ms = total_ms.saturating_add(val.saturating_mul(1_000)),
                 _ => return Err(format!("Unknown duration unit '{ch}'. Use h/m/s.")),
             }
         }
@@ -93,7 +93,7 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
     // Trailing number without unit → seconds
     if !current_num.is_empty() {
         let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{s}'"))?;
-        total_ms += val * 1_000;
+        total_ms = total_ms.saturating_add(val.saturating_mul(1_000));
     }
 
     if total_ms == 0 {
@@ -111,49 +111,55 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
     let s = s.trim().replace(' ', "T");
 
     let parts: Vec<&str> = s.split('T').collect();
-    if parts.len() != 2 {
+    let [date_str, time_with_tz] = parts.as_slice() else {
         return Err("Expected format: YYYY-MM-DDTHH:MM:SS or YYYY-MM-DD HH:MM:SS".to_string());
-    }
+    };
 
-    let date_parts: Vec<&str> = parts[0].split('-').collect();
-    if date_parts.len() != 3 {
+    let date_parts: Vec<&str> = date_str.split('-').collect();
+    let [year_s, month_s, day_s] = date_parts.as_slice() else {
         return Err("Expected date format: YYYY-MM-DD".to_string());
-    }
+    };
 
-    let time_str = parts[1].trim_end_matches('Z');
+    let time_str = time_with_tz.trim_end_matches('Z');
     let time_parts: Vec<&str> = time_str.split(':').collect();
-    if time_parts.len() < 2 {
-        return Err("Expected time format: HH:MM or HH:MM:SS".to_string());
-    }
+    let (hour_s, min_s, sec_s) = match time_parts.as_slice() {
+        [h, m] => (*h, *m, "0"),
+        [h, m, s, ..] => (*h, *m, *s),
+        _ => return Err("Expected time format: HH:MM or HH:MM:SS".to_string()),
+    };
 
-    let year: i64 = date_parts[0].parse().map_err(|_e| "Invalid year")?;
-    let month: i64 = date_parts[1].parse().map_err(|_e| "Invalid month")?;
-    let day: i64 = date_parts[2].parse().map_err(|_e| "Invalid day")?;
-    let hour: i64 = time_parts[0].parse().map_err(|_e| "Invalid hour")?;
-    let min: i64 = time_parts[1].parse().map_err(|_e| "Invalid minute")?;
-    let sec: i64 = if time_parts.len() > 2 { time_parts[2].parse().map_err(|_e| "Invalid second")? } else { 0 };
+    let year: i64 = year_s.parse().map_err(|_e| "Invalid year")?;
+    let month: i64 = month_s.parse().map_err(|_e| "Invalid month")?;
+    let day: i64 = day_s.parse().map_err(|_e| "Invalid day")?;
+    let hour: i64 = hour_s.parse().map_err(|_e| "Invalid hour")?;
+    let min: i64 = min_s.parse().map_err(|_e| "Invalid minute")?;
+    let sec: i64 = sec_s.parse().map_err(|_e| "Invalid second")?;
 
     // Simple days-since-epoch calculation (good enough for scheduling)
     // Using a basic algorithm for dates after 2000
     let mut days: i64 = 0;
     for y in 1970..year {
-        days += if is_leap_year(y) { 366 } else { 365 };
+        days = days.saturating_add(if is_leap_year(y) { 366 } else { 365 });
     }
     let month_days = [31, if is_leap_year(year) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    for day_count in month_days.iter().take((month - 1).to_usize()) {
+    for day_count in month_days.iter().take(month.saturating_sub(1).to_usize()) {
         if month > 12 {
             break;
         }
-        days += (*day_count).to_i64();
+        days = days.saturating_add((*day_count).to_i64());
     }
-    days += day - 1;
+    days = days.saturating_add(day.saturating_sub(1));
 
-    let total_secs = days * 86400 + hour * 3600 + min * 60 + sec;
+    let total_secs = days
+        .saturating_mul(86400)
+        .saturating_add(hour.saturating_mul(3600))
+        .saturating_add(min.saturating_mul(60))
+        .saturating_add(sec);
     if total_secs < 0 {
         return Err("DateTime is before epoch".to_string());
     }
 
-    Ok(total_secs.to_u64() * 1000)
+    Ok(total_secs.to_u64().saturating_mul(1000))
 }
 
 const fn is_leap_year(y: i64) -> bool {
@@ -183,7 +189,7 @@ fn format_duration(ms: u64) -> String {
 }
 
 // ============================================================
-// CoucouWatcher — implements cp_base::watchers::Watcher trait
+// CoucouWatcher — implements cp_base::state::watchers::Watcher trait
 // ============================================================
 
 /// A watcher that fires a notification at a specific time.
@@ -290,7 +296,7 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
 
             match parse_duration_ms(delay_str) {
                 Ok(delay_ms) => {
-                    fire_at_ms = now + delay_ms;
+                    fire_at_ms = now.saturating_add(delay_ms);
                     delay_desc = format!("in {}", format_duration(delay_ms));
                 }
                 Err(e) => {
@@ -313,7 +319,7 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
                         return ToolResult::new(tool.id.clone(), format!("DateTime '{dt_str}' is in the past!"), true);
                     }
                     fire_at_ms = target_ms;
-                    let remaining = format_duration(target_ms - now);
+                    let remaining = format_duration(target_ms.saturating_sub(now));
                     delay_desc = format!("at {dt_str} ({remaining})");
                 }
                 Err(e) => {

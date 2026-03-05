@@ -15,8 +15,10 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
+use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::ScratchpadPanel;
@@ -159,8 +161,8 @@ impl Module for ScratchpadModule {
         ]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
-        vec![cp_base::state::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
+        vec![cp_base::state::context::ContextTypeMeta {
             context_type: "scratchpad",
             icon_id: "scratchpad",
             is_fixed: true,
@@ -174,6 +176,62 @@ impl Module for ScratchpadModule {
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Scratchpad", "A useful scratchpad for you to use however you like")]
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+    fn is_core(&self) -> bool {
+        false
+    }
+    fn is_global(&self) -> bool {
+        false
+    }
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+    fn context_detail(&self, _ctx: &crate::state::context::ContextElement) -> Option<String> {
+        None
+    }
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+    fn on_close_context(
+        &self,
+        _ctx: &crate::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+    fn on_user_message(&self, _state: &mut State) {}
+    fn on_stream_stop(&self, _state: &mut State) {}
+    fn watch_paths(&self, _state: &State) -> Vec<crate::panels::WatchSpec> {
+        vec![]
+    }
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &crate::state::context::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }
 

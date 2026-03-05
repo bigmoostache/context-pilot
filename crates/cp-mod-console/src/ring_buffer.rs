@@ -46,15 +46,17 @@ impl RingBuffer {
         let mut inner = self.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut pos = inner.write_pos;
         for &byte in data {
-            inner.buf[pos] = byte;
-            pos += 1;
+            if let Some(slot) = inner.buf.get_mut(pos) {
+                *slot = byte;
+            }
+            pos = pos.saturating_add(1);
             if pos >= RING_BUFFER_CAPACITY {
                 pos = 0;
                 inner.wrapped = true;
             }
         }
         inner.write_pos = pos;
-        inner.total_written += data.len() as u64;
+        inner.total_written = inner.total_written.saturating_add(data.len() as u64);
     }
 
     /// Read the entire buffer contents as a string.
@@ -66,11 +68,11 @@ impl RingBuffer {
         let bytes = if inner.wrapped {
             // Data from write_pos..end, then 0..write_pos
             let mut v = Vec::with_capacity(RING_BUFFER_CAPACITY);
-            v.extend_from_slice(&inner.buf[inner.write_pos..]);
-            v.extend_from_slice(&inner.buf[..inner.write_pos]);
+            v.extend_from_slice(inner.buf.get(inner.write_pos..).unwrap_or_default());
+            v.extend_from_slice(inner.buf.get(..inner.write_pos).unwrap_or_default());
             v
         } else {
-            inner.buf[..inner.write_pos].to_vec()
+            inner.buf.get(..inner.write_pos).unwrap_or_default().to_vec()
         };
         (String::from_utf8_lossy(&bytes).into_owned(), total)
     }
@@ -81,7 +83,7 @@ impl RingBuffer {
         let (content, _) = self.read_all();
         let lines: Vec<&str> = content.lines().collect();
         let start = lines.len().saturating_sub(n);
-        lines[start..].join("\n")
+        lines.get(start..).unwrap_or_default().join("\n")
     }
 
     /// Check if the buffer content matches a regex pattern.

@@ -2,9 +2,11 @@ use std::process::{Command, Output, Stdio};
 use std::time::Duration;
 
 use crate::panels::Panel;
-use crate::state::{ContextType, ContextTypeMeta, State};
+use crate::state::context::{ContextType, ContextTypeMeta};
+use crate::state::runtime::State;
 use crate::tools::ToolDefinition;
-use crate::tools::{PreFlightResult, ToolResult, ToolUse};
+use crate::tools::pre_flight::PreFlightResult;
+use crate::tools::{ToolResult, ToolUse};
 
 /// A function that transforms tool result content into styled terminal lines.
 ///
@@ -155,7 +157,7 @@ pub trait Module: Send + Sync {
 
     /// Return detail string for a context element owned by this module (e.g., file path, pattern).
     /// Used in the Overview panel's context elements table.
-    fn context_detail(&self, _ctx: &crate::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &crate::state::context::ContextElement) -> Option<String> {
         None
     }
 
@@ -181,7 +183,7 @@ pub trait Module: Send + Sync {
     /// Returns Some(Ok(description)) if cleanup succeeded — caller removes the context element.
     fn on_close_context(
         &self,
-        _ctx: &crate::state::ContextElement,
+        _ctx: &crate::state::context::ContextElement,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -217,7 +219,7 @@ pub trait Module: Send + Sync {
     /// Returns true if the element should be marked `cache_deprecated`.
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &crate::state::ContextElement,
+        _ctx: &crate::state::context::ContextElement,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

@@ -1,4 +1,5 @@
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::SpineState;

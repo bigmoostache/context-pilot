@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 use serde::{Deserialize, Serialize};
 
 /// Serde default helper for `is_global` backward compatibility.

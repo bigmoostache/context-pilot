@@ -1,5 +1,6 @@
 use super::MEMORY_TLDR_MAX_TOKENS;
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{MemoryImportance, MemoryItem, MemoryState};
@@ -61,7 +62,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let ms = MemoryState::get_mut(state);
         let id = format!("M{}", ms.next_memory_id);
-        ms.next_memory_id += 1;
+        ms.next_memory_id = ms.next_memory_id.saturating_add(1);
         ms.memories.push(MemoryItem { id: id.clone(), tl_dr: content.clone(), contents, importance, labels });
 
         let preview = if content.len() > 40 {

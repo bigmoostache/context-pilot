@@ -113,8 +113,8 @@ pub(super) fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
     let mut sorted_contexts: Vec<_> =
         state.context.iter().filter(|c| c.context_type != ContextType::new(ContextType::CONVERSATION)).collect();
     sorted_contexts.sort_by(|a, b| {
-        let id_a = a.id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
-        let id_b = b.id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_a = a.id.strip_prefix('P').and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_b = b.id.strip_prefix('P').and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
         id_a.cmp(&id_b)
     });
 

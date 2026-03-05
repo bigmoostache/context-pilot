@@ -1,13 +1,13 @@
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::State;
-use cp_base::ui::{PendingForm, Question, QuestionOption};
+use cp_base::ui::question_form::{PendingForm, Question, QuestionOption};
 
 /// Execute the `ask_user_question` tool.
 /// Parses input, validates constraints, stores `PendingForm` in state.
 /// Returns a placeholder result — the real result is produced when the user
 /// submits or dismisses the form (handled by app.rs).
 pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let Some(questions_val) = tool.input.get("questions").and_then(|v| v.as_array()) else {
+    let Some(questions_val) = tool.input.get("questions").and_then(serde_json::Value::as_array) else {
         return ToolResult::new(
             tool.id.clone(),
             "Missing 'questions' parameter (expected array of 1-4 questions)".to_string(),
@@ -23,14 +23,14 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut questions = Vec::new();
 
     for (i, q_val) in questions_val.iter().enumerate() {
-        let question = match q_val.get("question").and_then(|v| v.as_str()) {
+        let question = match q_val.get("question").and_then(serde_json::Value::as_str) {
             Some(s) => s.to_string(),
             None => {
                 return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'question' field", i + 1), true);
             }
         };
 
-        let header = match q_val.get("header").and_then(|v| v.as_str()) {
+        let header = match q_val.get("header").and_then(serde_json::Value::as_str) {
             Some(s) => {
                 if s.chars().count() > 12 {
                     s.chars().take(12).collect()
@@ -45,7 +45,7 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let multi_select = q_val.get("multiSelect").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
-        let Some(options_val) = q_val.get("options").and_then(|v| v.as_array()) else {
+        let Some(options_val) = q_val.get("options").and_then(serde_json::Value::as_array) else {
             return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'options' field", i + 1), true);
         };
 
@@ -59,7 +59,7 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let mut options = Vec::new();
         for (j, o_val) in options_val.iter().enumerate() {
-            let label = match o_val.get("label").and_then(|v| v.as_str()) {
+            let label = match o_val.get("label").and_then(serde_json::Value::as_str) {
                 Some(s) => s.to_string(),
                 None => {
                     return ToolResult::new(
@@ -69,7 +69,7 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                     );
                 }
             };
-            let description = match o_val.get("description").and_then(|v| v.as_str()) {
+            let description = match o_val.get("description").and_then(serde_json::Value::as_str) {
                 Some(s) => s.to_string(),
                 None => {
                     return ToolResult::new(

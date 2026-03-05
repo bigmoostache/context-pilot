@@ -23,11 +23,13 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use cp_base::config::constants::STORE_DIR;
+use cp_base::config::constants;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolParam, ToolTexts};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
+use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -35,7 +37,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Directory for chunked log files
 fn logs_dir() -> PathBuf {
-    PathBuf::from(STORE_DIR).join(LOGS_DIR)
+    PathBuf::from(constants::STORE_DIR).join(LOGS_DIR)
 }
 
 /// Get chunk index for a log ID number
@@ -350,8 +352,8 @@ impl Module for LogsModule {
         vec![(ContextType::new(ContextType::LOGS), "Logs", true)]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
-        vec![cp_base::state::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
+        vec![cp_base::state::context::ContextTypeMeta {
             context_type: "logs",
             icon_id: "memory",
             is_fixed: true,

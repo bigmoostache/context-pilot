@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::PRESETS_DIR;
 use crate::types::{Preset, PresetWorkerState};
-use cp_base::config::constants::STORE_DIR;
+use cp_base::config::constants;
 
 /// YAML schema for presets.yaml
 #[derive(Deserialize)]
@@ -27,7 +27,7 @@ struct PresetYamlEntry {
 
 /// Ensure all built-in presets exist on disk. Creates missing ones.
 pub fn ensure_builtin_presets() {
-    let dir = Path::new(STORE_DIR).join(PRESETS_DIR);
+    let dir = Path::new(constants::STORE_DIR).join(PRESETS_DIR);
     if let Err(e) = fs::create_dir_all(&dir) {
         drop(writeln!(std::io::stderr(), "Failed to create presets directory: {e}"));
         return;

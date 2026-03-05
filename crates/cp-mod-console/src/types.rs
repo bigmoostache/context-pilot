@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use cp_base::panels::now_ms;
-use cp_base::state::State;
-use cp_base::watchers::{Watcher, WatcherResult};
+use cp_base::state::runtime::State;
+use cp_base::state::watchers::{Watcher, WatcherResult};
 use serde::{Deserialize, Serialize};
 
 use crate::manager::SessionHandle;
@@ -138,7 +138,7 @@ pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, la
 }
 
 // ============================================================
-// Console Watcher — implements cp_base::watchers::Watcher trait
+// Console Watcher — implements cp_base::state::watchers::Watcher trait
 // ============================================================
 
 /// A watcher that monitors a console session for a condition.
@@ -234,7 +234,7 @@ impl Watcher for ConsoleWatcher {
             return None;
         }
 
-        let elapsed_s = (now - self.registered_at_ms) / 1000;
+        let elapsed_s = now.saturating_sub(self.registered_at_ms) / 1000;
 
         if self.easy_bash {
             Some(WatcherResult {

@@ -10,11 +10,11 @@ use crate::GH_CMD_TIMEOUT_SECS;
 
 /// Parse a `gh api -i` response, splitting headers from body.
 #[must_use]
-pub fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String) {
+pub fn api_response(stdout: &str) -> (Option<String>, Option<u64>, String) {
     let (headers, body) = if let Some(pos) = stdout.find("\r\n\r\n") {
-        (stdout.get(..pos).unwrap_or(""), stdout.get(pos + 4..).unwrap_or(""))
+        (stdout.get(..pos).unwrap_or(""), stdout.get(pos.saturating_add(4)..).unwrap_or(""))
     } else if let Some(pos) = stdout.find("\n\n") {
-        (stdout.get(..pos).unwrap_or(""), stdout.get(pos + 2..).unwrap_or(""))
+        (stdout.get(..pos).unwrap_or(""), stdout.get(pos.saturating_add(2)..).unwrap_or(""))
     } else {
         return (None, None, stdout.to_string());
     };
@@ -120,9 +120,9 @@ fn parse_pr_json(json_str: &str) -> Option<crate::types::BranchPrInfo> {
 fn extract_json_string(json: &str, key: &str) -> Option<String> {
     let pattern = format!("\"{key}\":\"");
     if let Some(start) = json.find(&pattern) {
-        let value_start = start + pattern.len();
+        let value_start = start.saturating_add(pattern.len());
         let rest = json.get(value_start..).unwrap_or("");
-        let mut end = 0;
+        let mut end = 0usize;
         let mut escaped = false;
         for ch in rest.chars() {
             if escaped {
@@ -132,7 +132,7 @@ fn extract_json_string(json: &str, key: &str) -> Option<String> {
             } else if ch == '"' {
                 break;
             }
-            end += ch.len_utf8();
+            end = end.saturating_add(ch.len_utf8());
         }
         return Some(rest.get(..end).unwrap_or("").to_string());
     }
@@ -143,7 +143,7 @@ fn extract_json_string(json: &str, key: &str) -> Option<String> {
 fn extract_json_u64(json: &str, key: &str) -> Option<u64> {
     let pattern = format!("\"{key}\":");
     if let Some(start) = json.find(&pattern) {
-        let value_start = start + pattern.len();
+        let value_start = start.saturating_add(pattern.len());
         let rest = json.get(value_start..).unwrap_or("").trim_start();
         let num_str: String = rest.chars().take_while(char::is_ascii_digit).collect();
         return num_str.parse().ok();
@@ -156,17 +156,23 @@ fn parse_checks_status(json: &str) -> Option<String> {
     if !json.contains("statusCheckRollup") {
         return None;
     }
-    let success = json.matches("\"conclusion\":\"SUCCESS\"").count()
-        + json.matches("\"conclusion\":\"NEUTRAL\"").count()
-        + json.matches("\"conclusion\":\"SKIPPED\"").count();
-    let failure = json.matches("\"conclusion\":\"FAILURE\"").count()
-        + json.matches("\"conclusion\":\"TIMED_OUT\"").count()
-        + json.matches("\"conclusion\":\"CANCELLED\"").count();
-    let pending = json.matches("\"conclusion\":\"\"").count()
-        + json.matches("\"conclusion\":null").count()
-        + json.matches("\"status\":\"IN_PROGRESS\"").count()
-        + json.matches("\"status\":\"QUEUED\"").count()
-        + json.matches("\"status\":\"PENDING\"").count();
+    let success = json
+        .matches("\"conclusion\":\"SUCCESS\"")
+        .count()
+        .saturating_add(json.matches("\"conclusion\":\"NEUTRAL\"").count())
+        .saturating_add(json.matches("\"conclusion\":\"SKIPPED\"").count());
+    let failure = json
+        .matches("\"conclusion\":\"FAILURE\"")
+        .count()
+        .saturating_add(json.matches("\"conclusion\":\"TIMED_OUT\"").count())
+        .saturating_add(json.matches("\"conclusion\":\"CANCELLED\"").count());
+    let pending = json
+        .matches("\"conclusion\":\"\"")
+        .count()
+        .saturating_add(json.matches("\"conclusion\":null").count())
+        .saturating_add(json.matches("\"status\":\"IN_PROGRESS\"").count())
+        .saturating_add(json.matches("\"status\":\"QUEUED\"").count())
+        .saturating_add(json.matches("\"status\":\"PENDING\"").count());
 
     if failure > 0 {
         Some("failing".to_string())

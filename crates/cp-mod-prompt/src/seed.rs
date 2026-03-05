@@ -1,5 +1,5 @@
-use cp_base::config::library;
-use cp_base::state::State;
+use cp_base::config::accessors::library;
+use cp_base::state::runtime::State;
 
 use crate::types::PromptState;
 

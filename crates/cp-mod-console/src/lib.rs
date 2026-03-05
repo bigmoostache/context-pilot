@@ -25,8 +25,10 @@ use serde_json::json;
 
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, ContextTypeMeta, State};
-use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
+use cp_base::state::context::{ContextType, ContextTypeMeta};
+use cp_base::state::runtime::State;
+use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::manager::SessionHandle;
@@ -304,7 +306,7 @@ impl Module for ConsoleModule {
 
     fn on_close_context(
         &self,
-        ctx: &cp_base::state::ContextElement,
+        ctx: &cp_base::state::context::ContextElement,
         state: &mut State,
     ) -> Option<Result<String, String>> {
         if ctx.context_type.as_str() != ContextType::CONSOLE {
@@ -328,7 +330,7 @@ impl Module for ConsoleModule {
         Some(Ok(format!("console: {name}")))
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
         (ctx.context_type.as_str() == ContextType::CONSOLE).then(|| {
             let desc =
                 ctx.get_meta_str("console_description").or_else(|| ctx.get_meta_str("console_command")).unwrap_or("?");

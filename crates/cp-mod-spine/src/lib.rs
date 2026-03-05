@@ -19,8 +19,10 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
-use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
+use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::SpinePanel;
@@ -48,12 +50,12 @@ impl Module for SpineModule {
     fn init_state(&self, state: &mut State) {
         state.set_ext(SpineState::new());
         // Initialize the watcher registry (cross-cutting concern managed by spine)
-        state.set_ext(cp_base::watchers::WatcherRegistry::new());
+        state.set_ext(cp_base::state::watchers::WatcherRegistry::new());
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(SpineState::new());
-        state.set_ext(cp_base::watchers::WatcherRegistry::new());
+        state.set_ext(cp_base::state::watchers::WatcherRegistry::new());
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
@@ -63,7 +65,7 @@ impl Module for SpineModule {
         let mut processed: Vec<_> = ss.notifications.iter().filter(|n| n.is_processed()).cloned().collect();
         // Keep only the latest 10 processed (they're in chronological order)
         if processed.len() > 10 {
-            processed = processed.split_off(processed.len() - 10);
+            processed = processed.split_off(processed.len().saturating_sub(10));
         }
         to_save.extend(processed);
         // Sort by ID number to maintain order
@@ -100,7 +102,7 @@ impl Module for SpineModule {
         if let Some(coucous) = data.get("pending_coucous")
             && let Ok(coucou_list) = serde_json::from_value::<Vec<coucou::CoucouData>>(coucous.clone())
         {
-            let registry = cp_base::watchers::WatcherRegistry::get_mut(state);
+            let registry = cp_base::state::watchers::WatcherRegistry::get_mut(state);
             for cd in coucou_list {
                 // Register all coucous — expired ones will fire on next poll_all
                 // and create a notification, which is the desired behavior
@@ -187,8 +189,8 @@ impl Module for SpineModule {
         vec![("notification_mark_processed", visualize_spine_output), ("spine_configure", visualize_spine_output)]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
-        vec![cp_base::state::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
+        vec![cp_base::state::context::ContextTypeMeta {
             context_type: "spine",
             icon_id: "spine",
             is_fixed: true,
@@ -275,10 +277,10 @@ fn prune_notifications(notifications: &mut Vec<Notification>) {
         return;
     }
     let mut processed_seen = 0;
-    let drop_count = processed_count - 10;
+    let drop_count = processed_count.saturating_sub(10);
     notifications.retain(|n| {
         if n.is_processed() {
-            processed_seen += 1;
+            processed_seen = processed_seen.saturating_add(1);
             processed_seen > drop_count
         } else {
             true

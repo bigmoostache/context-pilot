@@ -4,7 +4,7 @@ use crate::state::State;
 use std::fmt::Write as _;
 
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let Some(ids) = tool.input.get("ids").and_then(|v| v.as_array()) else {
+    let Some(ids) = tool.input.get("ids").and_then(serde_json::Value::as_array) else {
         return ToolResult::new(tool.id.clone(), "Missing 'ids' array parameter".to_string(), true);
     };
 

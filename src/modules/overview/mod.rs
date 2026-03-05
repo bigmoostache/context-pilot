@@ -286,7 +286,7 @@ impl Module for OverviewModule {
         match tool.name.as_str() {
             "Close_panel" => {
                 let mut pf = PreFlightResult::new();
-                if let Some(ids) = tool.input.get("ids").and_then(|v| v.as_array()) {
+                if let Some(ids) = tool.input.get("ids").and_then(serde_json::Value::as_array) {
                     for id_val in ids {
                         if let Some(id) = id_val.as_str() {
                             if !state.context.iter().any(|c| c.id == id) {
@@ -303,9 +303,9 @@ impl Module for OverviewModule {
             }
             "tool_manage" => {
                 let mut pf = PreFlightResult::new();
-                if let Some(changes) = tool.input.get("changes").and_then(|v| v.as_array()) {
+                if let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) {
                     for change in changes {
-                        if let Some(tool_id) = change.get("tool").and_then(|v| v.as_str()) {
+                        if let Some(tool_id) = change.get("tool").and_then(serde_json::Value::as_str) {
                             if !state.tools.iter().any(|t| t.id == tool_id) {
                                 pf.errors.push(format!("Tool '{tool_id}' not found"));
                             } else if tool_id == "tool_manage" {
@@ -318,7 +318,7 @@ impl Module for OverviewModule {
             }
             "panel_goto_page" => {
                 let mut pf = PreFlightResult::new();
-                if let Some(panel_id) = tool.input.get("panel_id").and_then(|v| v.as_str()) {
+                if let Some(panel_id) = tool.input.get("panel_id").and_then(serde_json::Value::as_str) {
                     match state.context.iter().find(|c| c.id == panel_id) {
                         None => pf.errors.push(format!("Panel '{panel_id}' not found")),
                         Some(ctx) => {

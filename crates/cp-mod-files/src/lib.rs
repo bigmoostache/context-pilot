@@ -9,13 +9,14 @@ mod tools;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::FilePanel;
 use cp_base::modules::Module;
-use cp_base::tools::PreFlightResult;
+use cp_base::tools::pre_flight::PreFlightResult;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/files.yaml")));
@@ -172,8 +173,8 @@ impl Module for FilesModule {
         vec![("Edit", visualize_diff), ("Write", visualize_diff)]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
-        vec![cp_base::state::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
+        vec![cp_base::state::context::ContextTypeMeta {
             context_type: "file",
             icon_id: "file",
             is_fixed: false,
@@ -185,7 +186,7 @@ impl Module for FilesModule {
         }]
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
         (ctx.context_type.as_str() == ContextType::FILE)
             .then(|| ctx.get_meta_str("file_path").unwrap_or("").to_string())
     }
@@ -205,7 +206,7 @@ impl Module for FilesModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        ctx: &cp_base::state::ContextElement,
+        ctx: &cp_base::state::context::ContextElement,
         changed_path: &str,
         is_dir_event: bool,
     ) -> bool {
@@ -213,6 +214,51 @@ impl Module for FilesModule {
             return false;
         }
         ctx.context_type.as_str() == ContextType::FILE && ctx.get_meta_str("file_path") == Some(changed_path)
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+    fn init_state(&self, _state: &mut State) {}
+    fn reset_state(&self, _state: &mut State) {}
+    fn save_module_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+    fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+    fn fixed_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![]
+    }
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+    fn on_close_context(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+    fn on_user_message(&self, _state: &mut State) {}
+    fn on_stream_stop(&self, _state: &mut State) {}
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }
 
@@ -316,7 +362,7 @@ fn style_callback_line(line: &str, width: usize, colors: &CallbackColors) -> Opt
         // Find the status word and split around it
         if let Some(pos) = rest.find(" passed") {
             let name = rest.get(..pos).unwrap_or("");
-            let after = rest.get(pos + 7..).unwrap_or(""); // skip " passed"
+            let after = rest.get(pos.saturating_add(7)..).unwrap_or(""); // skip " passed"
             spans.push(Span::styled(name.to_string(), Style::default().fg(colors.dim)));
             spans.push(Span::styled(" passed", Style::default().fg(colors.green)));
             if !after.is_empty() {
@@ -324,7 +370,7 @@ fn style_callback_line(line: &str, width: usize, colors: &CallbackColors) -> Opt
             }
         } else if let Some(pos) = rest.find(" FAILED") {
             let name = rest.get(..pos).unwrap_or("");
-            let after = rest.get(pos + 7..).unwrap_or(""); // skip " FAILED"
+            let after = rest.get(pos.saturating_add(7)..).unwrap_or(""); // skip " FAILED"
             spans.push(Span::styled(name.to_string(), Style::default().fg(colors.dim)));
             spans.push(Span::styled(" FAILED", Style::default().fg(colors.red)));
             if !after.is_empty() {
@@ -332,7 +378,7 @@ fn style_callback_line(line: &str, width: usize, colors: &CallbackColors) -> Opt
             }
         } else if let Some(pos) = rest.find(" TIMED OUT") {
             let name = rest.get(..pos).unwrap_or("");
-            let after = rest.get(pos + 10..).unwrap_or(""); // skip " TIMED OUT"
+            let after = rest.get(pos.saturating_add(10)..).unwrap_or(""); // skip " TIMED OUT"
             spans.push(Span::styled(name.to_string(), Style::default().fg(colors.dim)));
             spans.push(Span::styled(" TIMED OUT", Style::default().fg(colors.red)));
             if !after.is_empty() {
@@ -344,7 +390,7 @@ fn style_callback_line(line: &str, width: usize, colors: &CallbackColors) -> Opt
             spans.push(Span::styled(" dispatched", Style::default().fg(colors.blue)));
         } else if let Some(pos) = rest.find(" skipped") {
             let name = rest.get(..pos).unwrap_or("");
-            let after = rest.get(pos + 8..).unwrap_or(""); // skip " skipped"
+            let after = rest.get(pos.saturating_add(8)..).unwrap_or(""); // skip " skipped"
             spans.push(Span::styled(name.to_string(), Style::default().fg(colors.dim)));
             spans.push(Span::styled(" skipped", Style::default().fg(colors.dim)));
             if !after.is_empty() {

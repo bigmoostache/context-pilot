@@ -19,7 +19,8 @@ pub mod watchlist;
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 

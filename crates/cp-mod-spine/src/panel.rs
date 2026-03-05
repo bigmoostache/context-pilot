@@ -2,11 +2,12 @@ use crossterm::event::KeyEvent;
 use ratatui::prelude::{Color, Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel, now_ms, scroll_key_action};
-use cp_base::state::Action;
-use cp_base::state::{ContextType, State, estimate_tokens};
-use cp_base::watchers::WatcherRegistry;
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
+use cp_base::state::watchers::WatcherRegistry;
 
 use crate::types::{NotificationType, SpineState};
 use std::fmt::Write as _;
@@ -139,7 +140,8 @@ impl Panel for SpinePanel {
                 let ts = format_timestamp(n.timestamp_ms);
                 let prefix = format!("{} {} {} — ", n.id, ts, n.kind.label());
                 let prefix_width = UnicodeWidthStr::width(prefix.as_str());
-                let content_max = if viewport > prefix_width + 10 { viewport - prefix_width } else { 40 };
+                let content_max =
+                    if viewport > prefix_width.saturating_add(10) { viewport.saturating_sub(prefix_width) } else { 40 };
                 let wrapped = wrap_text_simple(&n.content, content_max);
 
                 // First line with full prefix
@@ -184,7 +186,8 @@ impl Panel for SpinePanel {
                 let ts = format_timestamp(n.timestamp_ms);
                 let prefix = format!("{} {} {} — ", n.id, ts, n.kind.label());
                 let prefix_width = UnicodeWidthStr::width(prefix.as_str());
-                let content_max = if viewport > prefix_width + 10 { viewport - prefix_width } else { 40 };
+                let content_max =
+                    if viewport > prefix_width.saturating_add(10) { viewport.saturating_sub(prefix_width) } else { 40 };
                 let wrapped = wrap_text_simple(&n.content, content_max);
 
                 lines.push(Line::from(vec![
@@ -224,7 +227,8 @@ impl Panel for SpinePanel {
                 let ts = format_timestamp(n.timestamp_ms);
                 let prefix = format!("{} {} {} — ", n.id, ts, n.kind.label());
                 let prefix_width = UnicodeWidthStr::width(prefix.as_str());
-                let content_max = if viewport > prefix_width + 10 { viewport - prefix_width } else { 40 };
+                let content_max =
+                    if viewport > prefix_width.saturating_add(10) { viewport.saturating_sub(prefix_width) } else { 40 };
                 let wrapped = wrap_text_simple(&n.content, content_max);
 
                 // First line with full prefix
@@ -319,10 +323,10 @@ fn wrap_text_simple(text: &str, max_width: usize) -> Vec<String> {
         if current_width == 0 {
             current_line.push_str(word);
             current_width = word_width;
-        } else if current_width + 1 + word_width <= max_width {
+        } else if current_width.saturating_add(1).saturating_add(word_width) <= max_width {
             current_line.push(' ');
             current_line.push_str(word);
-            current_width += 1 + word_width;
+            current_width = current_width.saturating_add(1).saturating_add(word_width);
         } else {
             lines.push(current_line);
             current_line = word.to_string();

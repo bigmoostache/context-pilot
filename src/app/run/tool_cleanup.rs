@@ -5,7 +5,7 @@ use crate::infra::api::StreamEvent;
 use crate::infra::tools::execute_tool;
 use crate::state::{Message, MessageStatus, MessageType, State, ToolResultRecord};
 
-use cp_base::watchers::WatcherRegistry;
+use cp_base::state::watchers::WatcherRegistry;
 use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_mod_queue::QueueState;
 use cp_mod_spine::{NotificationType, SpineState};
@@ -47,7 +47,7 @@ impl App {
 
                     let mut ctx = crate::state::make_default_context_element(
                         &panel_id,
-                        cp_base::state::ContextType::new(cp_base::state::ContextType::CONSOLE),
+                        cp_base::state::context::ContextType::new(cp_base::state::context::ContextType::CONSOLE),
                         &dp.display_name,
                         true,
                     );
@@ -130,7 +130,7 @@ impl App {
 
                 let mut ctx = crate::state::make_default_context_element(
                     &panel_id,
-                    cp_base::state::ContextType::new(cp_base::state::ContextType::CONSOLE),
+                    cp_base::state::context::ContextType::new(cp_base::state::context::ContextType::CONSOLE),
                     &dp.display_name,
                     true,
                 );
@@ -319,7 +319,7 @@ impl App {
         }
 
         // Also clean up the question form state if it was pending
-        drop(self.state.module_data.remove(&std::any::TypeId::of::<cp_base::ui::PendingForm>()));
+        drop(self.state.module_data.remove(&std::any::TypeId::of::<cp_base::ui::question_form::PendingForm>()));
 
         // Clear any accumulated blocking results from partial callback completions
         self.accumulated_blocking_results.clear();

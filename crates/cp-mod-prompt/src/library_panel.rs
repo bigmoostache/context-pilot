@@ -1,9 +1,11 @@
 use ratatui::prelude::{Color, Line, Span, Style};
 
 use crate::types::PromptState;
-use cp_base::config::{INJECTIONS, theme};
+use cp_base::config::INJECTIONS;
+use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::ui::{Cell, render_table};
 use std::fmt::Write as _;
 
@@ -237,7 +239,7 @@ impl Panel for LibraryPanel {
         // Compute token count from context content and track content changes
         let items = self.context(state);
         if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::new(ContextType::LIBRARY)) {
-            let total: usize = items.iter().map(|i| cp_base::state::estimate_tokens(&i.content)).sum();
+            let total: usize = items.iter().map(|i| cp_base::state::context::estimate_tokens(&i.content)).sum();
             ctx.token_count = total;
             // Build combined content for hash tracking
             let combined: String = items.iter().map(|i| i.content.as_str()).collect::<Vec<_>>().join("\n");

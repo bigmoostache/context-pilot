@@ -94,8 +94,10 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Sort contexts by ID for display (P0, P1, P2, ...)
     let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
     sorted_indices.sort_by(|&a, &b| {
-        let id_a = state.context[a].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
-        let id_b = state.context[b].id.strip_prefix('P').and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_a =
+            state.context[a].id.strip_prefix('P').and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_b =
+            state.context[b].id.strip_prefix('P').and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
         id_a.cmp(&id_b)
     });
 

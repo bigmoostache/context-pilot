@@ -1,6 +1,7 @@
 use crate::storage;
 use crate::types::{PromptItem, PromptState, PromptType};
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {

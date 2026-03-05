@@ -35,7 +35,7 @@ impl FilePoller {
                         if n == 0 {
                             break;
                         }
-                        self.buffer.write(&buf[..n]);
+                        self.buffer.write(buf.get(..n).unwrap_or_default());
                     }
                 }
                 break;
@@ -49,8 +49,8 @@ impl FilePoller {
                     match f.read(&mut buf) {
                         Ok(0) | Err(_) => break,
                         Ok(n) => {
-                            self.buffer.write(&buf[..n]);
-                            self.offset += n.to_u64();
+                            self.buffer.write(buf.get(..n).unwrap_or_default());
+                            self.offset = self.offset.saturating_add(n.to_u64());
                         }
                     }
                 }

@@ -104,7 +104,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
             panel::load_panel(uid).map(|p| {
                 let mut elem = panel_to_context(&p, local_id);
 
-                if p.panel_type == ContextType::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
+                if p.panel_type.as_str() == ContextType::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
                     let msgs: Vec<Message> = p.message_uids.iter().filter_map(|uid| load_message(uid)).collect();
                     if !msgs.is_empty() {
                         let chunk_text = crate::state::format_messages_to_chunk(&msgs);
@@ -300,7 +300,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
             && ctx.context_type.as_str() != ContextType::SYSTEM
             && ctx.context_type.as_str() != ContextType::LIBRARY;
         if dominated && let Some(uid) = &ctx.uid {
-            let _r = important_uids.insert(ctx.context_type.clone(), uid.clone());
+            let _r = important_uids.insert(ctx.context_type.clone(), String::clone(uid));
         }
     }
 
@@ -311,7 +311,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         .filter(|c| {
             c.uid.is_some() && !c.context_type.is_fixed() && c.context_type.as_str() != ContextType::CONVERSATION
         })
-        .filter_map(|c| c.uid.as_ref().map(|uid| (uid.clone(), c.id.clone())))
+        .filter_map(|c| c.uid.as_ref().map(|uid: &String| (uid.clone(), c.id.clone())))
         .collect();
 
     // WorkerState
@@ -340,7 +340,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
             continue;
         }
         if let Some(uid) = &ctx.uid {
-            let _r = known_uids.insert(uid.clone());
+            let _r = known_uids.insert(String::clone(uid));
             let panel_data = PanelData {
                 uid: uid.clone(),
                 panel_type: ctx.context_type.clone(),
@@ -352,7 +352,9 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
                 } else if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY {
                     ctx.history_messages
                         .as_ref()
-                        .map(|msgs| msgs.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect())
+                        .map(|msgs: &Vec<Message>| {
+                            msgs.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
+                        })
                         .unwrap_or_default()
                 } else {
                     vec![]

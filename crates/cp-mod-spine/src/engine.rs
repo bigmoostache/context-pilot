@@ -10,7 +10,8 @@
 use cp_base::cast::SafeCast as _;
 use cp_base::config::{INJECTIONS, PROMPTS};
 use cp_base::panels::now_ms;
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 
 use crate::guard_rail::all_guard_rails;
 use crate::types::{ContinuationAction, Notification, NotificationType, SpineState};
@@ -53,7 +54,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
         {
             let backoff_secs = (1u64 << cfg.consecutive_continuation_errors.min(6)).min(60);
             let elapsed_ms = now_ms().saturating_sub(last_err_ms);
-            if elapsed_ms < backoff_secs * 1000 {
+            if elapsed_ms < backoff_secs.saturating_mul(1000) {
                 return SpineDecision::Idle;
             }
         }
@@ -82,7 +83,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             .messages
             .iter()
             .rev()
-            .find(|m| m.role == "user" && m.msg_type != cp_base::state::MessageType::ToolResult);
+            .find(|m| m.role == "user" && m.msg_type != cp_base::state::data::message::MessageType::ToolResult);
         if let Some(msg) = last_non_error_user {
             let content = msg.content.trim();
             let is_synthetic = content.starts_with("/* Auto-continuation:")
@@ -139,7 +140,8 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     }
 
     // All guard rails passed — fire the continuation
-    SpineState::get_mut(state).config.auto_continuation_count += 1;
+    let count = &mut SpineState::get_mut(state).config.auto_continuation_count;
+    *count = count.saturating_add(1);
     if SpineState::get(state).config.autonomous_start_ms.is_none() {
         SpineState::get_mut(state).config.autonomous_start_ms = Some(now_ms());
     }

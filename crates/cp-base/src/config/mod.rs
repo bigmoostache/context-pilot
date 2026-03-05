@@ -435,13 +435,6 @@ pub fn get_theme(theme_id: &str) -> Option<&'static Theme> {
 }
 
 // ============================================================================
-// Active Theme — delegated to accessors module
-// ============================================================================
-
-pub use accessors::active_theme;
-pub use accessors::set_active_theme;
-
-// ============================================================================
 // Icon Helper
 // ============================================================================
 
@@ -459,4 +452,3 @@ pub fn normalize_icon(icon: &str) -> String {
 
 /// Thin accessor modules: theme colors, UI chars, icons, library, prompt templates.
 pub mod accessors;
-pub use accessors::{chars, icons, library, prompts, theme};

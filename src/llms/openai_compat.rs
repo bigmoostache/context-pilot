@@ -87,12 +87,12 @@ pub(crate) fn collect_included_tool_ids(messages: &[Message], pending_tool_resul
 
         let has_result = messages[idx + 1..]
             .iter()
-            .filter(|m| {
+            .filter(|m: &&Message| {
                 m.status != MessageStatus::Deleted
                     && m.status != MessageStatus::Detached
                     && m.msg_type == MessageType::ToolResult
             })
-            .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
+            .any(|m: &Message| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
 
         if has_result {
             for id in tool_use_ids {

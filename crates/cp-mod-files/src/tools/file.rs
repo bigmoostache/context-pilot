@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use cp_base::state::{ContextElement, ContextType, State};
+use cp_base::state::context::{ContextElement, ContextType};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -24,7 +25,7 @@ pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let content = results.join("\n");
-    let has_error = paths.len() == 1 && results[0].starts_with("Error:");
+    let has_error = paths.len() == 1 && results.first().is_some_and(|r| r.starts_with("Error:"));
     ToolResult::new(tool.id.clone(), content, has_error)
 }
 
@@ -52,7 +53,7 @@ fn open_single_file(path: &str, state: &mut State) -> String {
     // Generate context ID (fills gaps) and UID
     let context_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid += 1;
+    state.global_next_uid = state.global_next_uid.saturating_add(1);
 
     // Create context element WITHOUT reading file content
     // Background cache system will populate it

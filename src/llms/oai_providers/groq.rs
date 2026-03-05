@@ -61,7 +61,9 @@ impl LlmClient for GroqClient {
         let pending_tool_ids: Vec<String> = request
             .tool_results
             .as_ref()
-            .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
+            .map(|results: &Vec<crate::infra::tools::ToolResult>| {
+                results.iter().map(|r| r.tool_use_id.clone()).collect()
+            })
             .unwrap_or_default();
 
         // GPT-OSS models get extra info about built-in tools

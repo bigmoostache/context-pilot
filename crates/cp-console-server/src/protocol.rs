@@ -84,54 +84,58 @@ pub(crate) fn interpret_escapes(input: &str) -> Vec<u8> {
     while i < bytes.len() {
         let Some(cur) = bytes.get(i).copied() else { break };
         if cur == b'\\' {
-            match bytes.get(i + 1).copied() {
+            match i.checked_add(1).and_then(|j| bytes.get(j)).copied() {
                 Some(b'n') => {
                     out.push(0x0A);
-                    i += 2;
+                    i = i.saturating_add(2);
                 }
                 Some(b'r') => {
                     out.push(0x0D);
-                    i += 2;
+                    i = i.saturating_add(2);
                 }
                 Some(b't') => {
                     out.push(0x09);
-                    i += 2;
+                    i = i.saturating_add(2);
                 }
                 Some(b'\\') => {
                     out.push(b'\\');
-                    i += 2;
+                    i = i.saturating_add(2);
                 }
                 Some(b'e') => {
                     out.push(0x1B);
-                    i += 2;
+                    i = i.saturating_add(2);
                 }
                 Some(b'0') => {
                     out.push(0x00);
-                    i += 2;
+                    i = i.saturating_add(2);
                 }
-                Some(b'x') => match (bytes.get(i + 2).copied(), bytes.get(i + 3).copied()) {
-                    (Some(hi), Some(lo)) if i + 3 < bytes.len() => {
-                        if let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo)) {
-                            out.push((h << 4) | l);
-                            i += 4;
-                        } else {
+                Some(b'x') => {
+                    let hi = i.checked_add(2).and_then(|j| bytes.get(j)).copied();
+                    let lo = i.checked_add(3).and_then(|j| bytes.get(j)).copied();
+                    match (hi, lo) {
+                        (Some(hi), Some(lo)) if i.saturating_add(3) < bytes.len() => {
+                            if let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo)) {
+                                out.push((h << 4) | l);
+                                i = i.saturating_add(4);
+                            } else {
+                                out.push(b'\\');
+                                i = i.saturating_add(1);
+                            }
+                        }
+                        _ => {
                             out.push(b'\\');
-                            i += 1;
+                            i = i.saturating_add(1);
                         }
                     }
-                    _ => {
-                        out.push(b'\\');
-                        i += 1;
-                    }
-                },
+                }
                 _ => {
                     out.push(b'\\');
-                    i += 1;
+                    i = i.saturating_add(1);
                 }
             }
         } else {
             out.push(cur);
-            i += 1;
+            i = i.saturating_add(1);
         }
     }
     out
@@ -140,9 +144,9 @@ pub(crate) fn interpret_escapes(input: &str) -> Vec<u8> {
 /// Convert a single ASCII hex digit byte to its numeric value.
 const fn hex_digit(b: u8) -> Option<u8> {
     match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
+        b'0'..=b'9' => Some(b.wrapping_sub(b'0')),
+        b'a'..=b'f' => Some(b.wrapping_sub(b'a').wrapping_add(10)),
+        b'A'..=b'F' => Some(b.wrapping_sub(b'A').wrapping_add(10)),
         _ => None,
     }
 }

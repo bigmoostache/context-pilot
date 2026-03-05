@@ -1,4 +1,4 @@
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::api::{FirecrawlClient, MapParams, ScrapeParams, SearchParams};
@@ -110,7 +110,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             }
 
-            let panel_id = crate::panel::create_panel(state, &format!("firecrawl_scrape: {url}"), &content);
+            let panel_id = crate::panel::create(state, &format!("firecrawl_scrape: {url}"), &content);
 
             ok_result(tool, format!("Created panel {panel_id}: scraped {url} ({title})"))
         }
@@ -171,7 +171,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             } else {
                 // Fallback: dump as YAML
                 let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
-                let panel_id = crate::panel::create_panel(state, &format!("firecrawl_search: {query}"), &panel_content);
+                let panel_id = crate::panel::create(state, &format!("firecrawl_search: {query}"), &panel_content);
                 return ok_result(tool, format!("Created panel {panel_id}: results for '{query}'"));
             };
 
@@ -187,7 +187,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let page_title = result.title.as_deref().unwrap_or("untitled");
                 let page_url = result.url.as_deref().unwrap_or("unknown");
 
-                let _r = write!(content, "## Result {} — {} ({})\n\n", i + 1, page_title, page_url);
+                let _r = write!(content, "## Result {} — {} ({})\n\n", i.saturating_add(1), page_title, page_url);
 
                 if let Some(ref md) = result.markdown {
                     content.push_str(md);
@@ -210,7 +210,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 content.push_str("---\n\n");
             }
 
-            let panel_id = crate::panel::create_panel(state, &format!("firecrawl_search: {query}"), &content);
+            let panel_id = crate::panel::create(state, &format!("firecrawl_search: {query}"), &content);
 
             ok_result(tool, format!("Created panel {panel_id}: {count} results for '{query}'"))
         }
@@ -281,7 +281,7 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
             let domain =
                 url.trim_start_matches("https://").trim_start_matches("http://").split('/').next().unwrap_or(url);
 
-            let panel_id = crate::panel::create_panel(state, &format!("firecrawl_map: {domain}"), &panel_content);
+            let panel_id = crate::panel::create(state, &format!("firecrawl_map: {domain}"), &panel_content);
 
             ok_result(tool, format!("Created panel {panel_id}: {count} URLs discovered on '{domain}'"))
         }

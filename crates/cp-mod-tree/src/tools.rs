@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use ignore::gitignore::GitignoreBuilder;
 use sha2::{Digest as _, Sha256};
 
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{TreeFileDescription, TreeState};
@@ -272,7 +273,7 @@ pub fn list_dir_entries(
     tree_filter: &str,
     dir_prefix: &str,
     name_prefix: &str,
-) -> Vec<cp_base::autocomplete::AutocompleteEntry> {
+) -> Vec<cp_base::state::autocomplete::AutocompleteEntry> {
     let root = PathBuf::from(".");
 
     // Build gitignore matcher from filter
@@ -294,7 +295,7 @@ pub fn list_dir_entries(
     let Ok(read) = fs::read_dir(&dir_path) else { return Vec::new() };
     let prefix_lower = name_prefix.to_lowercase();
 
-    let mut entries: Vec<cp_base::autocomplete::AutocompleteEntry> = read
+    let mut entries: Vec<cp_base::state::autocomplete::AutocompleteEntry> = read
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
@@ -313,7 +314,7 @@ pub fn list_dir_entries(
                 return None;
             }
 
-            Some(cp_base::autocomplete::AutocompleteEntry { name, is_dir })
+            Some(cp_base::state::autocomplete::AutocompleteEntry { name, is_dir })
         })
         .collect();
 
@@ -366,7 +367,7 @@ fn build_tree_new(node: &TreeNode<'_>, ctx: &TreeContext<'_>, output: &mut Strin
 
     let total = items.len();
     for (i, entry) in items.iter().enumerate() {
-        let is_last = i == total - 1;
+        let is_last = i == total.saturating_sub(1);
         let connector = if is_last { "└── " } else { "├── " };
         let child_prefix = if is_last { "    " } else { "│   " };
 

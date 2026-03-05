@@ -12,14 +12,14 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-use crate::parse::{extract_poll_interval, parse_api_response, poll_branch_pr, redact_token, sha256_hex};
+use crate::parse::{api_response, extract_poll_interval, poll_branch_pr, redact_token, sha256_hex};
 use secrecy::{ExposeSecret as _, SecretBox};
 
-use cp_base::config::constants::MAX_RESULT_CONTENT_BYTES;
+use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::CacheUpdate;
 use cp_base::panels::now_ms;
-use cp_base::state::estimate_tokens;
+use cp_base::state::context::estimate_tokens;
 
 use crate::GH_CMD_TIMEOUT_SECS;
 
@@ -67,21 +67,21 @@ struct GhWatch {
 }
 
 /// Background watcher that polls `GithubResult` panels for changes.
-pub struct GhWatcher {
+pub struct Watcher {
     watches: Arc<Mutex<HashMap<String, GhWatch>>>,
     branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,
     _thread: JoinHandle<()>,
 }
 
-impl std::fmt::Debug for GhWatcher {
+impl std::fmt::Debug for Watcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let watch_count = self.watches.lock().map(|w| w.len()).unwrap_or(0);
-        f.debug_struct("GhWatcher").field("watch_count", &watch_count).finish_non_exhaustive()
+        f.debug_struct("Watcher").field("watch_count", &watch_count).finish_non_exhaustive()
     }
 }
 
-impl GhWatcher {
-    /// Create a new `GhWatcher` with a background polling thread.
+impl Watcher {
+    /// Create a new `Watcher` with a background polling thread.
     #[must_use]
     pub fn new(cache_tx: Sender<CacheUpdate>) -> Self {
         let watches: Arc<Mutex<HashMap<String, GhWatch>>> = Arc::new(Mutex::new(HashMap::new()));
@@ -191,8 +191,9 @@ impl GhPollLoop {
                 let snapshot = {
                     let watch = branch_pr_watch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     watch.as_ref().and_then(|w| {
-                        (current_ms.saturating_sub(w.last_poll_ms) >= GH_DEFAULT_POLL_INTERVAL_SECS * 1000)
-                            .then(|| (w.branch.clone(), Arc::clone(&w.github_token), w.last_output_hash.clone()))
+                        (current_ms.saturating_sub(w.last_poll_ms)
+                            >= GH_DEFAULT_POLL_INTERVAL_SECS.saturating_mul(1000))
+                        .then(|| (w.branch.clone(), Arc::clone(&w.github_token), w.last_output_hash.clone()))
                     })
                 };
 
@@ -214,7 +215,9 @@ impl GhPollLoop {
                     // Send update if content changed
                     if let Some((_, pr_info)) = result {
                         let _r = cache_tx.send(CacheUpdate::ModuleSpecific {
-                            context_type: cp_base::state::ContextType::new(cp_base::state::ContextType::GITHUB_RESULT),
+                            context_type: cp_base::state::context::ContextType::new(
+                                cp_base::state::context::ContextType::GITHUB_RESULT,
+                            ),
                             data: Box::new(BranchPrUpdate { pr_info }),
                         });
                     }
@@ -228,7 +231,7 @@ impl GhPollLoop {
                 let watches = watches.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 watches
                     .values()
-                    .filter(|w| current_ms.saturating_sub(w.last_poll_ms) >= w.poll_interval_secs * 1000)
+                    .filter(|w| current_ms.saturating_sub(w.last_poll_ms) >= w.poll_interval_secs.saturating_mul(1000))
                     .map(|w| {
                         (
                             w.context_id.clone(),
@@ -262,7 +265,7 @@ impl GhPollLoop {
 
                     if let Some((_, body)) = outcome.content {
                         let body = redact_token(&body, token_str);
-                        let body = truncate_output(&body, MAX_RESULT_CONTENT_BYTES);
+                        let body = truncate_output(&body, constants::MAX_RESULT_CONTENT_BYTES);
                         let token_count = estimate_tokens(&body);
 
                         let _r = cache_tx.send(CacheUpdate::Content { context_id, content: body, token_count });
@@ -282,7 +285,7 @@ impl GhPollLoop {
 
                     if let Some((_, content)) = result {
                         let content = redact_token(&content, token_str);
-                        let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
+                        let content = truncate_output(&content, constants::MAX_RESULT_CONTENT_BYTES);
                         let token_count = estimate_tokens(&content);
 
                         let _r = cache_tx.send(CacheUpdate::Content { context_id, content, token_count });
@@ -301,10 +304,13 @@ struct ApiPollOutcome {
 
 /// Poll a `gh api` command using ETag-based conditional requests.
 fn poll_api_command(args: &[String], github_token: &str, current_etag: Option<&str>) -> ApiPollOutcome {
-    let mut cmd_args = Vec::with_capacity(args.len() + 4);
-    cmd_args.push(args[0].clone()); // "api"
+    let mut cmd_args = Vec::with_capacity(args.len().saturating_add(4));
+    let (Some(first_arg), rest) = (args.first(), args.get(1..).unwrap_or_default()) else {
+        return ApiPollOutcome { content: None, poll_interval: None };
+    };
+    cmd_args.push(first_arg.clone()); // "api"
     cmd_args.push("-i".to_string());
-    cmd_args.extend_from_slice(&args[1..]);
+    cmd_args.extend_from_slice(rest);
 
     if let Some(etag) = current_etag {
         cmd_args.push("-H".to_string());
@@ -335,7 +341,7 @@ fn poll_api_command(args: &[String], github_token: &str, current_etag: Option<&s
         return ApiPollOutcome { content: None, poll_interval: None };
     }
 
-    let (new_etag, poll_interval, body) = parse_api_response(&stdout);
+    let (new_etag, poll_interval, body) = api_response(&stdout);
     ApiPollOutcome { content: Some((new_etag, body)), poll_interval }
 }
 

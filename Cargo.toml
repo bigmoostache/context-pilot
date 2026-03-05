@@ -963,7 +963,7 @@ redundant_type_annotations = "deny"
 # Taskforce lints — high-value, systematic migration
 # ============================
 # Forces explicit checked arithmetic instead of silent panics
-# DISABLED: arithmetic_side_effects = "warn"
+arithmetic_side_effects = "warn"
 # Forces .get() instead of [] indexing — explicit panic handling
 indexing_slicing = "warn"
 # `as` silently truncates; replacing with TryFrom is strictly safer

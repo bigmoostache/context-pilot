@@ -108,7 +108,10 @@ impl LlmClient for AnthropicClient {
         if let Some(results) = &request.tool_results {
             let tool_result_blocks: Vec<ContentBlock> = results
                 .iter()
-                .map(|r| ContentBlock::ToolResult { tool_use_id: r.tool_use_id.clone(), content: r.content.clone() })
+                .map(|r: &crate::infra::tools::ToolResult| ContentBlock::ToolResult {
+                    tool_use_id: r.tool_use_id.clone(),
+                    content: r.content.clone(),
+                })
                 .collect();
 
             api_messages.push(ApiMessage { role: "user".to_string(), content: tool_result_blocks });

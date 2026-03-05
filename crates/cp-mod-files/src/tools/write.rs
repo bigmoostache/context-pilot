@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::Path;
 
-use cp_base::state::{ContextElement, ContextType, State, estimate_tokens};
+use cp_base::state::context::{ContextElement, ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use std::fmt::Write as _;
 
@@ -53,7 +54,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         // Add new context element
         let context_id = state.next_available_context_id();
         let uid = format!("UID_{}_P", state.global_next_uid);
-        state.global_next_uid += 1;
+        state.global_next_uid = state.global_next_uid.saturating_add(1);
 
         let file_name = path.file_name().map_or_else(|| path_str.to_string(), |n| n.to_string_lossy().to_string());
 
@@ -91,7 +92,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     result_msg.push_str("```diff\n");
     for (i, line) in contents.lines().enumerate() {
         if i >= 20 {
-            let _r = writeln!(result_msg, "+ ... ({} more lines)", line_count - 20);
+            let _r = writeln!(result_msg, "+ ... ({} more lines)", line_count.saturating_sub(20));
             break;
         }
         let _r = writeln!(result_msg, "+ {line}");

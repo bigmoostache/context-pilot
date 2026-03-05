@@ -1,4 +1,4 @@
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 
 // === Git change types ===
 

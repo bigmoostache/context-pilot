@@ -1,4 +1,4 @@
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::api::{BraveClient, LLMContextParams, SearchParams};
@@ -79,7 +79,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
 
             // Create dynamic panel
-            let panel_id = crate::panel::create_panel(state, &format!("brave_search: {query}"), &panel_content);
+            let panel_id = crate::panel::create(state, &format!("brave_search: {query}"), &panel_content);
 
             ok_result(tool, format!("Created panel {panel_id}: {result_count} results for '{query}'"))
         }
@@ -128,7 +128,7 @@ fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
                 Err(e) => return err_result(tool, format!("Failed to serialize response: {e}")),
             };
 
-            let panel_id = crate::panel::create_panel(state, &format!("brave_llm_context: {query}"), &panel_content);
+            let panel_id = crate::panel::create(state, &format!("brave_llm_context: {query}"), &panel_content);
 
             ok_result(tool, format!("Created panel {panel_id}: {url_count} URLs, ~{max_tokens} tokens for '{query}'"))
         }

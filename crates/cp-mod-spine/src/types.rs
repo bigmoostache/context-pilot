@@ -1,4 +1,5 @@
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use serde::{Deserialize, Serialize};
 
 const fn default_true() -> bool {
@@ -201,18 +202,18 @@ impl SpineState {
         let id = {
             let ss = Self::get_mut(state);
             let id = format!("N{}", ss.next_notification_id);
-            ss.next_notification_id += 1;
+            ss.next_notification_id = ss.next_notification_id.saturating_add(1);
             ss.notifications.push(Notification::new(id.clone(), kind, source, content));
             // Inline gc: cap at 100
             if ss.notifications.len() > 100 {
-                let excess = ss.notifications.len() - 100;
+                let excess = ss.notifications.len().saturating_sub(100);
                 let mut removed = 0usize;
                 ss.notifications.retain(|n| {
                     if removed >= excess {
                         return true;
                     }
                     if n.is_processed() {
-                        removed += 1;
+                        removed = removed.saturating_add(1);
                         return false;
                     }
                     true

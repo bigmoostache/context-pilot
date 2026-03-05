@@ -1,10 +1,11 @@
 use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::Action;
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 
 use crate::types::{TodoItem, TodoState, TodoStatus};
 use cp_base::panels::scroll_key_action;
@@ -29,7 +30,7 @@ impl TodoPanel {
             line.push('\n');
 
             for child in todos.iter().filter(|t| t.parent_id.as_ref() == Some(&todo.id)) {
-                line.push_str(&format_todo(child, todos, indent + 1));
+                line.push_str(&format_todo(child, todos, indent.saturating_add(1)));
             }
 
             line
@@ -100,7 +101,7 @@ impl Panel for TodoPanel {
             ) {
                 for todo in todos.iter().filter(|t| t.parent_id.as_ref() == parent_id) {
                     lines.push((indent, todo.id.clone(), todo.name.clone(), todo.status, todo.description.clone()));
-                    collect_todo_lines(todos, Some(&todo.id), indent + 1, lines);
+                    collect_todo_lines(todos, Some(&todo.id), indent.saturating_add(1), lines);
                 }
             }
 
@@ -133,7 +134,7 @@ impl Panel for TodoPanel {
                 ]));
 
                 if !description.is_empty() {
-                    let desc_prefix = "  ".repeat(indent + 1);
+                    let desc_prefix = "  ".repeat(indent.saturating_add(1));
                     text.push(Line::from(vec![
                         Span::styled(" ".to_string(), base_style),
                         Span::styled(desc_prefix, base_style),

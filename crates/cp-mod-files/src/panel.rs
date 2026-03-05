@@ -5,13 +5,14 @@ use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::cast::SafeCast as _;
-use cp_base::config::constants::PANEL_MAX_LOAD_BYTES;
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
+use cp_base::config::constants;
 use cp_base::panels::scroll_key_action;
 use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
-use cp_base::state::Action;
-use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::runtime::State;
 
 pub(crate) struct FileCacheRequest {
     pub context_id: String,
@@ -93,12 +94,12 @@ impl Panel for FilePanel {
         }
         // Hard byte limit: refuse to load oversized files
         if let Ok(meta) = fs::metadata(&path)
-            && meta.len().to_usize() > PANEL_MAX_LOAD_BYTES
+            && meta.len().to_usize() > constants::PANEL_MAX_LOAD_BYTES
         {
             let msg = format!(
                 "[File too large to load: {} bytes (limit: {} bytes). Close this panel and use grep or other tools to inspect portions of the file.]",
                 meta.len(),
-                PANEL_MAX_LOAD_BYTES
+                constants::PANEL_MAX_LOAD_BYTES
             );
             let token_count = estimate_tokens(&msg);
             return Some(CacheUpdate::Content { context_id, content: msg, token_count });
@@ -153,7 +154,7 @@ impl Panel for FilePanel {
 
         if highlighted.is_empty() {
             for (i, line) in content.lines().enumerate() {
-                let line_num = i + 1;
+                let line_num = i.saturating_add(1);
                 text.push(Line::from(vec![
                     Span::styled(
                         format!(" {line_num:4} "),
@@ -165,7 +166,7 @@ impl Panel for FilePanel {
             }
         } else {
             for (i, spans) in highlighted.iter().enumerate() {
-                let line_num = i + 1;
+                let line_num = i.saturating_add(1);
                 let mut line_spans = vec![
                     Span::styled(
                         format!(" {line_num:4} "),
@@ -184,4 +185,7 @@ impl Panel for FilePanel {
 
         text
     }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> { None }
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }

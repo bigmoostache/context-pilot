@@ -1,11 +1,12 @@
 use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
 use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::panels::{ContextItem, Panel, paginate_content};
-use cp_base::state::Action;
-use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::runtime::State;
 use cp_base::ui::{find_children_pattern, find_size_pattern};
 
 use crate::types::TreeState;

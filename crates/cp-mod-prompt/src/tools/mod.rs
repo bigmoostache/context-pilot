@@ -4,7 +4,7 @@ pub(crate) mod edit_prompt;
 pub(crate) mod library_editor;
 pub(crate) mod skill;
 
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

@@ -81,7 +81,7 @@ impl PendingForm {
     #[must_use]
     pub fn current_option_count(&self) -> usize {
         let Some(q) = self.questions.get(self.current_question) else { return 1 };
-        q.options.len() + 1 // +1 for "Other"
+        q.options.len().saturating_add(1) // +1 for "Other"
     }
 
     /// Index of the "Other" option for the current question
@@ -104,7 +104,7 @@ impl PendingForm {
         let other_idx = q.options.len();
         let Some(ans) = self.answers.get_mut(self.current_question) else { return };
         if ans.cursor > 0 {
-            ans.cursor -= 1;
+            ans.cursor = ans.cursor.saturating_sub(1);
         }
         ans.typing_other = ans.cursor == other_idx;
     }
@@ -112,12 +112,12 @@ impl PendingForm {
     /// Move cursor down
     pub fn cursor_down(&mut self) {
         let Some(q) = self.questions.get(self.current_question) else { return };
-        let option_count = q.options.len() + 1;
+        let option_count = q.options.len().saturating_add(1);
         let other_idx = q.options.len();
         let Some(ans) = self.answers.get_mut(self.current_question) else { return };
-        let max = option_count - 1;
+        let max = option_count.saturating_sub(1);
         if ans.cursor < max {
-            ans.cursor += 1;
+            ans.cursor = ans.cursor.saturating_add(1);
         }
         ans.typing_other = ans.cursor == other_idx;
     }
@@ -176,8 +176,8 @@ impl PendingForm {
         }
 
         // Advance to next question or resolve
-        if self.current_question < self.questions.len() - 1 {
-            self.current_question += 1;
+        if self.current_question < self.questions.len().saturating_sub(1) {
+            self.current_question = self.current_question.saturating_add(1);
         } else {
             self.submit();
         }
@@ -236,14 +236,14 @@ impl PendingForm {
     /// Go to previous question (Left arrow). Always allowed if not on first.
     pub const fn prev_question(&mut self) {
         if self.current_question > 0 {
-            self.current_question -= 1;
+            self.current_question = self.current_question.saturating_sub(1);
         }
     }
 
     /// Go to next question (Right arrow). Only allowed if current question has an answer.
     pub fn next_question(&mut self) {
-        if self.current_question < self.questions.len() - 1 && self.current_question_answered() {
-            self.current_question += 1;
+        if self.current_question < self.questions.len().saturating_sub(1) && self.current_question_answered() {
+            self.current_question = self.current_question.saturating_add(1);
         }
     }
 

@@ -7,6 +7,7 @@ pub mod cast;
 /// YAML config loader: prompts, library, themes, injections, constants.
 pub mod config;
 /// Re-export from `config::llm_types` for convenience.
+#[expect(clippy::pub_use, reason = "Intentional re-export module for downstream convenience")]
 pub mod llm_types {
     pub use crate::config::llm_types::{
         AnthropicModel, ApiCheckResult, DeepSeekModel, GrokModel, GroqModel, LlmProvider, ModelInfo, StreamEvent,
@@ -22,15 +23,6 @@ pub mod state;
 pub mod tools;
 /// Shared UI helpers: table rendering, text cells, question forms.
 pub mod ui;
-/// Watcher trait and registry for async condition monitoring.
-pub mod watchers {
-    pub use crate::state::watchers::*;
-}
-
-/// File-path autocomplete state for @-triggered popup.
-pub mod autocomplete {
-    pub use crate::state::autocomplete::*;
-}
 
 #[cfg(test)]
 mod tests {

@@ -52,21 +52,21 @@ impl QueueState {
     ///
     /// Delegates to [`State::ext()`] which centralizes the panic for unregistered module state.
     #[must_use]
-    pub fn get(state: &cp_base::state::State) -> &Self {
+    pub fn get(state: &cp_base::state::runtime::State) -> &Self {
         state.ext::<Self>()
     }
 
     /// Get mutable ref from State's `TypeMap`.
     ///
     /// Delegates to [`State::ext_mut()`] which centralizes the panic for unregistered module state.
-    pub fn get_mut(state: &mut cp_base::state::State) -> &mut Self {
+    pub fn get_mut(state: &mut cp_base::state::runtime::State) -> &mut Self {
         state.ext_mut::<Self>()
     }
 
     /// Queue a tool call. Returns the assigned index.
     pub fn enqueue(&mut self, call: QueuedToolCall) -> usize {
         let index = self.next_index;
-        self.next_index += 1;
+        self.next_index = self.next_index.saturating_add(1);
         let mut call = call;
         call.index = index;
         self.queued_calls.push(call);

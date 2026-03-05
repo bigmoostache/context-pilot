@@ -1,13 +1,14 @@
 use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::constants::MAX_RESULT_CONTENT_BYTES;
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
+use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
-use cp_base::state::Action;
-use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::runtime::State;
 
 use super::GIT_CMD_TIMEOUT_SECS;
 use super::GIT_STATUS_REFRESH_MS;
@@ -81,7 +82,7 @@ impl Panel for GitResultPanel {
                 } else {
                     format!("{stdout}\n{stderr}")
                 };
-                let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
+                let content = truncate_output(&content, constants::MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
                 Some(CacheUpdate::Content { context_id, content, token_count })
             }

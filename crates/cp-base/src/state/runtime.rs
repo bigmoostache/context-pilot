@@ -418,8 +418,8 @@ impl State {
     pub fn alloc_user_ids(&mut self) -> (String, String) {
         let id = format!("U{}", self.next_user_id);
         let uid = format!("UID_{}_U", self.global_next_uid);
-        self.next_user_id += 1;
-        self.global_next_uid += 1;
+        self.next_user_id = self.next_user_id.saturating_add(1);
+        self.global_next_uid = self.global_next_uid.saturating_add(1);
         (id, uid)
     }
 
@@ -427,8 +427,8 @@ impl State {
     pub fn alloc_assistant_ids(&mut self) -> (String, String) {
         let id = format!("A{}", self.next_assistant_id);
         let uid = format!("UID_{}_A", self.global_next_uid);
-        self.next_assistant_id += 1;
-        self.global_next_uid += 1;
+        self.next_assistant_id = self.next_assistant_id.saturating_add(1);
+        self.global_next_uid = self.global_next_uid.saturating_add(1);
         (id, uid)
     }
 
@@ -436,17 +436,17 @@ impl State {
     /// NOTE: Caller is responsible for persistence (`save_message`).
     /// Returns the index into self.messages.
     pub fn push_user_message(&mut self, content: String) -> usize {
-        let token_count = super::estimate_tokens(&content);
+        let token_count = super::context::estimate_tokens(&content);
         let (id, uid) = self.alloc_user_ids();
         let msg = Message::new_user(id, uid, content, token_count);
 
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
-            ctx.token_count += token_count;
+            ctx.token_count = ctx.token_count.saturating_add(token_count);
             ctx.last_refresh_ms = crate::panels::now_ms();
         }
 
         self.messages.push(msg);
-        self.messages.len() - 1
+        self.messages.len().saturating_sub(1)
     }
 
     /// Create an empty assistant message for streaming into, add it, return its index.
@@ -454,7 +454,7 @@ impl State {
         let (id, uid) = self.alloc_assistant_ids();
         let msg = Message::new_assistant(id, uid);
         self.messages.push(msg);
-        self.messages.len() - 1
+        self.messages.len().saturating_sub(1)
     }
 
     /// Prepare state for a new stream: transition to [`StreamPhase::Receiving`],

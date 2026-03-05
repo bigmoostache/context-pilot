@@ -1,4 +1,4 @@
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 
 /// Info about a PR associated with the current branch
 #[derive(Debug, Clone)]

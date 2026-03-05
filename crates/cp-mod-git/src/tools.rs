@@ -1,9 +1,10 @@
 use std::process::Command;
 
 use super::GIT_CMD_TIMEOUT_SECS;
-use cp_base::config::constants::MAX_RESULT_CONTENT_BYTES;
+use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use super::classify::{CommandClass, classify_git, validate_git_command};
@@ -34,18 +35,18 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                 c.context_type.as_str() == ContextType::GIT_RESULT && c.get_meta_str("result_command") == Some(command)
             });
 
-            if let Some(idx) = existing_idx {
+            if let Some(ctx_elem) = existing_idx.and_then(|idx| state.context.get_mut(idx)) {
                 // Reuse existing panel — mark deprecated to trigger re-fetch
-                state.context[idx].cache_deprecated = true;
-                let panel_id = state.context[idx].id.clone();
+                ctx_elem.cache_deprecated = true;
+                let panel_id = ctx_elem.id.clone();
                 ToolResult::new(tool.id.clone(), format!("Panel updated: {panel_id}"), false)
             } else {
                 // Create new GitResult panel
                 let panel_id = state.next_available_context_id();
                 let uid = format!("UID_{}_P", state.global_next_uid);
-                state.global_next_uid += 1;
+                state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-                let mut elem = cp_base::state::make_default_context_element(
+                let mut elem = cp_base::state::context::make_default_context_element(
                     &panel_id,
                     ContextType::new(ContextType::GIT_RESULT),
                     command,
@@ -116,7 +117,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                         format!("{}\n{}", stdout.trim(), stderr.trim())
                     };
                     let is_error = !output.status.success();
-                    let combined = truncate_output(&combined, MAX_RESULT_CONTENT_BYTES);
+                    let combined = truncate_output(&combined, constants::MAX_RESULT_CONTENT_BYTES);
                     ToolResult::new(
                         tool.id.clone(),
                         if combined.is_empty() {

@@ -1,8 +1,9 @@
 use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 
 use crate::types::QueueState;
 use std::fmt::Write as _;
@@ -81,7 +82,7 @@ impl Panel for QueuePanel {
             let short = if params.len() > 80 {
                 let mut end = 77;
                 while !params.is_char_boundary(end) {
-                    end -= 1;
+                    end = end.saturating_sub(1);
                 }
                 format!("{}...", params.get(..end).unwrap_or(""))
             } else {
@@ -115,7 +116,7 @@ impl QueuePanel {
                 let short = if params.len() > 120 {
                     let mut end = 117;
                     while !params.is_char_boundary(end) {
-                        end -= 1;
+                        end = end.saturating_sub(1);
                     }
                     format!("{}...", params.get(..end).unwrap_or(""))
                 } else {

@@ -1,4 +1,5 @@
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{TodoItem, TodoState, TodoStatus};
@@ -64,7 +65,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let ts = TodoState::get_mut(state);
         let id = format!("X{}", ts.next_todo_id);
-        ts.next_todo_id += 1;
+        ts.next_todo_id = ts.next_todo_id.saturating_add(1);
 
         ts.todos.push(TodoItem { id: id.clone(), parent_id, name: name.clone(), description, status });
 
@@ -365,7 +366,7 @@ pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Insert at new position
     let insert_idx = after_id.map_or(0, |aid| {
         // Find the after_id position (may have shifted after remove)
-        ts.todos.iter().position(|t| t.id == aid).map_or(0, |idx| idx + 1)
+        ts.todos.iter().position(|t| t.id == aid).map_or(0, |idx| idx.saturating_add(1))
     });
 
     ts.todos.insert(insert_idx, item);

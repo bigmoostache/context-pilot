@@ -44,7 +44,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     }
 
     // Render autocomplete popup if active
-    if let Some(ac) = state.get_ext::<cp_base::autocomplete::AutocompleteState>()
+    if let Some(ac) = state.get_ext::<cp_base::state::autocomplete::AutocompleteState>()
         && ac.active
     {
         // Position in main content area (right of sidebar, above status bar)
@@ -83,20 +83,20 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
 
     debug_assert!(body_layout.len() >= 2);
     match state.sidebar_mode {
-        cp_base::state::SidebarMode::Normal => {
+        cp_base::state::data::config::SidebarMode::Normal => {
             sidebar::render_sidebar(frame, state, body_layout[0]);
         }
-        cp_base::state::SidebarMode::Collapsed => {
+        cp_base::state::data::config::SidebarMode::Collapsed => {
             sidebar::render_sidebar_collapsed(frame, state, body_layout[0]);
         }
-        cp_base::state::SidebarMode::Hidden => {} // handled above
+        cp_base::state::data::config::SidebarMode::Hidden => {} // handled above
     }
     render_main_content(frame, state, body_layout[1]);
 }
 
 fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     // Check if question form is active — render it at bottom of content area
-    if let Some(form) = state.get_ext::<cp_base::ui::PendingForm>()
+    if let Some(form) = state.get_ext::<cp_base::ui::question_form::PendingForm>()
         && !form.resolved
     {
         // Split: content panel on top, question form at bottom
@@ -132,7 +132,7 @@ fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
 
     // ConversationPanel overrides render() with custom scrollbar + caching.
     // All other panels use render_panel_default (which calls panel.content()).
-    if context_type == ContextType::CONVERSATION {
+    if context_type.as_str() == ContextType::CONVERSATION {
         panel.render(frame, state, area);
     } else {
         panels::render_panel_default(panel.as_ref(), frame, state, area);

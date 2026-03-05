@@ -5,8 +5,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::cast::SafeCast;
+use crate::config::accessors::active_theme;
 use crate::config::constants::CHARS_PER_TOKEN;
-use crate::config::{active_theme, normalize_icon};
+use crate::config::normalize_icon;
 
 // =============================================================================
 // ContextType Registry — modules register metadata at startup
@@ -199,7 +200,7 @@ pub struct ContextElement {
     pub cached_content: Option<String>,
     /// Frozen Message objects for `ConversationHistory` panels (UI rendering)
     #[serde(skip)]
-    pub history_messages: Option<Vec<super::Message>>,
+    pub history_messages: Option<Vec<super::data::message::Message>>,
     /// Cache is deprecated - source data changed, needs regeneration
     #[serde(skip)]
     pub cache_deprecated: bool,

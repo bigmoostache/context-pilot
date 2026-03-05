@@ -217,7 +217,7 @@ impl ConversationPanel {
                 let line_count = cached.lines.len();
                 text.extend(cached.lines.iter().cloned());
                 // Update autocomplete with input visual line count
-                if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+                if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() {
                     ac.input_visual_lines = line_count.to_u16();
                 }
             } else {
@@ -236,7 +236,7 @@ impl ConversationPanel {
                     Some(InputCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
                 text.extend(input_lines);
                 // Update autocomplete with input visual line count
-                if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+                if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() {
                     ac.input_visual_lines = line_count.to_u16();
                 }
             }
@@ -256,7 +256,7 @@ impl ConversationPanel {
                 Some(InputCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
             text.extend(input_lines);
             // Update autocomplete with input visual line count
-            if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+            if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() {
                 ac.input_visual_lines = line_count.to_u16();
             }
         }

@@ -43,7 +43,7 @@ pub(crate) fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender
     // with a user turn — some models don't support assistant prefill.
     let mut reverie_messages = state.reveries.get(agent_id).map(|r| r.messages.clone()).unwrap_or_default();
     if reverie_messages.is_empty() {
-        reverie_messages.push(cp_base::state::Message::new_user(
+        reverie_messages.push(cp_base::state::data::message::Message::new_user(
             "reverie-kickoff".to_string(),
             "reverie-kickoff".to_string(),
             REVERIE.kickoff_message.trim_end().to_string(),

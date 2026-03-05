@@ -18,12 +18,12 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     let mut spans = vec![Span::styled(" ", base_style)];
 
     // === Primary status badge (mutually exclusive, priority order) ===
-    let has_question_form = state.get_ext::<cp_base::ui::PendingForm>().is_some();
+    let has_question_form = state.get_ext::<cp_base::ui::question_form::PendingForm>().is_some();
     let has_timed_watcher = {
         use cp_base::state::watchers::WatcherRegistry;
-        state
-            .get_ext::<WatcherRegistry>()
-            .is_some_and(|reg| reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some()))
+        state.get_ext::<WatcherRegistry>().is_some_and(|reg: &WatcherRegistry| {
+            reg.active_watchers().iter().any(|w: &Box<dyn cp_base::state::watchers::Watcher>| w.fire_at_ms().is_some())
+        })
     };
 
     if let Some(ref reason) = state.guard_rail_blocked {
@@ -237,7 +237,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 }
 
 /// Calculate the height needed for the question form
-pub(super) fn calculate_question_form_height(form: &cp_base::ui::PendingForm) -> u16 {
+pub(super) fn calculate_question_form_height(form: &cp_base::ui::question_form::PendingForm) -> u16 {
     let q = &form.questions[form.current_question];
     // Header line + question text + blank + options (including Other) + blank + nav hint
     let option_lines = q.options.len().to_u16() + 1; // +1 for "Other"
@@ -248,7 +248,7 @@ pub(super) fn calculate_question_form_height(form: &cp_base::ui::PendingForm) ->
 
 /// Render the question form at the bottom of the screen
 pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: Rect) {
-    let Some(form) = state.get_ext::<cp_base::ui::PendingForm>() else { return };
+    let Some(form) = state.get_ext::<cp_base::ui::question_form::PendingForm>() else { return };
 
     let q_idx = form.current_question;
     let q = &form.questions[q_idx];
@@ -385,7 +385,7 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
 }
 
 /// Calculate the height needed for the autocomplete popup
-pub(super) fn calculate_autocomplete_height(ac: &cp_base::autocomplete::AutocompleteState) -> u16 {
+pub(super) fn calculate_autocomplete_height(ac: &cp_base::state::autocomplete::AutocompleteState) -> u16 {
     let visible = ac.visible_matches().len().to_u16();
     // matches + border chrome (2)
     (visible + 2).clamp(4, 12)
@@ -393,7 +393,7 @@ pub(super) fn calculate_autocomplete_height(ac: &cp_base::autocomplete::Autocomp
 
 /// Render the @ autocomplete popup above the input area (bottom of content panel, growing upward)
 pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, area: Rect) {
-    let ac = match state.get_ext::<cp_base::autocomplete::AutocompleteState>() {
+    let ac = match state.get_ext::<cp_base::state::autocomplete::AutocompleteState>() {
         Some(ac) if ac.active => ac,
         _ => return,
     };

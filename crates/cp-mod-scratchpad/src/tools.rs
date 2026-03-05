@@ -1,4 +1,5 @@
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{ScratchpadCell, ScratchpadState};
@@ -22,7 +23,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let ss = ScratchpadState::get_mut(state);
     let id = format!("C{}", ss.next_scratchpad_id);
-    ss.next_scratchpad_id += 1;
+    ss.next_scratchpad_id = ss.next_scratchpad_id.saturating_add(1);
     ss.scratchpad_cells.push(ScratchpadCell { id: id.clone(), title: title.clone(), content: contents.clone() });
 
     // Update Scratchpad panel timestamp
@@ -94,12 +95,12 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     let ss = ScratchpadState::get_mut(state);
     let initial_count = ss.scratchpad_cells.len();
     ss.scratchpad_cells.retain(|c| !ids_to_delete.contains(&c.id));
-    let deleted_count = initial_count - ss.scratchpad_cells.len();
+    let deleted_count = initial_count.saturating_sub(ss.scratchpad_cells.len());
 
     let mut output = format!("Deleted {deleted_count} cell(s)");
 
     if deleted_count < ids_to_delete.len() {
-        let missing_count = ids_to_delete.len() - deleted_count;
+        let missing_count = ids_to_delete.len().saturating_sub(deleted_count);
         let _r = write!(output, ", {missing_count} not found");
     }
 

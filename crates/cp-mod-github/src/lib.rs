@@ -23,7 +23,9 @@ pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
+use cp_base::tools::pre_flight::PreFlightResult;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -93,8 +95,8 @@ impl Module for GithubModule {
         vec![("gh_execute", visualize_gh_output)]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
-        vec![cp_base::state::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
+        vec![cp_base::state::context::ContextTypeMeta {
             context_type: "github_result",
             icon_id: "git",
             is_fixed: false,
@@ -106,13 +108,90 @@ impl Module for GithubModule {
         }]
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
         (ctx.context_type.as_str() == ContextType::GITHUB_RESULT)
             .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_string())
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Git", "Git and GitHub operations")]
+    }
+
+    fn is_core(&self) -> bool {
+        false
+    }
+
+    fn is_global(&self) -> bool {
+        false
+    }
+
+    fn save_module_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<PreFlightResult> {
+        None
+    }
+
+    fn fixed_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![]
+    }
+
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    fn on_close_context(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+
+    fn on_user_message(&self, _state: &mut State) {}
+
+    fn on_stream_stop(&self, _state: &mut State) {}
+
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        vec![]
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }
 

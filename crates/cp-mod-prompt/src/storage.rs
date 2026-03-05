@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use cp_base::config::constants::STORE_DIR;
+use cp_base::config::constants;
 
 use crate::types::{PromptItem, PromptType};
 
@@ -19,7 +19,7 @@ const fn subdir_for(pt: PromptType) -> &'static str {
 
 /// Full path to the directory for a prompt type
 pub(crate) fn dir_for(pt: PromptType) -> PathBuf {
-    PathBuf::from(STORE_DIR).join(subdir_for(pt))
+    PathBuf::from(constants::STORE_DIR).join(subdir_for(pt))
 }
 
 /// Parse a prompt .md file with YAML frontmatter.
@@ -119,7 +119,7 @@ pub(crate) fn delete_prompt_from_dir(dir: &Path, id: &str) {
 /// Load all prompts from all three directories + built-ins from library.yaml.
 /// Returns (agents, skills, commands).
 pub(crate) fn load_all_prompts() -> AllPrompts {
-    use cp_base::config::library;
+    use cp_base::config::accessors::library;
 
     let mut agents = load_prompts_from_dir(&dir_for(PromptType::Agent), PromptType::Agent);
     let mut skills = load_prompts_from_dir(&dir_for(PromptType::Skill), PromptType::Skill);

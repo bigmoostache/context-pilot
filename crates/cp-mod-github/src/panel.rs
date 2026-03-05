@@ -2,13 +2,14 @@ use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
 use super::GH_CMD_TIMEOUT_SECS;
-use cp_base::config::constants::MAX_RESULT_CONTENT_BYTES;
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
+use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
-use cp_base::state::Action;
-use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::runtime::State;
 
 use crate::types::{GithubResultRequest, GithubState};
 use cp_base::panels::scroll_key_action;
@@ -91,7 +92,7 @@ impl Panel for GithubResultPanel {
                 } else {
                     content
                 };
-                let content = truncate_output(&content, MAX_RESULT_CONTENT_BYTES);
+                let content = truncate_output(&content, constants::MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
                 Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
             }
@@ -106,6 +107,14 @@ impl Panel for GithubResultPanel {
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         scroll_key_action(key)
     }
+
+    fn refresh(&self, _state: &mut State) {}
+
+    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)

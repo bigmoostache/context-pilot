@@ -2,16 +2,17 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use cp_base::config::constants::STORE_DIR;
+use cp_base::config::constants;
 
 use crate::PRESETS_DIR;
 use crate::types::{DefaultsInitializer, ModuleRegistry, Preset, PresetPanelConfig, PresetWorkerState, ToolDefBuilder};
-use cp_base::state::{ContextType, State, make_default_context_element};
+use cp_base::state::context::{ContextType, make_default_context_element};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use cp_mod_prompt::PromptState;
 
 fn presets_path() -> std::path::PathBuf {
-    Path::new(STORE_DIR).join(PRESETS_DIR)
+    Path::new(constants::STORE_DIR).join(PRESETS_DIR)
 }
 
 fn preset_file_path(name: &str) -> std::path::PathBuf {

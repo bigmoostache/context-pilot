@@ -88,10 +88,15 @@ impl FirecrawlClient {
         });
 
         if let (Some(country), Some(langs)) = (&p.country, &p.languages) {
-            body["location"] = serde_json::json!({
-                "country": country,
-                "languages": langs,
-            });
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert(
+                    "location".into(),
+                    serde_json::json!({
+                        "country": country,
+                        "languages": langs,
+                    }),
+                );
+            }
         }
 
         self.post_json("/scrape", &body)
@@ -111,17 +116,19 @@ impl FirecrawlClient {
             },
         });
 
-        if !p.sources.is_empty() {
-            body["sources"] = serde_json::json!(p.sources);
-        }
-        if let Some(ref cats) = p.categories {
-            body["categories"] = serde_json::json!(cats);
-        }
-        if let Some(tbs) = p.tbs {
-            body["tbs"] = serde_json::json!(tbs);
-        }
-        if let Some(loc) = p.location {
-            body["location"] = serde_json::json!(loc);
+        if let Some(obj) = body.as_object_mut() {
+            if !p.sources.is_empty() {
+                obj.insert("sources".into(), serde_json::json!(p.sources));
+            }
+            if let Some(ref cats) = p.categories {
+                obj.insert("categories".into(), serde_json::json!(cats));
+            }
+            if let Some(tbs) = p.tbs {
+                obj.insert("tbs".into(), serde_json::json!(tbs));
+            }
+            if let Some(loc) = p.location {
+                obj.insert("location".into(), serde_json::json!(loc));
+            }
         }
 
         self.post_json("/search", &body)
@@ -139,14 +146,19 @@ impl FirecrawlClient {
             "includeSubdomains": p.include_subdomains,
         });
 
-        if let Some(search) = p.search {
-            body["search"] = serde_json::json!(search);
-        }
-        if let (Some(country), Some(langs)) = (&p.country, &p.languages) {
-            body["location"] = serde_json::json!({
-                "country": country,
-                "languages": langs,
-            });
+        if let Some(obj) = body.as_object_mut() {
+            if let Some(search) = p.search {
+                obj.insert("search".into(), serde_json::json!(search));
+            }
+            if let (Some(country), Some(langs)) = (&p.country, &p.languages) {
+                obj.insert(
+                    "location".into(),
+                    serde_json::json!({
+                        "country": country,
+                        "languages": langs,
+                    }),
+                );
+            }
         }
 
         self.post_json("/map", &body)

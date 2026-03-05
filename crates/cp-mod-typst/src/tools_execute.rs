@@ -2,7 +2,8 @@
 //!
 //! Handles all subcommands: compile, init, fonts, query, update.
 
-use cp_base::state::{ContextElement, ContextType, State};
+use cp_base::state::context::{ContextElement, ContextType};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use std::collections::HashSet;
 use std::fs;

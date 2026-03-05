@@ -176,7 +176,7 @@ impl BraveClient {
 
 /// Simple URL encoding for query parameters.
 fn urlenc(s: &str) -> String {
-    let mut result = String::with_capacity(s.len() * 2);
+    let mut result = String::with_capacity(s.len().saturating_mul(2));
     for b in s.bytes() {
         match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {

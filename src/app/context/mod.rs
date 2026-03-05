@@ -120,7 +120,7 @@ pub(super) fn prepare_stream_context(
     if let Some(rev) = reverie {
         // ── Reverie path ──
         // Add P-main-conv: the main worker's conversation as a read-only panel
-        let main_conv_content = cp_base::state::format_messages_to_chunk(
+        let main_conv_content = cp_base::state::data::message::format_messages_to_chunk(
             &state
                 .messages
                 .iter()
@@ -205,7 +205,7 @@ pub(crate) use cp_mod_prompt::seed::{ensure_default_agent, get_active_agent_cont
 
 /// Assign a UID to a panel if it doesn't have one
 fn assign_panel_uid(state: &mut State, context_type: &str) {
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == context_type)
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == context_type)
         && ctx.uid.is_none()
     {
         ctx.uid = Some(format!("UID_{}_P", state.global_next_uid));

@@ -5,7 +5,7 @@
 //! The spine module polls the registry and fires notifications when
 //! conditions are met.
 
-use crate::state::State;
+use crate::state::runtime::State;
 
 /// Result of a satisfied watcher condition.
 #[derive(Debug)]

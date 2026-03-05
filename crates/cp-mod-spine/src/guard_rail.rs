@@ -1,5 +1,5 @@
 use cp_base::panels::now_ms;
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 
 use crate::types::SpineState;
 

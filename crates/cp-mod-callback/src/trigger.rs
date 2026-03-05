@@ -7,7 +7,7 @@ use std::path::Path;
 
 use globset::Glob;
 
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 
 use crate::types::{CallbackDefinition, CallbackState};
 

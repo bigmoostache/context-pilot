@@ -53,10 +53,8 @@ pub(crate) fn check_shell_operators(command: &str) -> Result<(), String> {
     let mut in_single = false;
     let mut in_double = false;
     let chars: Vec<char> = command.chars().collect();
-    let len = chars.len();
 
-    for i in 0..len {
-        let c = chars[i];
+    for (i, &c) in chars.iter().enumerate() {
         match c {
             '\'' if !in_double => in_single = !in_single,
             '"' if !in_single => in_double = !in_double,
@@ -64,10 +62,10 @@ pub(crate) fn check_shell_operators(command: &str) -> Result<(), String> {
             '|' | ';' | '`' | '>' | '<' => {
                 return Err(format!("Shell operator '{c}' is not allowed"));
             }
-            '$' if i + 1 < len && chars[i + 1] == '(' => {
+            '$' if chars.get(i.wrapping_add(1)) == Some(&'(') => {
                 return Err("Shell operator '$(' is not allowed".to_string());
             }
-            '&' if i + 1 < len && chars[i + 1] == '&' => {
+            '&' if chars.get(i.wrapping_add(1)) == Some(&'&') => {
                 return Err("Shell operator '&&' is not allowed".to_string());
             }
             '\n' | '\r' => {
@@ -102,12 +100,11 @@ pub(crate) fn validate_git_command(command: &str) -> Result<Vec<String>, String>
 
 /// Classify a git command (given as parsed args after "git") as read-only or mutating.
 pub(crate) fn classify_git(args: &[String]) -> CommandClass {
-    if args.is_empty() {
+    let Some(subcmd) = args.first().map(String::as_str) else {
         return CommandClass::Mutating; // safe default
-    }
+    };
 
-    let subcmd = args[0].as_str();
-    let rest: Vec<&str> = args[1..].iter().map(String::as_str).collect();
+    let rest: Vec<&str> = args.get(1..).unwrap_or_default().iter().map(String::as_str).collect();
 
     match subcmd {
         // Always read-only
@@ -129,16 +126,10 @@ pub(crate) fn classify_git(args: &[String]) -> CommandClass {
                 CommandClass::Mutating
             }
         }
-        "stash" => {
-            if rest.is_empty() {
-                CommandClass::Mutating
-            } else {
-                match rest[0] {
-                    "list" | "show" => CommandClass::ReadOnly,
-                    _ => CommandClass::Mutating,
-                }
-            }
-        }
+        "stash" => match rest.first() {
+            Some(&"list" | &"show") => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
         "tag" => {
             if rest.is_empty() || rest.iter().any(|a| matches!(*a, "-l" | "--list")) {
                 CommandClass::ReadOnly
@@ -146,19 +137,11 @@ pub(crate) fn classify_git(args: &[String]) -> CommandClass {
                 CommandClass::Mutating
             }
         }
-        "remote" => {
-            if rest.is_empty() {
-                CommandClass::ReadOnly
-            } else {
-                match rest[0] {
-                    "show" | "get-url" => CommandClass::ReadOnly,
-                    _ if rest.iter().any(|a| matches!(*a, "-v" | "--verbose")) && rest.len() == 1 => {
-                        CommandClass::ReadOnly
-                    }
-                    _ => CommandClass::Mutating,
-                }
-            }
-        }
+        "remote" => match rest.first() {
+            None | Some(&"show" | &"get-url") => CommandClass::ReadOnly,
+            _ if rest.iter().any(|a| matches!(*a, "-v" | "--verbose")) && rest.len() == 1 => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
         "config" => {
             if rest.iter().any(|a| matches!(*a, "--get" | "--get-all" | "--list" | "-l" | "--get-regexp")) {
                 CommandClass::ReadOnly
@@ -166,36 +149,18 @@ pub(crate) fn classify_git(args: &[String]) -> CommandClass {
                 CommandClass::Mutating
             }
         }
-        "notes" => {
-            if rest.is_empty() {
-                CommandClass::ReadOnly
-            } else {
-                match rest[0] {
-                    "show" | "list" => CommandClass::ReadOnly,
-                    _ => CommandClass::Mutating,
-                }
-            }
-        }
-        "worktree" => {
-            if rest.is_empty() {
-                CommandClass::ReadOnly
-            } else {
-                match rest[0] {
-                    "list" => CommandClass::ReadOnly,
-                    _ => CommandClass::Mutating,
-                }
-            }
-        }
-        "submodule" => {
-            if rest.is_empty() {
-                CommandClass::ReadOnly
-            } else {
-                match rest[0] {
-                    "status" | "summary" => CommandClass::ReadOnly,
-                    _ => CommandClass::Mutating,
-                }
-            }
-        }
+        "notes" => match rest.first() {
+            None | Some(&"show" | &"list") => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+        "worktree" => match rest.first() {
+            None | Some(&"list") => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
+        "submodule" => match rest.first() {
+            None | Some(&"status" | &"summary") => CommandClass::ReadOnly,
+            _ => CommandClass::Mutating,
+        },
 
         // Additional context-dependent commands
         "sparse-checkout" => match rest.first() {

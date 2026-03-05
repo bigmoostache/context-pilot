@@ -3,10 +3,10 @@
 //! Separated from trigger.rs which handles file collection and pattern matching.
 
 // Queue ID test marker — delete me later
-use cp_base::config::constants::STORE_DIR;
+use cp_base::config::constants;
 use cp_base::panels::now_ms;
-use cp_base::state::State;
-use cp_base::watchers::{DeferredPanel, Watcher, WatcherRegistry, WatcherResult};
+use cp_base::state::runtime::State;
+use cp_base::state::watchers::{DeferredPanel, Watcher, WatcherRegistry, WatcherResult};
 
 use cp_mod_console::manager::SessionHandle;
 use cp_mod_console::types::ConsoleState;
@@ -42,7 +42,7 @@ pub fn fire_callback(
     // Use the callback's cwd if set, otherwise project root
     let cwd = def.cwd.clone().or_else(|| Some(project_root.clone()));
 
-    // Build the script path — uses STORE_DIR for scripts dir
+    // Build the script path — uses constants::STORE_DIR for scripts dir
     // For built-in callbacks, use the built_in_command directly instead of a script file.
     let command = if def.built_in {
         let base_cmd = def.built_in_command.as_deref().unwrap_or("echo 'no built_in_command set'");
@@ -54,7 +54,7 @@ pub fn fire_callback(
             cmd = base_cmd,
         )
     } else {
-        let scripts_dir = std::path::PathBuf::from(STORE_DIR).join("scripts");
+        let scripts_dir = std::path::PathBuf::from(constants::STORE_DIR).join("scripts");
         let script_path = scripts_dir.join(format!("{}.sh", def.name));
         let script_path_str = if script_path.is_absolute() {
             script_path.to_string_lossy().to_string()

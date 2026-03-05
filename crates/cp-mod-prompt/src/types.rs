@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use cp_base::state::State;
+use cp_base::state::runtime::State;
 
 /// Discriminator for the three kinds of prompt library entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

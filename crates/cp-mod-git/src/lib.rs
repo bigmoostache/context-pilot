@@ -61,17 +61,18 @@ pub fn refresh_git_status(state: &mut State) {
     {
         for line in String::from_utf8_lossy(&output.stdout).lines() {
             let parts: Vec<&str> = line.split('\t').collect();
-            if parts.len() >= 3 {
-                let additions = parts[0].parse::<i32>().unwrap_or(0);
-                let deletions = parts[1].parse::<i32>().unwrap_or(0);
-                let path = parts[2].to_string();
+            let [add_str, del_str, path_str, ..] = parts.as_slice() else {
+                continue;
+            };
+            let additions = add_str.parse::<i32>().unwrap_or(0);
+            let deletions = del_str.parse::<i32>().unwrap_or(0);
+            let path = (*path_str).to_string();
 
-                // Check if file exists to determine if deleted
-                let change_type =
-                    if std::path::Path::new(&path).exists() { GitChangeType::Modified } else { GitChangeType::Deleted };
+            // Check if file exists to determine if deleted
+            let change_type =
+                if std::path::Path::new(&path).exists() { GitChangeType::Modified } else { GitChangeType::Deleted };
 
-                file_changes.push(GitFileChange { path, additions, deletions, change_type });
-            }
+            file_changes.push(GitFileChange { path, additions, deletions, change_type });
         }
     }
 
@@ -81,18 +82,19 @@ pub fn refresh_git_status(state: &mut State) {
     {
         for line in String::from_utf8_lossy(&output.stdout).lines() {
             let parts: Vec<&str> = line.split('\t').collect();
-            if parts.len() >= 3 {
-                let additions = parts[0].parse::<i32>().unwrap_or(0);
-                let deletions = parts[1].parse::<i32>().unwrap_or(0);
-                let path = parts[2].to_string();
+            let [add_str, del_str, path_str, ..] = parts.as_slice() else {
+                continue;
+            };
+            let additions = add_str.parse::<i32>().unwrap_or(0);
+            let deletions = del_str.parse::<i32>().unwrap_or(0);
+            let path = (*path_str).to_string();
 
-                // Skip if already in the list
-                if file_changes.iter().any(|f| f.path == path) {
-                    continue;
-                }
-
-                file_changes.push(GitFileChange { path, additions, deletions, change_type: GitChangeType::Added });
+            // Skip if already in the list
+            if file_changes.iter().any(|f| f.path == path) {
+                continue;
             }
+
+            file_changes.push(GitFileChange { path, additions, deletions, change_type: GitChangeType::Added });
         }
     }
 
@@ -131,7 +133,8 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::{ContextType, State};
+use cp_base::state::context::ContextType;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -218,8 +221,8 @@ impl Module for GitModule {
         vec![("git_execute", visualize_git_output)]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::ContextTypeMeta> {
-        vec![cp_base::state::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
+        vec![cp_base::state::context::ContextTypeMeta {
             context_type: "git_result",
             icon_id: "git",
             is_fixed: false,
@@ -231,7 +234,7 @@ impl Module for GitModule {
         }]
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
         (ctx.context_type.as_str() == ContextType::GIT_RESULT)
             .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_string())
     }
@@ -254,14 +257,14 @@ impl Module for GitModule {
             let mut total_add: i32 = 0;
             let mut total_del: i32 = 0;
             for file in &gs.file_changes {
-                total_add += file.additions;
-                total_del += file.deletions;
-                let net = file.additions - file.deletions;
+                total_add = total_add.saturating_add(file.additions);
+                total_del = total_del.saturating_add(file.deletions);
+                let net = file.additions.saturating_sub(file.deletions);
                 let net_str = if net >= 0 { format!("+{net}") } else { format!("{net}") };
                 let _r =
                     writeln!(output, "| {} | +{} | -{} | {} |", file.path, file.additions, file.deletions, net_str);
             }
-            let total_net = total_add - total_del;
+            let total_net = total_add.saturating_sub(total_del);
             let total_net_str = if total_net >= 0 { format!("+{total_net}") } else { format!("{total_net}") };
             let _r = writeln!(output, "| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |");
         }
@@ -288,7 +291,7 @@ impl Module for GitModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        ctx: &cp_base::state::ContextElement,
+        ctx: &cp_base::state::context::ContextElement,
         changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

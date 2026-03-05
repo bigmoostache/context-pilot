@@ -1,11 +1,12 @@
 use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
 use cp_base::panels::scroll_key_action;
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, paginate_content, update_if_changed};
-use cp_base::state::Action;
-use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::runtime::State;
 
 pub(crate) const BRAVE_PANEL_TYPE: &str = "brave_result";
 
@@ -14,13 +15,17 @@ const META_CONTENT: &str = "result_content";
 /// Create a dynamic panel with the given title and content.
 ///
 /// Returns the panel ID string (e.g., "P15").
-pub fn create_panel(state: &mut State, title: &str, content: &str) -> String {
+pub fn create(state: &mut State, title: &str, content: &str) -> String {
     let panel_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid += 1;
+    state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-    let mut elem =
-        cp_base::state::make_default_context_element(&panel_id, ContextType::new(BRAVE_PANEL_TYPE), title, false);
+    let mut elem = cp_base::state::context::make_default_context_element(
+        &panel_id,
+        ContextType::new(BRAVE_PANEL_TYPE),
+        title,
+        false,
+    );
     elem.uid = Some(uid);
     elem.cached_content = Some(content.to_string());
     elem.token_count = estimate_tokens(content);
@@ -35,7 +40,7 @@ pub fn create_panel(state: &mut State, title: &str, content: &str) -> String {
 
 /// Panel renderer for Brave search result panels.
 #[derive(Debug, Clone, Copy)]
-pub struct BraveResultPanel;
+pub struct Results;
 
 /// Cache request for restoring content from metadata after reload
 struct BraveRestoreRequest {
@@ -43,7 +48,7 @@ struct BraveRestoreRequest {
     content: String,
 }
 
-impl Panel for BraveResultPanel {
+impl Panel for Results {
     fn needs_cache(&self) -> bool {
         true
     }
@@ -107,6 +112,18 @@ impl Panel for BraveResultPanel {
             })
             .collect()
     }
+
+    fn refresh(&self, _state: &mut State) {}
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let ctx =

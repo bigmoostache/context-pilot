@@ -18,7 +18,7 @@ use crate::state::{ContextElement, ContextType, State, StreamPhase};
 use cp_mod_prompt::PromptState;
 
 // Re-export Action/ActionResult from cp-base (shared with module crates)
-pub(crate) use cp_base::state::{Action, ActionResult};
+pub(crate) use cp_base::state::actions::{Action, ActionResult};
 
 pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
     // Reset scroll acceleration on non-scroll actions
@@ -43,7 +43,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     // Populate entries for root directory
                     let filter = cp_mod_tree::TreeState::get(state).filter.clone();
                     let entries = cp_mod_tree::list_dir_entries(&filter, "", "");
-                    if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
+                    if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() {
                         ac.activate(anchor_pos);
                         ac.set_matches(entries);
                     }

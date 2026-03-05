@@ -1,6 +1,7 @@
 use crate::storage;
 use crate::types::{PromptItem, PromptState, PromptType};
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -105,7 +106,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid += 1;
 
-    let mut elem = cp_base::state::make_default_context_element(
+    let mut elem = cp_base::state::context::make_default_context_element(
         &panel_id,
         ContextType::new(ContextType::SKILL),
         &skill.name,

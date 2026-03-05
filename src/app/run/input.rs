@@ -67,7 +67,7 @@ impl App {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
 
-        let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else { return };
+        let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else { return };
 
         match key.code {
             KeyCode::Esc => {
@@ -107,14 +107,14 @@ impl App {
 
                     // Refresh entries for the new directory
                     let filter = cp_mod_tree::TreeState::get(&self.state).filter.clone();
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
                     ac.set_query(new_query);
                     let dir = ac.current_dir().to_string();
                     let prefix = ac.current_prefix().to_string();
                     let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
                     ac.set_matches(entries);
@@ -160,13 +160,13 @@ impl App {
 
                     // Refresh matches
                     let filter = cp_mod_tree::TreeState::get(&self.state).filter.clone();
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
                     let dir = ac.current_dir().to_string();
                     let prefix = ac.current_prefix().to_string();
                     let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
                     ac.set_matches(entries);
@@ -197,13 +197,13 @@ impl App {
 
                     // Refresh matches with new query
                     let filter = cp_mod_tree::TreeState::get(&self.state).filter.clone();
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
                     let dir = ac.current_dir().to_string();
                     let prefix = ac.current_prefix().to_string();
                     let entries = cp_mod_tree::list_dir_entries(&filter, &dir, &prefix);
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
+                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
                     ac.set_matches(entries);
@@ -238,7 +238,7 @@ impl App {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
 
-        let Some(form) = self.state.get_ext_mut::<cp_base::ui::PendingForm>() else { return };
+        let Some(form) = self.state.get_ext_mut::<cp_base::ui::question_form::PendingForm>() else { return };
 
         // Check if currently typing in "Other" field
         let typing_other = form.answers[form.current_question].typing_other;

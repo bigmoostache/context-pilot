@@ -2,15 +2,16 @@ use std::process::Command;
 
 use super::GH_CMD_TIMEOUT_SECS;
 use super::classify::CommandClass;
-use cp_base::config::constants::MAX_RESULT_CONTENT_BYTES;
+use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::mark_panels_dirty;
-use cp_base::state::{ContextType, State, make_default_context_element};
+use cp_base::state::context::{ContextType, make_default_context_element};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::GithubState;
 
-use super::classify::{classify_gh, validate_gh_command};
+use super::classify::{classify, validate_gh_command};
 
 /// Redact a GitHub token from command output if accidentally leaked.
 fn redact_token(output: &str, token: &str) -> String {
@@ -46,7 +47,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
     };
 
     // Classify
-    let class = classify_gh(&args);
+    let class = classify(&args);
 
     match class {
         CommandClass::ReadOnly => {
@@ -56,16 +57,16 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                     && c.get_meta_str("result_command") == Some(command)
             });
 
-            if let Some(idx) = existing_idx {
+            if let Some(ctx) = existing_idx.and_then(|idx| state.context.get_mut(idx)) {
                 // Reuse existing panel — mark deprecated to trigger re-fetch
-                state.context[idx].cache_deprecated = true;
-                let panel_id = state.context[idx].id.clone();
+                ctx.cache_deprecated = true;
+                let panel_id = ctx.id.clone();
                 ToolResult::new(tool.id.clone(), format!("Panel updated: {panel_id}"), false)
             } else {
                 // Create new GithubResult panel
                 let panel_id = state.next_available_context_id();
                 let uid = format!("UID_{}_P", state.global_next_uid);
-                state.global_next_uid += 1;
+                state.global_next_uid = state.global_next_uid.saturating_add(1);
 
                 let mut elem = make_default_context_element(
                     &panel_id,
@@ -119,7 +120,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                     };
                     let is_error = !output.status.success();
                     let combined = redact_token(&combined, &token);
-                    let combined = truncate_output(&combined, MAX_RESULT_CONTENT_BYTES);
+                    let combined = truncate_output(&combined, constants::MAX_RESULT_CONTENT_BYTES);
                     ToolResult::new(
                         tool.id.clone(),
                         if combined.is_empty() {

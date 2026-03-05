@@ -58,7 +58,7 @@ impl App {
             return;
         }
         // Don't process tools while a question form is pending user response
-        if self.state.get_ext::<cp_base::ui::PendingForm>().is_some() {
+        if self.state.get_ext::<cp_base::ui::question_form::PendingForm>().is_some() {
             return;
         }
         let _guard = crate::profile!("app::tool_exec");
@@ -386,7 +386,7 @@ impl App {
         }
 
         // Check if form is resolved
-        let resolved = self.state.get_ext::<cp_base::ui::PendingForm>().is_some_and(|f| f.resolved);
+        let resolved = self.state.get_ext::<cp_base::ui::question_form::PendingForm>().is_some_and(|f| f.resolved);
 
         if !resolved {
             return;
@@ -396,8 +396,8 @@ impl App {
         let Some(form) = self
             .state
             .module_data
-            .remove(&std::any::TypeId::of::<cp_base::ui::PendingForm>())
-            .and_then(|v| v.downcast::<cp_base::ui::PendingForm>().ok())
+            .remove(&std::any::TypeId::of::<cp_base::ui::question_form::PendingForm>())
+            .and_then(|v| v.downcast::<cp_base::ui::question_form::PendingForm>().ok())
         else {
             return;
         };

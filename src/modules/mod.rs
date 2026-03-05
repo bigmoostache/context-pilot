@@ -86,7 +86,7 @@ pub(crate) fn make_default_context_element(
     name: &str,
     cache_deprecated: bool,
 ) -> crate::state::ContextElement {
-    cp_base::state::make_default_context_element(id, context_type, name, cache_deprecated)
+    cp_base::state::context::make_default_context_element(id, context_type, name, cache_deprecated)
 }
 
 /// Returns all registered modules.
@@ -239,7 +239,7 @@ pub(crate) fn module_toggle_tool_definition() -> ToolDefinition {
 
 /// Execute the `module_toggle` tool.
 fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let Some(changes) = tool.input.get("changes").and_then(|v| v.as_array()) else {
+    let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) else {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Missing 'changes' parameter (expected array)".to_string(),
@@ -255,12 +255,12 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let known_ids: HashSet<&str> = all_mods.iter().map(|m| m.id()).collect();
 
     for (i, change) in changes.iter().enumerate() {
-        let Some(module_id) = change.get("module").and_then(|v| v.as_str()) else {
+        let Some(module_id) = change.get("module").and_then(serde_json::Value::as_str) else {
             failures.push(format!("Change {}: missing 'module' field", i + 1));
             continue;
         };
 
-        let Some(action) = change.get("action").and_then(|v| v.as_str()) else {
+        let Some(action) = change.get("action").and_then(serde_json::Value::as_str) else {
             failures.push(format!("Change {}: missing 'action' field", i + 1));
             continue;
         };

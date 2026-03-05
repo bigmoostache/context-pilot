@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use globset::Glob;
 
-use cp_base::config::constants::STORE_DIR;
-use cp_base::state::State;
+use cp_base::config::constants;
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{CallbackDefinition, CallbackState};
@@ -80,7 +80,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     cs.next_id += 1;
 
     // Write script file to .context-pilot/scripts/{name}.sh
-    let scripts_dir = PathBuf::from(STORE_DIR).join("scripts");
+    let scripts_dir = PathBuf::from(constants::STORE_DIR).join("scripts");
     if let Err(e) = fs::create_dir_all(&scripts_dir) {
         return ToolResult::new(tool.id.clone(), format!("Failed to create scripts directory: {e}"), true);
     }
@@ -237,7 +237,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Handle script updates
-    let scripts_dir = PathBuf::from(STORE_DIR).join("scripts");
+    let scripts_dir = PathBuf::from(constants::STORE_DIR).join("scripts");
     let script_path = scripts_dir.join(format!("{vessel_name}.sh"));
 
     if has_full_script {
@@ -331,7 +331,7 @@ pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Delete the script file
-    let script_path = PathBuf::from(STORE_DIR).join("scripts").join(format!("{}.sh", sunken_def.name));
+    let script_path = PathBuf::from(constants::STORE_DIR).join("scripts").join(format!("{}.sh", sunken_def.name));
     let script_deleted = if script_path.exists() {
         match fs::remove_file(&script_path) {
             Ok(()) => true,

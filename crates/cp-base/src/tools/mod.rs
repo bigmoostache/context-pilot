@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 // Re-export so downstream `use cp_base::tools::PreFlightResult` keeps working.
-mod pre_flight;
-pub use pre_flight::PreFlightResult;
+/// Pre-flight validation for tool calls (parameter checks before execution).
+pub mod pre_flight;
 
 // =============================================================================
 // YAML Tool Text — deserialized from yamls/tools/*.yaml
@@ -118,15 +118,15 @@ impl ParamType {
                 let mut required = Vec::new();
                 for param in params {
                     let mut schema = param.param_type.to_json_schema();
-                    if let Some(desc) = &param.description {
-                        if let Some(obj) = schema.as_object_mut() {
-                            drop(obj.insert("description".to_string(), json!(desc)));
-                        }
+                    if let Some(desc) = &param.description
+                        && let Some(obj) = schema.as_object_mut()
+                    {
+                        drop(obj.insert("description".to_string(), json!(desc)));
                     }
-                    if let Some(enum_vals) = &param.enum_values {
-                        if let Some(obj) = schema.as_object_mut() {
-                            drop(obj.insert("enum".to_string(), json!(enum_vals)));
-                        }
+                    if let Some(enum_vals) = &param.enum_values
+                        && let Some(obj) = schema.as_object_mut()
+                    {
+                        drop(obj.insert("enum".to_string(), json!(enum_vals)));
                     }
                     drop(properties.insert(param.name.clone(), schema));
                     if param.required {
@@ -262,15 +262,15 @@ impl ToolDefinition {
 
         for param in &self.params {
             let mut schema = param.param_type.to_json_schema();
-            if let Some(desc) = &param.description {
-                if let Some(obj) = schema.as_object_mut() {
-                    drop(obj.insert("description".to_string(), json!(desc)));
-                }
+            if let Some(desc) = &param.description
+                && let Some(obj) = schema.as_object_mut()
+            {
+                drop(obj.insert("description".to_string(), json!(desc)));
             }
-            if let Some(enum_vals) = &param.enum_values {
-                if let Some(obj) = schema.as_object_mut() {
-                    drop(obj.insert("enum".to_string(), json!(enum_vals)));
-                }
+            if let Some(enum_vals) = &param.enum_values
+                && let Some(obj) = schema.as_object_mut()
+            {
+                drop(obj.insert("enum".to_string(), json!(enum_vals)));
             }
             drop(properties.insert(param.name.clone(), schema));
             if param.required {

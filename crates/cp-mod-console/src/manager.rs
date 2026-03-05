@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use cp_base::config::constants::STORE_DIR;
+use cp_base::config::constants;
 use cp_base::panels::now_ms;
 
 use crate::CONSOLE_DIR;
@@ -19,12 +19,12 @@ use cp_base::cast::SafeCast as _;
 
 /// Socket path for the console server.
 fn server_socket_path() -> PathBuf {
-    PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join("server.sock")
+    PathBuf::from(constants::STORE_DIR).join(CONSOLE_DIR).join("server.sock")
 }
 
 /// PID file for the console server.
 fn server_pid_path() -> PathBuf {
-    PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join("server.pid")
+    PathBuf::from(constants::STORE_DIR).join(CONSOLE_DIR).join("server.pid")
 }
 
 /// Path to the server binary. Checks multiple locations:
@@ -62,7 +62,7 @@ fn server_binary_path() -> PathBuf {
 /// Build the log file path for a given session key (always absolute).
 #[must_use]
 pub fn log_file_path(key: &str) -> PathBuf {
-    let base = PathBuf::from(STORE_DIR).join(CONSOLE_DIR).join(format!("{key}.log"));
+    let base = PathBuf::from(constants::STORE_DIR).join(CONSOLE_DIR).join(format!("{key}.log"));
     if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
 }
 
@@ -113,7 +113,7 @@ pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Valu
 /// server binary fails to spawn.
 pub fn find_or_create_server() -> Result<(), String> {
     // Ensure console directory exists
-    let console_dir = PathBuf::from(STORE_DIR).join(CONSOLE_DIR);
+    let console_dir = PathBuf::from(constants::STORE_DIR).join(CONSOLE_DIR);
     fs::create_dir_all(&console_dir).map_err(|e| format!("Failed to create console dir: {e}"))?;
 
     // Try connecting to existing server
@@ -238,7 +238,9 @@ impl SessionHandle {
             "log_path": log_path_str,
         });
         if let Some(ref dir) = cwd {
-            req["cwd"] = serde_json::Value::String(dir.clone());
+            if let Some(obj) = req.as_object_mut() {
+                let _prev = obj.insert("cwd".to_string(), serde_json::Value::String(dir.clone()));
+            }
         }
 
         let resp = if let Ok(r) = server_request(&req) {

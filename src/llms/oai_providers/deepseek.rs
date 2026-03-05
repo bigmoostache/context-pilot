@@ -93,7 +93,9 @@ impl LlmClient for DeepSeekClient {
         let pending_tool_ids: Vec<String> = request
             .tool_results
             .as_ref()
-            .map(|results| results.iter().map(|r| r.tool_use_id.clone()).collect())
+            .map(|results: &Vec<crate::infra::tools::ToolResult>| {
+                results.iter().map(|r| r.tool_use_id.clone()).collect()
+            })
             .unwrap_or_default();
 
         // Build messages using shared builder

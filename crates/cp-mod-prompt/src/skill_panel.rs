@@ -1,9 +1,10 @@
 use ratatui::prelude::{Line, Span, Style};
 
 use crate::types::PromptState;
-use cp_base::config::theme;
+use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 
 pub(crate) struct SkillPanel;
 

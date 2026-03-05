@@ -1,5 +1,6 @@
 use cp_base::panels::{mark_panels_dirty, now_ms};
-use cp_base::state::{ContextType, State, estimate_tokens};
+use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
 use cp_mod_memory::{MemoryImportance, MemoryItem, MemoryState};

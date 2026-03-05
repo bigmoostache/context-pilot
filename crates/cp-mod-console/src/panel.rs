@@ -1,9 +1,10 @@
 use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::{chars, theme};
+use cp_base::config::accessors::{chars, theme};
 use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
-use cp_base::state::{ContextElement, ContextType, State, compute_total_pages, estimate_tokens};
+use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::runtime::State;
 
 use crate::types::ConsoleState;
 
@@ -89,14 +90,18 @@ impl Panel for ConsolePanel {
         // We must snap `cut` to a valid UTF-8 char boundary before slicing,
         // since console output may contain multi-byte characters (e.g. '²').
         let truncated = if buffer_content.len() > MAX_CONTEXT_CHARS {
-            let mut cut = buffer_content.len() - MAX_CONTEXT_CHARS;
+            let mut cut = buffer_content.len().saturating_sub(MAX_CONTEXT_CHARS);
             while cut < buffer_content.len() && !buffer_content.is_char_boundary(cut) {
-                cut += 1;
+                cut = cut.saturating_add(1);
             }
-            let start = buffer_content.get(cut..).unwrap_or("").find('\n').map_or(cut, |p| cut + p + 1);
+            let start = buffer_content
+                .get(cut..)
+                .unwrap_or("")
+                .find('\n')
+                .map_or(cut, |p| cut.saturating_add(p).saturating_add(1));
             format!(
                 "[...truncated, showing last {}B of {}B...]\n{}",
-                buffer_content.len() - start,
+                buffer_content.len().saturating_sub(start),
                 buffer_content.len(),
                 buffer_content.get(start..).unwrap_or("")
             )
