@@ -1,0 +1,96 @@
+# Curated list of allowed #[expect(...)] and #[allow(...)] annotations.
+#
+# Every occurrence in the codebase MUST have an entry here, or the
+# structure-check will fire an ERROR. This keeps lint suppression
+# intentional, visible, and continuously reviewed.
+#
+# Fields:
+#   path          — file path relative to repo root
+#   match         — exact string that appears on the annotation line(s)
+#   reason        — why this exception is currently accepted
+#   strategy      — ideas to eventually eliminate it
+#
+# To add a new exception: append an entry, run the structure-check,
+# and ensure it passes. To remove one: delete the entry AND the
+# annotation from the source code.
+
+exceptions:
+  # ── cast.rs: SafeCast macro infrastructure ──────────────────────────
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: '#![expect('
+    reason: >
+      Module-level expect for clippy::allow_attributes. The SafeCast
+      macros expand #[allow(...)] for different types — some lint triggers
+      are type-dependent, so #[expect] (which requires the lint to fire)
+      would produce unfulfilled-expectation errors on certain expansions.
+    strategy: >
+      Wait for Rust RFC to support conditional #[expect] per type
+      parameter, or replace macros with a build.rs code generator that
+      emits per-type impls with precise annotations.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: 'trivial_numeric_casts, trivial_casts, clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_precision_loss, reason = "macro-generated identity casts'
+    reason: >
+      Unsigned SafeCast macro impl. Raw `as` casts are the whole point of
+      this module — it centralizes all numeric casts behind saturating
+      wrappers so the rest of the codebase never uses raw `as`.
+    strategy: >
+      Replace macros with a proc-macro or build.rs that generates
+      per-type impls, each with only the #[allow] lints that actually
+      trigger for that specific source/target pair.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: 'reason = "macro-generated identity casts are unavoidable'
+    reason: >
+      Signed SafeCast macro impl. Same rationale as the unsigned variant —
+      macro-generated identity casts are unavoidable with the current
+      approach.
+    strategy: >
+      Same as above — proc-macro or build.rs per-type generation.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: 'reason = "SafeCast implementations necessarily use raw as casts"'
+    reason: >
+      Concrete f64 SafeCast impl. Cannot use #[expect] because not every
+      lint fires on every method (e.g. to_f64 is identity, no cast_precision_loss).
+    strategy: >
+      Split into individual method-level annotations so only the lints
+      that actually fire on each method are suppressed. Tedious but
+      precise.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: 'impl SafeCast for f32'
+    reason: >
+      Concrete f32 SafeCast impl. Same rationale as the f64 block —
+      not every lint fires on every method.
+    strategy: >
+      Same as f64 — per-method annotations for precision.
+
+  # ── config/mod.rs: invariant_panic ──────────────────────────────────
+
+  - path: "crates/cp-base/src/config/mod.rs"
+    match: '#[expect(clippy::panic'
+    reason: >
+      invariant_panic() is the centralized panic point for build-time and
+      config invariant violations (YAML not found, theme not loaded, module
+      state not initialized). These are unrecoverable programmer errors,
+      not runtime failures.
+    strategy: >
+      Consider compile-time validation (const fn / build.rs assertions)
+      for YAML and theme invariants. For module state, explore a type-state
+      pattern where uninitialized state is unrepresentable.
+
+  # ── console-server/main.rs: setsid() ───────────────────────────────
+
+  - path: "crates/cp-console-server/src/main.rs"
+    match: '#[expect(unsafe_code'
+    reason: >
+      Server calls setsid() at startup to become a session leader
+      (detach from TUI's terminal group). setsid() is POSIX
+      async-signal-safe with no preconditions — the unsafe block is
+      minimal and well-documented with a SAFETY comment.
+    strategy: >
+      Wrap in a safe helper crate (e.g. nix::unistd::setsid()) which
+      encapsulates the unsafe. The nix crate provides safe Rust bindings
+      for POSIX — adding it would eliminate the raw libc call.

@@ -27,5 +27,6 @@ done < <(find . -mindepth 1 -type d \
   -not -path './brilliant-cv/*' \
   -not -path './graceful-genetics/*' \
   -not -path './test-typst/*' \
+  -not -path './.github/workflows' \
   -not -path './yamls/tools')
 exit $exit_code
