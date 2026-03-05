@@ -270,20 +270,16 @@ impl World for ContextPilotWorld {
         self.fonts.get(index).cloned()
     }
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        use chrono::{Datelike as _, Local, Timelike as _, Utc};
+        use chrono::{Datelike as _, FixedOffset, Local, Timelike as _, Utc};
         let now = Local::now();
-        let naive = offset.map_or_else(
-            || now.naive_local(),
-            |hours| {
-                let utc = Utc::now();
-                #[expect(
-                    clippy::arithmetic_side_effects,
-                    reason = "chrono offset arithmetic cannot overflow for valid timezone offsets"
-                )]
-                let shifted = utc + chrono::Duration::hours(hours);
-                shifted.naive_utc()
-            },
-        );
+        let naive = if let Some(hours) = offset {
+            let utc = Utc::now();
+            let secs = hours.checked_mul(3600)?;
+            let tz = FixedOffset::east_opt(secs.to_i32())?;
+            utc.with_timezone(&tz).naive_local()
+        } else {
+            now.naive_local()
+        };
         Datetime::from_ymd_hms(
             naive.year(),
             naive.month().to_u8(),

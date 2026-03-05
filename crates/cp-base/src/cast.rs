@@ -1,8 +1,3 @@
-#![expect(
-    clippy::allow_attributes,
-    reason = "macro-generated #[allow] can't use #[expect] — some lint triggers depend on which type the macro expands for"
-)]
-
 //! Safe numeric casting helpers.
 //!
 //! Replace raw `as` casts that trigger `clippy::cast_possible_truncation`
@@ -33,143 +28,229 @@ pub trait Safe {
     fn to_f64(self) -> f64;
 }
 
-/// Implement `Safe` for an unsigned integer type using saturating semantics.
-macro_rules! impl_safe_cast_unsigned {
-    ($t:ty) => {
-        #[allow(trivial_numeric_casts, trivial_casts, clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_precision_loss, reason = "macro-generated identity casts (e.g. u32 as u32) are unavoidable — expect() would fail on non-identity expansions")]
-        impl Safe for $t {
-            #[inline]
-            fn to_u8(self) -> u8 {
-                if self > u8::MAX as $t { u8::MAX } else { self as u8 }
-            }
-            #[inline]
-            fn to_u16(self) -> u16 {
-                if self > u16::MAX as $t { u16::MAX } else { self as u16 }
-            }
-            #[inline]
-            fn to_u32(self) -> u32 {
-                if self > u32::MAX as $t { u32::MAX } else { self as u32 }
-            }
-            #[inline]
-            fn to_u64(self) -> u64 {
-                if self > u64::MAX as $t { u64::MAX } else { self as u64 }
-            }
-            #[inline]
-            fn to_usize(self) -> usize {
-                self as usize
-            }
-            #[inline]
-            fn to_i32(self) -> i32 {
-                if self > i32::MAX as $t { i32::MAX } else { self as i32 }
-            }
-            #[inline]
-            fn to_i64(self) -> i64 {
-                if self > i64::MAX as $t { i64::MAX } else { self as i64 }
-            }
-            #[inline]
-            fn to_f32(self) -> f32 {
-                self as f32
-            }
-            #[inline]
-            fn to_f64(self) -> f64 {
-                self as f64
-            }
+// ── Integer helpers ──────────────────────────────────────────────────
+
+/// Common body for unsigned integer → integer conversions via `TryInto`.
+macro_rules! unsigned_int_methods {
+    () => {
+        #[inline]
+        fn to_u8(self) -> u8 {
+            self.try_into().unwrap_or(u8::MAX)
+        }
+        #[inline]
+        fn to_u16(self) -> u16 {
+            self.try_into().unwrap_or(u16::MAX)
+        }
+        #[inline]
+        fn to_u32(self) -> u32 {
+            self.try_into().unwrap_or(u32::MAX)
+        }
+        #[inline]
+        fn to_u64(self) -> u64 {
+            self.try_into().unwrap_or(u64::MAX)
+        }
+        #[inline]
+        fn to_usize(self) -> usize {
+            self.try_into().unwrap_or(usize::MAX)
+        }
+        #[inline]
+        fn to_i32(self) -> i32 {
+            self.try_into().unwrap_or(i32::MAX)
+        }
+        #[inline]
+        fn to_i64(self) -> i64 {
+            self.try_into().unwrap_or(i64::MAX)
         }
     };
 }
 
-/// Implement `Safe` for a signed integer type using saturating/clamping semantics.
-macro_rules! impl_safe_cast_signed {
-    ($t:ty) => {
-        #[allow(
-            trivial_numeric_casts,
-            trivial_casts,
-            clippy::cast_lossless,
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            clippy::cast_possible_wrap,
-            clippy::cast_precision_loss,
-            reason = "macro-generated identity casts are unavoidable — expect() would fail on non-identity expansions"
-        )]
-        impl Safe for $t {
-            #[inline]
-            fn to_u8(self) -> u8 {
-                if self < 0 {
-                    0
-                } else if self > u8::MAX as $t {
-                    u8::MAX
-                } else {
-                    self as u8
-                }
-            }
-            #[inline]
-            fn to_u16(self) -> u16 {
-                if self < 0 {
-                    0
-                } else if self > u16::MAX as $t {
-                    u16::MAX
-                } else {
-                    self as u16
-                }
-            }
-            #[inline]
-            fn to_u32(self) -> u32 {
-                if self < 0 {
-                    0
-                } else if self > u32::MAX as $t {
-                    u32::MAX
-                } else {
-                    self as u32
-                }
-            }
-            #[inline]
-            fn to_u64(self) -> u64 {
-                if self < 0 { 0 } else { self as u64 }
-            }
-            #[inline]
-            fn to_usize(self) -> usize {
-                if self < 0 { 0 } else { self as usize }
-            }
-            #[inline]
-            fn to_i32(self) -> i32 {
-                if self > i32::MAX as $t {
-                    i32::MAX
-                } else if self < i32::MIN as $t {
-                    i32::MIN
-                } else {
-                    self as i32
-                }
-            }
-            #[inline]
-            fn to_i64(self) -> i64 {
-                self as i64
-            }
-            #[inline]
-            fn to_f32(self) -> f32 {
-                self as f32
-            }
-            #[inline]
-            fn to_f64(self) -> f64 {
-                self as f64
-            }
+/// Common body for signed integer → integer conversions via `TryInto`.
+macro_rules! signed_int_methods {
+    () => {
+        #[inline]
+        fn to_u8(self) -> u8 {
+            self.try_into().unwrap_or(0)
+        }
+        #[inline]
+        fn to_u16(self) -> u16 {
+            self.try_into().unwrap_or(0)
+        }
+        #[inline]
+        fn to_u32(self) -> u32 {
+            self.try_into().unwrap_or(0)
+        }
+        #[inline]
+        fn to_u64(self) -> u64 {
+            self.try_into().unwrap_or(0)
+        }
+        #[inline]
+        fn to_usize(self) -> usize {
+            self.try_into().unwrap_or(0)
+        }
+        #[inline]
+        fn to_i32(self) -> i32 {
+            self.try_into().unwrap_or(if self < 0 { i32::MIN } else { i32::MAX })
+        }
+        #[inline]
+        fn to_i64(self) -> i64 {
+            self.try_into().unwrap_or(if self < 0 { i64::MIN } else { i64::MAX })
         }
     };
 }
 
-impl_safe_cast_unsigned!(u16);
-impl_safe_cast_unsigned!(u32);
-impl_safe_cast_unsigned!(u64);
-impl_safe_cast_unsigned!(u128);
-impl_safe_cast_unsigned!(usize);
+// ── u16: lossless to both f32 and f64 ───────────────────────────────
 
-impl_safe_cast_signed!(i32);
-impl_safe_cast_signed!(i64);
-impl_safe_cast_signed!(isize);
+impl Safe for u16 {
+    unsigned_int_methods!();
+    #[inline]
+    fn to_f32(self) -> f32 {
+        f32::from(self)
+    }
+    #[inline]
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+}
+
+// ── u32: lossless to f64, lossy to f32 ──────────────────────────────
+
+impl Safe for u32 {
+    unsigned_int_methods!();
+    #[inline]
+    #[expect(clippy::cast_precision_loss, reason = "u32→f32: 24-bit mantissa cannot represent all 32-bit values")]
+    fn to_f32(self) -> f32 {
+        self as f32
+    }
+    #[inline]
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+}
+
+// ── u64: lossy to both f32 and f64 ──────────────────────────────────
+
+impl Safe for u64 {
+    unsigned_int_methods!();
+    #[inline]
+    #[expect(clippy::cast_precision_loss, reason = "u64→f32: 24-bit mantissa cannot represent all 64-bit values")]
+    fn to_f32(self) -> f32 {
+        self as f32
+    }
+    #[inline]
+    #[expect(clippy::cast_precision_loss, reason = "u64→f64: 53-bit mantissa cannot represent all 64-bit values")]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+}
+
+// ── u128: lossy to both f32 and f64 ─────────────────────────────────
+
+impl Safe for u128 {
+    unsigned_int_methods!();
+    #[inline]
+    #[expect(clippy::cast_precision_loss, reason = "u128→f32: 24-bit mantissa cannot represent all 128-bit values")]
+    fn to_f32(self) -> f32 {
+        self as f32
+    }
+    #[inline]
+    #[expect(clippy::cast_precision_loss, reason = "u128→f64: 53-bit mantissa cannot represent all 128-bit values")]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+}
+
+// ── usize: lossy to both f32 and f64 ────────────────────────────────
+
+impl Safe for usize {
+    unsigned_int_methods!();
+    #[inline]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "usize→f32: 24-bit mantissa cannot represent all pointer-width values"
+    )]
+    fn to_f32(self) -> f32 {
+        self as f32
+    }
+    #[inline]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "usize→f64: 53-bit mantissa cannot represent all pointer-width values"
+    )]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+}
+
+// ── i32: lossless to f64, lossy to f32 ──────────────────────────────
+
+impl Safe for i32 {
+    signed_int_methods!();
+    #[inline]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "i32→f32: 24-bit mantissa cannot represent all 32-bit signed values"
+    )]
+    fn to_f32(self) -> f32 {
+        self as f32
+    }
+    #[inline]
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+}
+
+// ── i64: lossy to both f32 and f64 ──────────────────────────────────
+
+impl Safe for i64 {
+    signed_int_methods!();
+    #[inline]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "i64→f32: 24-bit mantissa cannot represent all 64-bit signed values"
+    )]
+    fn to_f32(self) -> f32 {
+        self as f32
+    }
+    #[inline]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "i64→f64: 53-bit mantissa cannot represent all 64-bit signed values"
+    )]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+}
+
+// ── isize: lossy to both f32 and f64 ────────────────────────────────
+
+impl Safe for isize {
+    signed_int_methods!();
+    #[inline]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "isize→f32: 24-bit mantissa cannot represent all pointer-width signed values"
+    )]
+    fn to_f32(self) -> f32 {
+        self as f32
+    }
+    #[inline]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "isize→f64: 53-bit mantissa cannot represent all pointer-width signed values"
+    )]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+}
+
+// ── Float → integer ──────────────────────────────────────────────────
+// No TryFrom path in std — raw `as` with bounds checks is the only
+// option. These be the last holdouts where `as` cannot be avoided.
 
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    reason = "f64 Safe impl: saturating casts necessarily use raw `as`"
+    reason = "f64 Safe impl: saturating float→int casts necessarily use raw `as`"
 )]
 impl Safe for f64 {
     #[inline]
@@ -231,7 +312,7 @@ impl Safe for f64 {
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    reason = "f32 Safe impl: saturating casts necessarily use raw `as`"
+    reason = "f32 Safe impl: saturating float→int casts necessarily use raw `as`"
 )]
 impl Safe for f32 {
     #[inline]

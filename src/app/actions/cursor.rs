@@ -189,7 +189,6 @@ pub(super) fn handle_cursor_home(state: &mut State) {
 /// Handle `CursorEnd` — move cursor to end of current line.
 pub(super) fn handle_cursor_end(state: &mut State) {
     let after_cursor = state.input.get(state.input_cursor..).unwrap_or("");
-    state.input_cursor =
-        state.input_cursor.saturating_add(after_cursor.find('\n').unwrap_or(after_cursor.len()));
+    state.input_cursor = state.input_cursor.saturating_add(after_cursor.find('\n').unwrap_or(after_cursor.len()));
     state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
 }

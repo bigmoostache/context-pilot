@@ -437,21 +437,11 @@ pub(crate) mod error {
 
     #[expect(
         clippy::missing_trait_methods,
-        reason = "std::error::Error: provide/type_id/cause are unstable or deprecated — \
-                  only source() is implemented"
+        reason = "type_id/cause/provide are unstable or deprecated — cannot implement on stable Rust"
     )]
     impl std::error::Error for LlmError {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             None
-        }
-
-        fn description(&self) -> &str {
-            match self {
-                Self::Auth(_) => "authentication error",
-                Self::Network(_) => "network error",
-                Self::Api { .. } => "API error",
-                Self::StreamRead(_) => "stream read error",
-            }
         }
     }
 

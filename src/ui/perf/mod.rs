@@ -17,7 +17,9 @@ use std::time::Instant;
 /// Number of recent samples for trend analysis / ring buffer size
 const SAMPLE_RING_SIZE: usize = 64;
 
-/// Frame budget for 60fps (milliseconds)
+/// Bitmask for power-of-2 ring buffer wrapping (`SIZE - 1`).
+const RING_MASK: usize = SAMPLE_RING_SIZE - 1;
+/// Frame budget for 60fps (milliseconds).
 pub(crate) const FRAME_BUDGET_60FPS: f64 = 16.67;
 /// Frame budget for 30fps (milliseconds)
 pub(crate) const FRAME_BUDGET_30FPS: f64 = 33.33;
@@ -40,19 +42,17 @@ impl<T: Copy + Default> Default for RingBuffer<T> {
 
 impl<T: Copy + Default + Ord> RingBuffer<T> {
     /// Push a new value into the ring buffer.
-    #[expect(clippy::integer_division_remainder_used, reason = "ring buffer push: modulo for cyclic index wrap")]
     pub(crate) fn push(&mut self, value: T) {
         if let Some(slot) = self.data.get_mut(self.write_pos) {
             *slot = value;
         }
-        self.write_pos = self.write_pos.saturating_add(1) % SAMPLE_RING_SIZE;
+        self.write_pos = self.write_pos.saturating_add(1) & RING_MASK;
         if self.len < SAMPLE_RING_SIZE {
             self.len = self.len.saturating_add(1);
         }
     }
 
     /// Return the `count` most recent values.
-    #[expect(clippy::integer_division_remainder_used, reason = "ring buffer recent: modulo for cyclic index wrap")]
     pub(crate) fn recent(&self, count: usize) -> Vec<T> {
         if self.len == 0 {
             return Vec::new();
@@ -61,7 +61,7 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
         let mut result = Vec::with_capacity(count);
         let start = if self.len < SAMPLE_RING_SIZE { 0 } else { self.write_pos };
         for i in 0..count {
-            let idx = (start.saturating_add(self.len).saturating_sub(count).saturating_add(i)) % SAMPLE_RING_SIZE;
+            let idx = start.saturating_add(self.len).saturating_sub(count).saturating_add(i) & RING_MASK;
             if let Some(&val) = self.data.get(idx) {
                 result.push(val);
             }

@@ -172,10 +172,20 @@ pub fn now_ms() -> u64 {
     reason = "sole choke-point for truncating time/division arithmetic"
 )]
 pub mod time_arith {
+    use std::time::Duration;
+
+    use crate::cast::Safe as _;
+
     /// Truncating conversion from milliseconds to whole seconds.
     #[must_use]
     pub const fn ms_to_secs(ms: u64) -> u64 {
-        ms / 1000
+        Duration::from_millis(ms).as_secs()
+    }
+
+    /// Truncating conversion from microseconds to whole milliseconds.
+    #[must_use]
+    pub fn us_to_ms(us: u64) -> u64 {
+        Duration::from_micros(us).as_millis().to_u64()
     }
 
     /// Decompose seconds into `(hours, minutes, seconds)` within a 24 h window.
@@ -194,12 +204,6 @@ pub mod time_arith {
         let minutes = (total_secs % 3600) / 60;
         let seconds = total_secs % 60;
         (hours, minutes, seconds)
-    }
-
-    /// Truncating conversion from microseconds to whole milliseconds.
-    #[must_use]
-    pub const fn us_to_ms(us: u64) -> u64 {
-        us / 1000
     }
 
     /// 5 % of a value (`value / 20`), for budget stepping.

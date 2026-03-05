@@ -137,15 +137,8 @@ pub(crate) use cp_base::ui::{Cell, render_table};
 const SPINNER_BRAILLE: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /// Get a braille spinner frame for the given animation counter.
-#[expect(
-    clippy::integer_division_remainder_used,
-    clippy::arithmetic_side_effects,
-    reason = "modulo for cyclic spinner index is the algorithm"
-)]
 pub(crate) fn spinner(frame: u64) -> &'static str {
-    let index = frame.to_usize() % SPINNER_BRAILLE.len();
-    let Some(ch) = SPINNER_BRAILLE.get(index) else { return SPINNER_BRAILLE.first().copied().unwrap_or("⠋") };
-    ch
+    SPINNER_BRAILLE.iter().copied().cycle().nth(frame.to_usize()).unwrap_or("⠋")
 }
 
 // ─── Syntax Highlighting ─────────────────────────────────────────────────────

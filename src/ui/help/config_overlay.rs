@@ -189,18 +189,8 @@ fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
 }
 
 /// Format a token count as a compact human-readable string (e.g. "128K", "1.5M").
-#[expect(
-    clippy::integer_division_remainder_used,
-    reason = "format_tokens_compact: truncating division for human-readable K/M token display"
-)]
 fn format_tokens_compact(tokens: usize) -> String {
-    if tokens >= 1_000_000 {
-        format!("{:.1}M", tokens.to_f64() / 1_000_000.0)
-    } else if tokens >= 1_000 {
-        format!("{}K", tokens / 1_000)
-    } else {
-        format!("{tokens}")
-    }
+    crate::ui::helpers::format_number(tokens)
 }
 
 /// Render the budget bars (context budget, cleaning threshold, cleaning target, max cost).

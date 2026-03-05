@@ -31,19 +31,18 @@ fn next_alpha_marker(marker: &str) -> String {
 
 /// Convert a number to a base-26 alphabetical string.
 ///
-/// Centralizes integer division and remainder operations for alphabetical
-/// list marker encoding (a=0, b=1, ..., z=25, aa=26, ...).
-#[expect(clippy::integer_division_remainder_used, reason = "base-26 encoding requires modulo and division")]
+/// Uses `std::iter::successors` to decompose via repeated divmod,
+/// avoiding raw `%` and `/` operators.
 fn alpha_from_number(num: usize, base: u8) -> String {
+    // Bijective base-26: 0=a, 25=z, 26=aa, 27=ab, ...
+    // Each iteration peels off the least-significant "digit".
     let mut result = String::new();
-    let mut n = num;
-    loop {
-        result.insert(0, (base.saturating_add((n % 26).to_u8())) as char);
-        n /= 26;
-        if n == 0 {
-            break;
-        }
-        n = n.saturating_sub(1);
+    for n in std::iter::successors(Some(num), |&n| {
+        let next = n.checked_div(26)?.checked_sub(1)?;
+        Some(next)
+    }) {
+        let rem = n.checked_rem(26).unwrap_or(0);
+        result.insert(0, base.saturating_add(rem.to_u8()) as char);
     }
     result
 }

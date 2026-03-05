@@ -15,57 +15,108 @@
 # annotation from the source code.
 
 exceptions:
-  # ── cast.rs: Safe macro infrastructure ──────────────────────────
+  # ── cast.rs: Safe numeric casting infrastructure ─────────────────
 
   - path: "crates/cp-base/src/cast.rs"
-    match: '#![expect('
+    match: "u32→f32: 24-bit mantissa cannot represent all 32-bit values"
     reason: >
-      Module-level expect for clippy::allow_attributes. The Safe
-      macros expand #[allow(...)] for different types — some lint triggers
-      are type-dependent, so #[expect] (which requires the lint to fire)
-      would produce unfulfilled-expectation errors on certain expansions.
+      u32 Safe impl: lossy cast to f32. 24-bit mantissa too narrow.
     strategy: >
-      Wait for Rust RFC to support conditional #[expect] per type
-      parameter, or replace macros with a build.rs code generator that
-      emits per-type impls with precise annotations.
+      Irreducible — fundamental floating-point limitation.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'trivial_numeric_casts, trivial_casts, clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_precision_loss, reason = "macro-generated identity casts'
+    match: "u64→f32: 24-bit mantissa cannot represent all 64-bit values"
     reason: >
-      Unsigned Safe macro impl. Raw `as` casts are the whole point of
-      this module — it centralizes all numeric casts behind saturating
-      wrappers so the rest of the codebase never uses raw `as`.
+      u64 Safe impl: lossy cast to f32.
     strategy: >
-      Replace macros with a proc-macro or build.rs that generates
-      per-type impls, each with only the #[allow] lints that actually
-      trigger for that specific source/target pair.
+      Irreducible — fundamental floating-point limitation.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'reason = "macro-generated identity casts are unavoidable'
+    match: "u64→f64: 53-bit mantissa cannot represent all 64-bit values"
     reason: >
-      Signed Safe macro impl. Same rationale as the unsigned variant —
-      macro-generated identity casts are unavoidable with the current
-      approach.
+      u64 Safe impl: lossy cast to f64. 53-bit mantissa too narrow.
     strategy: >
-      Same as above — proc-macro or build.rs per-type generation.
+      Irreducible — fundamental floating-point limitation.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'f64 Safe impl: saturating casts necessarily use raw'
+    match: "u128→f32: 24-bit mantissa cannot represent all 128-bit values"
     reason: >
-      Concrete f64 Safe impl. Only cast_possible_truncation and
-      cast_sign_loss fire — reduced from 5 lints in the old #[allow].
-      Uses #[expect] (compiler-verified) instead of #[allow].
+      u128 Safe impl: lossy cast to f32.
     strategy: >
-      No further reduction — truncation and sign_loss are inherent
-      to f64→integer casts. Identity to_f64 triggers nothing.
+      Irreducible — fundamental floating-point limitation.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'f32 Safe impl: saturating casts necessarily use raw'
+    match: "u128→f64: 53-bit mantissa cannot represent all 128-bit values"
     reason: >
-      Concrete f32 Safe impl. Same as f64 — only truncation and
-      sign_loss fire. Uses #[expect] instead of #[allow].
+      u128 Safe impl: lossy cast to f64.
     strategy: >
-      No further reduction — same as f64.
+      Irreducible — fundamental floating-point limitation.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: "usize→f32: 24-bit mantissa cannot represent all pointer-width values"
+    reason: >
+      usize Safe impl: lossy cast to f32.
+    strategy: >
+      Irreducible — fundamental floating-point limitation.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: "usize→f64: 53-bit mantissa cannot represent all pointer-width values"
+    reason: >
+      usize Safe impl: lossy cast to f64.
+    strategy: >
+      Irreducible — fundamental floating-point limitation.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: "i32→f32: 24-bit mantissa cannot represent all 32-bit signed values"
+    reason: >
+      i32 Safe impl: lossy cast to f32. 24-bit mantissa too narrow.
+    strategy: >
+      Irreducible — fundamental floating-point limitation.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: "i64→f32: 24-bit mantissa cannot represent all 64-bit signed values"
+    reason: >
+      i64 Safe impl: lossy cast to f32.
+    strategy: >
+      Irreducible — fundamental floating-point limitation.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: "i64→f64: 53-bit mantissa cannot represent all 64-bit signed values"
+    reason: >
+      i64 Safe impl: lossy cast to f64.
+    strategy: >
+      Irreducible — fundamental floating-point limitation.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: "isize→f32: 24-bit mantissa cannot represent all pointer-width signed values"
+    reason: >
+      isize Safe impl: lossy cast to f32.
+    strategy: >
+      Irreducible — fundamental floating-point limitation.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: "isize→f64: 53-bit mantissa cannot represent all pointer-width signed values"
+    reason: >
+      isize Safe impl: lossy cast to f64.
+    strategy: >
+      Irreducible — fundamental floating-point limitation.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: "f64 Safe impl: saturating float"
+    reason: >
+      f64→integer casts in Safe impl. No TryFrom exists for
+      float→int in std. Raw `as` with bounds checking is the
+      only option.
+    strategy: >
+      Irreducible until std provides TryFrom<f64> for integers.
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: "f32 Safe impl: saturating float"
+    reason: >
+      f32→integer casts in Safe impl. Same as f64 — no TryFrom
+      path in std for float→int conversion.
+    strategy: >
+      Irreducible until std provides TryFrom<f32> for integers.
 
   # ── config/mod.rs: invariant_panic ──────────────────────────────────
 
@@ -80,17 +131,6 @@ exceptions:
       Consider compile-time validation (const fn / build.rs assertions)
       for YAML and theme invariants. For module state, explore a type-state
       pattern where uninitialized state is unrepresentable.
-
-  # ── compiler.rs: chrono timezone arithmetic ────────────────────────
-
-  - path: "crates/cp-mod-typst/src/compiler.rs"
-    match: 'chrono offset arithmetic cannot overflow'
-    reason: >
-      Adding a timezone offset (±12h) to a UTC datetime. chrono::Duration
-      arithmetic cannot overflow for valid timezone offsets.
-    strategy: >
-      Irreducible — chrono's Add impl requires the caller to handle the
-      arithmetic lint. The offset range (±12h) is always safe.
 
   # ── panels.rs: time_arith module ────────────────────────────────────
 
@@ -111,57 +151,7 @@ exceptions:
   # Types used via re-export where the shorter name conflicts with
   # common identifiers (reserved words, std types, or sibling types).
 
-  # ── ui/helpers.rs: spinner modulo ────────────────────────────────────
 
-  - path: "src/ui/helpers.rs"
-    match: 'modulo for cyclic spinner index is the algorithm'
-    reason: >
-      spinner() uses frame_counter % SPINNER_BRAILLE.len() to cycle
-      through animation frames. Modulo IS the algorithm.
-    strategy: >
-      Irreducible — cyclic indexing requires modulo.
-
-  # ── ui/perf/mod.rs: ring buffer modulo ──────────────────────────────
-
-  - path: "src/ui/perf/mod.rs"
-    match: 'ring buffer push: modulo for cyclic index wrap'
-    reason: >
-      RingBuffer::push() uses modulo to wrap write_pos around
-      the fixed-size ring. Modulo IS the algorithm.
-    strategy: >
-      Irreducible — ring buffer cycling requires modulo.
-
-  - path: "src/ui/perf/mod.rs"
-    match: 'ring buffer recent: modulo for cyclic index wrap'
-    reason: >
-      RingBuffer::recent() uses modulo to wrap read indices around
-      the fixed-size ring. Modulo IS the algorithm.
-    strategy: >
-      Irreducible — ring buffer cycling requires modulo.
-
-  # ── ui/help/config_overlay.rs: token formatting division ────────────
-
-  - path: "src/ui/help/config_overlay.rs"
-    match: 'format_tokens_compact: truncating division for human-readable K/M token display'
-    reason: >
-      format_tokens_compact() divides token counts by 1,000 or 1,000,000
-      for human-readable K/M display. Truncating integer division IS
-      the desired behavior.
-    strategy: >
-      Irreducible — integer truncation is the desired behavior for
-      compact token count display.
-
-  # ── conversation/list.rs: base-26 encoding ────────────────────────
-
-  - path: "src/modules/conversation/list.rs"
-    match: 'base-26 encoding requires modulo and division'
-    reason: >
-      alpha_from_number() converts a numeric index to alphabetic labels
-      (a, b, ..., z, aa, ab, ...) using modulo and division for base-26
-      encoding. Modulo IS the algorithm.
-    strategy: >
-      Irreducible — base-26 encoding inherently requires modulo
-      and division.
 
   # ── app/run/*: multiple_inherent_impl for App ─────────────────────────
 
@@ -212,12 +202,12 @@ exceptions:
       Same as input.rs.
 
   - path: "src/llms/mod.rs"
-    match: 'std::error::Error: provide/type_id/cause are unstable or deprecated'
+    match: "type_id/cause/provide are unstable or deprecated"
     reason: >
-      impl Error for LlmError implements source() and description().
-      provide(), type_id(), and cause() are either unstable or deprecated
-      and cannot be meaningfully implemented.
+      impl Error for LlmError implements source(). The remaining
+      unimplemented methods — type_id() (unstable), cause() (deprecated),
+      and provide() (unstable) — cannot be meaningfully implemented on
+      stable Rust. description() was removed (deprecated, Display covers it).
     strategy: >
-      Irreducible — the remaining unimplemented methods are either
-      unstable (provide) or deprecated (cause).
+      Irreducible on stable Rust. Re-evaluate when provide() stabilizes.
 
