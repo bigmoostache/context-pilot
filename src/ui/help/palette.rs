@@ -142,7 +142,7 @@ impl CommandPalette {
     }
 
     /// Move selection down
-    pub(crate) fn select_next(&mut self) {
+    pub(crate) const fn select_next(&mut self) {
         if !self.filtered_commands.is_empty() {
             self.selected = if self.selected.saturating_add(1) >= self.filtered_commands.len() {
                 0
@@ -200,10 +200,7 @@ impl CommandPalette {
             vec![
                 Span::styled(" > ", Style::default().fg(theme::accent())),
                 Span::styled("Type to search...", Style::default().fg(theme::text_muted())),
-                Span::styled(
-                    format!("{:>width$}", esc_hint, width = hint_padding),
-                    Style::default().fg(theme::text_muted()),
-                ),
+                Span::styled(format!("{esc_hint:>hint_padding$}"), Style::default().fg(theme::text_muted())),
             ]
         } else {
             let (before, after) = self.query.split_at(self.cursor);
@@ -222,7 +219,7 @@ impl CommandPalette {
         };
 
         let input_line = Paragraph::new(Line::from(input_display)).style(Style::default().bg(theme::bg_surface()));
-        let Some(&input_chunk) = chunks.get(0) else { return };
+        let Some(&input_chunk) = chunks.first() else { return };
         frame.render_widget(input_line, input_chunk);
 
         // Render filtered results
@@ -248,7 +245,8 @@ impl CommandPalette {
             };
 
             // Pad to full width for consistent highlight
-            let content_len = prefix.len().saturating_add(cmd.label.len()).saturating_add(2).saturating_add(cmd.description.len());
+            let content_len =
+                prefix.len().saturating_add(cmd.label.len()).saturating_add(2).saturating_add(cmd.description.len());
             let line_padding = (width.to_usize()).saturating_sub(content_len);
 
             result_lines.push(Line::from(vec![

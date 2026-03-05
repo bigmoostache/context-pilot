@@ -106,20 +106,29 @@ fn expand_paste_sentinels(
     (result, new_cursor)
 }
 
+/// Contextual data needed to render the input area.
+pub(crate) struct InputContext<'ctx> {
+    /// Known command IDs for `/command` highlighting and hints.
+    pub command_ids: &'ctx [String],
+    /// Paste buffer contents (indexed by sentinel markers).
+    pub paste_buffers: &'ctx [String],
+    /// Optional labels for paste buffers (command names, etc.).
+    pub paste_buffer_labels: &'ctx [Option<String>],
+    /// Base style for background/spacing spans.
+    pub base_style: Style,
+}
+
 /// Render input area to lines.
 ///
 /// Handles cursor rendering, paste placeholder expansion, command highlighting,
 /// and command hint display.
-#[expect(clippy::too_many_arguments, reason = "render parameters are cohesive and all required for input display")]
 pub(super) fn render_input(
     raw_input: &str,
     raw_cursor: usize,
     viewport_width: u16,
-    base_style: Style,
-    command_ids: &[String],
-    paste_buffers: &[String],
-    paste_buffer_labels: &[Option<String>],
+    ctx: &InputContext<'_>,
 ) -> Vec<Line<'static>> {
+    let base_style = ctx.base_style;
     let mut lines: Vec<Line<'static>> = Vec::new();
     let role_icon = icons::msg_user();
     let role_color = theme::user();
@@ -133,7 +142,7 @@ pub(super) fn render_input(
 
     // Pre-process: expand paste sentinels to display placeholders
     let (display_input, display_cursor) =
-        expand_paste_sentinels(raw_input, raw_cursor, paste_buffers, paste_buffer_labels);
+        expand_paste_sentinels(raw_input, raw_cursor, ctx.paste_buffers, ctx.paste_buffer_labels);
     let input = &display_input;
     let cursor_pos = display_cursor;
 
@@ -141,12 +150,7 @@ pub(super) fn render_input(
     let input_with_cursor = if cursor_pos >= input.len() {
         format!("{input}{cursor_char}")
     } else {
-        format!(
-            "{}{}{}",
-            input.get(..cursor_pos).unwrap_or(""),
-            cursor_char,
-            input.get(cursor_pos..).unwrap_or("")
-        )
+        format!("{}{}{}", input.get(..cursor_pos).unwrap_or(""), cursor_char, input.get(cursor_pos..).unwrap_or(""))
     };
 
     if input.is_empty() {
@@ -183,16 +187,13 @@ pub(super) fn render_input(
                         vec![
                             Span::styled(first_part.to_string(), Style::default().fg(theme::accent())),
                             Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()),
-                            Span::styled(
-                                parts.get(1).unwrap_or(&"").to_string(),
-                                Style::default().fg(theme::accent()),
-                            ),
+                            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(theme::accent())),
                         ]
                     } else {
                         vec![Span::styled(clean, Style::default().fg(theme::accent()))]
                     }
                 } else {
-                    build_input_spans(line_text, cursor_char, command_ids)
+                    build_input_spans(line_text, cursor_char, ctx.command_ids)
                 };
 
                 if has_end {
@@ -202,7 +203,7 @@ pub(super) fn render_input(
                 // Add command hints if this line segment contains the cursor and starts with /
                 if line_text.contains(cursor_char) && !in_paste_block {
                     let clean_line = line_text.replace(cursor_char, "");
-                    let hints = build_command_hints(&clean_line, command_ids);
+                    let hints = build_command_hints(&clean_line, ctx.command_ids);
                     spans.extend(hints);
                 }
 

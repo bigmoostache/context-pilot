@@ -13,44 +13,63 @@ use serde_json::Value;
 /// Parsed SSE streaming response (OpenAI-compatible format).
 #[derive(Debug, Deserialize)]
 pub(crate) struct StreamResponse {
+    /// List of completion choices returned by the API.
     pub choices: Vec<StreamChoice>,
+    /// Optional token usage statistics.
     pub usage: Option<StreamUsage>,
 }
 
+/// A single choice from a streaming response.
 #[derive(Debug, Deserialize)]
 pub(crate) struct StreamChoice {
+    /// Incremental content delta for this choice.
     pub delta: Option<StreamDelta>,
+    /// Reason the model stopped generating (e.g. `"stop"`, `"tool_calls"`).
     pub finish_reason: Option<String>,
 }
 
+/// Incremental delta content within a streaming choice.
 #[derive(Debug, Deserialize)]
 pub(crate) struct StreamDelta {
+    /// Text content fragment.
     pub content: Option<String>,
+    /// Tool call fragments being streamed.
     pub tool_calls: Option<Vec<StreamToolCall>>,
 }
 
+/// A single tool call delta from a streaming response.
 #[derive(Debug, Deserialize)]
 pub(crate) struct StreamToolCall {
+    /// Index of this tool call within the batch.
     pub index: Option<usize>,
+    /// Unique identifier assigned by the API.
     pub id: Option<String>,
+    /// Function name and argument fragments.
     pub function: Option<StreamFunctionDelta>,
 }
 
+/// Incremental function name and arguments within a tool call delta.
 #[derive(Debug, Deserialize)]
 pub(crate) struct StreamFunctionDelta {
+    /// Function name (sent once at the start of the tool call).
     pub name: Option<String>,
+    /// Partial JSON argument string.
     pub arguments: Option<String>,
 }
 
+/// Token usage statistics from a streaming response.
 #[derive(Debug, Deserialize)]
 pub(crate) struct StreamUsage {
+    /// Number of prompt tokens consumed.
     #[serde(rename = "prompt_tokens")]
     pub prompt: Option<usize>,
+    /// Number of completion tokens generated.
     #[serde(rename = "completion_tokens")]
     pub completion: Option<usize>,
     /// DeepSeek-specific cache fields
     #[serde(rename = "prompt_cache_hit_tokens")]
     pub prompt_cache_hit: Option<usize>,
+    /// `DeepSeek`-specific: prompt tokens that missed the cache.
     #[serde(rename = "prompt_cache_miss_tokens")]
     pub prompt_cache_miss: Option<usize>,
 }
@@ -80,10 +99,12 @@ pub(crate) fn parse_sse_line(line: &str) -> Option<StreamResponse> {
 /// Accumulator for building tool calls from streaming deltas.
 #[derive(Default)]
 pub(crate) struct ToolCallAccumulator {
+    /// Map from tool-call index to `(id, name, arguments)` triple.
     pub calls: std::collections::HashMap<usize, (String, String, String)>,
 }
 
 impl ToolCallAccumulator {
+    /// Create a new empty accumulator.
     pub(crate) fn new() -> Self {
         Self::default()
     }
@@ -133,7 +154,7 @@ impl ToolCallAccumulator {
 /// Dump an API request to disk for debugging.
 pub(crate) fn dump_request<T: Serialize>(worker_id: &str, provider: &str, request: &T) {
     let dir = ".context-pilot/last_requests";
-    let _r = std::fs::create_dir_all(dir);
+    let _r1 = std::fs::create_dir_all(dir);
     let path = format!("{dir}/{worker_id}_{provider}_last_request.json");
-    let _r = std::fs::write(path, serde_json::to_string_pretty(request).unwrap_or_default());
+    let _r2 = std::fs::write(path, serde_json::to_string_pretty(request).unwrap_or_default());
 }

@@ -13,6 +13,7 @@ use cp_mod_spine::types::{NotificationType, SpineState};
 use crate::app::App;
 use std::fmt::Write as _;
 
+#[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Non-blocking check: poll `WatcherRegistry` for satisfied conditions.
     /// - Blocking watchers: replace sentinel tool results and resume pipeline.
@@ -156,8 +157,7 @@ impl App {
         for tr in &mut tool_results {
             if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
                 // Console wait sentinel: replace entirely with watcher result
-                if let Some(result) =
-                    merged_blocking.iter().find(|r| r.tool_use_id.as_deref() == Some(&tr.tool_use_id))
+                if let Some(result) = merged_blocking.iter().find(|r| r.tool_use_id.as_deref() == Some(&tr.tool_use_id))
                 {
                     tr.content = result.description.clone();
                 }

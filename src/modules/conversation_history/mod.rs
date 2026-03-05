@@ -93,11 +93,7 @@ impl Module for ConversationHistoryModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn pre_flight(
-        &self,
-        _tool: &ToolUse,
-        _state: &State,
-    ) -> Option<crate::infra::tools::PreFlightResult> {
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<crate::infra::tools::PreFlightResult> {
         None
     }
 
@@ -117,10 +113,7 @@ impl Module for ConversationHistoryModule {
         None
     }
 
-    fn context_detail(
-        &self,
-        _ctx: &crate::state::ContextElement,
-    ) -> Option<String> {
+    fn context_detail(&self, _ctx: &crate::state::ContextElement) -> Option<String> {
         None
     }
 

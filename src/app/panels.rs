@@ -97,11 +97,7 @@ impl Panel for FallbackPanel {
     fn content(&self, _state: &State, _base_style: Style) -> Vec<Line<'static>> {
         vec![Line::from("Panel module no longer available")]
     }
-    fn handle_key(
-        &self,
-        _key: &crossterm::event::KeyEvent,
-        _state: &State,
-    ) -> Option<cp_base::state::actions::Action> {
+    fn handle_key(&self, _key: &crossterm::event::KeyEvent, _state: &State) -> Option<cp_base::state::actions::Action> {
         None
     }
     fn needs_cache(&self) -> bool {

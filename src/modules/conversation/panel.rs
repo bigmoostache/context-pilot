@@ -132,8 +132,15 @@ impl ConversationPanel {
 
                     // Render each frozen message with full formatting
                     for msg in msgs {
-                        let rendered_lines =
-                            render::render_message(msg, viewport_width, base_style, false, state.flags.ui.dev_mode);
+                        let rendered_lines = render::render_message(
+                            msg,
+                            &render::MessageRenderOpts {
+                                viewport_width,
+                                base_style,
+                                is_streaming: false,
+                                dev_mode: state.flags.ui.dev_mode,
+                            },
+                        );
                         text.extend(rendered_lines);
                     }
 
@@ -184,18 +191,21 @@ impl ConversationPanel {
                 }
 
                 // Cache miss - render message
-                let rendered_lines =
-                    render::render_message(msg, viewport_width, base_style, is_streaming_this, state.flags.ui.dev_mode);
+                let rendered_lines = render::render_message(
+                    msg,
+                    &render::MessageRenderOpts {
+                        viewport_width,
+                        base_style,
+                        is_streaming: is_streaming_this,
+                        dev_mode: state.flags.ui.dev_mode,
+                    },
+                );
 
                 // Store in per-message cache (but not for streaming message)
                 if !is_streaming_this {
                     let _r = state.message_cache.insert(
                         msg.id.clone(),
-                        MessageCache {
-                            lines: Rc::from(rendered_lines.as_slice()),
-                            content_hash: hash,
-                            viewport_width,
-                        },
+                        MessageCache { lines: Rc::from(rendered_lines.as_slice()), content_hash: hash, viewport_width },
                     );
                 }
 
@@ -231,10 +241,12 @@ impl ConversationPanel {
                     &state.input,
                     state.input_cursor,
                     viewport_width,
-                    base_style,
-                    &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
-                    &state.paste_buffers,
-                    &state.paste_buffer_labels,
+                    &render::InputContext {
+                        command_ids: &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
+                        paste_buffers: &state.paste_buffers,
+                        paste_buffer_labels: &state.paste_buffer_labels,
+                        base_style,
+                    },
                 );
                 let line_count = input_lines.len();
                 state.input_cache =
@@ -251,10 +263,12 @@ impl ConversationPanel {
                 &state.input,
                 state.input_cursor,
                 viewport_width,
-                base_style,
-                &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
-                &state.paste_buffers,
-                &state.paste_buffer_labels,
+                &render::InputContext {
+                    command_ids: &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
+                    paste_buffers: &state.paste_buffers,
+                    paste_buffer_labels: &state.paste_buffer_labels,
+                    base_style,
+                },
             );
             let line_count = input_lines.len();
             state.input_cache =
@@ -354,12 +368,7 @@ impl Panel for ConversationPanel {
         let base_style = Style::default().bg(theme::bg_surface());
         let title = self.title(state);
 
-        let inner_area = Rect::new(
-            area.x.saturating_add(1),
-            area.y,
-            area.width.saturating_sub(2),
-            area.height,
-        );
+        let inner_area = Rect::new(area.x.saturating_add(1), area.y, area.width.saturating_sub(2), area.height);
 
         let block = Block::default()
             .borders(Borders::ALL)

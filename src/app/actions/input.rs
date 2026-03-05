@@ -135,9 +135,10 @@ fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
             let start = i;
             i = i.saturating_add(1);
             let idx_start = i;
-            loop {
-                let Some(&b) = bytes.get(i) else { break };
-                if b == 0 { break; }
+            while let Some(&b) = bytes.get(i) {
+                if b == 0 {
+                    break;
+                }
                 i = i.saturating_add(1);
             }
             if i < bytes.len() {

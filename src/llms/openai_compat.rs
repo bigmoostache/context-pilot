@@ -23,41 +23,58 @@ use cp_base::config::INJECTIONS;
 /// OpenAI-compatible chat message.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct OaiMessage {
+    /// Message role (`"system"`, `"user"`, `"assistant"`, or `"tool"`).
     pub role: String,
+    /// Text content of the message.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
+    /// Tool calls made by the assistant.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<OaiToolCall>>,
+    /// ID of the tool call this message is a result for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
 }
 
+/// A single tool call issued by the assistant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct OaiToolCall {
+    /// Unique identifier for this tool call.
     pub id: String,
+    /// Always `"function"` for function-based tool calls.
     #[serde(rename = "type")]
     pub call_type: String,
+    /// Function name and serialized arguments.
     pub function: OaiFunction,
 }
 
+/// Function name and JSON-encoded arguments within a tool call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct OaiFunction {
+    /// Name of the function to invoke.
     pub name: String,
+    /// JSON-serialized argument string.
     pub arguments: String,
 }
 
 /// OpenAI-compatible tool definition wrapper.
 #[derive(Debug, Serialize)]
 pub(crate) struct OaiTool {
+    /// Always `"function"` for function-based tools.
     #[serde(rename = "type")]
     pub tool_type: String,
+    /// Function metadata (name, description, JSON-schema parameters).
     pub function: OaiFunctionDef,
 }
 
+/// Function metadata within an OpenAI-compatible tool definition.
 #[derive(Debug, Serialize)]
 pub(crate) struct OaiFunctionDef {
+    /// Function identifier.
     pub name: String,
+    /// Human-readable description sent to the model.
     pub description: String,
+    /// JSON Schema describing accepted parameters.
     pub parameters: Value,
 }
 
@@ -85,7 +102,9 @@ pub(crate) fn collect_included_tool_ids(messages: &[Message], pending_tool_resul
 
         let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
 
-        let has_result = messages[idx + 1..]
+        let has_result = messages
+            .get(idx.saturating_add(1)..)
+            .unwrap_or_default()
             .iter()
             .filter(|m: &&Message| {
                 m.status != MessageStatus::Deleted

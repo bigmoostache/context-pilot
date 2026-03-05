@@ -14,17 +14,17 @@ pub(crate) fn api_check(state: &mut State) -> ActionResult {
 }
 
 /// Advance to the next config bar index, wrapping around.
-pub(crate) fn next_bar(current: usize) -> usize {
+pub(crate) const fn next_bar(current: usize) -> usize {
     wrap_next(current, CONFIG_BAR_COUNT)
 }
 
 /// Go to the previous config bar index, wrapping around.
-pub(crate) fn prev_bar(current: usize) -> usize {
+pub(crate) const fn prev_bar(current: usize) -> usize {
     if current == 0 { CONFIG_BAR_COUNT.saturating_sub(1) } else { current.saturating_sub(1) }
 }
 
 /// Compute `(current + 1) % len` without triggering arithmetic lint.
-pub(crate) fn wrap_next(current: usize, len: usize) -> usize {
+pub(crate) const fn wrap_next(current: usize, len: usize) -> usize {
     let next = current.saturating_add(1);
     if next >= len { 0 } else { next }
 }
@@ -117,12 +117,12 @@ pub(crate) fn handle_config_prev_theme(state: &mut State) -> ActionResult {
 
 /// Compute 5% step for budget adjustment.
 #[expect(clippy::integer_division_remainder_used, reason = "5% step via division is the algorithm")]
-fn budget_step(max_budget: usize) -> usize {
+const fn budget_step(max_budget: usize) -> usize {
     max_budget / 20
 }
 
 /// Compute minimum 10% budget floor.
 #[expect(clippy::integer_division_remainder_used, reason = "10% floor via division is the algorithm")]
-fn budget_min(max_budget: usize) -> usize {
+const fn budget_min(max_budget: usize) -> usize {
     max_budget / 10
 }

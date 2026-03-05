@@ -28,14 +28,15 @@ pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult
 /// Token usage reported when a stream completes.
 struct TokenUsage {
     /// Number of output tokens generated.
-    output_tokens: usize,
+    output: usize,
     /// Number of cache-hit input tokens.
-    cache_hit_tokens: usize,
+    cache_hit: usize,
     /// Number of cache-miss input tokens.
-    cache_miss_tokens: usize,
+    cache_miss: usize,
 }
 
 /// Handle `StreamDone` action — finalize streaming, correct token counts.
+#[expect(clippy::too_many_arguments, reason = "stream-done parameters map 1:1 to API response fields")]
 pub(crate) fn handle_stream_done(
     state: &mut State,
     input_tokens: usize,
@@ -47,7 +48,7 @@ pub(crate) fn handle_stream_done(
     state.flags.stream.phase.transition(StreamPhase::Idle);
     state.last_stop_reason = stop_reason.map(ToString::to_string);
 
-    let usage = TokenUsage { output_tokens, cache_hit_tokens, cache_miss_tokens };
+    let usage = TokenUsage { output: output_tokens, cache_hit: cache_hit_tokens, cache_miss: cache_miss_tokens };
     apply_token_usage(state, &usage);
 
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
@@ -74,21 +75,21 @@ pub(crate) fn handle_stream_done(
 }
 
 /// Apply token usage to state counters.
-fn apply_token_usage(app_state: &mut State, usage: &TokenUsage) {
+const fn apply_token_usage(app_state: &mut State, usage: &TokenUsage) {
     // Set tick usage (this tick only)
-    app_state.tick_cache_hit_tokens = usage.cache_hit_tokens;
-    app_state.tick_cache_miss_tokens = usage.cache_miss_tokens;
-    app_state.tick_output_tokens = usage.output_tokens;
+    app_state.tick_cache_hit_tokens = usage.cache_hit;
+    app_state.tick_cache_miss_tokens = usage.cache_miss;
+    app_state.tick_output_tokens = usage.output;
 
     // Accumulate per-stream usage (reset at InputSubmit)
-    app_state.stream_cache_hit_tokens = app_state.stream_cache_hit_tokens.saturating_add(usage.cache_hit_tokens);
-    app_state.stream_cache_miss_tokens = app_state.stream_cache_miss_tokens.saturating_add(usage.cache_miss_tokens);
-    app_state.stream_output_tokens = app_state.stream_output_tokens.saturating_add(usage.output_tokens);
+    app_state.stream_cache_hit_tokens = app_state.stream_cache_hit_tokens.saturating_add(usage.cache_hit);
+    app_state.stream_cache_miss_tokens = app_state.stream_cache_miss_tokens.saturating_add(usage.cache_miss);
+    app_state.stream_output_tokens = app_state.stream_output_tokens.saturating_add(usage.output);
 
     // Accumulate total usage
-    app_state.cache_hit_tokens = app_state.cache_hit_tokens.saturating_add(usage.cache_hit_tokens);
-    app_state.cache_miss_tokens = app_state.cache_miss_tokens.saturating_add(usage.cache_miss_tokens);
-    app_state.total_output_tokens = app_state.total_output_tokens.saturating_add(usage.output_tokens);
+    app_state.cache_hit_tokens = app_state.cache_hit_tokens.saturating_add(usage.cache_hit);
+    app_state.cache_miss_tokens = app_state.cache_miss_tokens.saturating_add(usage.cache_miss);
+    app_state.total_output_tokens = app_state.total_output_tokens.saturating_add(usage.output);
 }
 
 /// Handle `StreamError` action — clean up streaming state, log error.

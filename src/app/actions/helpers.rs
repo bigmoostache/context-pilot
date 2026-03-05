@@ -66,15 +66,16 @@ pub(crate) fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
         if b == 0 {
             // Found opening \x00 — we're inside a sentinel. Find the closing \x00.
             let mut end = cursor;
-            loop {
-                let Some(&eb) = bytes.get(end) else { break };
-                if eb == 0 { break; }
+            while let Some(&eb) = bytes.get(end) {
+                if eb == 0 {
+                    break;
+                }
                 end = end.saturating_add(1);
             }
-            if let Some(&eb) = bytes.get(end) {
-                if eb == 0 {
-                    return end.saturating_add(1); // after closing \x00
-                }
+            if let Some(&eb) = bytes.get(end)
+                && eb == 0
+            {
+                return end.saturating_add(1); // after closing \x00
             }
             return cursor;
         } else if b.is_ascii_digit() {

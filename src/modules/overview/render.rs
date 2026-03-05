@@ -155,11 +155,7 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
                 };
 
                 let display_path = if file.path.len() > 38 {
-                    format!(
-                        "{}...{}",
-                        type_char,
-                        &file.path.get(file.path.len().saturating_sub(35)..).unwrap_or("")
-                    )
+                    format!("{}...{}", type_char, &file.path.get(file.path.len().saturating_sub(35)..).unwrap_or(""))
                 } else {
                     format!("{} {}", type_char, file.path)
                 };

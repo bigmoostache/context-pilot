@@ -92,7 +92,7 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
             .split(boot_area);
         debug_assert!(chunks.len() >= BOOT_STEP_COUNT.saturating_sub(1), "layout must produce at least 5 chunks");
 
-        let Some(title_area) = chunks.get(0).copied() else { return };
+        let Some(title_area) = chunks.first().copied() else { return };
         let Some(steps_area) = chunks.get(2).copied() else { return };
         let Some(gauge_area) = chunks.get(4).copied() else { return };
 
@@ -130,10 +130,7 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
         // Progress gauge — pure integer arithmetic to avoid float cast lints
         let pct = done_count.saturating_mul(100).checked_div(total).unwrap_or(0);
         let gauge_width = gauge_area.width;
-        let filled_usize = done_count
-            .saturating_mul(usize::from(gauge_width))
-            .checked_div(total)
-            .unwrap_or(0);
+        let filled_usize = done_count.saturating_mul(usize::from(gauge_width)).checked_div(total).unwrap_or(0);
         let filled = u16::try_from(filled_usize).unwrap_or(gauge_width);
         let mut gauge_bar = "█".repeat(filled_usize);
         gauge_bar.push_str(&"░".repeat(usize::from(gauge_width.saturating_sub(filled))));
@@ -202,6 +199,20 @@ use state::persistence::{
 };
 
 fn main() -> ExitCode {
+    /// Helper to mark a boot step as done, with bounds checking.
+    fn mark_step_done(steps: &mut [BootStep], idx: usize) {
+        if let Some(step) = steps.get_mut(idx) {
+            step.done = true;
+        }
+    }
+
+    /// Helper to set a boot step's detail, with bounds checking.
+    fn set_step_detail(steps: &mut [BootStep], idx: usize, detail: String) {
+        if let Some(step) = steps.get_mut(idx) {
+            step.detail = Some(detail);
+        }
+    }
+
     init_file_logger();
 
     // Parse CLI args
@@ -277,20 +288,6 @@ fn main() -> ExitCode {
 
     // Detect new vs fresh-start format
     let new_format = std::path::Path::new(".context-pilot").join("config.json").exists();
-
-    /// Helper to mark a boot step as done, with bounds checking.
-    fn mark_step_done(steps: &mut [BootStep], idx: usize) {
-        if let Some(step) = steps.get_mut(idx) {
-            step.done = true;
-        }
-    }
-
-    /// Helper to set a boot step's detail, with bounds checking.
-    fn set_step_detail(steps: &mut [BootStep], idx: usize, detail: String) {
-        if let Some(step) = steps.get_mut(idx) {
-            step.detail = Some(detail);
-        }
-    }
 
     let mut state = if new_format {
         // Phase 1: Load config + worker state
@@ -372,7 +369,8 @@ fn main() -> ExitCode {
 
     // Create and run app
     let mut app = App::new(state, cache_tx, resume_stream);
-    let run_result = app.run(&mut terminal, &tx, &rx, &cache_rx);
+    let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };
+    let run_result = app.run(&mut terminal, &ch);
 
     // Cleanup
     let _r_raw_off = disable_raw_mode();

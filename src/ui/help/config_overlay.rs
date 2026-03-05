@@ -167,6 +167,11 @@ fn render_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
 fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
     if state.flags.lifecycle.api_check_in_progress {
         let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+        #[expect(
+            clippy::arithmetic_side_effects,
+            clippy::integer_division_remainder_used,
+            reason = "modulo for cyclic spinner index is the algorithm"
+        )]
         let spinner_idx = state.spinner_frame.to_usize() % spinner_chars.len();
         let Some(&spinner) = spinner_chars.get(spinner_idx) else { return };
         lines.push(Line::from(vec![
@@ -191,7 +196,10 @@ fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
 }
 
 /// Render the budget bars (context budget, cleaning threshold, cleaning target, max cost).
-#[expect(clippy::integer_division_remainder_used, reason = "token count formatting: truncating division for human-readable K/M display")]
+#[expect(
+    clippy::integer_division_remainder_used,
+    reason = "render_budget_bars: truncating division for human-readable K/M token display"
+)]
 fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let format_tokens = |tokens: usize| -> String {
         if tokens >= 1_000_000 {
@@ -460,7 +468,10 @@ fn render_secondary_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
 }
 
 /// Render a single model line with context window size and pricing info.
-#[expect(clippy::integer_division_remainder_used, reason = "token count formatting: truncating division for human-readable K/M display")]
+#[expect(
+    clippy::integer_division_remainder_used,
+    reason = "render_model_line_with_info: truncating division for human-readable K/M token display"
+)]
 fn render_model_line_with_info<M: crate::llms::ModelInfo>(
     lines: &mut Vec<Line<'_>>,
     is_selected: bool,

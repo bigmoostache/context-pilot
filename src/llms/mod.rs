@@ -195,7 +195,13 @@ pub(crate) struct FakePanelMessage {
     pub content: String,
 }
 
-/// Convert milliseconds since UNIX epoch to ISO 8601 format
+/// Convert milliseconds since UNIX epoch to ISO 8601 format.
+#[expect(
+    clippy::arithmetic_side_effects,
+    clippy::integer_division_remainder_used,
+    reason = "hand-rolled date math: all divisions/modulos are by non-zero constants, \
+              subtraction is guarded by loop condition, addition is bounded by calendar range"
+)]
 fn ms_to_iso8601(ms: u64) -> String {
     use std::time::{Duration, UNIX_EPOCH};
     let duration = Duration::from_millis(ms);
@@ -243,11 +249,17 @@ fn ms_to_iso8601(ms: u64) -> String {
     format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
 }
 
+/// Gregorian leap year check.
+#[expect(clippy::integer_division_remainder_used, reason = "canonical Gregorian leap year formula requires modulo")]
 const fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
 
-/// Format a time delta in a human-readable way
+/// Format a time delta in a human-readable way.
+#[expect(
+    clippy::integer_division_remainder_used,
+    reason = "time unit conversions: all divisions are by non-zero constants (1000, 60, 3600)"
+)]
 fn format_time_delta(delta_ms: u64) -> String {
     let seconds = delta_ms / 1000;
     if seconds < 60 {
@@ -298,7 +310,7 @@ pub(crate) fn panel_footer_text(messages: &[Message], current_ms: u64) -> String
         for msg in recent_messages.iter().rev() {
             let iso_time = ms_to_iso8601(msg.timestamp_ms);
             let time_delta = if current_ms > msg.timestamp_ms {
-                format_time_delta(current_ms - msg.timestamp_ms)
+                format_time_delta(current_ms.saturating_sub(msg.timestamp_ms))
             } else {
                 "just now".to_string()
             };
@@ -360,7 +372,7 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value>
     let mut cache_breakpoints = std::collections::BTreeSet::new();
     if panel_count > 0 {
         for quarter in 1..=4usize {
-            let pos = (panel_count * quarter).div_ceil(4);
+            let pos = (panel_count.saturating_mul(quarter)).div_ceil(4);
             let _r = cache_breakpoints.insert(pos.saturating_sub(1));
         }
     }
@@ -382,8 +394,9 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value>
                     // Add cache_control at breakpoint positions
                     if let Some(panel_pos) = panel_result_indices.iter().position(|&i| i == msg_idx)
                         && cache_breakpoints.contains(&panel_pos)
+                        && let Some(obj) = result.as_object_mut()
                     {
-                        result["cache_control"] = serde_json::json!({"type": "ephemeral"});
+                        let _prev = obj.insert("cache_control".to_string(), serde_json::json!({"type": "ephemeral"}));
                     }
                     result
                 }
@@ -432,7 +445,7 @@ pub(crate) fn log_sse_error(ctx: &SseErrorContext<'_>) {
         ctx.provider, ctx.total_bytes, ctx.line_count, ctx.json_str
     );
 
-    let _r = std::fs::OpenOptions::new()
+    let _rw = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(&path)
@@ -472,7 +485,25 @@ pub(crate) mod error {
         }
     }
 
-    impl std::error::Error for LlmError {}
+    #[expect(
+        clippy::missing_trait_methods,
+        reason = "std::error::Error: provide/type_id/cause are unstable or deprecated — \
+                  only source() is implemented"
+    )]
+    impl std::error::Error for LlmError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            None
+        }
+
+        fn description(&self) -> &str {
+            match self {
+                Self::Auth(_) => "authentication error",
+                Self::Network(_) => "network error",
+                Self::Api { .. } => "API error",
+                Self::StreamRead(_) => "stream read error",
+            }
+        }
+    }
 
     impl From<reqwest::Error> for LlmError {
         fn from(e: reqwest::Error) -> Self {

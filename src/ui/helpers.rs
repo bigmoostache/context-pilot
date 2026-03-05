@@ -137,10 +137,14 @@ pub(crate) use cp_base::ui::{Cell, render_table};
 const SPINNER_BRAILLE: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /// Get a braille spinner frame for the given animation counter.
-#[expect(clippy::integer_division_remainder_used, reason = "modulo for cyclic spinner index is the algorithm")]
+#[expect(
+    clippy::integer_division_remainder_used,
+    clippy::arithmetic_side_effects,
+    reason = "modulo for cyclic spinner index is the algorithm"
+)]
 pub(crate) fn spinner(frame: u64) -> &'static str {
     let index = frame.to_usize() % SPINNER_BRAILLE.len();
-    let Some(ch) = SPINNER_BRAILLE.get(index) else { return SPINNER_BRAILLE.get(0).copied().unwrap_or("⠋") };
+    let Some(ch) = SPINNER_BRAILLE.get(index) else { return SPINNER_BRAILLE.first().copied().unwrap_or("⠋") };
     ch
 }
 
@@ -163,9 +167,10 @@ static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_
 static THEME_SET: LazyLock<ThemeSet> = LazyLock::new(ThemeSet::load_defaults);
 /// Type alias for syntax-highlighted line data.
 type HighlightResult = Vec<Vec<(Color, String)>>;
+/// Type alias for the highlight cache map.
+type HighlightCache = Mutex<HashMap<String, Arc<HighlightResult>>>;
 /// LRU-style cache for syntax highlighting results.
-static HIGHLIGHT_CACHE: LazyLock<Mutex<HashMap<String, Arc<HighlightResult>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+static HIGHLIGHT_CACHE: LazyLock<HighlightCache> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Convert syntect color to ratatui color
 const fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {

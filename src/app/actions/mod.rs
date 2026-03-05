@@ -153,9 +153,8 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::CursorEnd => {
             let after_cursor = state.input.get(state.input_cursor..).unwrap_or("");
-            state.input_cursor = state
-                .input_cursor
-                .saturating_add(after_cursor.find('\n').unwrap_or(after_cursor.len()));
+            state.input_cursor =
+                state.input_cursor.saturating_add(after_cursor.find('\n').unwrap_or(after_cursor.len()));
             state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
             ActionResult::Nothing
         }
@@ -408,9 +407,7 @@ fn handle_command_expansion(state: &mut State) {
                 sentinel,
                 state.input.get(state.input_cursor..).unwrap_or(""),
             );
-            state.input_cursor = word_start
-                .saturating_add(sentinel.len())
-                .saturating_add(1);
+            state.input_cursor = word_start.saturating_add(sentinel.len()).saturating_add(1);
         }
     }
 }
@@ -430,12 +427,8 @@ fn handle_input_backspace(state: &mut State) {
     if prev_b == 0 {
         // Find the opening \x00 by scanning backwards past the index digits
         let mut scan = state.input_cursor.saturating_sub(2); // skip closing \x00
-        loop {
-            let Some(&b) = bytes.get(scan) else { break };
-            if b == 0 {
-                break;
-            }
-            if scan == 0 {
+        while let Some(&b) = bytes.get(scan) {
+            if b == 0 || scan == 0 {
                 break;
             }
             scan = scan.saturating_sub(1);
@@ -454,12 +447,8 @@ fn handle_input_backspace(state: &mut State) {
         // Check if cursor is inside a sentinel (between \x00 and closing \x00)
         // Scan backwards to see if we hit \x00 before any non-digit
         let mut scan = cursor_prev;
-        loop {
-            let Some(&b) = bytes.get(scan) else { break };
-            if !b.is_ascii_digit() {
-                break;
-            }
-            if scan == 0 {
+        while let Some(&b) = bytes.get(scan) {
+            if !b.is_ascii_digit() || scan == 0 {
                 break;
             }
             scan = scan.saturating_sub(1);
@@ -468,23 +457,18 @@ fn handle_input_backspace(state: &mut State) {
         if scan_b == 0 {
             // We're inside a sentinel — find the closing \x00
             let mut end = state.input_cursor;
-            loop {
-                let Some(&b) = bytes.get(end) else { break };
+            while let Some(&b) = bytes.get(end) {
                 if b == 0 {
                     break;
                 }
                 end = end.saturating_add(1);
             }
-            if let Some(&b) = bytes.get(end) {
-                if b == 0 {
-                    end = end.saturating_add(1); // include closing \x00
-                }
+            if let Some(&b) = bytes.get(end)
+                && b == 0
+            {
+                end = end.saturating_add(1); // include closing \x00
             }
-            state.input = format!(
-                "{}{}",
-                state.input.get(..scan).unwrap_or(""),
-                state.input.get(end..).unwrap_or("")
-            );
+            state.input = format!("{}{}", state.input.get(..scan).unwrap_or(""), state.input.get(end..).unwrap_or(""));
             state.input_cursor = scan;
         } else {
             // Not a sentinel — normal backspace
@@ -498,8 +482,7 @@ fn handle_input_backspace(state: &mut State) {
 
 /// Remove one character before the cursor (normal backspace).
 fn normal_backspace(state: &mut State) {
-    let prev =
-        state.input.get(..state.input_cursor).unwrap_or("").char_indices().last().map_or(0, |(i, _)| i);
+    let prev = state.input.get(..state.input_cursor).unwrap_or("").char_indices().last().map_or(0, |(i, _)| i);
     let _r = state.input.remove(prev);
     state.input_cursor = prev;
 }
@@ -512,8 +495,18 @@ fn select_context(state: &mut State, forward: bool) {
     }
     let mut sorted: Vec<usize> = (0..state.context.len()).collect();
     sorted.sort_by(|&a, &b| {
-        let id_a = state.context.get(a).and_then(|el| el.id.strip_prefix('P')).and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
-        let id_b = state.context.get(b).and_then(|el| el.id.strip_prefix('P')).and_then(|n| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_a = state
+            .context
+            .get(a)
+            .and_then(|el| el.id.strip_prefix('P'))
+            .and_then(|n| n.parse::<usize>().ok())
+            .unwrap_or(usize::MAX);
+        let id_b = state
+            .context
+            .get(b)
+            .and_then(|el| el.id.strip_prefix('P'))
+            .and_then(|n| n.parse::<usize>().ok())
+            .unwrap_or(usize::MAX);
         id_a.cmp(&id_b)
     });
     let cur = sorted.iter().position(|&i| i == state.selected_context).unwrap_or(0);

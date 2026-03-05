@@ -58,39 +58,39 @@ struct AnthropicRequest {
 /// Content block metadata from SSE stream events.
 #[derive(Debug, Deserialize)]
 struct StreamContentBlock {
-    /// Block type (e.g. "text", "tool_use")
+    /// Block type (e.g. "text", "`tool_use`")
     #[serde(rename = "type")]
     block_type: Option<String>,
-    /// Block ID (for tool_use blocks)
+    /// Block ID (for `tool_use` blocks)
     id: Option<String>,
-    /// Tool name (for tool_use blocks)
+    /// Tool name (for `tool_use` blocks)
     name: Option<String>,
 }
 
 /// Delta payload from SSE stream events.
 #[derive(Debug, Deserialize)]
 struct StreamDelta {
-    /// Delta type (e.g. "text_delta", "input_json_delta")
+    /// Delta type (e.g. "`text_delta`", "`input_json_delta`")
     #[serde(rename = "type")]
     delta_type: Option<String>,
     /// Text content delta
     text: Option<String>,
     /// Partial JSON for tool input
     partial_json: Option<String>,
-    /// Stop reason (e.g. "end_turn", "tool_use")
+    /// Stop reason (e.g. "`end_turn`", "`tool_use`")
     stop_reason: Option<String>,
 }
 
 /// Top-level SSE stream event from the Anthropic API.
 #[derive(Debug, Deserialize)]
 struct StreamMessage {
-    /// Event type (e.g. "content_block_start", "message_delta")
+    /// Event type (e.g. "`content_block_start`", "`message_delta`")
     #[serde(rename = "type")]
     event_type: String,
     /// Content block index (unused but present in API)
     #[serde(default)]
     _index: Option<usize>,
-    /// Content block metadata (for block_start events)
+    /// Content block metadata (for `block_start` events)
     content_block: Option<StreamContentBlock>,
     /// Delta payload (for delta events)
     delta: Option<StreamDelta>,

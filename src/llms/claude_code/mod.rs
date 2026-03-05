@@ -63,9 +63,9 @@ fn dump_last_request(worker_id: &str, api_request: &Value) {
         },
         "request_body": api_request,
     });
-    let _r = fs::create_dir_all(LAST_REQUESTS_DIR);
+    let _r1 = fs::create_dir_all(LAST_REQUESTS_DIR);
     let path = format!("{LAST_REQUESTS_DIR}/{worker_id}_last_request.json");
-    let _r = fs::write(path, serde_json::to_string_pretty(&debug).unwrap_or_default());
+    let _r2 = fs::write(path, serde_json::to_string_pretty(&debug).unwrap_or_default());
 }
 
 /// Claude Code OAuth client
@@ -124,6 +124,75 @@ impl ClaudeCodeClient {
         }
 
         Some(SecretBox::new(Box::new(creds.claude_ai_oauth.access_token)))
+    }
+
+    /// Run sequential API health checks: auth, streaming, and tool calling.
+    pub(crate) fn do_check_api(&self, model: &str) -> ApiCheckResult {
+        let access_token = match self.access_token.as_ref() {
+            Some(t) => t.expose_secret(),
+            None => {
+                return ApiCheckResult {
+                    auth_ok: false,
+                    streaming_ok: false,
+                    tools_ok: false,
+                    error: Some("OAuth token not found or expired".to_string()),
+                };
+            }
+        };
+
+        let client = Client::new();
+        let mapped_model = map_model_name(model);
+        let system = check_api::system_block();
+
+        // Test 1: Basic auth — simple non-streaming request
+        let auth_result = check_api::build_check_request(&check_api::CheckRequest {
+            client: &client,
+            access_token,
+            model: mapped_model,
+            system: &system,
+            user_text: "Hi",
+            stream: false,
+            tools: None,
+        })
+        .send();
+        let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
+        if !auth_ok {
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
+        }
+
+        // Test 2: Streaming
+        let stream_result = check_api::build_check_request(&check_api::CheckRequest {
+            client: &client,
+            access_token,
+            model: mapped_model,
+            system: &system,
+            user_text: "Say ok",
+            stream: true,
+            tools: None,
+        })
+        .send();
+        let streaming_ok = stream_result.as_ref().is_ok_and(|r| r.status().is_success());
+
+        // Test 3: Tool calling
+        let test_tool = serde_json::json!([{
+            "name": "test_tool",
+            "description": "A test tool",
+            "input_schema": {"type": "object", "properties": {}, "required": []}
+        }]);
+        let tools_result = check_api::build_check_request(&check_api::CheckRequest {
+            client: &client,
+            access_token,
+            model: mapped_model,
+            system: &system,
+            user_text: "Hi",
+            stream: false,
+            tools: Some(&test_tool),
+        })
+        .send();
+        let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
+
+        ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
 
     /// Execute a streaming request against the Claude Code API.
@@ -409,26 +478,26 @@ impl Default for ClaudeCodeClient {
 /// Content block metadata from SSE stream events.
 #[derive(Debug, Deserialize)]
 struct StreamContentBlock {
-    /// Block type (e.g. "text", "tool_use")
+    /// Block type (e.g. `text`, `tool_use`)
     #[serde(rename = "type")]
     block_type: Option<String>,
-    /// Block ID (for tool_use blocks)
+    /// Block ID (for `tool_use` blocks)
     id: Option<String>,
-    /// Tool name (for tool_use blocks)
+    /// Tool name (for `tool_use` blocks)
     name: Option<String>,
 }
 
 /// Delta payload from SSE stream events.
 #[derive(Debug, Deserialize)]
 struct StreamDelta {
-    /// Delta type (e.g. "text_delta", "input_json_delta")
+    /// Delta type (e.g. `text_delta`, `input_json_delta`)
     #[serde(rename = "type")]
     delta_type: Option<String>,
     /// Text content delta
     text: Option<String>,
     /// Partial JSON for tool input
     partial_json: Option<String>,
-    /// Stop reason (e.g. "end_turn", "tool_use")
+    /// Stop reason (e.g. `end_turn`, `tool_use`)
     stop_reason: Option<String>,
 }
 
@@ -442,16 +511,16 @@ struct StreamMessageBody {
 /// Top-level SSE stream event from the Claude Code API.
 #[derive(Debug, Deserialize)]
 struct StreamMessage {
-    /// Event type (e.g. "content_block_start", "message_delta")
+    /// Event type (e.g. `content_block_start`, `message_delta`)
     #[serde(rename = "type")]
     event_type: String,
-    /// Content block metadata (for block_start events)
+    /// Content block metadata (for `block_start` events)
     content_block: Option<StreamContentBlock>,
     /// Delta payload (for delta events)
     delta: Option<StreamDelta>,
     /// Token usage statistics
     usage: Option<StreamUsage>,
-    /// Message body (for message_start events)
+    /// Message body (for `message_start` events)
     message: Option<StreamMessageBody>,
 }
 

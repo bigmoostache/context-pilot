@@ -110,7 +110,8 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
                 let mut elem = panel_to_context(&p, local_id);
 
                 if p.panel_type.as_str() == ContextType::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
-                    let msgs: Vec<Message> = p.message_uids.iter().filter_map(|msg_uid| load_message(msg_uid)).collect();
+                    let msgs: Vec<Message> =
+                        p.message_uids.iter().filter_map(|msg_uid| load_message(msg_uid)).collect();
                     if !msgs.is_empty() {
                         let chunk_text = crate::state::format_messages_to_chunk(&msgs);
                         let token_count = crate::state::estimate_tokens(&chunk_text);

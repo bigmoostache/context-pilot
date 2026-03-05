@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use super::context::{ContextElement, ContextType};
 use super::data::config::SidebarMode;
 use super::data::message::Message;
-use super::flags::{StatusBools, ConfigOverlay, HighlightFn, StreamPhase, StreamingTool, UiState};
+use super::flags::{ConfigOverlay, HighlightFn, StatusBools, StreamPhase, StreamingTool, UiState};
 use crate::cast::SafeCast as _;
 use crate::config::llm_types::{LlmProvider, ModelInfo as _};
 use crate::tools::ToolDefinition;

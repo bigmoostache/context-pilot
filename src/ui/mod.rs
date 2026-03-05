@@ -44,9 +44,12 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         ])
         .split(area);
 
-    debug_assert!(main_layout.len() >= 2, "main_layout must have at least 2 chunks");
-    render_body(frame, state, main_layout[0]);
-    input::render_status_bar(frame, state, main_layout[1]);
+    let (Some(&body_area), Some(&status_area)) = (main_layout.first(), main_layout.get(1)) else {
+        debug_assert!(false, "main_layout must have at least 2 chunks");
+        return;
+    };
+    render_body(frame, state, body_area);
+    input::render_status_bar(frame, state, status_area);
 
     // Render performance overlay if enabled
     if state.flags.ui.perf_enabled {
@@ -59,7 +62,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     {
         // Position in main content area (right of sidebar, above status bar)
         let sw = state.sidebar_mode.width();
-        let content_x = area.x + sw;
+        let content_x = area.x.saturating_add(sw);
         let content_width = area.width.saturating_sub(sw);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
         let content_area = Rect::new(content_x, area.y, content_width, content_height);
@@ -92,17 +95,20 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
         ])
         .split(area);
 
-    debug_assert!(body_layout.len() >= 2, "body_layout must have at least 2 chunks");
+    let (Some(&sidebar_area), Some(&content_area)) = (body_layout.first(), body_layout.get(1)) else {
+        debug_assert!(false, "body_layout must have at least 2 chunks");
+        return;
+    };
     match state.sidebar_mode {
         cp_base::state::data::config::SidebarMode::Normal => {
-            sidebar::render_sidebar(frame, state, body_layout[0]);
+            sidebar::render_sidebar(frame, state, sidebar_area);
         }
         cp_base::state::data::config::SidebarMode::Collapsed => {
-            sidebar::render_sidebar_collapsed(frame, state, body_layout[0]);
+            sidebar::render_sidebar_collapsed(frame, state, sidebar_area);
         }
         cp_base::state::data::config::SidebarMode::Hidden => {} // handled above
     }
-    render_main_content(frame, state, body_layout[1]);
+    render_main_content(frame, state, content_area);
 }
 
 /// Render the main content area, splitting for question form if active.
@@ -121,10 +127,17 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
             ])
             .split(area);
 
-        debug_assert!(layout.len() >= 2, "question form layout must have at least 2 chunks");
-        render_content_panel(frame, state, layout[0]);
+        let (Some(&panel_area), Some(&raw_form_area)) = (layout.first(), layout.get(1)) else {
+            debug_assert!(false, "question form layout must have at least 2 chunks");
+            return;
+        };
+        render_content_panel(frame, state, panel_area);
         // Indent form by 1 col to avoid overlapping sidebar border
-        let form_area = Rect { x: layout[1].x + 1, width: layout[1].width.saturating_sub(1), ..layout[1] };
+        let form_area = Rect {
+            x: raw_form_area.x.saturating_add(1),
+            width: raw_form_area.width.saturating_sub(1),
+            ..raw_form_area
+        };
         input::render_question_form(frame, state, form_area);
         return;
     }

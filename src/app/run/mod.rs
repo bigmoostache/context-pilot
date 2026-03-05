@@ -1,7 +1,7 @@
 /// Constructor, state persistence helpers, autocomplete / question-form / palette input handlers.
 mod input;
 /// Main event loop (`App::run`) and spine check / auto-continuation.
-mod lifecycle;
+pub(crate) mod lifecycle;
 /// Reverie (context-optimizer sub-agent) stream lifecycle and tool dispatch.
 mod reverie;
 /// Stream-event processing, retry logic, typewriter buffer, and stream finalization.

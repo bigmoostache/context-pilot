@@ -17,14 +17,17 @@ use super::super::openai_compat::{self, BuildOptions, OaiMessage};
 use super::super::openai_streaming::ToolCallAccumulator;
 use super::super::{LlmClient, LlmRequest, StreamEvent};
 
+/// `DeepSeek` chat completions API endpoint.
 const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
 /// `DeepSeek` client
 pub(crate) struct DeepSeekClient {
+    /// API key loaded from the `DEEPSEEK_API_KEY` environment variable.
     api_key: Option<SecretBox<String>>,
 }
 
 impl DeepSeekClient {
+    /// Create a new `DeepSeekClient`, reading the API key from the environment.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
         Self { api_key: env::var("DEEPSEEK_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
@@ -45,13 +48,18 @@ impl Default for DeepSeekClient {
 /// which is required for deepseek-reasoner model on assistant messages.
 #[derive(Debug, Serialize)]
 struct DsMessage {
+    /// Message role (`"system"`, `"user"`, `"assistant"`, or `"tool"`).
     role: String,
+    /// Text content of the message.
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<String>,
+    /// Chain-of-thought reasoning (deepseek-reasoner only).
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning_content: Option<String>,
+    /// Tool calls made by the assistant.
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_calls: Option<Vec<openai_compat::OaiToolCall>>,
+    /// ID of the tool call this message is a result for.
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
 }
@@ -70,15 +78,22 @@ impl DsMessage {
     }
 }
 
+/// Serializable request body for the `DeepSeek` chat completions API.
 #[derive(Debug, Serialize)]
 struct DsRequest {
+    /// Model identifier (e.g. `"deepseek-chat"`, `"deepseek-reasoner"`).
     model: String,
+    /// Conversation messages.
     messages: Vec<DsMessage>,
+    /// Tool definitions available to the model.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tools: Vec<openai_compat::OaiTool>,
+    /// Tool selection strategy (e.g. `"auto"`).
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
+    /// Maximum number of tokens to generate.
     max_tokens: u32,
+    /// Whether to stream the response via SSE.
     stream: bool,
 }
 

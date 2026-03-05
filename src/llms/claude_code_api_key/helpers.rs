@@ -19,6 +19,9 @@ pub(crate) const BILLING_HEADER: &str =
 /// Directory for last-request debug dumps
 pub(crate) const LAST_REQUESTS_DIR: &str = ".context-pilot/last_requests";
 
+/// Sentinel value returned by `.get()` when a key is missing.
+const NULL: Value = Value::Null;
+
 /// Map model names to full API model identifiers
 pub(crate) fn map_model_name(model: &str) -> &str {
     match model {
@@ -37,19 +40,19 @@ pub(crate) fn inject_system_reminder(messages: &mut Vec<Value>) {
     let reminder = serde_json::json!({"type": "text", "text": SYSTEM_REMINDER});
 
     for msg in messages.iter_mut() {
-        if msg["role"] != "user" {
+        if msg.get("role").unwrap_or(&NULL) != "user" {
             continue;
         }
 
         // Skip tool_result messages (from panel injection / tool loop)
-        if let Some(arr) = msg["content"].as_array()
-            && arr.iter().any(|block| block["type"] == "tool_result")
+        if let Some(arr) = msg.get("content").unwrap_or(&NULL).as_array()
+            && arr.iter().any(|block| block.get("type").unwrap_or(&NULL) == "tool_result")
         {
             continue;
         }
 
         // Convert string content to array format and prepend reminder
-        let content = &msg["content"];
+        let content = msg.get("content").unwrap_or(&NULL);
         if content.is_string() {
             let text = content.as_str().unwrap_or("").to_string();
             msg["content"] = serde_json::json!([
@@ -57,7 +60,7 @@ pub(crate) fn inject_system_reminder(messages: &mut Vec<Value>) {
                 {"type": "text", "text": text}
             ]);
         } else if content.is_array()
-            && let Some(arr) = msg["content"].as_array_mut()
+            && let Some(arr) = msg.get_mut("content").and_then(Value::as_array_mut)
         {
             arr.insert(0, reminder);
         }
@@ -97,23 +100,31 @@ pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
     let mut result: Vec<Value> = Vec::with_capacity(messages.len());
 
     for msg in messages.drain(..) {
-        let same_role = result.last().is_some_and(|last: &Value| last["role"] == msg["role"]);
+        let msg_role = msg.get("role").unwrap_or(&NULL);
+        let same_role = result.last().is_some_and(|last: &Value| last.get("role").unwrap_or(&NULL) == msg_role);
         if !same_role {
-            let blocks = content_to_blocks(&msg["content"]);
-            result.push(serde_json::json!({"role": msg["role"], "content": blocks}));
+            let blocks = content_to_blocks(msg.get("content").unwrap_or(&NULL));
+            result.push(serde_json::json!({"role": msg_role, "content": blocks}));
             continue;
         }
 
         let prev_has_tool_result = result.last().is_some_and(|last| {
-            last["content"].as_array().is_some_and(|arr| arr.iter().any(|b| b["type"] == "tool_result"))
+            last.get("content")
+                .unwrap_or(&NULL)
+                .as_array()
+                .is_some_and(|arr| arr.iter().any(|b| b.get("type").unwrap_or(&NULL) == "tool_result"))
         });
-        let curr_has_tool_result =
-            msg["content"].as_array().is_some_and(|arr| arr.iter().any(|b| b["type"] == "tool_result"));
+        let curr_has_tool_result = msg
+            .get("content")
+            .unwrap_or(&NULL)
+            .as_array()
+            .is_some_and(|arr| arr.iter().any(|b| b.get("type").unwrap_or(&NULL) == "tool_result"));
 
         if prev_has_tool_result == curr_has_tool_result {
             // Same content type — safe to merge
-            let new_blocks = content_to_blocks(&msg["content"]);
-            if let Some(arr) = result.last_mut().and_then(|last| last["content"].as_array_mut()) {
+            let new_blocks = content_to_blocks(msg.get("content").unwrap_or(&NULL));
+            if let Some(arr) = result.last_mut().and_then(|last| last.get_mut("content").and_then(Value::as_array_mut))
+            {
                 arr.extend(new_blocks);
             }
         } else {
@@ -122,14 +133,14 @@ pub(crate) fn ensure_message_alternation(messages: &mut Vec<Value>) {
                 "role": "assistant",
                 "content": [{"type": "text", "text": "ok"}]
             }));
-            let blocks = content_to_blocks(&msg["content"]);
-            result.push(serde_json::json!({"role": msg["role"], "content": blocks}));
+            let blocks = content_to_blocks(msg.get("content").unwrap_or(&NULL));
+            result.push(serde_json::json!({"role": msg_role, "content": blocks}));
         }
     }
 
     // API requires first message to be user role. Panel injection starts with
     // assistant messages, so prepend a placeholder user message if needed.
-    if result.first().is_some_and(|m| m["role"] == "assistant") {
+    if result.first().is_some_and(|m| m.get("role").unwrap_or(&NULL) == "assistant") {
         result.insert(
             0,
             serde_json::json!({
@@ -166,9 +177,9 @@ pub(crate) fn dump_last_request(worker_id: &str, api_request: &Value) {
         },
         "request_body": api_request,
     });
-    let _r = std::fs::create_dir_all(LAST_REQUESTS_DIR);
+    let _r1 = std::fs::create_dir_all(LAST_REQUESTS_DIR);
     let path = format!("{LAST_REQUESTS_DIR}/{worker_id}_last_request.json");
-    let _r = std::fs::write(path, serde_json::to_string_pretty(&debug).unwrap_or_default());
+    let _r2 = std::fs::write(path, serde_json::to_string_pretty(&debug).unwrap_or_default());
 }
 
 /// Apply standard Claude Code request headers to a reqwest builder.

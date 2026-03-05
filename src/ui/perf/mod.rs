@@ -40,7 +40,7 @@ impl<T: Copy + Default> Default for RingBuffer<T> {
 
 impl<T: Copy + Default + Ord> RingBuffer<T> {
     /// Push a new value into the ring buffer.
-    #[expect(clippy::integer_division_remainder_used, reason = "modulo for cyclic ring buffer index is the algorithm")]
+    #[expect(clippy::integer_division_remainder_used, reason = "ring buffer push: modulo for cyclic index wrap")]
     pub(crate) fn push(&mut self, value: T) {
         if let Some(slot) = self.data.get_mut(self.write_pos) {
             *slot = value;
@@ -52,7 +52,7 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
     }
 
     /// Return the `count` most recent values.
-    #[expect(clippy::integer_division_remainder_used, reason = "modulo for cyclic ring buffer index is the algorithm")]
+    #[expect(clippy::integer_division_remainder_used, reason = "ring buffer recent: modulo for cyclic index wrap")]
     pub(crate) fn recent(&self, count: usize) -> Vec<T> {
         if self.len == 0 {
             return Vec::new();
@@ -97,7 +97,7 @@ impl Default for OpStats {
 pub(crate) struct FrameState {
     /// Timestamp of the current frame start (if any).
     frame_start: Option<Instant>,
-    /// Last CPU measurement: (timestamp, cpu_ticks).
+    /// Last CPU measurement: (timestamp, `cpu_ticks`).
     last_cpu_measure: (Instant, u64),
     /// Last time system stats were refreshed.
     last_stats_refresh: Instant,
@@ -248,6 +248,9 @@ impl PerfMetrics {
 
     /// Get snapshot of metrics for display
     pub(crate) fn snapshot(&self) -> PerfSnapshot {
+        /// Type alias for raw operation data extracted under lock.
+        type RawOp = (&'static str, u64, Vec<u64>);
+
         // Extract frame data and release lock before processing ops
         let frame_samples: Vec<f64> = {
             let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -255,7 +258,7 @@ impl PerfMetrics {
         };
 
         // Extract op data under lock, then process without holding it
-        let raw_ops: Vec<(&'static str, u64, Vec<u64>)> = {
+        let raw_ops: Vec<RawOp> = {
             let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
             ops.iter()
                 .map(|(name, stats)| {

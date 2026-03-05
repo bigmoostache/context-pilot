@@ -31,7 +31,7 @@ pub(super) fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String>
         "callback" => cp_mod_callback::types::CallbackState::get(state).active_set.len(),
         "scratchpad" => cp_mod_scratchpad::types::ScratchpadState::get(state).scratchpad_cells.len(),
         "queue" => cp_mod_queue::types::QueueState::get(state).queued_calls.len(),
-        "overview" => state.context.len() + 2, // +2 for system prompt + tool definitions
+        "overview" => state.context.len().saturating_add(2), // +2 for system prompt + tool definitions
         "tools" => state.tools.iter().filter(|t| t.enabled).count(),
         _ => return None,
     };
@@ -68,23 +68,23 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Use shared token calculation (same as Statistics panel)
     let system_prompt_tokens = {
         let sp = cp_mod_prompt::seed::get_active_agent_content(state);
-        crate::state::estimate_tokens(&sp) * 2
+        crate::state::estimate_tokens(&sp).saturating_mul(2)
     };
     let tool_def_tokens = crate::modules::overview::context::estimate_tool_definitions_tokens(state);
     let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-    let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
+    let total_tokens = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
     let max_tokens = state.effective_context_budget();
     let threshold_tokens = state.cleaning_threshold_tokens();
 
     // Compute hit/miss token breakdown for progress bar
     // System prompt and tool definitions always count as "hit" (stable, always cached)
-    let mut hit_tokens = system_prompt_tokens + tool_def_tokens;
+    let mut hit_tokens = system_prompt_tokens.saturating_add(tool_def_tokens);
     let mut miss_tokens = 0usize;
     for ctx in &state.context {
         if ctx.panel_cache_hit {
-            hit_tokens += ctx.token_count;
+            hit_tokens = hit_tokens.saturating_add(ctx.token_count);
         } else {
-            miss_tokens += ctx.token_count;
+            miss_tokens = miss_tokens.saturating_add(ctx.token_count);
         }
     }
 
@@ -98,18 +98,26 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     sorted_indices.sort_by(|&a, &b| {
         let ctx_a = state.context.get(a);
         let ctx_b = state.context.get(b);
-        let id_a =
-            ctx_a.and_then(|c| c.id.strip_prefix('P')).and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
-        let id_b =
-            ctx_b.and_then(|c| c.id.strip_prefix('P')).and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_a = ctx_a
+            .and_then(|c| c.id.strip_prefix('P'))
+            .and_then(|n: &str| n.parse::<usize>().ok())
+            .unwrap_or(usize::MAX);
+        let id_b = ctx_b
+            .and_then(|c| c.id.strip_prefix('P'))
+            .and_then(|n: &str| n.parse::<usize>().ok())
+            .unwrap_or(usize::MAX);
         id_a.cmp(&id_b)
     });
 
     // Separate fixed (P1-P9) and dynamic (P10+) contexts, skipping Conversation (it's the chat feed, not a numbered panel)
     let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
         .into_iter()
-        .filter(|&i| state.context.get(i).is_some_and(|c| c.context_type != ContextType::new(ContextType::CONVERSATION)))
+        .filter(|&i| {
+            state.context.get(i).is_some_and(|c| c.context_type != ContextType::new(ContextType::CONVERSATION))
+        })
         .partition(|&i| state.context.get(i).is_some_and(|c| c.context_type.is_fixed()));
+
+    let lctx = SidebarLineCtx { state, id_width, spin, base_style };
 
     // Render Conversation entry (special: no Px ID, highlights when selected)
     if let Some(conv_idx) =
@@ -136,7 +144,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Render fixed contexts (always visible)
     for &i in &fixed_indices {
         if let Some(ctx) = state.context.get(i) {
-            render_context_line(&mut lines, ctx, i, state, id_width, spin, base_style);
+            render_context_line(&mut lines, ctx, i, &lctx);
         }
     }
 
@@ -148,11 +156,11 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let current_page = dynamic_indices
         .iter()
         .position(|&i| i == state.selected_context)
-        .map_or(0, |selected_pos| selected_pos / MAX_DYNAMIC_PER_PAGE);
+        .map_or(0, |selected_pos| selected_pos.checked_div(MAX_DYNAMIC_PER_PAGE).unwrap_or(0));
 
     // Get dynamic contexts for current page
-    let page_start = current_page * MAX_DYNAMIC_PER_PAGE;
-    let page_end = (page_start + MAX_DYNAMIC_PER_PAGE).min(total_dynamic);
+    let page_start = current_page.saturating_mul(MAX_DYNAMIC_PER_PAGE);
+    let page_end = page_start.saturating_add(MAX_DYNAMIC_PER_PAGE).min(total_dynamic);
     let page_indices: Vec<usize> = dynamic_indices.get(page_start..page_end).unwrap_or(&[]).to_vec();
 
     // Add separator if there are dynamic contexts
@@ -163,14 +171,14 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
         // Render dynamic contexts for current page
         for &i in &page_indices {
             if let Some(ctx) = state.context.get(i) {
-                render_context_line(&mut lines, ctx, i, state, id_width, spin, base_style);
+                render_context_line(&mut lines, ctx, i, &lctx);
             }
         }
 
         // Page indicator (only if more than one page)
         if total_pages > 1 {
             lines.push(Line::from(vec![Span::styled(
-                format!("  page {}/{}", current_page + 1, total_pages),
+                format!("  page {}/{}", current_page.saturating_add(1), total_pages),
                 Style::default().fg(theme::text_muted()),
             )]));
         }
@@ -207,7 +215,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let miss_pct = if max_tokens > 0 { miss_tokens.to_f64() / max_tokens.to_f64() } else { 0.0 };
     let hit_filled = (hit_pct * bar_width.to_f64()).to_usize();
     let miss_filled = (miss_pct * bar_width.to_f64()).to_usize();
-    let total_filled = (hit_filled + miss_filled).min(bar_width);
+    let total_filled = hit_filled.saturating_add(miss_filled).min(bar_width);
     let threshold_pos = (threshold_pct.to_f64() * bar_width.to_f64()).to_usize();
 
     // Build bar: [green hit][orange miss][empty]
@@ -414,7 +422,8 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     }
 
     let paragraph = Paragraph::new(lines).style(base_style);
-    frame.render_widget(paragraph, sidebar_layout[0]);
+    let Some(&context_area) = sidebar_layout.first() else { return };
+    frame.render_widget(paragraph, context_area);
 
     // Help hints at bottom of sidebar
     let help_entries = [
@@ -437,20 +446,30 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
         .collect();
 
     let help_paragraph = Paragraph::new(help_lines).style(base_style);
-    frame.render_widget(help_paragraph, sidebar_layout[1]);
+    let Some(&help_area) = sidebar_layout.get(1) else { return };
+    frame.render_widget(help_paragraph, help_area);
+}
+
+/// Layout context for rendering a single sidebar context line.
+struct SidebarLineCtx<'ctx> {
+    /// Application state for selection and module lookups.
+    state: &'ctx State,
+    /// Alignment width for panel IDs.
+    id_width: usize,
+    /// Current spinner frame character.
+    spin: &'ctx str,
+    /// Base style for background spans.
+    base_style: Style,
 }
 
 /// Render a single context line in the sidebar panel list.
-#[expect(clippy::too_many_arguments, reason = "render_context_line needs all these params for sidebar display")]
 fn render_context_line(
     lines: &mut Vec<Line<'static>>,
     ctx: &crate::state::ContextElement,
     array_index: usize,
-    state: &State,
-    id_width: usize,
-    spin: &str,
-    base_style: Style,
+    lctx: &SidebarLineCtx<'_>,
 ) {
+    let state = lctx.state;
     let is_selected = array_index == state.selected_context;
     let icon = ctx.context_type.icon();
 
@@ -459,19 +478,19 @@ fn render_context_line(
 
     // Build the line — fixed panels show a count badge instead of Px ID
     let shortcut = if ctx.context_type.is_fixed() {
-        let badge = fixed_panel_badge(ctx.context_type.as_str(), state).unwrap_or_default();
-        format!("{badge:>id_width$}")
+        let badge = fixed_panel_badge(ctx.context_type.as_str(), lctx.state).unwrap_or_default();
+        format!("{badge:>id_width$}", id_width = lctx.id_width)
     } else {
-        format!("{:>width$}", &ctx.id, width = id_width)
+        format!("{:>width$}", &ctx.id, width = lctx.id_width)
     };
     let name = truncate_string(&ctx.name, 18);
 
     // Show spinner instead of token count when loading
     // Show page indicator for paginated panels
     let tokens_or_spinner = if is_loading {
-        format!("{spin:>6}")
+        format!("{:>6}", lctx.spin)
     } else if ctx.total_pages > 1 {
-        format!("{}/{}", ctx.current_page + 1, ctx.total_pages)
+        format!("{}/{}", ctx.current_page.saturating_add(1), ctx.total_pages)
     } else {
         format_number(ctx.token_count)
     };
@@ -496,6 +515,6 @@ fn render_context_line(
         Span::styled(icon, Style::default().fg(if is_selected { theme::accent() } else { theme::text_muted() })),
         Span::styled(format!("{name:<18}"), Style::default().fg(name_color)),
         Span::styled(format!("{tokens_or_spinner:>6}"), Style::default().fg(tokens_color)),
-        Span::styled(" ", base_style),
+        Span::styled(" ", lctx.base_style),
     ]));
 }

@@ -22,18 +22,25 @@ fn get_visualizer_registry() -> &'static HashMap<String, ToolVisualizer> {
     VISUALIZER_REGISTRY.get_or_init(build_visualizer_registry)
 }
 
+/// Display options for rendering a single conversation message.
+pub(crate) struct MessageRenderOpts {
+    /// Available viewport width for text wrapping.
+    pub viewport_width: u16,
+    /// Base style for background and default text.
+    pub base_style: Style,
+    /// Whether this message is currently being streamed.
+    pub is_streaming: bool,
+    /// Whether to show developer-mode token counts.
+    pub dev_mode: bool,
+}
+
 /// Render a single message to lines (without caching logic).
 /// Formats user messages, assistant messages, tool calls, and tool results
 /// with appropriate icons, colors, and markdown rendering.
-#[expect(clippy::too_many_arguments, reason = "render parameters are cohesive and all required for message display")]
-pub(crate) fn render_message(
-    msg: &Message,
-    viewport_width: u16,
-    base_style: Style,
-    is_streaming_this: bool,
-    dev_mode: bool,
-) -> Vec<Line<'static>> {
+pub(crate) fn render_message(msg: &Message, opts: &MessageRenderOpts) -> Vec<Line<'static>> {
     let mut output_lines: Vec<Line<'static>> = Vec::new();
+    let viewport_width = opts.viewport_width;
+    let base_style = opts.base_style;
 
     // Handle tool call messages — YAML-style parameter display
     if msg.msg_type == MessageType::ToolCall {
@@ -58,7 +65,8 @@ pub(crate) fn render_message(
                         | serde_json::Value::Array(_)
                         | serde_json::Value::Object(_) => val.to_string(),
                     };
-                    render_param_lines(&mut output_lines, &param_prefix, key, &val_str, wrap_width, base_style);
+                    let pstyle = ParamStyle { prefix: &param_prefix, wrap_width, base_style };
+                    render_param_lines(&mut output_lines, &pstyle, key, &val_str);
                 }
             }
         }
@@ -87,22 +95,21 @@ pub(crate) fn render_message(
             };
 
             let mut is_first = true;
-            let mut push_with_prefix =
-                |line_spans: Vec<Span<'static>>, result_lines: &mut Vec<Line<'static>>| {
-                    if is_first {
-                        let mut full = vec![
-                            Span::styled(status_icon.clone(), Style::default().fg(status_color)),
-                            Span::styled(" ".to_string(), base_style),
-                        ];
-                        full.extend(line_spans);
-                        result_lines.push(Line::from(full));
-                        is_first = false;
-                    } else {
-                        let mut full = vec![Span::styled(" ".repeat(prefix_width), base_style)];
-                        full.extend(line_spans);
-                        result_lines.push(Line::from(full));
-                    }
-                };
+            let mut push_with_prefix = |line_spans: Vec<Span<'static>>, result_lines: &mut Vec<Line<'static>>| {
+                if is_first {
+                    let mut full = vec![
+                        Span::styled(status_icon.clone(), Style::default().fg(status_color)),
+                        Span::styled(" ".to_string(), base_style),
+                    ];
+                    full.extend(line_spans);
+                    result_lines.push(Line::from(full));
+                    is_first = false;
+                } else {
+                    let mut full = vec![Span::styled(" ".repeat(prefix_width), base_style)];
+                    full.extend(line_spans);
+                    result_lines.push(Line::from(full));
+                }
+            };
 
             if let Some(vis_lines) = custom_lines {
                 // Use module-provided visualization
@@ -150,7 +157,7 @@ pub(crate) fn render_message(
     let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
 
     if content.trim().is_empty() {
-        if msg.role == "assistant" && is_streaming_this {
+        if msg.role == "assistant" && opts.is_streaming {
             output_lines.push(Line::from(vec![
                 Span::styled(role_icon, Style::default().fg(role_color)),
                 Span::styled(status_icon, Style::default().fg(theme::text_muted())),
@@ -258,7 +265,7 @@ pub(crate) fn render_message(
     }
 
     // Dev mode: show token counts
-    if dev_mode && msg.role == "assistant" && (msg.input_tokens > 0 || msg.content_token_count > 0) {
+    if opts.dev_mode && msg.role == "assistant" && (msg.input_tokens > 0 || msg.content_token_count > 0) {
         output_lines.push(Line::from(vec![
             Span::styled(" ".repeat(prefix_width), base_style),
             Span::styled(
@@ -301,7 +308,7 @@ pub(crate) fn render_streaming_tool(
     let param_prefix = " ".repeat(prefix_width);
     if !partial_json.is_empty() {
         for (key, val) in extract_json_fields(partial_json) {
-            render_param_lines(&mut lines, &param_prefix, &key, &val, wrap_width, base_style);
+            render_param_lines(&mut lines, &ParamStyle { prefix: &param_prefix, wrap_width, base_style }, &key, &val);
         }
     }
 
@@ -443,45 +450,47 @@ fn read_json_value(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>, f
     }
 }
 
+/// Style context for rendering YAML-style parameter lines.
+pub(crate) struct ParamStyle<'style> {
+    /// Indentation prefix for parameter lines.
+    pub prefix: &'style str,
+    /// Maximum width for value text.
+    pub wrap_width: usize,
+    /// Base style for background/spacing spans.
+    pub base_style: Style,
+}
+
 /// Render a parameter key-value pair as one or more lines.
 ///
 /// Single-line values render as `prefix key: value`. Multiline values unroll
 /// line by line, each continuation indented to align under the first value char.
-#[expect(clippy::too_many_arguments, reason = "render parameters are cohesive and all required for YAML-style display")]
-fn render_param_lines(
-    lines: &mut Vec<Line<'static>>,
-    param_prefix: &str,
-    key: &str,
-    val: &str,
-    wrap_width: usize,
-    base_style: Style,
-) {
+fn render_param_lines(lines: &mut Vec<Line<'static>>, style: &ParamStyle<'_>, key: &str, val: &str) {
     let key_span_width = key.len().saturating_add(2); // "key: "
-    let val_width = wrap_width.saturating_sub(key_span_width);
+    let val_width = style.wrap_width.saturating_sub(key_span_width);
     let val_lines: Vec<&str> = val.lines().collect();
 
     if val_lines.len() <= 1 {
         // Single-line value — truncate if too wide
         let display_val = truncate_single_line(val, val_width);
         lines.push(Line::from(vec![
-            Span::styled(param_prefix.to_string(), base_style),
+            Span::styled(style.prefix.to_string(), style.base_style),
             Span::styled(format!("{key}: "), Style::default().fg(theme::accent())),
             Span::styled(display_val, Style::default().fg(theme::text_secondary())),
         ]));
     } else {
         // Multiline value — unroll each line with continuation indent
-        let continuation = format!("{}{}", param_prefix, " ".repeat(key_span_width));
+        let continuation = format!("{}{}", style.prefix, " ".repeat(key_span_width));
         for (idx, line) in val_lines.iter().enumerate() {
             let display_line = truncate_single_line(line, val_width);
             if idx == 0 {
                 lines.push(Line::from(vec![
-                    Span::styled(param_prefix.to_string(), base_style),
+                    Span::styled(style.prefix.to_string(), style.base_style),
                     Span::styled(format!("{key}: "), Style::default().fg(theme::accent())),
                     Span::styled(display_line, Style::default().fg(theme::text_secondary())),
                 ]));
             } else {
                 lines.push(Line::from(vec![
-                    Span::styled(continuation.clone(), base_style),
+                    Span::styled(continuation.clone(), style.base_style),
                     Span::styled(display_line, Style::default().fg(theme::text_secondary())),
                 ]));
             }
@@ -498,4 +507,4 @@ fn truncate_single_line(val: &str, max_width: usize) -> String {
     }
 }
 
-pub(super) use super::render_input::render_input;
+pub(super) use super::render_input::{InputContext, render_input};

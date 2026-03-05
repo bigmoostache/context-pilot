@@ -27,15 +27,23 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
     sorted_indices.sort_by(|&a, &b| {
         let ctx_a = state.context.get(a);
         let ctx_b = state.context.get(b);
-        let id_a = ctx_a.and_then(|c| c.id.strip_prefix('P')).and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
-        let id_b = ctx_b.and_then(|c| c.id.strip_prefix('P')).and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_a = ctx_a
+            .and_then(|c| c.id.strip_prefix('P'))
+            .and_then(|n: &str| n.parse::<usize>().ok())
+            .unwrap_or(usize::MAX);
+        let id_b = ctx_b
+            .and_then(|c| c.id.strip_prefix('P'))
+            .and_then(|n: &str| n.parse::<usize>().ok())
+            .unwrap_or(usize::MAX);
         id_a.cmp(&id_b)
     });
 
     // Separate fixed and dynamic, skip conversation (rendered separately)
     let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
         .into_iter()
-        .filter(|&i| state.context.get(i).is_some_and(|c| c.context_type != ContextType::new(ContextType::CONVERSATION)))
+        .filter(|&i| {
+            state.context.get(i).is_some_and(|c| c.context_type != ContextType::new(ContextType::CONVERSATION))
+        })
         .partition(|&i| state.context.get(i).is_some_and(|c| c.context_type.is_fixed()));
 
     // Conversation entry
@@ -60,16 +68,17 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
     }
 
     let paragraph = ratatui::widgets::Paragraph::new(lines).style(base_style);
-    frame.render_widget(paragraph, layout[0]);
+    let Some(&panel_area) = layout.first() else { return };
+    frame.render_widget(paragraph, panel_area);
 
     // Token summary at bottom (3 lines: current / threshold / budget)
     let system_prompt_tokens = {
         let sp = cp_mod_prompt::seed::get_active_agent_content(state);
-        crate::state::estimate_tokens(&sp) * 2
+        crate::state::estimate_tokens(&sp).saturating_mul(2)
     };
     let tool_def_tokens = crate::modules::overview::context::estimate_tool_definitions_tokens(state);
     let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-    let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
+    let total_tokens = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
     let max_tokens = state.effective_context_budget();
     let threshold_tokens = state.cleaning_threshold_tokens();
 
@@ -90,10 +99,15 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
     ];
 
     let token_paragraph = ratatui::widgets::Paragraph::new(token_lines).style(base_style);
-    frame.render_widget(token_paragraph, layout[1]);
+    let Some(&token_area) = layout.get(1) else { return };
+    frame.render_widget(token_paragraph, token_area);
 }
 
 /// Render a single collapsed sidebar line for a context panel.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "render_collapsed_line needs idx, state, style, and badge for collapsed sidebar display"
+)]
 fn render_collapsed_line(
     lines: &mut Vec<Line<'static>>,
     idx: usize,

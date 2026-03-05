@@ -276,7 +276,10 @@ impl World for ContextPilotWorld {
             || now.naive_local(),
             |hours| {
                 let utc = Utc::now();
-                #[expect(clippy::arithmetic_side_effects, reason = "chrono offset arithmetic cannot overflow for valid timezone offsets")]
+                #[expect(
+                    clippy::arithmetic_side_effects,
+                    reason = "chrono offset arithmetic cannot overflow for valid timezone offsets"
+                )]
                 let shifted = utc + chrono::Duration::hours(hours);
                 shifted.naive_utc()
             },

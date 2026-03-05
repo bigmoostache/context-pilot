@@ -22,9 +22,9 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     let has_question_form = state.get_ext::<cp_base::ui::question_form::PendingForm>().is_some();
     let has_timed_watcher = {
         use cp_base::state::watchers::WatcherRegistry;
-        state.get_ext::<WatcherRegistry>().is_some_and(|reg: &WatcherRegistry| {
-            reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some())
-        })
+        state
+            .get_ext::<WatcherRegistry>()
+            .is_some_and(|reg: &WatcherRegistry| reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some()))
     };
 
     if let Some(ref reason) = state.guard_rail_blocked {
@@ -111,7 +111,8 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     // Active agent card
     let prompt_state = PromptState::get(state);
     if let Some(ref agent_id) = prompt_state.active_agent_id {
-        let agent_name = prompt_state.agents.iter().find(|a| &a.id == agent_id).map_or(agent_id.as_str(), |a| a.name.as_str());
+        let agent_name =
+            prompt_state.agents.iter().find(|a| &a.id == agent_id).map_or(agent_id.as_str(), |a| a.name.as_str());
         spans.push(Span::styled(
             format!(" 🤖 {agent_name} "),
             Style::default().fg(Color::White).bg(Color::Rgb(130, 80, 200)).bold(),
@@ -121,7 +122,8 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 
     // Loaded skill cards
     for skill_id in &prompt_state.loaded_skill_ids {
-        let skill_name = prompt_state.skills.iter().find(|s| s.id == *skill_id).map_or(skill_id.as_str(), |s| s.name.as_str());
+        let skill_name =
+            prompt_state.skills.iter().find(|s| s.id == *skill_id).map_or(skill_id.as_str(), |s| s.name.as_str());
         spans.push(Span::styled(
             format!(" 📚 {skill_name} "),
             Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold(),
@@ -151,7 +153,9 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
             total_deletions = total_deletions.saturating_add(file.deletions);
             match file.change_type {
                 GitChangeType::Untracked => untracked_count = untracked_count.saturating_add(1),
-                GitChangeType::Modified | GitChangeType::Added | GitChangeType::Renamed => modified_count = modified_count.saturating_add(1),
+                GitChangeType::Modified | GitChangeType::Added | GitChangeType::Renamed => {
+                    modified_count = modified_count.saturating_add(1);
+                }
                 GitChangeType::Deleted => deleted_count = deleted_count.saturating_add(1),
             }
         }
@@ -198,8 +202,11 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         let Some(rev) = state.reveries.get(*rev_key) else { continue };
         // Look up the agent's display name from PromptState
         let rev_prompt_state = PromptState::get(state);
-        let agent_name =
-            rev_prompt_state.agents.iter().find(|a| a.id == rev.agent_id).map_or(rev.agent_id.as_str(), |a| a.name.as_str());
+        let agent_name = rev_prompt_state
+            .agents
+            .iter()
+            .find(|a| a.id == rev.agent_id)
+            .map_or(rev.agent_id.as_str(), |a| a.name.as_str());
         let tools_done = rev.tool_call_count;
         let rev_spin = if rev.is_streaming { format!("{spin} ") } else { String::new() };
         spans.push(Span::styled(
@@ -259,8 +266,11 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
     let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Progress indicator
-    let progress =
-        if form.questions.len() > 1 { format!(" ({}/{}) ", q_idx.saturating_add(1), form.questions.len()) } else { String::new() };
+    let progress = if form.questions.len() > 1 {
+        format!(" ({}/{}) ", q_idx.saturating_add(1), form.questions.len())
+    } else {
+        String::new()
+    };
 
     // Question text
     lines.push(Line::from(vec![
@@ -414,7 +424,9 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, ar
     let border_chrome = 2u16; // top + bottom border of the conversation panel
     let input_lines = ac.input_visual_lines;
     let scroll_padding = 2u16; // padding lines below input in the conversation panel
-    let popup_bottom = area.y.saturating_add(area.height.saturating_sub(border_chrome.saturating_add(input_lines).saturating_add(scroll_padding)));
+    let popup_bottom = area.y.saturating_add(
+        area.height.saturating_sub(border_chrome.saturating_add(input_lines).saturating_add(scroll_padding)),
+    );
     let popup_top = popup_bottom.saturating_sub(popup_height);
     // Clamp: don't go above the top of the content area (+1 for border)
     let y = popup_top.max(area.y.saturating_add(1));

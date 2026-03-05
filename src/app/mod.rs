@@ -11,7 +11,7 @@ pub(crate) mod prompt_builder;
 /// Reverie sub-agent: trigger, tools, and lifecycle.
 pub(crate) mod reverie;
 /// Main event loop, streaming, tool pipeline, watchers.
-mod run;
+pub(crate) mod run;
 
 pub(crate) use context::{ensure_default_agent, ensure_default_contexts};
 

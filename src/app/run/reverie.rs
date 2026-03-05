@@ -10,6 +10,7 @@ use crate::state::persistence::save_state;
 use cp_base::config::REVERIE;
 use cp_mod_queue::types::QueueState;
 
+#[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Check if any reverie needs a stream started (state has reverie but no stream).
     /// Called from the main event loop.

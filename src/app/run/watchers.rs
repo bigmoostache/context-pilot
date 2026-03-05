@@ -7,6 +7,7 @@ use crate::state::{ContextType, State};
 
 use crate::app::App;
 
+#[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Set up file watchers from all modules' `watch_paths()`.
     pub(super) fn setup_file_watchers(&mut self) {

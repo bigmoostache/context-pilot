@@ -20,15 +20,23 @@ use crate::app::context::{get_active_agent_content, prepare_stream_context};
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
 
+/// Bundles the I/O channels polled by the main event loop.
+pub(crate) struct EventChannels<'ch> {
+    /// Sends stream events to the LLM provider thread.
+    pub tx: &'ch Sender<StreamEvent>,
+    /// Receives stream events from the LLM provider thread.
+    pub rx: &'ch Receiver<StreamEvent>,
+    /// Receives cache update results from the background hasher.
+    pub cache_rx: &'ch Receiver<CacheUpdate>,
+}
+
+#[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Main event loop: processes input, stream events, tools, spine, and rendering.
-    #[expect(clippy::too_many_arguments, reason = "event-loop entry point bundles terminal + channels")]
     pub(crate) fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-        tx: &Sender<StreamEvent>,
-        rx: &Receiver<StreamEvent>,
-        cache_rx: &Receiver<CacheUpdate>,
+        ch: &EventChannels<'_>,
     ) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
         self.setup_file_watchers();
@@ -61,7 +69,7 @@ impl App {
                 // Handle command palette events first if it's open
                 if self.command_palette.is_open {
                     if let Some(action) = self.handle_palette_event(&evt) {
-                        self.handle_action(action, tx);
+                        self.handle_action(action, ch.tx);
                     }
                     self.state.flags.ui.dirty = true;
 
@@ -127,7 +135,7 @@ impl App {
                     self.command_palette.open(&self.state);
                     self.state.flags.ui.dirty = true;
                 } else {
-                    self.handle_action(action, tx);
+                    self.handle_action(action, ch.tx);
                 }
 
                 // Render immediately after input for instant feedback
@@ -142,28 +150,28 @@ impl App {
             }
 
             // === BACKGROUND PROCESSING ===
-            self.process_stream_events(rx);
-            self.handle_retry(tx);
+            self.process_stream_events(ch.rx);
+            self.handle_retry(ch.tx);
             self.process_typewriter();
-            self.process_cache_updates(cache_rx);
+            self.process_cache_updates(ch.cache_rx);
             self.process_watcher_events();
             // Check if we're waiting for panels and they're ready (non-blocking)
-            self.check_waiting_for_panels(tx);
+            self.check_waiting_for_panels(ch.tx);
             // Check if deferred sleep timer has expired (non-blocking)
-            self.check_deferred_sleep(tx);
+            self.check_deferred_sleep(ch.tx);
             // Check if a question form has been resolved by the user
-            self.check_question_form(tx);
+            self.check_question_form(ch.tx);
             // Check watchers (blocking sentinel replacement + async → spine notifications)
-            self.check_watchers(tx);
+            self.check_watchers(ch.tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
                 self.sync_gh_watches();
             }
             self.check_timer_based_deprecation();
-            self.handle_tool_execution(tx);
+            self.handle_tool_execution(ch.tx);
             self.finalize_stream();
-            self.check_spine(tx);
+            self.check_spine(ch.tx);
             self.process_api_check_results();
 
             // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===

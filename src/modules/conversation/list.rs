@@ -106,11 +106,7 @@ pub(super) fn detect_list_action(input: &str) -> Option<ListAction> {
         if marker.chars().all(|c| c.is_ascii_digit())
             && let Ok(num) = marker.parse::<usize>()
         {
-            return Some(ListAction::Continue(format!(
-                "\n{}{}. ",
-                " ".repeat(indent),
-                num.saturating_add(1)
-            )));
+            return Some(ListAction::Continue(format!("\n{}{}. ", " ".repeat(indent), num.saturating_add(1))));
         }
 
         // Alphabetic: a, b, c, ... or A, B, C, ... (single char only)

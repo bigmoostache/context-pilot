@@ -26,20 +26,24 @@ use helpers::{
 
 /// Claude Code API Key client
 pub(crate) struct ClaudeCodeApiKeyClient {
+    /// Anthropic API key loaded from the `ANTHROPIC_API_KEY` environment variable
     api_key: Option<SecretBox<String>>,
 }
 
 impl ClaudeCodeApiKeyClient {
+    /// Create a new client, loading the API key from environment.
     pub(crate) fn new() -> Self {
         let api_key = Self::load_api_key();
         Self { api_key }
     }
 
+    /// Load the API key from the `ANTHROPIC_API_KEY` environment variable.
     pub(crate) fn load_api_key() -> Option<SecretBox<String>> {
         let key = env::var("ANTHROPIC_API_KEY").ok()?;
         Some(SecretBox::new(Box::new(key)))
     }
 
+    /// Run sequential API health checks: auth, streaming, and tool calling.
     pub(crate) fn check_api_impl(&self, model: &str) -> ApiCheckResult {
         let api_key = match self.api_key.as_ref() {
             Some(t) => t.expose_secret(),

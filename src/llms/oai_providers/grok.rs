@@ -16,14 +16,17 @@ use super::super::openai_compat::{self, BuildOptions, OaiMessage};
 use super::super::openai_streaming::ToolCallAccumulator;
 use super::super::{LlmClient, LlmRequest, StreamEvent};
 
+/// xAI Grok chat completions API endpoint.
 const GROK_API_ENDPOINT: &str = "https://api.x.ai/v1/chat/completions";
 
 /// xAI Grok client
 pub(crate) struct GrokClient {
+    /// API key loaded from the `XAI_API_KEY` environment variable.
     api_key: Option<SecretBox<String>>,
 }
 
 impl GrokClient {
+    /// Create a new `GrokClient`, reading the API key from the environment.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
         Self { api_key: env::var("XAI_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
@@ -36,15 +39,22 @@ impl Default for GrokClient {
     }
 }
 
+/// Serializable request body for the Grok chat completions API.
 #[derive(Debug, Serialize)]
 struct GrokRequest {
+    /// Model identifier (e.g. `"grok-3"`).
     model: String,
+    /// Conversation messages.
     messages: Vec<OaiMessage>,
+    /// Tool definitions available to the model.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tools: Vec<openai_compat::OaiTool>,
+    /// Tool selection strategy (e.g. `"auto"`).
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
+    /// Maximum number of tokens to generate.
     max_tokens: u32,
+    /// Whether to stream the response via SSE.
     stream: bool,
 }
 

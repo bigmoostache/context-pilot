@@ -26,7 +26,11 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let question = match q_val.get("question").and_then(serde_json::Value::as_str) {
             Some(s) => s.to_string(),
             None => {
-                return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'question' field", i.saturating_add(1)), true);
+                return ToolResult::new(
+                    tool.id.clone(),
+                    format!("Question {}: missing 'question' field", i.saturating_add(1)),
+                    true,
+                );
             }
         };
 
@@ -39,14 +43,22 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             }
             None => {
-                return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'header' field", i.saturating_add(1)), true);
+                return ToolResult::new(
+                    tool.id.clone(),
+                    format!("Question {}: missing 'header' field", i.saturating_add(1)),
+                    true,
+                );
             }
         };
 
         let multi_select = q_val.get("multiSelect").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
         let Some(options_val) = q_val.get("options").and_then(serde_json::Value::as_array) else {
-            return ToolResult::new(tool.id.clone(), format!("Question {}: missing 'options' field", i.saturating_add(1)), true);
+            return ToolResult::new(
+                tool.id.clone(),
+                format!("Question {}: missing 'options' field", i.saturating_add(1)),
+                true,
+            );
         };
 
         if options_val.len() < 2 || options_val.len() > 4 {
@@ -74,7 +86,11 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                 None => {
                     return ToolResult::new(
                         tool.id.clone(),
-                        format!("Question {} option {}: missing 'description'", i.saturating_add(1), j.saturating_add(1)),
+                        format!(
+                            "Question {} option {}: missing 'description'",
+                            i.saturating_add(1),
+                            j.saturating_add(1)
+                        ),
                         true,
                     );
                 }

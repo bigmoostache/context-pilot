@@ -19,6 +19,7 @@ use std::fmt::Write as _;
 
 // ─── Tool pipeline ──────────────────────────────────────────────────────────
 
+#[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Create and persist a `tool_call` message for a single `ToolUse`.
     /// Used for both direct tool calls and queue-flushed replays.

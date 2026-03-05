@@ -19,14 +19,17 @@ use super::super::{LlmClient, LlmRequest, StreamEvent};
 use crate::infra::tools::ToolDefinition;
 use cp_base::config::INJECTIONS;
 
+/// Groq chat completions API endpoint.
 const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions";
 
 /// Groq client
 pub(crate) struct GroqClient {
+    /// API key loaded from the `GROQ_API_KEY` environment variable.
     api_key: Option<SecretBox<String>>,
 }
 
 impl GroqClient {
+    /// Create a new `GroqClient`, reading the API key from the environment.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
         Self { api_key: env::var("GROQ_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
@@ -39,15 +42,22 @@ impl Default for GroqClient {
     }
 }
 
+/// Serializable request body for the Groq chat completions API.
 #[derive(Debug, Serialize)]
 struct GroqRequest {
+    /// Model identifier (e.g. `"llama-3.3-70b-versatile"`).
     model: String,
+    /// Conversation messages.
     messages: Vec<OaiMessage>,
+    /// Tool definitions (function tools or built-in tools like `browser_search`).
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    tools: Vec<Value>, // Can be function tools or built-in tools (browser_search, code_interpreter)
+    tools: Vec<Value>,
+    /// Tool selection strategy (e.g. `"auto"`).
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
+    /// Maximum number of completion tokens to generate.
     max_completion_tokens: u32,
+    /// Whether to stream the response via SSE.
     stream: bool,
 }
 

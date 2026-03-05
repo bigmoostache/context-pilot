@@ -9,6 +9,7 @@ use crate::app::context::{get_active_agent_content, prepare_stream_context};
 use crate::state::cache::{CacheUpdate, process_cache_request};
 use crate::state::{State, StreamPhase, get_context_type_meta};
 
+#[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Drain the stream-event channel and apply each event (chunks, tools, done, errors).
     pub(super) fn process_stream_events(&mut self, rx: &Receiver<StreamEvent>) {

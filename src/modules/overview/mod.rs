@@ -383,10 +383,7 @@ impl Module for OverviewModule {
         None
     }
 
-    fn context_detail(
-        &self,
-        _ctx: &crate::state::ContextElement,
-    ) -> Option<String> {
+    fn context_detail(&self, _ctx: &crate::state::ContextElement) -> Option<String> {
         None
     }
 
