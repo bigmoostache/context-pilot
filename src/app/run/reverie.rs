@@ -48,6 +48,7 @@ impl App {
             for evt in events {
                 self.state.flags.ui.dirty = true;
                 match evt {
+                    StreamEvent::ToolProgress { .. } => {} // Reveries run in background — no UI preview
                     StreamEvent::Chunk(text) => {
                         if let Some(rev) = self.state.reveries.get_mut(&agent_id) {
                             if rev.messages.last().is_none_or(|m| m.role != "assistant") {

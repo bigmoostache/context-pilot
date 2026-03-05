@@ -88,8 +88,9 @@ impl ToolCallAccumulator {
         Self::default()
     }
 
-    /// Feed a streaming tool call delta.
-    pub(crate) fn feed(&mut self, call: &StreamToolCall) {
+    /// Feed a streaming tool call delta. Returns `(name, args_so_far)` for
+    /// progress reporting when the tool name is known.
+    pub(crate) fn feed(&mut self, call: &StreamToolCall) -> Option<(String, String)> {
         let idx = call.index.unwrap_or(0);
         let entry = self.calls.entry(idx).or_insert_with(|| (String::new(), String::new(), String::new()));
 
@@ -104,6 +105,9 @@ impl ToolCallAccumulator {
                 entry.2.push_str(args);
             }
         }
+
+        // Report progress when we know the tool name
+        if entry.1.is_empty() { None } else { Some((entry.1.clone(), entry.2.clone())) }
     }
 
     /// Drain all completed tool calls into `ToolUse` events.

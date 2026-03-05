@@ -21,11 +21,16 @@ impl App {
                 StreamEvent::Chunk(text) => {
                     self.typewriter.add_chunk(&text);
                 }
+                StreamEvent::ToolProgress { name, input_so_far } => {
+                    self.state.streaming_tool = Some(crate::state::StreamingTool { name, input_so_far });
+                }
                 StreamEvent::ToolUse(tool) => {
+                    self.state.streaming_tool = None;
                     self.pending_tools.push(tool);
                 }
                 StreamEvent::Done { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason } => {
                     self.typewriter.mark_done();
+                    self.state.streaming_tool = None;
                     self.pending_done =
                         Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason));
                     // API call succeeded — reset retry counter immediately at tick level

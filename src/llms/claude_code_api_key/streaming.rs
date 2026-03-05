@@ -136,8 +136,9 @@ pub(super) fn parse_sse_stream(
                     if let Some(block) = event.content_block
                         && block.block_type.as_deref() == Some("tool_use")
                     {
-                        current_tool =
-                            Some((block.id.unwrap_or_default(), block.name.unwrap_or_default(), String::new()));
+                        let name = block.name.unwrap_or_default();
+                        let _r = tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: String::new() });
+                        current_tool = Some((block.id.unwrap_or_default(), name, String::new()));
                     }
                 }
                 "content_block_delta" => {
@@ -150,9 +151,13 @@ pub(super) fn parse_sse_stream(
                             }
                             Some("input_json_delta") => {
                                 if let Some(json) = delta.partial_json
-                                    && let Some((_, _, ref mut input)) = current_tool
+                                    && let Some((_, ref name, ref mut input)) = current_tool
                                 {
                                     input.push_str(&json);
+                                    let _r = tx.send(StreamEvent::ToolProgress {
+                                        name: name.clone(),
+                                        input_so_far: input.clone(),
+                                    });
                                 }
                             }
                             _ => {}

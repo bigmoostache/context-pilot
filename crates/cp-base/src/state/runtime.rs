@@ -123,6 +123,19 @@ pub struct StateFlags {
     pub lifecycle: LifecycleFlags,
 }
 
+/// Advisory state for a tool call currently being streamed by the LLM.
+///
+/// Populated from [`StreamEvent::ToolProgress`] events, cleared on
+/// [`StreamEvent::ToolUse`] or [`StreamEvent::Done`]. Pure UI — has
+/// no effect on tool execution.
+#[derive(Debug, Clone, Default)]
+pub struct StreamingTool {
+    /// Tool name (e.g., `"Edit"`, `"Open"`). Known from `content_block_start`.
+    pub name: String,
+    /// Accumulated partial JSON input (grows with each `input_json_delta`).
+    pub input_so_far: String,
+}
+
 /// Runtime state (messages loaded in memory)
 pub struct State {
     /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
@@ -141,6 +154,8 @@ pub struct State {
     pub selected_context: usize,
     /// Boolean status flags, organized by domain.
     pub flags: StateFlags,
+    /// Tool call currently being streamed (advisory, for UI rendering).
+    pub streaming_tool: Option<StreamingTool>,
     /// Selected bar in config view (0=budget, 1=threshold, 2=target)
     pub config_selected_bar: usize,
     /// Stop reason from last completed stream (e.g., "`end_turn`", "`max_tokens`", "`tool_use`")
@@ -270,6 +285,7 @@ impl Default for State {
                 config: ConfigFlags { reverie_enabled: true, ..ConfigFlags::default() },
                 ..StateFlags::default()
             },
+            streaming_tool: None,
             last_stop_reason: None,
             scroll_offset: 0.0,
             scroll_accel: 1.0,

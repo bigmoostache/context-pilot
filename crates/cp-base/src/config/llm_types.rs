@@ -10,6 +10,16 @@ use crate::tools::ToolUse;
 pub enum StreamEvent {
     /// Text chunk from the response.
     Chunk(String),
+    /// Advisory: a tool call is being streamed (name + partial JSON input so far).
+    ///
+    /// Pure UI hint — has no effect on execution. Cleared when the final
+    /// [`ToolUse`](Self::ToolUse) arrives.
+    ToolProgress {
+        /// Tool name (available from `content_block_start`).
+        name: String,
+        /// Accumulated partial JSON input (grows with each `input_json_delta`).
+        input_so_far: String,
+    },
     /// Tool use request from the LLM.
     ToolUse(ToolUse),
     /// Stream completed with token usage.

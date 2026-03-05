@@ -78,6 +78,12 @@ impl ConversationPanel {
             std::hash::Hash::hash(&msg.input_tokens, &mut hasher);
         }
 
+        // Hash streaming tool state (invalidate when tool preview changes)
+        if let Some(ref st) = state.streaming_tool {
+            std::hash::Hash::hash(&st.name, &mut hasher);
+            std::hash::Hash::hash(&st.input_so_far, &mut hasher);
+        }
+
         // Hash input
         std::hash::Hash::hash(&state.input, &mut hasher);
         std::hash::Hash::hash(&state.input_cursor, &mut hasher);
@@ -192,6 +198,16 @@ impl ConversationPanel {
 
                 text.extend(lines);
             }
+        }
+
+        // Render streaming tool preview (between messages and input)
+        if let Some(ref streaming_tool) = state.streaming_tool {
+            text.extend(render::render_streaming_tool(
+                &streaming_tool.name,
+                &streaming_tool.input_so_far,
+                viewport_width,
+                base_style,
+            ));
         }
 
         // Render input area with caching

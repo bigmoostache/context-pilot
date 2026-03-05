@@ -152,7 +152,9 @@ impl LlmClient for GroqClient {
                         }
                         if let Some(calls) = delta.tool_calls {
                             for call in &calls {
-                                tool_acc.feed(call);
+                                if let Some((name, input_so_far)) = tool_acc.feed(call) {
+                                    let _r = tx.send(StreamEvent::ToolProgress { name, input_so_far });
+                                }
                             }
                         }
                     }
