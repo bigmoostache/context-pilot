@@ -11,8 +11,8 @@ use crate::state::{Message, MessageStatus, MessageType, StreamPhase, ToolResultR
 use super::streaming::{has_dirty_file_panels, has_dirty_panels, trigger_dirty_panel_refresh};
 use cp_mod_callback::firing as callback_firing;
 use cp_mod_callback::trigger as callback_trigger;
-use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
-use cp_mod_queue::QueueState;
+use cp_mod_console::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
+use cp_mod_queue::types::QueueState;
 
 use crate::app::App;
 use std::fmt::Write as _;
@@ -97,7 +97,7 @@ impl App {
                 } else if QueueState::get(&self.state).active && !QueueState::is_queue_tool(&tool.name) {
                     // Queue intercept: enqueue instead of executing
                     let qs = QueueState::get_mut(&mut self.state);
-                    let idx = qs.enqueue(cp_mod_queue::QueuedToolCall {
+                    let idx = qs.enqueue(cp_mod_queue::types::QueuedToolCall {
                         index: 0,
                         tool_name: tool.name.clone(),
                         tool_use_id: tool.id.clone(),

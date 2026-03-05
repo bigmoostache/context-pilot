@@ -110,21 +110,21 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
                     continue;
                 }
                 if is_open {
-                    let ts = TreeState::get_mut(state);
-                    ts.open_folders.retain(|p| p != &normalized);
+                    let ts_mut = TreeState::get_mut(state);
+                    ts_mut.open_folders.retain(|p| p != &normalized);
                     // Also close all children
                     let prefix = format!("{normalized}/");
-                    ts.open_folders.retain(|p| !p.starts_with(&prefix));
+                    ts_mut.open_folders.retain(|p| !p.starts_with(&prefix));
                     closed.push(normalized);
                 }
             }
             _ => {
                 // toggle
                 if is_open && normalized != "." {
-                    let ts = TreeState::get_mut(state);
-                    ts.open_folders.retain(|p| p != &normalized);
+                    let ts_toggle = TreeState::get_mut(state);
+                    ts_toggle.open_folders.retain(|p| p != &normalized);
                     let prefix = format!("{normalized}/");
-                    ts.open_folders.retain(|p| !p.starts_with(&prefix));
+                    ts_toggle.open_folders.retain(|p| !p.starts_with(&prefix));
                     closed.push(normalized);
                 } else if !is_open {
                     TreeState::get_mut(state).open_folders.push(normalized.clone());

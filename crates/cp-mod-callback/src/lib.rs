@@ -8,9 +8,11 @@
 // Queue ID test marker — delete me later
 /// Script execution: spawn callback processes, capture output, handle timeouts.
 pub mod firing;
+/// Callback panel: table display and editor rendering.
 mod panel;
 /// Tool dispatch: upsert, toggle, open/close editor.
 pub mod tools;
+/// Upsert tool internals: create, update, delete callback definitions.
 mod tools_upsert;
 /// Glob matching and callback trigger on file edits.
 pub mod trigger;
@@ -31,6 +33,7 @@ use self::panel::CallbackPanel;
 use self::types::CallbackState;
 use cp_base::cast::SafeCast as _;
 
+/// Lazily parsed tool texts from the callback YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/callback.yaml")));
 
@@ -229,5 +232,58 @@ impl Module for CallbackModule {
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Callback", "Auto-fire scripts on file edits")]
+    }
+
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+
+    fn tool_visualizers(&self) -> Vec<(&'static str, cp_base::modules::ToolVisualizer)> {
+        vec![]
+    }
+
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    fn on_close_context(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+
+    fn on_user_message(&self, _state: &mut State) {}
+
+    fn on_stream_stop(&self, _state: &mut State) {}
+
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        vec![]
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }

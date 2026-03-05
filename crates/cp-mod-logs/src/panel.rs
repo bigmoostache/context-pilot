@@ -34,9 +34,11 @@ impl LogsPanel {
 }
 
 /// Shared context for recursive log entry formatting/rendering.
-struct LogTreeContext<'a> {
-    all_logs: &'a [LogEntry],
-    open_ids: &'a [String],
+struct LogTreeContext<'src> {
+    /// All log entries for child lookup during recursive rendering.
+    all_logs: &'src [LogEntry],
+    /// IDs of expanded summary logs (children visible).
+    open_ids: &'src [String],
 }
 
 /// Recursively format a log entry with indentation for tree display.
@@ -53,7 +55,7 @@ fn format_log_entry(output: &mut String, entry: &LogEntry, ctx: &LogTreeContext<
             // Show children indented
             for child_id in &entry.children_ids {
                 if let Some(child) = ctx.all_logs.iter().find(|l| l.id == *child_id) {
-                    format_log_entry(output, child, ctx, depth + 1);
+                    format_log_entry(output, child, ctx, depth.saturating_add(1));
                 }
             }
         } else {
@@ -69,6 +71,45 @@ fn format_log_entry(output: &mut String, entry: &LogEntry, ctx: &LogTreeContext<
 }
 
 impl Panel for LogsPanel {
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn handle_key(&self, _key: &crossterm::event::KeyEvent, _state: &State) -> Option<cp_base::state::actions::Action> {
+        None
+    }
+
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &cp_base::state::context::ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+
     fn title(&self, _state: &State) -> String {
         "Logs".to_string()
     }
@@ -142,7 +183,7 @@ fn render_log_entry(lines: &mut Vec<Line<'static>>, entry: &LogEntry, ctx: &LogT
         if is_open {
             for child_id in &entry.children_ids {
                 if let Some(child) = ctx.all_logs.iter().find(|l| l.id == *child_id) {
-                    render_log_entry(lines, child, ctx, depth + 1);
+                    render_log_entry(lines, child, ctx, depth.saturating_add(1));
                 }
             }
         }
@@ -156,6 +197,7 @@ fn render_log_entry(lines: &mut Vec<Line<'static>>, entry: &LogEntry, ctx: &LogT
     }
 }
 
+/// Format a millisecond timestamp as a local `YYYY-MM-DD HH:MM:SS` string.
 fn format_timestamp(ms: u64) -> String {
     use chrono::{Local, TimeZone as _};
     i64::try_from(ms)

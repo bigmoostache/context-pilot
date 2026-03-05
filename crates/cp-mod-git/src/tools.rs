@@ -96,8 +96,8 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
             } else {
                 for ctx in &mut state.context {
                     if ctx.context_type.as_str() == ContextType::GIT_RESULT
-                        && let Some(cmd) = ctx.get_meta_str("result_command")
-                        && invalidations.iter().any(|re| re.is_match(cmd))
+                        && let Some(cached_cmd) = ctx.get_meta_str("result_command")
+                        && invalidations.iter().any(|re| re.is_match(cached_cmd))
                     {
                         ctx.cache_deprecated = true;
                     }

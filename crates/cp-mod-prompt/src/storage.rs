@@ -55,7 +55,7 @@ pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
     };
 
     let yaml_block = after_first.get(..end).unwrap_or("");
-    let body_start = end + 4; // skip \n---
+    let body_start = end.saturating_add(4); // skip \n---
     let body = after_first.get(body_start..).unwrap_or("").trim_start_matches('\n').to_string();
 
     let fm: Frontmatter = serde_yaml::from_str(yaml_block).unwrap_or_default();

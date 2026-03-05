@@ -53,7 +53,7 @@ pub(crate) fn optimize_context_tool_definition() -> ToolDefinition {
 /// destroying the reverie state after processing this result.
 pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
     // Block report if queue has unflushed actions
-    let qs = cp_mod_queue::QueueState::get(state);
+    let qs = cp_mod_queue::types::QueueState::get(state);
     if !qs.queued_calls.is_empty() {
         return ToolResult {
             tool_use_id: tool.id.clone(),

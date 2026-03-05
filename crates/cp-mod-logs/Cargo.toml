@@ -13,6 +13,7 @@ readme.workspace = true
 cp-base.workspace = true
 cp-mod-memory = { path = "../cp-mod-memory" }
 cp-mod-queue = { path = "../cp-mod-queue" }
+crossterm.workspace = true
 ratatui.workspace = true
 serde.workspace = true
 serde_json.workspace = true

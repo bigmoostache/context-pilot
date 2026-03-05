@@ -12,7 +12,7 @@ mod tools;
 /// Queue state types: `QueueState`, `QueuedToolCall`.
 pub mod types;
 
-pub use types::{QueueState, QueuedToolCall};
+use types::{QueueState, QueuedToolCall};
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;

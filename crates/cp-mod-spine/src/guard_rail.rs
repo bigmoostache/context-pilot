@@ -157,8 +157,7 @@ impl GuardRailStopLogic for MaxDurationGuard {
             (SpineState::get(state).config.max_duration_secs, SpineState::get(state).config.autonomous_start_ms)
         {
             let elapsed_ms = now_ms().saturating_sub(start_ms);
-            #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
-            let elapsed_secs = elapsed_ms / 1000;
+            let elapsed_secs = cp_base::panels::time_arith::ms_to_secs(elapsed_ms);
             elapsed_secs >= max_secs
         } else {
             false
@@ -166,9 +165,10 @@ impl GuardRailStopLogic for MaxDurationGuard {
     }
 
     fn block_reason(&self, state: &State) -> String {
-        #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
-        let elapsed_secs =
-            SpineState::get(state).config.autonomous_start_ms.map_or(0, |start| now_ms().saturating_sub(start) / 1000);
+        let elapsed_secs = SpineState::get(state)
+            .config
+            .autonomous_start_ms
+            .map_or(0, |start| cp_base::panels::time_arith::ms_to_secs(now_ms().saturating_sub(start)));
         format!(
             "Duration limit reached: {}s / {}s",
             elapsed_secs,

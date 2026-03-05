@@ -12,15 +12,22 @@ use cp_base::config::constants;
 /// YAML schema for presets.yaml
 #[derive(Deserialize)]
 struct PresetsYaml {
+    /// List of preset entries parsed from YAML.
     presets: Vec<PresetYamlEntry>,
 }
 
+/// A single preset entry as defined in presets.yaml.
 #[derive(Deserialize)]
 struct PresetYamlEntry {
+    /// Preset identifier (alphanumeric + hyphens).
     name: String,
+    /// Human-readable description.
     description: String,
+    /// Optional system prompt / agent ID to activate.
     system_prompt: Option<String>,
+    /// Module IDs to enable for this preset.
     active_modules: Vec<String>,
+    /// Tool IDs to disable when this preset is loaded.
     #[serde(default)]
     disabled_tools: Vec<String>,
 }
@@ -43,6 +50,7 @@ pub fn ensure_builtin_presets() {
     }
 }
 
+/// Parse built-in preset definitions from the embedded presets.yaml file.
 fn builtin_preset_definitions() -> Vec<Preset> {
     let yaml_str = include_str!("../../../yamls/presets.yaml");
     let yaml: PresetsYaml = match serde_yaml::from_str(yaml_str) {

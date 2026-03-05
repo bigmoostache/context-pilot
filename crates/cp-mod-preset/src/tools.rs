@@ -9,12 +9,14 @@ use crate::types::{DefaultsInitializer, ModuleRegistry, Preset, PresetPanelConfi
 use cp_base::state::context::{ContextType, make_default_context_element};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
-use cp_mod_prompt::PromptState;
+use cp_mod_prompt::types::PromptState;
 
+/// Return the directory path where preset JSON files are stored.
 fn presets_path() -> std::path::PathBuf {
     Path::new(constants::STORE_DIR).join(PRESETS_DIR)
 }
 
+/// Return the full file path for a named preset JSON file.
 fn preset_file_path(name: &str) -> std::path::PathBuf {
     presets_path().join(format!("{name}.json"))
 }
@@ -30,6 +32,7 @@ fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Execute `preset_snapshot_myself`: capture current worker config as a named preset.
 pub(crate) fn execute_snapshot(tool: &ToolUse, state: &State, all_modules: ModuleRegistry) -> ToolResult {
     let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
@@ -156,11 +159,15 @@ pub(crate) fn execute_snapshot(tool: &ToolUse, state: &State, all_modules: Modul
 
 /// Bundled function pointers for preset load operations.
 pub(crate) struct LoadCallbacks {
+    /// Returns all registered module implementations.
     pub all_modules: ModuleRegistry,
+    /// Builds tool definitions from currently active modules.
     pub active_tool_defs: ToolDefBuilder,
+    /// Initializes default state for modules missing persisted data.
     pub ensure_defaults: DefaultsInitializer,
 }
 
+/// Execute `preset_load`: restore a saved preset configuration.
 pub(crate) fn execute_load(tool: &ToolUse, state: &mut State, cb: &LoadCallbacks) -> ToolResult {
     let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
@@ -248,7 +255,7 @@ pub(crate) fn execute_load(tool: &ToolUse, state: &mut State, cb: &LoadCallbacks
     for panel_cfg in &ws.dynamic_panels {
         let context_id = state.next_available_context_id();
         let uid = format!("UID_{}_P", state.global_next_uid);
-        state.global_next_uid += 1;
+        state.global_next_uid = state.global_next_uid.saturating_add(1);
 
         let mut elem = make_default_context_element(&context_id, panel_cfg.panel_type.clone(), &panel_cfg.name, true);
         elem.uid = Some(uid);

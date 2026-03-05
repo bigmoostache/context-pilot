@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
-use cp_mod_prompt::PromptState;
+use cp_mod_prompt::types::PromptState;
 
 use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel};

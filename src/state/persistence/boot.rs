@@ -55,7 +55,7 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
     }
 
     let _r = dotenvy::dotenv().ok();
-    cp_mod_github::GithubState::get_mut(state).github_token = std::env::var("GITHUB_TOKEN").ok();
+    cp_mod_github::types::GithubState::get_mut(state).github_token = std::env::var("GITHUB_TOKEN").ok();
 
     set_active_theme(&state.active_theme);
 }

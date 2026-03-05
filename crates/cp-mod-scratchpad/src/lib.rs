@@ -11,7 +11,7 @@ mod tools;
 /// Scratchpad state types: `ScratchpadCell`, `ScratchpadState`.
 pub mod types;
 
-pub use types::{ScratchpadCell, ScratchpadState};
+use types::{ScratchpadCell, ScratchpadState};
 
 use serde_json::json;
 

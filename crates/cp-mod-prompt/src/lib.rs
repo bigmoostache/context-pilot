@@ -4,16 +4,20 @@
 //! panels), and commands (input shortcuts), plus a library editor for inline
 //! content editing.
 
+/// Panel rendering for the prompt library overview.
 mod library_panel;
 /// Built-in agent and skill definitions seeded on first run.
 pub mod seed;
+/// Panel rendering for loaded skill content.
 mod skill_panel;
+/// Persistent storage for prompt items (agents, skills, commands).
 pub(crate) mod storage;
+/// Tool dispatch for all prompt CRUD operations.
 mod tools;
 /// Prompt item types: `PromptItem`, `PromptState`, `PromptType`.
 pub mod types;
 
-pub use types::{PromptItem, PromptState, PromptType};
+use types::{PromptItem, PromptState, PromptType};
 
 use serde_json::json;
 
@@ -29,6 +33,7 @@ use self::library_panel::LibraryPanel;
 use self::skill_panel::SkillPanel;
 use cp_base::modules::Module;
 
+/// Lazily parsed YAML tool definitions for all prompt tools.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/prompt.yaml")));
 
@@ -348,6 +353,57 @@ impl Module for PromptModule {
             ("Agent", "Manage system prompt agents"),
             ("Command", "Manage input commands"),
         ]
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+        None
+    }
+
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    fn on_user_message(&self, _state: &mut State) {}
+
+    fn on_stream_stop(&self, _state: &mut State) {}
+
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        vec![]
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }
 

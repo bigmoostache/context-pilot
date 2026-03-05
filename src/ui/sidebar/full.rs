@@ -17,20 +17,20 @@ use cp_base::cast::SafeCast as _;
 pub(super) fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String> {
     let count = match ctx_type {
         "todo" => {
-            let ts = cp_mod_todo::TodoState::get(state);
-            ts.todos.iter().filter(|t| !matches!(t.status, cp_mod_todo::TodoStatus::Done)).count()
+            let ts = cp_mod_todo::types::TodoState::get(state);
+            ts.todos.iter().filter(|t| !matches!(t.status, cp_mod_todo::types::TodoStatus::Done)).count()
         }
         "library" => cp_mod_prompt::types::PromptState::get(state).loaded_skill_ids.len(),
-        "tree" => cp_mod_tree::TreeState::get(state).open_folders.len(),
-        "memory" => cp_mod_memory::MemoryState::get(state).memories.len(),
-        "spine" => cp_mod_spine::SpineState::unprocessed_notifications(state).len(),
+        "tree" => cp_mod_tree::types::TreeState::get(state).open_folders.len(),
+        "memory" => cp_mod_memory::types::MemoryState::get(state).memories.len(),
+        "spine" => cp_mod_spine::types::SpineState::unprocessed_notifications(state).len(),
         "logs" => {
-            let ls = cp_mod_logs::LogsState::get(state);
+            let ls = cp_mod_logs::types::LogsState::get(state);
             ls.logs.iter().filter(|l| l.is_top_level()).count()
         }
         "callback" => cp_mod_callback::types::CallbackState::get(state).active_set.len(),
-        "scratchpad" => cp_mod_scratchpad::ScratchpadState::get(state).scratchpad_cells.len(),
-        "queue" => cp_mod_queue::QueueState::get(state).queued_calls.len(),
+        "scratchpad" => cp_mod_scratchpad::types::ScratchpadState::get(state).scratchpad_cells.len(),
+        "queue" => cp_mod_queue::types::QueueState::get(state).queued_calls.len(),
         "overview" => state.context.len() + 2, // +2 for system prompt + tool definitions
         "tools" => state.tools.iter().filter(|t| t.enabled).count(),
         _ => return None,
@@ -231,7 +231,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
     // Separator before token stats
     // PR card (if current branch has an active PR)
-    if let Some(pr) = &cp_mod_github::GithubState::get(state).branch_pr {
+    if let Some(pr) = &cp_mod_github::types::GithubState::get(state).branch_pr {
         let state_color = match pr.state.as_str() {
             "OPEN" => theme::success(),
             "MERGED" => theme::accent(),

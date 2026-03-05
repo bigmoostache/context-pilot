@@ -30,19 +30,19 @@ pub fn ensure_default_agent(state: &mut State) {
         },
     });
 
-    let ps = PromptState::get_mut(state);
-    ps.agents = agents;
-    ps.skills = skills;
-    ps.commands = commands;
+    let ps_mut = PromptState::get_mut(state);
+    ps_mut.agents = agents;
+    ps_mut.skills = skills;
+    ps_mut.commands = commands;
 
     // Ensure there's always an active agent
-    if let Some(active_id) = &ps.active_agent_id {
+    if let Some(active_id) = &ps_mut.active_agent_id {
         // Verify the active agent still exists
-        if !ps.agents.iter().any(|s| s.id == *active_id) {
-            ps.active_agent_id = Some(default_id.to_string());
+        if !ps_mut.agents.iter().any(|s| s.id == *active_id) {
+            ps_mut.active_agent_id = Some(default_id.to_string());
         }
     } else {
-        ps.active_agent_id = Some(default_id.to_string());
+        ps_mut.active_agent_id = Some(default_id.to_string());
     }
 }
 

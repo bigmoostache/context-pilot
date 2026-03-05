@@ -11,8 +11,9 @@ mod tools;
 /// Memory state types: `MemoryItem`, `MemoryImportance`, `MemoryState`.
 pub mod types;
 
+use types::{MemoryImportance, MemoryItem, MemoryState};
+
 use cp_base::cast::SafeCast as _;
-pub use types::{MemoryImportance, MemoryItem, MemoryState};
 
 /// Maximum token length for memory `tl_dr` field (enforced on create/update)
 pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;

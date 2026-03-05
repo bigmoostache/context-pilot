@@ -6,8 +6,8 @@ use crate::infra::tools::execute_tool;
 use crate::state::{Message, MessageStatus, MessageType, State, ToolResultRecord};
 
 use cp_base::state::watchers::WatcherRegistry;
-use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
-use cp_mod_queue::QueueState;
+use cp_mod_console::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
+use cp_mod_queue::types::QueueState;
 use cp_mod_spine::{NotificationType, SpineState};
 
 use crate::app::App;

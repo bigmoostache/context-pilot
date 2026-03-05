@@ -98,7 +98,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                 if ctx.context_type.as_str() == ContextType::GITHUB_RESULT {
                     let matches = ctx
                         .get_meta_str("result_command")
-                        .is_some_and(|cmd| invalidations.iter().any(|re| re.is_match(cmd)));
+                        .is_some_and(|cached_cmd| invalidations.iter().any(|re| re.is_match(cached_cmd)));
                     if matches {
                         ctx.cache_deprecated = true;
                     }

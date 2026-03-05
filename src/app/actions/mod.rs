@@ -15,7 +15,7 @@ pub(crate) use helpers::{clean_llm_id_prefix, eject_cursor_from_sentinel, find_c
 
 use crate::infra::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::state::{ContextElement, ContextType, State, StreamPhase};
-use cp_mod_prompt::PromptState;
+use cp_mod_prompt::types::PromptState;
 
 // Re-export Action/ActionResult from cp-base (shared with module crates)
 pub(crate) use cp_base::state::actions::{Action, ActionResult};
@@ -41,8 +41,8 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 };
                 if should_trigger {
                     // Populate entries for root directory
-                    let filter = cp_mod_tree::TreeState::get(state).filter.clone();
-                    let entries = cp_mod_tree::list_dir_entries(&filter, "", "");
+                    let filter = cp_mod_tree::types::TreeState::get(state).filter.clone();
+                    let entries = cp_mod_tree::tools::list_dir_entries(&filter, "", "");
                     if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() {
                         ac.activate(anchor_pos);
                         ac.set_matches(entries);
@@ -410,7 +410,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Nothing
         }
         Action::ConfigToggleAutoContinue => {
-            let spine = cp_mod_spine::SpineState::get_mut(state);
+            let spine = cp_mod_spine::types::SpineState::get_mut(state);
             spine.config.continue_until_todos_done = !spine.config.continue_until_todos_done;
             state.flags.ui.dirty = true;
             ActionResult::Save

@@ -15,7 +15,7 @@ impl App {
 
     /// Sync `GhWatcher` with current `GithubResult` panels
     pub(super) fn sync_gh_watches(&self) {
-        let token = match &cp_mod_github::GithubState::get(&self.state).github_token {
+        let token = match &cp_mod_github::types::GithubState::get(&self.state).github_token {
             Some(t) => t.clone(),
             None => return,
         };
@@ -29,7 +29,7 @@ impl App {
         self.gh_watcher.sync_watches(&panels);
 
         // Sync branch PR watch — poll for PRs on the current git branch
-        let branch = cp_mod_git::GitState::get(&self.state).branch.as_deref();
+        let branch = cp_mod_git::types::GitState::get(&self.state).branch.as_deref();
         self.gh_watcher.sync_branch_pr(branch, Some(&token));
     }
 
@@ -80,7 +80,7 @@ impl App {
                     if let CacheUpdate::ModuleSpecific { data, .. } = update
                         && let Ok(pr_update) = data.downcast::<cp_mod_github::watcher::BranchPrUpdate>()
                     {
-                        cp_mod_github::GithubState::get_mut(state).branch_pr = pr_update.pr_info;
+                        cp_mod_github::types::GithubState::get_mut(state).branch_pr = pr_update.pr_info;
                         state.flags.ui.dirty = true;
                     }
                     continue;

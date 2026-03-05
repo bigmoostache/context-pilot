@@ -5,13 +5,16 @@
 //! (archive a history panel with log/memory extraction). Logs are stored
 //! globally in chunked JSON files under `.context-pilot/logs/`.
 
+/// Logs panel: tree-structured display of log entries with summaries.
 mod panel;
+/// Tool implementations: create, summarize, toggle, close conversation history.
 mod tools;
 /// Log state types: `LogEntry`, `LogsState`.
 pub mod types;
 
+use types::{LogEntry, LogsState};
+
 use cp_base::cast::SafeCast as _;
-pub use types::{LogEntry, LogsState};
 
 /// Logs subdirectory (chunked JSON files, global across workers)
 pub const LOGS_DIR: &str = "logs";
@@ -32,6 +35,7 @@ use cp_base::tools::pre_flight::PreFlightResult;
 use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
+/// Lazily parsed tool texts from the logs YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/logs.yaml")));
 
@@ -41,6 +45,7 @@ fn logs_dir() -> PathBuf {
 }
 
 /// Get chunk index for a log ID number
+#[expect(clippy::integer_division_remainder_used, reason = "intentional truncating arithmetic")]
 const fn chunk_index(log_id_num: usize) -> usize {
     log_id_num / LOGS_CHUNK_SIZE
 }
@@ -243,6 +248,7 @@ impl Module for LogsModule {
         ]
     }
 
+    #[expect(clippy::integer_division_remainder_used, reason = "intentional truncating arithmetic for token estimation")]
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
         match tool.name.as_str() {
             "log_summarize" => {
@@ -276,7 +282,7 @@ impl Module for LogsModule {
             "Close_conversation_history" => {
                 let mut pf = PreFlightResult::new();
                 // Queue must be active for destructive history panel operations
-                if !cp_mod_queue::QueueState::get(state).active {
+                if !cp_mod_queue::types::QueueState::get(state).active {
                     pf.errors.push(
                         "Cannot close conversation history without an active queue. \
                          Activate the queue first (Queue_activate), then queue this call. \
@@ -300,11 +306,11 @@ impl Module for LogsModule {
                     let max_tokens = cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
                     for (i, mem) in memories.iter().enumerate() {
                         if let Some(content) = mem.get("content").and_then(|v| v.as_str()) {
-                            let approx_tokens = content.split_whitespace().count() * 4 / 3;
+                            let approx_tokens = content.split_whitespace().count().saturating_mul(4) / 3;
                             if approx_tokens > max_tokens {
                                 pf.errors.push(format!(
                                     "Memory #{} content too long: ~{} tokens (max {}). Shorten it.",
-                                    i + 1,
+                                    i.saturating_add(1),
                                     approx_tokens,
                                     max_tokens,
                                 ));
@@ -352,6 +358,10 @@ impl Module for LogsModule {
         vec![(ContextType::new(ContextType::LOGS), "Logs", true)]
     }
 
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
         vec![cp_base::state::context::ContextTypeMeta {
             context_type: "logs",
@@ -364,6 +374,59 @@ impl Module for LogsModule {
             needs_async_wait: false,
         }]
     }
+
+    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        vec![]
+    }
+
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+        None
+    }
+
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    fn on_close_context(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        vec![]
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
+    }
+
+    fn on_user_message(&self, _state: &mut State) {}
+
+    fn on_stream_stop(&self, _state: &mut State) {}
 }
 
 /// Visualizer for logs tool results.

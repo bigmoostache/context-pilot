@@ -4,6 +4,7 @@ use cp_base::state::context::ContextType;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
+/// Create a new slash-command from tool parameters and persist it.
 pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let name = tool.input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -47,6 +48,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created command '{name}' with ID '{id}' (use as /{id})"), false)
 }
 
+/// Delete a command by ID and remove it from storage.
 pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);

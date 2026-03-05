@@ -234,8 +234,7 @@ impl Watcher for ConsoleWatcher {
             return None;
         }
 
-        #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
-        let elapsed_s = now.saturating_sub(self.registered_at_ms) / 1000;
+        let elapsed_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(self.registered_at_ms));
 
         if self.easy_bash {
             Some(WatcherResult {

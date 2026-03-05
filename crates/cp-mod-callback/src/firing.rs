@@ -80,7 +80,7 @@ pub fn fire_callback(
     let session_key = {
         let cs = ConsoleState::get_mut(state);
         let key = format!("cb_{}", cs.next_session_id);
-        cs.next_session_id += 1;
+        cs.next_session_id = cs.next_session_id.saturating_add(1);
         key
     };
 
@@ -94,7 +94,7 @@ pub fn fire_callback(
     // Register watcher
     let is_blocking = def.blocking && blocking_tool_use_id.is_some();
     let now = now_ms();
-    let deadline_ms = def.timeout_secs.map(|t| now + t * 1000);
+    let deadline_ms = def.timeout_secs.map(|t| now.saturating_add(t.saturating_mul(1000)));
 
     let watcher_desc = if is_blocking {
         format!("⏳ Callback '{}' (blocking)", def.name)
@@ -301,7 +301,8 @@ impl Watcher for CallbackWatcher {
         if now < deadline {
             return None;
         }
-        let elapsed_s = (now - self.registered_at_ms) / 1000;
+        #[expect(clippy::integer_division_remainder_used, reason = "converting ms to seconds")]
+        let elapsed_s = now.saturating_sub(self.registered_at_ms) / 1000;
         Some(WatcherResult {
             description: format!("· {} TIMED OUT ({}s)", self.callback_name, elapsed_s,),
             panel_id: None,
@@ -331,5 +332,21 @@ impl Watcher for CallbackWatcher {
     fn suicide(&self, state: &State) -> bool {
         let cs = ConsoleState::get(state);
         !cs.sessions.contains_key(&self.session_name)
+    }
+
+    fn is_easy_bash(&self) -> bool {
+        false
+    }
+
+    fn is_persistent(&self) -> bool {
+        false
+    }
+
+    fn fire_at_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn message(&self) -> Option<&str> {
+        None
     }
 }

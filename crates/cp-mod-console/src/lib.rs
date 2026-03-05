@@ -37,7 +37,6 @@ use self::manager::SessionHandle;
 use self::panel::ConsolePanel;
 use self::types::{ConsoleState, SessionMeta};
 
-pub use self::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_base::cast::SafeCast as _;
 
 /// Lazily parsed tool descriptions from the console YAML definition.

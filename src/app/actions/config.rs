@@ -30,7 +30,7 @@ pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
         }
         3 => {
             // Max cost guard rail ($0.50 steps)
-            let spine = cp_mod_spine::SpineState::get_mut(state);
+            let spine = cp_mod_spine::types::SpineState::get_mut(state);
             let current = spine.config.max_cost.unwrap_or(0.0);
             spine.config.max_cost = Some(current + 0.50);
         }
@@ -61,7 +61,7 @@ pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
         }
         3 => {
             // Max cost guard rail ($0.50 steps, min $0 = disabled)
-            let spine = cp_mod_spine::SpineState::get_mut(state);
+            let spine = cp_mod_spine::types::SpineState::get_mut(state);
             let current = spine.config.max_cost.unwrap_or(0.0);
             let new_val = current - 0.50;
             spine.config.max_cost = if new_val <= 0.0 { None } else { Some(new_val) };

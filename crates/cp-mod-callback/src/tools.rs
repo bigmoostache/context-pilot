@@ -116,12 +116,12 @@ pub fn execute_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), format!("Callback '{anchor_id}' not found"), true);
     }
 
-    let cs = CallbackState::get_mut(state);
+    let cs_mut = CallbackState::get_mut(state);
     if active {
-        let _ = cs.active_set.insert(anchor_id.clone());
+        let _ = cs_mut.active_set.insert(anchor_id.clone());
         ToolResult::new(tool.id.clone(), format!("Callback {anchor_id} activated ✓"), false)
     } else {
-        let _ = cs.active_set.remove(&anchor_id);
+        let _ = cs_mut.active_set.remove(&anchor_id);
         ToolResult::new(tool.id.clone(), format!("Callback {anchor_id} deactivated ✗"), false)
     }
 }

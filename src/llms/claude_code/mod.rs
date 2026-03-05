@@ -3,6 +3,9 @@
 //! Uses OAuth tokens from ~/.claude/.credentials.json with Bearer authentication.
 //! Replicates Claude Code's request signature to access Claude 4.5 models.
 
+mod check_api;
+mod message_format;
+
 use std::env;
 use std::fs;
 use std::io::{BufRead as _, BufReader};
@@ -41,130 +44,6 @@ fn map_model_name(model: &str) -> &str {
         "claude-sonnet-4-5" => "claude-sonnet-4-5-20250929",
         "claude-haiku-4-5" => "claude-haiku-4-5-20251001",
         _ => model,
-    }
-}
-
-/// Inject the system-reminder text block into the first non-tool-result user message.
-/// Claude Code's server validates that messages contain this marker.
-/// Must skip `tool_result` user messages (from panel injection) since mixing text blocks
-/// into `tool_result` messages breaks the API's `tool_use/tool_result` pairing.
-fn inject_system_reminder(messages: &mut Vec<Value>) {
-    let reminder = serde_json::json!({"type": "text", "text": SYSTEM_REMINDER});
-
-    for msg in messages.iter_mut() {
-        if msg["role"] != "user" {
-            continue;
-        }
-
-        // Skip tool_result messages (from panel injection / tool loop)
-        if let Some(arr) = msg["content"].as_array()
-            && arr.iter().any(|block| block["type"] == "tool_result")
-        {
-            continue;
-        }
-
-        // Convert string content to array format and prepend reminder
-        let content = &msg["content"];
-        if content.is_string() {
-            let text = content.as_str().unwrap_or("").to_string();
-            msg["content"] = serde_json::json!([
-                reminder,
-                {"type": "text", "text": text}
-            ]);
-        } else if content.is_array()
-            && let Some(arr) = msg["content"].as_array_mut()
-        {
-            arr.insert(0, reminder);
-        }
-        return; // Only inject into first eligible user message
-    }
-
-    // No eligible user message found (all are tool_results, e.g. during tool loop).
-    // Prepend a standalone user message with just the reminder at position 0.
-    messages.insert(
-        0,
-        serde_json::json!({
-            "role": "user",
-            "content": [reminder]
-        }),
-    );
-    // Must follow with a minimal assistant ack to maintain user/assistant alternation.
-    messages.insert(
-        1,
-        serde_json::json!({
-            "role": "assistant",
-            "content": [{"type": "text", "text": "ok"}]
-        }),
-    );
-}
-
-/// Ensure strict user/assistant message alternation as required by the API.
-/// - Consecutive text-only user messages are merged into one.
-/// - Between a `tool_result` user message and a text user message, a placeholder
-///   assistant message is inserted (can't merge these — `tool_result` + text mixing
-///   breaks `inject_system_reminder` and API validation).
-/// - Consecutive assistant messages are merged.
-fn ensure_message_alternation(messages: &mut Vec<Value>) {
-    if messages.len() <= 1 {
-        return;
-    }
-
-    let mut result: Vec<Value> = Vec::with_capacity(messages.len());
-
-    for msg in messages.drain(..) {
-        let same_role = result.last().is_some_and(|last: &Value| last["role"] == msg["role"]);
-        if !same_role {
-            let blocks = content_to_blocks(&msg["content"]);
-            result.push(serde_json::json!({"role": msg["role"], "content": blocks}));
-            continue;
-        }
-
-        let prev_has_tool_result = result.last().is_some_and(|last| {
-            last["content"].as_array().is_some_and(|arr| arr.iter().any(|b| b["type"] == "tool_result"))
-        });
-        let curr_has_tool_result =
-            msg["content"].as_array().is_some_and(|arr| arr.iter().any(|b| b["type"] == "tool_result"));
-
-        if prev_has_tool_result == curr_has_tool_result {
-            // Same content type — safe to merge
-            let new_blocks = content_to_blocks(&msg["content"]);
-            if let Some(arr) = result.last_mut().and_then(|last| last["content"].as_array_mut()) {
-                arr.extend(new_blocks);
-            }
-        } else {
-            // Different content types — insert placeholder assistant to separate them
-            result.push(serde_json::json!({
-                "role": "assistant",
-                "content": [{"type": "text", "text": "ok"}]
-            }));
-            let blocks = content_to_blocks(&msg["content"]);
-            result.push(serde_json::json!({"role": msg["role"], "content": blocks}));
-        }
-    }
-
-    // API requires first message to be user role. Panel injection starts with
-    // assistant messages, so prepend a placeholder user message if needed.
-    if result.first().is_some_and(|m| m["role"] == "assistant") {
-        result.insert(
-            0,
-            serde_json::json!({
-                "role": "user",
-                "content": [{"type": "text", "text": "ok"}]
-            }),
-        );
-    }
-
-    *messages = result;
-}
-
-/// Convert content (string or array) to an array of content blocks.
-fn content_to_blocks(content: &Value) -> Vec<Value> {
-    if content.is_string() {
-        vec![serde_json::json!({"type": "text", "text": content.as_str().unwrap_or("")})]
-    } else if let Some(arr) = content.as_array() {
-        arr.clone()
-    } else {
-        vec![]
     }
 }
 
@@ -239,153 +118,6 @@ impl ClaudeCodeClient {
         Some(SecretBox::new(Box::new(creds.claude_ai_oauth.access_token)))
     }
 
-    pub(crate) fn do_check_api(&self, model: &str) -> ApiCheckResult {
-        let access_token = match self.access_token.as_ref() {
-            Some(t) => t.expose_secret(),
-            None => {
-                return ApiCheckResult {
-                    auth_ok: false,
-                    streaming_ok: false,
-                    tools_ok: false,
-                    error: Some("OAuth token not found or expired".to_string()),
-                };
-            }
-        };
-
-        let client = Client::new();
-        let mapped_model = map_model_name(model);
-
-        // System with billing header
-        let system = serde_json::json!([
-            {"type": "text", "text": BILLING_HEADER},
-            {"type": "text", "text": "You are a helpful assistant."}
-        ]);
-
-        // User message with system-reminder injected (required by server validation)
-        let user_msg = serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": SYSTEM_REMINDER},
-                {"type": "text", "text": "Hi"}
-            ]
-        });
-
-        // Test 1: Basic auth with simple non-streaming request
-        let auth_result = client
-            .post(CLAUDE_CODE_ENDPOINT)
-            .header("accept", "application/json")
-            .header("authorization", format!("Bearer {access_token}"))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", OAUTH_BETA_HEADER)
-            .header("anthropic-dangerous-direct-browser-access", "true")
-            .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
-            .header("x-app", "cli")
-            .header("x-stainless-arch", "x64")
-            .header("x-stainless-lang", "js")
-            .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
-            .header("x-stainless-retry-count", "0")
-            .header("x-stainless-runtime", "node")
-            .header("x-stainless-runtime-version", "v24.3.0")
-            .json(&serde_json::json!({
-                "model": mapped_model,
-                "max_tokens": 10,
-                "system": system,
-                "messages": [user_msg]
-            }))
-            .send();
-
-        let auth_ok = auth_result.as_ref().is_ok_and(|resp| resp.status().is_success());
-
-        if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
-            return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
-        }
-
-        // Test 2: Streaming request
-        let stream_msg = serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": SYSTEM_REMINDER},
-                {"type": "text", "text": "Say ok"}
-            ]
-        });
-        let stream_result = client
-            .post(CLAUDE_CODE_ENDPOINT)
-            .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {access_token}"))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", OAUTH_BETA_HEADER)
-            .header("anthropic-dangerous-direct-browser-access", "true")
-            .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
-            .header("x-app", "cli")
-            .header("x-stainless-arch", "x64")
-            .header("x-stainless-lang", "js")
-            .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
-            .header("x-stainless-retry-count", "0")
-            .header("x-stainless-runtime", "node")
-            .header("x-stainless-runtime-version", "v24.3.0")
-            .json(&serde_json::json!({
-                "model": mapped_model,
-                "max_tokens": 10,
-                "stream": true,
-                "system": system,
-                "messages": [stream_msg]
-            }))
-            .send();
-
-        let streaming_ok = stream_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
-
-        // Test 3: Tool calling
-        let tools_msg = serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": SYSTEM_REMINDER},
-                {"type": "text", "text": "Hi"}
-            ]
-        });
-        let tools_result = client
-            .post(CLAUDE_CODE_ENDPOINT)
-            .header("accept", "application/json")
-            .header("authorization", format!("Bearer {access_token}"))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", OAUTH_BETA_HEADER)
-            .header("anthropic-dangerous-direct-browser-access", "true")
-            .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
-            .header("x-app", "cli")
-            .header("x-stainless-arch", "x64")
-            .header("x-stainless-lang", "js")
-            .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
-            .header("x-stainless-retry-count", "0")
-            .header("x-stainless-runtime", "node")
-            .header("x-stainless-runtime-version", "v24.3.0")
-            .json(&serde_json::json!({
-                "model": mapped_model,
-                "max_tokens": 50,
-                "system": system,
-                "tools": [{
-                    "name": "test_tool",
-                    "description": "A test tool",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
-                }],
-                "messages": [tools_msg]
-            }))
-            .send();
-
-        let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
-
-        ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
-    }
-
     pub(crate) fn do_stream(&self, request: &LlmRequest, tx: &Sender<StreamEvent>) -> Result<(), LlmError> {
         let access_token = self
             .access_token
@@ -433,10 +165,10 @@ impl ClaudeCodeClient {
         }
 
         // Ensure strict user/assistant alternation (merges consecutive same-role messages)
-        ensure_message_alternation(&mut json_messages);
+        message_format::ensure_message_alternation(&mut json_messages);
 
         // Inject system-reminder into first user message for Claude Code validation
-        inject_system_reminder(&mut json_messages);
+        message_format::inject_system_reminder(&mut json_messages);
 
         // Build final request (cache_control breakpoints are on panel tool_results above)
         let api_request = serde_json::json!({

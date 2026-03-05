@@ -1,12 +1,18 @@
+/// Agent CRUD tool handlers.
 pub(crate) mod agent;
+/// Command CRUD tool handlers.
 pub(crate) mod command;
+/// Diff-based prompt editing tool handler.
 pub(crate) mod edit_prompt;
+/// Library editor open/close tool handlers.
 pub(crate) mod library_editor;
+/// Skill CRUD and load/unload tool handlers.
 pub(crate) mod skill;
 
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
+/// Dispatch a tool call to the appropriate prompt sub-handler.
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     match tool.name.as_str() {
         "agent_create" => Some(agent::create(tool, state)),

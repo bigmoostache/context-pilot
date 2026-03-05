@@ -65,7 +65,7 @@ impl App {
                         // Max retries reached, show error
                         self.state.api_retry_count = 0;
                         // Track consecutive failed continuations for backoff
-                        let spine = cp_mod_spine::SpineState::get_mut(&mut self.state);
+                        let spine = cp_mod_spine::types::SpineState::get_mut(&mut self.state);
                         spine.config.consecutive_continuation_errors += 1;
                         spine.config.last_continuation_error_ms = Some(crate::app::panels::now_ms());
                         let _r = apply_action(&mut self.state, Action::StreamError(e));
@@ -196,7 +196,7 @@ impl App {
             // This means MaxAutoRetries only fires on consecutive *failed* continuations,
             // not on total auto-continuations in an autonomous session.
             {
-                let spine_cfg = &mut cp_mod_spine::SpineState::get_mut(&mut self.state).config;
+                let spine_cfg = &mut cp_mod_spine::types::SpineState::get_mut(&mut self.state).config;
                 spine_cfg.auto_continuation_count = 0;
                 // Reset consecutive error backoff — successful completion proves API is healthy
                 spine_cfg.consecutive_continuation_errors = 0;
@@ -208,7 +208,7 @@ impl App {
 
             // Unblock any guard-rail-blocked notifications — they get another chance now
             // that a stream has completed successfully.
-            cp_mod_spine::SpineState::unblock_all(&mut self.state);
+            cp_mod_spine::types::SpineState::unblock_all(&mut self.state);
 
             self.typewriter.reset();
             self.pending_done = None;

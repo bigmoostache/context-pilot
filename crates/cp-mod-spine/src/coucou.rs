@@ -173,12 +173,9 @@ const fn is_leap_year(y: i64) -> bool {
 }
 
 /// Format milliseconds as a human-friendly duration string.
-#[expect(clippy::integer_division_remainder_used, reason = "intentional truncating time arithmetic")]
 fn format_duration(ms: u64) -> String {
-    let total_secs = ms / 1000;
-    let hours = total_secs / 3600;
-    let minutes = (total_secs % 3600) / 60;
-    let secs = total_secs % 60;
+    let total_secs = cp_base::panels::time_arith::ms_to_secs(ms);
+    let (hours, minutes, secs) = cp_base::panels::time_arith::secs_to_hms_unwrapped(total_secs);
 
     if hours > 0 && minutes > 0 && secs > 0 {
         format!("{hours}h{minutes}m{secs}s")

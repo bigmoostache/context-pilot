@@ -465,6 +465,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-console",
+ "crossterm",
  "globset",
  "ratatui",
  "serde",
@@ -539,6 +540,7 @@ dependencies = [
  "cp-base",
  "cp-mod-memory",
  "cp-mod-queue",
+ "crossterm",
  "ratatui",
  "serde",
  "serde_json",
@@ -574,6 +576,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-files",
+ "crossterm",
  "ratatui",
  "serde",
  "serde_json",

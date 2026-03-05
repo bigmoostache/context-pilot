@@ -16,12 +16,9 @@ use std::fmt::Write as _;
 pub(crate) struct SpinePanel;
 
 /// Format a millisecond timestamp as HH:MM:SS
-#[expect(clippy::integer_division_remainder_used, reason = "intentional truncating time arithmetic")]
 fn format_timestamp(ms: u64) -> String {
-    let secs = ms / 1000;
-    let hours = (secs % 86400) / 3600;
-    let minutes = (secs % 3600) / 60;
-    let seconds = secs % 60;
+    let secs = cp_base::panels::time_arith::ms_to_secs(ms);
+    let (hours, minutes, seconds) = cp_base::panels::time_arith::secs_to_hms(secs);
     format!("{hours:02}:{minutes:02}:{seconds:02}")
 }
 
@@ -81,8 +78,7 @@ impl SpinePanel {
                 output.push_str("\n=== Active Watchers ===\n");
                 let now = now_ms();
                 for w in watchers {
-                    #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
-                    let age_s = (now.saturating_sub(w.registered_ms())) / 1000;
+                    let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
                     let mode = if w.is_blocking() { "blocking" } else { "async" };
                     let _r4 = writeln!(output, "[{}] {} ({}, {}s ago)", w.id(), w.description(), mode, age_s);
                 }
@@ -320,8 +316,7 @@ impl Panel for SpinePanel {
                 )]));
                 let now = now_ms();
                 for w in watchers {
-                    #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
-                    let age_s = (now.saturating_sub(w.registered_ms())) / 1000;
+                    let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
                     let mode_color = if w.is_blocking() { theme::warning() } else { theme::text_secondary() };
                     let mode_label = if w.is_blocking() { "⏳" } else { "👁" };
                     lines.push(Line::from(vec![

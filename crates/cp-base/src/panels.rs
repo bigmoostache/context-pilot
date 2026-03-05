@@ -161,6 +161,38 @@ pub fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis().to_u64()).unwrap_or(0)
 }
 
+/// Truncating time arithmetic — the sole choke-point for `/ 1000`, `% 3600`, etc.
+///
+/// Every millisecond-to-second conversion and HMS decomposition in the
+/// codebase funnels through these helpers so no other file triggers
+/// `clippy::integer_division_remainder_used`.
+#[expect(clippy::integer_division_remainder_used, reason = "sole choke-point for truncating time arithmetic")]
+pub mod time_arith {
+    /// Truncating conversion from milliseconds to whole seconds.
+    #[must_use]
+    pub const fn ms_to_secs(ms: u64) -> u64 {
+        ms / 1000
+    }
+
+    /// Decompose seconds into `(hours, minutes, seconds)` within a 24 h window.
+    #[must_use]
+    pub const fn secs_to_hms(total_secs: u64) -> (u64, u64, u64) {
+        let hours = (total_secs % 86400) / 3600;
+        let minutes = (total_secs % 3600) / 60;
+        let seconds = total_secs % 60;
+        (hours, minutes, seconds)
+    }
+
+    /// Decompose seconds into `(hours, minutes, seconds)` without 24 h wrap.
+    #[must_use]
+    pub const fn secs_to_hms_unwrapped(total_secs: u64) -> (u64, u64, u64) {
+        let hours = total_secs / 3600;
+        let minutes = (total_secs % 3600) / 60;
+        let seconds = total_secs % 60;
+        (hours, minutes, seconds)
+    }
+}
+
 /// Update `last_refresh_ms` only if content actually changed (hash differs).
 /// Returns true if content changed.
 pub fn update_if_changed(ctx: &mut ContextElement, content: &str) -> bool {

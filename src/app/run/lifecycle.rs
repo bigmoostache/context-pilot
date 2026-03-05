@@ -338,7 +338,7 @@ impl App {
         if already {
             return;
         }
-        let ts = cp_mod_todo::TodoState::get(&self.state);
+        let ts = cp_mod_todo::types::TodoState::get(&self.state);
         if !ts.has_incomplete_todos() {
             return;
         }

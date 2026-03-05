@@ -12,6 +12,8 @@ mod tools;
 /// Tree state types: `TreeState`, `TreeFileDescription`.
 pub mod types;
 
+use types::{TreeFileDescription, TreeState};
+
 use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
@@ -25,10 +27,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use self::panel::TreePanel;
 use cp_base::modules::Module;
 
-pub use types::{DEFAULT_TREE_FILTER, TreeFileDescription, TreeState};
-
 // Re-export directory listing for autocomplete
-pub use self::tools::list_dir_entries;
 
 /// Lazily parsed tool definitions loaded from the YAML spec.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =

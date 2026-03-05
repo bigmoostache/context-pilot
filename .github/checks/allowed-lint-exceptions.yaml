@@ -94,3 +94,216 @@ exceptions:
       Wrap in a safe helper crate (e.g. nix::unistd::setsid()) which
       encapsulates the unsafe. The nix crate provides safe Rust bindings
       for POSIX — adding it would eliminate the raw libc call.
+
+  # ── panels.rs: time_arith module ────────────────────────────────────
+
+  - path: "crates/cp-base/src/panels.rs"
+    match: '#[expect(clippy::integer_division_remainder_used'
+    reason: >
+      Centralized time arithmetic module: ms_to_secs(), secs_to_hms(),
+      secs_to_hms_unwrapped(). All truncating integer division for time
+      conversions is funneled here — no other file in the codebase
+      performs raw / 1000 or % 3600.
+    strategy: >
+      Fundamentally irreducible — integer truncation IS the desired
+      behavior for millisecond-to-second conversion. No alternative
+      representation avoids it.
+
+  # ── coucou.rs: calendar modulo ──────────────────────────────────────
+
+  - path: "crates/cp-mod-spine/src/coucou.rs"
+    match: '#[expect(clippy::integer_division_remainder_used'
+    reason: >
+      is_leap_year() uses y % 4, y % 100, y % 400 — the canonical
+      Gregorian leap year formula. Modulo IS the algorithm; there is
+      no refactoring that avoids it.
+    strategy: >
+      Replace hand-rolled date math with the chrono crate, which would
+      eliminate the need for is_leap_year() entirely. Low priority —
+      the current impl is correct and minimal.
+
+  # ── pub_use: module re-export shims ─────────────────────────────────
+  # Module lib.rs files re-export types from submodules so downstream
+  # crates can use short paths (e.g. cp_mod_git::classify instead of
+  # cp_mod_git::classify::classify). These are intentional API surface.
+
+  - path: "crates/cp-base/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-export shim for llm_types — downstream crates import from
+      cp_base::llm_types rather than cp_base::config::llm_types.
+    strategy: >
+      Only removable if all consumers switch to the full config path.
+
+  - path: "crates/cp-mod-console/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-exports SessionStatus for external use without deep path.
+    strategy: >
+      Make submodule pub and update callers.
+
+  - path: "crates/cp-mod-git/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-exports classify and watcher types for downstream use.
+    strategy: >
+      Make submodules pub and update callers.
+
+  - path: "crates/cp-mod-github/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-exports classify and watcher types for downstream use.
+    strategy: >
+      Make submodules pub and update callers.
+
+  - path: "crates/cp-mod-memory/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-exports memory types for downstream convenience.
+    strategy: >
+      Make submodule pub and update callers.
+
+  - path: "crates/cp-mod-prompt/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-exports prompt types for downstream convenience.
+    strategy: >
+      Make submodules pub and update callers.
+
+  - path: "crates/cp-mod-queue/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-exports QueueState for downstream convenience.
+    strategy: >
+      Make submodule pub and update callers.
+
+  - path: "crates/cp-mod-scratchpad/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-exports scratchpad types for downstream convenience.
+    strategy: >
+      Make submodule pub and update callers.
+
+  - path: "crates/cp-mod-spine/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-exports spine types for downstream convenience.
+    strategy: >
+      Make submodules pub and update callers.
+
+  - path: "crates/cp-mod-todo/src/lib.rs"
+    match: '#[expect(clippy::pub_use'
+    reason: >
+      Re-exports todo types for downstream convenience.
+    strategy: >
+      Make submodule pub and update callers.
+
+  - path: "crates/cp-mod-tree/src/lib.rs"
+    match: 'TreeFileDescription, TreeState'
+    reason: >
+      Re-exports TreeState and TreeFileDescription for downstream use.
+    strategy: >
+      Make submodules pub and update callers.
+
+  - path: "crates/cp-mod-tree/src/lib.rs"
+    match: 'tools::list_dir_entries'
+    reason: >
+      Re-exports list_dir_entries for autocomplete module.
+    strategy: >
+      Make submodule pub and update callers.
+
+  # ── module_name_repetitions: names that include their module ────────
+  # Types used via re-export where the shorter name conflicts with
+  # common identifiers (reserved words, std types, or sibling types).
+
+  - path: "crates/cp-base/src/cast.rs"
+    match: 'SafeCast'
+    reason: >
+      "Safe" alone is meaningless. SafeCast is the centralized numeric
+      casting trait — used via re-export at 50+ callsites.
+    strategy: >
+      Only viable if cast module is always used qualified (cast::Safe).
+
+  - path: "crates/cp-base/src/state/autocomplete.rs"
+    match: 'AutocompleteEntry'
+    reason: >
+      "Entry" alone conflicts with HashMap::Entry and other entry types.
+    strategy: >
+      Only viable with crate-level namespace change.
+
+  - path: "crates/cp-base/src/state/autocomplete.rs"
+    match: 'AutocompleteState'
+    reason: >
+      "State" conflicts with the runtime State struct.
+    strategy: >
+      Only viable with crate-level namespace change.
+
+  - path: "crates/cp-base/src/state/context.rs"
+    match: 'ContextTypeMeta'
+    reason: >
+      "TypeMeta" alone is too generic across a codebase with many
+      metadata types.
+    strategy: >
+      Rename if module path is always explicit at callsites.
+
+  - path: "crates/cp-base/src/state/context.rs"
+    match: '381 callsites via re-export'
+    reason: >
+      ContextType — "Type" is a reserved Rust keyword.
+    strategy: >
+      Irreducible — reserved keyword conflict.
+
+  - path: "crates/cp-base/src/state/context.rs"
+    match: '78 callsites via re-export'
+    reason: >
+      ContextElement — "Element" alone is too generic.
+    strategy: >
+      Could rename to PanelElement but churn is enormous.
+
+  - path: "crates/cp-base/src/state/data/message.rs"
+    match: '52 callsites via re-export'
+    reason: >
+      MessageType — "Type" is a reserved keyword.
+    strategy: >
+      Irreducible — reserved keyword conflict.
+
+  - path: "crates/cp-base/src/state/data/message.rs"
+    match: '58 callsites via re-export'
+    reason: >
+      MessageStatus — "Status" alone conflicts with ProcessStatus,
+      SessionStatus, NotificationStatus.
+    strategy: >
+      Could rename to MsgStatus but low value.
+
+  - path: "crates/cp-base/src/state/data/config.rs"
+    match: 'SharedConfig'
+    reason: >
+      "Shared" alone conveys no meaning. Distinguishes from per-worker
+      WorkerState.
+    strategy: >
+      Could rename to GlobalConfig but SharedConfig is established.
+
+  - path: "crates/cp-base/src/state/mod.rs"
+    match: 'ReverieState/ReverieType'
+    reason: >
+      "State" and "Type" both conflict with common identifiers.
+    strategy: >
+      Only resolvable by moving reverie to its own crate.
+
+  - path: "crates/cp-base/src/tools/pre_flight.rs"
+    match: 'PreFlightResult'
+    reason: >
+      "Result" conflicts with std::result::Result.
+    strategy: >
+      Irreducible — std::Result conflict.
+
+  # ── indexing_slicing: LCS diff algorithm ────────────────────────────
+
+  - path: "crates/cp-mod-files/src/tools/diff.rs"
+    match: 'clippy::indexing_slicing'
+    reason: >
+      LCS algorithm with provably in-bounds indices — i in 0..=old_len
+      and j in 0..=new_len over a (old_len+1)×(new_len+1) table.
+    strategy: >
+      Bounds are mathematically proven. Could wrap in checked-index
+      newtype but low priority for a classic algorithm.

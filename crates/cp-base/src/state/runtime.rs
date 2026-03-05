@@ -469,7 +469,7 @@ impl State {
     }
 
     // =========================================================================
-    // Model selection & context window (merged from model_helpers.rs)
+    // Model selection & context window
     // =========================================================================
 
     /// Get the API model string for the current provider/model selection
@@ -534,7 +534,7 @@ impl State {
     // Cleaning thresholds
     // =========================================================================
 
-    /// Get the cleaning target as absolute proportion (threshold x `target_proportion`)
+    /// Get the cleaning target as absolute proportion (threshold × `target_proportion`)
     #[must_use]
     pub fn cleaning_target(&self) -> f32 {
         self.cleaning_threshold * self.cleaning_target_proportion

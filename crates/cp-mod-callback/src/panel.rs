@@ -14,9 +14,11 @@ use cp_base::ui::{Cell, render_table};
 
 use crate::types::CallbackState;
 
+/// Panel rendering for callback definitions table and inline script editor.
 pub(crate) struct CallbackPanel;
 
 impl CallbackPanel {
+    /// Build the markdown table representation used for LLM context.
     fn format_for_context(state: &State) -> String {
         let cs = CallbackState::get(state);
 
@@ -84,6 +86,45 @@ impl CallbackPanel {
 }
 
 impl Panel for CallbackPanel {
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &cp_base::state::context::ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+
+    fn handle_key(&self, _key: &crossterm::event::KeyEvent, _state: &State) -> Option<cp_base::state::actions::Action> {
+        None
+    }
+
     fn title(&self, _state: &State) -> String {
         "Callbacks".to_string()
     }
@@ -128,26 +169,26 @@ impl Panel for CallbackPanel {
 
         let viewport = state.last_viewport_width as usize;
         let fixed_width = indent
-            + id_width
-            + separator_width
-            + name_width
-            + separator_width
-            + pattern_width
-            + separator_width
-            + separator_width
-            + blocking_width
-            + separator_width
-            + timeout_width
-            + separator_width
-            + active_width
-            + separator_width
-            + scope_width
-            + separator_width
-            + success_width
-            + separator_width
-            + cwd_width;
-        let desc_max = if viewport > fixed_width + 20 {
-            viewport - fixed_width
+            .saturating_add(id_width)
+            .saturating_add(separator_width)
+            .saturating_add(name_width)
+            .saturating_add(separator_width)
+            .saturating_add(pattern_width)
+            .saturating_add(separator_width)
+            .saturating_add(separator_width)
+            .saturating_add(blocking_width)
+            .saturating_add(separator_width)
+            .saturating_add(timeout_width)
+            .saturating_add(separator_width)
+            .saturating_add(active_width)
+            .saturating_add(separator_width)
+            .saturating_add(scope_width)
+            .saturating_add(separator_width)
+            .saturating_add(success_width)
+            .saturating_add(separator_width)
+            .saturating_add(cwd_width);
+        let desc_max = if viewport > fixed_width.saturating_add(20) {
+            viewport.saturating_sub(fixed_width)
         } else {
             40 // minimum reasonable width
         };
@@ -172,8 +213,8 @@ impl Panel for CallbackPanel {
                         Cell::new(&timeout, normal),
                         Cell::new(active, normal),
                         Cell::new(scope, muted),
-                        Cell::new(&successes[i], muted),
-                        Cell::new(&cwds[i], muted),
+                        Cell::new(successes.get(i).map_or("—", String::as_str), muted),
+                        Cell::new(cwds.get(i).map_or("—", String::as_str), muted),
                     ]);
                 } else {
                     all_rows.push(vec![
@@ -307,10 +348,10 @@ fn wrap_text_simple(text: &str, max_width: usize) -> Vec<String> {
         if current_width == 0 {
             current_line.push_str(word);
             current_width = word_width;
-        } else if current_width + 1 + word_width <= max_width {
+        } else if current_width.saturating_add(1).saturating_add(word_width) <= max_width {
             current_line.push(' ');
             current_line.push_str(word);
-            current_width += 1 + word_width;
+            current_width = current_width.saturating_add(1).saturating_add(word_width);
         } else {
             lines.push(current_line);
             current_line = word.to_string();

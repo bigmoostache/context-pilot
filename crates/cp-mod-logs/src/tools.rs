@@ -12,7 +12,7 @@ use crate::types::{LogEntry, LogsState};
 fn push_log(state: &mut State, content: String) {
     let ls = LogsState::get_mut(state);
     let id = format!("L{}", ls.next_log_id);
-    ls.next_log_id += 1;
+    ls.next_log_id = ls.next_log_id.saturating_add(1);
     ls.logs.push(LogEntry::new(id, content));
 }
 
@@ -20,7 +20,7 @@ fn push_log(state: &mut State, content: String) {
 fn push_log_with_timestamp(state: &mut State, content: String, timestamp_ms: u64) {
     let ls = LogsState::get_mut(state);
     let id = format!("L{}", ls.next_log_id);
-    ls.next_log_id += 1;
+    ls.next_log_id = ls.next_log_id.saturating_add(1);
     ls.logs.push(LogEntry::with_timestamp(id, content, timestamp_ms));
 }
 
@@ -37,6 +37,7 @@ fn touch_logs_panel(state: &mut State) {
     }
 }
 
+/// Execute `log_create`: add one or more timestamped log entries.
 pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(entries) = tool.input.get("entries").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'entries' array".to_string(), true);
@@ -46,13 +47,13 @@ pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResul
         return ToolResult::new(tool.id.clone(), "Empty 'entries' array".to_string(), true);
     }
 
-    let mut count = 0;
+    let mut count: usize = 0;
     for entry_obj in entries {
         if let Some(content) = entry_obj.get("content").and_then(|v| v.as_str())
             && !content.is_empty()
         {
             push_log(state, content.to_string());
-            count += 1;
+            count = count.saturating_add(1);
         }
     }
 
@@ -63,6 +64,7 @@ pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResul
     ToolResult::new(tool.id.clone(), format!("Created {count} log(s)"), false)
 }
 
+/// Execute `log_summarize`: collapse multiple logs under a parent summary entry.
 pub(crate) fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Parse log_ids
     let log_ids: Vec<String> = match tool.input.get("log_ids").and_then(|v| v.as_array()) {
@@ -119,7 +121,7 @@ pub(crate) fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolRe
     // Create the summary log and set parent_id on children
     let ls = LogsState::get_mut(state);
     let summary_id = format!("L{}", ls.next_log_id);
-    ls.next_log_id += 1;
+    ls.next_log_id = ls.next_log_id.saturating_add(1);
     let summary = LogEntry {
         id: summary_id.clone(),
         timestamp_ms: max_timestamp,
@@ -141,6 +143,7 @@ pub(crate) fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolRe
     ToolResult::new(tool.id.clone(), format!("Created summary {} with {} children", summary_id, log_ids.len()), false)
 }
 
+/// Execute `log_toggle`: expand or collapse a log summary's children.
 pub(crate) fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
@@ -197,6 +200,7 @@ pub(crate) fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResul
     )
 }
 
+/// Execute `Close_conversation_history`: extract logs/memories and remove the panel.
 pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
     // 1. Validate the panel ID
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
@@ -210,19 +214,22 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
     let Some(panel_idx) = state.context.iter().position(|c| c.id == panel_id) else {
         return ToolResult::new(tool.id.clone(), format!("Panel '{panel_id}' not found"), true);
     };
-    if state.context[panel_idx].context_type.as_str() != ContextType::CONVERSATION_HISTORY {
+    let Some(panel) = state.context.get(panel_idx) else {
+        return ToolResult::new(tool.id.clone(), format!("Panel index {panel_idx} out of bounds"), true);
+    };
+    if panel.context_type.as_str() != ContextType::CONVERSATION_HISTORY {
         return ToolResult::new(
             tool.id.clone(),
             format!(
                 "Panel '{}' is not a conversation history panel (type: {:?})",
-                panel_id, state.context[panel_idx].context_type
+                panel_id, panel.context_type
             ),
             true,
         );
     }
 
     // 2. Extract the last message timestamp from the panel
-    let last_msg_timestamp = state.context[panel_idx]
+    let last_msg_timestamp = panel
         .history_messages
         .as_ref()
         .and_then(|msgs| msgs.last())
@@ -242,7 +249,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
 
     // 4. Create log entries (using panel's last message timestamp)
     if let Some(logs_array) = logs_array {
-        let mut log_count = 0;
+        let mut log_count: usize = 0;
         for log_obj in logs_array {
             if let Some(content) = log_obj.get("content").and_then(|v| v.as_str())
                 && !content.is_empty()
@@ -252,7 +259,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
                 } else {
                     push_log(state, content.to_string());
                 }
-                log_count += 1;
+                log_count = log_count.saturating_add(1);
             }
         }
         if log_count > 0 {
@@ -263,7 +270,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
 
     // 5. Create memory items
     if let Some(memories_array) = tool.input.get("memories").and_then(|v| v.as_array()) {
-        let mut mem_count = 0;
+        let mut mem_count: usize = 0;
         for mem_obj in memories_array {
             if let Some(content) = mem_obj.get("content").and_then(|v| v.as_str())
                 && !content.is_empty()
@@ -291,7 +298,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
 
                 let ms = MemoryState::get_mut(state);
                 let id = format!("M{}", ms.next_memory_id);
-                ms.next_memory_id += 1;
+                ms.next_memory_id = ms.next_memory_id.saturating_add(1);
                 ms.memories.push(MemoryItem {
                     id,
                     tl_dr: content.to_string(),
@@ -299,7 +306,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
                     importance: importance_level,
                     labels: vec![],
                 });
-                mem_count += 1;
+                mem_count = mem_count.saturating_add(1);
             }
         }
         if mem_count > 0 {

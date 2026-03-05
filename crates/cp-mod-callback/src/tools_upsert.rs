@@ -75,9 +75,9 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Generate ID
-    let cs = CallbackState::get_mut(state);
-    let anchor_id = format!("CB{}", cs.next_id);
-    cs.next_id += 1;
+    let cs_mut = CallbackState::get_mut(state);
+    let anchor_id = format!("CB{}", cs_mut.next_id);
+    cs_mut.next_id = cs_mut.next_id.saturating_add(1);
 
     // Write script file to .context-pilot/scripts/{name}.sh
     let scripts_dir = PathBuf::from(constants::STORE_DIR).join("scripts");
@@ -127,9 +127,9 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Add to state and mark active
-    let cs = CallbackState::get_mut(state);
-    cs.definitions.push(definition);
-    let _ = cs.active_set.insert(anchor_id.clone());
+    let cs_store = CallbackState::get_mut(state);
+    cs_store.definitions.push(definition);
+    let _ = cs_store.active_set.insert(anchor_id.clone());
 
     // Build success message
     let mut msg = format!(
@@ -181,8 +181,8 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Diff-based edits require the editor to be open first (so the AI can see current content)
     if has_diff {
-        let cs = CallbackState::get(state);
-        if cs.editor_open.as_deref() != Some(&anchor_id) {
+        let cs_check = CallbackState::get(state);
+        if cs_check.editor_open.as_deref() != Some(&anchor_id) {
             return ToolResult::new(
                 tool.id.clone(),
                 format!(
@@ -193,8 +193,10 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
-    let cs = CallbackState::get_mut(state);
-    let def = &mut cs.definitions[def_idx];
+    let cs_mut = CallbackState::get_mut(state);
+    let Some(def) = cs_mut.definitions.get_mut(def_idx) else {
+        return ToolResult::new(tool.id.clone(), format!("Definition index {def_idx} out of bounds"), true);
+    };
     let vessel_name = def.name.clone();
     let mut changes = Vec::new();
 
@@ -321,13 +323,13 @@ pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Remove definition and get the name for script cleanup
-    let cs = CallbackState::get_mut(state);
-    let sunken_def = cs.definitions.remove(def_idx);
-    let _ = cs.active_set.remove(&anchor_id);
+    let cs_mut = CallbackState::get_mut(state);
+    let sunken_def = cs_mut.definitions.remove(def_idx);
+    let _ = cs_mut.active_set.remove(&anchor_id);
 
     // If editor was open for this callback, close it
-    if cs.editor_open.as_deref() == Some(&anchor_id) {
-        cs.editor_open = None;
+    if cs_mut.editor_open.as_deref() == Some(&anchor_id) {
+        cs_mut.editor_open = None;
     }
 
     // Delete the script file
@@ -388,7 +390,7 @@ fn has_singular_env_var(script: &str) -> bool {
     let needle = "$CP_CHANGED_FILE";
     let mut start = 0;
     while let Some(pos) = script.get(start..).unwrap_or("").find(needle) {
-        let abs_pos = start + pos + needle.len();
+        let abs_pos = start.saturating_add(pos).saturating_add(needle.len());
         // If the next char is 'S' or 's', this is actually $CP_CHANGED_FILES — skip it
         match script.as_bytes().get(abs_pos) {
             Some(b'S' | b's') => {

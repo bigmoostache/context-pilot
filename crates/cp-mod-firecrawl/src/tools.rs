@@ -192,7 +192,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let page_title = result.title.as_deref().unwrap_or("untitled");
                 let page_url = result.url.as_deref().unwrap_or("unknown");
 
-                let _r = write!(content, "## Result {} — {} ({})\n\n", i.saturating_add(1), page_title, page_url);
+                let _r1 = write!(content, "## Result {} — {} ({})\n\n", i.saturating_add(1), page_title, page_url);
 
                 if let Some(ref md) = result.markdown {
                     content.push_str(md);
@@ -207,7 +207,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 {
                     content.push_str("**Links:**\n");
                     for link in links.iter().take(10) {
-                        let _r = writeln!(content, "- {link}");
+                        let _r2 = writeln!(content, "- {link}");
                     }
                     content.push('\n');
                 }

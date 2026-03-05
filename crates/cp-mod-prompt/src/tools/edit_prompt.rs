@@ -55,22 +55,22 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Get the item and check if builtin
-    let ps = PromptState::get(state);
+    let ps_readonly = PromptState::get(state);
     let (is_builtin, current_content) = match entity_type {
         EntityType::Agent => {
-            let Some(a) = ps.agents.iter().find(|a| a.id == id) else {
+            let Some(a) = ps_readonly.agents.iter().find(|a| a.id == id) else {
                 return ToolResult::new(tool.id.clone(), format!("Agent '{id}' vanished mid-edit"), true);
             };
             (a.is_builtin, a.content.clone())
         }
         EntityType::Skill => {
-            let Some(s) = ps.skills.iter().find(|s| s.id == id) else {
+            let Some(s) = ps_readonly.skills.iter().find(|s| s.id == id) else {
                 return ToolResult::new(tool.id.clone(), format!("Skill '{id}' vanished mid-edit"), true);
             };
             (s.is_builtin, s.content.clone())
         }
         EntityType::Command => {
-            let Some(c) = ps.commands.iter().find(|c| c.id == id) else {
+            let Some(c) = ps_readonly.commands.iter().find(|c| c.id == id) else {
                 return ToolResult::new(tool.id.clone(), format!("Command '{id}' vanished mid-edit"), true);
             };
             (c.is_builtin, c.content.clone())
@@ -108,10 +108,10 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let replaced = if replace_all { count } else { 1 };
 
     // Apply the change
-    let ps = PromptState::get_mut(state);
+    let ps_mut = PromptState::get_mut(state);
     match entity_type {
         EntityType::Agent => {
-            let Some(a) = ps.agents.iter_mut().find(|a| a.id == id) else {
+            let Some(a) = ps_mut.agents.iter_mut().find(|a| a.id == id) else {
                 return ToolResult::new(tool.id.clone(), format!("Agent '{id}' vanished mid-edit"), true);
             };
             a.content = new_content;
@@ -119,7 +119,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             state.touch_panel(ContextType::SYSTEM);
         }
         EntityType::Skill => {
-            let Some(s) = ps.skills.iter_mut().find(|s| s.id == id) else {
+            let Some(s) = ps_mut.skills.iter_mut().find(|s| s.id == id) else {
                 return ToolResult::new(tool.id.clone(), format!("Skill '{id}' vanished mid-edit"), true);
             };
             s.content = new_content;
@@ -139,7 +139,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         }
         EntityType::Command => {
-            let Some(c) = ps.commands.iter_mut().find(|c| c.id == id) else {
+            let Some(c) = ps_mut.commands.iter_mut().find(|c| c.id == id) else {
                 return ToolResult::new(tool.id.clone(), format!("Command '{id}' vanished mid-edit"), true);
             };
             c.content = new_content;
@@ -174,13 +174,18 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), result_msg, false)
 }
 
+/// The kind of prompt entity being edited.
 enum EntityType {
+    /// An agent prompt.
     Agent,
+    /// A skill prompt.
     Skill,
+    /// A command prompt.
     Command,
 }
 
 impl EntityType {
+    /// Return a human-readable label for this entity type.
     const fn label(&self) -> &'static str {
         match self {
             Self::Agent => "agent",
@@ -203,28 +208,37 @@ fn generate_unified_diff(old: &str, new: &str) -> String {
     let mut lcs_idx = 0;
 
     while old_idx < old_lines.len() || new_idx < new_lines.len() {
-        if lcs_idx < lcs.len() {
-            let (lcs_old, lcs_new) = lcs[lcs_idx];
+        if let Some(&(lcs_old, lcs_new)) = lcs.get(lcs_idx) {
             while old_idx < lcs_old {
-                let _r = writeln!(result, "- {}", old_lines[old_idx]);
-                old_idx += 1;
+                if let Some(line) = old_lines.get(old_idx) {
+                    let _r = writeln!(result, "- {line}");
+                }
+                old_idx = old_idx.saturating_add(1);
             }
             while new_idx < lcs_new {
-                let _r = writeln!(result, "+ {}", new_lines[new_idx]);
-                new_idx += 1;
+                if let Some(line) = new_lines.get(new_idx) {
+                    let _r = writeln!(result, "+ {line}");
+                }
+                new_idx = new_idx.saturating_add(1);
             }
-            let _r = writeln!(result, "  {}", old_lines[old_idx]);
-            old_idx += 1;
-            new_idx += 1;
-            lcs_idx += 1;
+            if let Some(line) = old_lines.get(old_idx) {
+                let _r = writeln!(result, "  {line}");
+            }
+            old_idx = old_idx.saturating_add(1);
+            new_idx = new_idx.saturating_add(1);
+            lcs_idx = lcs_idx.saturating_add(1);
         } else {
             while old_idx < old_lines.len() {
-                let _r = writeln!(result, "- {}", old_lines[old_idx]);
-                old_idx += 1;
+                if let Some(line) = old_lines.get(old_idx) {
+                    let _r = writeln!(result, "- {line}");
+                }
+                old_idx = old_idx.saturating_add(1);
             }
             while new_idx < new_lines.len() {
-                let _r = writeln!(result, "+ {}", new_lines[new_idx]);
-                new_idx += 1;
+                if let Some(line) = new_lines.get(new_idx) {
+                    let _r = writeln!(result, "+ {line}");
+                }
+                new_idx = new_idx.saturating_add(1);
             }
         }
     }
@@ -232,18 +246,30 @@ fn generate_unified_diff(old: &str, new: &str) -> String {
     result
 }
 
-fn lcs<'a>(old: &[&'a str], new: &[&'a str]) -> Vec<(usize, usize)> {
+/// Compute the longest common subsequence index pairs between two line slices.
+fn lcs<'src>(old: &[&'src str], new: &[&'src str]) -> Vec<(usize, usize)> {
     let old_len = old.len();
     let new_len = new.len();
-    let mut lengths = vec![vec![0; new_len + 1]; old_len + 1];
+    let mut lengths = vec![vec![0usize; new_len.saturating_add(1)]; old_len.saturating_add(1)];
 
     for i in 1..=old_len {
         for j in 1..=new_len {
-            if old[i - 1] == new[j - 1] {
-                lengths[i][j] = lengths[i - 1][j - 1] + 1;
+            let Some(old_val) = old.get(i.saturating_sub(1)) else { continue };
+            let Some(new_val) = new.get(j.saturating_sub(1)) else { continue };
+            let value = if old_val == new_val {
+                lengths
+                    .get(i.saturating_sub(1))
+                    .and_then(|r| r.get(j.saturating_sub(1)))
+                    .copied()
+                    .unwrap_or(0)
+                    .saturating_add(1)
             } else {
-                lengths[i][j] = lengths[i - 1][j].max(lengths[i][j - 1]);
-            }
+                let up = lengths.get(i.saturating_sub(1)).and_then(|r| r.get(j)).copied().unwrap_or(0);
+                let left = lengths.get(i).and_then(|r| r.get(j.saturating_sub(1))).copied().unwrap_or(0);
+                up.max(left)
+            };
+            let Some(cell) = lengths.get_mut(i).and_then(|r| r.get_mut(j)) else { continue };
+            *cell = value;
         }
     }
 
@@ -251,14 +277,20 @@ fn lcs<'a>(old: &[&'a str], new: &[&'a str]) -> Vec<(usize, usize)> {
     let mut i = old_len;
     let mut j = new_len;
     while i > 0 && j > 0 {
-        if old[i - 1] == new[j - 1] {
-            result.push((i - 1, j - 1));
-            i -= 1;
-            j -= 1;
-        } else if lengths[i - 1][j] > lengths[i][j - 1] {
-            i -= 1;
+        let old_val = old.get(i.saturating_sub(1));
+        let new_val = new.get(j.saturating_sub(1));
+        if old_val == new_val {
+            result.push((i.saturating_sub(1), j.saturating_sub(1)));
+            i = i.saturating_sub(1);
+            j = j.saturating_sub(1);
         } else {
-            j -= 1;
+            let up = lengths.get(i.saturating_sub(1)).and_then(|r| r.get(j)).copied().unwrap_or(0);
+            let left = lengths.get(i).and_then(|r| r.get(j.saturating_sub(1))).copied().unwrap_or(0);
+            if up > left {
+                i = i.saturating_sub(1);
+            } else {
+                j = j.saturating_sub(1);
+            }
         }
     }
     result.reverse();

@@ -44,7 +44,7 @@ pub(super) fn prepare_stream_context(
     // messages the LLM already saw (e.g., user sent a message during a tool
     // call pause — the message is in context, LLM responds, but without this
     // the notification would still be "unprocessed" when the stream ends).
-    cp_mod_spine::SpineState::mark_user_message_notifications_processed(state);
+    cp_mod_spine::types::SpineState::mark_user_message_notifications_processed(state);
 
     // Detach old conversation chunks before anything else
     detach::detach_conversation_chunks(state);
@@ -141,7 +141,7 @@ pub(super) fn prepare_stream_context(
 
         // Inject the reverie agent's prompt content
         {
-            let ps = cp_mod_prompt::PromptState::get(state);
+            let ps = cp_mod_prompt::types::PromptState::get(state);
             if let Some(agent) = ps.agents.iter().find(|a| a.id == rev.agent_id) {
                 reverie_panel_content.push_str("## Agent Instructions\n");
                 reverie_panel_content.push_str(&agent.content);

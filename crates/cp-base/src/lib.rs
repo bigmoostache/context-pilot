@@ -7,7 +7,6 @@ pub mod cast;
 /// YAML config loader: prompts, library, themes, injections, constants.
 pub mod config;
 /// Re-export from `config::llm_types` for convenience.
-#[expect(clippy::pub_use, reason = "Intentional re-export module for downstream convenience")]
 pub mod llm_types {
     pub use crate::config::llm_types::{
         AnthropicModel, ApiCheckResult, DeepSeekModel, GrokModel, GroqModel, LlmProvider, ModelInfo, StreamEvent,

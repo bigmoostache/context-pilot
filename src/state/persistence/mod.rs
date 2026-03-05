@@ -25,7 +25,7 @@ use std::fs;
 use std::io::Write as _;
 use std::path::PathBuf;
 
-use cp_mod_logs::LogsState;
+use cp_mod_logs::types::LogsState;
 
 use crate::infra::config::set_active_theme;
 use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};

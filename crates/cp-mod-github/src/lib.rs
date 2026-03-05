@@ -18,7 +18,7 @@ pub mod types;
 /// Background watcher: polls `gh` for PR/issue updates, auto-refreshes panels.
 pub mod watcher;
 
-pub use types::GithubState;
+use types::GithubState;
 
 /// Timeout for gh commands (seconds)
 pub const GH_CMD_TIMEOUT_SECS: u64 = 60;

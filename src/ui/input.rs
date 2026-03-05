@@ -8,8 +8,8 @@ use crate::llms::{LlmProvider, ModelInfo as _};
 use crate::state::State;
 
 use cp_base::cast::SafeCast as _;
-use cp_mod_prompt::PromptState;
-use cp_mod_queue::QueueState;
+use cp_mod_prompt::types::PromptState;
+use cp_mod_queue::types::QueueState;
 
 pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let base_style = Style::default().bg(theme::bg_base()).fg(theme::text_muted());
@@ -129,7 +129,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     }
 
     // Git branch (if available)
-    let gs = cp_mod_git::GitState::get(state);
+    let gs = cp_mod_git::types::GitState::get(state);
     if let Some(branch) = &gs.branch {
         spans.push(Span::styled(format!(" {branch} "), Style::default().fg(Color::White).bg(Color::Blue)));
         spans.push(Span::styled(" ", base_style));
@@ -137,7 +137,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 
     // Git change stats (if there are any changes)
     if !gs.file_changes.is_empty() {
-        use cp_mod_git::GitChangeType;
+        use cp_mod_git::types::GitChangeType;
 
         let mut total_additions: i32 = 0;
         let mut total_deletions: i32 = 0;
@@ -178,7 +178,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     // Auto-continuation status card (always visible)
     {
         use crate::infra::config::normalize_icon;
-        use cp_mod_spine::SpineState;
+        use cp_mod_spine::types::SpineState;
         let spine_cfg = &SpineState::get(state).config;
         let (icon, bg_color) = if spine_cfg.continue_until_todos_done {
             (normalize_icon("🔁"), theme::warning())

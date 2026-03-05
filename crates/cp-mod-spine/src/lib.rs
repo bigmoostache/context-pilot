@@ -16,7 +16,7 @@ pub(crate) mod tools;
 /// Notification, spine config, and state types.
 pub mod types;
 
-pub use types::{Notification, NotificationType, SpineConfig, SpineState};
+use types::{Notification, SpineState};
 
 use serde_json::json;
 

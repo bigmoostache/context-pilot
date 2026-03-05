@@ -1,14 +1,47 @@
+use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
 use crate::types::PromptState;
 use cp_base::config::accessors::theme;
-use cp_base::panels::{ContextItem, Panel};
-use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action};
+use cp_base::state::actions::Action;
+use cp_base::state::context::{ContextElement, ContextType, estimate_tokens};
 use cp_base::state::runtime::State;
 
+/// Panel displaying a single loaded skill's content.
 pub(crate) struct SkillPanel;
 
 impl Panel for SkillPanel {
+    fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
+        scroll_key_action(key)
+    }
+
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn refresh_cache(&self, _request: CacheRequest) -> Option<CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(&self, _ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut ContextElement, _state: &mut State) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+
     fn title(&self, state: &State) -> String {
         // Find the skill name from the selected context element
         let selected = state.context.get(state.selected_context);
@@ -77,9 +110,10 @@ impl Panel for SkillPanel {
         };
 
         for (idx, content, tokens) in updates {
-            let ctx = &mut state.context[idx];
-            ctx.cached_content = Some(content);
-            ctx.token_count = tokens;
+            if let Some(ctx) = state.context.get_mut(idx) {
+                ctx.cached_content = Some(content);
+                ctx.token_count = tokens;
+            }
         }
     }
 

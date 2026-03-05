@@ -256,7 +256,7 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     );
 
     // 4. Max Cost Guard Rail
-    let spine_cfg = &cp_mod_spine::SpineState::get(state).config;
+    let spine_cfg = &cp_mod_spine::types::SpineState::get(state).config;
     let max_cost = spine_cfg.max_cost.unwrap_or(0.0);
     let max_display = 20.0f64;
     let cost_filled = ((max_cost / max_display) * bar_width.to_f64()).min(bar_width.to_f64()).to_usize();
@@ -365,7 +365,7 @@ fn render_theme_section(lines: &mut Vec<Line<'_>>, state: &State) {
 
 fn render_toggles_section(lines: &mut Vec<Line<'_>>, state: &State) {
     // Auto-continuation toggle
-    let spine_cfg = &cp_mod_spine::SpineState::get(state).config;
+    let spine_cfg = &cp_mod_spine::types::SpineState::get(state).config;
     let auto_on = spine_cfg.continue_until_todos_done;
     let (check, status, color) =
         if auto_on { ("[x]", "ON", theme::success()) } else { ("[ ]", "OFF", theme::text_muted()) };

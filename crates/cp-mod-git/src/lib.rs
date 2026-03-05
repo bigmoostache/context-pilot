@@ -15,9 +15,10 @@ mod tools;
 /// Git state types: `GitState`, `GitFileChange`, `GitChangeType`.
 pub mod types;
 
+use types::{GitChangeType, GitFileChange, GitState};
+
 use cp_base::cast::SafeCast as _;
 use std::fmt::Write as _;
-pub use types::{GitChangeType, GitFileChange, GitState};
 
 /// Refresh git status (branch, file changes) into `GitState`.
 /// Called periodically by the overview panel to keep stats up to date.
@@ -123,8 +124,8 @@ pub fn refresh_git_status(state: &mut State) {
         }
     }
 
-    let gs = GitState::get_mut(state);
-    gs.file_changes = file_changes;
+    let gs_mut = GitState::get_mut(state);
+    gs_mut.file_changes = file_changes;
 }
 
 /// Timeout for git commands (seconds)

@@ -4,6 +4,7 @@ use cp_base::state::context::{ContextType, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
+/// Create a new skill from tool parameters and persist it.
 pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let name = tool.input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -47,6 +48,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created skill '{name}' with ID '{id}'"), false)
 }
 
+/// Delete a skill by ID, unloading it first if necessary.
 pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
@@ -77,6 +79,7 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Deleted skill '{}' ({})", skill.name, id), false)
 }
 
+/// Load a skill into the active context as a panel.
 pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) if !id.is_empty() => id,
@@ -104,7 +107,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let content = format!("[{}] {}\n\n{}", skill.id, skill.name, skill.content);
     let tokens = estimate_tokens(&content);
     let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid += 1;
+    state.global_next_uid = state.global_next_uid.saturating_add(1);
 
     let mut elem = cp_base::state::context::make_default_context_element(
         &panel_id,
@@ -130,6 +133,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     )
 }
 
+/// Remove a loaded skill from the active context.
 pub(crate) fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) if !id.is_empty() => id,

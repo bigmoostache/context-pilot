@@ -8,7 +8,7 @@ use crate::ui::{
     theme,
 };
 use cp_base::cast::SafeCast as _;
-use cp_mod_git::GitChangeType;
+use cp_mod_git::types::GitChangeType;
 
 /// Horizontal separator line.
 pub(super) fn separator() -> Vec<Line<'static>> {
@@ -98,7 +98,7 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
 /// Render the GIT STATUS section (branch + file changes summary table).
 pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'static>> {
     let mut text: Vec<Line<'_>> = Vec::new();
-    let gs = cp_mod_git::GitState::get(state);
+    let gs = cp_mod_git::types::GitState::get(state);
 
     if !gs.is_repo {
         return text;

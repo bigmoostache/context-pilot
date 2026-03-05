@@ -12,6 +12,7 @@ readme.workspace = true
 [dependencies]
 cp-base.workspace = true
 cp-mod-files = { path = "../cp-mod-files" }
+crossterm.workspace = true
 ratatui.workspace = true
 serde.workspace = true
 serde_json.workspace = true

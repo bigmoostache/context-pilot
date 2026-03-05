@@ -8,7 +8,7 @@ use crate::app::reverie::{streaming, tools};
 use crate::infra::api::StreamEvent;
 use crate::state::persistence::save_state;
 use cp_base::config::REVERIE;
-use cp_mod_queue::QueueState;
+use cp_mod_queue::types::QueueState;
 
 impl App {
     /// Check if any reverie needs a stream started (state has reverie but no stream).
@@ -92,9 +92,9 @@ impl App {
                     }
                     StreamEvent::Error(e) => {
                         // Reverie errors are non-critical — log and destroy this agent's session
-                        let _r = cp_mod_spine::SpineState::create_notification(
+                        let _r = cp_mod_spine::types::SpineState::create_notification(
                             &mut self.state,
-                            cp_mod_spine::NotificationType::Custom,
+                            cp_mod_spine::types::NotificationType::Custom,
                             "Reverie".to_string(),
                             format!("Reverie '{agent_id}' error: {e}. Destroying session."),
                         );
@@ -138,9 +138,9 @@ impl App {
                 // Check tool cap guard rail
                 let cap = crate::infra::constants::REVERIE_TOOL_CAP;
                 if self.state.reveries.get(&agent_id).is_some_and(|r| r.tool_call_count > cap) {
-                    let _r = cp_mod_spine::SpineState::create_notification(
+                    let _r = cp_mod_spine::types::SpineState::create_notification(
                         &mut self.state,
-                        cp_mod_spine::NotificationType::Custom,
+                        cp_mod_spine::types::NotificationType::Custom,
                         "Reverie".to_string(),
                         format!("Tool cap ({cap}) reached for '{agent_id}'. Force-stopping."),
                     );
@@ -176,9 +176,9 @@ impl App {
                     // Check for Report sentinel
                     if result.content.starts_with("REVERIE_REPORT:") {
                         let summary = result.content.strip_prefix("REVERIE_REPORT:").unwrap_or("Completed");
-                        let _r = cp_mod_spine::SpineState::create_notification(
+                        let _r = cp_mod_spine::types::SpineState::create_notification(
                             &mut self.state,
-                            cp_mod_spine::NotificationType::Custom,
+                            cp_mod_spine::types::NotificationType::Custom,
                             "Reverie".to_string(),
                             summary.to_string(),
                         );
@@ -201,7 +201,7 @@ impl App {
                         && !QueueState::is_queue_tool(&tool.name);
                     if should_queue {
                         let qs = QueueState::get_mut(&mut self.state);
-                        let idx = qs.enqueue(cp_mod_queue::QueuedToolCall {
+                        let idx = qs.enqueue(cp_mod_queue::types::QueuedToolCall {
                             index: 0,
                             tool_name: tool.name.clone(),
                             tool_use_id: tool.id.clone(),
@@ -310,9 +310,9 @@ impl App {
             let retries = self.state.reveries.get(&agent_id).map_or(0, |r| r.report_retries);
             if retries >= 1 {
                 // Max retries reached — force destroy
-                let _r = cp_mod_spine::SpineState::create_notification(
+                let _r = cp_mod_spine::types::SpineState::create_notification(
                     &mut self.state,
-                    cp_mod_spine::NotificationType::Custom,
+                    cp_mod_spine::types::NotificationType::Custom,
                     "Reverie".to_string(),
                     format!("Reverie '{agent_id}' ended without Report after retry. Force-destroying."),
                 );
