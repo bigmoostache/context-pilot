@@ -17,6 +17,90 @@ use std::process::ExitCode;
 use std::sync::Mutex;
 use std::sync::mpsc;
 
+use ratatui::prelude::*;
+
+// ─── Boot Screen ────────────────────────────────────────────────────────────
+// Phased loading with visual progress — no more black void on startup.
+
+/// A single boot step shown in the loading screen.
+struct BootStep {
+    label: &'static str,
+    detail: Option<String>,
+    done: bool,
+}
+
+/// Render the boot screen with completed/in-progress steps and a progress bar.
+fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, steps: &[BootStep]) {
+    let done_count = steps.iter().filter(|s| s.done).count();
+    let total = steps.len().max(1); // avoid division by zero
+
+    drop(terminal.draw(|frame| {
+        let area = frame.area();
+
+        // Centered box: 50 wide, 2 (title) + steps + 2 (gauge + padding)
+        let raw_height = steps.len().saturating_add(5).min(area.height as usize);
+        let box_height = u16::try_from(raw_height).unwrap_or(area.height);
+        let box_width = 50.min(area.width);
+        let x = area.width.saturating_sub(box_width) / 2;
+        let y = area.height.saturating_sub(box_height) / 2;
+        let boot_area = Rect::new(x, y, box_width, box_height);
+
+        // Split: steps area + gauge
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // title
+                Constraint::Length(1), // blank
+                Constraint::Min(1),    // steps
+                Constraint::Length(1), // blank
+                Constraint::Length(1), // gauge
+            ])
+            .split(boot_area);
+
+        // Title
+        let title = Line::from(vec![
+            Span::styled("⚓ ", Style::default().fg(Color::Cyan)),
+            Span::styled("Context Pilot", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+        ]);
+        frame.render_widget(title, chunks[0]);
+
+        // Steps
+        let step_lines: Vec<Line<'_>> = steps
+            .iter()
+            .enumerate()
+            .map(|(i, step)| {
+                let (icon, style) = if step.done {
+                    ("  ✓ ", Style::default().fg(Color::Green))
+                } else if i == done_count {
+                    ("  ▸ ", Style::default().fg(Color::Yellow))
+                } else {
+                    ("    ", Style::default().fg(Color::DarkGray))
+                };
+                let detail = step.detail.as_deref().unwrap_or("");
+                let text = if detail.is_empty() {
+                    format!("{icon}{}", step.label)
+                } else {
+                    format!("{icon}{} ({detail})", step.label)
+                };
+                Line::from(Span::styled(text, style))
+            })
+            .collect();
+        let steps_widget = ratatui::widgets::Paragraph::new(step_lines);
+        frame.render_widget(steps_widget, chunks[2]);
+
+        // Progress gauge — pure integer arithmetic to avoid float cast lints
+        let pct = done_count * 100 / total;
+        let gauge_width = chunks[4].width;
+        let filled_usize = done_count * usize::from(gauge_width) / total;
+        let filled = u16::try_from(filled_usize).unwrap_or(gauge_width);
+        let mut bar = "█".repeat(filled_usize);
+        bar.push_str(&"░".repeat(usize::from(gauge_width.saturating_sub(filled))));
+        let gauge_line =
+            Line::from(vec![Span::styled(bar, Style::default().fg(Color::Cyan)), Span::raw(format!(" {pct}%"))]);
+        frame.render_widget(gauge_line, chunks[4]);
+    }));
+}
+
 // ─── File Logger ────────────────────────────────────────────────────────────
 // Minimal `log` backend that appends trace-level messages to a single file.
 // Registered once at startup; no-ops if the file can't be opened.
@@ -65,7 +149,6 @@ use crossterm::{
     event::{DisableBracketedPaste, EnableBracketedPaste},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::prelude::*;
 
 use app::{App, ensure_default_agent, ensure_default_contexts};
 use infra::api::StreamEvent;
@@ -129,19 +212,27 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
 
+    // ─── Phased boot with progress rendering ────────────────────────────
+    let mut steps = vec![
+        BootStep { label: "Loading state", detail: None, done: false },
+        BootStep { label: "Initializing modules", detail: None, done: false },
+        BootStep { label: "Preparing workspace", detail: None, done: false },
+    ];
+
+    // Show initial boot screen immediately — banish the black void
+    render_boot_screen(&mut terminal, &steps);
+
+    // Phase 1: Load state (config + panels + messages)
     let mut state = load_state();
+    steps[0].done = true;
+    render_boot_screen(&mut terminal, &steps);
 
-    // Set callback hooks for extracted module crates
+    // Phase 2: Initialize modules
     state.highlight_fn = Some(ui::helpers::highlight_file);
-
-    // Validate module dependencies at startup
     modules::validate_dependencies(&state.active_modules);
-
-    // Initialize the ContextType registry from all modules (must happen before any is_fixed/icon/needs_cache calls)
     modules::init_registry();
 
     // Remove orphaned context elements whose module no longer exists
-    // (e.g., tmux panels persisted before the tmux crate was removed).
     {
         let known_types: std::collections::HashSet<String> = modules::all_modules()
             .iter()
@@ -155,13 +246,15 @@ fn main() -> ExitCode {
             .collect();
         state.context.retain(|c| known_types.contains(c.context_type.as_str()));
     }
+    steps[1].done = true;
+    render_boot_screen(&mut terminal, &steps);
 
-    // Ensure default context elements and seed exist
+    // Phase 3: Prepare workspace
     ensure_default_contexts(&mut state);
     ensure_default_agent(&mut state);
-
-    // Ensure built-in presets exist on disk
     cp_mod_preset::builtin::ensure_builtin_presets();
+    steps[2].done = true;
+    render_boot_screen(&mut terminal, &steps);
 
     // Create channels
     let (tx, rx) = mpsc::channel::<StreamEvent>();
