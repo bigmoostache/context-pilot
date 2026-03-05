@@ -34,7 +34,7 @@ pub(crate) fn handle_stream_done(
     cache_miss_tokens: usize,
     stop_reason: Option<&str>,
 ) -> ActionResult {
-    state.is_streaming = false;
+    state.flags.is_streaming = false;
     state.last_stop_reason = stop_reason.map(ToString::to_string);
 
     // Set tick stats (this tick only)
@@ -77,7 +77,7 @@ pub(crate) fn handle_stream_done(
 
 /// Handle `StreamError` action — clean up streaming state, log error
 pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
-    state.is_streaming = false;
+    state.flags.is_streaming = false;
 
     // Remove estimated tokens on error from Conversation context
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {

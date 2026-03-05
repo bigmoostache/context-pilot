@@ -13,10 +13,10 @@ impl App {
     pub(super) fn process_stream_events(&mut self, rx: &Receiver<StreamEvent>) {
         let _guard = crate::profile!("app::stream_events");
         while let Ok(evt) = rx.try_recv() {
-            if !self.state.is_streaming {
+            if !self.state.flags.is_streaming {
                 continue;
             }
-            self.state.dirty = true;
+            self.state.flags.dirty = true;
             match evt {
                 StreamEvent::Chunk(text) => {
                     self.typewriter.add_chunk(&text);
@@ -73,7 +73,7 @@ impl App {
     pub(super) fn handle_retry(&mut self, tx: &Sender<StreamEvent>) {
         if let Some(_error) = self.pending_retry_error.take() {
             // Still streaming, retry the request
-            if self.state.is_streaming {
+            if self.state.flags.is_streaming {
                 // Clear any partial assistant message content before retrying
                 if let Some(msg) = self.state.messages.last_mut()
                     && msg.role == "assistant"
@@ -98,18 +98,18 @@ impl App {
                     },
                     tx.clone(),
                 );
-                self.state.dirty = true;
+                self.state.flags.dirty = true;
             }
         }
     }
 
     pub(super) fn process_typewriter(&mut self) {
         let _guard = crate::profile!("app::typewriter");
-        if self.state.is_streaming
+        if self.state.flags.is_streaming
             && let Some(chars) = self.typewriter.take_chars()
         {
             let _r = apply_action(&mut self.state, Action::AppendChars(chars));
-            self.state.dirty = true;
+            self.state.flags.dirty = true;
         }
     }
 
@@ -117,9 +117,9 @@ impl App {
         if let Some(rx) = &self.api_check_rx
             && let Ok(result) = rx.try_recv()
         {
-            self.state.api_check_in_progress = false;
+            self.state.flags.api_check_in_progress = false;
             self.state.api_check_result = Some(result);
-            self.state.dirty = true;
+            self.state.flags.dirty = true;
             self.api_check_rx = None;
             self.save_state_async();
         }
@@ -127,7 +127,7 @@ impl App {
 
     /// Continue streaming after tool execution (called when panels are ready).
     pub(super) fn continue_streaming(&mut self, tx: &Sender<StreamEvent>) {
-        self.state.is_tooling = false;
+        self.state.flags.is_tooling = false;
         let ctx = prepare_stream_context(&mut self.state, true, None);
         let system_prompt = get_active_agent_content(&self.state);
         self.typewriter.reset();
@@ -149,13 +149,13 @@ impl App {
     }
 
     pub(super) fn finalize_stream(&mut self) {
-        if !self.state.is_streaming {
+        if !self.state.flags.is_streaming {
             return;
         }
         // Don't finalize while waiting for panels or deferred sleep —
         // pending_done is still Some from the intermediate stream, and
         // continue_streaming will clear it when the deferred state resolves.
-        if self.state.waiting_for_panels || self.deferred_tool_sleeping {
+        if self.state.flags.waiting_for_panels || self.deferred_tool_sleeping {
             return;
         }
         // Don't finalize while a question form is pending user response
@@ -172,7 +172,7 @@ impl App {
             && self.typewriter.pending_chars.is_empty()
             && self.pending_tools.is_empty()
         {
-            self.state.dirty = true;
+            self.state.flags.dirty = true;
             let stop_reason = stop_reason.clone();
             match apply_action(
                 &mut self.state,

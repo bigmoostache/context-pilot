@@ -46,7 +46,7 @@ impl App {
             };
 
             for evt in events {
-                self.state.dirty = true;
+                self.state.flags.dirty = true;
                 match evt {
                     StreamEvent::Chunk(text) => {
                         if let Some(rev) = self.state.reveries.get_mut(&agent_id) {

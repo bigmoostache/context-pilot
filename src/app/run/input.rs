@@ -269,7 +269,7 @@ impl App {
                     match id.as_str() {
                         "quit" => return None, // Signal quit
                         "reload" => {
-                            self.state.reload_pending = true;
+                            self.state.flags.reload_pending = true;
                             perform_reload(&self.state);
                             return None;
                         }

@@ -55,7 +55,7 @@ impl Module for OverviewModule {
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         json!({
             "active_modules": state.active_modules.iter().collect::<Vec<_>>(),
-            "dev_mode": state.dev_mode,
+            "dev_mode": state.flags.dev_mode,
             "llm_provider": state.llm_provider,
             "anthropic_model": state.anthropic_model,
             "grok_model": state.grok_model,
@@ -66,7 +66,7 @@ impl Module for OverviewModule {
             "secondary_grok_model": state.secondary_grok_model,
             "secondary_groq_model": state.secondary_groq_model,
             "secondary_deepseek_model": state.secondary_deepseek_model,
-            "reverie_enabled": state.reverie_enabled,
+            "reverie_enabled": state.flags.reverie_enabled,
             "cleaning_threshold": state.cleaning_threshold,
             "cleaning_target_proportion": state.cleaning_target_proportion,
             "context_budget": state.context_budget,
@@ -91,7 +91,7 @@ impl Module for OverviewModule {
             }
         }
         if let Some(v) = data.get("dev_mode").and_then(serde_json::Value::as_bool) {
-            state.dev_mode = v;
+            state.flags.dev_mode = v;
         }
         if let Some(v) = data.get("llm_provider")
             && let Ok(p) = serde_json::from_value(v.clone())
@@ -144,7 +144,7 @@ impl Module for OverviewModule {
             state.secondary_deepseek_model = m;
         }
         if let Some(v) = data.get("reverie_enabled").and_then(serde_json::Value::as_bool) {
-            state.reverie_enabled = v;
+            state.flags.reverie_enabled = v;
         }
         if let Some(v) = data.get("cleaning_threshold").and_then(serde_json::Value::as_f64) {
             state.cleaning_threshold = v.to_f32();

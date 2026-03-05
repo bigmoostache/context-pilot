@@ -16,7 +16,7 @@ pub(crate) fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Execute `reload_tui` tool (public for module access)
 pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Set flag - actual reload happens in app.rs after tool result is saved
-    state.reload_pending = true;
+    state.flags.reload_pending = true;
 
     ToolResult::new(tool.id.clone(), "Reload initiated. Restarting TUI...".to_string(), false)
 }
@@ -24,7 +24,7 @@ pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResul
 /// Set the reload flag in config.json so `run.sh` restarts the TUI.
 ///
 /// Callers must `return` immediately after — the main event loop checks
-/// `state.reload_pending` and exits cleanly through `main()`.
+/// `state.flags.reload_pending` and exits cleanly through `main()`.
 /// Terminal cleanup is handled by `main()` on normal return.
 pub(crate) fn perform_reload(state: &State) {
     use crate::state::persistence::save_state;

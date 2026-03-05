@@ -81,7 +81,7 @@ impl App {
                         && let Ok(pr_update) = data.downcast::<cp_mod_github::watcher::BranchPrUpdate>()
                     {
                         cp_mod_github::GithubState::get_mut(state).branch_pr = pr_update.pr_info;
-                        state.dirty = true;
+                        state.flags.dirty = true;
                     }
                     continue;
                 }
@@ -93,7 +93,7 @@ impl App {
                 let _changed = panel.apply_cache_update(update, &mut ctx, state);
                 ctx.cache_in_flight = false;
                 state.context.insert(idx, ctx);
-                state.dirty = true;
+                state.flags.dirty = true;
                 continue;
             }
 
@@ -107,7 +107,7 @@ impl App {
             let _changed = panel.apply_cache_update(update, &mut ctx, state);
             ctx.cache_in_flight = false;
             state.context.insert(idx, ctx);
-            state.dirty = true;
+            state.flags.dirty = true;
         }
     }
 
@@ -141,7 +141,7 @@ impl App {
                         if module.watcher_immediate_refresh() {
                             refresh_indices.push(i);
                         }
-                        self.state.dirty = true;
+                        self.state.flags.dirty = true;
                         break; // Only one module owns each context type
                     }
                 }
@@ -265,7 +265,7 @@ impl App {
                 }
                 drop(self.state.context.remove(i));
             }
-            self.state.dirty = true;
+            self.state.flags.dirty = true;
         }
     }
 

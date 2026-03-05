@@ -50,7 +50,7 @@ impl Panel for ConversationHistoryPanel {
         // Prefer rendering from history_messages (full formatting with icons/markdown)
         if let Some(ref msgs) = ctx.history_messages {
             for msg in msgs {
-                let msg_lines = render::render_message(msg, viewport_width, base_style, false, state.dev_mode);
+                let msg_lines = render::render_message(msg, viewport_width, base_style, false, state.flags.dev_mode);
                 lines.extend(msg_lines);
             }
         } else if let Some(content) = &ctx.cached_content {

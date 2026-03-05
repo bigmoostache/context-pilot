@@ -15,8 +15,39 @@ use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderC
 /// Takes (`file_path`, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>
 pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>;
 
+/// Boolean status flags extracted from [`State`] to satisfy `clippy::struct_excessive_bools`.
+///
+/// Each flag is an independent toggle checked by different subsystems — they don't encode
+/// a hidden enum. Grouped here purely to keep the parent struct under clippy's 3-bool threshold.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct StateFlags {
+    /// Whether a stream is actively receiving tokens from the LLM.
+    pub is_streaming: bool,
+    /// Whether the system is currently executing tool calls (between stream ticks).
+    pub is_tooling: bool,
+    /// Whether the user has manually scrolled (disables auto-scroll to bottom).
+    pub user_scrolled: bool,
+    /// Whether the UI needs to be redrawn.
+    pub dirty: bool,
+    /// Dev mode — shows additional debug info like token counts.
+    pub dev_mode: bool,
+    /// Performance monitoring overlay enabled (F12 to toggle).
+    pub perf_enabled: bool,
+    /// Configuration view is open (Ctrl+H to toggle).
+    pub config_view: bool,
+    /// Whether config overlay is showing secondary model selection (Tab toggles).
+    pub config_secondary_mode: bool,
+    /// Whether the reverie system is enabled (auto-trigger on threshold breach).
+    pub reverie_enabled: bool,
+    /// Whether an API check is in progress.
+    pub api_check_in_progress: bool,
+    /// Reload pending (set by `system_reload`, triggers reload after tool result saved).
+    pub reload_pending: bool,
+    /// Waiting for file panels to load before continuing stream.
+    pub waiting_for_panels: bool,
+}
+
 /// Runtime state (messages loaded in memory)
-#[expect(clippy::struct_excessive_bools, reason = "Runtime state legitimately needs many boolean flags")]
 pub struct State {
     /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
     pub context: Vec<ContextElement>,
@@ -32,18 +63,14 @@ pub struct State {
     pub paste_buffer_labels: Vec<Option<String>>,
     /// Index of the currently selected context panel in the sidebar.
     pub selected_context: usize,
-    /// Whether a stream is actively receiving tokens from the LLM.
-    pub is_streaming: bool,
-    /// Whether the system is currently executing tool calls (between stream ticks).
-    /// True when tools are being dispatched, panels loading, console waits, or sleep timers.
-    /// The LLM is not receiving tokens during this phase.
-    pub is_tooling: bool,
+    /// Boolean status flags (streaming, dirty, dev_mode, etc.)
+    pub flags: StateFlags,
+    /// Selected bar in config view (0=budget, 1=threshold, 2=target)
+    pub config_selected_bar: usize,
     /// Stop reason from last completed stream (e.g., "`end_turn`", "`max_tokens`", "`tool_use`")
     pub last_stop_reason: Option<String>,
     /// Vertical scroll offset in the conversation view (fractional lines).
     pub scroll_offset: f32,
-    /// Whether the user has manually scrolled (disables auto-scroll to bottom).
-    pub user_scrolled: bool,
     /// Scroll acceleration (increases when holding scroll keys)
     pub scroll_accel: f32,
     /// Maximum scroll offset (set by UI based on content height)
@@ -64,18 +91,8 @@ pub struct State {
     pub tools: Vec<ToolDefinition>,
     /// Active module IDs
     pub active_modules: std::collections::HashSet<String>,
-    /// Whether the UI needs to be redrawn
-    pub dirty: bool,
     /// Frame counter for spinner animations (wraps around)
     pub spinner_frame: u64,
-    /// Dev mode - shows additional debug info like token counts
-    pub dev_mode: bool,
-    /// Performance monitoring overlay enabled (F12 to toggle)
-    pub perf_enabled: bool,
-    /// Configuration view is open (Ctrl+H to toggle)
-    pub config_view: bool,
-    /// Selected bar in config view (0=budget, 1=threshold, 2=target)
-    pub config_selected_bar: usize,
     /// Active theme ID (dnd, modern, futuristic, forest, sea, space)
     pub active_theme: String,
     /// Selected LLM provider
@@ -88,8 +105,6 @@ pub struct State {
     pub groq_model: crate::llm_types::GroqModel,
     /// Active `DeepSeek` model variant.
     pub deepseek_model: crate::llm_types::DeepSeekModel,
-    /// Whether config overlay is showing secondary model selection (Tab toggles)
-    pub config_secondary_mode: bool,
     /// Secondary LLM provider (for reveries / sub-agents)
     pub secondary_provider: crate::llm_types::LlmProvider,
     /// Secondary Anthropic model variant.
@@ -100,8 +115,6 @@ pub struct State {
     pub secondary_groq_model: crate::llm_types::GroqModel,
     /// Secondary `DeepSeek` model variant.
     pub secondary_deepseek_model: crate::llm_types::DeepSeekModel,
-    /// Whether the reverie system is enabled (auto-trigger on threshold breach)
-    pub reverie_enabled: bool,
     /// Sidebar display mode: Normal (full), Collapsed (icons only), Hidden
     pub sidebar_mode: SidebarMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
@@ -132,18 +145,12 @@ pub struct State {
     /// Context budget in tokens (None = use model's full context window)
     pub context_budget: Option<usize>,
 
-    /// Whether an API check is in progress
-    pub api_check_in_progress: bool,
     /// Result of the last API check
     pub api_check_result: Option<crate::llm_types::ApiCheckResult>,
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
     /// Guard rail block reason (set when spine blocks, cleared when streaming starts)
     pub guard_rail_blocked: Option<String>,
-    /// Reload pending (set by `system_reload`, triggers reload after tool result saved)
-    pub reload_pending: bool,
-    /// Waiting for file panels to load before continuing stream
-    pub waiting_for_panels: bool,
     /// Previous panel hash list for cache cost tracking
     pub previous_panel_hash_list: Vec<String>,
     /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding
@@ -182,11 +189,9 @@ impl Default for State {
             paste_buffers: vec![],
             paste_buffer_labels: vec![],
             selected_context: 0,
-            is_streaming: false,
-            is_tooling: false,
+            flags: StateFlags { dirty: true, reverie_enabled: true, ..StateFlags::default() },
             last_stop_reason: None,
             scroll_offset: 0.0,
-            user_scrolled: false,
             scroll_accel: 1.0,
             max_scroll: 0.0,
             streaming_estimated_tokens: 0,
@@ -195,13 +200,9 @@ impl Default for State {
             next_tool_id: 1,
             next_result_id: 1,
             global_next_uid: 1,
-            active_modules: std::collections::HashSet::new(),
             tools: vec![],
-            dirty: true,
+            active_modules: std::collections::HashSet::new(),
             spinner_frame: 0,
-            dev_mode: false,
-            perf_enabled: false,
-            config_view: false,
             config_selected_bar: 0,
             active_theme: crate::config::DEFAULT_THEME.to_string(),
             llm_provider: crate::llm_types::LlmProvider::default(),
@@ -209,13 +210,11 @@ impl Default for State {
             grok_model: crate::llm_types::GrokModel::default(),
             groq_model: crate::llm_types::GroqModel::default(),
             deepseek_model: crate::llm_types::DeepSeekModel::default(),
-            config_secondary_mode: false,
             secondary_provider: crate::llm_types::LlmProvider::Anthropic,
             secondary_anthropic_model: crate::llm_types::AnthropicModel::ClaudeHaiku45,
             secondary_grok_model: crate::llm_types::GrokModel::default(),
             secondary_groq_model: crate::llm_types::GroqModel::default(),
             secondary_deepseek_model: crate::llm_types::DeepSeekModel::default(),
-            reverie_enabled: true,
             sidebar_mode: SidebarMode::Normal,
             reveries: HashMap::new(),
             cache_hit_tokens: 0,
@@ -230,12 +229,9 @@ impl Default for State {
             cleaning_threshold: 0.70,
             cleaning_target_proportion: 0.70,
             context_budget: None,
-            api_check_in_progress: false,
             api_check_result: None,
             api_retry_count: 0,
             guard_rail_blocked: None,
-            reload_pending: false,
-            waiting_for_panels: false,
             previous_panel_hash_list: vec![],
             tool_sleep_until_ms: 0,
             last_viewport_width: 0,
@@ -300,7 +296,7 @@ impl State {
             ctx.last_refresh_ms = crate::panels::now_ms();
             ctx.cache_deprecated = true;
         }
-        self.dirty = true;
+        self.flags.dirty = true;
     }
 
     /// Find the first available context ID (fills gaps instead of always incrementing)
@@ -359,7 +355,7 @@ impl State {
 
     /// Prepare state for a new stream: set `is_streaming`, clear stop reason, reset tick counters.
     pub fn begin_streaming(&mut self) {
-        self.is_streaming = true;
+        self.flags.is_streaming = true;
         self.last_stop_reason = None;
         self.streaming_estimated_tokens = 0;
         self.tick_cache_hit_tokens = 0;
@@ -373,7 +369,7 @@ impl std::fmt::Debug for State {
         f.debug_struct("State")
             .field("context_len", &self.context.len())
             .field("messages_len", &self.messages.len())
-            .field("is_streaming", &self.is_streaming)
+            .field("is_streaming", &self.flags.is_streaming)
             .field("module_data_keys", &self.module_data.len())
             .finish_non_exhaustive()
     }

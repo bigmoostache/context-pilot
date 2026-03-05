@@ -19,7 +19,7 @@ pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, state: &State, area: 
     let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Tab indicator
-    let showing_main = !state.config_secondary_mode;
+    let showing_main = !state.flags.config_secondary_mode;
     let tab_text = if showing_main { "Main Model" } else { "Secondary Model (Reverie)" };
     lines.push(Line::from(vec![
         Span::styled("  ", Style::default()),
@@ -91,7 +91,7 @@ fn render_provider_section(lines: &mut Vec<Line<'_>>, state: &State) {
     lines.push(Line::from(""));
 
     // Show selection indicator for main or secondary provider depending on Tab mode
-    let active_provider = if state.config_secondary_mode { state.secondary_provider } else { state.llm_provider };
+    let active_provider = if state.flags.config_secondary_mode { state.secondary_provider } else { state.llm_provider };
 
     let providers = [
         (LlmProvider::Anthropic, "1", "Anthropic Claude"),
@@ -157,7 +157,7 @@ fn render_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
     }
 }
 fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
-    if state.api_check_in_progress {
+    if state.flags.api_check_in_progress {
         let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
         let spinner = spinner_chars[(state.spinner_frame.to_usize()) % spinner_chars.len()];
         lines.push(Line::from(vec![
@@ -377,7 +377,7 @@ fn render_toggles_section(lines: &mut Vec<Line<'_>>, state: &State) {
     ]));
 
     // Reverie toggle
-    let rev_on = state.reverie_enabled;
+    let rev_on = state.flags.reverie_enabled;
     let (check, status, color) =
         if rev_on { ("[x]", "ON", theme::success()) } else { ("[ ]", "OFF", theme::text_muted()) };
     lines.push(Line::from(vec![

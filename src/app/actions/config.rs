@@ -4,9 +4,9 @@ use super::ActionResult;
 
 /// Trigger an API connectivity check and save.
 pub(crate) fn api_check(state: &mut State) -> ActionResult {
-    state.api_check_in_progress = true;
+    state.flags.api_check_in_progress = true;
     state.api_check_result = None;
-    state.dirty = true;
+    state.flags.dirty = true;
     ActionResult::StartApiCheck
 }
 
@@ -36,7 +36,7 @@ pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
         }
         _ => {}
     }
-    state.dirty = true;
+    state.flags.dirty = true;
     ActionResult::Save
 }
 
@@ -68,7 +68,7 @@ pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
         }
         _ => {}
     }
-    state.dirty = true;
+    state.flags.dirty = true;
     ActionResult::Save
 }
 
@@ -79,7 +79,7 @@ pub(crate) fn handle_config_next_theme(state: &mut State) -> ActionResult {
     let next_idx = (current_idx + 1) % THEME_ORDER.len();
     state.active_theme = THEME_ORDER[next_idx].to_string();
     crate::infra::config::set_active_theme(&state.active_theme);
-    state.dirty = true;
+    state.flags.dirty = true;
     ActionResult::Save
 }
 
@@ -90,6 +90,6 @@ pub(crate) fn handle_config_prev_theme(state: &mut State) -> ActionResult {
     let prev_idx = if current_idx == 0 { THEME_ORDER.len() - 1 } else { current_idx - 1 };
     state.active_theme = THEME_ORDER[prev_idx].to_string();
     crate::infra::config::set_active_theme(&state.active_theme);
-    state.dirty = true;
+    state.flags.dirty = true;
     ActionResult::Save
 }

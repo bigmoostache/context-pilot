@@ -19,7 +19,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     {
         state.selected_context = index;
         state.scroll_offset = 0.0;
-        state.user_scrolled = false;
+        state.flags.user_scrolled = false;
         state.input.clear();
         state.input_cursor = 0;
         return ActionResult::Nothing;
@@ -68,7 +68,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends
-    if state.is_streaming {
+    if state.flags.is_streaming {
         let insert_pos = state.messages.len().saturating_sub(1);
         state.messages.insert(insert_pos, user_msg);
         return ActionResult::Save;

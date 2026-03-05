@@ -306,7 +306,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::ScrollUp(amount) => {
             let accel_amount = amount * state.scroll_accel;
             state.scroll_offset = (state.scroll_offset - accel_amount).max(0.0);
-            state.user_scrolled = true;
+            state.flags.user_scrolled = true;
             state.scroll_accel = (state.scroll_accel + SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
             ActionResult::Nothing
         }
@@ -317,8 +317,8 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Nothing
         }
         Action::StopStreaming => {
-            if state.is_streaming {
-                state.is_streaming = false;
+            if state.flags.is_streaming {
+                state.flags.is_streaming = false;
                 if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
                     ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
                 }
@@ -351,20 +351,20 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Save
         }
         Action::TogglePerfMonitor => {
-            state.perf_enabled = crate::ui::perf::PERF.toggle();
-            state.dirty = true;
+            state.flags.perf_enabled = crate::ui::perf::PERF.toggle();
+            state.flags.dirty = true;
             ActionResult::Nothing
         }
         Action::ToggleConfigView => {
-            state.config_view = !state.config_view;
-            state.dirty = true;
+            state.flags.config_view = !state.flags.config_view;
+            state.flags.dirty = true;
             ActionResult::Nothing
         }
         Action::ConfigSelectProvider(provider) => {
             state.llm_provider = provider;
-            state.api_check_in_progress = true;
+            state.flags.api_check_in_progress = true;
             state.api_check_result = None;
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::StartApiCheck
         }
         Action::ConfigSelectAnthropicModel(m) => {
@@ -385,12 +385,12 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ConfigSelectNextBar => {
             state.config_selected_bar = (state.config_selected_bar + 1) % 4;
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::Nothing
         }
         Action::ConfigSelectPrevBar => {
             state.config_selected_bar = if state.config_selected_bar == 0 { 3 } else { state.config_selected_bar - 1 };
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::Nothing
         }
 
@@ -408,55 +408,55 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             if let Some(idx) = state.context.iter().position(|c| c.id == id) {
                 state.selected_context = idx;
                 state.scroll_offset = 0.0;
-                state.user_scrolled = false;
-                state.dirty = true;
+                state.flags.user_scrolled = false;
+                state.flags.dirty = true;
             }
             ActionResult::Nothing
         }
         Action::ConfigToggleAutoContinue => {
             let spine = cp_mod_spine::SpineState::get_mut(state);
             spine.config.continue_until_todos_done = !spine.config.continue_until_todos_done;
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::Save
         }
         Action::ConfigSelectSecondaryProvider(provider) => {
             state.secondary_provider = provider;
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::Save
         }
         Action::ConfigSelectSecondaryAnthropicModel(m) => {
             state.secondary_anthropic_model = m;
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::Save
         }
         Action::ConfigSelectSecondaryGrokModel(m) => {
             state.secondary_grok_model = m;
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::Save
         }
         Action::ConfigSelectSecondaryGroqModel(m) => {
             state.secondary_groq_model = m;
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::Save
         }
         Action::ConfigSelectSecondaryDeepSeekModel(m) => {
             state.secondary_deepseek_model = m;
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::Save
         }
         Action::ConfigToggleReverie => {
-            state.reverie_enabled = !state.reverie_enabled;
-            state.dirty = true;
+            state.flags.reverie_enabled = !state.flags.reverie_enabled;
+            state.flags.dirty = true;
             ActionResult::Save
         }
         Action::ConfigToggleSecondaryMode => {
-            state.config_secondary_mode = !state.config_secondary_mode;
-            state.dirty = true;
+            state.flags.config_secondary_mode = !state.flags.config_secondary_mode;
+            state.flags.dirty = true;
             ActionResult::Nothing
         }
         Action::CycleSidebarMode => {
             state.sidebar_mode = state.sidebar_mode.next();
-            state.dirty = true;
+            state.flags.dirty = true;
             ActionResult::Nothing
         }
         Action::None => ActionResult::Nothing,
@@ -485,5 +485,5 @@ fn select_context(state: &mut State, forward: bool) {
     };
     state.selected_context = sorted[next];
     state.scroll_offset = 0.0;
-    state.user_scrolled = false;
+    state.flags.user_scrolled = false;
 }
