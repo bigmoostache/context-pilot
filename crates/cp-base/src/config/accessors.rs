@@ -5,7 +5,7 @@
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
-use super::{DEFAULT_THEME, THEME_ORDER, THEMES, Theme, yaml_invariant_panic};
+use super::{DEFAULT_THEME, THEME_ORDER, THEMES, Theme, invariant_panic};
 
 // =============================================================================
 // ACTIVE THEME (Global State — index-based lookup, fully safe)
@@ -42,7 +42,7 @@ pub fn set_active_theme(theme_id: &str) {
 pub fn active_theme() -> &'static Theme {
     let idx = CACHED_THEME_IDX.load(Ordering::Acquire);
     let resolve = |theme: Option<&'static Theme>| -> &'static Theme {
-        theme.unwrap_or_else(|| yaml_invariant_panic("themes.yaml has no themes"))
+        theme.unwrap_or_else(|| invariant_panic("themes.yaml has no themes"))
     };
     if idx == u8::MAX {
         // First call before set_active_theme — initialize from default

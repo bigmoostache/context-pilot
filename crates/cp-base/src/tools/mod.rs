@@ -230,14 +230,14 @@ impl ToolDefinition {
     ///
     /// # Panics
     ///
-    /// Panics via [`yaml_invariant_panic`](crate::config::yaml_invariant_panic) if
+    /// Panics via [`invariant_panic`](crate::config::invariant_panic) if
     /// the tool ID is missing — indicates a code/YAML mismatch caught during development.
     #[must_use]
     pub fn from_yaml<'a>(id: &str, texts: &'a ToolTexts) -> ToolDefBuilder<'a> {
         let text = texts
             .tools
             .get(id)
-            .unwrap_or_else(|| crate::config::yaml_invariant_panic(&format!("Tool '{id}' not found in YAML")));
+            .unwrap_or_else(|| crate::config::invariant_panic(&format!("Tool '{id}' not found in YAML")));
         ToolDefBuilder {
             id: id.to_string(),
             description: text.description.trim().to_string(),

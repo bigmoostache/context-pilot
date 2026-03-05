@@ -380,22 +380,22 @@ pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea
 ///
 /// # Panics
 ///
-/// Panics via [`yaml_invariant_panic`] if the YAML content doesn't match the target type.
+/// Panics via [`invariant_panic`] if the YAML content doesn't match the target type.
 #[must_use]
 pub fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
-    serde_yaml::from_str(content).unwrap_or_else(|e| yaml_invariant_panic(&format!("Failed to parse {name}: {e}")))
+    serde_yaml::from_str(content).unwrap_or_else(|e| invariant_panic(&format!("Failed to parse {name}: {e}")))
 }
 
-/// Panic for YAML/config invariant violations.
+/// Panic for compile-time invariant violations (YAML schemas, module state, theme lookups).
 ///
-/// Centralizes `clippy::panic` suppression — all compile-time-embedded config
-/// invariant panics route through here.
+/// Centralizes `clippy::panic` suppression — all build-time-embedded config
+/// invariant panics route through here, as do module-state initialization checks.
 ///
 /// # Panics
 ///
 /// Always panics — that is its purpose.
 #[expect(clippy::panic, reason = "invariant violation is unrecoverable — validated by tests")]
-pub fn yaml_invariant_panic(msg: &str) -> ! {
+pub fn invariant_panic(msg: &str) -> ! {
     panic!("{msg}")
 }
 

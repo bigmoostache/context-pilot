@@ -264,16 +264,18 @@ impl State {
 
     /// Get module state by type, panicking if not initialized.
     ///
-    /// Prefer this over `get_ext().expect()` — the panic lives here once,
+    /// Prefer this over `get_ext().expect()` — the panic lives in
+    /// [`invariant_panic`](crate::config::invariant_panic) once,
     /// so callers don't need `#[expect(clippy::expect_used)]`.
     ///
     /// # Panics
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
     #[must_use]
-    #[expect(clippy::expect_used, reason = "centralized panic — callers use ext() to avoid per-site #[expect]")]
     pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
-        self.get_ext::<T>().expect("module state not initialized — was init_state() called?")
+        self.get_ext::<T>().unwrap_or_else(|| {
+            crate::config::invariant_panic("module state not initialized — was init_state() called?")
+        })
     }
 
     /// Get mutable module state by type, panicking if not initialized.
@@ -281,9 +283,10 @@ impl State {
     /// # Panics
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
-    #[expect(clippy::expect_used, reason = "centralized panic — callers use ext_mut() to avoid per-site #[expect]")]
     pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
-        self.get_ext_mut::<T>().expect("module state not initialized — was init_state() called?")
+        self.get_ext_mut::<T>().unwrap_or_else(|| {
+            crate::config::invariant_panic("module state not initialized — was init_state() called?")
+        })
     }
 
     /// Set module-owned state by type. Replaces any existing value of this type.
