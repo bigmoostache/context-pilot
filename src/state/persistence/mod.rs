@@ -36,20 +36,187 @@ fn new_format_exists() -> bool {
     PathBuf::from(STORE_DIR).join(CONFIG_FILE).exists()
 }
 
-/// Load state using new multi-file format
+// ─── Phased Boot Loading ────────────────────────────────────────────────────
+// Split into phases so main.rs can render progress between each.
+
+/// Phase 1 result: config + worker state loaded from disk.
+pub(crate) struct BootConfig {
+    pub shared: SharedConfig,
+    pub worker: WorkerState,
+}
+
+/// Phase 2 result: context panels + message UIDs to load next.
+pub(crate) struct BootPanels {
+    pub context: Vec<ContextElement>,
+    pub message_uids: Vec<String>,
+    pub panel_count: usize,
+}
+
+/// Phase 1: Load config.json and worker state from disk.
+pub(crate) fn boot_load_config() -> BootConfig {
+    let shared = config::load_config().unwrap_or_default();
+    let worker = worker::load_worker(DEFAULT_WORKER_ID).unwrap_or_default();
+    BootConfig { shared, worker }
+}
+
+/// Phase 2: Build context panels from panel JSONs on disk.
+pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
+    let mut context: Vec<ContextElement> = Vec::new();
+    let important = &cfg.worker.important_panel_uids;
+    let mut panel_count: usize = 0;
+
+    // Conversation panel
+    if let Some(uid) = important.get(&ContextType::new(ContextType::CONVERSATION))
+        && let Some(panel_data) = panel::load_panel(uid)
+    {
+        context.push(panel_to_context(&panel_data, "chat"));
+        panel_count += 1;
+    }
+
+    // Fixed panels (P0-P7)
+    let defaults = crate::modules::all_fixed_panel_defaults();
+    for (pos, (_, _, ct, name, cache_deprecated)) in defaults.iter().enumerate() {
+        let id = format!("P{pos}");
+        if *ct == ContextType::SYSTEM {
+            context.push(crate::modules::make_default_context_element(&id, ct.clone(), name, *cache_deprecated));
+        } else if let Some(uid) = important.get(ct)
+            && let Some(panel_data) = panel::load_panel(uid)
+        {
+            context.push(panel_to_context(&panel_data, &id));
+            panel_count += 1;
+        }
+    }
+
+    // Dynamic panels (P8+)
+    let mut dynamic_panels: Vec<(String, ContextElement)> = cfg
+        .worker
+        .panel_uid_to_local_id
+        .iter()
+        .filter_map(|(uid, local_id)| {
+            panel::load_panel(uid).map(|p| {
+                let mut elem = panel_to_context(&p, local_id);
+
+                if p.panel_type == ContextType::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
+                    let msgs: Vec<Message> = p.message_uids.iter().filter_map(|uid| load_message(uid)).collect();
+                    if !msgs.is_empty() {
+                        let content = crate::state::format_messages_to_chunk(&msgs);
+                        let token_count = crate::state::estimate_tokens(&content);
+                        let total_pages = crate::state::compute_total_pages(token_count);
+                        elem.cached_content = Some(content);
+                        elem.history_messages = Some(msgs);
+                        elem.token_count = token_count;
+                        elem.total_pages = total_pages;
+                        elem.full_token_count = token_count;
+                        elem.cache_deprecated = false;
+                    }
+                }
+
+                (local_id.clone(), elem)
+            })
+        })
+        .collect();
+    dynamic_panels.sort_by(|a, b| {
+        let a_num: usize = a.0.trim_start_matches('P').parse().unwrap_or(999);
+        let b_num: usize = b.0.trim_start_matches('P').parse().unwrap_or(999);
+        a_num.cmp(&b_num)
+    });
+    panel_count += dynamic_panels.len();
+    for (_, elem) in dynamic_panels {
+        context.push(elem);
+    }
+
+    // Extract message UIDs for Phase 3
+    let message_uids: Vec<String> = important
+        .get(&ContextType::new(ContextType::CONVERSATION))
+        .and_then(|uid| panel::load_panel(uid))
+        .map(|p| p.message_uids)
+        .unwrap_or_default();
+
+    BootPanels { context, message_uids, panel_count }
+}
+
+/// Phase 3: Load conversation messages from individual YAML files.
+pub(crate) fn boot_load_messages(uids: &[String]) -> Vec<Message> {
+    uids.iter().filter_map(|uid| load_message(uid)).collect()
+}
+
+/// Phase 4: Assemble final `State` from boot phases.
+pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages: Vec<Message>) -> State {
+    // Calculate display ID counters from loaded messages
+    let next_user_id = messages
+        .iter()
+        .filter(|m| m.id.starts_with('U'))
+        .filter_map(|m| m.id[1..].parse::<usize>().ok())
+        .max()
+        .map_or(1, |n| n + 1);
+    let next_assistant_id = messages
+        .iter()
+        .filter(|m| m.id.starts_with('A'))
+        .filter_map(|m| m.id[1..].parse::<usize>().ok())
+        .max()
+        .map_or(1, |n| n + 1);
+
+    let mut state = State {
+        context: panels.context,
+        messages,
+        selected_context: cfg.shared.selected_context,
+        next_user_id,
+        next_assistant_id,
+        next_tool_id: cfg.worker.next_tool_id,
+        next_result_id: cfg.worker.next_result_id,
+        input: cfg.shared.draft_input,
+        input_cursor: cfg.shared.draft_cursor,
+        sidebar_mode: cfg.shared.sidebar_mode,
+        active_theme: cfg.shared.active_theme.clone(),
+        ..State::default()
+    };
+
+    // Initialize module-owned state before loading persisted data
+    for module in crate::modules::all_modules() {
+        module.init_state(&mut state);
+    }
+
+    // Load module data from config
+    let null = serde_json::Value::Null;
+    for module in crate::modules::all_modules() {
+        let data = if module.is_global() {
+            cfg.shared.modules.get(module.id()).unwrap_or(&null)
+        } else {
+            cfg.worker.modules.get(module.id()).unwrap_or(&null)
+        };
+        module.load_module_data(data, &mut state);
+
+        let worker_data = cfg.worker.modules.get(&format!("{}_worker", module.id())).unwrap_or(&null);
+        module.load_worker_data(worker_data, &mut state);
+    }
+
+    if state.tools.is_empty() {
+        state.tools = crate::modules::active_tool_definitions(&state.active_modules);
+    }
+
+    let _r = dotenvy::dotenv().ok();
+    cp_mod_github::GithubState::get_mut(&mut state).github_token = std::env::var("GITHUB_TOKEN").ok();
+
+    set_active_theme(&state.active_theme);
+    state
+}
+
+// ─── Legacy Entry Point ─────────────────────────────────────────────────────
+
+/// Load state: delegates to phased boot for existing projects, or creates fresh defaults.
 pub(crate) fn load_state() -> State {
     if new_format_exists() {
-        load_state_new()
+        // Existing project — use phased boot (monolithic path for non-TUI callers)
+        let cfg = boot_load_config();
+        let panels = boot_load_panels(&cfg);
+        let messages = boot_load_messages(&panels.message_uids);
+        boot_assemble_state(cfg, panels, messages)
     } else {
         // Fresh start - create default state
         let mut state = State::default();
-        // Populate active_modules with all defaults BEFORE ensure_default_contexts
-        // runs — otherwise non-core panels get skipped on first run.
         state.active_modules = crate::modules::default_active_modules();
         state.tools = crate::modules::active_tool_definitions(&state.active_modules);
-        // Add reverie's optimize_context tool (always available for main AI)
         state.tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
-        // Initialize module-owned state (TypeMap entries)
         for module in crate::modules::all_modules() {
             module.init_state(&mut state);
         }
@@ -58,7 +225,6 @@ pub(crate) fn load_state() -> State {
     }
 }
 
-/// Load state from the new multi-file format
 /// Convert `PanelData` to `ContextElement`
 fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
     ContextElement {
@@ -84,151 +250,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
     }
 }
 
-fn load_state_new() -> State {
-    // Load shared config
-    let shared_config = config::load_config().unwrap_or_default();
-
-    // Load worker state (main_worker)
-    let worker_state = worker::load_worker(DEFAULT_WORKER_ID).unwrap_or_default();
-
-    // Build context from panels in panels/ folder
-    let mut context: Vec<ContextElement> = Vec::new();
-    let important = &worker_state.important_panel_uids;
-
-    // Load Conversation panel (special: not in FIXED_PANEL_ORDER, uses id "chat")
-    if let Some(uid) = important.get(&ContextType::new(ContextType::CONVERSATION))
-        && let Some(panel_data) = panel::load_panel(uid)
-    {
-        context.push(panel_to_context(&panel_data, "chat"));
-    }
-
-    // Load fixed panels in canonical order (P0-P7) from module registry
-    let defaults = crate::modules::all_fixed_panel_defaults();
-    for (pos, (_, _, ct, name, cache_deprecated)) in defaults.iter().enumerate() {
-        let id = format!("P{pos}");
-        if *ct == ContextType::SYSTEM {
-            // System panel is not stored in panels/ - comes from systems[]
-            context.push(crate::modules::make_default_context_element(&id, ct.clone(), name, *cache_deprecated));
-        } else if let Some(uid) = important.get(ct)
-            && let Some(panel_data) = panel::load_panel(uid)
-        {
-            context.push(panel_to_context(&panel_data, &id));
-        }
-    }
-
-    // Load dynamic panels from panel_uid_to_local_id (P8+)
-    let mut dynamic_panels: Vec<(String, ContextElement)> = worker_state
-        .panel_uid_to_local_id
-        .iter()
-        .filter_map(|(uid, local_id)| {
-            panel::load_panel(uid).map(|p| {
-                let mut elem = panel_to_context(&p, local_id);
-
-                // For ConversationHistory panels, load history messages and rebuild cached content
-                if p.panel_type == ContextType::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
-                    let msgs: Vec<Message> = p.message_uids.iter().filter_map(|uid| load_message(uid)).collect();
-                    if !msgs.is_empty() {
-                        let content = crate::state::format_messages_to_chunk(&msgs);
-                        let token_count = crate::state::estimate_tokens(&content);
-                        let total_pages = crate::state::compute_total_pages(token_count);
-                        elem.cached_content = Some(content);
-                        elem.history_messages = Some(msgs);
-                        elem.token_count = token_count;
-                        elem.total_pages = total_pages;
-                        elem.full_token_count = token_count;
-                        elem.cache_deprecated = false;
-                    }
-                }
-
-                (local_id.clone(), elem)
-            })
-        })
-        .collect();
-    // Sort by local ID to maintain order
-    dynamic_panels.sort_by(|a, b| {
-        let a_num: usize = a.0.trim_start_matches('P').parse().unwrap_or(999);
-        let b_num: usize = b.0.trim_start_matches('P').parse().unwrap_or(999);
-        a_num.cmp(&b_num)
-    });
-    for (_, elem) in dynamic_panels {
-        context.push(elem);
-    }
-
-    // Load messages from the conversation panel
-    let message_uids: Vec<String> = important
-        .get(&ContextType::new(ContextType::CONVERSATION))
-        .and_then(|uid| panel::load_panel(uid))
-        .map(|p| p.message_uids)
-        .unwrap_or_default();
-
-    let messages: Vec<Message> = message_uids.iter().filter_map(|uid| load_message(uid)).collect();
-
-    // Calculate display ID counters from loaded messages
-    let next_user_id = messages
-        .iter()
-        .filter(|m| m.id.starts_with('U'))
-        .filter_map(|m| m.id[1..].parse::<usize>().ok())
-        .max()
-        .map_or(1, |n| n + 1);
-    let next_assistant_id = messages
-        .iter()
-        .filter(|m| m.id.starts_with('A'))
-        .filter_map(|m| m.id[1..].parse::<usize>().ok())
-        .max()
-        .map_or(1, |n| n + 1);
-
-    // Start with default state, then apply infrastructure + module data
-    let mut state = State {
-        context,
-        messages,
-        selected_context: shared_config.selected_context,
-        next_user_id,
-        next_assistant_id,
-        next_tool_id: worker_state.next_tool_id,
-        next_result_id: worker_state.next_result_id,
-        input: shared_config.draft_input,
-        input_cursor: shared_config.draft_cursor,
-        sidebar_mode: shared_config.sidebar_mode,
-        active_theme: shared_config.active_theme.clone(),
-        ..State::default()
-    };
-
-    // Initialize module-owned state (TypeMap entries) before loading persisted data
-    for module in crate::modules::all_modules() {
-        module.init_state(&mut state);
-    }
-
-    // Load module data from appropriate config (global → SharedConfig, worker → WorkerState)
-    let null = serde_json::Value::Null;
-    for module in crate::modules::all_modules() {
-        let data = if module.is_global() {
-            shared_config.modules.get(module.id()).unwrap_or(&null)
-        } else {
-            worker_state.modules.get(module.id()).unwrap_or(&null)
-        };
-        module.load_module_data(data, &mut state);
-
-        // Always load worker-specific data from worker state
-        let worker_data = worker_state.modules.get(&format!("{}_worker", module.id())).unwrap_or(&null);
-        module.load_worker_data(worker_data, &mut state);
-    }
-
-    // If tools weren't built by core module's load_module_data (e.g., no saved data),
-    // ensure tools are built from active_modules
-    if state.tools.is_empty() {
-        state.tools = crate::modules::active_tool_definitions(&state.active_modules);
-    }
-
-    // Load GitHub token from environment
-    let _r = dotenvy::dotenv().ok();
-    cp_mod_github::GithubState::get_mut(&mut state).github_token = std::env::var("GITHUB_TOKEN").ok();
-
-    // Set the global active theme
-    set_active_theme(&state.active_theme);
-    state
-}
-
-/// Build a `WriteBatch` from the current state (CPU work only — no I/O).
+/// Convert `PanelData` to `ContextElement`
 /// This serializes all config, worker state, panels, and history messages
 /// into a batch of file write/delete operations.
 pub(crate) fn build_save_batch(state: &State) -> WriteBatch {

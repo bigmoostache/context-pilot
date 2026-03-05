@@ -153,7 +153,7 @@ use crossterm::{
 use app::{App, ensure_default_agent, ensure_default_contexts};
 use infra::api::StreamEvent;
 use state::cache::CacheUpdate;
-use state::persistence::load_state;
+use state::persistence::{boot_assemble_state, boot_load_config, boot_load_messages, boot_load_panels, load_state};
 
 fn main() -> ExitCode {
     init_file_logger();
@@ -214,7 +214,9 @@ fn main() -> ExitCode {
 
     // ─── Phased boot with progress rendering ────────────────────────────
     let mut steps = vec![
-        BootStep { label: "Loading state", detail: None, done: false },
+        BootStep { label: "Loading config", detail: None, done: false },
+        BootStep { label: "Loading panels", detail: None, done: false },
+        BootStep { label: "Loading messages", detail: None, done: false },
         BootStep { label: "Initializing modules", detail: None, done: false },
         BootStep { label: "Preparing workspace", detail: None, done: false },
     ];
@@ -222,12 +224,41 @@ fn main() -> ExitCode {
     // Show initial boot screen immediately — banish the black void
     render_boot_screen(&mut terminal, &steps);
 
-    // Phase 1: Load state (config + panels + messages)
-    let mut state = load_state();
-    steps[0].done = true;
-    render_boot_screen(&mut terminal, &steps);
+    // Detect new vs fresh-start format
+    let new_format = std::path::Path::new(".context-pilot").join("config.json").exists();
 
-    // Phase 2: Initialize modules
+    let mut state = if new_format {
+        // Phase 1: Load config + worker state
+        let cfg = boot_load_config();
+        steps[0].done = true;
+        render_boot_screen(&mut terminal, &steps);
+
+        // Phase 2: Build context from panel JSONs
+        let panels = boot_load_panels(&cfg);
+        steps[1].detail = Some(format!("{} panels", panels.panel_count));
+        steps[1].done = true;
+        render_boot_screen(&mut terminal, &steps);
+
+        // Phase 3: Load conversation messages from YAML
+        let msg_count = panels.message_uids.len();
+        let messages = boot_load_messages(&panels.message_uids);
+        steps[2].detail = Some(format!("{msg_count} messages"));
+        steps[2].done = true;
+        render_boot_screen(&mut terminal, &steps);
+
+        // Phase 4: Assemble state + init modules
+        boot_assemble_state(cfg, panels, messages)
+    } else {
+        // Fresh start — no files to load, just create default state
+        let s = load_state();
+        steps[0].done = true;
+        steps[1].done = true;
+        steps[2].done = true;
+        render_boot_screen(&mut terminal, &steps);
+        s
+    };
+
+    // Phase 4 continued: Initialize modules
     state.highlight_fn = Some(ui::helpers::highlight_file);
     modules::validate_dependencies(&state.active_modules);
     modules::init_registry();
@@ -246,14 +277,14 @@ fn main() -> ExitCode {
             .collect();
         state.context.retain(|c| known_types.contains(c.context_type.as_str()));
     }
-    steps[1].done = true;
+    steps[3].done = true;
     render_boot_screen(&mut terminal, &steps);
 
-    // Phase 3: Prepare workspace
+    // Phase 5: Prepare workspace
     ensure_default_contexts(&mut state);
     ensure_default_agent(&mut state);
     cp_mod_preset::builtin::ensure_builtin_presets();
-    steps[2].done = true;
+    steps[4].done = true;
     render_boot_screen(&mut terminal, &steps);
 
     // Create channels
