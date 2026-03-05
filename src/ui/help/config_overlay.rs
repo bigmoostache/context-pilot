@@ -166,16 +166,9 @@ fn render_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
 /// Render the API check status line (spinner while checking, result when done).
 fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
     if state.flags.lifecycle.api_check_in_progress {
-        let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-        #[expect(
-            clippy::arithmetic_side_effects,
-            clippy::integer_division_remainder_used,
-            reason = "modulo for cyclic spinner index is the algorithm"
-        )]
-        let spinner_idx = state.spinner_frame.to_usize() % spinner_chars.len();
-        let Some(&spinner) = spinner_chars.get(spinner_idx) else { return };
+        let spin = crate::ui::helpers::spinner(state.spinner_frame);
         lines.push(Line::from(vec![
-            Span::styled(format!("  {spinner} "), Style::default().fg(theme::accent())),
+            Span::styled(format!("  {spin} "), Style::default().fg(theme::accent())),
             Span::styled("Checking API...", Style::default().fg(theme::text_muted())),
         ]));
     } else if let Some(result) = &state.api_check_result {
@@ -195,22 +188,23 @@ fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
     }
 }
 
-/// Render the budget bars (context budget, cleaning threshold, cleaning target, max cost).
+/// Format a token count as a compact human-readable string (e.g. "128K", "1.5M").
 #[expect(
     clippy::integer_division_remainder_used,
-    reason = "render_budget_bars: truncating division for human-readable K/M token display"
+    reason = "format_tokens_compact: truncating division for human-readable K/M token display"
 )]
-fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
-    let format_tokens = |tokens: usize| -> String {
-        if tokens >= 1_000_000 {
-            format!("{:.1}M", tokens.to_f64() / 1_000_000.0)
-        } else if tokens >= 1_000 {
-            format!("{}K", tokens / 1_000)
-        } else {
-            format!("{tokens}")
-        }
-    };
+fn format_tokens_compact(tokens: usize) -> String {
+    if tokens >= 1_000_000 {
+        format!("{:.1}M", tokens.to_f64() / 1_000_000.0)
+    } else if tokens >= 1_000 {
+        format!("{}K", tokens / 1_000)
+    } else {
+        format!("{tokens}")
+    }
+}
 
+/// Render the budget bars (context budget, cleaning threshold, cleaning target, max cost).
+fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let bar_width = 24usize;
     let max_budget = state.model_context_window();
     let effective_budget = state.effective_context_budget();
@@ -228,7 +222,7 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
             pct: budget_pct,
             filled: budget_filled,
             bar_width,
-            tokens_str: &format_tokens(effective_budget),
+            tokens_str: &format_tokens_compact(effective_budget),
             bar_color: theme::success(),
             extra: None,
         },
@@ -247,7 +241,7 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
             pct: threshold_pct,
             filled: threshold_filled,
             bar_width,
-            tokens_str: &format_tokens(threshold_tokens),
+            tokens_str: &format_tokens_compact(threshold_tokens),
             bar_color: theme::warning(),
             extra: None,
         },
@@ -268,7 +262,7 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
             pct: target_pct,
             filled: target_filled,
             bar_width,
-            tokens_str: &format_tokens(target_tokens),
+            tokens_str: &format_tokens_compact(target_tokens),
             bar_color: theme::accent(),
             extra: Some(&extra),
         },
@@ -468,10 +462,6 @@ fn render_secondary_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
 }
 
 /// Render a single model line with context window size and pricing info.
-#[expect(
-    clippy::integer_division_remainder_used,
-    reason = "render_model_line_with_info: truncating division for human-readable K/M token display"
-)]
 fn render_model_line_with_info<M: crate::llms::ModelInfo>(
     lines: &mut Vec<Line<'_>>,
     is_selected: bool,
@@ -483,8 +473,7 @@ fn render_model_line_with_info<M: crate::llms::ModelInfo>(
     let style =
         if is_selected { Style::default().fg(theme::accent()).bold() } else { Style::default().fg(theme::text()) };
 
-    let ctx = model.context_window();
-    let ctx_str = if ctx >= 1_000_000 { format!("{}M", ctx / 1_000_000) } else { format!("{}K", ctx / 1_000) };
+    let ctx_str = format_tokens_compact(model.context_window());
     let price_str = format!("${:.0}/${:.0}", model.input_price_per_mtok(), model.output_price_per_mtok());
 
     lines.push(Line::from(vec![

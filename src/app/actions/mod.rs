@@ -199,14 +199,14 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         // === Streaming (delegated) ===
         Action::AppendChars(text) => streaming::handle_append_chars(state, &text),
         Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason } => {
-            streaming::handle_stream_done(
-                state,
+            let event = streaming::StreamDoneEvent {
                 input_tokens,
                 output_tokens,
-                cache_hit_tokens,
-                cache_miss_tokens,
-                stop_reason.as_deref(),
-            )
+                cache_hit: cache_hit_tokens,
+                cache_miss: cache_miss_tokens,
+                stop_reason: stop_reason.as_deref(),
+            };
+            streaming::handle_stream_done(state, &event)
         }
         Action::StreamError(e) => streaming::handle_stream_error(state, &e),
 

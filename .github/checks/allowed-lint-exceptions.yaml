@@ -95,16 +95,17 @@ exceptions:
   # ── panels.rs: time_arith module ────────────────────────────────────
 
   - path: "crates/cp-base/src/panels.rs"
-    match: '#[expect(clippy::integer_division_remainder_used'
+    match: 'sole choke-point for truncating time/division arithmetic'
     reason: >
-      Centralized time arithmetic module: ms_to_secs(), secs_to_hms(),
-      secs_to_hms_unwrapped(). All truncating integer division for time
-      conversions is funneled here — no other file in the codebase
-      performs raw / 1000 or % 3600.
+      Centralized time/division arithmetic module: ms_to_secs(),
+      secs_to_hms(), secs_to_hms_unwrapped(), div_const(). All
+      truncating integer division is funneled here so no other file
+      triggers integer_division_remainder_used or arithmetic_side_effects
+      for division.
     strategy: >
       Fundamentally irreducible — integer truncation IS the desired
-      behavior for millisecond-to-second conversion. No alternative
-      representation avoids it.
+      behavior for millisecond-to-second conversion and const-divisor
+      helpers. No alternative representation avoids it.
 
   # ── coucou.rs: calendar modulo ──────────────────────────────────────
 
@@ -118,26 +119,6 @@ exceptions:
       Replace hand-rolled date math with the chrono crate, which would
       eliminate the need for is_leap_year() entirely. Low priority —
       the current impl is correct and minimal.
-
-  # ── cp-mod-logs/lib.rs: chunked persistence + token estimation ──────
-
-  - path: "crates/cp-mod-logs/src/lib.rs"
-    match: 'intentional truncating arithmetic"'
-    reason: >
-      chunk_index divides log IDs by LOGS_CHUNK_SIZE for chunked
-      persistence. Truncating integer division IS the algorithm.
-    strategy: >
-      Could use a generic div_floor helper but adds no value —
-      single-use function with trivially correct arithmetic.
-
-  - path: "crates/cp-mod-logs/src/lib.rs"
-    match: 'token estimation'
-    reason: >
-      Token estimation heuristic: word_count * 4 / 3 approximates BPE
-      token count. Division IS the algorithm.
-    strategy: >
-      Could extract an approx_tokens(text) helper to cp-base, but it's
-      a single-use heuristic with no reuse potential.
 
   # ── module_name_repetitions: names that include their module ────────
   # Types used via re-export where the shorter name conflicts with
@@ -224,50 +205,6 @@ exceptions:
     strategy: >
       Irreducible — std::Result conflict.
 
-  # ── profiler.rs: microsecond-to-millisecond division ────────────────
-
-  - path: "src/infra/profiler.rs"
-    match: 'microsecond-to-millisecond truncating conversion'
-    reason: >
-      us / 1000 converts microseconds to milliseconds. Truncating integer
-      division IS the desired behavior — sub-millisecond precision is
-      intentionally discarded for logging thresholds.
-    strategy: >
-      Could extract a us_to_ms() helper to cp-base::panels::time_arith,
-      but it's a single-use conversion with trivially correct arithmetic.
-
-  # ── config.rs: budget step/min division ──────────────────────────────
-
-  - path: "src/app/actions/config.rs"
-    match: '5% step via division is the algorithm'
-    reason: >
-      budget_step() computes max_budget / 20 for 5% increments.
-      Truncating integer division IS the algorithm.
-    strategy: >
-      Irreducible — integer truncation is the desired behavior for
-      percentage-based budget stepping.
-
-  - path: "src/app/actions/config.rs"
-    match: '10% floor via division is the algorithm'
-    reason: >
-      budget_min() computes max_budget / 10 for 10% minimum floor.
-      Truncating integer division IS the algorithm.
-    strategy: >
-      Irreducible — integer truncation is the desired behavior for
-      percentage-based budget floor.
-
-  # ── streaming.rs: stream-done handler ──────────────────────────────
-
-  - path: "src/app/actions/streaming.rs"
-    match: 'stream-done parameters map 1:1 to API response fields'
-    reason: >
-      handle_stream_done() takes 6 parameters (state, input_tokens,
-      output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason)
-      because each maps directly to an API response field.
-    strategy: >
-      Could introduce a StreamDoneParams struct, but it adds indirection
-      for a single callsite with no reuse benefit.
-
   # ── ui/helpers.rs: spinner modulo ────────────────────────────────────
 
   - path: "src/ui/helpers.rs"
@@ -296,50 +233,17 @@ exceptions:
     strategy: >
       Irreducible — ring buffer cycling requires modulo.
 
-  # ── ui/help/config_overlay.rs: spinner modulo ───────────────────────
-
-  - path: "src/ui/help/config_overlay.rs"
-    match: 'modulo for cyclic spinner index is the algorithm'
-    reason: >
-      render_api_check() uses frame_counter % spinner_chars.len() to
-      cycle through spinner animation frames. Modulo IS the algorithm.
-    strategy: >
-      Irreducible — cyclic indexing requires modulo.
-
   # ── ui/help/config_overlay.rs: token formatting division ────────────
 
   - path: "src/ui/help/config_overlay.rs"
-    match: 'render_budget_bars: truncating division for human-readable K/M token display'
+    match: 'format_tokens_compact: truncating division for human-readable K/M token display'
     reason: >
-      render_budget_bars() divides token counts by 1,000 or 1,000,000
+      format_tokens_compact() divides token counts by 1,000 or 1,000,000
       for human-readable K/M display. Truncating integer division IS
       the desired behavior.
     strategy: >
-      Could extract a format_tokens_compact() helper, but it's a
-      localized display-only conversion with trivially correct arithmetic.
-
-  - path: "src/ui/help/config_overlay.rs"
-    match: 'render_model_line_with_info: truncating division for human-readable K/M token display'
-    reason: >
-      render_model_line_with_info() divides context window sizes by
-      1,000 or 1,000,000 for human-readable K/M display. Truncating
-      integer division IS the desired behavior.
-    strategy: >
-      Could extract a format_tokens_compact() helper, but it's a
-      localized display-only conversion with trivially correct arithmetic.
-
-  # ── ui/sidebar/collapsed.rs: too many arguments ──────────────────
-
-  - path: "src/ui/sidebar/collapsed.rs"
-    match: 'render_collapsed_line needs idx, state, style, and badge for collapsed sidebar display'
-    reason: >
-      render_collapsed_line() takes 5 parameters (lines, idx, state,
-      base_style, badge) because each is independently needed for
-      rendering a single collapsed sidebar icon line.
-    strategy: >
-      Could introduce a CollapsedLineParams struct, but the function
-      is only called from 3 sites within the same module and the
-      parameters are all distinct rendering concerns.
+      Irreducible — integer truncation is the desired behavior for
+      compact token count display.
 
   # ── conversation/list.rs: base-26 encoding ────────────────────────
 
@@ -420,15 +324,6 @@ exceptions:
       Gregorian leap year formula. Modulo IS the algorithm.
     strategy: >
       Replace with chrono crate, eliminating the need for is_leap_year().
-
-  - path: "src/llms/mod.rs"
-    match: 'time unit conversions: all divisions are by non-zero constants'
-    reason: >
-      format_time_delta() divides milliseconds by 1000, seconds by 60
-      and 3600. All divisors are non-zero constants.
-    strategy: >
-      Could use cp-base::panels::time_arith helpers, but the function
-      is self-contained and trivially correct.
 
   - path: "src/llms/mod.rs"
     match: 'std::error::Error: provide/type_id/cause are unstable or deprecated'

@@ -45,9 +45,8 @@ fn logs_dir() -> PathBuf {
 }
 
 /// Get chunk index for a log ID number
-#[expect(clippy::integer_division_remainder_used, reason = "intentional truncating arithmetic")]
 const fn chunk_index(log_id_num: usize) -> usize {
-    log_id_num / LOGS_CHUNK_SIZE
+    cp_base::panels::time_arith::div_const::<LOGS_CHUNK_SIZE>(log_id_num)
 }
 
 /// Build write operations for chunked log persistence (CPU only — no I/O).
@@ -248,10 +247,6 @@ impl Module for LogsModule {
         ]
     }
 
-    #[expect(
-        clippy::integer_division_remainder_used,
-        reason = "intentional truncating arithmetic for token estimation"
-    )]
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
         match tool.name.as_str() {
             "log_summarize" => {
@@ -309,7 +304,7 @@ impl Module for LogsModule {
                     let max_tokens = cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
                     for (i, mem) in memories.iter().enumerate() {
                         if let Some(content) = mem.get("content").and_then(|v| v.as_str()) {
-                            let approx_tokens = content.split_whitespace().count().saturating_mul(4) / 3;
+                            let approx_tokens = cp_base::panels::time_arith::div_const::<3>(content.split_whitespace().count().saturating_mul(4));
                             if approx_tokens > max_tokens {
                                 pf.errors.push(format!(
                                     "Memory #{} content too long: ~{} tokens (max {}). Shorten it.",

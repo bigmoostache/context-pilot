@@ -166,7 +166,11 @@ pub fn now_ms() -> u64 {
 /// Every millisecond-to-second conversion and HMS decomposition in the
 /// codebase funnels through these helpers so no other file triggers
 /// `clippy::integer_division_remainder_used`.
-#[expect(clippy::integer_division_remainder_used, reason = "sole choke-point for truncating time arithmetic")]
+#[expect(
+    clippy::integer_division_remainder_used,
+    clippy::arithmetic_side_effects,
+    reason = "sole choke-point for truncating time/division arithmetic"
+)]
 pub mod time_arith {
     /// Truncating conversion from milliseconds to whole seconds.
     #[must_use]
@@ -190,6 +194,30 @@ pub mod time_arith {
         let minutes = (total_secs % 3600) / 60;
         let seconds = total_secs % 60;
         (hours, minutes, seconds)
+    }
+
+    /// Truncating conversion from microseconds to whole milliseconds.
+    #[must_use]
+    pub const fn us_to_ms(us: u64) -> u64 {
+        us / 1000
+    }
+
+    /// 5 % of a value (`value / 20`), for budget stepping.
+    #[must_use]
+    pub const fn five_pct(value: usize) -> usize {
+        value / 20
+    }
+
+    /// 10 % of a value (`value / 10`), for budget floor.
+    #[must_use]
+    pub const fn ten_pct(value: usize) -> usize {
+        value / 10
+    }
+
+    /// Truncating integer division by a compile-time constant divisor.
+    #[must_use]
+    pub const fn div_const<const D: usize>(value: usize) -> usize {
+        value / D
     }
 }
 

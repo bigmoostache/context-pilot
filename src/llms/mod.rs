@@ -256,20 +256,21 @@ const fn is_leap_year(year: i32) -> bool {
 }
 
 /// Format a time delta in a human-readable way.
-#[expect(
-    clippy::integer_division_remainder_used,
-    reason = "time unit conversions: all divisions are by non-zero constants (1000, 60, 3600)"
-)]
 fn format_time_delta(delta_ms: u64) -> String {
-    let seconds = delta_ms / 1000;
+    use cp_base::panels::time_arith;
+
+    let seconds = time_arith::ms_to_secs(delta_ms);
     if seconds < 60 {
         format!("{seconds} seconds ago")
-    } else if seconds < 3600 {
-        let minutes = seconds / 60;
-        if minutes == 1 { "1 minute ago".to_string() } else { format!("{minutes} minutes ago") }
     } else {
-        let hours = seconds / 3600;
-        if hours == 1 { "1 hour ago".to_string() } else { format!("{hours} hours ago") }
+        let (hours, minutes, _secs) = time_arith::secs_to_hms_unwrapped(seconds);
+        if hours == 0 {
+            if minutes == 1 { "1 minute ago".to_string() } else { format!("{minutes} minutes ago") }
+        } else if hours == 1 {
+            "1 hour ago".to_string()
+        } else {
+            format!("{hours} hours ago")
+        }
     }
 }
 

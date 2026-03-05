@@ -1,3 +1,5 @@
+use cp_base::panels::time_arith;
+
 use crate::state::State;
 
 use super::ActionResult;
@@ -116,13 +118,11 @@ pub(crate) fn handle_config_prev_theme(state: &mut State) -> ActionResult {
 }
 
 /// Compute 5% step for budget adjustment.
-#[expect(clippy::integer_division_remainder_used, reason = "5% step via division is the algorithm")]
 const fn budget_step(max_budget: usize) -> usize {
-    max_budget / 20
+    time_arith::five_pct(max_budget)
 }
 
 /// Compute minimum 10% budget floor.
-#[expect(clippy::integer_division_remainder_used, reason = "10% floor via division is the algorithm")]
 const fn budget_min(max_budget: usize) -> usize {
-    max_budget / 10
+    time_arith::ten_pct(max_budget)
 }

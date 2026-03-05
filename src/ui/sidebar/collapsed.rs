@@ -5,6 +5,18 @@ use crate::state::{ContextType, State};
 
 use super::full::fixed_panel_badge;
 
+/// Context needed to render a single collapsed sidebar line.
+struct CollapsedLineCtx<'ctx> {
+    /// Index of the context panel in `state.context`.
+    idx: usize,
+    /// Application state used to look up panel data and selection.
+    state: &'ctx State,
+    /// Base background style for the sidebar.
+    base_style: Style,
+    /// Optional badge text (e.g. unread count) displayed next to the icon.
+    badge: Option<&'ctx str>,
+}
+
 /// Render a collapsed sidebar (icons + badges only, ~14 columns wide).
 /// Shows: selection arrow, icon, badge count. Token bar at the bottom.
 pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, area: Rect) {
@@ -50,20 +62,35 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
     if let Some(conv_idx) =
         state.context.iter().position(|c| c.context_type == ContextType::new(ContextType::CONVERSATION))
     {
-        render_collapsed_line(&mut lines, conv_idx, state, base_style, None);
+        render_collapsed_line(&mut lines, &CollapsedLineCtx {
+            idx: conv_idx,
+            state,
+            base_style,
+            badge: None,
+        });
     }
 
     // Fixed panels
     for &i in &fixed_indices {
         let badge = state.context.get(i).and_then(|c| fixed_panel_badge(c.context_type.as_str(), state));
-        render_collapsed_line(&mut lines, i, state, base_style, badge.as_deref());
+        render_collapsed_line(&mut lines, &CollapsedLineCtx {
+            idx: i,
+            state,
+            base_style,
+            badge: badge.as_deref(),
+        });
     }
 
     // Dynamic panels separator + entries
     if !dynamic_indices.is_empty() {
         lines.push(Line::from(vec![Span::styled("  ──────────", Style::default().fg(theme::border_muted()))]));
         for &i in &dynamic_indices {
-            render_collapsed_line(&mut lines, i, state, base_style, None);
+            render_collapsed_line(&mut lines, &CollapsedLineCtx {
+                idx: i,
+                state,
+                base_style,
+                badge: None,
+            });
         }
     }
 
@@ -104,32 +131,22 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
 }
 
 /// Render a single collapsed sidebar line for a context panel.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "render_collapsed_line needs idx, state, style, and badge for collapsed sidebar display"
-)]
-fn render_collapsed_line(
-    lines: &mut Vec<Line<'static>>,
-    idx: usize,
-    state: &State,
-    base_style: Style,
-    badge: Option<&str>,
-) {
-    let Some(ctx) = state.context.get(idx) else { return };
-    let is_selected = idx == state.selected_context;
-    let icon = ctx.context_type.icon();
+fn render_collapsed_line(lines: &mut Vec<Line<'static>>, ctx: &CollapsedLineCtx<'_>) {
+    let Some(panel) = ctx.state.context.get(ctx.idx) else { return };
+    let is_selected = ctx.idx == ctx.state.selected_context;
+    let icon = panel.context_type.icon();
 
     let arrow = if is_selected { "▸" } else { " " };
     let arrow_color = if is_selected { theme::accent() } else { theme::bg_base() };
     let icon_color = if is_selected { theme::accent() } else { theme::text_muted() };
 
     // Badge or short ID for dynamic panels
-    let label = badge.map_or_else(
+    let label = ctx.badge.map_or_else(
         || {
-            if ctx.context_type.is_fixed() {
+            if panel.context_type.is_fixed() {
                 "   ".to_string()
             } else {
-                format!("{:>3}", &ctx.id.strip_prefix('P').unwrap_or(&ctx.id))
+                format!("{:>3}", &panel.id.strip_prefix('P').unwrap_or(&panel.id))
             }
         },
         |b| format!("{b:>3}"),
@@ -137,7 +154,7 @@ fn render_collapsed_line(
     let label_color = if is_selected { theme::accent() } else { theme::text_muted() };
 
     // Token count (compact)
-    let tokens = format_number(ctx.token_count);
+    let tokens = format_number(panel.token_count);
     let tokens_color = theme::accent_dim();
 
     lines.push(Line::from(vec![
@@ -145,6 +162,6 @@ fn render_collapsed_line(
         Span::styled(icon, Style::default().fg(icon_color)),
         Span::styled(label, Style::default().fg(label_color)),
         Span::styled(format!("{tokens:>5}"), Style::default().fg(tokens_color)),
-        Span::styled(" ", base_style),
+        Span::styled(" ", ctx.base_style),
     ]));
 }
