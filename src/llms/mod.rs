@@ -435,10 +435,7 @@ pub(crate) mod error {
         }
     }
 
-    #[expect(
-        clippy::missing_trait_methods,
-        reason = "type_id/cause/provide are unstable or deprecated — cannot implement on stable Rust"
-    )]
+    #[expect(clippy::missing_trait_methods, reason = "type_id/cause/provide are unstable or deprecated")]
     impl std::error::Error for LlmError {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             None

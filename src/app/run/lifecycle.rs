@@ -39,9 +39,9 @@ impl App {
         ch: &EventChannels<'_>,
     ) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
-        self.setup_file_watchers();
-        self.sync_gh_watches();
-        self.schedule_initial_cache_refreshes();
+        super::watchers::setup_file_watchers(self);
+        super::watchers::sync_gh_watches(self);
+        super::watchers::schedule_initial_cache_refreshes(self);
 
         // Claim ownership immediately
         save_state(&self.state);
@@ -150,39 +150,39 @@ impl App {
             }
 
             // === BACKGROUND PROCESSING ===
-            self.process_stream_events(ch.rx);
-            self.handle_retry(ch.tx);
-            self.process_typewriter();
-            self.process_cache_updates(ch.cache_rx);
-            self.process_watcher_events();
+            super::streaming::process_stream_events(self, ch.rx);
+            super::streaming::handle_retry(self, ch.tx);
+            super::streaming::process_typewriter(self);
+            super::watchers::process_cache_updates(self, ch.cache_rx);
+            super::watchers::process_watcher_events(self);
             // Check if we're waiting for panels and they're ready (non-blocking)
-            self.check_waiting_for_panels(ch.tx);
+            super::tool_pipeline::check_waiting_for_panels(self, ch.tx);
             // Check if deferred sleep timer has expired (non-blocking)
-            self.check_deferred_sleep(ch.tx);
+            super::tool_pipeline::check_deferred_sleep(self, ch.tx);
             // Check if a question form has been resolved by the user
-            self.check_question_form(ch.tx);
+            super::tool_pipeline::check_question_form(self, ch.tx);
             // Check watchers (blocking sentinel replacement + async → spine notifications)
-            self.check_watchers(ch.tx);
+            super::tool_cleanup::check_watchers(self, ch.tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
-                self.sync_gh_watches();
+                super::watchers::sync_gh_watches(self);
             }
-            self.check_timer_based_deprecation();
-            self.handle_tool_execution(ch.tx);
-            self.finalize_stream();
+            super::watchers::check_timer_based_deprecation(self);
+            super::tool_pipeline::handle_tool_execution(self, ch.tx);
+            super::streaming::finalize_stream(self);
             self.check_spine(ch.tx);
-            self.process_api_check_results();
+            super::streaming::process_api_check_results(self);
 
             // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
             // Check if a reverie needs to start streaming (state.reverie exists but no stream yet)
-            self.maybe_start_reverie_stream();
+            super::reverie::maybe_start_reverie_stream(self);
             // Poll reverie stream events (text chunks, tool calls, done/error)
-            self.process_reverie_events();
+            super::reverie::process_reverie_events(self);
             // Execute pending reverie tool calls (after main tools — main AI has priority)
-            self.handle_reverie_tools();
+            super::reverie::handle_reverie_tools(self);
             // Check if reverie ended without calling Report (auto-relaunch guard rail)
-            self.check_reverie_end_turn();
+            super::reverie::check_reverie_end_turn(self);
 
             // Check if TUI reload was requested (by system_reload tool)
             if self.state.flags.lifecycle.reload_pending {
@@ -242,7 +242,7 @@ impl App {
                 // tool_use messages are properly paired with a tool_result.
                 // Without this, the orphaned tool_use causes API 400 errors on
                 // the next stream (tool_use without matching tool_result).
-                self.flush_pending_tool_results_as_interrupted();
+                super::tool_cleanup::flush_pending_tool_results_as_interrupted(self);
 
                 // Pause auto-continuation when user explicitly cancels streaming.
                 // Without this, the spine would immediately relaunch a new stream

@@ -85,48 +85,13 @@ exceptions:
       Could merge all impl blocks into a single file, but that would
       create a 2500+ line file. The split is intentional for navigation.
 
-  - path: "src/app/run/reverie.rs"
-    match: 'App methods split across run/ submodules for readability'
-    reason: >
-      See src/app/run/input.rs entry.
-    strategy: >
-      Same as input.rs.
-
-  - path: "src/app/run/streaming.rs"
-    match: 'App methods split across run/ submodules for readability'
-    reason: >
-      See src/app/run/input.rs entry.
-    strategy: >
-      Same as input.rs.
-
-  - path: "src/app/run/tool_cleanup.rs"
-    match: 'App methods split across run/ submodules for readability'
-    reason: >
-      See src/app/run/input.rs entry.
-    strategy: >
-      Same as input.rs.
-
-  - path: "src/app/run/tool_pipeline.rs"
-    match: 'App methods split across run/ submodules for readability'
-    reason: >
-      See src/app/run/input.rs entry.
-    strategy: >
-      Same as input.rs.
-
-  - path: "src/app/run/watchers.rs"
-    match: 'App methods split across run/ submodules for readability'
-    reason: >
-      See src/app/run/input.rs entry.
-    strategy: >
-      Same as input.rs.
-
   - path: "src/llms/mod.rs"
     match: "type_id/cause/provide are unstable or deprecated"
     reason: >
       impl Error for LlmError implements source(). The remaining
-      unimplemented methods — type_id() (unstable), cause() (deprecated),
-      and provide() (unstable) — cannot be meaningfully implemented on
-      stable Rust. description() was removed (deprecated, Display covers it).
+      unimplemented methods — type_id() (private::Internal param),
+      cause() (deprecated), and provide() (unstable nightly) — cannot
+      be meaningfully implemented on stable Rust.
     strategy: >
       Irreducible on stable Rust. Re-evaluate when provide() stabilizes.
 

@@ -28,80 +28,37 @@ pub trait Safe {
     fn to_f64(self) -> f64;
 }
 
-// ── Integer helpers ──────────────────────────────────────────────────
-
-/// Common body for unsigned integer → integer conversions via `TryInto`.
-macro_rules! unsigned_int_methods {
-    () => {
-        #[inline]
-        fn to_u8(self) -> u8 {
-            self.try_into().unwrap_or(u8::MAX)
-        }
-        #[inline]
-        fn to_u16(self) -> u16 {
-            self.try_into().unwrap_or(u16::MAX)
-        }
-        #[inline]
-        fn to_u32(self) -> u32 {
-            self.try_into().unwrap_or(u32::MAX)
-        }
-        #[inline]
-        fn to_u64(self) -> u64 {
-            self.try_into().unwrap_or(u64::MAX)
-        }
-        #[inline]
-        fn to_usize(self) -> usize {
-            self.try_into().unwrap_or(usize::MAX)
-        }
-        #[inline]
-        fn to_i32(self) -> i32 {
-            self.try_into().unwrap_or(i32::MAX)
-        }
-        #[inline]
-        fn to_i64(self) -> i64 {
-            self.try_into().unwrap_or(i64::MAX)
-        }
-    };
-}
-
-/// Common body for signed integer → integer conversions via `TryInto`.
-macro_rules! signed_int_methods {
-    () => {
-        #[inline]
-        fn to_u8(self) -> u8 {
-            self.try_into().unwrap_or(0)
-        }
-        #[inline]
-        fn to_u16(self) -> u16 {
-            self.try_into().unwrap_or(0)
-        }
-        #[inline]
-        fn to_u32(self) -> u32 {
-            self.try_into().unwrap_or(0)
-        }
-        #[inline]
-        fn to_u64(self) -> u64 {
-            self.try_into().unwrap_or(0)
-        }
-        #[inline]
-        fn to_usize(self) -> usize {
-            self.try_into().unwrap_or(0)
-        }
-        #[inline]
-        fn to_i32(self) -> i32 {
-            self.try_into().unwrap_or(if self < 0 { i32::MIN } else { i32::MAX })
-        }
-        #[inline]
-        fn to_i64(self) -> i64 {
-            self.try_into().unwrap_or(if self < 0 { i64::MIN } else { i64::MAX })
-        }
-    };
-}
-
 // ── u16: lossless to both f32 and f64 ───────────────────────────────
 
 impl Safe for u16 {
-    unsigned_int_methods!();
+    #[inline]
+    fn to_u8(self) -> u8 {
+        self.try_into().unwrap_or(u8::MAX)
+    }
+    #[inline]
+    fn to_u16(self) -> u16 {
+        self
+    }
+    #[inline]
+    fn to_u32(self) -> u32 {
+        u32::from(self)
+    }
+    #[inline]
+    fn to_u64(self) -> u64 {
+        u64::from(self)
+    }
+    #[inline]
+    fn to_usize(self) -> usize {
+        usize::from(self)
+    }
+    #[inline]
+    fn to_i32(self) -> i32 {
+        i32::from(self)
+    }
+    #[inline]
+    fn to_i64(self) -> i64 {
+        i64::from(self)
+    }
     #[inline]
     fn to_f32(self) -> f32 {
         f32::from(self)
@@ -112,16 +69,86 @@ impl Safe for u16 {
     }
 }
 
-// ── Lossy int→float: precision loss is inherent ─────────────────────
-// Mantissa width (f32: 24 bits, f64: 53 bits) cannot represent all
-// values of wider integer types. This is fundamental, not fixable.
-
+/// Lossy int→float: precision loss is inherent.
+///
+/// Mantissa width (f32: 24 bits, f64: 53 bits) cannot represent all
+/// values of wider integer types. This is fundamental, not fixable.
 #[expect(
     clippy::cast_precision_loss,
     reason = "lossy int→float: mantissa too narrow — inherent floating-point limitation"
 )]
 mod lossy_float {
     use super::Safe;
+
+    // ── Integer helpers ──────────────────────────────────────────
+
+    /// Common body for unsigned integer → integer conversions via `TryInto`.
+    macro_rules! unsigned_int_methods {
+        () => {
+            #[inline]
+            fn to_u8(self) -> u8 {
+                self.try_into().unwrap_or(u8::MAX)
+            }
+            #[inline]
+            fn to_u16(self) -> u16 {
+                self.try_into().unwrap_or(u16::MAX)
+            }
+            #[inline]
+            fn to_u32(self) -> u32 {
+                self.try_into().unwrap_or(u32::MAX)
+            }
+            #[inline]
+            fn to_u64(self) -> u64 {
+                self.try_into().unwrap_or(u64::MAX)
+            }
+            #[inline]
+            fn to_usize(self) -> usize {
+                self.try_into().unwrap_or(usize::MAX)
+            }
+            #[inline]
+            fn to_i32(self) -> i32 {
+                self.try_into().unwrap_or(i32::MAX)
+            }
+            #[inline]
+            fn to_i64(self) -> i64 {
+                self.try_into().unwrap_or(i64::MAX)
+            }
+        };
+    }
+
+    /// Common body for signed integer → integer conversions via `TryInto`.
+    macro_rules! signed_int_methods {
+        () => {
+            #[inline]
+            fn to_u8(self) -> u8 {
+                self.try_into().unwrap_or(0)
+            }
+            #[inline]
+            fn to_u16(self) -> u16 {
+                self.try_into().unwrap_or(0)
+            }
+            #[inline]
+            fn to_u32(self) -> u32 {
+                self.try_into().unwrap_or(0)
+            }
+            #[inline]
+            fn to_u64(self) -> u64 {
+                self.try_into().unwrap_or(0)
+            }
+            #[inline]
+            fn to_usize(self) -> usize {
+                self.try_into().unwrap_or(0)
+            }
+            #[inline]
+            fn to_i32(self) -> i32 {
+                self.try_into().unwrap_or(if self < 0 { i32::MIN } else { i32::MAX })
+            }
+            #[inline]
+            fn to_i64(self) -> i64 {
+                self.try_into().unwrap_or(if self < 0 { i64::MIN } else { i64::MAX })
+            }
+        };
+    }
 
     // ── Unsigned int→float helpers ───────────────────────────────
 
@@ -186,43 +213,42 @@ mod lossy_float {
     // ── Implementations ──────────────────────────────────────────
 
     impl Safe for u32 {
-        super::unsigned_int_methods!();
+        unsigned_int_methods!();
         unsigned_lossless_f64!();
     }
 
     impl Safe for u64 {
-        super::unsigned_int_methods!();
+        unsigned_int_methods!();
         unsigned_lossy_both!();
     }
 
     impl Safe for u128 {
-        super::unsigned_int_methods!();
+        unsigned_int_methods!();
         unsigned_lossy_both!();
     }
 
     impl Safe for usize {
-        super::unsigned_int_methods!();
+        unsigned_int_methods!();
         unsigned_lossy_both!();
     }
 
     impl Safe for i32 {
-        super::signed_int_methods!();
+        signed_int_methods!();
         signed_lossless_f64!();
     }
 
     impl Safe for i64 {
-        super::signed_int_methods!();
+        signed_int_methods!();
         signed_lossy_both!();
     }
 
     impl Safe for isize {
-        super::signed_int_methods!();
+        signed_int_methods!();
         signed_lossy_both!();
     }
 }
 
-// ── Float→integer: no TryFrom in std, raw `as` is the only path ─────
-
+/// Float→integer: no `TryFrom` in std, raw `as` is the only path.
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
