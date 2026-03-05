@@ -36,10 +36,10 @@ pub(crate) fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Dispatch to subcommand handler
     match parsed {
-        TypstCommand::Compile { input, output, root: _ } => exec_compile(tool, &input, output.as_deref()),
+        TypstCommand::Compile { input, output, .. } => exec_compile(tool, &input, output.as_deref()),
         TypstCommand::Init { template, directory } => exec_init(tool, state, &template, directory.as_deref()),
         TypstCommand::Fonts { variants } => exec_fonts(tool, state, variants),
-        TypstCommand::Query { input, selector, field: _ } => exec_query(tool, state, &input, &selector),
+        TypstCommand::Query { input, selector, .. } => exec_query(tool, state, &input, &selector),
         TypstCommand::Update { package } => exec_update(tool, package.as_deref()),
         TypstCommand::Watch { input, output } => exec_watch(tool, &input, output.as_deref()),
         TypstCommand::Unwatch { input } => exec_unwatch(tool, &input),
@@ -120,7 +120,7 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
         pkg_dir.display()
     );
     for f in &files_copied {
-        let _r = write!(result, "  {f}\n");
+        let _r = writeln!(result, "  {f}");
     }
 
     ok_result(tool, result)
@@ -310,7 +310,7 @@ fn exec_update(tool: &ToolUse, package: Option<&str>) -> ToolResult {
 
         let mut result = format!("Cached packages ({}):\n", cached.len());
         for (ns, name, ver) in &cached {
-            let _r = write!(result, "  @{ns}/{name}:{ver}\n");
+            let _r = writeln!(result, "  @{ns}/{name}:{ver}");
         }
         result.push_str("\nUse 'typst update @preview/name:version' to re-download a specific package.");
         ok_result(tool, result)
@@ -429,7 +429,7 @@ fn exec_watchlist(tool: &ToolUse) -> ToolResult {
 
     let mut output = format!("Typst Watchlist ({} documents):\n\n", watchlist.entries.len());
     for (source, entry) in watchlist.list() {
-        let _r = write!(output, "  {} → {} ({} deps)\n", source, entry.output, entry.deps.len());
+        let _r = writeln!(output, "  {} → {} ({} deps)", source, entry.output, entry.deps.len());
     }
     output.push_str("\nUse 'typst unwatch <file.typ>' to remove.");
     ok_result(tool, output)

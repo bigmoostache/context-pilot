@@ -17,7 +17,7 @@ use super::tools;
 
 /// Resolve the secondary model string from provider + model enum.
 fn secondary_model_string(state: &State) -> String {
-    use cp_base::llm_types::{LlmProvider, ModelInfo};
+    use cp_base::llm_types::{LlmProvider, ModelInfo as _};
     match state.secondary_provider {
         LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
             state.secondary_anthropic_model.api_name().to_string()

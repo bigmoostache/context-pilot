@@ -193,7 +193,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Header line
     if replace_all && replaced > 1 {
         let _r =
-            write!(result_msg, "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)\n");
+            writeln!(result_msg, "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)");
     } else {
         let _r = writeln!(result_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
     }

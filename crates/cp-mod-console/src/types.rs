@@ -117,8 +117,12 @@ impl ConsoleState {
     /// Shutdown all sessions (called during reset).
     pub fn shutdown_all(state: &mut State) {
         let cs = Self::get_mut(state);
-        for (_, handle) in cs.sessions.drain() {
-            handle.kill();
+        let mut keys: Vec<_> = cs.sessions.keys().cloned().collect();
+        keys.sort();
+        for key in keys {
+            if let Some(handle) = cs.sessions.remove(&key) {
+                handle.kill();
+            }
         }
     }
 }

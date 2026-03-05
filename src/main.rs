@@ -58,6 +58,7 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
                 Constraint::Length(1), // gauge
             ])
             .split(boot_area);
+        debug_assert!(chunks.len() >= 5);
 
         // Title
         let title = Line::from(vec![
@@ -147,7 +148,7 @@ fn init_file_logger() {
 }
 
 use crossterm::{
-    ExecutableCommand,
+    ExecutableCommand as _,
     event::{DisableBracketedPaste, EnableBracketedPaste},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };

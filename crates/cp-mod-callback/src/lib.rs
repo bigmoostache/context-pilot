@@ -27,7 +27,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::CallbackPanel;
 use self::types::CallbackState;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/callback.yaml")));
@@ -222,12 +222,7 @@ impl Module for CallbackModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
-        if ctx.context_type.as_str() == ContextType::CALLBACK {
-            let cs_count = "callbacks"; // Can't access state here, just label it
-            Some(cs_count.to_string())
-        } else {
-            None
-        }
+        (ctx.context_type.as_str() == ContextType::CALLBACK).then_some("callbacks".to_string())
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {

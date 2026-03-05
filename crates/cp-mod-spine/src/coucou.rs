@@ -219,18 +219,14 @@ impl Watcher for CoucouWatcher {
 
     fn check(&self, _state: &State) -> Option<WatcherResult> {
         let now = now_ms();
-        if now >= self.fire_at_ms {
-            Some(WatcherResult {
-                description: format!("⏰ Coucou! {}", self.message),
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                processed_already: false,
-            })
-        } else {
-            None
-        }
+        (now >= self.fire_at_ms).then(|| WatcherResult {
+            description: format!("⏰ Coucou! {}", self.message),
+            panel_id: None,
+            tool_use_id: None,
+            close_panel: false,
+            create_panel: None,
+            processed_already: false,
+        })
     }
 
     fn check_timeout(&self) -> Option<WatcherResult> {

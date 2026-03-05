@@ -293,7 +293,7 @@ impl Panel for LibraryPanel {
         content.push_str("|------|------|--------|-------------|\n");
         for agent in &ps.agents {
             let active = if ps.active_agent_id.as_deref() == Some(&agent.id) { "✓" } else { "" };
-            let _r = write!(content, "| {} | {} | {} | {} |\n", agent.id, agent.name, active, agent.description);
+            let _r = writeln!(content, "| {} | {} | {} | {} |", agent.id, agent.name, active, agent.description);
         }
 
         // Skills table
@@ -303,7 +303,7 @@ impl Panel for LibraryPanel {
             content.push_str("|------|------|--------|-------------|\n");
             for skill in &ps.skills {
                 let loaded = if ps.loaded_skill_ids.contains(&skill.id) { "✓" } else { "" };
-                let _r = write!(content, "| {} | {} | {} | {} |\n", skill.id, skill.name, loaded, skill.description);
+                let _r = writeln!(content, "| {} | {} | {} | {} |", skill.id, skill.name, loaded, skill.description);
             }
         }
 
@@ -313,7 +313,7 @@ impl Panel for LibraryPanel {
             content.push_str("| Command | Name | Description |\n");
             content.push_str("|---------|------|-------------|\n");
             for cmd in &ps.commands {
-                let _r = write!(content, "| /{} | {} | {} |\n", cmd.id, cmd.name, cmd.description);
+                let _r = writeln!(content, "| /{} | {} | {} |", cmd.id, cmd.name, cmd.description);
             }
         }
 

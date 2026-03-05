@@ -121,7 +121,7 @@ impl App {
                 };
 
                 // Check for Ctrl+P to open palette
-                if let Action::OpenCommandPalette = action {
+                if matches!(action, Action::OpenCommandPalette) {
                     self.command_palette.open(&self.state);
                     self.state.flags.ui.dirty = true;
                 } else {

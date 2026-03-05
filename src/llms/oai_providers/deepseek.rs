@@ -5,11 +5,11 @@
 //! with a thin wrapper to add `reasoning_content` for deepseek-reasoner.
 
 use std::env;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
-use secrecy::{ExposeSecret, SecretBox};
+use secrecy::{ExposeSecret as _, SecretBox};
 use serde::Serialize;
 
 use super::super::error::LlmError;
@@ -59,7 +59,7 @@ struct DsMessage {
 impl DsMessage {
     /// Convert from shared `OaiMessage`, adding `reasoning_content` for assistant messages.
     fn from_oai(msg: OaiMessage, is_reasoner: bool) -> Self {
-        let reasoning_content = if is_reasoner && msg.role == "assistant" { Some(String::new()) } else { None };
+        let reasoning_content = (is_reasoner && msg.role == "assistant").then(String::new);
         Self {
             role: msg.role,
             content: msg.content,

@@ -83,7 +83,8 @@ impl Module for OverviewModule {
             // Auto-add newly introduced modules that aren't in the persisted config.
             // This handles the case where a new module is added to the codebase but
             // the user's config.json was written before it existed.
-            let all_defaults = crate::modules::default_active_modules();
+            let mut all_defaults: Vec<_> = crate::modules::default_active_modules().into_iter().collect();
+            all_defaults.sort();
             for module_id in &all_defaults {
                 if !state.active_modules.contains(module_id) {
                     let _r = state.active_modules.insert(module_id.clone());

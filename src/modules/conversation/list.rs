@@ -1,5 +1,5 @@
 /// Actions for list continuation behavior
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 pub(super) enum ListAction {
     Continue(String), // Insert list continuation (e.g., "\n- " or "\n2. ")

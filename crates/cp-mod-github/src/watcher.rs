@@ -191,11 +191,8 @@ impl GhPollLoop {
                 let snapshot = {
                     let watch = branch_pr_watch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     watch.as_ref().and_then(|w| {
-                        if current_ms.saturating_sub(w.last_poll_ms) >= GH_DEFAULT_POLL_INTERVAL_SECS * 1000 {
-                            Some((w.branch.clone(), Arc::clone(&w.github_token), w.last_output_hash.clone()))
-                        } else {
-                            None
-                        }
+                        (current_ms.saturating_sub(w.last_poll_ms) >= GH_DEFAULT_POLL_INTERVAL_SECS * 1000)
+                            .then(|| (w.branch.clone(), Arc::clone(&w.github_token), w.last_output_hash.clone()))
                     })
                 };
 

@@ -107,11 +107,8 @@ impl Module for GithubModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
-        if ctx.context_type.as_str() == ContextType::GITHUB_RESULT {
-            Some(ctx.get_meta_str("result_command").unwrap_or("").to_string())
-        } else {
-            None
-        }
+        (ctx.context_type.as_str() == ContextType::GITHUB_RESULT)
+            .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_string())
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {

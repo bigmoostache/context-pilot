@@ -30,7 +30,7 @@ pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolR
         match status {
             Some(true) => already.push(id.as_str()),
             Some(false) => {
-                let _: bool = SpineState::mark_notification_processed(state, id);
+                let _ = SpineState::mark_notification_processed(state, id);
                 marked.push(id.as_str());
             }
             None => not_found.push(id.as_str()),
@@ -172,7 +172,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     }
 
     // === Reset runtime counters ===
-    if let Some(true) = tool.input.get("reset_counters").and_then(serde_json::Value::as_bool) {
+    if tool.input.get("reset_counters").and_then(serde_json::Value::as_bool) == Some(true) {
         SpineState::get_mut(state).config.auto_continuation_count = 0;
         SpineState::get_mut(state).config.autonomous_start_ms = None;
         changes.push("reset runtime counters".to_string());

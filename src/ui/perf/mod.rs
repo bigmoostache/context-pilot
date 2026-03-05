@@ -7,7 +7,7 @@ mod overlay;
 pub(crate) use overlay::render_perf_overlay;
 
 use crate::infra::constants::PERF_STATS_REFRESH_MS;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -82,7 +82,7 @@ impl Default for OpStats {
 }
 
 /// Frame and system stats state (accessed only from the render thread)
-struct FrameState {
+pub(crate) struct FrameState {
     frame_start: Option<Instant>,
     last_cpu_measure: (Instant, u64),
     last_stats_refresh: Instant,
@@ -93,17 +93,17 @@ pub(crate) struct PerfMetrics {
     /// Whether performance monitoring is enabled
     pub enabled: AtomicBool,
     /// Per-operation statistics
-    ops: RwLock<HashMap<&'static str, OpStats>>,
+    pub ops: RwLock<HashMap<&'static str, OpStats>>,
     /// Frame time ring buffer (microseconds)
-    frame_times: RwLock<RingBuffer<u64>>,
+    pub frame_times: RwLock<RingBuffer<u64>>,
     /// Frame and system stats state (single lock replaces 3 separate `RwLocks`)
-    frame_state: RwLock<FrameState>,
+    pub frame_state: RwLock<FrameState>,
     /// Total frames counted
     pub frame_count: AtomicU64,
     /// CPU usage percentage (0-100), `stored.to_f32()` bits
-    cpu_usage: AtomicU32,
+    pub cpu_usage: AtomicU32,
     /// Memory usage in bytes
-    memory_bytes: AtomicU64,
+    pub memory_bytes: AtomicU64,
 }
 
 impl Default for PerfMetrics {

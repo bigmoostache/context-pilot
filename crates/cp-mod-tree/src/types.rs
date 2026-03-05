@@ -14,7 +14,7 @@ pub struct TreeFileDescription {
 }
 
 /// Default tree filter (gitignore-style patterns)
-pub const DEFAULT_TREE_FILTER: &str = r"# Ignore common non-essential directories
+pub const DEFAULT_TREE_FILTER: &str = "# Ignore common non-essential directories
 .git/
 target/
 node_modules/

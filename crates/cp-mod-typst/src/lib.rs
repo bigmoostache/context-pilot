@@ -121,7 +121,7 @@ fn ensure_typst_callback(state: &mut State) {
 
     // The CLI subcommand reads the watchlist, checks if any changed files are dependencies,
     // and recompiles affected documents (updating deps at the same time).
-    let script = format!(r"bash -c '{binary_path} typst-recompile-watched $CP_CHANGED_FILES'");
+    let script = format!("bash -c '{binary_path} typst-recompile-watched $CP_CHANGED_FILES'");
 
     cs.definitions.push(CallbackDefinition {
         id: cb_id.clone(),

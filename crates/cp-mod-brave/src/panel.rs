@@ -74,7 +74,7 @@ impl Panel for BraveResultPanel {
                 ctx.token_count = token_count;
             }
             ctx.cache_deprecated = false;
-            let _: bool = update_if_changed(ctx, &content);
+            let _ = update_if_changed(ctx, &content);
             true
         } else {
             false

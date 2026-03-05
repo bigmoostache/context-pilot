@@ -1,6 +1,6 @@
 //! SSE stream parsing for Claude Code API responses.
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use serde::Deserialize;
@@ -54,7 +54,7 @@ pub(super) struct StreamUsage {
     pub cache_read: Option<usize>,
 }
 
-/// Parsed SSE stream result: (input_tokens, output_tokens, cache_hit, cache_miss, stop_reason).
+/// Parsed SSE stream result: (`input_tokens`, `output_tokens`, `cache_hit`, `cache_miss`, `stop_reason`).
 pub(super) type SseStreamResult = (usize, usize, usize, usize, Option<String>);
 
 /// Parse an SSE stream from a Claude API response, sending events to the channel.
@@ -223,7 +223,7 @@ pub(super) fn parse_sse_stream(
 /// Log an SSE error event to `.context-pilot/errors/` for post-mortem debugging.
 /// Appends to `sse_errors.log` so multiple occurrences are visible.
 fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lines: &[String]) {
-    use std::io::Write;
+    use std::io::Write as _;
 
     let dir = std::path::Path::new(".context-pilot").join("errors");
     let _r = std::fs::create_dir_all(&dir);

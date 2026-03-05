@@ -18,7 +18,7 @@ use crate::app::panels::ContextItem;
 use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::ToolResult;
 use crate::state::Message;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
 pub(crate) use cp_base::llm_types::{
@@ -371,7 +371,7 @@ pub(crate) struct SseErrorContext<'a> {
 
 /// Log an SSE error event to `.context-pilot/errors/sse_errors.log` for post-mortem debugging.
 pub(crate) fn log_sse_error(ctx: &SseErrorContext<'_>) {
-    use std::io::Write;
+    use std::io::Write as _;
 
     let dir = std::path::Path::new(".context-pilot").join("errors");
     let _r = std::fs::create_dir_all(&dir);

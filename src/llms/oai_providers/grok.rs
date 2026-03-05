@@ -4,11 +4,11 @@
 //! Message building is delegated to the shared `openai_compat` module.
 
 use std::env;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
-use secrecy::{ExposeSecret, SecretBox};
+use secrecy::{ExposeSecret as _, SecretBox};
 use serde::Serialize;
 
 use super::super::error::LlmError;

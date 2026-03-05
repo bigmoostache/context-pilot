@@ -7,7 +7,7 @@ use crate::ui::{
     helpers::{Cell, format_number, render_table},
     theme,
 };
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_mod_git::GitChangeType;
 
 /// Horizontal separator line.

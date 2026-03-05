@@ -30,9 +30,12 @@ use std::fmt::Write as _;
 /// The crate doesn't depend on the binary — these function pointers bridge the gap.
 #[derive(Debug, Clone, Copy)]
 pub struct PresetModule {
-    pub(crate) all_modules: ModuleRegistry,
-    pub(crate) active_tool_defs: ToolDefBuilder,
-    pub(crate) ensure_defaults: DefaultsInitializer,
+    /// Returns the full list of registered [`Module`](cp_base::modules::Module) implementations.
+    pub all_modules: ModuleRegistry,
+    /// Builds the active tool definition list from currently enabled modules.
+    pub active_tool_defs: ToolDefBuilder,
+    /// Initializes default module state for any modules lacking persisted data.
+    pub ensure_defaults: DefaultsInitializer,
 }
 
 impl PresetModule {
@@ -144,7 +147,7 @@ impl Module for PresetModule {
         output.push_str("|------|------|-------------|\n");
         for p in &presets {
             let ptype = if p.built_in { "built-in" } else { "custom" };
-            let _r = write!(output, "| {} | {} | {} |\n", p.name, ptype, p.description);
+            let _r = writeln!(output, "| {} | {} | {} |", p.name, ptype, p.description);
         }
         Some(output)
     }

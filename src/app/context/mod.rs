@@ -1,4 +1,4 @@
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 use crate::app::panels::{ContextItem, collect_all_context, refresh_all_panels};
 use crate::infra::tools::ToolDefinition;

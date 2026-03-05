@@ -1,5 +1,5 @@
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::PermissionsExt as _;
 use std::path::PathBuf;
 
 use globset::Glob;
@@ -9,7 +9,7 @@ use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{CallbackDefinition, CallbackState};
-use std::fmt::Write;
+use std::fmt::Write as _;
 
 /// Create a new callback with its script file.
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {

@@ -11,7 +11,7 @@ mod tools;
 /// Git state types: `GitState`, `GitFileChange`, `GitChangeType`.
 pub mod types;
 
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use std::fmt::Write as _;
 pub use types::{GitChangeType, GitFileChange, GitState};
 
@@ -232,11 +232,8 @@ impl Module for GitModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
-        if ctx.context_type.as_str() == ContextType::GIT_RESULT {
-            Some(ctx.get_meta_str("result_command").unwrap_or("").to_string())
-        } else {
-            None
-        }
+        (ctx.context_type.as_str() == ContextType::GIT_RESULT)
+            .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_string())
     }
 
     fn overview_context_section(&self, state: &State) -> Option<String> {
@@ -262,11 +259,11 @@ impl Module for GitModule {
                 let net = file.additions - file.deletions;
                 let net_str = if net >= 0 { format!("+{net}") } else { format!("{net}") };
                 let _r =
-                    write!(output, "| {} | +{} | -{} | {} |\n", file.path, file.additions, file.deletions, net_str);
+                    writeln!(output, "| {} | +{} | -{} | {} |", file.path, file.additions, file.deletions, net_str);
             }
             let total_net = total_add - total_del;
             let total_net_str = if total_net >= 0 { format!("+{total_net}") } else { format!("{total_net}") };
-            let _r = write!(output, "| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |\n");
+            let _r = writeln!(output, "| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |");
         }
         Some(output)
     }

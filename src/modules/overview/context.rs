@@ -1,4 +1,4 @@
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 use crate::modules::all_modules;
 use crate::state::{State, estimate_tokens, get_context_type_meta};
@@ -59,13 +59,13 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     output.push_str("Context Elements:\n");
 
     accumulated += system_prompt_tokens;
-    let _r = write!(output, "  -- system-prompt (×2): {system_prompt_tokens} tokens (acc: {accumulated})\n");
+    let _r = writeln!(output, "  -- system-prompt (×2): {system_prompt_tokens} tokens (acc: {accumulated})");
 
     accumulated += tool_def_tokens;
     let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
-    let _r = write!(
+    let _r = writeln!(
         output,
-        "  -- tool-definitions ({enabled_count} enabled): {tool_def_tokens} tokens (acc: {accumulated})\n"
+        "  -- tool-definitions ({enabled_count} enabled): {tool_def_tokens} tokens (acc: {accumulated})"
     );
 
     // --- Panels sorted by last_refresh_ms, with Conversation forced to end ---
@@ -91,15 +91,15 @@ pub(crate) fn generate_context_content(state: &State) -> String {
         accumulated += ctx.token_count;
 
         if details.is_empty() {
-            let _r = write!(
+            let _r = writeln!(
                 output,
-                "  {} {}: {} tokens {} {} (acc: {})\n",
+                "  {} {}: {} tokens {} {} (acc: {})",
                 ctx.id, type_name, ctx.token_count, cost, hit_miss, accumulated
             );
         } else {
-            let _r = write!(
+            let _r = writeln!(
                 output,
-                "  {} {} ({}): {} tokens {} {} (acc: {})\n",
+                "  {} {} ({}): {} tokens {} {} (acc: {})",
                 ctx.id, type_name, details, ctx.token_count, cost, hit_miss, accumulated
             );
         }

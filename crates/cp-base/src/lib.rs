@@ -56,7 +56,7 @@ mod tests {
     /// Validate every tool YAML file parses into `ToolTexts`.
     #[test]
     fn tool_yaml_deserialization() {
-        let yamls: &[(&str, &str)] = &[
+        let yamls: Vec<(&str, &str)> = vec![
             ("brave", include_str!("../../../yamls/tools/brave.yaml")),
             ("callback", include_str!("../../../yamls/tools/callback.yaml")),
             ("console", include_str!("../../../yamls/tools/console.yaml")),
@@ -78,7 +78,7 @@ mod tests {
             ("tree", include_str!("../../../yamls/tools/tree.yaml")),
             ("typst", include_str!("../../../yamls/tools/typst.yaml")),
         ];
-        for (name, content) in yamls {
+        for (name, content) in &yamls {
             // Panics with a clear message if schema doesn't match ToolTexts
             drop(
                 serde_yaml::from_str::<ToolTexts>(content)
@@ -88,7 +88,7 @@ mod tests {
     }
 
     /// Validate config YAML files parse into their specific types directly
-    /// (not via LazyLock — catches type mismatches even if statics change).
+    /// (not via `LazyLock` — catches type mismatches even if statics change).
     #[test]
     fn config_yaml_direct_parse() {
         drop(

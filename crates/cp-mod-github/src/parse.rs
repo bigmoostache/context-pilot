@@ -30,11 +30,7 @@ pub fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String)
 pub fn extract_header(headers: &str, name: &str) -> Option<String> {
     let prefix = format!("{name}:");
     headers.lines().find_map(|line| {
-        if line.to_lowercase().starts_with(&prefix) {
-            Some(line.get(prefix.len()..).unwrap_or("").trim().to_string())
-        } else {
-            None
-        }
+        line.to_lowercase().starts_with(&prefix).then(|| line.get(prefix.len()..).unwrap_or("").trim().to_string())
     })
 }
 

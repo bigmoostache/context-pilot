@@ -7,7 +7,7 @@
 //! The main thread does the CPU work (serialization), the writer thread
 //! does the I/O work (file writes). This keeps the event loop responsive.
 use std::fs;
-use std::io::Write;
+use std::io::Write as _;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};

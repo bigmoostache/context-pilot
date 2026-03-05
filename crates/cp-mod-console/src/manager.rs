@@ -193,13 +193,13 @@ pub struct SessionHandle {
     /// Absolute path to the log file.
     pub log_path: String,
     /// Server-reported PID (shared with poller).
-    child_id: Arc<Mutex<Option<u32>>>,
+    pub child_id: Arc<Mutex<Option<u32>>>,
     /// Timestamp (ms since epoch) when spawned.
     pub started_at: u64,
     /// Timestamp when process exited (shared with status poller).
     pub finished_at: Arc<Mutex<Option<u64>>>,
     /// Signal to stop background poller threads.
-    stop_polling: Arc<AtomicBool>,
+    pub stop_polling: Arc<AtomicBool>,
 }
 
 /// Parameters for reconnecting to an existing server-managed session.

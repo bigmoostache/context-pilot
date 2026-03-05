@@ -7,7 +7,7 @@ use crate::state::State;
 use crate::ui::theme;
 
 use super::commands::{PaletteCommand, get_available_commands};
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 /// State for the command palette
 #[derive(Debug, Clone, Default)]
@@ -21,7 +21,7 @@ pub(crate) struct CommandPalette {
     /// Currently selected index in filtered results
     pub selected: usize,
     /// Cached filtered commands
-    filtered_commands: Vec<PaletteCommand>,
+    pub filtered_commands: Vec<PaletteCommand>,
 }
 
 impl CommandPalette {
@@ -180,6 +180,7 @@ impl CommandPalette {
                 Constraint::Length(1), // Bottom border
             ])
             .split(palette_area);
+        debug_assert!(chunks.len() >= 3);
 
         // Render input line with cursor and Esc hint
         let esc_hint = "  Esc to close";

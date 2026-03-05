@@ -25,7 +25,7 @@ impl Panel for QueuePanel {
                 // This ensures the panel sorts correctly in context ordering —
                 // unchanged panels stay near the top (cache-friendly), changed panels
                 // float to the end (near conversation) so they don't break the prefix.
-                let _: bool = cp_base::panels::update_if_changed(ctx, &content);
+                let _ = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }

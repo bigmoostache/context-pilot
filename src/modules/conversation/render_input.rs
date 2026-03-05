@@ -256,7 +256,7 @@ enum InputSegment {
 fn split_paste_placeholders(line: &str) -> Vec<InputSegment> {
     let mut segments = Vec::new();
     let mut current = String::new();
-    let mut chars = line.chars().peekable();
+    let mut chars = line.chars();
 
     while let Some(ch) = chars.next() {
         if ch == PASTE_PLACEHOLDER_START {

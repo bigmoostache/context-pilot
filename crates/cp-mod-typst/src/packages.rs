@@ -4,7 +4,7 @@
 //! in the user-global cache at `~/.cache/typst/packages/preview/{name}/{version}/`.
 
 use std::fs;
-use std::io::Read;
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 
 use flate2::read::GzDecoder;
@@ -125,7 +125,7 @@ pub fn download_package(spec: &PackageSpec) -> Result<(), String> {
     let bytes = response.bytes().map_err(|e| format!("Failed to read response: {e}"))?;
 
     // Extract tar.gz to cache directory
-    let gz = GzDecoder::new(&bytes[..]);
+    let gz = GzDecoder::new(&*bytes);
     let mut archive = tar::Archive::new(gz);
 
     for entry in archive.entries().map_err(|e| format!("Failed to read tar archive: {e}"))? {

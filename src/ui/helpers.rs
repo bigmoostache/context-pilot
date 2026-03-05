@@ -1,5 +1,5 @@
-use cp_base::cast::SafeCast;
-use unicode_width::UnicodeWidthStr;
+use cp_base::cast::SafeCast as _;
+use unicode_width::UnicodeWidthStr as _;
 
 pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
     if s.width() <= max_width {

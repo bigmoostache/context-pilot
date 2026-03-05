@@ -119,7 +119,7 @@ impl Panel for ConsolePanel {
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
         ctx.cache_deprecated = false;
-        let _: bool = update_if_changed(ctx, &content);
+        let _ = update_if_changed(ctx, &content);
 
         // Also update status metadata from session handle
         if let Some(session_name) = ctx.get_meta_str("console_name").map(ToString::to_string) {

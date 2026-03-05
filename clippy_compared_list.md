@@ -1,6 +1,6 @@
 # Clippy Lint Configuration vs Defaults
 
-> **56** total clippy lints — **326** overridden, **-270** at default
+> **57** total clippy lints — **325** overridden, **-268** at default
 
 | Lint | Category | Default | Current | |
 |------|----------|---------|---------|---|
@@ -30,6 +30,7 @@
 | `inline_asm_x_att_syntax` | 🔒 restriction | 💤 allow | 💤 allow |  |
 | `inline_asm_x_intel_syntax` | 🔒 restriction | 💤 allow | 💤 allow |  |
 | `integer_division` | 🔒 restriction | 💤 allow | 💤 allow |  |
+| `let_underscore_untyped` | 🔒 restriction | 💤 allow | 💤 allow |  |
 | `little_endian_bytes` | 🔒 restriction | 💤 allow | 💤 allow |  |
 | `map_with_unused_argument_over_ranges` | 🔒 restriction | 💤 allow | 💤 allow |  |
 | `min_ident_chars` | 🔒 restriction | 💤 allow | 💤 allow |  |

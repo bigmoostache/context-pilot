@@ -79,7 +79,10 @@ impl Module for ConsoleModule {
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let cs = ConsoleState::get(state);
         let mut sessions_map: HashMap<String, SessionMeta> = HashMap::new();
-        for (name, handle) in &cs.sessions {
+        let mut session_keys: Vec<_> = cs.sessions.keys().cloned().collect();
+        session_keys.sort();
+        for name in &session_keys {
+            let Some(handle) = cs.sessions.get(name) else { continue };
             // Only persist live (non-terminal) sessions
             if !handle.get_status().is_terminal()
                 && let Some(pid) = handle.pid()
@@ -144,7 +147,10 @@ impl Module for ConsoleModule {
 
         // Phase 1: Reconnect sessions (no &mut State needed)
         let mut reconnected: Vec<(String, SessionHandle)> = Vec::new();
-        for (name, meta) in &sessions_map {
+        let mut sorted_session_names: Vec<_> = sessions_map.keys().cloned().collect();
+        sorted_session_names.sort();
+        for name in &sorted_session_names {
+            let Some(meta) = sessions_map.get(name) else { continue };
             let handle = SessionHandle::reconnect(manager::ReconnectMeta {
                 name: name.clone(),
                 command: meta.command.clone(),
@@ -323,14 +329,12 @@ impl Module for ConsoleModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
-        if ctx.context_type.as_str() == ContextType::CONSOLE {
+        (ctx.context_type.as_str() == ContextType::CONSOLE).then(|| {
             let desc =
                 ctx.get_meta_str("console_description").or_else(|| ctx.get_meta_str("console_command")).unwrap_or("?");
             let status = ctx.get_meta_str("console_status").unwrap_or("?");
-            Some(format!("{desc} ({status})"))
-        } else {
-            None
-        }
+            format!("{desc} ({status})")
+        })
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {

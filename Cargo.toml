@@ -897,6 +897,66 @@ use_debug = "deny"
 redundant_type_annotations = "deny"
 
 # ============================
+# Taskforce lints — high-value, systematic migration
+# ============================
+# Forces explicit checked arithmetic instead of silent panics
+arithmetic_side_effects = "warn"
+# Forces .get() instead of [] indexing — explicit panic handling
+indexing_slicing = "warn"
+# `as` silently truncates; replacing with TryFrom is strictly safer
+as_conversions = "warn"
+# Catches real bugs comparing floats to constants
+float_cmp_const = "warn"
+# Forces explicit intent on integer division
+integer_division = "warn"
+# Same rationale as integer_division
+modulo_arithmetic = "warn"
+# Eliminates subtle type inference bugs with numeric literals
+default_numeric_fallback = "warn"
+# Improves match clarity, mechanical fixes
+pattern_type_mismatch = "warn"
+# Docs on private items — pays dividends forever
+missing_docs_in_private_items = "warn"
+# Forces deliberate API design with #[non_exhaustive]
+exhaustive_enums = "warn"
+# Same — forces deliberate struct API design
+exhaustive_structs = "warn"
+# Pure mechanical cleanup, free quality
+redundant_pub_crate = "warn"
+# Mechanical, zero controversy
+map_with_unused_argument_over_ranges = "warn"
+# Real correctness bug class in float loops
+while_float = "warn"
+# Free perf for numerics
+imprecise_flops = "warn"
+# Free perf for numerics
+suboptimal_flops = "warn"
+# Audit and deduplicate deps
+multiple_crate_versions = "warn"
+# Forces explicit todo!() or real impls — no silent default footguns
+missing_trait_methods = "warn"
+# Enforces String::from consistency over .to_string() on &str
+str_to_string = "warn"
+# Prevents accidental drops of MustUse types
+let_underscore_untyped = "warn"
+# Catches debug-logging mistakes with pointer formatting
+pointer_format = "warn"
+# Forces exhaustiveness thinking in if-else chains
+else_if_without_else = "warn"
+# Unrelated shadows are genuinely confusing
+shadow_unrelated = "warn"
+# Mechanical, makes docs professional
+doc_paragraphs_missing_punctuation = "warn"
+# Named lifetimes improve complex code readability
+single_char_lifetime_names = "warn"
+# Audit re-exports are intentional
+pub_use = "warn"
+# Isolating unsafe ops is a strict quality win
+multiple_unsafe_ops_per_block = "warn"
+# Prevents genuine UB with unions
+default_union_representation = "warn"
+
+# ============================
 # Nursery — remaining (warn)
 # ============================
 clear_with_drain = "warn"
@@ -966,7 +1026,6 @@ impl_trait_in_params = "warn"
 integer_division_remainder_used = "warn"
 iter_over_hash_type = "warn"
 large_include_file = "warn"
-let_underscore_untyped = "warn"
 missing_asserts_for_indexing = "warn"
 mixed_read_write_in_expression = "warn"
 module_name_repetitions = "warn"
@@ -991,8 +1050,6 @@ unused_trait_names = "warn"
 # ============================
 # Ensures proper Cargo.toml metadata (description, license, etc.)
 cargo_common_metadata = "warn"
-# multiple_crate_versions: skipped — bitflags 1.x/2.x and syn 1.x/2.x
-# are unavoidable transitive duplicates from syntect, notify, and proc-macros
 # Feature names shouldn't be negative (no_*)
 negative_feature_names = "warn"
 # Feature named same as dep is redundant

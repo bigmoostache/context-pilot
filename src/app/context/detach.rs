@@ -170,12 +170,12 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
             }
         };
 
-        let panel_uid = format!("UID_{}_P", state.global_next_uid);
+        let panel_global_uid = format!("UID_{}_P", state.global_next_uid);
         state.global_next_uid += 1;
 
         state.context.push(ContextElement {
             id: panel_id,
-            uid: Some(panel_uid),
+            uid: Some(panel_global_uid),
             context_type: ContextType::new(ContextType::CONVERSATION_HISTORY),
             name: chunk_name,
             token_count,

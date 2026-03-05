@@ -217,7 +217,7 @@ impl App {
 
         // All resolved — resume normal pipeline: create result message + continue streaming
         let result_id = format!("R{}", self.state.next_result_id);
-        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
+        let result_global_uid = format!("UID_{}_R", self.state.global_next_uid);
         self.state.next_result_id += 1;
         self.state.global_next_uid += 1;
         let tool_result_records: Vec<ToolResultRecord> = tool_results
@@ -231,7 +231,7 @@ impl App {
             .collect();
         let result_msg = Message {
             id: result_id,
-            uid: Some(result_uid),
+            uid: Some(result_global_uid),
             role: "user".to_string(),
             msg_type: MessageType::ToolResult,
             content: String::new(),
@@ -252,12 +252,12 @@ impl App {
 
         // Create new assistant message for continued streaming
         let assistant_id = format!("A{}", self.state.next_assistant_id);
-        let assistant_uid = format!("UID_{}_A", self.state.global_next_uid);
+        let assistant_global_uid = format!("UID_{}_A", self.state.global_next_uid);
         self.state.next_assistant_id += 1;
         self.state.global_next_uid += 1;
         let new_assistant_msg = Message {
             id: assistant_id,
-            uid: Some(assistant_uid),
+            uid: Some(assistant_global_uid),
             role: "assistant".to_string(),
             msg_type: MessageType::TextMessage,
             content: String::new(),
@@ -345,7 +345,7 @@ impl App {
 
         // Create a tool_result message pairing each pending tool_use
         let result_id = format!("R{}", self.state.next_result_id);
-        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
+        let result_global_uid = format!("UID_{}_R", self.state.global_next_uid);
         self.state.next_result_id += 1;
         self.state.global_next_uid += 1;
 
@@ -365,7 +365,7 @@ impl App {
 
         let result_msg = Message {
             id: result_id,
-            uid: Some(result_uid),
+            uid: Some(result_global_uid),
             role: "user".to_string(),
             msg_type: MessageType::ToolResult,
             content: String::new(),
@@ -428,7 +428,7 @@ pub(super) fn execute_queue_flush(
         } else {
             result.content.clone()
         };
-        let _r = write!(summary, "{}. {} → {} ({})\n", call.index, call.tool_name, status, short);
+        let _r = writeln!(summary, "{}. {} → {} ({})", call.index, call.tool_name, status, short);
         flushed.push(FlushedTool { tool: queued_tool, result });
     }
 

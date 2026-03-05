@@ -202,7 +202,8 @@ pub(crate) fn execute_load(tool: &ToolUse, state: &mut State, cb: &LoadCallbacks
 
     // 2. Set active_modules — ensure core modules are always included
     let modules = (cb.all_modules)();
-    let core_ids: HashSet<String> = modules.iter().filter(|m| m.is_core()).map(|m| m.id().to_string()).collect();
+    let mut core_ids: Vec<String> = modules.iter().filter(|m| m.is_core()).map(|m| m.id().to_string()).collect();
+    core_ids.sort();
     let mut new_active: HashSet<String> = ws.active_modules.iter().cloned().collect();
     // Always include core modules
     for core_id in &core_ids {

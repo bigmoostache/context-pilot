@@ -12,10 +12,10 @@ use crate::types::ProcessStatus;
 
 /// Tails a log file, pushing new bytes into a shared ring buffer.
 pub(crate) struct FilePoller {
-    pub(crate) path: PathBuf,
-    pub(crate) buffer: RingBuffer,
-    pub(crate) stop: Arc<AtomicBool>,
-    pub(crate) offset: u64,
+    pub path: PathBuf,
+    pub buffer: RingBuffer,
+    pub stop: Arc<AtomicBool>,
+    pub offset: u64,
 }
 
 impl FilePoller {
@@ -63,10 +63,10 @@ impl FilePoller {
 
 /// Periodically asks the console server for process status updates.
 pub(crate) struct StatusPoller {
-    pub(crate) key: String,
-    pub(crate) status: Arc<Mutex<ProcessStatus>>,
-    pub(crate) finished_at: Arc<Mutex<Option<u64>>>,
-    pub(crate) stop: Arc<AtomicBool>,
+    pub key: String,
+    pub status: Arc<Mutex<ProcessStatus>>,
+    pub finished_at: Arc<Mutex<Option<u64>>>,
+    pub stop: Arc<AtomicBool>,
 }
 
 impl StatusPoller {

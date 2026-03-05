@@ -7,9 +7,9 @@
 //!
 //! View results: tail -f .context-pilot/perf.log
 
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::Write as _;
 use std::time::Instant;
 
 const THRESHOLD_MS: u128 = 5; // Only log operations taking > 5ms

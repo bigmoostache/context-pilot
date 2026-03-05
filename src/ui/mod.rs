@@ -34,6 +34,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         ])
         .split(area);
 
+    debug_assert!(main_layout.len() >= 2);
     render_body(frame, state, main_layout[0]);
     input::render_status_bar(frame, state, main_layout[1]);
 
@@ -80,6 +81,7 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
         ])
         .split(area);
 
+    debug_assert!(body_layout.len() >= 2);
     match state.sidebar_mode {
         cp_base::state::SidebarMode::Normal => {
             sidebar::render_sidebar(frame, state, body_layout[0]);
@@ -107,6 +109,7 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
             ])
             .split(area);
 
+        debug_assert!(layout.len() >= 2);
         render_content_panel(frame, state, layout[0]);
         // Indent form by 1 col to avoid overlapping sidebar border
         let form_area = Rect { x: layout[1].x + 1, width: layout[1].width.saturating_sub(1), ..layout[1] };

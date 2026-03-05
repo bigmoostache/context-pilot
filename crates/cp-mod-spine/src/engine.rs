@@ -213,8 +213,8 @@ fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) 
 pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool {
     match action {
         ContinuationAction::SyntheticMessage(content) => {
-            let _: usize = state.push_user_message(content);
-            let _: usize = state.push_empty_assistant();
+            let _ = state.push_user_message(content);
+            let _ = state.push_empty_assistant();
             state.begin_streaming();
             true
         }
@@ -227,10 +227,10 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
                 .map(|m| m.role.as_str());
 
             if last_role != Some("user") {
-                let _: usize = state.push_user_message(INJECTIONS.spine.continue_msg.trim_end().to_string());
+                let _ = state.push_user_message(INJECTIONS.spine.continue_msg.trim_end().to_string());
             }
 
-            let _: usize = state.push_empty_assistant();
+            let _ = state.push_empty_assistant();
             state.begin_streaming();
             true
         }

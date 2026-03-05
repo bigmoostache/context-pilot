@@ -4,10 +4,10 @@ use ratatui::{
 };
 
 use super::{helpers::spinner, theme};
-use crate::llms::{LlmProvider, ModelInfo};
+use crate::llms::{LlmProvider, ModelInfo as _};
 use crate::state::State;
 
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_mod_prompt::PromptState;
 use cp_mod_queue::QueueState;
 
@@ -190,8 +190,11 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         spans.push(Span::styled(" ", base_style));
     }
 
-    // Active reverie cards — one per running background optimizer
-    for rev in state.reveries.values() {
+    // Active reverie cards — one per running background optimizer (sorted by key for determinism)
+    let mut sorted_reverie_keys: Vec<_> = state.reveries.keys().collect();
+    sorted_reverie_keys.sort();
+    for rev_key in &sorted_reverie_keys {
+        let Some(rev) = state.reveries.get(*rev_key) else { continue };
         // Look up the agent's display name from PromptState
         let ps = PromptState::get(state);
         let agent_name =

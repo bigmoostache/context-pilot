@@ -77,7 +77,7 @@ impl Panel for FilePanel {
         }
         ctx.cache_deprecated = false;
         let content_ref = ctx.cached_content.clone().unwrap_or_default();
-        let _: bool = update_if_changed(ctx, &content_ref);
+        let _ = update_if_changed(ctx, &content_ref);
         true
     }
 

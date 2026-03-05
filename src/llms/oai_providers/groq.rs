@@ -4,11 +4,11 @@
 //! Message building is delegated to the shared `openai_compat` module.
 
 use std::env;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use reqwest::blocking::Client;
-use secrecy::{ExposeSecret, SecretBox};
+use secrecy::{ExposeSecret as _, SecretBox};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -65,11 +65,10 @@ impl LlmClient for GroqClient {
             .unwrap_or_default();
 
         // GPT-OSS models get extra info about built-in tools
-        let system_suffix = if request.model.starts_with("openai/gpt-oss") {
-            Some(INJECTIONS.providers.gpt_oss_suffix.trim_end().to_string())
-        } else {
-            None
-        };
+        let system_suffix = request
+            .model
+            .starts_with("openai/gpt-oss")
+            .then(|| INJECTIONS.providers.gpt_oss_suffix.trim_end().to_string());
 
         // Build messages using shared builder
         let mut messages = openai_compat::build_messages(

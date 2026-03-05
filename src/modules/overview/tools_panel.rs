@@ -66,7 +66,7 @@ fn generate_tools_context(state: &State) -> String {
     output.push_str("|----------|------|--------|-------------|\n");
     for tool in &state.tools {
         let status = if tool.enabled { "\u{2713}" } else { "\u{2717}" };
-        let _r = write!(output, "| {} | {} | {} | {} |\n", tool.category, tool.id, status, tool.short_desc);
+        let _r = writeln!(output, "| {} | {} | {} | {} |", tool.category, tool.id, status, tool.short_desc);
     }
 
     output

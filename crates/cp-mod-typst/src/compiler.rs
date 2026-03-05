@@ -16,7 +16,7 @@ use typst::utils::LazyHash;
 use typst::{Library, World};
 
 use crate::packages;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use std::fmt::Write as _;
 
 /// Successful compilation output: PDF bytes, warning text, and accessed file paths.
@@ -57,7 +57,7 @@ pub fn compile_to_pdf(source_path: &str) -> Result<CompileOutput, String> {
             let pdf_bytes = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).map_err(|errors| {
                 let mut msg = String::new();
                 for diag in &errors {
-                    let _r = write!(msg, "pdf error: {}\n", diag.message);
+                    let _r = writeln!(msg, "pdf error: {}", diag.message);
                 }
                 msg
             })?;
@@ -74,9 +74,9 @@ pub fn compile_to_pdf(source_path: &str) -> Result<CompileOutput, String> {
         Err(errors) => {
             let mut msg = String::new();
             for diag in &errors {
-                let _r = write!(msg, "error: {}\n", diag.message);
+                let _r = writeln!(msg, "error: {}", diag.message);
                 for hint in &diag.hints {
-                    let _r = write!(msg, "  hint: {hint}\n");
+                    let _r = writeln!(msg, "  hint: {hint}");
                 }
             }
             if !warnings.is_empty() {
@@ -267,7 +267,7 @@ impl World for ContextPilotWorld {
         self.fonts.get(index).cloned()
     }
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        use chrono::{Datelike, Local, Timelike, Utc};
+        use chrono::{Datelike as _, Local, Timelike as _, Utc};
         let now = Local::now();
         let naive = offset.map_or_else(
             || now.naive_local(),

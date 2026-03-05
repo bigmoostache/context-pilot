@@ -11,7 +11,7 @@ use ratatui::{
 
 use crate::state::{ContextType, State};
 use crate::ui::{helpers::count_wrapped_lines, theme};
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 // Re-export the Panel trait, ContextItem, and utility functions from cp-base
 pub(crate) use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};

@@ -185,11 +185,8 @@ impl Module for FilesModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::ContextElement) -> Option<String> {
-        if ctx.context_type.as_str() == ContextType::FILE {
-            Some(ctx.get_meta_str("file_path").unwrap_or("").to_string())
-        } else {
-            None
-        }
+        (ctx.context_type.as_str() == ContextType::FILE)
+            .then(|| ctx.get_meta_str("file_path").unwrap_or("").to_string())
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {

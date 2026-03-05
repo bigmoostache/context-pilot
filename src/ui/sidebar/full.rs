@@ -1,4 +1,7 @@
-use ratatui::{prelude::*, widgets::Paragraph};
+use ratatui::{
+    prelude::{Constraint, Direction, Frame, Layout, Line, Rect, Span, Style},
+    widgets::Paragraph,
+};
 
 use super::super::{
     chars,
@@ -7,7 +10,7 @@ use super::super::{
 };
 use crate::infra::constants::SIDEBAR_HELP_HEIGHT;
 use crate::state::{ContextType, State};
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 /// Returns a count badge for fixed panels, replacing the panel ID (P1, P2, etc.)
 /// with a meaningful number that reflects the panel's content.
@@ -49,6 +52,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
             Constraint::Length(SIDEBAR_HELP_HEIGHT), // Help hints
         ])
         .split(area);
+    debug_assert!(sidebar_layout.len() >= 2);
 
     // Context list
     let mut lines: Vec<Line<'_>> = vec![

@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use super::context::{ContextElement, ContextType};
 use super::data::config::SidebarMode;
 use super::data::message::Message;
+use crate::cast::SafeCast as _;
+use crate::llm_types::{LlmProvider, ModelInfo as _};
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderCache};
 
@@ -187,7 +189,7 @@ pub struct State {
     /// Active theme ID (dnd, modern, futuristic, forest, sea, space)
     pub active_theme: String,
     /// Selected LLM provider
-    pub llm_provider: crate::llm_types::LlmProvider,
+    pub llm_provider: LlmProvider,
     /// Active Anthropic model variant.
     pub anthropic_model: crate::llm_types::AnthropicModel,
     /// Active Grok model variant.
@@ -197,7 +199,7 @@ pub struct State {
     /// Active `DeepSeek` model variant.
     pub deepseek_model: crate::llm_types::DeepSeekModel,
     /// Secondary LLM provider (for reveries / sub-agents)
-    pub secondary_provider: crate::llm_types::LlmProvider,
+    pub secondary_provider: LlmProvider,
     /// Secondary Anthropic model variant.
     pub secondary_anthropic_model: crate::llm_types::AnthropicModel,
     /// Secondary Grok model variant.
@@ -301,12 +303,12 @@ impl Default for State {
             spinner_frame: 0,
             config_selected_bar: 0,
             active_theme: crate::config::DEFAULT_THEME.to_string(),
-            llm_provider: crate::llm_types::LlmProvider::default(),
+            llm_provider: LlmProvider::default(),
             anthropic_model: crate::llm_types::AnthropicModel::default(),
             grok_model: crate::llm_types::GrokModel::default(),
             groq_model: crate::llm_types::GroqModel::default(),
             deepseek_model: crate::llm_types::DeepSeekModel::default(),
-            secondary_provider: crate::llm_types::LlmProvider::Anthropic,
+            secondary_provider: LlmProvider::Anthropic,
             secondary_anthropic_model: crate::llm_types::AnthropicModel::ClaudeHaiku45,
             secondary_grok_model: crate::llm_types::GrokModel::default(),
             secondary_groq_model: crate::llm_types::GroqModel::default(),
@@ -406,7 +408,7 @@ impl State {
                 n.parse().ok()
             })
             .collect();
-        let id = (9..).find(|n| !used_ids.contains(n)).unwrap_or(9);
+        let id = (9..10_000).find(|n| !used_ids.contains(n)).unwrap_or(9);
         format!("P{id}")
     }
 
@@ -464,6 +466,139 @@ impl State {
         self.tick_cache_hit_tokens = 0;
         self.tick_cache_miss_tokens = 0;
         self.tick_output_tokens = 0;
+    }
+
+    // =========================================================================
+    // Model selection & context window (merged from model_helpers.rs)
+    // =========================================================================
+
+    /// Get the API model string for the current provider/model selection
+    #[must_use]
+    pub fn current_model(&self) -> String {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.api_name().to_string()
+            }
+            LlmProvider::Grok => self.grok_model.api_name().to_string(),
+            LlmProvider::Groq => self.groq_model.api_name().to_string(),
+            LlmProvider::DeepSeek => self.deepseek_model.api_name().to_string(),
+        }
+    }
+
+    /// Get the max output tokens for the current provider/model selection
+    #[must_use]
+    pub fn current_max_output_tokens(&self) -> u32 {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.max_output_tokens()
+            }
+            LlmProvider::Grok => self.grok_model.max_output_tokens(),
+            LlmProvider::Groq => self.groq_model.max_output_tokens(),
+            LlmProvider::DeepSeek => self.deepseek_model.max_output_tokens(),
+        }
+    }
+
+    /// Get the max output tokens for the secondary provider/model selection
+    #[must_use]
+    pub fn secondary_max_output_tokens(&self) -> u32 {
+        match self.secondary_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.secondary_anthropic_model.max_output_tokens()
+            }
+            LlmProvider::Grok => self.secondary_grok_model.max_output_tokens(),
+            LlmProvider::Groq => self.secondary_groq_model.max_output_tokens(),
+            LlmProvider::DeepSeek => self.secondary_deepseek_model.max_output_tokens(),
+        }
+    }
+
+    /// Get the current model's context window
+    #[must_use]
+    pub fn model_context_window(&self) -> usize {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.context_window()
+            }
+            LlmProvider::Grok => self.grok_model.context_window(),
+            LlmProvider::Groq => self.groq_model.context_window(),
+            LlmProvider::DeepSeek => self.deepseek_model.context_window(),
+        }
+    }
+
+    /// Get effective context budget (custom or model's full context)
+    #[must_use]
+    pub fn effective_context_budget(&self) -> usize {
+        self.context_budget.unwrap_or_else(|| self.model_context_window())
+    }
+
+    // =========================================================================
+    // Cleaning thresholds
+    // =========================================================================
+
+    /// Get the cleaning target as absolute proportion (threshold x `target_proportion`)
+    #[must_use]
+    pub fn cleaning_target(&self) -> f32 {
+        self.cleaning_threshold * self.cleaning_target_proportion
+    }
+
+    /// Get cleaning threshold in tokens
+    #[must_use]
+    pub fn cleaning_threshold_tokens(&self) -> usize {
+        (self.effective_context_budget().to_f32() * self.cleaning_threshold).to_usize()
+    }
+
+    /// Get cleaning target in tokens
+    #[must_use]
+    pub fn cleaning_target_tokens(&self) -> usize {
+        (self.effective_context_budget().to_f32() * self.cleaning_target()).to_usize()
+    }
+
+    // =========================================================================
+    // Pricing
+    // =========================================================================
+
+    /// Get cache hit price per million tokens for the current model
+    #[must_use]
+    pub fn cache_hit_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.cache_hit_price_per_mtok()
+            }
+            LlmProvider::Grok => self.grok_model.cache_hit_price_per_mtok(),
+            LlmProvider::Groq => self.groq_model.cache_hit_price_per_mtok(),
+            LlmProvider::DeepSeek => self.deepseek_model.cache_hit_price_per_mtok(),
+        }
+    }
+
+    /// Get cache miss price per million tokens for the current model
+    #[must_use]
+    pub fn cache_miss_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.cache_miss_price_per_mtok()
+            }
+            LlmProvider::Grok => self.grok_model.cache_miss_price_per_mtok(),
+            LlmProvider::Groq => self.groq_model.cache_miss_price_per_mtok(),
+            LlmProvider::DeepSeek => self.deepseek_model.cache_miss_price_per_mtok(),
+        }
+    }
+
+    /// Get output price per million tokens for the current model
+    #[must_use]
+    pub fn output_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.output_price_per_mtok()
+            }
+            LlmProvider::Grok => self.grok_model.output_price_per_mtok(),
+            LlmProvider::Groq => self.groq_model.output_price_per_mtok(),
+            LlmProvider::DeepSeek => self.deepseek_model.output_price_per_mtok(),
+        }
+    }
+
+    /// Calculate cost in USD for a given token count and price per `MTok`
+    #[must_use]
+    pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
+        tokens.to_f64() * price_per_mtok.to_f64() / 1_000_000.0
     }
 }
 

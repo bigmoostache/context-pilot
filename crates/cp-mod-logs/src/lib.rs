@@ -10,7 +10,7 @@ mod tools;
 /// Log state types: `LogEntry`, `LogsState`.
 pub mod types;
 
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 pub use types::{LogEntry, LogsState};
 
 /// Logs subdirectory (chunked JSON files, global across workers)
@@ -60,11 +60,15 @@ pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<(PathBu
         }
     }
 
-    // Build write op for each chunk
-    for (idx, chunk_logs) in &chunks {
-        let path = dir.join(format!("chunk_{idx}.json"));
-        if let Ok(json) = serde_json::to_string_pretty(chunk_logs) {
-            ops.push((path, json.into_bytes()));
+    // Build write op for each chunk (sorted by index for deterministic output)
+    let mut sorted_chunk_keys: Vec<_> = chunks.keys().copied().collect();
+    sorted_chunk_keys.sort();
+    for idx in sorted_chunk_keys {
+        if let Some(chunk_logs) = chunks.get(&idx) {
+            let path = dir.join(format!("chunk_{idx}.json"));
+            if let Ok(json) = serde_json::to_string_pretty(chunk_logs) {
+                ops.push((path, json.into_bytes()));
+            }
         }
     }
 

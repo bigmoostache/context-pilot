@@ -154,16 +154,16 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut result_msg = String::new();
 
     if replace_all && replaced > 1 {
-        let _r = write!(
+        let _r = writeln!(
             result_msg,
-            "Edited {} '{}': {} replacements (~{} lines changed each)\n",
+            "Edited {} '{}': {} replacements (~{} lines changed each)",
             entity_type.label(),
             id,
             replaced,
             lines_changed
         );
     } else {
-        let _r = write!(result_msg, "Edited {} '{}': ~{} lines changed\n", entity_type.label(), id, lines_changed);
+        let _r = writeln!(result_msg, "Edited {} '{}': ~{} lines changed", entity_type.label(), id, lines_changed);
     }
 
     result_msg.push_str("```diff\n");
@@ -205,24 +205,24 @@ fn generate_unified_diff(old: &str, new: &str) -> String {
         if lcs_idx < lcs.len() {
             let (lcs_old, lcs_new) = lcs[lcs_idx];
             while old_idx < lcs_old {
-                let _r = write!(result, "- {}\n", old_lines[old_idx]);
+                let _r = writeln!(result, "- {}", old_lines[old_idx]);
                 old_idx += 1;
             }
             while new_idx < lcs_new {
-                let _r = write!(result, "+ {}\n", new_lines[new_idx]);
+                let _r = writeln!(result, "+ {}", new_lines[new_idx]);
                 new_idx += 1;
             }
-            let _r = write!(result, "  {}\n", old_lines[old_idx]);
+            let _r = writeln!(result, "  {}", old_lines[old_idx]);
             old_idx += 1;
             new_idx += 1;
             lcs_idx += 1;
         } else {
             while old_idx < old_lines.len() {
-                let _r = write!(result, "- {}\n", old_lines[old_idx]);
+                let _r = writeln!(result, "- {}", old_lines[old_idx]);
                 old_idx += 1;
             }
             while new_idx < new_lines.len() {
-                let _r = write!(result, "+ {}\n", new_lines[new_idx]);
+                let _r = writeln!(result, "+ {}", new_lines[new_idx]);
                 new_idx += 1;
             }
         }

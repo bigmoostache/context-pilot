@@ -420,15 +420,19 @@ fn install_signal_handlers() {
 /// Kill all sessions — used during shutdown.
 fn kill_all_sessions(sessions: &Sessions) {
     let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
-    for (_, session) in map.iter_mut() {
-        if !session.is_terminal() {
-            drop(Command::new("kill").args([&session.pid.to_string()]).output());
-            std::thread::sleep(std::time::Duration::from_millis(50));
-            if is_pid_alive(session.pid) {
-                drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
+    let mut keys: Vec<_> = map.keys().cloned().collect();
+    keys.sort();
+    for key in &keys {
+        if let Some(session) = map.get_mut(key) {
+            if !session.is_terminal() {
+                drop(Command::new("kill").args([&session.pid.to_string()]).output());
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                if is_pid_alive(session.pid) {
+                    drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
+                }
             }
+            drop(session.stdin.take());
         }
-        drop(session.stdin.take());
     }
     map.clear();
 }

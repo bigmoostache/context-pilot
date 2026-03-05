@@ -69,17 +69,15 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
             let askpass_tempfile = github_token.as_ref().and_then(|token| {
                 let askpass_path = std::env::temp_dir().join(format!("cpilot_askpass_{}", std::process::id()));
                 let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
-                if std::fs::write(&askpass_path, &script).is_ok() {
+                std::fs::write(&askpass_path, &script).is_ok().then(|| {
                     #[cfg(unix)]
                     {
-                        use std::os::unix::fs::PermissionsExt;
+                        use std::os::unix::fs::PermissionsExt as _;
                         let _ = std::fs::set_permissions(&askpass_path, std::fs::Permissions::from_mode(0o700)).ok();
                     }
                     let _ = cmd.env("GIT_ASKPASS", &askpass_path);
-                    Some(askpass_path)
-                } else {
-                    None
-                }
+                    askpass_path
+                })
             });
 
             let result = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);

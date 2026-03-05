@@ -188,8 +188,11 @@ pub fn classify_gh(args: &[String]) -> CommandClass {
     if group == "api" {
         let rest: Vec<&str> = args.iter().skip(1).map(String::as_str).collect();
         let has_mutating_method = rest.windows(2).any(|w| {
-            (w[0] == "--method" || w[0] == "-X")
-                && matches!(w[1].to_uppercase().as_str(), "POST" | "PUT" | "PATCH" | "DELETE")
+            let (Some(flag), Some(method)) = (w.get(0), w.get(1)) else {
+                return false;
+            };
+            (*flag == "--method" || *flag == "-X")
+                && matches!(method.to_uppercase().as_str(), "POST" | "PUT" | "PATCH" | "DELETE")
         });
         return if has_mutating_method { CommandClass::Mutating } else { CommandClass::ReadOnly };
     }

@@ -48,7 +48,7 @@ fn format_log_entry(output: &mut String, entry: &LogEntry, ctx: &LogTreeContext<
         let icon = if is_open { "▼" } else { "▶" };
         let child_count = entry.children_ids.len();
         if is_open {
-            let _r = write!(output, "{}{} [{}] {} {}\n", indent, icon, entry.id, time_str, entry.content);
+            let _r = writeln!(output, "{}{} [{}] {} {}", indent, icon, entry.id, time_str, entry.content);
             // Show children indented
             for child_id in &entry.children_ids {
                 if let Some(child) = ctx.all_logs.iter().find(|l| l.id == *child_id) {
@@ -56,14 +56,14 @@ fn format_log_entry(output: &mut String, entry: &LogEntry, ctx: &LogTreeContext<
                 }
             }
         } else {
-            let _r = write!(
+            let _r = writeln!(
                 output,
-                "{}{} [{}] {} {} ({} children)\n",
+                "{}{} [{}] {} {} ({} children)",
                 indent, icon, entry.id, time_str, entry.content, child_count
             );
         }
     } else {
-        let _r = write!(output, "{}[{}] {} {}\n", indent, entry.id, time_str, entry.content);
+        let _r = writeln!(output, "{}[{}] {} {}", indent, entry.id, time_str, entry.content);
     }
 }
 
@@ -156,7 +156,7 @@ fn render_log_entry(lines: &mut Vec<Line<'static>>, entry: &LogEntry, ctx: &LogT
 }
 
 fn format_timestamp(ms: u64) -> String {
-    use chrono::{Local, TimeZone};
+    use chrono::{Local, TimeZone as _};
     i64::try_from(ms)
         .ok()
         .and_then(|ms| Local.timestamp_millis_opt(ms).single())

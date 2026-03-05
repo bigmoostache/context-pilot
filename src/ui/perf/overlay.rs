@@ -6,7 +6,7 @@
 use super::super::helpers::Cell;
 use super::super::{chars, theme};
 use super::{FRAME_BUDGET_30FPS, FRAME_BUDGET_60FPS, PERF};
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use ratatui::Frame;
 use ratatui::prelude::{Color, Line, Rect, Span, Style};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};

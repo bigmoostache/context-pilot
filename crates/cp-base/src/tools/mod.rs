@@ -249,6 +249,33 @@ impl ToolDefinition {
             reverie_allowed: false,
         }
     }
+
+    /// Emit the Anthropic-compatible JSON Schema for this tool's parameters.
+    #[must_use]
+    pub fn to_json_schema(&self) -> Value {
+        let mut properties = serde_json::Map::new();
+        let mut required = Vec::new();
+
+        for param in &self.params {
+            let mut schema = param.param_type.to_json_schema();
+            if let Some(desc) = &param.description {
+                schema["description"] = json!(desc);
+            }
+            if let Some(enum_vals) = &param.enum_values {
+                schema["enum"] = json!(enum_vals);
+            }
+            drop(properties.insert(param.name.clone(), schema));
+            if param.required {
+                required.push(param.name.clone());
+            }
+        }
+
+        json!({
+            "type": "object",
+            "properties": properties,
+            "required": required
+        })
+    }
 }
 
 /// Builder for constructing a [`ToolDefinition`] from YAML text.
@@ -380,35 +407,6 @@ impl ToolDefBuilder<'_> {
             reverie_allowed: self.reverie_allowed,
             category: self.category,
         }
-    }
-}
-
-impl ToolDefinition {
-    /// Emit the Anthropic-compatible JSON Schema for this tool's parameters.
-    #[must_use]
-    pub fn to_json_schema(&self) -> Value {
-        let mut properties = serde_json::Map::new();
-        let mut required = Vec::new();
-
-        for param in &self.params {
-            let mut schema = param.param_type.to_json_schema();
-            if let Some(desc) = &param.description {
-                schema["description"] = json!(desc);
-            }
-            if let Some(enum_vals) = &param.enum_values {
-                schema["enum"] = json!(enum_vals);
-            }
-            drop(properties.insert(param.name.clone(), schema));
-            if param.required {
-                required.push(param.name.clone());
-            }
-        }
-
-        json!({
-            "type": "object",
-            "properties": properties,
-            "required": required
-        })
     }
 }
 

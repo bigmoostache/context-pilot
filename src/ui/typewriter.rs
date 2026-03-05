@@ -4,16 +4,16 @@ use std::time::{Duration, Instant};
 use crate::infra::constants::{
     TYPEWRITER_DEFAULT_DELAY_MS, TYPEWRITER_MAX_DELAY_MS, TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MOVING_AVG_SIZE,
 };
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 pub(crate) struct TypewriterBuffer {
     pub pending_chars: VecDeque<char>,
-    chunk_intervals: VecDeque<Duration>,
-    chunk_sizes: VecDeque<usize>,
-    last_chunk_time: Option<Instant>,
-    last_char_time: Instant,
-    chars_per_ms: f64,
-    stream_done: bool,
+    pub chunk_intervals: VecDeque<Duration>,
+    pub chunk_sizes: VecDeque<usize>,
+    pub last_chunk_time: Option<Instant>,
+    pub last_char_time: Instant,
+    pub chars_per_ms: f64,
+    pub stream_done: bool,
 }
 
 impl TypewriterBuffer {

@@ -96,7 +96,10 @@ impl Module for BraveModule {
     }
 
     fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
-        (context_type.as_str() == panel::BRAVE_PANEL_TYPE).then(|| Box::new(panel::BraveResultPanel) as Box<dyn Panel>)
+        (context_type.as_str() == panel::BRAVE_PANEL_TYPE).then(|| {
+            let panel: Box<dyn Panel> = Box::new(panel::BraveResultPanel);
+            panel
+        })
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {

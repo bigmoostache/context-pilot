@@ -1,4 +1,4 @@
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_base::state::State;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};

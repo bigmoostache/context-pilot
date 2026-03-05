@@ -1,10 +1,66 @@
+use std::sync::mpsc::Sender;
+
 use crossterm::event;
 
-use crate::app::actions::Action;
-
 use crate::app::App;
+use crate::app::actions::Action;
+use crate::infra::gh_watcher::GhWatcher;
+use crate::infra::watcher::FileWatcher;
+use crate::state::cache::CacheUpdate;
+use crate::state::persistence::{build_message_op, build_save_batch};
+use crate::state::{Message, State};
+use crate::ui::help::CommandPalette;
+use crate::ui::typewriter::TypewriterBuffer;
+use cp_base::panels::now_ms;
 
 impl App {
+    pub(crate) fn new(state: State, cache_tx: Sender<CacheUpdate>, resume_stream: bool) -> Self {
+        let file_watcher = FileWatcher::new().ok();
+        let gh_watcher = GhWatcher::new(cache_tx.clone());
+
+        Self {
+            state,
+            typewriter: TypewriterBuffer::new(),
+            pending_done: None,
+            pending_tools: Vec::new(),
+            cache_tx,
+            file_watcher,
+            gh_watcher,
+            watched_file_paths: std::collections::HashSet::new(),
+            watched_dir_paths: std::collections::HashSet::new(),
+            last_timer_check_ms: now_ms(),
+            last_ownership_check_ms: now_ms(),
+            pending_retry_error: None,
+            last_render_ms: 0,
+            last_spinner_ms: 0,
+            last_gh_sync_ms: 0,
+            api_check_rx: None,
+            resume_stream,
+            command_palette: CommandPalette::new(),
+            wait_started_ms: 0,
+            deferred_tool_sleep_until_ms: 0,
+            deferred_tool_sleeping: false,
+            writer: crate::state::persistence::PersistenceWriter::new(),
+            last_poll_ms: std::collections::HashMap::new(),
+            pending_question_tool_results: None,
+            pending_console_wait_tool_results: None,
+            accumulated_blocking_results: Vec::new(),
+            reverie_streams: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Send state to background writer (debounced, non-blocking).
+    /// Preferred over `save_state()` in the main event loop.
+    pub(super) fn save_state_async(&self) {
+        self.writer.send_batch(build_save_batch(&self.state));
+    }
+
+    /// Send a message to background writer (non-blocking).
+    /// Preferred over `save_message()` in the main event loop.
+    pub(super) fn save_message_async(&self, msg: &Message) {
+        self.writer.send_message(build_message_op(msg));
+    }
+
     /// Handle keyboard events when the @ autocomplete popup is active.
     /// Mutates `AutocompleteState` and state.input directly.
     pub(super) fn handle_autocomplete_event(&mut self, event: &event::Event) {

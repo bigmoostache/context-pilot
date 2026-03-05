@@ -22,7 +22,7 @@ pub(crate) use writer::{DeleteOp, PersistenceWriter, WriteBatch, WriteOp};
 use chrono::Local;
 use std::collections::HashMap;
 use std::fs;
-use std::io::Write;
+use std::io::Write as _;
 use std::path::PathBuf;
 
 use cp_mod_logs::LogsState;
@@ -107,10 +107,10 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
                 if p.panel_type == ContextType::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
                     let msgs: Vec<Message> = p.message_uids.iter().filter_map(|uid| load_message(uid)).collect();
                     if !msgs.is_empty() {
-                        let content = crate::state::format_messages_to_chunk(&msgs);
-                        let token_count = crate::state::estimate_tokens(&content);
+                        let chunk_text = crate::state::format_messages_to_chunk(&msgs);
+                        let token_count = crate::state::estimate_tokens(&chunk_text);
                         let total_pages = crate::state::compute_total_pages(token_count);
-                        elem.cached_content = Some(content);
+                        elem.cached_content = Some(chunk_text);
                         elem.history_messages = Some(msgs);
                         elem.token_count = token_count;
                         elem.total_pages = total_pages;
@@ -357,7 +357,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
                 },
                 metadata: ctx.metadata.clone(),
                 content_hash: ctx.content_hash.clone(),
-                panel_total_cost: if ctx.panel_total_cost > 0.0 { Some(ctx.panel_total_cost) } else { None },
+                panel_total_cost: (ctx.panel_total_cost > 0.0).then_some(ctx.panel_total_cost),
             };
             if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
                 writes.push(WriteOp { path: panels_dir.join(format!("{uid}.json")), content: json.into_bytes() });

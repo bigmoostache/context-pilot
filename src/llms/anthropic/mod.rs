@@ -1,11 +1,11 @@
 //! Anthropic Claude API implementation.
 
 use reqwest::blocking::Client;
-use secrecy::{ExposeSecret, SecretBox};
+use secrecy::{ExposeSecret as _, SecretBox};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use super::error::LlmError;

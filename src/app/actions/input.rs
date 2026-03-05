@@ -36,7 +36,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
     // Assign user display ID and UID
     let user_id = format!("U{}", state.next_user_id);
-    let user_uid = format!("UID_{}_U", state.global_next_uid);
+    let user_global_uid = format!("UID_{}_U", state.global_next_uid);
     state.next_user_id += 1;
     state.global_next_uid += 1;
 
@@ -48,7 +48,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
         content.clone()
     };
 
-    let user_msg = Message::new_user(user_id, user_uid, content, user_token_estimate);
+    let user_msg = Message::new_user(user_id, user_global_uid, content, user_token_estimate);
     save_message(&user_msg);
 
     // Add user message tokens to Conversation context and update timestamp

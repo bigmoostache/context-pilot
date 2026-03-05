@@ -24,13 +24,13 @@ impl App {
     /// Used for both direct tool calls and queue-flushed replays.
     fn save_tool_call_message(&mut self, tool: &cp_base::tools::ToolUse) {
         let tool_id = format!("T{}", self.state.next_tool_id);
-        let tool_uid = format!("UID_{}_T", self.state.global_next_uid);
+        let tool_global_uid = format!("UID_{}_T", self.state.global_next_uid);
         self.state.next_tool_id += 1;
         self.state.global_next_uid += 1;
 
         let tool_msg = Message {
             id: tool_id,
-            uid: Some(tool_uid),
+            uid: Some(tool_global_uid),
             role: "assistant".to_string(),
             msg_type: MessageType::ToolCall,
             content: String::new(),
@@ -245,7 +245,7 @@ impl App {
 
         // Create tool result message
         let result_id = format!("R{}", self.state.next_result_id);
-        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
+        let result_global_uid = format!("UID_{}_R", self.state.global_next_uid);
         self.state.next_result_id += 1;
         self.state.global_next_uid += 1;
         let tool_result_records: Vec<ToolResultRecord> = tool_results
@@ -260,7 +260,7 @@ impl App {
             .collect();
         let result_msg = Message {
             id: result_id,
-            uid: Some(result_uid),
+            uid: Some(result_global_uid),
             role: "user".to_string(),
             msg_type: MessageType::ToolResult,
             content: String::new(),
@@ -281,12 +281,12 @@ impl App {
 
         // Create new assistant message
         let assistant_id = format!("A{}", self.state.next_assistant_id);
-        let assistant_uid = format!("UID_{}_A", self.state.global_next_uid);
+        let assistant_global_uid = format!("UID_{}_A", self.state.global_next_uid);
         self.state.next_assistant_id += 1;
         self.state.global_next_uid += 1;
         let new_assistant_msg = Message {
             id: assistant_id,
-            uid: Some(assistant_uid),
+            uid: Some(assistant_global_uid),
             role: "assistant".to_string(),
             msg_type: MessageType::TextMessage,
             content: String::new(),
@@ -417,7 +417,7 @@ impl App {
 
         // Now resume the normal pipeline: create result message and continue streaming
         let result_id = format!("R{}", self.state.next_result_id);
-        let result_uid = format!("UID_{}_R", self.state.global_next_uid);
+        let result_global_uid = format!("UID_{}_R", self.state.global_next_uid);
         self.state.next_result_id += 1;
         self.state.global_next_uid += 1;
         let tool_result_records: Vec<ToolResultRecord> = tool_results
@@ -431,7 +431,7 @@ impl App {
             .collect();
         let result_msg = Message {
             id: result_id,
-            uid: Some(result_uid),
+            uid: Some(result_global_uid),
             role: "user".to_string(),
             msg_type: MessageType::ToolResult,
             content: String::new(),
@@ -452,12 +452,12 @@ impl App {
 
         // Create new assistant message for continued streaming
         let assistant_id = format!("A{}", self.state.next_assistant_id);
-        let assistant_uid = format!("UID_{}_A", self.state.global_next_uid);
+        let assistant_global_uid = format!("UID_{}_A", self.state.global_next_uid);
         self.state.next_assistant_id += 1;
         self.state.global_next_uid += 1;
         let new_assistant_msg = Message {
             id: assistant_id,
-            uid: Some(assistant_uid),
+            uid: Some(assistant_global_uid),
             role: "assistant".to_string(),
             msg_type: MessageType::TextMessage,
             content: String::new(),

@@ -17,6 +17,7 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(1), Constraint::Length(token_area_height)])
         .split(area);
+    debug_assert!(layout.len() >= 2);
 
     let mut lines: Vec<Line<'_>> = Vec::new();
     lines.push(Line::from(""));
