@@ -15,6 +15,7 @@ const CACHE_POOL_SIZE: usize = 6;
 /// Bounded thread pool for cache operations.
 /// Workers pull (`CacheRequest`, Sender<CacheUpdate>) pairs from a shared channel.
 pub(crate) struct CachePool {
+    /// Sender half of the job channel feeding worker threads.
     job_tx: Sender<(CacheRequest, Sender<CacheUpdate>)>,
 }
 

@@ -4,6 +4,7 @@ use crate::state::State;
 /// The ID of this tool - it cannot be disabled
 pub(crate) const MANAGE_TOOLS_ID: &str = "manage_tools";
 
+/// Execute the `tool_manage` tool to enable or disable tools.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) else {
         return ToolResult::new(tool.id.clone(), "Missing 'changes' parameter (expected array)".to_string(), true);
@@ -18,18 +19,18 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     for (i, change) in changes.iter().enumerate() {
         let Some(tool_name) = change.get("tool").and_then(serde_json::Value::as_str) else {
-            failures.push(format!("Change {}: missing 'tool'", i + 1));
+            failures.push(format!("Change {}: missing 'tool'", i.saturating_add(1)));
             continue;
         };
 
         let Some(action) = change.get("action").and_then(serde_json::Value::as_str) else {
-            failures.push(format!("Change {}: missing 'action'", i + 1));
+            failures.push(format!("Change {}: missing 'action'", i.saturating_add(1)));
             continue;
         };
 
         // Cannot disable the manage_tools tool itself
         if tool_name == MANAGE_TOOLS_ID && action == "disable" {
-            failures.push(format!("Change {}: cannot disable '{}'", i + 1, MANAGE_TOOLS_ID));
+            failures.push(format!("Change {}: cannot disable '{}'", i.saturating_add(1), MANAGE_TOOLS_ID));
             continue;
         }
 
@@ -37,7 +38,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         if tool_name == "panel_goto_page" {
             failures.push(format!(
                 "Change {}: '{}' is automatically managed (enabled when panels are paginated)",
-                i + 1,
+                i.saturating_add(1),
                 tool_name
             ));
             continue;
@@ -65,11 +66,15 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
                     }
                 }
                 _ => {
-                    failures.push(format!("Change {}: invalid action '{}' (use 'enable' or 'disable')", i + 1, action));
+                    failures.push(format!(
+                        "Change {}: invalid action '{}' (use 'enable' or 'disable')",
+                        i.saturating_add(1),
+                        action
+                    ));
                 }
             },
             None => {
-                failures.push(format!("Change {}: tool '{}' not found", i + 1, tool_name));
+                failures.push(format!("Change {}: tool '{}' not found", i.saturating_add(1), tool_name));
             }
         }
     }

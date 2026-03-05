@@ -12,6 +12,8 @@ use ratatui::{
 use crate::state::{ContextType, State};
 use crate::ui::{helpers::count_wrapped_lines, theme};
 use cp_base::cast::SafeCast as _;
+use cp_base::panels::{CacheRequest, CacheUpdate};
+use cp_base::state::context::ContextElement;
 
 // Re-export the Panel trait, ContextItem, and utility functions from cp-base
 pub(crate) use cp_base::panels::{ContextItem, Panel, now_ms, paginate_content, update_if_changed};
@@ -22,7 +24,7 @@ pub(crate) fn render_panel_default(panel: &dyn Panel, frame: &mut Frame<'_>, sta
     let base_style = Style::default().bg(theme::bg_surface());
     let title = panel.title(state);
 
-    let inner_area = Rect::new(area.x + 1, area.y, area.width.saturating_sub(2), area.height);
+    let inner_area = Rect::new(area.x.saturating_add(1), area.y, area.width.saturating_sub(2), area.height);
 
     // Build bottom title for dynamic panels: "refreshed Xs ago"
     let bottom_title =
@@ -35,7 +37,7 @@ pub(crate) fn render_panel_default(panel: &dyn Panel, frame: &mut Frame<'_>, sta
             if now <= ts {
                 return None;
             }
-            Some(format!(" {} ", crate::ui::helpers::format_time_ago(now - ts)))
+            Some(format!(" {} ", crate::ui::helpers::format_time_ago(now.saturating_sub(ts))))
         });
 
     let mut block = Block::default()
@@ -95,6 +97,36 @@ impl Panel for FallbackPanel {
     fn content(&self, _state: &State, _base_style: Style) -> Vec<Line<'static>> {
         vec![Line::from("Panel module no longer available")]
     }
+    fn handle_key(
+        &self,
+        _key: &crossterm::event::KeyEvent,
+        _state: &State,
+    ) -> Option<cp_base::state::actions::Action> {
+        None
+    }
+    fn needs_cache(&self) -> bool {
+        false
+    }
+    fn refresh(&self, _state: &mut State) {}
+    fn refresh_cache(&self, _request: CacheRequest) -> Option<CacheUpdate> {
+        None
+    }
+    fn build_cache_request(&self, _ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        None
+    }
+    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut ContextElement, _state: &mut State) -> bool {
+        false
+    }
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+    fn context(&self, _state: &State) -> Vec<ContextItem> {
+        Vec::new()
+    }
+    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+        false
+    }
+    fn render(&self, _frame: &mut Frame<'_>, _state: &mut State, _area: Rect) {}
 }
 
 /// Refresh all panels (update token counts, etc.)

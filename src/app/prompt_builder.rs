@@ -111,11 +111,15 @@ pub(crate) fn assemble_prompt(
 // ── Panel injection ─────────────────────────────────────────────
 
 /// Context needed for panel injection into the prompt.
-struct PanelInjection<'a> {
-    fake_panels: &'a [crate::llms::FakePanelMessage],
-    messages: &'a [Message],
+struct PanelInjection<'inj> {
+    /// Fake panel messages to inject as tool call/result pairs.
+    fake_panels: &'inj [crate::llms::FakePanelMessage],
+    /// Conversation messages (for footer timestamp calculation).
+    messages: &'inj [Message],
+    /// Current timestamp in milliseconds.
     current_ms: u64,
-    seed_content: Option<&'a str>,
+    /// Optional seed content to re-inject after panels.
+    seed_content: Option<&'inj str>,
 }
 
 /// Inject context panels as fake tool call/result message pairs.
@@ -185,7 +189,8 @@ fn inject_panel_messages(api_messages: &mut Vec<ApiMessage>, ctx: &PanelInjectio
 fn build_tool_call_blocks(msg: &Message, messages: &[Message], idx: usize) -> Option<Vec<ContentBlock>> {
     let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
 
-    let has_matching_result = messages[idx + 1..]
+    let rest = messages.get(idx.saturating_add(1)..).unwrap_or_default();
+    let has_matching_result = rest
         .iter()
         .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
         .filter(|m| m.msg_type == MessageType::ToolResult)

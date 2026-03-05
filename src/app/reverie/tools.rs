@@ -8,6 +8,7 @@ use crate::state::State;
 use cp_base::config::REVERIE;
 use std::fmt::Write as _;
 
+/// Parsed tool text definitions for the reverie subsystem.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/reverie.yaml")));
 

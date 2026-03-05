@@ -3,6 +3,7 @@ use crate::modules::all_modules;
 use crate::state::State;
 use std::fmt::Write as _;
 
+/// Execute the `Close_panel` tool to remove context panels.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(ids) = tool.input.get("ids").and_then(serde_json::Value::as_array) else {
         return ToolResult::new(tool.id.clone(), "Missing 'ids' array parameter".to_string(), true);
@@ -34,7 +35,11 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         // Fixed panels are always protected
-        if state.context[idx].context_type.is_fixed() {
+        let Some(ctx_elem) = state.context.get(idx) else {
+            not_found.push(id.to_string());
+            continue;
+        };
+        if ctx_elem.context_type.is_fixed() {
             skipped.push(format!("{id} (protected)"));
             continue;
         }

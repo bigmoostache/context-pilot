@@ -16,20 +16,25 @@ use std::time::Duration;
 /// A single file write operation
 #[derive(Debug, Clone)]
 pub(crate) struct WriteOp {
+    /// Target file path.
     pub path: PathBuf,
+    /// Serialized bytes to write.
     pub content: Vec<u8>,
 }
 
 /// A single file delete operation
 #[derive(Debug, Clone)]
 pub(crate) struct DeleteOp {
+    /// Target file path to remove.
     pub path: PathBuf,
 }
 
 /// A batch of persistence operations to execute atomically
 #[derive(Debug, Clone)]
 pub(crate) struct WriteBatch {
+    /// File write operations in this batch.
     pub writes: Vec<WriteOp>,
+    /// File delete operations in this batch.
     pub deletes: Vec<DeleteOp>,
     /// Directories to ensure exist before writing
     pub ensure_dirs: Vec<PathBuf>,
@@ -49,7 +54,9 @@ enum WriterMsg {
 
 /// Handle to the background persistence writer
 pub(crate) struct PersistenceWriter {
+    /// Sender end of the writer message channel.
     tx: Sender<WriterMsg>,
+    /// Join handle for the background I/O thread.
     handle: Option<JoinHandle<()>>,
 }
 
@@ -82,16 +89,16 @@ impl PersistenceWriter {
     /// Used on app exit to ensure all state is persisted.
     pub(crate) fn flush(&self) {
         let (done_tx, done_rx) = mpsc::channel();
-        let _r = self.tx.send(WriterMsg::Flush(done_tx));
+        let _send = self.tx.send(WriterMsg::Flush(done_tx));
         // Block until the writer signals completion (timeout 5s to prevent infinite hang)
-        let _r = done_rx.recv_timeout(Duration::from_secs(5));
+        let _recv = done_rx.recv_timeout(Duration::from_secs(5));
     }
 
     /// Shutdown the writer thread gracefully
     pub(crate) fn shutdown(&mut self) {
-        let _r = self.tx.send(WriterMsg::Shutdown);
+        let _send = self.tx.send(WriterMsg::Shutdown);
         if let Some(handle) = self.handle.take() {
-            let _r = handle.join();
+            let _join = handle.join();
         }
     }
 }
@@ -105,6 +112,7 @@ impl Drop for PersistenceWriter {
 
 /// Background writer thread state. Owns the channel receiver.
 struct WriterThread {
+    /// Receiver end of the writer message channel.
     rx: Receiver<WriterMsg>,
 }
 

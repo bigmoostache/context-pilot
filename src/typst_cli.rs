@@ -11,11 +11,9 @@
 ///
 /// Returns `Err((message, exit_code))` on missing args or compilation failure.
 pub(crate) fn run_typst_compile(args: &[String]) -> Result<String, (String, i32)> {
-    if args.is_empty() {
+    let Some(source_path) = args.first() else {
         return Err(("Usage: cpilot typst-compile <source.typ>".to_string(), 1));
-    }
-
-    let source_path = &args[0];
+    };
 
     // Output: same directory, same name, .pdf extension
     let stem = std::path::Path::new(source_path).file_stem().and_then(|s| s.to_str()).unwrap_or("output");

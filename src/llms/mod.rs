@@ -5,6 +5,7 @@
 pub(crate) mod anthropic;
 pub(crate) mod claude_code;
 pub(crate) mod claude_code_api_key;
+/// OpenAI-compatible provider implementations (Grok, Groq, DeepSeek).
 pub(crate) mod oai_providers;
 pub(crate) mod openai_compat;
 pub(crate) mod openai_streaming;
@@ -33,13 +34,21 @@ use oai_providers::groq;
 /// Configuration for an LLM request
 #[derive(Debug, Clone)]
 pub(crate) struct LlmRequest {
+    /// Model identifier string
     pub model: String,
+    /// Maximum number of output tokens to generate
     pub max_output_tokens: u32,
+    /// Conversation messages to send
     pub messages: Vec<Message>,
+    /// Context items (panels) to inject
     pub context_items: Vec<ContextItem>,
+    /// Tool definitions available for the model
     pub tools: Vec<ToolDefinition>,
+    /// Pending tool results from a tool loop
     pub tool_results: Option<Vec<ToolResult>>,
+    /// Custom system prompt (falls back to default if None)
     pub system_prompt: Option<String>,
+    /// Extra context for cleaner mode
     pub extra_context: Option<String>,
     /// Seed/system prompt content to repeat after panels
     pub seed_content: Option<String>,
@@ -82,14 +91,23 @@ pub(crate) fn start_api_check(provider: LlmProvider, model: String, tx: Sender<A
 
 /// Parameters for starting a streaming LLM request
 pub(crate) struct StreamParams {
+    /// Which LLM provider to use
     pub provider: LlmProvider,
+    /// Model identifier string
     pub model: String,
+    /// Maximum number of output tokens to generate
     pub max_output_tokens: u32,
+    /// Conversation messages to send
     pub messages: Vec<Message>,
+    /// Context items (panels) to inject
     pub context_items: Vec<ContextItem>,
+    /// Tool definitions available for the model
     pub tools: Vec<ToolDefinition>,
+    /// System prompt text
     pub system_prompt: String,
+    /// Seed content to repeat after panels
     pub seed_content: Option<String>,
+    /// Worker/reverie ID for debug logging
     pub worker_id: String,
 }
 
@@ -127,21 +145,42 @@ pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
     });
 }
 
-// Re-export common types used by providers
+/// Content block types used in API messages.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub(crate) enum ContentBlock {
+    /// Plain text content
     #[serde(rename = "text")]
-    Text { text: String },
+    Text {
+        /// The text content
+        text: String,
+    },
+    /// Tool use request from the assistant
     #[serde(rename = "tool_use")]
-    ToolUse { id: String, name: String, input: Value },
+    ToolUse {
+        /// Tool invocation ID
+        id: String,
+        /// Tool name
+        name: String,
+        /// Tool input parameters
+        input: Value,
+    },
+    /// Tool result response from the user
     #[serde(rename = "tool_result")]
-    ToolResult { tool_use_id: String, content: String },
+    ToolResult {
+        /// ID of the tool use this result responds to
+        tool_use_id: String,
+        /// Tool result content
+        content: String,
+    },
 }
 
+/// A single message in the API conversation format.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ApiMessage {
+    /// Message role (e.g. "user", "assistant")
     pub role: String,
+    /// Content blocks within this message
     pub content: Vec<ContentBlock>,
 }
 
@@ -361,12 +400,17 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value>
 }
 
 /// Context for logging an SSE error event.
-pub(crate) struct SseErrorContext<'a> {
-    pub provider: &'a str,
-    pub json_str: &'a str,
+pub(crate) struct SseErrorContext<'ctx> {
+    /// Name of the LLM provider that encountered the error
+    pub provider: &'ctx str,
+    /// Raw JSON string from the error event
+    pub json_str: &'ctx str,
+    /// Total bytes read from the stream so far
     pub total_bytes: usize,
+    /// Total SSE lines read from the stream so far
     pub line_count: usize,
-    pub last_lines: &'a [String],
+    /// Last few SSE lines for context
+    pub last_lines: &'ctx [String],
 }
 
 /// Log an SSE error event to `.context-pilot/errors/sse_errors.log` for post-mortem debugging.
@@ -395,15 +439,25 @@ pub(crate) fn log_sse_error(ctx: &SseErrorContext<'_>) {
         .and_then(|mut f| f.write_all(entry.as_bytes()));
 }
 
+/// LLM error types.
 pub(crate) mod error {
     use std::fmt;
 
     /// Typed error for LLM streaming operations.
     #[derive(Debug)]
     pub(crate) enum LlmError {
+        /// Authentication error (missing or invalid API key)
         Auth(String),
+        /// Network-level error (connection failure, DNS, etc.)
         Network(String),
-        Api { status: u16, body: String },
+        /// API-level error with HTTP status code and response body
+        Api {
+            /// HTTP status code
+            status: u16,
+            /// Response body text
+            body: String,
+        },
+        /// Error reading the SSE stream mid-response
         StreamRead(String),
     }
 

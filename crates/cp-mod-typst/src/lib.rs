@@ -18,13 +18,14 @@ mod tools_execute;
 pub mod watchlist;
 
 use cp_base::modules::{Module, ToolVisualizer};
-use cp_base::panels::{Panel, WatchSpec};
+use cp_base::panels::Panel;
 use cp_base::state::context::{ContextElement, ContextType, ContextTypeMeta};
 use cp_base::state::runtime::State;
 use cp_base::tools::pre_flight::PreFlightResult;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
+/// Lazily parsed tool definitions loaded from the YAML spec.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/typst.yaml")));
 
@@ -63,7 +64,7 @@ impl Module for TypstModule {
     fn init_state(&self, state: &mut State) {
         cp_base::config::constants::ensure_shared_dir();
         ensure_typst_callback(state);
-        templates::seed_templates();
+        templates::seed();
     }
 
     fn reset_state(&self, _state: &mut State) {
@@ -77,7 +78,7 @@ impl Module for TypstModule {
     fn load_module_data(&self, _data: &serde_json::Value, state: &mut State) {
         cp_base::config::constants::ensure_shared_dir();
         ensure_typst_callback(state);
-        templates::seed_templates();
+        templates::seed();
     }
 
     fn save_worker_data(&self, _state: &State) -> serde_json::Value {
@@ -152,11 +153,7 @@ impl Module for TypstModule {
         vec![]
     }
 
-    fn on_close_context(
-        &self,
-        _ctx: &crate::state::context::ContextElement,
-        _state: &mut State,
-    ) -> Option<Result<String, String>> {
+    fn on_close_context(&self, _ctx: &ContextElement, _state: &mut State) -> Option<Result<String, String>> {
         None
     }
 
@@ -168,16 +165,11 @@ impl Module for TypstModule {
 
     fn on_stream_stop(&self, _state: &mut State) {}
 
-    fn watch_paths(&self, _state: &State) -> Vec<crate::panels::WatchSpec> {
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
         vec![]
     }
 
-    fn should_invalidate_on_fs_change(
-        &self,
-        _ctx: &crate::state::context::ContextElement,
-        _changed_path: &str,
-        _is_dir_event: bool,
-    ) -> bool {
+    fn should_invalidate_on_fs_change(&self, _ctx: &ContextElement, _changed_path: &str, _is_dir_event: bool) -> bool {
         false
     }
 
@@ -206,7 +198,7 @@ fn ensure_typst_callback(state: &mut State) {
 
     // Single callback: watches ALL files, checks watchlist to find affected docs
     let cb_id = format!("CB{}", cs.next_id);
-    cs.next_id += 1;
+    cs.next_id = cs.next_id.saturating_add(1);
 
     // The CLI subcommand reads the watchlist, checks if any changed files are dependencies,
     // and recompiles affected documents (updating deps at the same time).
@@ -225,5 +217,5 @@ fn ensure_typst_callback(state: &mut State) {
         built_in: true,
         built_in_command: Some(script),
     });
-    let _ = cs.active_set.insert(cb_id);
+    let _r = cs.active_set.insert(cb_id);
 }

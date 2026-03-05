@@ -27,10 +27,10 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
     let mut text: Vec<Line<'_>> = Vec::new();
 
     let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
-    let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt) * 2;
+    let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt).saturating_mul(2);
     let tool_def_tokens = super::context::estimate_tool_definitions_tokens(state);
     let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-    let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
+    let total_tokens = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
     let budget = state.effective_context_budget();
     let threshold = state.cleaning_threshold_tokens();
     let usage_pct = (total_tokens.to_f64() / budget.to_f64() * 100.0).min(100.0);
@@ -72,7 +72,7 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
 
     let mut bar_spans = vec![Span::styled(" ".to_string(), base_style)];
     for i in 0..bar_width {
-        let char = if i == threshold_pos && threshold_pos < bar_width {
+        let ch = if i == threshold_pos && threshold_pos < bar_width {
             "|" // Threshold marker
         } else if i < filled {
             chars::BLOCK_FULL
@@ -88,7 +88,7 @@ pub(super) fn render_token_usage(state: &State, base_style: Style) -> Vec<Line<'
             theme::bg_elevated()
         };
 
-        bar_spans.push(Span::styled(char, Style::default().fg(color)));
+        bar_spans.push(Span::styled(ch, Style::default().fg(color)));
     }
     text.push(Line::from(bar_spans));
 
@@ -142,9 +142,9 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
             .file_changes
             .iter()
             .map(|file| {
-                total_add += file.additions;
-                total_del += file.deletions;
-                let net = file.additions - file.deletions;
+                total_add = total_add.saturating_add(file.additions);
+                total_del = total_del.saturating_add(file.deletions);
+                let net = file.additions.saturating_sub(file.deletions);
 
                 let type_char = match file.change_type {
                     GitChangeType::Added => "A",
@@ -155,7 +155,11 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
                 };
 
                 let display_path = if file.path.len() > 38 {
-                    format!("{}...{}", type_char, &file.path.get(file.path.len() - 35..).unwrap_or(""))
+                    format!(
+                        "{}...{}",
+                        type_char,
+                        &file.path.get(file.path.len().saturating_sub(35)..).unwrap_or("")
+                    )
                 } else {
                     format!("{} {}", type_char, file.path)
                 };
@@ -176,7 +180,7 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
             })
             .collect();
 
-        let total_net = total_add - total_del;
+        let total_net = total_add.saturating_sub(total_del);
         let total_net_color = match total_net.cmp(&0) {
             std::cmp::Ordering::Greater => theme::success(),
             std::cmp::Ordering::Less => theme::error(),
@@ -226,8 +230,8 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
 
     // --- System prompt entry ---
     let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
-    let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt) * 2;
-    accumulated += system_prompt_tokens;
+    let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt).saturating_mul(2);
+    accumulated = accumulated.saturating_add(system_prompt_tokens);
     rows.push(vec![
         Cell::new("--", Style::default().fg(theme::text_muted())),
         Cell::new("system-prompt (×2)", Style::default().fg(theme::text_secondary())),
@@ -242,7 +246,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
     // --- Tool definitions entry ---
     let tool_def_tokens = super::context::estimate_tool_definitions_tokens(state);
     let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
-    accumulated += tool_def_tokens;
+    accumulated = accumulated.saturating_add(tool_def_tokens);
     rows.push(vec![
         Cell::new("--", Style::default().fg(theme::text_muted())),
         Cell::new(format!("tool-defs ({enabled_count} enabled)"), Style::default().fg(theme::text_secondary())),
@@ -281,7 +285,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
         let refreshed = if ctx.last_refresh_ms < 1_577_836_800_000 {
             "—".to_string()
         } else if now_ms > ctx.last_refresh_ms {
-            crate::ui::helpers::format_time_ago(now_ms - ctx.last_refresh_ms)
+            crate::ui::helpers::format_time_ago(now_ms.saturating_sub(ctx.last_refresh_ms))
         } else {
             "now".to_string()
         };
@@ -293,7 +297,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
         let (hit_str, hit_color) =
             if ctx.panel_cache_hit { ("\u{2713}", theme::success()) } else { ("\u{2717}", theme::error()) };
 
-        accumulated += ctx.token_count;
+        accumulated = accumulated.saturating_add(ctx.token_count);
 
         rows.push(vec![
             Cell::new(id_with_icon, Style::default().fg(theme::accent_dim())),

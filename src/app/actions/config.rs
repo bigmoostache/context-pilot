@@ -2,6 +2,9 @@ use crate::state::State;
 
 use super::ActionResult;
 
+/// Number of config bars available.
+const CONFIG_BAR_COUNT: usize = 4;
+
 /// Trigger an API connectivity check and save.
 pub(crate) fn api_check(state: &mut State) -> ActionResult {
     state.flags.lifecycle.api_check_in_progress = true;
@@ -10,15 +13,31 @@ pub(crate) fn api_check(state: &mut State) -> ActionResult {
     ActionResult::StartApiCheck
 }
 
-/// Handle `ConfigIncreaseSelectedBar` action
+/// Advance to the next config bar index, wrapping around.
+pub(crate) fn next_bar(current: usize) -> usize {
+    wrap_next(current, CONFIG_BAR_COUNT)
+}
+
+/// Go to the previous config bar index, wrapping around.
+pub(crate) fn prev_bar(current: usize) -> usize {
+    if current == 0 { CONFIG_BAR_COUNT.saturating_sub(1) } else { current.saturating_sub(1) }
+}
+
+/// Compute `(current + 1) % len` without triggering arithmetic lint.
+pub(crate) fn wrap_next(current: usize, len: usize) -> usize {
+    let next = current.saturating_add(1);
+    if next >= len { 0 } else { next }
+}
+
+/// Handle `ConfigIncreaseSelectedBar` action.
 pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
     match state.config_selected_bar {
         0 => {
             // Context budget
             let max_budget = state.model_context_window();
-            let step = max_budget / 20; // 5% steps
+            let step = budget_step(max_budget);
             let current = state.context_budget.unwrap_or(max_budget);
-            state.context_budget = Some((current + step).min(max_budget));
+            state.context_budget = Some(current.saturating_add(step).min(max_budget));
         }
         1 => {
             // Cleaning threshold
@@ -40,14 +59,14 @@ pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Handle `ConfigDecreaseSelectedBar` action
+/// Handle `ConfigDecreaseSelectedBar` action.
 pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
     match state.config_selected_bar {
         0 => {
             // Context budget
             let max_budget = state.model_context_window();
-            let step = max_budget / 20; // 5% steps
-            let min_budget = max_budget / 10; // Minimum 10% of context
+            let step = budget_step(max_budget);
+            let min_budget = budget_min(max_budget);
             let current = state.context_budget.unwrap_or(max_budget);
             state.context_budget = Some((current.saturating_sub(step)).max(min_budget));
         }
@@ -72,24 +91,38 @@ pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Handle `ConfigNextTheme` action
+/// Handle `ConfigNextTheme` action.
 pub(crate) fn handle_config_next_theme(state: &mut State) -> ActionResult {
     use crate::infra::config::THEME_ORDER;
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
-    let next_idx = (current_idx + 1) % THEME_ORDER.len();
-    state.active_theme = THEME_ORDER[next_idx].to_string();
+    let next_idx = wrap_next(current_idx, THEME_ORDER.len());
+    let Some(theme) = THEME_ORDER.get(next_idx) else { return ActionResult::Nothing };
+    state.active_theme = (*theme).to_string();
     crate::infra::config::set_active_theme(&state.active_theme);
     state.flags.ui.dirty = true;
     ActionResult::Save
 }
 
-/// Handle `ConfigPrevTheme` action
+/// Handle `ConfigPrevTheme` action.
 pub(crate) fn handle_config_prev_theme(state: &mut State) -> ActionResult {
     use crate::infra::config::THEME_ORDER;
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
-    let prev_idx = if current_idx == 0 { THEME_ORDER.len() - 1 } else { current_idx - 1 };
-    state.active_theme = THEME_ORDER[prev_idx].to_string();
+    let prev_idx = if current_idx == 0 { THEME_ORDER.len().saturating_sub(1) } else { current_idx.saturating_sub(1) };
+    let Some(theme) = THEME_ORDER.get(prev_idx) else { return ActionResult::Nothing };
+    state.active_theme = (*theme).to_string();
     crate::infra::config::set_active_theme(&state.active_theme);
     state.flags.ui.dirty = true;
     ActionResult::Save
+}
+
+/// Compute 5% step for budget adjustment.
+#[expect(clippy::integer_division_remainder_used, reason = "5% step via division is the algorithm")]
+fn budget_step(max_budget: usize) -> usize {
+    max_budget / 20
+}
+
+/// Compute minimum 10% budget floor.
+#[expect(clippy::integer_division_remainder_used, reason = "10% floor via division is the algorithm")]
+fn budget_min(max_budget: usize) -> usize {
+    max_budget / 10
 }

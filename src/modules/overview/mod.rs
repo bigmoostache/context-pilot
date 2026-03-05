@@ -1,8 +1,14 @@
+/// Context content generation for the LLM overview.
 pub(crate) mod context;
+/// Panel implementation for the overview statistics view.
 mod panel;
+/// TUI rendering for the overview panel sections.
 mod render;
+/// Rendering for the detailed statistics sections.
 mod render_details;
+/// Tool implementations for context management.
 mod tools;
+/// Panel for tools/configuration display.
 mod tools_panel;
 
 use serde_json::json;
@@ -18,9 +24,11 @@ use self::tools_panel::ToolsPanel;
 use super::Module;
 use cp_base::cast::SafeCast;
 
+/// Lazily parsed tool text definitions for core tools.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/core.yaml")));
 
+/// Module that provides the overview panel, tools panel, and system tools.
 pub(crate) struct OverviewModule;
 
 impl Module for OverviewModule {
@@ -81,8 +89,6 @@ impl Module for OverviewModule {
         if let Some(arr) = data.get("active_modules").and_then(|v| v.as_array()) {
             state.active_modules = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
             // Auto-add newly introduced modules that aren't in the persisted config.
-            // This handles the case where a new module is added to the codebase but
-            // the user's config.json was written before it existed.
             let mut all_defaults: Vec<_> = crate::modules::default_active_modules().into_iter().collect();
             all_defaults.sort();
             for module_id in &all_defaults {
@@ -170,9 +176,7 @@ impl Module for OverviewModule {
         }
         if let Some(arr) = data.get("disabled_tools").and_then(|v| v.as_array()) {
             let disabled: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
-            // Build tools from active_modules (must be loaded already) and apply disabled state
             state.tools = crate::modules::active_tool_definitions(&state.active_modules);
-            // Add reverie's optimize_context tool (always available for main AI)
             state.tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
             for tool in &mut state.tools {
                 if tool.id != "tool_manage" && tool.id != "module_toggle" && disabled.contains(&tool.id) {
@@ -361,6 +365,70 @@ impl Module for OverviewModule {
             ("system_reload", visualize_core_output),
             ("panel_goto_page", visualize_core_output),
         ]
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+
+    fn init_state(&self, _state: &mut State) {}
+
+    fn reset_state(&self, _state: &mut State) {}
+
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    fn context_detail(
+        &self,
+        _ctx: &crate::state::ContextElement,
+    ) -> Option<String> {
+        None
+    }
+
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    fn on_close_context(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+
+    fn on_user_message(&self, _state: &mut State) {}
+
+    fn on_stream_stop(&self, _state: &mut State) {}
+
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        vec![]
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }
 

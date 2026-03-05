@@ -7,6 +7,9 @@ use crate::app::panels::get_panel;
 use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 use crate::state::State;
 
+/// Map a terminal event to an application action.
+///
+/// Returns `None` for Ctrl+Q (quit signal), `Some(Action)` for everything else.
 pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
     match event {
         Event::Key(key) => {

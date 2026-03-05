@@ -44,14 +44,19 @@ fn new_format_exists() -> bool {
 
 /// Phase 1 result: config + worker state loaded from disk.
 pub(crate) struct BootConfig {
+    /// Global shared configuration.
     pub shared: SharedConfig,
+    /// Per-worker state.
     pub worker: WorkerState,
 }
 
 /// Phase 2 result: context panels + message UIDs to load next.
 pub(crate) struct BootPanels {
+    /// Loaded context elements (panels).
     pub context: Vec<ContextElement>,
+    /// UIDs of conversation messages to load in phase 3.
     pub message_uids: Vec<String>,
+    /// Total number of panels loaded from disk.
     pub panel_count: usize,
 }
 
@@ -73,7 +78,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
         && let Some(panel_data) = panel::load_panel(uid)
     {
         context.push(panel_to_context(&panel_data, "chat"));
-        panel_count += 1;
+        panel_count = panel_count.saturating_add(1);
     }
 
     // Fixed panels (P0-P7)
@@ -91,7 +96,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
             && let Some(panel_data) = panel::load_panel(uid)
         {
             context.push(panel_to_context(&panel_data, &id));
-            panel_count += 1;
+            panel_count = panel_count.saturating_add(1);
         }
     }
 
@@ -105,7 +110,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
                 let mut elem = panel_to_context(&p, local_id);
 
                 if p.panel_type.as_str() == ContextType::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
-                    let msgs: Vec<Message> = p.message_uids.iter().filter_map(|uid| load_message(uid)).collect();
+                    let msgs: Vec<Message> = p.message_uids.iter().filter_map(|msg_uid| load_message(msg_uid)).collect();
                     if !msgs.is_empty() {
                         let chunk_text = crate::state::format_messages_to_chunk(&msgs);
                         let token_count = crate::state::estimate_tokens(&chunk_text);
@@ -128,7 +133,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
         let b_num: usize = b.0.trim_start_matches('P').parse().unwrap_or(999);
         a_num.cmp(&b_num)
     });
-    panel_count += dynamic_panels.len();
+    panel_count = panel_count.saturating_add(dynamic_panels.len());
     for (_, elem) in dynamic_panels {
         context.push(elem);
     }
@@ -156,13 +161,13 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
         .filter(|m| m.id.starts_with('U'))
         .filter_map(|m| m.id.get(1..).unwrap_or("").parse::<usize>().ok())
         .max()
-        .map_or(1, |n| n + 1);
+        .map_or(1, |n| n.saturating_add(1));
     let next_assistant_id = messages
         .iter()
         .filter(|m| m.id.starts_with('A'))
         .filter_map(|m| m.id.get(1..).unwrap_or("").parse::<usize>().ok())
         .max()
-        .map_or(1, |n| n + 1);
+        .map_or(1, |n| n.saturating_add(1));
 
     // Module init + data loading is driven by main.rs via boot_init_modules()
     // so it can render per-module progress on the loading screen.
@@ -459,7 +464,7 @@ pub(crate) fn check_ownership() -> bool {
 /// Log an error to .context-pilot/errors/ and return the file path
 pub(crate) fn log_error(error: &str) -> String {
     let errors_dir = PathBuf::from(STORE_DIR).join(ERRORS_DIR);
-    let _r = fs::create_dir_all(&errors_dir).ok();
+    let _mkdir = fs::create_dir_all(&errors_dir).ok();
 
     // Count existing error files to determine next number
     let error_count = fs::read_dir(&errors_dir)
@@ -468,7 +473,7 @@ pub(crate) fn log_error(error: &str) -> String {
         })
         .unwrap_or(0);
 
-    let error_num = error_count + 1;
+    let error_num = error_count.saturating_add(1);
     let filename = format!("error_{error_num}.txt");
     let filepath = errors_dir.join(&filename);
 

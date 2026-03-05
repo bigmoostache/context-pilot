@@ -7,10 +7,12 @@ use std::path::PathBuf;
 use crate::infra::constants::{PANELS_DIR, STORE_DIR};
 use crate::state::PanelData;
 
+/// Build the path to the panels directory.
 fn panels_dir() -> PathBuf {
     PathBuf::from(STORE_DIR).join(PANELS_DIR)
 }
 
+/// Build the filesystem path for a panel with the given UID.
 fn panel_path(uid: &str) -> PathBuf {
     panels_dir().join(format!("{uid}.json"))
 }

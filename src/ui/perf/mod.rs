@@ -3,6 +3,7 @@
 //! Provides low-overhead profiling with real-time stats collection.
 //! Toggle with F12.
 
+/// Performance overlay rendering (F12 panel).
 mod overlay;
 pub(crate) use overlay::render_perf_overlay;
 
@@ -21,10 +22,13 @@ pub(crate) const FRAME_BUDGET_60FPS: f64 = 16.67;
 /// Frame budget for 30fps (milliseconds)
 pub(crate) const FRAME_BUDGET_30FPS: f64 = 33.33;
 
-/// Ring buffer for recent samples
+/// Ring buffer for recent samples.
 pub(crate) struct RingBuffer<T: Copy + Default> {
+    /// Backing storage for ring data.
     data: Vec<T>,
+    /// Next write position (wraps around).
     write_pos: usize,
+    /// Number of valid entries (up to `SAMPLE_RING_SIZE`).
     len: usize,
 }
 
@@ -35,14 +39,20 @@ impl<T: Copy + Default> Default for RingBuffer<T> {
 }
 
 impl<T: Copy + Default + Ord> RingBuffer<T> {
+    /// Push a new value into the ring buffer.
+    #[expect(clippy::integer_division_remainder_used, reason = "modulo for cyclic ring buffer index is the algorithm")]
     pub(crate) fn push(&mut self, value: T) {
-        self.data[self.write_pos] = value;
-        self.write_pos = (self.write_pos + 1) % SAMPLE_RING_SIZE;
+        if let Some(slot) = self.data.get_mut(self.write_pos) {
+            *slot = value;
+        }
+        self.write_pos = self.write_pos.saturating_add(1) % SAMPLE_RING_SIZE;
         if self.len < SAMPLE_RING_SIZE {
-            self.len += 1;
+            self.len = self.len.saturating_add(1);
         }
     }
 
+    /// Return the `count` most recent values.
+    #[expect(clippy::integer_division_remainder_used, reason = "modulo for cyclic ring buffer index is the algorithm")]
     pub(crate) fn recent(&self, count: usize) -> Vec<T> {
         if self.len == 0 {
             return Vec::new();
@@ -51,14 +61,16 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
         let mut result = Vec::with_capacity(count);
         let start = if self.len < SAMPLE_RING_SIZE { 0 } else { self.write_pos };
         for i in 0..count {
-            let idx = (start + self.len - count + i) % SAMPLE_RING_SIZE;
-            result.push(self.data[idx]);
+            let idx = (start.saturating_add(self.len).saturating_sub(count).saturating_add(i)) % SAMPLE_RING_SIZE;
+            if let Some(&val) = self.data.get(idx) {
+                result.push(val);
+            }
         }
         result
     }
 }
 
-/// Single operation's accumulated statistics
+/// Single operation's accumulated statistics.
 pub(crate) struct OpStats {
     /// Total invocation count
     pub count: AtomicU64,
@@ -81,14 +93,17 @@ impl Default for OpStats {
     }
 }
 
-/// Frame and system stats state (accessed only from the render thread)
+/// Frame and system stats state (accessed only from the render thread).
 pub(crate) struct FrameState {
+    /// Timestamp of the current frame start (if any).
     frame_start: Option<Instant>,
+    /// Last CPU measurement: (timestamp, cpu_ticks).
     last_cpu_measure: (Instant, u64),
+    /// Last time system stats were refreshed.
     last_stats_refresh: Instant,
 }
 
-/// Global performance metrics collector
+/// Global performance metrics collector.
 pub(crate) struct PerfMetrics {
     /// Whether performance monitoring is enabled
     pub enabled: AtomicBool,
@@ -126,7 +141,7 @@ impl Default for PerfMetrics {
     }
 }
 
-/// Read CPU ticks and memory from /proc/self/stat and /proc/self/statm
+/// Read CPU ticks and memory from /proc/self/stat and /proc/self/statm.
 fn read_proc_stat() -> Option<(u64, u64)> {
     // Read CPU ticks from /proc/self/stat
     // Format: pid (comm) state ... utime stime ...
@@ -135,18 +150,19 @@ fn read_proc_stat() -> Option<(u64, u64)> {
     let mut fields = stat.split_whitespace();
     let utime: u64 = fields.nth(13)?.parse().ok()?;
     let stime: u64 = fields.next()?.parse().ok()?;
-    let cpu_ticks = utime + stime;
+    let cpu_ticks = utime.saturating_add(stime);
 
     // Read memory from /proc/self/statm (in pages)
     // First field is total program size, second is RSS
     let statm = std::fs::read_to_string("/proc/self/statm").ok()?;
     let rss_pages: u64 = statm.split_whitespace().nth(1)?.parse().ok()?;
     let page_size = 4096u64; // Standard page size
-    let mem_bytes = rss_pages * page_size;
+    let mem_bytes = rss_pages.saturating_mul(page_size);
 
     Some((cpu_ticks, mem_bytes))
 }
 
+/// Global performance metrics instance.
 pub(crate) static PERF: std::sync::LazyLock<PerfMetrics> = std::sync::LazyLock::new(PerfMetrics::default);
 
 impl PerfMetrics {
@@ -165,8 +181,8 @@ impl PerfMetrics {
         let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(stats) = ops.get(name) {
             let _r = stats.count.fetch_add(1, Ordering::Relaxed);
-            let _r = stats.total_us.fetch_add(duration_us, Ordering::Relaxed);
-            let _r = stats.max_us.fetch_max(duration_us, Ordering::Relaxed);
+            let _r1 = stats.total_us.fetch_add(duration_us, Ordering::Relaxed);
+            let _r2 = stats.max_us.fetch_max(duration_us, Ordering::Relaxed);
             if let Ok(mut samples) = stats.samples.write() {
                 samples.push(duration_us);
             }
@@ -207,12 +223,12 @@ impl PerfMetrics {
     fn refresh_system_stats(&self) {
         if let Some((cpu_ticks, mem_bytes)) = read_proc_stat() {
             let cpu_pct = {
-                let mut state = self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner);
+                let mut frame_st = self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner);
                 let now = Instant::now();
-                let elapsed = now.duration_since(state.last_cpu_measure.0).as_secs_f32();
+                let elapsed = now.duration_since(frame_st.last_cpu_measure.0).as_secs_f32();
 
                 let pct = if elapsed > 0.0 {
-                    let tick_delta = cpu_ticks.saturating_sub(state.last_cpu_measure.1);
+                    let tick_delta = cpu_ticks.saturating_sub(frame_st.last_cpu_measure.1);
                     // Convert ticks to seconds (usually 100 ticks/sec on Linux)
                     let cpu_seconds = tick_delta.to_f32() / 100.0;
                     // CPU percentage = (cpu_time / wall_time) * 100
@@ -221,7 +237,7 @@ impl PerfMetrics {
                     0.0
                 };
 
-                state.last_cpu_measure = (now, cpu_ticks);
+                frame_st.last_cpu_measure = (now, cpu_ticks);
                 pct
             };
             // Atomic stores don't need the lock
@@ -270,7 +286,7 @@ impl PerfMetrics {
                             diff * diff
                         })
                         .sum::<f64>()
-                        / (count - 1).to_f64();
+                        / count.saturating_sub(1).to_f64();
                     variance.sqrt()
                 } else {
                     0.0
@@ -325,22 +341,32 @@ impl PerfMetrics {
     }
 }
 
-/// Snapshot of operation statistics for display
+/// Snapshot of operation statistics for display.
 #[derive(Clone)]
 pub(crate) struct OpSnapshot {
+    /// Operation name (static string reference).
     pub name: &'static str,
+    /// Total cumulative time in milliseconds.
     pub total_ms: f64,
+    /// Mean execution time in milliseconds.
     pub mean_ms: f64,
+    /// Standard deviation of execution time in milliseconds.
     pub std_ms: f64,
 }
 
-/// Snapshot of all metrics for display
+/// Snapshot of all metrics for display.
 #[derive(Clone)]
 pub(crate) struct PerfSnapshot {
+    /// Per-operation snapshots sorted by total time descending.
     pub ops: Vec<OpSnapshot>,
+    /// Recent frame times in milliseconds.
     pub frame_times_ms: Vec<f64>,
+    /// Average frame time in milliseconds.
     pub frame_avg_ms: f64,
+    /// Maximum frame time in milliseconds.
     pub frame_max_ms: f64,
+    /// CPU usage percentage (0-100).
     pub cpu_usage: f32,
+    /// Memory usage in megabytes.
     pub memory_mb: f64,
 }

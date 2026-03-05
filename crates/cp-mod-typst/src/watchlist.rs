@@ -27,6 +27,7 @@ pub struct WatchEntry {
     pub deps: Vec<String>,
 }
 
+/// Disk path for the persisted watchlist JSON file.
 const WATCHLIST_PATH: &str = ".context-pilot/shared/typst-watchlist.json";
 
 impl Watchlist {

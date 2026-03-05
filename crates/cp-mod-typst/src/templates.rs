@@ -1,19 +1,19 @@
 use std::fs;
 use std::path::Path;
 
-// Blocking callback merge test
+/// Directory where built-in Typst templates are seeded and stored.
 const TEMPLATES_DIR: &str = ".context-pilot/shared/typst-templates";
 
 /// Seed built-in templates to .context-pilot/shared/typst-templates/ if they don't already exist.
-pub fn seed_templates() {
-    let _r = fs::create_dir_all(TEMPLATES_DIR);
+pub fn seed() {
+    let _r1 = fs::create_dir_all(TEMPLATES_DIR);
 
     let templates = [("report", REPORT_TEMPLATE), ("invoice", INVOICE_TEMPLATE), ("letter", LETTER_TEMPLATE)];
 
     for (name, content) in &templates {
         let path = format!("{TEMPLATES_DIR}/{name}.typ");
         if !Path::new(&path).exists() {
-            let _r = fs::write(&path, content);
+            let _r2 = fs::write(&path, content);
         }
     }
 }
@@ -40,6 +40,7 @@ pub fn list_template_names() -> Vec<String> {
     names
 }
 
+/// Built-in Typst report template with title page, table of contents, and paginated layout.
 const REPORT_TEMPLATE: &str = r##"// Report Template — Context Pilot
 // Usage: #import "../templates/report.typ": *
 
@@ -90,6 +91,7 @@ const REPORT_TEMPLATE: &str = r##"// Report Template — Context Pilot
 // Export: wrap your document in report(title: "...", author: "...")[...]
 "##;
 
+/// Built-in Typst invoice template with company/client details and itemized billing table.
 const INVOICE_TEMPLATE: &str = r##"// Invoice Template — Context Pilot
 // Usage: #import "../templates/invoice.typ": *
 
@@ -165,6 +167,7 @@ const INVOICE_TEMPLATE: &str = r##"// Invoice Template — Context Pilot
 }
 "##;
 
+/// Built-in Typst letter template with sender/recipient addresses and formal layout.
 const LETTER_TEMPLATE: &str = r##"// Letter Template — Context Pilot
 // Usage: #import "../templates/letter.typ": *
 

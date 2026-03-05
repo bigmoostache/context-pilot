@@ -76,13 +76,7 @@ impl App {
                             stream.pending_tools.push(tool);
                         }
                     }
-                    StreamEvent::Done {
-                        input_tokens: _,
-                        output_tokens: _,
-                        cache_hit_tokens: _,
-                        cache_miss_tokens: _,
-                        stop_reason: _,
-                    } => {
+                    StreamEvent::Done { .. } => {
                         if let Some(rev) = self.state.reveries.get_mut(&agent_id) {
                             if let Some(msg) = rev.messages.last_mut() {
                                 msg.status = crate::state::MessageStatus::Full;
@@ -92,7 +86,7 @@ impl App {
                     }
                     StreamEvent::Error(e) => {
                         // Reverie errors are non-critical — log and destroy this agent's session
-                        let _r = cp_mod_spine::types::SpineState::create_notification(
+                        let _notif = cp_mod_spine::types::SpineState::create_notification(
                             &mut self.state,
                             cp_mod_spine::types::NotificationType::Custom,
                             "Reverie".to_string(),
@@ -100,8 +94,8 @@ impl App {
                         );
                         // Discard any queued actions from the failed reverie
                         QueueState::get_mut(&mut self.state).clear();
-                        let _r = self.state.reveries.remove(&agent_id);
-                        let _r = self.reverie_streams.remove(&agent_id);
+                        drop(self.state.reveries.remove(&agent_id));
+                        drop(self.reverie_streams.remove(&agent_id));
                         break; // This agent's stream is gone, move to next
                     }
                 }
@@ -132,21 +126,21 @@ impl App {
             for tool in &pending {
                 // Increment tool call count
                 if let Some(rev) = self.state.reveries.get_mut(&agent_id) {
-                    rev.tool_call_count += 1;
+                    rev.tool_call_count = rev.tool_call_count.saturating_add(1);
                 }
 
                 // Check tool cap guard rail
                 let cap = crate::infra::constants::REVERIE_TOOL_CAP;
                 if self.state.reveries.get(&agent_id).is_some_and(|r| r.tool_call_count > cap) {
-                    let _r = cp_mod_spine::types::SpineState::create_notification(
+                    let _notif_cap = cp_mod_spine::types::SpineState::create_notification(
                         &mut self.state,
                         cp_mod_spine::types::NotificationType::Custom,
                         "Reverie".to_string(),
                         format!("Tool cap ({cap}) reached for '{agent_id}'. Force-stopping."),
                     );
                     QueueState::get_mut(&mut self.state).clear();
-                    let _r = self.state.reveries.remove(&agent_id);
-                    let _r = self.reverie_streams.remove(&agent_id);
+                    drop(self.state.reveries.remove(&agent_id));
+                    drop(self.reverie_streams.remove(&agent_id));
                     break; // Move to next agent
                 }
 
@@ -176,7 +170,7 @@ impl App {
                     // Check for Report sentinel
                     if result.content.starts_with("REVERIE_REPORT:") {
                         let summary = result.content.strip_prefix("REVERIE_REPORT:").unwrap_or("Completed");
-                        let _r = cp_mod_spine::types::SpineState::create_notification(
+                        let _notif_report = cp_mod_spine::types::SpineState::create_notification(
                             &mut self.state,
                             cp_mod_spine::types::NotificationType::Custom,
                             "Reverie".to_string(),
@@ -189,8 +183,8 @@ impl App {
                         // do NOT touch QueueState.active — that's the main worker's toggle.
                         QueueState::get_mut(&mut self.state).clear();
                         // Destroy this agent's reverie
-                        let _r = self.state.reveries.remove(&agent_id);
-                        let _r = self.reverie_streams.remove(&agent_id);
+                        drop(self.state.reveries.remove(&agent_id));
+                        drop(self.reverie_streams.remove(&agent_id));
                         save_state(&self.state);
                         break; // Move to next agent
                     }
@@ -212,7 +206,7 @@ impl App {
                         let short = if params.len() > 120 {
                             let mut end = 117;
                             while !params.is_char_boundary(end) {
-                                end -= 1;
+                                end = end.saturating_sub(1);
                             }
                             format!("{}...", params.get(..end).unwrap_or(""))
                         } else {
@@ -310,21 +304,21 @@ impl App {
             let retries = self.state.reveries.get(&agent_id).map_or(0, |r| r.report_retries);
             if retries >= 1 {
                 // Max retries reached — force destroy
-                let _r = cp_mod_spine::types::SpineState::create_notification(
+                let _notif_end = cp_mod_spine::types::SpineState::create_notification(
                     &mut self.state,
                     cp_mod_spine::types::NotificationType::Custom,
                     "Reverie".to_string(),
                     format!("Reverie '{agent_id}' ended without Report after retry. Force-destroying."),
                 );
                 QueueState::get_mut(&mut self.state).clear();
-                let _r = self.state.reveries.remove(&agent_id);
-                let _r = self.reverie_streams.remove(&agent_id);
+                drop(self.state.reveries.remove(&agent_id));
+                drop(self.reverie_streams.remove(&agent_id));
                 continue;
             }
 
             // Inject a user message telling the LLM to call Report, then re-stream
             if let Some(rev) = self.state.reveries.get_mut(&agent_id) {
-                rev.report_retries += 1;
+                rev.report_retries = rev.report_retries.saturating_add(1);
                 rev.is_streaming = true;
 
                 for msg in &mut rev.messages {

@@ -89,11 +89,15 @@ pub(super) fn messages_to_api(
 }
 
 /// Context needed for panel injection into the prompt.
-struct PanelInjection<'a> {
-    fake_panels: &'a [crate::llms::FakePanelMessage],
-    messages: &'a [Message],
+struct PanelInjection<'ctx> {
+    /// Prepared panel messages to inject
+    fake_panels: &'ctx [crate::llms::FakePanelMessage],
+    /// Conversation messages for footer timestamps
+    messages: &'ctx [Message],
+    /// Current time in milliseconds since UNIX epoch
     current_ms: u64,
-    seed_content: Option<&'a str>,
+    /// Seed/system content to re-inject after panels
+    seed_content: Option<&'ctx str>,
 }
 
 /// Inject context panels as fake tool call/result message pairs.
@@ -162,7 +166,8 @@ fn inject_panel_messages(api_messages: &mut Vec<ApiMessage>, ctx: &PanelInjectio
 fn build_tool_call_blocks(msg: &Message, messages: &[Message], idx: usize) -> Option<Vec<ContentBlock>> {
     let tool_use_ids: Vec<&str> = msg.tool_uses.iter().map(|t| t.id.as_str()).collect();
 
-    let has_matching_result = messages[idx + 1..]
+    let remaining = messages.get(idx.saturating_add(1)..).unwrap_or_default();
+    let has_matching_result = remaining
         .iter()
         .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
         .filter(|m| m.msg_type == MessageType::ToolResult)

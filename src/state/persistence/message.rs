@@ -12,10 +12,12 @@ use std::path::PathBuf;
 use crate::infra::constants::{MESSAGES_DIR, STORE_DIR};
 use crate::state::Message;
 
+/// Build the path to the messages directory.
 fn messages_dir() -> PathBuf {
     PathBuf::from(STORE_DIR).join(MESSAGES_DIR)
 }
 
+/// Build the filesystem path for a message with the given UID.
 fn message_path(uid: &str) -> PathBuf {
     messages_dir().join(format!("{uid}.yaml"))
 }
@@ -30,7 +32,7 @@ pub(crate) fn load_message(uid: &str) -> Option<Message> {
 /// Save a message to the messages directory using its UID
 pub(crate) fn save_message(msg: &Message) {
     let dir = messages_dir();
-    let _r = fs::create_dir_all(&dir).ok();
+    let _mkdir = fs::create_dir_all(&dir).ok();
     // Use UID if available, otherwise fall back to id
     let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
     let path = message_path(file_id);

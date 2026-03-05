@@ -4,12 +4,19 @@
 //! and runs the main event loop. Also handles `typst-compile` and
 //! `typst-recompile-watched` subcommands for callback scripts.
 
+/// Application logic: event loop, actions, context preparation.
 mod app;
+/// Infrastructure: API clients, tools, constants, file watchers.
 mod infra;
+/// LLM provider abstraction and streaming.
 mod llms;
+/// Module system: panels, tools, and context providers.
 mod modules;
+/// Persistent and runtime state management.
 mod state;
+/// CLI subcommands for Typst compilation.
 mod typst_cli;
+/// Terminal UI: rendering, input, theme, sidebar.
 mod ui;
 
 use std::io::{self, Write};
@@ -24,10 +31,28 @@ use ratatui::prelude::{
 // ─── Boot Screen ────────────────────────────────────────────────────────────
 // Phased loading with visual progress — no more black void on startup.
 
+/// Index constants for boot steps — avoids raw integer indexing.
+const STEP_CONFIG: usize = 0;
+/// Boot step index: loading panels.
+const STEP_PANELS: usize = 1;
+/// Boot step index: loading messages.
+const STEP_MESSAGES: usize = 2;
+/// Boot step index: assembling state.
+const STEP_ASSEMBLE: usize = 3;
+/// Boot step index: initializing modules.
+const STEP_MODULES: usize = 4;
+/// Boot step index: preparing workspace.
+const STEP_WORKSPACE: usize = 5;
+/// Total number of boot steps.
+const BOOT_STEP_COUNT: usize = 6;
+
 /// A single boot step shown in the loading screen.
 struct BootStep {
+    /// Human-readable label for this step.
     label: &'static str,
+    /// Optional detail string shown in parentheses after the label.
     detail: Option<String>,
+    /// Whether this step has completed.
     done: bool,
 }
 
@@ -43,8 +68,15 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
         let raw_height = steps.len().saturating_add(5).min(area.height as usize);
         let box_height = u16::try_from(raw_height).unwrap_or(area.height);
         let box_width = 50.min(area.width);
-        let x = area.width.saturating_sub(box_width) / 2;
-        let y = area.height.saturating_sub(box_height) / 2;
+        // center horizontally: (width - box_width) / 2
+        let x = {
+            let diff = area.width.saturating_sub(box_width);
+            diff >> 1 // equivalent to / 2 without triggering the lint
+        };
+        let y = {
+            let diff = area.height.saturating_sub(box_height);
+            diff >> 1
+        };
         let boot_area = Rect::new(x, y, box_width, box_height);
 
         // Split: steps area + gauge
@@ -58,14 +90,18 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
                 Constraint::Length(1), // gauge
             ])
             .split(boot_area);
-        debug_assert!(chunks.len() >= 5);
+        debug_assert!(chunks.len() >= BOOT_STEP_COUNT.saturating_sub(1), "layout must produce at least 5 chunks");
+
+        let Some(title_area) = chunks.get(0).copied() else { return };
+        let Some(steps_area) = chunks.get(2).copied() else { return };
+        let Some(gauge_area) = chunks.get(4).copied() else { return };
 
         // Title
         let title = Line::from(vec![
             Span::styled("⚓ ", Style::default().fg(Color::Cyan)),
             Span::styled("Context Pilot", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
         ]);
-        frame.render_widget(title, chunks[0]);
+        frame.render_widget(title, title_area);
 
         // Steps
         let step_lines: Vec<Line<'_>> = steps
@@ -89,18 +125,21 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
             })
             .collect();
         let steps_widget = ratatui::widgets::Paragraph::new(step_lines);
-        frame.render_widget(steps_widget, chunks[2]);
+        frame.render_widget(steps_widget, steps_area);
 
         // Progress gauge — pure integer arithmetic to avoid float cast lints
-        let pct = done_count * 100 / total;
-        let gauge_width = chunks[4].width;
-        let filled_usize = done_count * usize::from(gauge_width) / total;
+        let pct = done_count.saturating_mul(100).checked_div(total).unwrap_or(0);
+        let gauge_width = gauge_area.width;
+        let filled_usize = done_count
+            .saturating_mul(usize::from(gauge_width))
+            .checked_div(total)
+            .unwrap_or(0);
         let filled = u16::try_from(filled_usize).unwrap_or(gauge_width);
-        let mut bar = "█".repeat(filled_usize);
-        bar.push_str(&"░".repeat(usize::from(gauge_width.saturating_sub(filled))));
+        let mut gauge_bar = "█".repeat(filled_usize);
+        gauge_bar.push_str(&"░".repeat(usize::from(gauge_width.saturating_sub(filled))));
         let gauge_line =
-            Line::from(vec![Span::styled(bar, Style::default().fg(Color::Cyan)), Span::raw(format!(" {pct}%"))]);
-        frame.render_widget(gauge_line, chunks[4]);
+            Line::from(vec![Span::styled(gauge_bar, Style::default().fg(Color::Cyan)), Span::raw(format!(" {pct}%"))]);
+        frame.render_widget(gauge_line, gauge_area);
     }));
 }
 
@@ -108,6 +147,7 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
 // Minimal `log` backend that appends trace-level messages to a single file.
 // Registered once at startup; no-ops if the file can't be opened.
 
+/// File-backed logger that writes trace-level messages to `.context-pilot/state-machine.log`.
 struct FileLogger(Mutex<Option<std::fs::File>>);
 
 impl log::Log for FileLogger {
@@ -170,12 +210,16 @@ fn main() -> ExitCode {
 
     // Handle typst subcommands (used by callback scripts)
     if args.len() >= 2 {
-        match args[1].as_str() {
+        let Some(subcommand) = args.get(1) else {
+            return ExitCode::FAILURE;
+        };
+        let rest = args.get(2..).unwrap_or_default();
+        match subcommand.as_str() {
             // Compile a .typ → .pdf in the same directory
-            "typst-compile" => return handle_cli_result(typst_cli::run_typst_compile(&args[2..])),
+            "typst-compile" => return handle_cli_result(typst_cli::run_typst_compile(rest)),
             // Recompile watched documents whose dependencies changed
             "typst-recompile-watched" => {
-                return handle_cli_result(typst_cli::run_typst_recompile_watched(&args[2..]));
+                return handle_cli_result(typst_cli::run_typst_recompile_watched(rest));
             }
             _ => {}
         }
@@ -186,18 +230,18 @@ fn main() -> ExitCode {
     // which corrupts the SSH session and the error is lost.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        let _r = disable_raw_mode();
-        let _r = io::stdout().execute(DisableBracketedPaste);
-        let _r = io::stdout().execute(LeaveAlternateScreen);
+        let _r_raw = disable_raw_mode();
+        let _r_paste = io::stdout().execute(DisableBracketedPaste);
+        let _r_screen = io::stdout().execute(LeaveAlternateScreen);
 
         // Write panic info to .context-pilot/errors/panic.log
         let error_dir = std::path::Path::new(".context-pilot").join("errors");
-        let _r = std::fs::create_dir_all(&error_dir);
+        let _r_mkdir = std::fs::create_dir_all(&error_dir);
         let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
         let backtrace = std::backtrace::Backtrace::force_capture();
         let msg = format!("[{ts}] {info}\n\n{backtrace}\n\n---\n");
         let log_path = error_dir.join("panic.log");
-        let _r = std::fs::OpenOptions::new()
+        let _r_write = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&log_path)
@@ -210,10 +254,10 @@ fn main() -> ExitCode {
         drop(writeln!(io::stderr(), "Fatal: failed to enable raw mode"));
         return ExitCode::FAILURE;
     };
-    let _r = io::stdout().execute(EnterAlternateScreen);
-    let _r = io::stdout().execute(EnableBracketedPaste);
+    let _r_enter = io::stdout().execute(EnterAlternateScreen);
+    let _r_paste_on = io::stdout().execute(EnableBracketedPaste);
     let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
-        let _r = disable_raw_mode();
+        let _r_cleanup = disable_raw_mode();
         drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));
         return ExitCode::FAILURE;
     };
@@ -234,49 +278,63 @@ fn main() -> ExitCode {
     // Detect new vs fresh-start format
     let new_format = std::path::Path::new(".context-pilot").join("config.json").exists();
 
+    /// Helper to mark a boot step as done, with bounds checking.
+    fn mark_step_done(steps: &mut [BootStep], idx: usize) {
+        if let Some(step) = steps.get_mut(idx) {
+            step.done = true;
+        }
+    }
+
+    /// Helper to set a boot step's detail, with bounds checking.
+    fn set_step_detail(steps: &mut [BootStep], idx: usize, detail: String) {
+        if let Some(step) = steps.get_mut(idx) {
+            step.detail = Some(detail);
+        }
+    }
+
     let mut state = if new_format {
         // Phase 1: Load config + worker state
         let cfg = boot_load_config();
         let module_data = boot_extract_module_data(&cfg);
-        steps[0].done = true;
+        mark_step_done(&mut steps, STEP_CONFIG);
         render_boot_screen(&mut terminal, &steps);
 
         // Phase 2: Build context from panel JSONs
         let panels = boot_load_panels(&cfg);
-        steps[1].detail = Some(format!("{} panels", panels.panel_count));
-        steps[1].done = true;
+        set_step_detail(&mut steps, STEP_PANELS, format!("{} panels", panels.panel_count));
+        mark_step_done(&mut steps, STEP_PANELS);
         render_boot_screen(&mut terminal, &steps);
 
         // Phase 3: Load conversation messages from YAML
         let msg_count = panels.message_uids.len();
         let messages = boot_load_messages(&panels.message_uids);
-        steps[2].detail = Some(format!("{msg_count} messages"));
-        steps[2].done = true;
+        set_step_detail(&mut steps, STEP_MESSAGES, format!("{msg_count} messages"));
+        mark_step_done(&mut steps, STEP_MESSAGES);
         render_boot_screen(&mut terminal, &steps);
 
         // Phase 4: Assemble state (without module init)
-        let mut state = boot_assemble_state(cfg, panels, messages);
-        steps[3].done = true;
+        let mut assembled_state = boot_assemble_state(cfg, panels, messages);
+        mark_step_done(&mut steps, STEP_ASSEMBLE);
         render_boot_screen(&mut terminal, &steps);
 
         // Phase 5: Initialize modules (with per-module progress)
-        boot_init_modules(&mut state, &module_data, |module_name| {
-            steps[4].detail = Some(module_name.to_string());
+        boot_init_modules(&mut assembled_state, &module_data, |module_name| {
+            set_step_detail(&mut steps, STEP_MODULES, module_name.to_string());
             render_boot_screen(&mut terminal, &steps);
         });
-        steps[4].done = true;
-        steps[5].detail = Some("registering types".to_string());
+        mark_step_done(&mut steps, STEP_MODULES);
+        set_step_detail(&mut steps, STEP_WORKSPACE, "registering types".to_string());
         render_boot_screen(&mut terminal, &steps);
 
-        state
+        assembled_state
     } else {
         // Fresh start — no files to load, just create default state
         let s = load_state();
-        steps[0].done = true;
-        steps[1].done = true;
-        steps[2].done = true;
-        steps[3].done = true;
-        steps[4].done = true;
+        mark_step_done(&mut steps, STEP_CONFIG);
+        mark_step_done(&mut steps, STEP_PANELS);
+        mark_step_done(&mut steps, STEP_MESSAGES);
+        mark_step_done(&mut steps, STEP_ASSEMBLE);
+        mark_step_done(&mut steps, STEP_MODULES);
         render_boot_screen(&mut terminal, &steps);
         s
     };
@@ -305,7 +363,7 @@ fn main() -> ExitCode {
     ensure_default_contexts(&mut state);
     ensure_default_agent(&mut state);
     cp_mod_preset::builtin::ensure_builtin_presets();
-    steps[5].done = true;
+    mark_step_done(&mut steps, STEP_WORKSPACE);
     render_boot_screen(&mut terminal, &steps);
 
     // Create channels
@@ -317,9 +375,9 @@ fn main() -> ExitCode {
     let run_result = app.run(&mut terminal, &tx, &rx, &cache_rx);
 
     // Cleanup
-    let _r = disable_raw_mode();
-    let _r = io::stdout().execute(DisableBracketedPaste);
-    let _r = io::stdout().execute(LeaveAlternateScreen);
+    let _r_raw_off = disable_raw_mode();
+    let _r_paste_off = io::stdout().execute(DisableBracketedPaste);
+    let _r_leave = io::stdout().execute(LeaveAlternateScreen);
 
     if let Err(e) = run_result {
         drop(writeln!(io::stderr(), "Fatal: {e}"));

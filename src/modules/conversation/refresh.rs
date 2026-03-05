@@ -10,14 +10,14 @@ pub(crate) fn estimate_message_tokens(m: &crate::state::Message) -> usize {
         .iter()
         .map(|tu| {
             let input_str = serde_json::to_string(&tu.input).unwrap_or_default();
-            estimate_tokens(&tu.name) + estimate_tokens(&input_str)
+            estimate_tokens(&tu.name).saturating_add(estimate_tokens(&input_str))
         })
         .sum();
 
     // Count tool results
     let tool_result_tokens: usize = m.tool_results.iter().map(|tr| estimate_tokens(&tr.content)).sum();
 
-    content_tokens + tool_use_tokens + tool_result_tokens
+    content_tokens.saturating_add(tool_use_tokens).saturating_add(tool_result_tokens)
 }
 
 /// Refresh token count for the Conversation context element

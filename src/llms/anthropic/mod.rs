@@ -21,10 +21,12 @@ use messages::{log_sse_error, messages_to_api};
 
 /// Anthropic Claude client
 pub(crate) struct AnthropicClient {
+    /// API key loaded from `ANTHROPIC_API_KEY` environment variable
     api_key: Option<SecretBox<String>>,
 }
 
 impl AnthropicClient {
+    /// Create a new Anthropic client, loading the API key from the environment.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
         Self { api_key: env::var("ANTHROPIC_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
@@ -36,47 +38,72 @@ impl Default for AnthropicClient {
         Self::new()
     }
 }
+/// Serializable Anthropic API request body.
 #[derive(Debug, Serialize)]
 struct AnthropicRequest {
+    /// Model identifier
     model: String,
+    /// Maximum tokens to generate
     max_tokens: u32,
+    /// System prompt text
     system: String,
+    /// Conversation messages
     messages: Vec<ApiMessage>,
+    /// Available tools
     tools: Value,
+    /// Whether to stream the response
     stream: bool,
 }
 
+/// Content block metadata from SSE stream events.
 #[derive(Debug, Deserialize)]
 struct StreamContentBlock {
+    /// Block type (e.g. "text", "tool_use")
     #[serde(rename = "type")]
     block_type: Option<String>,
+    /// Block ID (for tool_use blocks)
     id: Option<String>,
+    /// Tool name (for tool_use blocks)
     name: Option<String>,
 }
 
+/// Delta payload from SSE stream events.
 #[derive(Debug, Deserialize)]
 struct StreamDelta {
+    /// Delta type (e.g. "text_delta", "input_json_delta")
     #[serde(rename = "type")]
     delta_type: Option<String>,
+    /// Text content delta
     text: Option<String>,
+    /// Partial JSON for tool input
     partial_json: Option<String>,
+    /// Stop reason (e.g. "end_turn", "tool_use")
     stop_reason: Option<String>,
 }
 
+/// Top-level SSE stream event from the Anthropic API.
 #[derive(Debug, Deserialize)]
 struct StreamMessage {
+    /// Event type (e.g. "content_block_start", "message_delta")
     #[serde(rename = "type")]
     event_type: String,
+    /// Content block index (unused but present in API)
     #[serde(default)]
     _index: Option<usize>,
+    /// Content block metadata (for block_start events)
     content_block: Option<StreamContentBlock>,
+    /// Delta payload (for delta events)
     delta: Option<StreamDelta>,
+    /// Token usage statistics
     usage: Option<StreamUsage>,
 }
 
+/// Token usage statistics from the Anthropic API.
 #[derive(Debug, Deserialize)]
 struct StreamUsage {
+    /// Number of input tokens consumed
     input_tokens: Option<usize>,
+    /// Number of output tokens generated
     output_tokens: Option<usize>,
 }
 
@@ -141,9 +168,9 @@ impl LlmClient for AnthropicClient {
         // Dump last request for debugging
         {
             let dir = ".context-pilot/last_requests";
-            let _r = std::fs::create_dir_all(dir);
+            let _r1 = std::fs::create_dir_all(dir);
             let path = format!("{}/{}_anthropic_last_request.json", dir, request.worker_id);
-            let _r = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
+            let _r2 = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
         }
 
         let response = client
@@ -174,8 +201,8 @@ impl LlmClient for AnthropicClient {
             match reader.read_line(&mut line) {
                 Ok(0) => break, // EOF
                 Ok(n) => {
-                    total_bytes += n;
-                    line_count += 1;
+                    total_bytes = total_bytes.saturating_add(n);
+                    line_count = line_count.saturating_add(1);
                 }
                 Err(e) => {
                     let tool_ctx = current_tool.as_ref().map_or_else(

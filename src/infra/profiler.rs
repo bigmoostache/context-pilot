@@ -12,15 +12,21 @@ use std::fs::OpenOptions;
 use std::io::Write as _;
 use std::time::Instant;
 
-const THRESHOLD_MS: u128 = 5; // Only log operations taking > 5ms
+/// Minimum duration (ms) before an operation is logged to disk.
+const THRESHOLD_MS: u128 = 5;
+/// Path to the on-disk performance log file.
 const LOG_FILE: &str = ".context-pilot/perf.log";
 
+/// RAII guard that records elapsed time on drop.
 pub(crate) struct ProfileGuard {
+    /// Name of the profiled operation.
     name: &'static str,
+    /// Instant when the guard was created.
     start: Instant,
 }
 
 impl ProfileGuard {
+    /// Create a new profile guard for the given operation name.
     pub(crate) fn new(name: &'static str) -> Self {
         Self { name, start: Instant::now() }
     }
@@ -30,6 +36,7 @@ impl Drop for ProfileGuard {
     fn drop(&mut self) {
         let elapsed = self.start.elapsed();
         let us = elapsed.as_micros().to_u64();
+        #[expect(clippy::integer_division_remainder_used, reason = "microsecond-to-millisecond truncating conversion")]
         let ms = us / 1000;
 
         // Always record to in-memory perf system

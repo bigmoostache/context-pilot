@@ -2,9 +2,9 @@ use super::theme;
 use cp_base::cast::SafeCast as _;
 use ratatui::prelude::{Span, Style};
 
-/// Calculate the display width of text after stripping markdown markers
+/// Calculate the display width of text after stripping markdown markers.
 fn markdown_display_width(text: &str) -> usize {
-    let mut width = 0;
+    let mut width = 0usize;
     let mut chars = text.chars().peekable();
 
     while let Some(c) = chars.next() {
@@ -13,59 +13,59 @@ fn markdown_display_width(text: &str) -> usize {
                 // Skip to closing backtick, count content
                 while let Some(&next) = chars.peek() {
                     if next == '`' {
-                        let _r = chars.next();
+                        let _r1 = chars.next();
                         break;
                     }
-                    width += 1;
-                    let _r = chars.next();
+                    width = width.saturating_add(1);
+                    let _r1 = chars.next();
                 }
             }
             '*' | '_' => {
                 // Check for double (bold) — single markers are treated as plain text
                 if chars.peek() == Some(&c) {
-                    let _r = chars.next(); // consume second marker
+                    let _r1 = chars.next(); // consume second marker
                     // Count until closing **/__
                     while let Some(next) = chars.next() {
                         if next == c && chars.peek() == Some(&c) {
-                            let _r = chars.next();
+                            let _r2 = chars.next();
                             break;
                         }
-                        width += 1;
+                        width = width.saturating_add(1);
                     }
                 } else {
                     // Single * or _ — treat as literal character
-                    width += 1;
+                    width = width.saturating_add(1);
                 }
             }
             '[' => {
                 // Link [text](url) - only count the text part
-                let mut link_text_len = 0;
+                let mut link_text_len = 0usize;
                 let mut found_bracket = false;
                 for next in chars.by_ref() {
                     if next == ']' {
                         found_bracket = true;
                         break;
                     }
-                    link_text_len += 1;
+                    link_text_len = link_text_len.saturating_add(1);
                 }
                 if found_bracket && chars.peek() == Some(&'(') {
-                    let _r = chars.next(); // consume (
+                    let _r1 = chars.next(); // consume (
                     for next in chars.by_ref() {
                         if next == ')' {
                             break;
                         }
                     }
-                    width += link_text_len;
+                    width = width.saturating_add(link_text_len);
                 } else {
                     // Not a valid link
-                    width += 1 + link_text_len;
+                    width = width.saturating_add(1).saturating_add(link_text_len);
                     if found_bracket {
-                        width += 1;
+                        width = width.saturating_add(1);
                     }
                 }
             }
             _ => {
-                width += 1;
+                width = width.saturating_add(1);
             }
         }
     }
@@ -83,9 +83,9 @@ fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
         return vec![text.to_string()];
     }
 
-    let mut lines = Vec::new();
+    let mut result_lines = Vec::new();
     let mut current_line = String::new();
-    let mut current_width = 0;
+    let mut current_width = 0usize;
 
     for word in text.split_whitespace() {
         let word_width = markdown_display_width(word);
@@ -96,33 +96,33 @@ fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
                 // Break long word character by character
                 for ch in word.chars() {
                     if current_width >= width {
-                        lines.push(std::mem::take(&mut current_line));
+                        result_lines.push(std::mem::take(&mut current_line));
                         current_width = 0;
                     }
                     current_line.push(ch);
-                    current_width += 1;
+                    current_width = current_width.saturating_add(1);
                 }
             } else {
                 current_line.push_str(word);
                 current_width = word_width;
             }
-        } else if current_width + 1 + word_width <= width {
+        } else if current_width.saturating_add(1).saturating_add(word_width) <= width {
             // Fits on current line with a space
             current_line.push(' ');
             current_line.push_str(word);
-            current_width += 1 + word_width;
+            current_width = current_width.saturating_add(1).saturating_add(word_width);
         } else {
             // Doesn't fit — start a new line
-            lines.push(std::mem::take(&mut current_line));
+            result_lines.push(std::mem::take(&mut current_line));
             if word_width > width {
                 current_width = 0;
                 for ch in word.chars() {
                     if current_width >= width {
-                        lines.push(std::mem::take(&mut current_line));
+                        result_lines.push(std::mem::take(&mut current_line));
                         current_width = 0;
                     }
                     current_line.push(ch);
-                    current_width += 1;
+                    current_width = current_width.saturating_add(1);
                 }
             } else {
                 current_line.push_str(word);
@@ -132,27 +132,27 @@ fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
     }
 
     if !current_line.is_empty() {
-        lines.push(current_line);
+        result_lines.push(current_line);
     }
 
-    if lines.is_empty() {
-        lines.push(String::new());
+    if result_lines.is_empty() {
+        result_lines.push(String::new());
     }
 
-    lines
+    result_lines
 }
 
 /// Render a markdown table with aligned columns.
 ///
-/// Strategy: compute fixed column widths → for each row, wrap cell text to fit
-/// → render each display line as a sequence of fixed-width cells separated by │.
+/// Strategy: compute fixed column widths -> for each row, wrap cell text to fit
+/// -> render each display line as a sequence of fixed-width cells separated by |.
 /// Vertical separators are always at the same character positions.
-pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_width: usize) -> Vec<Vec<Span<'static>>> {
+pub(crate) fn render_markdown_table(table_lines: &[&str], _base_style: Style, max_width: usize) -> Vec<Vec<Span<'static>>> {
     // Parse all rows into cells
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut is_separator_row: Vec<bool> = Vec::new();
 
-    for line in lines {
+    for line in table_lines {
         let trimmed = line.trim();
         // Remove leading and trailing pipes
         let inner = trimmed.trim_start_matches('|').trim_end_matches('|');
@@ -170,24 +170,24 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
     let mut col_widths: Vec<usize> = vec![0; num_cols];
 
     for (i, row) in rows.iter().enumerate() {
-        if is_separator_row[i] {
+        if is_separator_row.get(i).copied().unwrap_or(false) {
             continue; // Don't count separator row for width calculation
         }
         for (col, cell) in row.iter().enumerate() {
-            if col < col_widths.len() {
-                col_widths[col] = col_widths[col].max(markdown_display_width(cell));
+            if let Some(cw) = col_widths.get_mut(col) {
+                *cw = (*cw).max(markdown_display_width(cell));
             }
         }
     }
 
     // Constrain columns to fit within max_width
     // Each column separator " │ " takes 3 chars, so separators = (num_cols - 1) * 3
-    let separator_width = if num_cols > 1 { (num_cols - 1) * 3 } else { 0 };
+    let separator_width = if num_cols > 1 { num_cols.saturating_sub(1).saturating_mul(3) } else { 0 };
     let total_content_width: usize = col_widths.iter().sum();
-    let total_width = total_content_width + separator_width;
+    let total_width = total_content_width.saturating_add(separator_width);
 
     if total_width > max_width && max_width > separator_width {
-        let available = max_width - separator_width;
+        let available = max_width.saturating_sub(separator_width);
         // Shrink columns proportionally
         let mut new_widths: Vec<usize> = col_widths
             .iter()
@@ -199,16 +199,22 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
         // Distribute any remaining space to the widest columns
         let used: usize = new_widths.iter().sum();
         if used < available {
-            let mut remaining = available - used;
+            let mut remaining = available.saturating_sub(used);
             // Sort column indices by original width (descending) to give extra space to wider columns
             let mut col_indices: Vec<usize> = (0..num_cols).collect();
-            col_indices.sort_by(|&a, &b| col_widths[b].cmp(&col_widths[a]));
+            col_indices.sort_by(|&a, &b| {
+                let width_a = col_widths.get(a).copied().unwrap_or(0);
+                let width_b = col_widths.get(b).copied().unwrap_or(0);
+                width_b.cmp(&width_a)
+            });
             for &idx in &col_indices {
                 if remaining == 0 {
                     break;
                 }
-                new_widths[idx] += 1;
-                remaining -= 1;
+                if let Some(nw) = new_widths.get_mut(idx) {
+                    *nw = nw.saturating_add(1);
+                }
+                remaining = remaining.saturating_sub(1);
             }
         }
         col_widths = new_widths;
@@ -218,7 +224,7 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
     let mut result: Vec<Vec<Span<'static>>> = Vec::new();
 
     for (row_idx, row) in rows.iter().enumerate() {
-        if is_separator_row[row_idx] {
+        if is_separator_row.get(row_idx).copied().unwrap_or(false) {
             // Render separator row with dashes
             let mut spans: Vec<Span<'static>> = Vec::new();
             for (col, width) in col_widths.iter().enumerate() {
@@ -253,7 +259,7 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
                     }
 
                     let cell_text =
-                        wrapped_cells.get(col).and_then(|lines| lines.get(line_idx)).map_or("", |s| s.as_str());
+                        wrapped_cells.get(col).and_then(|cell_lines| cell_lines.get(line_idx)).map_or("", |s| s.as_str());
 
                     // Build a single fixed-width span for this cell.
                     // Content + padding always equals exactly `width` display chars.
@@ -283,7 +289,8 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
             }
 
             // Add thin separator line between data rows (not after last row, not after header's separator)
-            if row_idx < rows.len() - 1 && !is_separator_row.get(row_idx + 1).copied().unwrap_or(false) {
+            let next_row_idx = row_idx.saturating_add(1);
+            if next_row_idx < rows.len() && !is_separator_row.get(next_row_idx).copied().unwrap_or(false) {
                 let mut sep_spans: Vec<Span<'static>> = Vec::new();
                 for (col, width) in col_widths.iter().enumerate() {
                     if col > 0 {
@@ -299,7 +306,7 @@ pub(crate) fn render_markdown_table(lines: &[&str], _base_style: Style, max_widt
     result
 }
 
-/// Parse markdown text and return styled spans
+/// Parse markdown text and return styled spans.
 pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> {
     let trimmed = line.trim_start();
 
@@ -320,7 +327,7 @@ pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'st
     // Bullet points: - or *
     if let Some(stripped) = trimmed.strip_prefix("- ") {
         let content = stripped.to_string();
-        let indent = line.len() - trimmed.len();
+        let indent = line.len().saturating_sub(trimmed.len());
         let mut spans = vec![
             Span::styled(" ".repeat(indent), base_style),
             Span::styled("• ", Style::default().fg(theme::accent_dim())),
@@ -331,7 +338,7 @@ pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'st
 
     if trimmed.starts_with("* ") && !trimmed.starts_with("**") {
         let content = trimmed.get(2..).unwrap_or("").to_string();
-        let indent = line.len() - trimmed.len();
+        let indent = line.len().saturating_sub(trimmed.len());
         let mut spans = vec![
             Span::styled(" ".repeat(indent), base_style),
             Span::styled("• ", Style::default().fg(theme::accent_dim())),
@@ -344,7 +351,7 @@ pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'st
     parse_inline_markdown(line)
 }
 
-/// Parse inline markdown (bold, italic, code)
+/// Parse inline markdown (bold, italic, code) and return styled spans.
 pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
     let mut spans = Vec::new();
     let mut chars = text.chars().peekable();
@@ -361,7 +368,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 let mut code = String::new();
                 while let Some(&next) = chars.peek() {
                     if next == '`' {
-                        let _r = chars.next();
+                        let _r1 = chars.next();
                         break;
                     }
                     if let Some(ch) = chars.next() {
@@ -378,7 +385,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 let is_double = chars.peek() == Some(&c);
 
                 if is_double {
-                    let _r = chars.next(); // consume second */_
+                    let _r1 = chars.next(); // consume second */_
 
                     if !current.is_empty() {
                         spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
@@ -388,7 +395,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                     let mut bold_text = String::new();
                     while let Some(next) = chars.next() {
                         if next == c && chars.peek() == Some(&c) {
-                            let _r = chars.next(); // consume closing **
+                            let _r2 = chars.next(); // consume closing **
                             break;
                         }
                         bold_text.push(next);
@@ -416,7 +423,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 }
 
                 if found_bracket && chars.peek() == Some(&'(') {
-                    let _r = chars.next(); // consume (
+                    let _r1 = chars.next(); // consume (
                     // Skip URL characters — we only display the link text
                     for next in chars.by_ref() {
                         if next == ')' {

@@ -11,6 +11,7 @@ use cp_base::cast::SafeCast as _;
 use cp_mod_prompt::types::PromptState;
 use cp_mod_queue::types::QueueState;
 
+/// Render the status bar at the bottom of the screen.
 pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let base_style = Style::default().bg(theme::bg_base()).fg(theme::text_muted());
     let spin = spinner(state.spinner_frame);
@@ -22,7 +23,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     let has_timed_watcher = {
         use cp_base::state::watchers::WatcherRegistry;
         state.get_ext::<WatcherRegistry>().is_some_and(|reg: &WatcherRegistry| {
-            reg.active_watchers().iter().any(|w: &Box<dyn cp_base::state::watchers::Watcher>| w.fire_at_ms().is_some())
+            reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some())
         })
     };
 
@@ -108,9 +109,9 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     }
 
     // Active agent card
-    let ps = PromptState::get(state);
-    if let Some(ref agent_id) = ps.active_agent_id {
-        let agent_name = ps.agents.iter().find(|a| &a.id == agent_id).map_or(agent_id.as_str(), |a| a.name.as_str());
+    let prompt_state = PromptState::get(state);
+    if let Some(ref agent_id) = prompt_state.active_agent_id {
+        let agent_name = prompt_state.agents.iter().find(|a| &a.id == agent_id).map_or(agent_id.as_str(), |a| a.name.as_str());
         spans.push(Span::styled(
             format!(" 🤖 {agent_name} "),
             Style::default().fg(Color::White).bg(Color::Rgb(130, 80, 200)).bold(),
@@ -119,8 +120,8 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     }
 
     // Loaded skill cards
-    for skill_id in &ps.loaded_skill_ids {
-        let skill_name = ps.skills.iter().find(|s| s.id == *skill_id).map_or(skill_id.as_str(), |s| s.name.as_str());
+    for skill_id in &prompt_state.loaded_skill_ids {
+        let skill_name = prompt_state.skills.iter().find(|s| s.id == *skill_id).map_or(skill_id.as_str(), |s| s.name.as_str());
         spans.push(Span::styled(
             format!(" 📚 {skill_name} "),
             Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold(),
@@ -141,22 +142,22 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 
         let mut total_additions: i32 = 0;
         let mut total_deletions: i32 = 0;
-        let mut untracked_count = 0;
-        let mut modified_count = 0;
-        let mut deleted_count = 0;
+        let mut untracked_count = 0u32;
+        let mut modified_count = 0u32;
+        let mut deleted_count = 0u32;
 
         for file in &gs.file_changes {
-            total_additions += file.additions;
-            total_deletions += file.deletions;
+            total_additions = total_additions.saturating_add(file.additions);
+            total_deletions = total_deletions.saturating_add(file.deletions);
             match file.change_type {
-                GitChangeType::Untracked => untracked_count += 1,
-                GitChangeType::Modified | GitChangeType::Added | GitChangeType::Renamed => modified_count += 1,
-                GitChangeType::Deleted => deleted_count += 1,
+                GitChangeType::Untracked => untracked_count = untracked_count.saturating_add(1),
+                GitChangeType::Modified | GitChangeType::Added | GitChangeType::Renamed => modified_count = modified_count.saturating_add(1),
+                GitChangeType::Deleted => deleted_count = deleted_count.saturating_add(1),
             }
         }
 
         // Line changes card: +N/-N/net
-        let net_change = total_additions - total_deletions;
+        let net_change = total_additions.saturating_sub(total_deletions);
         let (net_prefix, net_color) = if net_change >= 0 { ("+", theme::success()) } else { ("", theme::error()) };
         let bg = theme::bg_elevated();
 
@@ -196,9 +197,9 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     for rev_key in &sorted_reverie_keys {
         let Some(rev) = state.reveries.get(*rev_key) else { continue };
         // Look up the agent's display name from PromptState
-        let ps = PromptState::get(state);
+        let rev_prompt_state = PromptState::get(state);
         let agent_name =
-            ps.agents.iter().find(|a| a.id == rev.agent_id).map_or(rev.agent_id.as_str(), |a| a.name.as_str());
+            rev_prompt_state.agents.iter().find(|a| a.id == rev.agent_id).map_or(rev.agent_id.as_str(), |a| a.name.as_str());
         let tools_done = rev.tool_call_count;
         let rev_spin = if rev.is_streaming { format!("{spin} ") } else { String::new() };
         spans.push(Span::styled(
@@ -227,7 +228,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 
     let left_width: usize = spans.iter().map(|s| s.content.chars().count()).sum();
     let right_width = right_info.len();
-    let padding = (area.width.to_usize()).saturating_sub(left_width + right_width);
+    let padding = (area.width.to_usize()).saturating_sub(left_width.saturating_add(right_width));
 
     spans.push(Span::styled(" ".repeat(padding), base_style));
     spans.push(Span::styled(&right_info, base_style));
@@ -236,30 +237,30 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     frame.render_widget(paragraph, area);
 }
 
-/// Calculate the height needed for the question form
+/// Calculate the height needed for the question form.
 pub(super) fn calculate_question_form_height(form: &cp_base::ui::question_form::PendingForm) -> u16 {
-    let q = &form.questions[form.current_question];
+    let Some(q) = form.questions.get(form.current_question) else { return 6 };
     // Header line + question text + blank + options (including Other) + blank + nav hint
-    let option_lines = q.options.len().to_u16() + 1; // +1 for "Other"
+    let option_lines = q.options.len().to_u16().saturating_add(1); // +1 for "Other"
     let header_lines = 2u16; // header + question text
     let chrome = 4u16; // borders (2) + spacing + nav hint
-    (header_lines + option_lines * 2 + chrome).min(20) // each option: label + description
+    (header_lines.saturating_add(option_lines.saturating_mul(2)).saturating_add(chrome)).min(20) // each option: label + description
 }
 
-/// Render the question form at the bottom of the screen
+/// Render the question form at the bottom of the screen.
 pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let Some(form) = state.get_ext::<cp_base::ui::question_form::PendingForm>() else { return };
 
     let q_idx = form.current_question;
-    let q = &form.questions[q_idx];
-    let ans = &form.answers[q_idx];
+    let Some(q) = form.questions.get(q_idx) else { return };
+    let Some(ans) = form.answers.get(q_idx) else { return };
     let other_idx = q.options.len();
 
     let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Progress indicator
     let progress =
-        if form.questions.len() > 1 { format!(" ({}/{}) ", q_idx + 1, form.questions.len()) } else { String::new() };
+        if form.questions.len() > 1 { format!(" ({}/{}) ", q_idx.saturating_add(1), form.questions.len()) } else { String::new() };
 
     // Question text
     lines.push(Line::from(vec![
@@ -384,14 +385,14 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
     frame.render_widget(paragraph, area);
 }
 
-/// Calculate the height needed for the autocomplete popup
+/// Calculate the height needed for the autocomplete popup.
 pub(super) fn calculate_autocomplete_height(ac: &cp_base::state::autocomplete::AutocompleteState) -> u16 {
     let visible = ac.visible_matches().len().to_u16();
     // matches + border chrome (2)
-    (visible + 2).clamp(4, 12)
+    (visible.saturating_add(2)).clamp(4, 12)
 }
 
-/// Render the @ autocomplete popup above the input area (bottom of content panel, growing upward)
+/// Render the @ autocomplete popup above the input area (bottom of content panel, growing upward).
 pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let ac = match state.get_ext::<cp_base::state::autocomplete::AutocompleteState>() {
         Some(ac) if ac.active => ac,
@@ -413,16 +414,16 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, ar
     let border_chrome = 2u16; // top + bottom border of the conversation panel
     let input_lines = ac.input_visual_lines;
     let scroll_padding = 2u16; // padding lines below input in the conversation panel
-    let popup_bottom = area.y + area.height.saturating_sub(border_chrome + input_lines + scroll_padding);
+    let popup_bottom = area.y.saturating_add(area.height.saturating_sub(border_chrome.saturating_add(input_lines).saturating_add(scroll_padding)));
     let popup_top = popup_bottom.saturating_sub(popup_height);
     // Clamp: don't go above the top of the content area (+1 for border)
-    let y = popup_top.max(area.y + 1);
+    let y = popup_top.max(area.y.saturating_add(1));
     let clamped_height = popup_bottom.saturating_sub(y);
     if clamped_height < 3 {
         return; // Not enough space to render
     }
 
-    let x = area.x + 1; // +1 to clear the panel's left border
+    let x = area.x.saturating_add(1); // +1 to clear the panel's left border
     let popup_area = Rect::new(x, y, popup_width, clamped_height);
 
     let mut lines: Vec<Line<'_>> = Vec::new();
@@ -433,7 +434,7 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, ar
         lines.push(Line::from(vec![Span::styled("  No matches", Style::default().fg(theme::text_muted()))]));
     } else {
         for (i, entry) in visible.iter().enumerate() {
-            let abs_idx = ac.scroll_offset + i;
+            let abs_idx = ac.scroll_offset.saturating_add(i);
             let is_selected = abs_idx == ac.selected;
 
             let cursor_marker = if is_selected { ">" } else { " " };

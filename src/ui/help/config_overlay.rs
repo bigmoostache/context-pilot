@@ -8,12 +8,15 @@ use crate::infra::constants::{chars, theme};
 use crate::state::State;
 use cp_base::cast::SafeCast as _;
 
+/// Render the configuration overlay (Ctrl+H) centered on the given area.
 pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Center the overlay, clamped to available area
     let overlay_width = 56u16.min(area.width);
     let overlay_height = 38u16.min(area.height); // Reduced from 50
-    let x = area.x + area.width.saturating_sub(overlay_width) / 2;
-    let y = area.y + area.height.saturating_sub(overlay_height) / 2;
+    let half_width = area.width.saturating_sub(overlay_width).saturating_div(2);
+    let x = area.x.saturating_add(half_width);
+    let half_height = area.height.saturating_sub(overlay_height).saturating_div(2);
+    let y = area.y.saturating_add(half_height);
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height);
 
     let mut lines: Vec<Line<'_>> = Vec::new();
@@ -74,6 +77,7 @@ pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, state: &State, area: 
     frame.render_widget(paragraph, overlay_area);
 }
 
+/// Append a horizontal separator line to the output.
 fn add_separator(lines: &mut Vec<Line<'_>>) {
     lines.push(Line::from(""));
     lines.push(Line::from(vec![Span::styled(
@@ -119,6 +123,7 @@ fn render_provider_section(lines: &mut Vec<Line<'_>>, state: &State) {
     }
 }
 
+/// Render the main model section with model list and pricing.
 fn render_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
     use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 
@@ -157,10 +162,13 @@ fn render_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
         }
     }
 }
+
+/// Render the API check status line (spinner while checking, result when done).
 fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
     if state.flags.lifecycle.api_check_in_progress {
         let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-        let spinner = spinner_chars[(state.spinner_frame.to_usize()) % spinner_chars.len()];
+        let spinner_idx = state.spinner_frame.to_usize() % spinner_chars.len();
+        let Some(&spinner) = spinner_chars.get(spinner_idx) else { return };
         lines.push(Line::from(vec![
             Span::styled(format!("  {spinner} "), Style::default().fg(theme::accent())),
             Span::styled("Checking API...", Style::default().fg(theme::text_muted())),
@@ -181,6 +189,9 @@ fn render_api_check(lines: &mut Vec<Line<'_>>, state: &State) {
         ]));
     }
 }
+
+/// Render the budget bars (context budget, cleaning threshold, cleaning target, max cost).
+#[expect(clippy::integer_division_remainder_used, reason = "token count formatting: truncating division for human-readable K/M display")]
 fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     let format_tokens = |tokens: usize| -> String {
         if tokens >= 1_000_000 {
@@ -287,18 +298,29 @@ fn render_budget_bars(lines: &mut Vec<Line<'_>>, state: &State) {
     ]));
 }
 
-struct BarConfig<'a> {
+/// Configuration for rendering a single budget bar.
+struct BarConfig<'cfg> {
+    /// Index of the currently selected bar.
     selected: usize,
+    /// Index of this bar (for selection comparison).
     idx: usize,
-    label: &'a str,
+    /// Display label shown before the bar.
+    label: &'cfg str,
+    /// Percentage value to show after the bar.
     pct: usize,
+    /// Number of filled cells in the bar.
     filled: usize,
+    /// Total width of the bar in cells.
     bar_width: usize,
-    tokens_str: &'a str,
+    /// Formatted token count string.
+    tokens_str: &'cfg str,
+    /// Color used for the filled portion of the bar.
     bar_color: Color,
-    extra: Option<&'a str>,
+    /// Optional extra text appended after the token count.
+    extra: Option<&'cfg str>,
 }
 
+/// Render a single budget bar line with selection indicator, bar, and label.
 fn render_bar(lines: &mut Vec<Line<'_>>, cfg: &BarConfig<'_>) {
     let is_selected = cfg.selected == cfg.idx;
     let indicator = if is_selected { ">" } else { " " };
@@ -329,6 +351,7 @@ fn render_bar(lines: &mut Vec<Line<'_>>, cfg: &BarConfig<'_>) {
     ]));
 }
 
+/// Render the theme section with current theme info and navigation.
 fn render_theme_section(lines: &mut Vec<Line<'_>>, state: &State) {
     lines.push(Line::from(vec![Span::styled("  Theme", Style::default().fg(theme::text_secondary()).bold())]));
     lines.push(Line::from(""));
@@ -358,21 +381,22 @@ fn render_theme_section(lines: &mut Vec<Line<'_>>, state: &State) {
 
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
     lines.push(Line::from(vec![Span::styled(
-        format!("     ({}/{})", current_idx + 1, THEME_ORDER.len()),
+        format!("     ({}/{})", current_idx.saturating_add(1), THEME_ORDER.len()),
         Style::default().fg(theme::text_muted()),
     )]));
 }
 
+/// Render the toggle section (auto-continue, reverie).
 fn render_toggles_section(lines: &mut Vec<Line<'_>>, state: &State) {
     // Auto-continuation toggle
     let spine_cfg = &cp_mod_spine::types::SpineState::get(state).config;
     let auto_on = spine_cfg.continue_until_todos_done;
-    let (check, status, color) =
+    let (auto_check, auto_status, auto_color) =
         if auto_on { ("[x]", "ON", theme::success()) } else { ("[ ]", "OFF", theme::text_muted()) };
     lines.push(Line::from(vec![
         Span::styled("  Auto-continue: ", Style::default().fg(theme::text_secondary()).bold()),
-        Span::styled(format!("{check} "), Style::default().fg(color).bold()),
-        Span::styled(status, Style::default().fg(color).bold()),
+        Span::styled(format!("{auto_check} "), Style::default().fg(auto_color).bold()),
+        Span::styled(auto_status, Style::default().fg(auto_color).bold()),
         Span::styled("  (press ", Style::default().fg(theme::text_muted())),
         Span::styled("s", Style::default().fg(theme::warning())),
         Span::styled(" to toggle)", Style::default().fg(theme::text_muted())),
@@ -380,18 +404,19 @@ fn render_toggles_section(lines: &mut Vec<Line<'_>>, state: &State) {
 
     // Reverie toggle
     let rev_on = state.flags.config.reverie_enabled;
-    let (check, status, color) =
+    let (rev_check, rev_status, rev_color) =
         if rev_on { ("[x]", "ON", theme::success()) } else { ("[ ]", "OFF", theme::text_muted()) };
     lines.push(Line::from(vec![
         Span::styled("  Reverie:       ", Style::default().fg(theme::text_secondary()).bold()),
-        Span::styled(format!("{check} "), Style::default().fg(color).bold()),
-        Span::styled(status, Style::default().fg(color).bold()),
+        Span::styled(format!("{rev_check} "), Style::default().fg(rev_color).bold()),
+        Span::styled(rev_status, Style::default().fg(rev_color).bold()),
         Span::styled("  (press ", Style::default().fg(theme::text_muted())),
         Span::styled("r", Style::default().fg(theme::warning())),
         Span::styled(" to toggle)", Style::default().fg(theme::text_muted())),
     ]));
 }
 
+/// Render the secondary model section (Reverie model selection).
 fn render_secondary_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
     use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider};
 
@@ -434,6 +459,8 @@ fn render_secondary_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
     }
 }
 
+/// Render a single model line with context window size and pricing info.
+#[expect(clippy::integer_division_remainder_used, reason = "token count formatting: truncating division for human-readable K/M display")]
 fn render_model_line_with_info<M: crate::llms::ModelInfo>(
     lines: &mut Vec<Line<'_>>,
     is_selected: bool,

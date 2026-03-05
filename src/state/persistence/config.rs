@@ -7,6 +7,7 @@ use std::process;
 use crate::infra::constants::{CONFIG_FILE, STORE_DIR};
 use crate::state::SharedConfig;
 
+/// Build the filesystem path to the shared config file.
 fn config_path() -> PathBuf {
     PathBuf::from(STORE_DIR).join(CONFIG_FILE)
 }

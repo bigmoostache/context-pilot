@@ -73,13 +73,19 @@ pub fn parse_command(command: &str) -> Result<TypstCommand, String> {
     }
 
     // Skip leading "typst" if present
-    let start = usize::from(tokens[0] == "typst");
+    let Some(first) = tokens.first() else {
+        return Err("Empty command".to_string());
+    };
+    let start = usize::from(first == "typst");
     if start >= tokens.len() {
         return Err("Missing subcommand. Available: compile, init, query, fonts, update".to_string());
     }
 
-    let subcommand = &tokens[start];
-    let args = &tokens[start + 1..];
+    let Some(subcommand) = tokens.get(start) else {
+        return Err("Missing subcommand. Available: compile, init, query, fonts, update".to_string());
+    };
+    let rest_start = start.saturating_add(1);
+    let args = tokens.get(rest_start..).unwrap_or_default();
 
     match subcommand.as_str() {
         "compile" | "c" => parse_compile(args),
@@ -96,6 +102,7 @@ pub fn parse_command(command: &str) -> Result<TypstCommand, String> {
     }
 }
 
+/// Parse `compile` subcommand arguments into a `TypstCommand::Compile`.
 fn parse_compile(args: &[String]) -> Result<TypstCommand, String> {
     if args.is_empty() {
         return Err("Usage: typst compile <input.typ> [-o <output.pdf>] [--root <dir>]".to_string());
@@ -107,40 +114,47 @@ fn parse_compile(args: &[String]) -> Result<TypstCommand, String> {
     let mut i = 0;
 
     while i < args.len() {
-        match args[i].as_str() {
+        let Some(arg) = args.get(i) else {
+            break;
+        };
+        match arg.as_str() {
             "-o" | "--output" => {
-                i += 1;
-                if i >= args.len() {
+                i = i.saturating_add(1);
+                let Some(val) = args.get(i) else {
                     return Err("Missing value for -o/--output".to_string());
-                }
-                output = Some(args[i].clone());
+                };
+                output = Some(val.clone());
             }
             "--root" => {
-                i += 1;
-                if i >= args.len() {
+                i = i.saturating_add(1);
+                let Some(val) = args.get(i) else {
                     return Err("Missing value for --root".to_string());
-                }
-                root = Some(args[i].clone());
+                };
+                root = Some(val.clone());
             }
-            arg if arg.starts_with('-') => {
+            a if a.starts_with('-') => {
                 // Skip unknown flags silently
             }
             _ => {
+                let Some(val) = args.get(i) else {
+                    break;
+                };
                 if input.is_none() {
-                    input = Some(args[i].clone());
+                    input = Some(val.clone());
                 } else if output.is_none() {
                     // Second positional arg is output
-                    output = Some(args[i].clone());
+                    output = Some(val.clone());
                 }
             }
         }
-        i += 1;
+        i = i.saturating_add(1);
     }
 
     let input = input.ok_or("Missing input file. Usage: typst compile <input.typ>")?;
     Ok(TypstCommand::Compile { input, output, root })
 }
 
+/// Parse `init` subcommand arguments into a `TypstCommand::Init`.
 fn parse_init(args: &[String]) -> Result<TypstCommand, String> {
     if args.is_empty() {
         return Err(
@@ -149,11 +163,15 @@ fn parse_init(args: &[String]) -> Result<TypstCommand, String> {
         );
     }
 
-    let template = args[0].clone();
+    let Some(template) = args.first() else {
+        return Err("Usage: typst init <@preview/template:version> [directory]".to_string());
+    };
+    let template = template.clone();
     let directory = args.get(1).cloned();
     Ok(TypstCommand::Init { template, directory })
 }
 
+/// Parse `query` subcommand arguments into a `TypstCommand::Query`.
 fn parse_query(args: &[String]) -> Result<TypstCommand, String> {
     if args.len() < 2 {
         return Err("Usage: typst query <input.typ> <selector> [--field <field>]".to_string());
@@ -167,28 +185,34 @@ fn parse_query(args: &[String]) -> Result<TypstCommand, String> {
     let mut i = 2;
 
     while i < args.len() {
-        if args[i] == "--field" {
-            i += 1;
-            if i < args.len() {
-                field = Some(args[i].clone());
+        let Some(arg) = args.get(i) else {
+            break;
+        };
+        if arg == "--field" {
+            i = i.saturating_add(1);
+            if let Some(val) = args.get(i) {
+                field = Some(val.clone());
             }
         }
-        i += 1;
+        i = i.saturating_add(1);
     }
 
     Ok(TypstCommand::Query { input, selector, field })
 }
 
+/// Parse `fonts` subcommand arguments into a `TypstCommand::Fonts`.
 fn parse_fonts(args: &[String]) -> TypstCommand {
     let variants = args.iter().any(|a| a == "--variants");
     TypstCommand::Fonts { variants }
 }
 
+/// Parse `update` subcommand arguments into a `TypstCommand::Update`.
 fn parse_update(args: &[String]) -> TypstCommand {
     let package = args.first().cloned();
     TypstCommand::Update { package }
 }
 
+/// Parse `watch` subcommand arguments into a `TypstCommand::Watch`.
 fn parse_watch(args: &[String]) -> Result<TypstCommand, String> {
     if args.is_empty() {
         return Err("Usage: typst watch <input.typ> [-o <output.pdf>]".to_string());
@@ -199,35 +223,45 @@ fn parse_watch(args: &[String]) -> Result<TypstCommand, String> {
     let mut i = 0;
 
     while i < args.len() {
-        match args[i].as_str() {
+        let Some(arg) = args.get(i) else {
+            break;
+        };
+        match arg.as_str() {
             "-o" | "--output" => {
-                i += 1;
-                if i >= args.len() {
+                i = i.saturating_add(1);
+                let Some(val) = args.get(i) else {
                     return Err("Missing value for -o/--output".to_string());
-                }
-                output = Some(args[i].clone());
+                };
+                output = Some(val.clone());
             }
-            arg if arg.starts_with('-') => {}
+            a if a.starts_with('-') => {}
             _ => {
+                let Some(val) = args.get(i) else {
+                    break;
+                };
                 if input.is_none() {
-                    input = Some(args[i].clone());
+                    input = Some(val.clone());
                 } else if output.is_none() {
-                    output = Some(args[i].clone());
+                    output = Some(val.clone());
                 }
             }
         }
-        i += 1;
+        i = i.saturating_add(1);
     }
 
     let input = input.ok_or("Missing input file. Usage: typst watch <input.typ>")?;
     Ok(TypstCommand::Watch { input, output })
 }
 
+/// Parse `unwatch` subcommand arguments into a `TypstCommand::Unwatch`.
 fn parse_unwatch(args: &[String]) -> Result<TypstCommand, String> {
     if args.is_empty() {
         return Err("Usage: typst unwatch <input.typ>".to_string());
     }
-    Ok(TypstCommand::Unwatch { input: args[0].clone() })
+    let Some(input) = args.first() else {
+        return Err("Usage: typst unwatch <input.typ>".to_string());
+    };
+    Ok(TypstCommand::Unwatch { input: input.clone() })
 }
 
 /// Basic shell-like string splitting that respects quotes.

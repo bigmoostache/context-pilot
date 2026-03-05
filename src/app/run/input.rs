@@ -14,6 +14,7 @@ use crate::ui::typewriter::TypewriterBuffer;
 use cp_base::panels::now_ms;
 
 impl App {
+    /// Create a new `App` with the given state, cache channel, and resume flag.
     pub(crate) fn new(state: State, cache_tx: Sender<CacheUpdate>, resume_stream: bool) -> Self {
         let file_watcher = FileWatcher::new().ok();
         let gh_watcher = GhWatcher::new(cache_tx.clone());
@@ -103,21 +104,21 @@ impl App {
                         new_query,
                         self.state.input.get(old_cursor..).unwrap_or("")
                     );
-                    self.state.input_cursor = anchor + 1 + new_query.len(); // +1 for '@'
+                    self.state.input_cursor = anchor.saturating_add(1).saturating_add(new_query.len()); // +1 for '@'
 
                     // Refresh entries for the new directory
                     let filter = cp_mod_tree::types::TreeState::get(&self.state).filter.clone();
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
+                    let Some(ac_query) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
-                    ac.set_query(new_query);
-                    let dir = ac.current_dir().to_string();
-                    let prefix = ac.current_prefix().to_string();
+                    ac_query.set_query(new_query);
+                    let dir = ac_query.current_dir().to_string();
+                    let prefix = ac_query.current_prefix().to_string();
                     let entries = cp_mod_tree::tools::list_dir_entries(&filter, &dir, &prefix);
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
+                    let Some(ac_matches) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
-                    ac.set_matches(entries);
+                    ac_matches.set_matches(entries);
                 } else {
                     // File: insert the full path and close
                     let anchor = ac.anchor_pos;
@@ -130,7 +131,7 @@ impl App {
                         full_path,
                         self.state.input.get(cursor..).unwrap_or("")
                     );
-                    self.state.input_cursor = anchor + full_path.len() + 1; // +1 for space
+                    self.state.input_cursor = anchor.saturating_add(full_path.len()).saturating_add(1); // +1 for space
                 }
             }
             KeyCode::Backspace => {
@@ -142,13 +143,13 @@ impl App {
                     let query_len = ac.query.len();
                     let query = ac.query.clone();
                     // Update cursor position to match shortened query
-                    self.state.input_cursor = anchor + 1 + query_len; // +1 for '@'
+                    self.state.input_cursor = anchor.saturating_add(1).saturating_add(query_len); // +1 for '@'
 
                     // Also update the input text
                     let old_len = self.state.input.len();
-                    let after_at = anchor + 1; // skip '@'
+                    let after_at = anchor.saturating_add(1); // skip '@'
                     // Rebuild: everything before @, then @query, then everything after old cursor
-                    let rest_start = after_at + query.len() + 1; // +1 for the removed char
+                    let rest_start = after_at.saturating_add(query.len()).saturating_add(1); // +1 for the removed char
                     if rest_start <= old_len {
                         self.state.input = format!(
                             "{}@{}{}",
@@ -160,16 +161,16 @@ impl App {
 
                     // Refresh matches
                     let filter = cp_mod_tree::types::TreeState::get(&self.state).filter.clone();
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
+                    let Some(ac_dir) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
-                    let dir = ac.current_dir().to_string();
-                    let prefix = ac.current_prefix().to_string();
+                    let dir = ac_dir.current_dir().to_string();
+                    let prefix = ac_dir.current_prefix().to_string();
                     let entries = cp_mod_tree::tools::list_dir_entries(&filter, &dir, &prefix);
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
+                    let Some(ac_set) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
-                    ac.set_matches(entries);
+                    ac_set.set_matches(entries);
                 } else {
                     // Query was empty — remove the '@' and deactivate
                     ac.deactivate();
@@ -188,25 +189,25 @@ impl App {
                 if c == ' ' || c == '\n' {
                     ac.deactivate();
                     self.state.input.insert(self.state.input_cursor, c);
-                    self.state.input_cursor += c.len_utf8();
+                    self.state.input_cursor = self.state.input_cursor.saturating_add(c.len_utf8());
                 } else {
                     // Append to query and update input
                     ac.push_char(c);
                     self.state.input.insert(self.state.input_cursor, c);
-                    self.state.input_cursor += c.len_utf8();
+                    self.state.input_cursor = self.state.input_cursor.saturating_add(c.len_utf8());
 
                     // Refresh matches with new query
                     let filter = cp_mod_tree::types::TreeState::get(&self.state).filter.clone();
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
+                    let Some(ac_refresh) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
-                    let dir = ac.current_dir().to_string();
-                    let prefix = ac.current_prefix().to_string();
+                    let dir = ac_refresh.current_dir().to_string();
+                    let prefix = ac_refresh.current_prefix().to_string();
                     let entries = cp_mod_tree::tools::list_dir_entries(&filter, &dir, &prefix);
-                    let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
+                    let Some(ac_update) = self.state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() else {
                         return;
                     };
-                    ac.set_matches(entries);
+                    ac_update.set_matches(entries);
                 }
             }
             KeyCode::Left
@@ -241,7 +242,8 @@ impl App {
         let Some(form) = self.state.get_ext_mut::<cp_base::ui::question_form::PendingForm>() else { return };
 
         // Check if currently typing in "Other" field
-        let typing_other = form.answers[form.current_question].typing_other;
+        let Some(current_answer) = form.answers.get(form.current_question) else { return };
+        let typing_other = current_answer.typing_other;
 
         match key.code {
             KeyCode::Esc => {

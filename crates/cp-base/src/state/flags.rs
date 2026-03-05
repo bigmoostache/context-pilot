@@ -58,17 +58,17 @@ impl StreamPhase {
 
 /// Stream-related state: the current [`StreamPhase`] plus independent scroll tracking.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct StreamFlags {
+pub struct StreamState {
     /// Current phase of the LLM stream lifecycle.
     pub phase: StreamPhase,
     /// Whether the user has manually scrolled (disables auto-scroll to bottom).
     pub user_scrolled: bool,
 }
 
-/// UI and lifecycle status flags — separated from [`StreamFlags`] to stay under
+/// UI and lifecycle status flags — separated from [`StreamState`] to stay under
 /// clippy's 3-bool threshold per struct.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct UiFlags {
+pub struct UiState {
     /// Whether the UI needs to be redrawn.
     pub dirty: bool,
     /// Dev mode — shows additional debug info like token counts.
@@ -79,7 +79,7 @@ pub struct UiFlags {
 
 /// Configuration overlay flags.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct ConfigFlags {
+pub struct ConfigOverlay {
     /// Configuration view is open (Ctrl+H to toggle).
     pub config_view: bool,
     /// Whether config overlay is showing secondary model selection (Tab toggles).
@@ -90,7 +90,7 @@ pub struct ConfigFlags {
 
 /// Lifecycle flags for async operations and reload state.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct LifecycleFlags {
+pub struct Lifecycle {
     /// Whether an API check is in progress.
     pub api_check_in_progress: bool,
     /// Reload pending (set by `system_reload`, triggers reload after tool result saved).
@@ -104,15 +104,15 @@ pub struct LifecycleFlags {
 /// Access individual flags via domain sub-structs: `flags.stream.is_streaming`,
 /// `flags.ui.dirty`, `flags.config.reverie_enabled`, `flags.lifecycle.reload_pending`.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct StateFlags {
+pub struct StatusBools {
     /// Streaming and scrolling state.
-    pub stream: StreamFlags,
+    pub stream: StreamState,
     /// UI rendering and debug toggles.
-    pub ui: UiFlags,
+    pub ui: UiState,
     /// Configuration overlay state.
-    pub config: ConfigFlags,
+    pub config: ConfigOverlay,
     /// Async operation and reload lifecycle.
-    pub lifecycle: LifecycleFlags,
+    pub lifecycle: Lifecycle,
 }
 
 /// Advisory state for a tool call currently being streamed by the LLM.

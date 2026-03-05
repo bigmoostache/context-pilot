@@ -17,7 +17,7 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(1), Constraint::Length(token_area_height)])
         .split(area);
-    debug_assert!(layout.len() >= 2);
+    debug_assert!(layout.len() >= 2, "collapsed sidebar layout must have at least 2 chunks");
 
     let mut lines: Vec<Line<'_>> = Vec::new();
     lines.push(Line::from(""));
@@ -25,18 +25,18 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
     // Sort contexts by panel ID order
     let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
     sorted_indices.sort_by(|&a, &b| {
-        let id_a =
-            state.context[a].id.strip_prefix('P').and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
-        let id_b =
-            state.context[b].id.strip_prefix('P').and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let ctx_a = state.context.get(a);
+        let ctx_b = state.context.get(b);
+        let id_a = ctx_a.and_then(|c| c.id.strip_prefix('P')).and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+        let id_b = ctx_b.and_then(|c| c.id.strip_prefix('P')).and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
         id_a.cmp(&id_b)
     });
 
     // Separate fixed and dynamic, skip conversation (rendered separately)
     let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
         .into_iter()
-        .filter(|&i| state.context[i].context_type != ContextType::new(ContextType::CONVERSATION))
-        .partition(|&i| state.context[i].context_type.is_fixed());
+        .filter(|&i| state.context.get(i).is_some_and(|c| c.context_type != ContextType::new(ContextType::CONVERSATION)))
+        .partition(|&i| state.context.get(i).is_some_and(|c| c.context_type.is_fixed()));
 
     // Conversation entry
     if let Some(conv_idx) =
@@ -47,7 +47,7 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
 
     // Fixed panels
     for &i in &fixed_indices {
-        let badge = fixed_panel_badge(state.context[i].context_type.as_str(), state);
+        let badge = state.context.get(i).and_then(|c| fixed_panel_badge(c.context_type.as_str(), state));
         render_collapsed_line(&mut lines, i, state, base_style, badge.as_deref());
     }
 
@@ -93,7 +93,7 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
     frame.render_widget(token_paragraph, layout[1]);
 }
 
-// Ye olde compass needle — points to the active panel
+/// Render a single collapsed sidebar line for a context panel.
 fn render_collapsed_line(
     lines: &mut Vec<Line<'static>>,
     idx: usize,
@@ -101,7 +101,7 @@ fn render_collapsed_line(
     base_style: Style,
     badge: Option<&str>,
 ) {
-    let ctx = &state.context[idx];
+    let Some(ctx) = state.context.get(idx) else { return };
     let is_selected = idx == state.selected_context;
     let icon = ctx.context_type.icon();
 

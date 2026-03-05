@@ -81,6 +81,17 @@ exceptions:
       for YAML and theme invariants. For module state, explore a type-state
       pattern where uninitialized state is unrepresentable.
 
+  # ── compiler.rs: chrono timezone arithmetic ────────────────────────
+
+  - path: "crates/cp-mod-typst/src/compiler.rs"
+    match: 'chrono offset arithmetic cannot overflow'
+    reason: >
+      Adding a timezone offset (±12h) to a UTC datetime. chrono::Duration
+      arithmetic cannot overflow for valid timezone offsets.
+    strategy: >
+      Irreducible — chrono's Add impl requires the caller to handle the
+      arithmetic lint. The offset range (±12h) is always safe.
+
   # ── panels.rs: time_arith module ────────────────────────────────────
 
   - path: "crates/cp-base/src/panels.rs"
@@ -212,4 +223,154 @@ exceptions:
       "Result" conflicts with std::result::Result.
     strategy: >
       Irreducible — std::Result conflict.
+
+  # ── profiler.rs: microsecond-to-millisecond division ────────────────
+
+  - path: "src/infra/profiler.rs"
+    match: 'microsecond-to-millisecond truncating conversion'
+    reason: >
+      us / 1000 converts microseconds to milliseconds. Truncating integer
+      division IS the desired behavior — sub-millisecond precision is
+      intentionally discarded for logging thresholds.
+    strategy: >
+      Could extract a us_to_ms() helper to cp-base::panels::time_arith,
+      but it's a single-use conversion with trivially correct arithmetic.
+
+  # ── config.rs: budget step/min division ──────────────────────────────
+
+  # ── check_api.rs: health-check builder ────────────────────────────
+
+  - path: "src/llms/claude_code/check_api.rs"
+    match: 'health-check builder needs all request parameters individually'
+    reason: >
+      build_check_request() takes 7 parameters (client, token, model,
+      system, user_text, stream, tools) because each health check
+      variation needs independent control of these values.
+    strategy: >
+      Could introduce a CheckRequestParams struct, but the function is
+      only called 3 times and the parameters map 1:1 to HTTP request
+      fields. Low value refactoring.
+
+  # ── lifecycle.rs: main event loop entry point ──────────────────────
+
+  - path: "src/app/run/lifecycle.rs"
+    match: 'event-loop entry point bundles terminal + channels'
+    reason: >
+      App::run() is the main event loop entry point that takes &mut self,
+      terminal, tx, rx, and cache_rx. All five are essential I/O handles
+      that the event loop polls on every tick.
+    strategy: >
+      Could bundle tx/rx/cache_rx into a Channels struct, but it adds
+      indirection for a single callsite with no reuse benefit.
+
+  - path: "src/app/actions/config.rs"
+    match: '5% step via division is the algorithm'
+    reason: >
+      budget_step() computes max_budget / 20 for 5% increments.
+      Truncating integer division IS the algorithm.
+    strategy: >
+      Irreducible — integer truncation is the desired behavior for
+      percentage-based budget stepping.
+
+  - path: "src/app/actions/config.rs"
+    match: '10% floor via division is the algorithm'
+    reason: >
+      budget_min() computes max_budget / 10 for 10% minimum floor.
+      Truncating integer division IS the algorithm.
+    strategy: >
+      Irreducible — integer truncation is the desired behavior for
+      percentage-based budget floor.
+
+  # ── ui/helpers.rs: spinner modulo ────────────────────────────────────
+
+  - path: "src/ui/helpers.rs"
+    match: 'modulo for cyclic spinner index is the algorithm'
+    reason: >
+      spinner() uses frame_counter % SPINNER_BRAILLE.len() to cycle
+      through animation frames. Modulo IS the algorithm.
+    strategy: >
+      Irreducible — cyclic indexing requires modulo.
+
+  # ── ui/perf/mod.rs: ring buffer modulo ──────────────────────────────
+
+  - path: "src/ui/perf/mod.rs"
+    match: 'modulo for cyclic ring buffer index is the algorithm'
+    reason: >
+      RingBuffer::push() and recent() use modulo to wrap indices around
+      the fixed-size ring. Modulo IS the algorithm.
+    strategy: >
+      Irreducible — ring buffer cycling requires modulo.
+
+  # ── ui/help/config_overlay.rs: token formatting division ────────────
+
+  - path: "src/ui/help/config_overlay.rs"
+    match: 'token count formatting: truncating division for human-readable K/M display'
+    reason: >
+      render_budget_bars() and render_model_line_with_info() divide
+      token counts by 1,000 or 1,000,000 for human-readable K/M
+      display. Truncating integer division IS the desired behavior.
+    strategy: >
+      Could extract a format_tokens_compact() helper, but these are
+      localized display-only conversions with trivially correct
+      arithmetic.
+
+  # ── ui/sidebar/full.rs: too many arguments ─────────────────────────
+
+  - path: "src/ui/sidebar/full.rs"
+    match: 'render_context_line needs all these params for sidebar display'
+    reason: >
+      render_context_line() takes 7 parameters (lines, ctx, index,
+      state, id_width, spin, base_style) because each is independently
+      needed for rendering a single sidebar panel line.
+    strategy: >
+      Could introduce a SidebarRenderContext struct, but the function
+      is only called from 2 sites within the same module and the
+      parameters map directly to rendering concerns.
+
+  # ── conversation/list.rs: base-26 encoding ────────────────────────
+
+  - path: "src/modules/conversation/list.rs"
+    match: 'base-26 encoding requires modulo and division'
+    reason: >
+      alpha_from_number() converts a numeric index to alphabetic labels
+      (a, b, ..., z, aa, ab, ...) using modulo and division for base-26
+      encoding. Modulo IS the algorithm.
+    strategy: >
+      Irreducible — base-26 encoding inherently requires modulo
+      and division.
+
+  # ── conversation/render.rs: too_many_arguments ────────────────────
+
+  - path: "src/modules/conversation/render.rs"
+    match: 'render parameters are cohesive and all required for message display'
+    reason: >
+      render_message() takes 8 parameters (message fields, display
+      state, viewport width, etc.) because each is independently
+      needed for rendering a single conversation message.
+    strategy: >
+      Could introduce a RenderMessageContext struct, but the function
+      is internal and the parameters map 1:1 to rendering concerns.
+
+  - path: "src/modules/conversation/render.rs"
+    match: 'render parameters are cohesive and all required for YAML-style display'
+    reason: >
+      render_param_lines() takes 8 parameters for rendering tool call
+      parameters in YAML-style format. Each parameter controls a
+      different aspect of the rendering.
+    strategy: >
+      Could bundle into a struct, but it's a single-callsite internal
+      function with cohesive parameters.
+
+  # ── conversation/render_input.rs: too_many_arguments ──────────────
+
+  - path: "src/modules/conversation/render_input.rs"
+    match: 'render parameters are cohesive and all required for input display'
+    reason: >
+      render_input() takes 7 parameters (raw input, cursor position,
+      viewport width, style, command IDs, paste buffers, paste labels)
+      because each is independently needed for rendering the input area.
+    strategy: >
+      Could introduce a RenderInputParams struct, but the function
+      is called from a single site and the parameters are all
+      distinct rendering concerns.
 

@@ -1,15 +1,22 @@
+use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
+use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel, paginate_content};
 use crate::modules::conversation::render;
 use crate::state::{ContextType, State};
 use crate::ui::theme;
+use cp_base::panels::scroll_key_action;
 
 /// Panel for frozen conversation history chunks.
 /// Content is set once at creation (via `detach_conversation_chunks`) and never refreshed.
 pub(super) struct ConversationHistoryPanel;
 
 impl Panel for ConversationHistoryPanel {
+    fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
+        scroll_key_action(key)
+    }
+
     fn title(&self, state: &State) -> String {
         state
             .context
@@ -68,4 +75,41 @@ impl Panel for ConversationHistoryPanel {
         }
         lines
     }
+
+    fn refresh(&self, _state: &mut State) {}
+
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut crate::state::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &crate::state::ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }

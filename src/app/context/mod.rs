@@ -11,8 +11,11 @@ mod detach;
 
 /// Context data prepared for streaming
 pub(super) struct StreamContext {
+    /// Filtered conversation messages for the LLM.
     pub messages: Vec<Message>,
+    /// Collected and sorted context items from all panels.
     pub context_items: Vec<ContextItem>,
+    /// Tool definitions available for this streaming session.
     pub tools: Vec<ToolDefinition>,
 }
 
@@ -209,7 +212,7 @@ fn assign_panel_uid(state: &mut State, context_type: &str) {
         && ctx.uid.is_none()
     {
         ctx.uid = Some(format!("UID_{}_P", state.global_next_uid));
-        state.global_next_uid += 1;
+        state.global_next_uid = state.global_next_uid.saturating_add(1);
     }
 }
 
@@ -240,8 +243,8 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
         }
 
         // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
-        let id = format!("P{}", pos + 1);
-        let insert_pos = (pos + 1).min(state.context.len()); // +1 to account for Conversation at index 0
+        let id = format!("P{}", pos.saturating_add(1));
+        let insert_pos = pos.saturating_add(1).min(state.context.len()); // +1 to account for Conversation at index 0
         let elem =
             modules::make_default_context_element(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
         state.context.insert(insert_pos, elem);

@@ -6,17 +6,27 @@ use crate::infra::constants::{
 };
 use cp_base::cast::SafeCast as _;
 
+/// Buffered typewriter animation: accumulates streaming chunks and releases
+/// characters at a smoothed rate for a natural typing effect.
 pub(crate) struct TypewriterBuffer {
+    /// Characters waiting to be released to the display.
     pub pending_chars: VecDeque<char>,
+    /// Recent inter-chunk intervals for speed estimation.
     pub chunk_intervals: VecDeque<Duration>,
+    /// Recent chunk sizes (in characters) for speed estimation.
     pub chunk_sizes: VecDeque<usize>,
+    /// Timestamp of the last received chunk.
     pub last_chunk_time: Option<Instant>,
+    /// Timestamp of the last character release.
     pub last_char_time: Instant,
+    /// Current estimated characters-per-millisecond release rate.
     pub chars_per_ms: f64,
+    /// Whether the upstream stream has finished sending chunks.
     pub stream_done: bool,
 }
 
 impl TypewriterBuffer {
+    /// Create a new typewriter buffer with default speed.
     pub(crate) fn new() -> Self {
         Self {
             pending_chars: VecDeque::new(),
@@ -29,6 +39,7 @@ impl TypewriterBuffer {
         }
     }
 
+    /// Reset the buffer to its initial state, clearing all pending data.
     pub(crate) fn reset(&mut self) {
         self.pending_chars.clear();
         self.chunk_intervals.clear();
@@ -39,6 +50,7 @@ impl TypewriterBuffer {
         self.stream_done = false;
     }
 
+    /// Add a new text chunk from the stream, updating speed estimates.
     pub(crate) fn add_chunk(&mut self, text: &str) {
         let now = Instant::now();
 
@@ -64,6 +76,7 @@ impl TypewriterBuffer {
         self.recalculate_speed();
     }
 
+    /// Recalculate the release speed based on recent chunk intervals and sizes.
     fn recalculate_speed(&mut self) {
         if self.chunk_intervals.is_empty() || self.chunk_sizes.is_empty() {
             return;
@@ -82,9 +95,13 @@ impl TypewriterBuffer {
         }
     }
 
+    /// Mark the stream as finished; remaining chars will be flushed faster.
     pub(crate) const fn mark_done(&mut self) {
         self.stream_done = true;
     }
+
+    /// Release characters that are due based on elapsed time.
+    /// Returns `None` if no characters are ready yet.
     pub(crate) fn take_chars(&mut self) -> Option<String> {
         if self.pending_chars.is_empty() {
             return None;

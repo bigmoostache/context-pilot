@@ -43,7 +43,7 @@ impl App {
                 if let Some(ref dp) = result.create_panel {
                     let panel_id = self.state.next_available_context_id();
                     let uid = format!("UID_{}_P", self.state.global_next_uid);
-                    self.state.global_next_uid += 1;
+                    self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
 
                     let mut ctx = crate::state::make_default_context_element(
                         &panel_id,
@@ -108,13 +108,13 @@ impl App {
 
         // Check if there are STILL blocking watchers pending in the registry.
         // If so, don't resume yet — more results are coming.
-        let registry = WatcherRegistry::get(&self.state);
-        if registry.has_blocking_watchers() {
+        let watcher_reg = WatcherRegistry::get(&self.state);
+        if watcher_reg.has_blocking_watchers() {
             return;
         }
 
         // All blocking watchers done — merge accumulated results and resume pipeline.
-        let mut blocking_results = std::mem::take(&mut self.accumulated_blocking_results);
+        let mut merged_blocking = std::mem::take(&mut self.accumulated_blocking_results);
 
         let Some(mut tool_results) = self.pending_console_wait_tool_results.take() else {
             return;
@@ -122,11 +122,11 @@ impl App {
 
         // Handle deferred panel creation FIRST — so descriptions include panel IDs
         // before we copy them into tool results during sentinel replacement.
-        for result in &mut blocking_results {
+        for result in &mut merged_blocking {
             if let Some(ref dp) = result.create_panel {
                 let panel_id = self.state.next_available_context_id();
                 let uid = format!("UID_{}_P", self.state.global_next_uid);
-                self.state.global_next_uid += 1;
+                self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
 
                 let mut ctx = crate::state::make_default_context_element(
                     &panel_id,
@@ -157,7 +157,7 @@ impl App {
             if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
                 // Console wait sentinel: replace entirely with watcher result
                 if let Some(result) =
-                    blocking_results.iter().find(|r| r.tool_use_id.as_deref() == Some(&tr.tool_use_id))
+                    merged_blocking.iter().find(|r| r.tool_use_id.as_deref() == Some(&tr.tool_use_id))
                 {
                     tr.content = result.description.clone();
                 }
@@ -166,7 +166,7 @@ impl App {
                 // Extract sentinel_id and original content, then merge with callback result
                 let after_sentinel = &tr.content.get(CONSOLE_WAIT_BLOCKING_SENTINEL.len()..).unwrap_or("");
                 // Find matching watcher result by sentinel_id prefix
-                let matched_result = blocking_results
+                let matched_result = merged_blocking
                     .iter()
                     .find(|r| r.tool_use_id.as_ref().is_some_and(|tid| after_sentinel.starts_with(tid.as_str())));
                 if let Some(result) = matched_result
@@ -174,7 +174,7 @@ impl App {
                 {
                     let original_content = &after_sentinel.get(sentinel_id.len()..).unwrap_or("");
                     // Collect ALL blocking results for this sentinel (multiple callbacks)
-                    let all_matched: Vec<&str> = blocking_results
+                    let all_matched: Vec<&str> = merged_blocking
                         .iter()
                         .filter(|r| r.tool_use_id.as_deref() == Some(sentinel_id.as_str()))
                         .map(|r| r.description.as_str())
@@ -197,8 +197,8 @@ impl App {
             // Safety valve: if no blocking watchers remain but sentinels are unresolved,
             // force-resolve them to prevent infinite pipeline stall. This can happen when
             // a watcher fires with a stale tool_use_id that doesn't match any pending result.
-            let registry = WatcherRegistry::get(&self.state);
-            if registry.has_blocking_watchers() {
+            let safety_reg = WatcherRegistry::get(&self.state);
+            if safety_reg.has_blocking_watchers() {
                 self.pending_console_wait_tool_results = Some(tool_results);
                 return;
             }
@@ -218,8 +218,8 @@ impl App {
         // All resolved — resume normal pipeline: create result message + continue streaming
         let result_id = format!("R{}", self.state.next_result_id);
         let result_global_uid = format!("UID_{}_R", self.state.global_next_uid);
-        self.state.next_result_id += 1;
-        self.state.global_next_uid += 1;
+        self.state.next_result_id = self.state.next_result_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
         let tool_result_records: Vec<ToolResultRecord> = tool_results
             .iter()
             .map(|r| ToolResultRecord {
@@ -253,8 +253,8 @@ impl App {
         // Create new assistant message for continued streaming
         let assistant_id = format!("A{}", self.state.next_assistant_id);
         let assistant_global_uid = format!("UID_{}_A", self.state.global_next_uid);
-        self.state.next_assistant_id += 1;
-        self.state.global_next_uid += 1;
+        self.state.next_assistant_id = self.state.next_assistant_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
         let new_assistant_msg = Message {
             id: assistant_id,
             uid: Some(assistant_global_uid),
@@ -278,12 +278,12 @@ impl App {
             self.state.tick_cache_hit_tokens = cache_hit_tokens;
             self.state.tick_cache_miss_tokens = cache_miss_tokens;
             self.state.tick_output_tokens = output_tokens;
-            self.state.stream_cache_hit_tokens += cache_hit_tokens;
-            self.state.stream_cache_miss_tokens += cache_miss_tokens;
-            self.state.stream_output_tokens += output_tokens;
-            self.state.cache_hit_tokens += cache_hit_tokens;
-            self.state.cache_miss_tokens += cache_miss_tokens;
-            self.state.total_output_tokens += output_tokens;
+            self.state.stream_cache_hit_tokens = self.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
+            self.state.stream_cache_miss_tokens = self.state.stream_cache_miss_tokens.saturating_add(cache_miss_tokens);
+            self.state.stream_output_tokens = self.state.stream_output_tokens.saturating_add(output_tokens);
+            self.state.cache_hit_tokens = self.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
+            self.state.cache_miss_tokens = self.state.cache_miss_tokens.saturating_add(cache_miss_tokens);
+            self.state.total_output_tokens = self.state.total_output_tokens.saturating_add(output_tokens);
         }
 
         self.save_state_async();
@@ -346,8 +346,8 @@ impl App {
         // Create a tool_result message pairing each pending tool_use
         let result_id = format!("R{}", self.state.next_result_id);
         let result_global_uid = format!("UID_{}_R", self.state.global_next_uid);
-        self.state.next_result_id += 1;
-        self.state.global_next_uid += 1;
+        self.state.next_result_id = self.state.next_result_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
 
         let tool_result_records: Vec<ToolResultRecord> = all_pending
             .iter()
@@ -386,7 +386,9 @@ impl App {
 
 /// Flushed tool execution pair: the original `ToolUse` and its result.
 pub(super) struct FlushedTool {
+    /// The original tool-use request that was dequeued and executed.
     pub tool: cp_base::tools::ToolUse,
+    /// The execution result for this tool call.
     pub result: crate::infra::tools::ToolResult,
 }
 

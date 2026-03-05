@@ -17,12 +17,15 @@ use crate::modules::{ToolVisualizer, build_visualizer_registry};
 /// Lazily built registry of `tool_name` -> visualizer function.
 static VISUALIZER_REGISTRY: OnceLock<HashMap<String, ToolVisualizer>> = OnceLock::new();
 
+/// Retrieve or initialize the global visualizer registry.
 fn get_visualizer_registry() -> &'static HashMap<String, ToolVisualizer> {
     VISUALIZER_REGISTRY.get_or_init(build_visualizer_registry)
 }
 
-/// Render a single message to lines (without caching logic)
-/// Render a single message to lines (without caching logic)
+/// Render a single message to lines (without caching logic).
+/// Formats user messages, assistant messages, tool calls, and tool results
+/// with appropriate icons, colors, and markdown rendering.
+#[expect(clippy::too_many_arguments, reason = "render parameters are cohesive and all required for message display")]
 pub(crate) fn render_message(
     msg: &Message,
     viewport_width: u16,
@@ -30,15 +33,15 @@ pub(crate) fn render_message(
     is_streaming_this: bool,
     dev_mode: bool,
 ) -> Vec<Line<'static>> {
-    let mut lines: Vec<Line<'static>> = Vec::new();
+    let mut output_lines: Vec<Line<'static>> = Vec::new();
 
     // Handle tool call messages — YAML-style parameter display
     if msg.msg_type == MessageType::ToolCall {
         let icon = icons::msg_tool_call();
-        let prefix_width = UnicodeWidthStr::width(icon.as_str()) + 1; // icon display width + space
-        let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
+        let prefix_width = UnicodeWidthStr::width(icon.as_str()).saturating_add(1); // icon display width + space
+        let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
         for tool_use in &msg.tool_uses {
-            lines.push(Line::from(vec![
+            output_lines.push(Line::from(vec![
                 Span::styled(icon.clone(), Style::default().fg(theme::success())),
                 Span::styled(" ".to_string(), base_style),
                 Span::styled(tool_use.name.clone(), Style::default().fg(theme::text()).bold()),
@@ -55,12 +58,12 @@ pub(crate) fn render_message(
                         | serde_json::Value::Array(_)
                         | serde_json::Value::Object(_) => val.to_string(),
                     };
-                    render_param_lines(&mut lines, &param_prefix, key, &val_str, wrap_width, base_style);
+                    render_param_lines(&mut output_lines, &param_prefix, key, &val_str, wrap_width, base_style);
                 }
             }
         }
-        lines.push(Line::from(""));
-        return lines;
+        output_lines.push(Line::from(""));
+        return output_lines;
     }
 
     // Handle tool result messages
@@ -72,8 +75,8 @@ pub(crate) fn render_message(
                 (icons::msg_tool_result(), theme::success())
             };
 
-            let prefix_width = 4;
-            let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 1).max(20);
+            let prefix_width: usize = 4;
+            let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(1)).max(20);
 
             // Check if a module registered a custom visualizer for this tool
             let registry = get_visualizer_registry();
@@ -84,32 +87,33 @@ pub(crate) fn render_message(
             };
 
             let mut is_first = true;
-            let mut push_with_prefix = |line_spans: Vec<Span<'static>>, lines: &mut Vec<Line<'static>>| {
-                if is_first {
-                    let mut full = vec![
-                        Span::styled(status_icon.clone(), Style::default().fg(status_color)),
-                        Span::styled(" ".to_string(), base_style),
-                    ];
-                    full.extend(line_spans);
-                    lines.push(Line::from(full));
-                    is_first = false;
-                } else {
-                    let mut full = vec![Span::styled(" ".repeat(prefix_width), base_style)];
-                    full.extend(line_spans);
-                    lines.push(Line::from(full));
-                }
-            };
+            let mut push_with_prefix =
+                |line_spans: Vec<Span<'static>>, result_lines: &mut Vec<Line<'static>>| {
+                    if is_first {
+                        let mut full = vec![
+                            Span::styled(status_icon.clone(), Style::default().fg(status_color)),
+                            Span::styled(" ".to_string(), base_style),
+                        ];
+                        full.extend(line_spans);
+                        result_lines.push(Line::from(full));
+                        is_first = false;
+                    } else {
+                        let mut full = vec![Span::styled(" ".repeat(prefix_width), base_style)];
+                        full.extend(line_spans);
+                        result_lines.push(Line::from(full));
+                    }
+                };
 
             if let Some(vis_lines) = custom_lines {
                 // Use module-provided visualization
                 for vis_line in vis_lines {
-                    push_with_prefix(vis_line.spans, &mut lines);
+                    push_with_prefix(vis_line.spans, &mut output_lines);
                 }
             } else {
                 // Fallback: plain text rendering with wrapping
                 for line in result.content.lines() {
                     if line.is_empty() {
-                        lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
+                        output_lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
                         continue;
                     }
 
@@ -117,14 +121,14 @@ pub(crate) fn render_message(
                     for wrapped_line in wrapped {
                         push_with_prefix(
                             vec![Span::styled(wrapped_line, Style::default().fg(theme::text_secondary()))],
-                            &mut lines,
+                            &mut output_lines,
                         );
                     }
                 }
             }
         }
-        lines.push(Line::from(""));
-        return lines;
+        output_lines.push(Line::from(""));
+        return output_lines;
     }
 
     // Regular text message
@@ -143,17 +147,17 @@ pub(crate) fn render_message(
 
     let prefix = format!("{role_icon}{status_icon}");
     let prefix_width = UnicodeWidthStr::width(prefix.as_str());
-    let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
+    let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
 
     if content.trim().is_empty() {
         if msg.role == "assistant" && is_streaming_this {
-            lines.push(Line::from(vec![
+            output_lines.push(Line::from(vec![
                 Span::styled(role_icon, Style::default().fg(role_color)),
                 Span::styled(status_icon, Style::default().fg(theme::text_muted())),
                 Span::styled("...".to_string(), Style::default().fg(theme::text_muted()).italic()),
             ]));
         } else {
-            lines.push(Line::from(vec![
+            output_lines.push(Line::from(vec![
                 Span::styled(role_icon, Style::default().fg(role_color)),
                 Span::styled(status_icon, Style::default().fg(theme::text_muted())),
             ]));
@@ -165,11 +169,11 @@ pub(crate) fn render_message(
         let mut i = 0;
 
         while i < content_lines.len() {
-            let line = content_lines[i];
+            let Some(&line) = content_lines.get(i) else { break };
 
             if line.is_empty() {
-                lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
-                i += 1;
+                output_lines.push(Line::from(vec![Span::styled(" ".repeat(prefix_width), base_style)]));
+                i = i.saturating_add(1);
                 continue;
             }
 
@@ -177,12 +181,13 @@ pub(crate) fn render_message(
                 // Check for markdown table
                 if line.trim().starts_with('|') && line.trim().ends_with('|') {
                     let mut table_lines: Vec<&str> = vec![line];
-                    let mut j = i + 1;
+                    let mut j = i.saturating_add(1);
                     while j < content_lines.len() {
-                        let next = content_lines[j].trim();
-                        if next.starts_with('|') && next.ends_with('|') {
-                            table_lines.push(content_lines[j]);
-                            j += 1;
+                        let Some(&next) = content_lines.get(j) else { break };
+                        let next_trimmed = next.trim();
+                        if next_trimmed.starts_with('|') && next_trimmed.ends_with('|') {
+                            table_lines.push(next);
+                            j = j.saturating_add(1);
                         } else {
                             break;
                         }
@@ -196,12 +201,12 @@ pub(crate) fn render_message(
                                 Span::styled(status_icon.clone(), Style::default().fg(theme::text_muted())),
                             ];
                             line_spans.extend(row_spans);
-                            lines.push(Line::from(line_spans));
+                            output_lines.push(Line::from(line_spans));
                             is_first_line = false;
                         } else {
                             let mut line_spans = vec![Span::styled(" ".repeat(prefix_width), base_style)];
                             line_spans.extend(row_spans);
-                            lines.push(Line::from(line_spans));
+                            output_lines.push(Line::from(line_spans));
                         }
                     }
 
@@ -220,12 +225,12 @@ pub(crate) fn render_message(
                             Span::styled(status_icon.clone(), Style::default().fg(theme::text_muted())),
                         ];
                         line_spans.extend(md_spans);
-                        lines.push(Line::from(line_spans));
+                        output_lines.push(Line::from(line_spans));
                         is_first_line = false;
                     } else {
                         let mut line_spans = vec![Span::styled(" ".repeat(prefix_width), base_style)];
                         line_spans.extend(md_spans);
-                        lines.push(Line::from(line_spans));
+                        output_lines.push(Line::from(line_spans));
                     }
                 }
             } else {
@@ -234,27 +239,27 @@ pub(crate) fn render_message(
 
                 for line_text in &wrapped {
                     if is_first_line {
-                        lines.push(Line::from(vec![
+                        output_lines.push(Line::from(vec![
                             Span::styled(role_icon.clone(), Style::default().fg(role_color)),
                             Span::styled(status_icon.clone(), Style::default().fg(theme::text_muted())),
                             Span::styled(line_text.clone(), Style::default().fg(theme::text())),
                         ]));
                         is_first_line = false;
                     } else {
-                        lines.push(Line::from(vec![
+                        output_lines.push(Line::from(vec![
                             Span::styled(" ".repeat(prefix_width), base_style),
                             Span::styled(line_text.clone(), Style::default().fg(theme::text())),
                         ]));
                     }
                 }
             }
-            i += 1;
+            i = i.saturating_add(1);
         }
     }
 
     // Dev mode: show token counts
     if dev_mode && msg.role == "assistant" && (msg.input_tokens > 0 || msg.content_token_count > 0) {
-        lines.push(Line::from(vec![
+        output_lines.push(Line::from(vec![
             Span::styled(" ".repeat(prefix_width), base_style),
             Span::styled(
                 format!("[in:{} out:{}]", msg.input_tokens, msg.content_token_count),
@@ -263,8 +268,8 @@ pub(crate) fn render_message(
         ]));
     }
 
-    lines.push(Line::from(""));
-    lines
+    output_lines.push(Line::from(""));
+    output_lines
 }
 
 /// Render a streaming tool call preview with YAML-style parameter display.
@@ -280,8 +285,8 @@ pub(crate) fn render_streaming_tool(
     let mut lines: Vec<Line<'static>> = Vec::new();
 
     let icon = icons::msg_tool_call();
-    let prefix_width = UnicodeWidthStr::width(icon.as_str()) + 1; // icon display width + space
-    let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
+    let prefix_width = UnicodeWidthStr::width(icon.as_str()).saturating_add(1); // icon display width + space
+    let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
 
     // Tool name header
     lines.push(Line::from(vec![
@@ -403,19 +408,19 @@ fn read_json_value(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>, f
         Some('"') => read_json_string(chars).unwrap_or_default(),
         Some(c) if c == '{' || c == '[' => {
             // Capture from current position to end (may be incomplete)
-            let start = chars.peek().map_or(full.len(), |&(i, _)| i);
+            let start = chars.peek().map_or(full.len(), |&(idx, _)| idx);
             // Consume remaining chars for this nested structure
             let open = c;
             let close = if c == '{' { '}' } else { ']' };
-            let mut depth = 0;
+            let mut depth: i32 = 0;
             let mut end = full.len();
-            for (i, ch) in chars.by_ref() {
-                if ch == open {
-                    depth += 1;
-                } else if ch == close {
-                    depth -= 1;
+            for (byte_idx, nested_ch) in chars.by_ref() {
+                if nested_ch == open {
+                    depth = depth.saturating_add(1);
+                } else if nested_ch == close {
+                    depth = depth.saturating_sub(1);
                     if depth == 0 {
-                        end = i + ch.len_utf8();
+                        end = byte_idx.saturating_add(nested_ch.len_utf8());
                         break;
                     }
                 }
@@ -442,6 +447,7 @@ fn read_json_value(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>, f
 ///
 /// Single-line values render as `prefix key: value`. Multiline values unroll
 /// line by line, each continuation indented to align under the first value char.
+#[expect(clippy::too_many_arguments, reason = "render parameters are cohesive and all required for YAML-style display")]
 fn render_param_lines(
     lines: &mut Vec<Line<'static>>,
     param_prefix: &str,
@@ -450,7 +456,7 @@ fn render_param_lines(
     wrap_width: usize,
     base_style: Style,
 ) {
-    let key_span_width = key.len() + 2; // "key: "
+    let key_span_width = key.len().saturating_add(2); // "key: "
     let val_width = wrap_width.saturating_sub(key_span_width);
     let val_lines: Vec<&str> = val.lines().collect();
 
@@ -465,9 +471,9 @@ fn render_param_lines(
     } else {
         // Multiline value — unroll each line with continuation indent
         let continuation = format!("{}{}", param_prefix, " ".repeat(key_span_width));
-        for (i, line) in val_lines.iter().enumerate() {
+        for (idx, line) in val_lines.iter().enumerate() {
             let display_line = truncate_single_line(line, val_width);
-            if i == 0 {
+            if idx == 0 {
                 lines.push(Line::from(vec![
                     Span::styled(param_prefix.to_string(), base_style),
                     Span::styled(format!("{key}: "), Style::default().fg(theme::accent())),

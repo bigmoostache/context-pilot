@@ -1,11 +1,20 @@
+/// Character constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::chars;
+/// Help subsystem: config overlay and command palette.
 pub(crate) mod help;
+/// Shared UI helper functions: truncation, formatting, syntax highlighting.
 pub(crate) mod helpers;
+/// Status bar, question form, and autocomplete popup rendering.
 mod input;
+/// Markdown parsing and table rendering utilities.
 pub(crate) mod markdown;
+/// Performance monitoring overlay and metrics.
 pub(crate) mod perf;
+/// Sidebar rendering (full and collapsed modes).
 mod sidebar;
+/// Theme color constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::theme;
+/// Typewriter animation buffer for streaming text.
 pub(crate) mod typewriter;
 
 use ratatui::Frame;
@@ -17,6 +26,7 @@ use crate::infra::constants::STATUS_BAR_HEIGHT;
 use crate::state::{ContextType, State};
 use crate::ui::perf::PERF;
 
+/// Top-level render entry point: draws the entire TUI frame.
 pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     PERF.frame_start();
     let _guard = crate::profile!("ui::render");
@@ -34,7 +44,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         ])
         .split(area);
 
-    debug_assert!(main_layout.len() >= 2);
+    debug_assert!(main_layout.len() >= 2, "main_layout must have at least 2 chunks");
     render_body(frame, state, main_layout[0]);
     input::render_status_bar(frame, state, main_layout[1]);
 
@@ -64,6 +74,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     PERF.frame_end();
 }
 
+/// Render the body area: sidebar (if visible) and main content panel.
 fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let sw = state.sidebar_mode.width();
     if sw == 0 {
@@ -81,7 +92,7 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
         ])
         .split(area);
 
-    debug_assert!(body_layout.len() >= 2);
+    debug_assert!(body_layout.len() >= 2, "body_layout must have at least 2 chunks");
     match state.sidebar_mode {
         cp_base::state::data::config::SidebarMode::Normal => {
             sidebar::render_sidebar(frame, state, body_layout[0]);
@@ -94,6 +105,7 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     render_main_content(frame, state, body_layout[1]);
 }
 
+/// Render the main content area, splitting for question form if active.
 fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     // Check if question form is active — render it at bottom of content area
     if let Some(form) = state.get_ext::<cp_base::ui::question_form::PendingForm>()
@@ -109,7 +121,7 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
             ])
             .split(area);
 
-        debug_assert!(layout.len() >= 2);
+        debug_assert!(layout.len() >= 2, "question form layout must have at least 2 chunks");
         render_content_panel(frame, state, layout[0]);
         // Indent form by 1 col to avoid overlapping sidebar border
         let form_area = Rect { x: layout[1].x + 1, width: layout[1].width.saturating_sub(1), ..layout[1] };
@@ -121,6 +133,7 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     render_content_panel(frame, state, area);
 }
 
+/// Render the active content panel (conversation or generic panel).
 fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let _guard = crate::profile!("ui::render_panel");
     let context_type = state

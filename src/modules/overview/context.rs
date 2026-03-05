@@ -6,29 +6,29 @@ use std::fmt::Write as _;
 
 /// Estimate tokens for all enabled tool definitions as they'd appear in the API request.
 pub(crate) fn estimate_tool_definitions_tokens(state: &State) -> usize {
-    let mut total = 0;
+    let mut total = 0usize;
     for tool in &state.tools {
         if !tool.enabled {
             continue;
         }
         // Each tool contributes: name, description, and parameter schema
-        total += estimate_tokens(&tool.name);
-        total += estimate_tokens(&tool.description);
+        total = total.saturating_add(estimate_tokens(&tool.name));
+        total = total.saturating_add(estimate_tokens(&tool.description));
         for param in &tool.params {
-            total += estimate_tokens(&param.name);
+            total = total.saturating_add(estimate_tokens(&param.name));
             if let Some(desc) = &param.description {
-                total += estimate_tokens(desc);
+                total = total.saturating_add(estimate_tokens(desc));
             }
             if let Some(vals) = &param.enum_values {
                 for v in vals {
-                    total += estimate_tokens(v);
+                    total = total.saturating_add(estimate_tokens(v));
                 }
             }
             // JSON schema overhead per param (~10 tokens for type, required, etc.)
-            total += 10;
+            total = total.saturating_add(10);
         }
         // Per-tool JSON overhead (~15 tokens for wrapping object, input_schema, etc.)
-        total += 15;
+        total = total.saturating_add(15);
     }
     total
 }
@@ -39,13 +39,13 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     // Estimate system prompt tokens
     let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
     // The system prompt is sent twice: once in the system field, once as seed re-injection
-    let system_prompt_tokens = estimate_tokens(&system_prompt) * 2;
+    let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
 
     // Estimate tool definition tokens
     let tool_def_tokens = estimate_tool_definitions_tokens(state);
 
     let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-    let total_tokens = system_prompt_tokens + tool_def_tokens + panel_tokens;
+    let total_tokens = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
     let budget = state.effective_context_budget();
     let threshold = state.cleaning_threshold_tokens();
     let usage_pct = (total_tokens.to_f64() / budget.to_f64() * 100.0).min(100.0);
@@ -58,12 +58,12 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     // --- Non-panel entries first: system prompt and tool definitions ---
     output.push_str("Context Elements:\n");
 
-    accumulated += system_prompt_tokens;
-    let _r = writeln!(output, "  -- system-prompt (×2): {system_prompt_tokens} tokens (acc: {accumulated})");
+    accumulated = accumulated.saturating_add(system_prompt_tokens);
+    let _r1 = writeln!(output, "  -- system-prompt (×2): {system_prompt_tokens} tokens (acc: {accumulated})");
 
-    accumulated += tool_def_tokens;
+    accumulated = accumulated.saturating_add(tool_def_tokens);
     let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
-    let _r = writeln!(
+    let _r2 = writeln!(
         output,
         "  -- tool-definitions ({enabled_count} enabled): {tool_def_tokens} tokens (acc: {accumulated})"
     );
@@ -88,16 +88,16 @@ pub(crate) fn generate_context_content(state: &State) -> String {
         let hit_miss = if ctx.panel_cache_hit { "\u{2713}" } else { "\u{2717}" };
         let cost = format!("${:.2}", ctx.panel_total_cost);
 
-        accumulated += ctx.token_count;
+        accumulated = accumulated.saturating_add(ctx.token_count);
 
         if details.is_empty() {
-            let _r = writeln!(
+            let _r3 = writeln!(
                 output,
                 "  {} {}: {} tokens {} {} (acc: {})",
                 ctx.id, type_name, ctx.token_count, cost, hit_miss, accumulated
             );
         } else {
-            let _r = writeln!(
+            let _r4 = writeln!(
                 output,
                 "  {} {} ({}): {} tokens {} {} (acc: {})",
                 ctx.id, type_name, details, ctx.token_count, cost, hit_miss, accumulated
@@ -108,7 +108,7 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     // Statistics
     let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
     let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
-    let _r =
+    let _r5 =
         write!(output, "\nMessages: {} ({} user, {} assistant)\n", state.messages.len(), user_msgs, assistant_msgs);
 
     // Module-specific overview sections (todos, memories, git status, etc.)

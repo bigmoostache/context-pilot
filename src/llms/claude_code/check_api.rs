@@ -13,6 +13,7 @@ use super::{
 use crate::infra::constants::API_VERSION;
 
 impl ClaudeCodeClient {
+    /// Run sequential API health checks: auth, streaming, and tool calling.
     pub(crate) fn do_check_api(&self, model: &str) -> ApiCheckResult {
         let access_token = match self.access_token.as_ref() {
             Some(t) => t.expose_secret(),
@@ -66,6 +67,7 @@ fn system_block() -> Value {
 }
 
 /// Build a health-check request with standard Claude Code headers.
+#[expect(clippy::too_many_arguments, reason = "health-check builder needs all request parameters individually")]
 fn build_check_request(
     client: &Client,
     access_token: &str,
@@ -91,10 +93,14 @@ fn build_check_request(
         "messages": [user_msg]
     });
     if stream {
-        body["stream"] = serde_json::json!(true);
+        if let Some(obj) = body.as_object_mut() {
+            let _r = obj.insert("stream".to_string(), serde_json::json!(true));
+        }
     }
     if let Some(t) = tools {
-        body["tools"] = t.clone();
+        if let Some(obj) = body.as_object_mut() {
+            let _r = obj.insert("tools".to_string(), t.clone());
+        }
     }
 
     let accept = if stream { "text/event-stream" } else { "application/json" };

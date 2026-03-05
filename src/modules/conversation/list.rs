@@ -1,34 +1,49 @@
 /// Actions for list continuation behavior
 use cp_base::cast::SafeCast as _;
 
+/// Describes what action to take when Enter is pressed on a list item.
 pub(super) enum ListAction {
-    Continue(String), // Insert list continuation (e.g., "\n- " or "\n2. ")
-    RemoveItem,       // Remove empty list item but keep the newline
+    /// Insert list continuation (e.g., "\n- " or "\n2. ")
+    Continue(String),
+    /// Remove empty list item but keep the newline
+    RemoveItem,
 }
 
 /// Increment alphabetical list marker: a->b, z->aa, A->B, Z->AA
 fn next_alpha_marker(marker: &str) -> String {
     let chars: Vec<char> = marker.chars().collect();
-    let is_upper = chars[0].is_ascii_uppercase();
+    let Some(&first_char) = chars.first() else {
+        return "a".to_string();
+    };
+    let is_upper = first_char.is_ascii_uppercase();
     let base = if is_upper { b'A' } else { b'a' };
 
     // Convert to number (a=0, b=1, ..., z=25, aa=26, ab=27, ...)
     let mut num: usize = 0;
     for c in &chars {
-        num = num * 26 + (c.to_ascii_lowercase() as usize - b'a' as usize);
+        num = num.saturating_mul(26).saturating_add(c.to_ascii_lowercase() as usize).saturating_sub(b'a' as usize);
     }
-    num += 1; // Increment
+    num = num.saturating_add(1); // Increment
 
-    // Convert back to letters
+    // Convert back to letters using base-26 encoding
+    alpha_from_number(num, base)
+}
+
+/// Convert a number to a base-26 alphabetical string.
+///
+/// Centralizes integer division and remainder operations for alphabetical
+/// list marker encoding (a=0, b=1, ..., z=25, aa=26, ...).
+#[expect(clippy::integer_division_remainder_used, reason = "base-26 encoding requires modulo and division")]
+fn alpha_from_number(num: usize, base: u8) -> String {
     let mut result = String::new();
     let mut n = num;
     loop {
-        result.insert(0, (base + (n % 26).to_u8()) as char);
+        result.insert(0, (base.saturating_add((n % 26).to_u8())) as char);
         n /= 26;
         if n == 0 {
             break;
         }
-        n -= 1; // Adjust for 1-based (a=1, not a=0 for multi-char)
+        n = n.saturating_sub(1);
     }
     result
 }
@@ -61,7 +76,7 @@ pub(super) fn detect_list_action(input: &str) -> Option<ListAction> {
     // Ordered (numeric or alphabetic): exactly "X. " with nothing after
     if let Some(dot_pos) = trimmed.find(". ") {
         let marker = trimmed.get(..dot_pos).unwrap_or("");
-        let after = trimmed.get(dot_pos + 2..).unwrap_or("");
+        let after = trimmed.get(dot_pos.saturating_add(2)..).unwrap_or("");
         if after.is_empty() {
             // Check if it's a valid marker (numeric or alphabetic)
             let is_numeric = marker.chars().all(|c| c.is_ascii_digit());
@@ -78,20 +93,24 @@ pub(super) fn detect_list_action(input: &str) -> Option<ListAction> {
     // Unordered list: "- text" or "* text"
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
         let prefix = trimmed.get(..2).unwrap_or("");
-        let indent = current_line.len() - trimmed.len();
+        let indent = current_line.len().saturating_sub(trimmed.len());
         return Some(ListAction::Continue(format!("\n{}{}", " ".repeat(indent), prefix)));
     }
 
     // Ordered list: "1. text", "a. text", "A. text", etc.
     if let Some(dot_pos) = trimmed.find(". ") {
         let marker = trimmed.get(..dot_pos).unwrap_or("");
-        let indent = current_line.len() - trimmed.len();
+        let indent = current_line.len().saturating_sub(trimmed.len());
 
         // Numeric: 1, 2, 3, ...
         if marker.chars().all(|c| c.is_ascii_digit())
             && let Ok(num) = marker.parse::<usize>()
         {
-            return Some(ListAction::Continue(format!("\n{}{}. ", " ".repeat(indent), num + 1)));
+            return Some(ListAction::Continue(format!(
+                "\n{}{}. ",
+                " ".repeat(indent),
+                num.saturating_add(1)
+            )));
         }
 
         // Alphabetic: a, b, c, ... or A, B, C, ... (single char only)

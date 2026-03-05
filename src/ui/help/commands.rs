@@ -14,12 +14,14 @@ pub(crate) struct PaletteCommand {
 }
 
 impl PaletteCommand {
+    /// Create a new palette command with the given id, label, and description.
     pub(crate) fn new(id: impl Into<String>, label: impl Into<String>, description: impl Into<String>) -> Self {
         let label = label.into();
         let keywords = vec![label.to_lowercase()];
         Self { id: id.into(), label, description: description.into(), keywords }
     }
 
+    /// Add extra keywords for fuzzy matching.
     pub(crate) fn with_keywords(mut self, keywords: &[&str]) -> Self {
         self.keywords.extend(keywords.iter().map(|s| s.to_lowercase()));
         self
@@ -45,28 +47,28 @@ impl PaletteCommand {
             return 0;
         }
         let query_lower = query.to_lowercase();
-        let mut score = 0;
+        let mut score = 0i32;
 
         // Exact ID match (highest priority)
         if self.id.to_lowercase() == query_lower {
-            score += 1000;
+            score = score.saturating_add(1000);
         } else if self.id.to_lowercase().starts_with(&query_lower) {
-            score += 500;
+            score = score.saturating_add(500);
         }
 
         // Label match
         if self.label.to_lowercase().starts_with(&query_lower) {
-            score += 100;
+            score = score.saturating_add(100);
         } else if self.label.to_lowercase().contains(&query_lower) {
-            score += 50;
+            score = score.saturating_add(50);
         }
 
         // Keyword match
         for keyword in &self.keywords {
             if keyword.starts_with(&query_lower) {
-                score += 30;
+                score = score.saturating_add(30);
             } else if keyword.contains(&query_lower) {
-                score += 10;
+                score = score.saturating_add(10);
             }
         }
 

@@ -25,8 +25,8 @@ impl App {
     fn save_tool_call_message(&mut self, tool: &cp_base::tools::ToolUse) {
         let tool_id = format!("T{}", self.state.next_tool_id);
         let tool_global_uid = format!("UID_{}_T", self.state.global_next_uid);
-        self.state.next_tool_id += 1;
-        self.state.global_next_uid += 1;
+        self.state.next_tool_id = self.state.next_tool_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
 
         let tool_msg = Message {
             id: tool_id,
@@ -45,6 +45,7 @@ impl App {
         self.state.messages.push(tool_msg);
     }
 
+    /// Execute pending tool calls: pre-flight, queue intercept, callbacks, and pipeline resumption.
     pub(super) fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>) {
         if !self.state.flags.stream.phase.is_streaming()
             || self.pending_done.is_none()
@@ -108,7 +109,7 @@ impl App {
                     let short = if params.len() > 120 {
                         let mut end = 117;
                         while !params.is_char_boundary(end) {
-                            end -= 1;
+                            end = end.saturating_sub(1);
                         }
                         format!("{}...", params.get(..end).unwrap_or(""))
                     } else {
@@ -218,7 +219,7 @@ impl App {
                 if !blocking_cbs.is_empty() {
                     // Generate a unique sentinel ID for the blocking watcher
                     let sentinel_id = format!("cb_block_{}", self.state.next_tool_id);
-                    self.state.next_tool_id += 1;
+                    self.state.next_tool_id = self.state.next_tool_id.saturating_add(1);
 
                     let _summaries =
                         callback_firing::fire_blocking_callbacks(&mut self.state, &blocking_cbs, &sentinel_id);
@@ -246,8 +247,8 @@ impl App {
         // Create tool result message
         let result_id = format!("R{}", self.state.next_result_id);
         let result_global_uid = format!("UID_{}_R", self.state.global_next_uid);
-        self.state.next_result_id += 1;
-        self.state.global_next_uid += 1;
+        self.state.next_result_id = self.state.next_result_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
         let tool_result_records: Vec<ToolResultRecord> = tool_results
             .iter()
             .zip(tools.iter())
@@ -282,8 +283,8 @@ impl App {
         // Create new assistant message
         let assistant_id = format!("A{}", self.state.next_assistant_id);
         let assistant_global_uid = format!("UID_{}_A", self.state.global_next_uid);
-        self.state.next_assistant_id += 1;
-        self.state.global_next_uid += 1;
+        self.state.next_assistant_id = self.state.next_assistant_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
         let new_assistant_msg = Message {
             id: assistant_id,
             uid: Some(assistant_global_uid),
@@ -306,12 +307,12 @@ impl App {
             self.state.tick_cache_hit_tokens = cache_hit_tokens;
             self.state.tick_cache_miss_tokens = cache_miss_tokens;
             self.state.tick_output_tokens = output_tokens;
-            self.state.stream_cache_hit_tokens += cache_hit_tokens;
-            self.state.stream_cache_miss_tokens += cache_miss_tokens;
-            self.state.stream_output_tokens += output_tokens;
-            self.state.cache_hit_tokens += cache_hit_tokens;
-            self.state.cache_miss_tokens += cache_miss_tokens;
-            self.state.total_output_tokens += output_tokens;
+            self.state.stream_cache_hit_tokens = self.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
+            self.state.stream_cache_miss_tokens = self.state.stream_cache_miss_tokens.saturating_add(cache_miss_tokens);
+            self.state.stream_output_tokens = self.state.stream_output_tokens.saturating_add(output_tokens);
+            self.state.cache_hit_tokens = self.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
+            self.state.cache_miss_tokens = self.state.cache_miss_tokens.saturating_add(cache_miss_tokens);
+            self.state.total_output_tokens = self.state.total_output_tokens.saturating_add(output_tokens);
         }
 
         self.save_state_async();
@@ -418,8 +419,8 @@ impl App {
         // Now resume the normal pipeline: create result message and continue streaming
         let result_id = format!("R{}", self.state.next_result_id);
         let result_global_uid = format!("UID_{}_R", self.state.global_next_uid);
-        self.state.next_result_id += 1;
-        self.state.global_next_uid += 1;
+        self.state.next_result_id = self.state.next_result_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
         let tool_result_records: Vec<ToolResultRecord> = tool_results
             .iter()
             .map(|r| ToolResultRecord {
@@ -453,8 +454,8 @@ impl App {
         // Create new assistant message for continued streaming
         let assistant_id = format!("A{}", self.state.next_assistant_id);
         let assistant_global_uid = format!("UID_{}_A", self.state.global_next_uid);
-        self.state.next_assistant_id += 1;
-        self.state.global_next_uid += 1;
+        self.state.next_assistant_id = self.state.next_assistant_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
         let new_assistant_msg = Message {
             id: assistant_id,
             uid: Some(assistant_global_uid),
@@ -477,12 +478,12 @@ impl App {
             self.state.tick_cache_hit_tokens = cache_hit_tokens;
             self.state.tick_cache_miss_tokens = cache_miss_tokens;
             self.state.tick_output_tokens = output_tokens;
-            self.state.stream_cache_hit_tokens += cache_hit_tokens;
-            self.state.stream_cache_miss_tokens += cache_miss_tokens;
-            self.state.stream_output_tokens += output_tokens;
-            self.state.cache_hit_tokens += cache_hit_tokens;
-            self.state.cache_miss_tokens += cache_miss_tokens;
-            self.state.total_output_tokens += output_tokens;
+            self.state.stream_cache_hit_tokens = self.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
+            self.state.stream_cache_miss_tokens = self.state.stream_cache_miss_tokens.saturating_add(cache_miss_tokens);
+            self.state.stream_output_tokens = self.state.stream_output_tokens.saturating_add(output_tokens);
+            self.state.cache_hit_tokens = self.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
+            self.state.cache_miss_tokens = self.state.cache_miss_tokens.saturating_add(cache_miss_tokens);
+            self.state.total_output_tokens = self.state.total_output_tokens.saturating_add(output_tokens);
         }
 
         self.save_state_async();

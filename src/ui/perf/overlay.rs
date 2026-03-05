@@ -11,6 +11,7 @@ use ratatui::Frame;
 use ratatui::prelude::{Color, Line, Rect, Span, Style};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 
+/// Render the performance overlay in the top-right corner.
 pub(crate) fn render_perf_overlay(frame: &mut Frame<'_>, area: Rect) {
     use super::super::helpers::render_table;
 
@@ -21,7 +22,7 @@ pub(crate) fn render_perf_overlay(frame: &mut Frame<'_>, area: Rect) {
     let overlay_height = 28u16;
 
     // Position in top-right
-    let x = area.width.saturating_sub(overlay_width + 2);
+    let x = area.width.saturating_sub(overlay_width.saturating_add(2));
     let y = 1;
     let overlay_area = Rect::new(x, y, overlay_width, overlay_height.min(area.height.saturating_sub(2)));
 
@@ -82,7 +83,8 @@ pub(crate) fn render_perf_overlay(frame: &mut Frame<'_>, area: Rect) {
             let name = if op.name.len() <= 24 {
                 op.name.to_string()
             } else {
-                format!("..{}", &op.name.get(op.name.len() - 22..).unwrap_or(""))
+                let tail_start = op.name.len().saturating_sub(22);
+                format!("..{}", op.name.get(tail_start..).unwrap_or(""))
             };
             let name_str = if is_hotspot { format!("! {name}") } else { format!("  {name}") };
 
@@ -139,6 +141,7 @@ pub(crate) fn render_perf_overlay(frame: &mut Frame<'_>, area: Rect) {
     frame.render_widget(paragraph, overlay_area);
 }
 
+/// Map frame time to a color (green/yellow/red).
 fn frame_time_color(ms: f64) -> Color {
     if ms < FRAME_BUDGET_60FPS {
         theme::success()
@@ -148,6 +151,8 @@ fn frame_time_color(ms: f64) -> Color {
         theme::error()
     }
 }
+
+/// Render a budget bar showing current frame time as a percentage of the budget.
 fn render_budget_bar(current_ms: f64, label: &str, budget_ms: f64) -> Line<'static> {
     let pct = (current_ms / budget_ms * 100.0).min(150.0);
     let bar_width = 30usize;
@@ -171,6 +176,8 @@ fn render_budget_bar(current_ms: f64, label: &str, budget_ms: f64) -> Line<'stat
         Span::styled(format!(" {pct:>5.0}%"), Style::default().fg(color)),
     ])
 }
+
+/// Render a sparkline visualization of recent frame times.
 fn render_sparkline(values: &[f64]) -> Line<'static> {
     const SPARK_CHARS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
@@ -185,8 +192,9 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
     let sparkline: String = values
         .iter()
         .map(|&v| {
-            let idx = ((v / max_val) * (SPARK_CHARS.len() - 1).to_f64()).to_usize();
-            SPARK_CHARS[idx.min(SPARK_CHARS.len() - 1)]
+            let idx = ((v / max_val) * SPARK_CHARS.len().saturating_sub(1).to_f64()).to_usize();
+            let clamped = idx.min(SPARK_CHARS.len().saturating_sub(1));
+            SPARK_CHARS.get(clamped).copied().unwrap_or('▁')
         })
         .collect();
 

@@ -109,65 +109,87 @@ pub(crate) const DEFAULT_WORKER_ID: &str = "main_worker";
 // THEME COLORS (loaded from active theme in yamls/themes.yaml)
 // =============================================================================
 
+/// Theme color accessors loaded from the active YAML theme.
 pub(crate) mod theme {
     use crate::infra::config::active_theme;
     use ratatui::style::Color;
 
+    /// Convert an RGB array to a ratatui `Color`.
     const fn rgb(c: [u8; 3]) -> Color {
         Color::Rgb(c[0], c[1], c[2])
     }
 
     // Primary brand colors
+
+    /// Accent color from the active theme.
     pub(crate) fn accent() -> Color {
         rgb(active_theme().colors.accent)
     }
+    /// Dimmed accent color from the active theme.
     pub(crate) fn accent_dim() -> Color {
         rgb(active_theme().colors.accent_dim)
     }
+    /// Success color from the active theme.
     pub(crate) fn success() -> Color {
         rgb(active_theme().colors.success)
     }
+    /// Warning color from the active theme.
     pub(crate) fn warning() -> Color {
         rgb(active_theme().colors.warning)
     }
+    /// Error color from the active theme.
     pub(crate) fn error() -> Color {
         rgb(active_theme().colors.error)
     }
 
     // Text colors
+
+    /// Primary text color from the active theme.
     pub(crate) fn text() -> Color {
         rgb(active_theme().colors.text)
     }
+    /// Secondary text color from the active theme.
     pub(crate) fn text_secondary() -> Color {
         rgb(active_theme().colors.text_secondary)
     }
+    /// Muted text color from the active theme.
     pub(crate) fn text_muted() -> Color {
         rgb(active_theme().colors.text_muted)
     }
 
     // Background colors
+
+    /// Base background color from the active theme.
     pub(crate) fn bg_base() -> Color {
         rgb(active_theme().colors.bg_base)
     }
+    /// Surface background color from the active theme.
     pub(crate) fn bg_surface() -> Color {
         rgb(active_theme().colors.bg_surface)
     }
+    /// Elevated background color from the active theme.
     pub(crate) fn bg_elevated() -> Color {
         rgb(active_theme().colors.bg_elevated)
     }
 
     // Border colors
+
+    /// Border color from the active theme.
     pub(crate) fn border() -> Color {
         rgb(active_theme().colors.border)
     }
+    /// Muted border color from the active theme.
     pub(crate) fn border_muted() -> Color {
         rgb(active_theme().colors.border_muted)
     }
 
     // Role-specific colors
+
+    /// User role color from the active theme.
     pub(crate) fn user() -> Color {
         rgb(active_theme().colors.user)
     }
+    /// Assistant role color from the active theme.
     pub(crate) fn assistant() -> Color {
         rgb(active_theme().colors.assistant)
     }
@@ -177,13 +199,21 @@ pub(crate) mod theme {
 // UI CHARACTERS
 // =============================================================================
 
+/// Unicode box-drawing and symbol characters for TUI rendering.
 pub(crate) mod chars {
+    /// Horizontal line character (box-drawing).
     pub(crate) const HORIZONTAL: &str = "─";
+    /// Full block character.
     pub(crate) const BLOCK_FULL: &str = "█";
+    /// Light shade block character.
     pub(crate) const BLOCK_LIGHT: &str = "░";
+    /// Right-pointing arrow character.
     pub(crate) const ARROW_RIGHT: &str = "▸";
+    /// Up-pointing arrow character.
     pub(crate) const ARROW_UP: &str = "↑";
+    /// Down-pointing arrow character.
     pub(crate) const ARROW_DOWN: &str = "↓";
+    /// Cross / multiplication sign character.
     pub(crate) const CROSS: &str = "✗";
 }
 
@@ -192,30 +222,36 @@ pub(crate) mod chars {
 // All icons are normalized to 2 display cells width for consistent alignment
 // =============================================================================
 
+/// Icon accessors loaded from the active YAML theme, normalized to 2 cells.
 pub(crate) mod icons {
     use crate::infra::config::{active_theme, normalize_icon};
 
-    // Message types - accessor functions for active theme (normalized to 2 cells)
+    /// Icon for user messages (normalized to 2 cells).
     pub(crate) fn msg_user() -> String {
         normalize_icon(&active_theme().messages.user)
     }
+    /// Icon for assistant messages (normalized to 2 cells).
     pub(crate) fn msg_assistant() -> String {
         normalize_icon(&active_theme().messages.assistant)
     }
+    /// Icon for tool call messages (normalized to 2 cells).
     pub(crate) fn msg_tool_call() -> String {
         normalize_icon(&active_theme().messages.tool_call)
     }
+    /// Icon for tool result messages (normalized to 2 cells).
     pub(crate) fn msg_tool_result() -> String {
         normalize_icon(&active_theme().messages.tool_result)
     }
+    /// Icon for error messages (normalized to 2 cells).
     pub(crate) fn msg_error() -> String {
         normalize_icon(&active_theme().messages.error)
     }
 
-    // Message status (normalized to 2 cells)
+    /// Icon for full status indicator (normalized to 2 cells).
     pub(crate) fn status_full() -> String {
         normalize_icon(&active_theme().status.full)
     }
+    /// Icon for deleted status indicator (normalized to 2 cells).
     pub(crate) fn status_deleted() -> String {
         normalize_icon(&active_theme().status.deleted)
     }
@@ -225,36 +261,46 @@ pub(crate) mod icons {
 // PROMPTS (loaded from yamls/prompts.yaml via config module)
 // =============================================================================
 
+/// Library content accessors loaded from YAML configuration.
 pub(crate) mod library {
     use crate::infra::config::LIBRARY;
 
+    /// Returns the default agent content from the library configuration.
     pub(crate) fn default_agent_content() -> &'static str {
         let id = &LIBRARY.default_agent_id;
         LIBRARY.agents.iter().find(|a| a.id == *id).map_or("", |a| a.content.as_str())
     }
 }
 
+/// Prompt template accessors loaded from YAML configuration.
 pub(crate) mod prompts {
     use crate::infra::config::PROMPTS;
 
+    /// Prompt template for panel headers.
     pub(crate) fn panel_header() -> &'static str {
         &PROMPTS.panel.header
     }
+    /// Prompt template for panel timestamps.
     pub(crate) fn panel_timestamp() -> &'static str {
         &PROMPTS.panel.timestamp
     }
+    /// Prompt template for unknown panel timestamps.
     pub(crate) fn panel_timestamp_unknown() -> &'static str {
         &PROMPTS.panel.timestamp_unknown
     }
+    /// Prompt template for panel footers.
     pub(crate) fn panel_footer() -> &'static str {
         &PROMPTS.panel.footer
     }
+    /// Prompt template for panel footer message lines.
     pub(crate) fn panel_footer_msg_line() -> &'static str {
         &PROMPTS.panel.footer_msg_line
     }
+    /// Prompt template for panel footer message headers.
     pub(crate) fn panel_footer_msg_header() -> &'static str {
         &PROMPTS.panel.footer_msg_header
     }
+    /// Prompt template for panel footer acknowledgment.
     pub(crate) fn panel_footer_ack() -> &'static str {
         &PROMPTS.panel.footer_ack
     }

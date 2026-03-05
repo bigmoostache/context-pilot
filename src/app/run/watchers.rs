@@ -39,16 +39,22 @@ impl App {
     /// path, staggered by the `cache_in_flight` guard — preventing a massive burst
     /// of concurrent background threads on startup when many panels are persisted.
     pub(super) fn schedule_initial_cache_refreshes(&mut self) {
-        for i in 0..self.state.context.len() {
-            let ctx = &self.state.context[i];
-            if !ctx.context_type.is_fixed() {
-                continue;
-            }
-            let panel = crate::app::panels::get_panel(&ctx.context_type);
-            let request = panel.build_cache_request(ctx, &self.state);
-            if let Some(request) = request {
-                process_cache_request(request, self.cache_tx.clone());
-                self.state.context[i].cache_in_flight = true;
+        // Collect requests first (immutable borrow), then mark in-flight (mutable borrow).
+        let requests: Vec<(usize, CacheRequest)> = self
+            .state
+            .context
+            .iter()
+            .enumerate()
+            .filter(|(_, ctx)| ctx.context_type.is_fixed())
+            .filter_map(|(i, ctx)| {
+                let panel = crate::app::panels::get_panel(&ctx.context_type);
+                panel.build_cache_request(ctx, &self.state).map(|req| (i, req))
+            })
+            .collect();
+        for (i, request) in requests {
+            process_cache_request(request, self.cache_tx.clone());
+            if let Some(ctx) = self.state.context.get_mut(i) {
+                ctx.cache_in_flight = true;
             }
         }
     }
@@ -77,8 +83,8 @@ impl App {
                 if context_type.as_str() == ContextType::GITHUB_RESULT
                     && data.is::<cp_mod_github::watcher::BranchPrUpdate>()
                 {
-                    if let CacheUpdate::ModuleSpecific { data, .. } = update
-                        && let Ok(pr_update) = data.downcast::<cp_mod_github::watcher::BranchPrUpdate>()
+                    if let CacheUpdate::ModuleSpecific { data: owned_data, .. } = update
+                        && let Ok(pr_update) = owned_data.downcast::<cp_mod_github::watcher::BranchPrUpdate>()
                     {
                         cp_mod_github::types::GithubState::get_mut(state).branch_pr = pr_update.pr_info;
                         state.flags.ui.dirty = true;
@@ -156,15 +162,17 @@ impl App {
         refresh_indices.sort_unstable();
         refresh_indices.dedup();
         for i in refresh_indices {
-            if self.state.context[i].cache_in_flight {
+            let Some(ctx) = self.state.context.get(i) else { continue };
+            if ctx.cache_in_flight {
                 continue;
             }
-            let ctx = &self.state.context[i];
             let panel = crate::app::panels::get_panel(&ctx.context_type);
             let request = panel.build_cache_request(ctx, &self.state);
             if let Some(request) = request {
                 process_cache_request(request, self.cache_tx.clone());
-                self.state.context[i].cache_in_flight = true;
+                if let Some(ctx_mut) = self.state.context.get_mut(i) {
+                    ctx_mut.cache_in_flight = true;
+                }
             }
         }
 
@@ -250,8 +258,10 @@ impl App {
         // Mutable pass: send requests, mark in-flight, update poll timestamps
         for (i, request) in requests {
             process_cache_request(request, self.cache_tx.clone());
-            self.state.context[i].cache_in_flight = true;
-            let _ = self.last_poll_ms.insert(self.state.context[i].id.clone(), current_ms);
+            if let Some(ctx) = self.state.context.get_mut(i) {
+                ctx.cache_in_flight = true;
+                let _r = self.last_poll_ms.insert(ctx.id.clone(), current_ms);
+            }
         }
 
         // Mutable pass: remove suicided panels (reverse order to preserve indices)
@@ -261,7 +271,7 @@ impl App {
                 if self.state.selected_context >= self.state.context.len().saturating_sub(1) {
                     self.state.selected_context = self.state.context.len().saturating_sub(2);
                 } else if self.state.selected_context > i {
-                    self.state.selected_context -= 1;
+                    self.state.selected_context = self.state.selected_context.saturating_sub(1);
                 }
                 drop(self.state.context.remove(i));
             }

@@ -18,6 +18,7 @@ use super::list::{self, ListAction};
 use super::render;
 use cp_base::cast::SafeCast as _;
 
+/// Panel for displaying the conversation messages and user input.
 pub(super) struct ConversationPanel;
 
 impl ConversationPanel {
@@ -131,9 +132,9 @@ impl ConversationPanel {
 
                     // Render each frozen message with full formatting
                     for msg in msgs {
-                        let lines =
+                        let rendered_lines =
                             render::render_message(msg, viewport_width, base_style, false, state.flags.ui.dev_mode);
-                        text.extend(lines);
+                        text.extend(rendered_lines);
                     }
 
                     // Separator footer
@@ -183,18 +184,22 @@ impl ConversationPanel {
                 }
 
                 // Cache miss - render message
-                let lines =
+                let rendered_lines =
                     render::render_message(msg, viewport_width, base_style, is_streaming_this, state.flags.ui.dev_mode);
 
                 // Store in per-message cache (but not for streaming message)
                 if !is_streaming_this {
                     let _r = state.message_cache.insert(
                         msg.id.clone(),
-                        MessageCache { lines: Rc::from(lines.as_slice()), content_hash: hash, viewport_width },
+                        MessageCache {
+                            lines: Rc::from(rendered_lines.as_slice()),
+                            content_hash: hash,
+                            viewport_width,
+                        },
                     );
                 }
 
-                text.extend(lines);
+                text.extend(rendered_lines);
             }
         }
 
@@ -349,7 +354,12 @@ impl Panel for ConversationPanel {
         let base_style = Style::default().bg(theme::bg_surface());
         let title = self.title(state);
 
-        let inner_area = Rect::new(area.x + 1, area.y, area.width.saturating_sub(2), area.height);
+        let inner_area = Rect::new(
+            area.x.saturating_add(1),
+            area.y,
+            area.width.saturating_sub(2),
+            area.height,
+        );
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -412,5 +422,40 @@ impl Panel for ConversationPanel {
                 &mut scrollbar_state,
             );
         }
+    }
+
+    fn refresh(&self, _state: &mut State) {}
+
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut crate::state::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &crate::state::ContextElement, _state: &State) -> bool {
+        false
     }
 }

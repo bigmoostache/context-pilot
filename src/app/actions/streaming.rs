@@ -4,7 +4,7 @@ use crate::state::{ContextType, State, StreamPhase, estimate_tokens};
 use super::ActionResult;
 use super::helpers::clean_llm_id_prefix;
 
-/// Handle `AppendChars` action — append streaming text to assistant message
+/// Handle `AppendChars` action — append streaming text to assistant message.
 pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
     if let Some(msg) = state.messages.last_mut()
         && msg.role == "assistant"
@@ -17,7 +17,7 @@ pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult
 
         if added > 0 {
             if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
-                ctx.token_count += added;
+                ctx.token_count = ctx.token_count.saturating_add(added);
             }
             state.streaming_estimated_tokens = new_estimate;
         }
@@ -25,7 +25,17 @@ pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult
     ActionResult::Nothing
 }
 
-/// Handle `StreamDone` action — finalize streaming, correct token counts
+/// Token usage reported when a stream completes.
+struct TokenUsage {
+    /// Number of output tokens generated.
+    output_tokens: usize,
+    /// Number of cache-hit input tokens.
+    cache_hit_tokens: usize,
+    /// Number of cache-miss input tokens.
+    cache_miss_tokens: usize,
+}
+
+/// Handle `StreamDone` action — finalize streaming, correct token counts.
 pub(crate) fn handle_stream_done(
     state: &mut State,
     input_tokens: usize,
@@ -37,20 +47,8 @@ pub(crate) fn handle_stream_done(
     state.flags.stream.phase.transition(StreamPhase::Idle);
     state.last_stop_reason = stop_reason.map(ToString::to_string);
 
-    // Set tick stats (this tick only)
-    state.tick_cache_hit_tokens = cache_hit_tokens;
-    state.tick_cache_miss_tokens = cache_miss_tokens;
-    state.tick_output_tokens = output_tokens;
-
-    // Accumulate per-stream stats (reset at InputSubmit)
-    state.stream_cache_hit_tokens += cache_hit_tokens;
-    state.stream_cache_miss_tokens += cache_miss_tokens;
-    state.stream_output_tokens += output_tokens;
-
-    // Accumulate total stats
-    state.cache_hit_tokens += cache_hit_tokens;
-    state.cache_miss_tokens += cache_miss_tokens;
-    state.total_output_tokens += output_tokens;
+    let usage = TokenUsage { output_tokens, cache_hit_tokens, cache_miss_tokens };
+    apply_token_usage(state, &usage);
 
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
@@ -75,7 +73,25 @@ pub(crate) fn handle_stream_done(
     ActionResult::Save
 }
 
-/// Handle `StreamError` action — clean up streaming state, log error
+/// Apply token usage to state counters.
+fn apply_token_usage(app_state: &mut State, usage: &TokenUsage) {
+    // Set tick usage (this tick only)
+    app_state.tick_cache_hit_tokens = usage.cache_hit_tokens;
+    app_state.tick_cache_miss_tokens = usage.cache_miss_tokens;
+    app_state.tick_output_tokens = usage.output_tokens;
+
+    // Accumulate per-stream usage (reset at InputSubmit)
+    app_state.stream_cache_hit_tokens = app_state.stream_cache_hit_tokens.saturating_add(usage.cache_hit_tokens);
+    app_state.stream_cache_miss_tokens = app_state.stream_cache_miss_tokens.saturating_add(usage.cache_miss_tokens);
+    app_state.stream_output_tokens = app_state.stream_output_tokens.saturating_add(usage.output_tokens);
+
+    // Accumulate total usage
+    app_state.cache_hit_tokens = app_state.cache_hit_tokens.saturating_add(usage.cache_hit_tokens);
+    app_state.cache_miss_tokens = app_state.cache_miss_tokens.saturating_add(usage.cache_miss_tokens);
+    app_state.total_output_tokens = app_state.total_output_tokens.saturating_add(usage.output_tokens);
+}
+
+/// Handle `StreamError` action — clean up streaming state, log error.
 pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
     state.flags.stream.phase.transition(StreamPhase::Idle);
 

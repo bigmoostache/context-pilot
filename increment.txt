@@ -523,3 +523,8 @@
 20:05:05.015238553 fmt crates/cp-mod-typst/src/lib.rs
 20:05:15.887377808 fmt crates/cp-mod-typst/src/lib.rs
 20:05:22.357935817 fmt crates/cp-mod-typst/src/lib.rs
+20:12:49.311416056 fmt crates/cp-mod-typst/src/lib.rs
+20:12:54.275057028 fmt crates/cp-mod-typst/src/lib.rs
+20:12:59.032611850 fmt crates/cp-mod-typst/src/lib.rs
+20:13:03.105668105 fmt crates/cp-mod-typst/src/lib.rs
+20:16:23.040342836 fmt crates/cp-base/src/state/flags.rs

@@ -1,25 +1,27 @@
 use cp_base::cast::SafeCast as _;
 use unicode_width::UnicodeWidthStr as _;
 
+/// Truncate a string to fit within `max_width` display columns, appending '…' if truncated.
 pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
     if s.width() <= max_width {
         s.to_string()
     } else {
         let mut result = String::new();
-        let mut width = 0;
+        let mut width = 0usize;
         for c in s.chars() {
             let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
-            if width + cw + 1 > max_width {
+            if width.saturating_add(cw).saturating_add(1) > max_width {
                 result.push('…');
                 break;
             }
             result.push(c);
-            width += cw;
+            width = width.saturating_add(cw);
         }
         result
     }
 }
 
+/// Format a number with K/M suffix for compact display.
 pub(crate) fn format_number(n: usize) -> String {
     if n >= 1_000_000 {
         format!("{:.1}M", n.to_f64() / 1_000_000.0)
@@ -30,19 +32,22 @@ pub(crate) fn format_number(n: usize) -> String {
     }
 }
 
-/// Format a millisecond delta as a human-readable "x ago" string
+/// Format a millisecond delta as a human-readable "x ago" string.
+/// Uses `time_arith` helpers for all truncating integer division.
 pub(crate) fn format_time_ago(delta_ms: u64) -> String {
-    let seconds = delta_ms / 1000;
+    let seconds = cp_base::panels::time_arith::ms_to_secs(delta_ms);
+    let (_, minutes, _) = cp_base::panels::time_arith::secs_to_hms_unwrapped(seconds);
+    let (hours, _, _) = cp_base::panels::time_arith::secs_to_hms_unwrapped(seconds);
     if seconds < 60 {
         format!("{seconds}s ago")
     } else if seconds < 3600 {
-        format!("{}m ago", seconds / 60)
+        format!("{minutes}m ago")
     } else {
-        format!("{}h ago", seconds / 3600)
+        format!("{hours}h ago")
     }
 }
 
-/// Word-wrap text to fit within a given width
+/// Word-wrap text to fit within a given width.
 pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
         return vec![text.to_string()];
@@ -50,7 +55,7 @@ pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
 
     let mut lines = Vec::new();
     let mut current_line = String::new();
-    let mut current_width = 0;
+    let mut current_width = 0usize;
 
     for word in text.split_whitespace() {
         let word_width = word.chars().count();
@@ -59,11 +64,11 @@ pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
             // First word on line
             current_line = word.to_string();
             current_width = word_width;
-        } else if current_width + 1 + word_width <= max_width {
+        } else if current_width.saturating_add(1).saturating_add(word_width) <= max_width {
             // Word fits on current line
             current_line.push(' ');
             current_line.push_str(word);
-            current_width += 1 + word_width;
+            current_width = current_width.saturating_add(1).saturating_add(word_width);
         } else {
             // Word doesn't fit, start new line
             lines.push(current_line);
@@ -83,8 +88,8 @@ pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     lines
 }
 
-/// Count how many lines a Line will take when wrapped to a given width
-/// Uses unicode width for accurate display width calculation
+/// Count how many lines a `Line` will take when wrapped to a given width.
+/// Uses unicode width for accurate display width calculation.
 pub(crate) fn count_wrapped_lines(line: &ratatui::prelude::Line<'_>, max_width: usize) -> usize {
     if max_width == 0 {
         return 1;
@@ -98,25 +103,25 @@ pub(crate) fn count_wrapped_lines(line: &ratatui::prelude::Line<'_>, max_width: 
     }
 
     // Simulate word wrapping
-    let mut line_count = 1;
-    let mut current_width = 0;
+    let mut line_count = 1usize;
+    let mut current_width = 0usize;
 
     for word in full_text.split_inclusive(|c: char| c.is_whitespace()) {
         let word_width = word.width();
 
         if current_width == 0 {
             current_width = word_width;
-        } else if current_width + word_width <= max_width {
-            current_width += word_width;
+        } else if current_width.saturating_add(word_width) <= max_width {
+            current_width = current_width.saturating_add(word_width);
         } else {
             // Word doesn't fit, start new line
-            line_count += 1;
+            line_count = line_count.saturating_add(1);
             current_width = word_width;
         }
 
         // Handle very long words that need to be broken
         while current_width > max_width {
-            line_count += 1;
+            line_count = line_count.saturating_add(1);
             current_width = current_width.saturating_sub(max_width);
         }
     }
@@ -131,10 +136,12 @@ pub(crate) use cp_base::ui::{Cell, render_table};
 /// Braille spinner frames (smooth 10-frame animation)
 const SPINNER_BRAILLE: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-/// Get a braille spinner frame (default spinner)
+/// Get a braille spinner frame for the given animation counter.
+#[expect(clippy::integer_division_remainder_used, reason = "modulo for cyclic spinner index is the algorithm")]
 pub(crate) fn spinner(frame: u64) -> &'static str {
-    let index = (frame.to_usize()) % SPINNER_BRAILLE.len();
-    SPINNER_BRAILLE[index]
+    let index = frame.to_usize() % SPINNER_BRAILLE.len();
+    let Some(ch) = SPINNER_BRAILLE.get(index) else { return SPINNER_BRAILLE.get(0).copied().unwrap_or("⠋") };
+    ch
 }
 
 // ─── Syntax Highlighting ─────────────────────────────────────────────────────
@@ -150,9 +157,13 @@ use syntect::util::LinesWithEndings;
 
 use ratatui::style::Color;
 
+/// Lazily-loaded default syntax definitions.
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
+/// Lazily-loaded default theme set.
 static THEME_SET: LazyLock<ThemeSet> = LazyLock::new(ThemeSet::load_defaults);
+/// Type alias for syntax-highlighted line data.
 type HighlightResult = Vec<Vec<(Color, String)>>;
+/// LRU-style cache for syntax highlighting results.
 static HIGHLIGHT_CACHE: LazyLock<Mutex<HashMap<String, Arc<HighlightResult>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -161,8 +172,8 @@ const fn to_ratatui_color(color: syntect::highlighting::Color) -> Color {
     Color::Rgb(color.r, color.g, color.b)
 }
 
-/// Get syntax-highlighted spans for a file
-/// Returns Vec of lines, where each line is Vec of (color, text) pairs
+/// Get syntax-highlighted spans for a file.
+/// Returns Vec of lines, where each line is Vec of (color, text) pairs.
 pub(crate) fn highlight_file(path: &str, content: &str) -> Arc<HighlightResult> {
     // Check cache first (keyed by path + content hash for simplicity)
     let cache_key = format!("{}:{}", path, content.len());
@@ -188,6 +199,7 @@ pub(crate) fn highlight_file(path: &str, content: &str) -> Arc<HighlightResult> 
     result
 }
 
+/// Perform syntax highlighting on the given file content.
 fn do_highlight(path: &str, content: &str) -> Vec<Vec<(Color, String)>> {
     // Find syntax for this file
     let syntax = SYNTAX_SET
@@ -204,9 +216,11 @@ fn do_highlight(path: &str, content: &str) -> Vec<Vec<(Color, String)>> {
         .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text());
 
     // Use a dark theme
-    let theme = &THEME_SET.themes["base16-ocean.dark"];
+    let Some(theme_ref) = THEME_SET.themes.get("base16-ocean.dark") else {
+        return Vec::new();
+    };
 
-    let mut highlighter = HighlightLines::new(syntax, theme);
+    let mut highlighter = HighlightLines::new(syntax, theme_ref);
     let mut result = Vec::new();
 
     for line in LinesWithEndings::from(content) {

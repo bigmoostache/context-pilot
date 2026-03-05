@@ -70,28 +70,36 @@ fn dump_last_request(worker_id: &str, api_request: &Value) {
 
 /// Claude Code OAuth client
 pub(crate) struct ClaudeCodeClient {
+    /// OAuth access token loaded from `~/.claude/.credentials.json`
     access_token: Option<SecretBox<String>>,
 }
 
+/// On-disk credentials file structure for Claude Code OAuth.
 #[derive(Deserialize)]
 struct CredentialsFile {
+    /// OAuth credentials section
     #[serde(rename = "claudeAiOauth")]
     claude_ai_oauth: OAuthCredentials,
 }
 
+/// OAuth credential fields within the credentials file.
 #[derive(Deserialize)]
 struct OAuthCredentials {
+    /// Bearer access token
     #[serde(rename = "accessToken")]
     access_token: String,
+    /// Token expiry timestamp in milliseconds since UNIX epoch
     #[serde(rename = "expiresAt")]
     expires_at: u64,
 }
 
 impl ClaudeCodeClient {
+    /// Create a new Claude Code client, loading the OAuth token from disk.
     pub(crate) fn new() -> Self {
         let access_token = Self::load_oauth_token();
         Self { access_token }
     }
+    /// Load the OAuth token from `~/.claude/.credentials.json`, checking expiry.
     fn load_oauth_token() -> Option<SecretBox<String>> {
         let home = env::var("HOME").ok()?;
         let home_path = PathBuf::from(&home);
@@ -118,6 +126,7 @@ impl ClaudeCodeClient {
         Some(SecretBox::new(Box::new(creds.claude_ai_oauth.access_token)))
     }
 
+    /// Execute a streaming request against the Claude Code API.
     pub(crate) fn do_stream(&self, request: &LlmRequest, tx: &Sender<StreamEvent>) -> Result<(), LlmError> {
         let access_token = self
             .access_token
@@ -236,8 +245,8 @@ impl ClaudeCodeClient {
             match reader.read_line(&mut line) {
                 Ok(0) => break, // EOF
                 Ok(n) => {
-                    total_bytes += n;
-                    line_count += 1;
+                    total_bytes = total_bytes.saturating_add(n);
+                    line_count = line_count.saturating_add(1);
                 }
                 Err(e) => {
                     // Walk error source chain. Known causes: TimedOut, ConnectionReset, UnexpectedEof
@@ -397,46 +406,68 @@ impl Default for ClaudeCodeClient {
     }
 }
 
+/// Content block metadata from SSE stream events.
 #[derive(Debug, Deserialize)]
 struct StreamContentBlock {
+    /// Block type (e.g. "text", "tool_use")
     #[serde(rename = "type")]
     block_type: Option<String>,
+    /// Block ID (for tool_use blocks)
     id: Option<String>,
+    /// Tool name (for tool_use blocks)
     name: Option<String>,
 }
 
+/// Delta payload from SSE stream events.
 #[derive(Debug, Deserialize)]
 struct StreamDelta {
+    /// Delta type (e.g. "text_delta", "input_json_delta")
     #[serde(rename = "type")]
     delta_type: Option<String>,
+    /// Text content delta
     text: Option<String>,
+    /// Partial JSON for tool input
     partial_json: Option<String>,
+    /// Stop reason (e.g. "end_turn", "tool_use")
     stop_reason: Option<String>,
 }
 
+/// Message body from `message_start` events.
 #[derive(Debug, Deserialize)]
 struct StreamMessageBody {
+    /// Token usage statistics
     usage: Option<StreamUsage>,
 }
 
+/// Top-level SSE stream event from the Claude Code API.
 #[derive(Debug, Deserialize)]
 struct StreamMessage {
+    /// Event type (e.g. "content_block_start", "message_delta")
     #[serde(rename = "type")]
     event_type: String,
+    /// Content block metadata (for block_start events)
     content_block: Option<StreamContentBlock>,
+    /// Delta payload (for delta events)
     delta: Option<StreamDelta>,
+    /// Token usage statistics
     usage: Option<StreamUsage>,
+    /// Message body (for message_start events)
     message: Option<StreamMessageBody>,
 }
 
+/// Token usage statistics from the Claude Code API.
 #[derive(Debug, Deserialize)]
 struct StreamUsage {
+    /// Number of input tokens consumed
     #[serde(rename = "input_tokens")]
     input: Option<usize>,
+    /// Number of output tokens generated
     #[serde(rename = "output_tokens")]
     output: Option<usize>,
+    /// Number of tokens written to cache
     #[serde(rename = "cache_creation_input_tokens")]
     cache_creation: Option<usize>,
+    /// Number of tokens read from cache
     #[serde(rename = "cache_read_input_tokens")]
     cache_read: Option<usize>,
 }

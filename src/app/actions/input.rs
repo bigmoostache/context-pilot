@@ -7,7 +7,7 @@ use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};
 use crate::modules::all_modules;
 
-/// Handle `InputSubmit` action — context switching, message creation, stream start
+/// Handle `InputSubmit` action — context switching, message creation, stream start.
 pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     if state.input.is_empty() {
         return ActionResult::Nothing;
@@ -37,8 +37,8 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     // Assign user display ID and UID
     let user_id = format!("U{}", state.next_user_id);
     let user_global_uid = format!("UID_{}_U", state.global_next_uid);
-    state.next_user_id += 1;
-    state.global_next_uid += 1;
+    state.next_user_id = state.next_user_id.saturating_add(1);
+    state.global_next_uid = state.global_next_uid.saturating_add(1);
 
     // Capture info for notification before moving user_msg
     let user_id_str = user_id.clone();
@@ -53,7 +53,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
     // Add user message tokens to Conversation context and update timestamp
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
-        ctx.token_count += user_token_estimate;
+        ctx.token_count = ctx.token_count.saturating_add(user_token_estimate);
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
 
@@ -89,7 +89,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Handle `ClearConversation` action
+/// Handle `ClearConversation` action.
 pub(crate) fn handle_clear_conversation(state: &mut State) -> ActionResult {
     for msg in &state.messages {
         // Delete by UID if available, otherwise by id
@@ -129,18 +129,21 @@ fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
     let mut i = 0;
 
     while i < bytes.len() {
-        if bytes[i] == 0 {
+        let Some(&current_byte) = bytes.get(i) else { break };
+        if current_byte == 0 {
             // Found sentinel start — find the index and closing \x00
             let start = i;
-            i += 1;
+            i = i.saturating_add(1);
             let idx_start = i;
-            while i < bytes.len() && bytes[i] != 0 {
-                i += 1;
+            loop {
+                let Some(&b) = bytes.get(i) else { break };
+                if b == 0 { break; }
+                i = i.saturating_add(1);
             }
             if i < bytes.len() {
                 // Found closing \x00
                 let idx_str = input.get(idx_start..i).unwrap_or("");
-                i += 1; // skip closing \x00
+                i = i.saturating_add(1); // skip closing \x00
 
                 if let Ok(idx) = idx_str.parse::<usize>() {
                     if let Some(content) = paste_buffers.get(idx) {
@@ -158,7 +161,7 @@ fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
         } else {
             let Some(ch) = input.get(i..).unwrap_or("").chars().next() else { break };
             result.push(ch);
-            i += ch.len_utf8();
+            i = i.saturating_add(ch.len_utf8());
         }
     }
 
@@ -186,7 +189,7 @@ fn replace_commands(input: &str, commands: &[PromptItem]) -> String {
                 .map_or((token, ""), |pos| (token.get(..pos).unwrap_or(""), token.get(pos..).unwrap_or("")));
             commands
                 .iter()
-                .find(|c| c.id == cmd_id)
+                .find(|cmd| cmd.id == cmd_id)
                 .map_or_else(|| line.to_string(), |cmd| format!("{}{}", cmd.content.trim_end(), rest))
         })
         .collect::<Vec<_>>()

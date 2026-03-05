@@ -76,7 +76,7 @@ pub fn compile_to_pdf(source_path: &str) -> Result<CompileOutput, String> {
             for diag in &errors {
                 let _r = writeln!(msg, "error: {}", diag.message);
                 for hint in &diag.hints {
-                    let _r = writeln!(msg, "  hint: {hint}");
+                    let _r2 = writeln!(msg, "  hint: {hint}");
                 }
             }
             if !warnings.is_empty() {
@@ -143,6 +143,7 @@ struct ContextPilotWorld {
 }
 
 impl ContextPilotWorld {
+    /// Create a new world rooted at `root` with the given main source file.
     fn new(root: PathBuf, main_id: FileId) -> Result<Self, String> {
         // Discover system fonts
         let mut book = FontBook::new();
@@ -181,6 +182,7 @@ impl ContextPilotWorld {
         Ok(world)
     }
 
+    /// Load (and cache) the source file identified by `id`.
     fn load_source(&mut self, id: FileId) -> Result<Source, String> {
         if let Some(source) = self.sources.get(&id) {
             return Ok(source.clone());
@@ -193,6 +195,7 @@ impl ContextPilotWorld {
         Ok(source)
     }
 
+    /// Resolve a `FileId` to an absolute filesystem path (local or package).
     fn resolve_path(&self, id: FileId) -> Result<PathBuf, String> {
         // Check if this FileId belongs to a package (@preview/name:version)
         if let Some(pkg_spec) = id.package() {
@@ -273,7 +276,9 @@ impl World for ContextPilotWorld {
             || now.naive_local(),
             |hours| {
                 let utc = Utc::now();
-                (utc + chrono::Duration::hours(hours)).naive_utc()
+                #[expect(clippy::arithmetic_side_effects, reason = "chrono offset arithmetic cannot overflow for valid timezone offsets")]
+                let shifted = utc + chrono::Duration::hours(hours);
+                shifted.naive_utc()
             },
         );
         Datetime::from_ymd_hms(

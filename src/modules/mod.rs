@@ -1,7 +1,12 @@
+/// Conversation display, input rendering, and message formatting.
 pub(crate) mod conversation;
+/// Frozen conversation history chunks for context management.
 pub(crate) mod conversation_history;
+/// Overview panel with token usage, statistics, and configuration.
 pub(crate) mod overview;
+/// Pre-flight validation for tool calls.
 pub(crate) mod pre_flight;
+/// Interactive user question forms.
 pub(crate) mod questions;
 
 use std::collections::{HashMap, HashSet};
@@ -11,6 +16,7 @@ use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{ContextType, State};
 
+/// Lazily parsed tool text definitions for core tools.
 static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../yamls/tools/core.yaml")));
 
@@ -45,18 +51,26 @@ pub(crate) fn init_registry() {
 
 /// Metadata for a fixed panel default.
 pub(crate) struct FixedPanelDefault {
+    /// Unique identifier of the owning module.
     pub module_id: &'static str,
+    /// Whether this module is a core (non-deactivatable) module.
     pub is_core: bool,
+    /// The context type of this fixed panel.
     pub context_type: ContextType,
+    /// Human-readable display name for the panel.
     pub display_name: &'static str,
+    /// Whether the cache for this panel is deprecated.
     pub cache_deprecated: bool,
 }
+
+/// Lookup entry for fixed panel defaults: (`module_id`, `is_core`, `display_name`, `cache_deprecated`).
+type FixedPanelLookup<'lookup> = (&'lookup str, bool, &'lookup str, bool);
 
 /// Collect all fixed panel defaults in canonical order (derived from the registry).
 pub(crate) fn all_fixed_panel_defaults() -> Vec<FixedPanelDefault> {
     // Build a lookup from context_type to module defaults
     let modules = all_modules();
-    let mut lookup: HashMap<ContextType, (&str, bool, &str, bool)> = HashMap::new();
+    let mut lookup: HashMap<ContextType, FixedPanelLookup<'_>> = HashMap::new();
     for module in &modules {
         for (ct, name, cache_dep) in module.fixed_panel_defaults() {
             let _r = lookup.insert(ct, (module.id(), module.is_core(), name, cache_dep));
@@ -179,6 +193,7 @@ pub(crate) fn create_panel(context_type: &ContextType) -> Option<Box<dyn Panel>>
     None
 }
 
+/// Validate that all active module dependencies are satisfied.
 pub(crate) fn validate_dependencies(active: &HashSet<String>) {
     for module in all_modules() {
         if active.contains(module.id()) {
@@ -256,17 +271,17 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     for (i, change) in changes.iter().enumerate() {
         let Some(module_id) = change.get("module").and_then(serde_json::Value::as_str) else {
-            failures.push(format!("Change {}: missing 'module' field", i + 1));
+            failures.push(format!("Change {}: missing 'module' field", i.saturating_add(1)));
             continue;
         };
 
         let Some(action) = change.get("action").and_then(serde_json::Value::as_str) else {
-            failures.push(format!("Change {}: missing 'action' field", i + 1));
+            failures.push(format!("Change {}: missing 'action' field", i.saturating_add(1)));
             continue;
         };
 
         if !known_ids.contains(module_id) {
-            failures.push(format!("Change {}: unknown module '{}'", i + 1, module_id));
+            failures.push(format!("Change {}: unknown module '{}'", i.saturating_add(1), module_id));
             continue;
         }
 
@@ -307,7 +322,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                             successes.push(format!("deactivated '{module_id}'"));
                         }
                         Err(msg) => {
-                            failures.push(format!("Change {}: {}", i + 1, msg));
+                            failures.push(format!("Change {}: {}", i.saturating_add(1), msg));
                         }
                     }
                 } else {
@@ -317,7 +332,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
             _ => {
                 failures.push(format!(
                     "Change {}: invalid action '{}' (use 'activate' or 'deactivate')",
-                    i + 1,
+                    i.saturating_add(1),
                     action
                 ));
             }

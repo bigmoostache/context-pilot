@@ -7,6 +7,7 @@ use crate::state::State;
 use cp_base::panels::scroll_key_action;
 use std::fmt::Write as _;
 
+/// Panel that displays tool configuration, agents, skills, and presets.
 pub(super) struct ToolsPanel;
 
 impl Panel for ToolsPanel {
@@ -54,6 +55,41 @@ impl Panel for ToolsPanel {
 
         text
     }
+
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut crate::state::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &crate::state::ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }
 
 /// Generate the plain-text/markdown tools context sent to the LLM.

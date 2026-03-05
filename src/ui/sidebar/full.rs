@@ -38,8 +38,10 @@ pub(super) fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String>
     Some(count.to_string())
 }
 
-/// Maximum number of dynamic contexts (P7+) to show per page
+/// Maximum number of dynamic contexts (P7+) to show per page.
 const MAX_DYNAMIC_PER_PAGE: usize = 10;
+
+/// Render the full sidebar with context list, token bar, PR card, and help hints.
 pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let _guard = crate::profile!("ui::sidebar");
     let base_style = Style::default().bg(theme::bg_base());
@@ -52,7 +54,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
             Constraint::Length(SIDEBAR_HELP_HEIGHT), // Help hints
         ])
         .split(area);
-    debug_assert!(sidebar_layout.len() >= 2);
+    debug_assert!(sidebar_layout.len() >= 2, "sidebar layout must have at least 2 chunks");
 
     // Context list
     let mut lines: Vec<Line<'_>> = vec![
@@ -94,18 +96,20 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Sort contexts by ID for display (P0, P1, P2, ...)
     let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
     sorted_indices.sort_by(|&a, &b| {
+        let ctx_a = state.context.get(a);
+        let ctx_b = state.context.get(b);
         let id_a =
-            state.context[a].id.strip_prefix('P').and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+            ctx_a.and_then(|c| c.id.strip_prefix('P')).and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
         let id_b =
-            state.context[b].id.strip_prefix('P').and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
+            ctx_b.and_then(|c| c.id.strip_prefix('P')).and_then(|n: &str| n.parse::<usize>().ok()).unwrap_or(usize::MAX);
         id_a.cmp(&id_b)
     });
 
     // Separate fixed (P1-P9) and dynamic (P10+) contexts, skipping Conversation (it's the chat feed, not a numbered panel)
     let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
         .into_iter()
-        .filter(|&i| state.context[i].context_type != ContextType::new(ContextType::CONVERSATION))
-        .partition(|&i| state.context[i].context_type.is_fixed());
+        .filter(|&i| state.context.get(i).is_some_and(|c| c.context_type != ContextType::new(ContextType::CONVERSATION)))
+        .partition(|&i| state.context.get(i).is_some_and(|c| c.context_type.is_fixed()));
 
     // Render Conversation entry (special: no Px ID, highlights when selected)
     if let Some(conv_idx) =
@@ -116,7 +120,8 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let indicator_color = if is_selected { theme::accent() } else { theme::bg_base() };
         let name_color = if is_selected { theme::accent() } else { theme::text_secondary() };
         let icon = ContextType::new(ContextType::CONVERSATION).icon();
-        let conv_tokens = format_number(state.context[conv_idx].token_count);
+        let conv_ctx = state.context.get(conv_idx);
+        let conv_tokens = format_number(conv_ctx.map_or(0, |c| c.token_count));
 
         lines.push(Line::from(vec![
             Span::styled(format!(" {indicator}"), Style::default().fg(indicator_color)),
@@ -130,8 +135,9 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
     // Render fixed contexts (always visible)
     for &i in &fixed_indices {
-        let ctx = &state.context[i];
-        render_context_line(&mut lines, ctx, i, state, id_width, spin, base_style);
+        if let Some(ctx) = state.context.get(i) {
+            render_context_line(&mut lines, ctx, i, state, id_width, spin, base_style);
+        }
     }
 
     // Calculate pagination for dynamic contexts
@@ -147,7 +153,7 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Get dynamic contexts for current page
     let page_start = current_page * MAX_DYNAMIC_PER_PAGE;
     let page_end = (page_start + MAX_DYNAMIC_PER_PAGE).min(total_dynamic);
-    let page_indices: Vec<usize> = dynamic_indices[page_start..page_end].to_vec();
+    let page_indices: Vec<usize> = dynamic_indices.get(page_start..page_end).unwrap_or(&[]).to_vec();
 
     // Add separator if there are dynamic contexts
     if total_dynamic > 0 {
@@ -156,8 +162,9 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
         // Render dynamic contexts for current page
         for &i in &page_indices {
-            let ctx = &state.context[i];
-            render_context_line(&mut lines, ctx, i, state, id_width, spin, base_style);
+            if let Some(ctx) = state.context.get(i) {
+                render_context_line(&mut lines, ctx, i, state, id_width, spin, base_style);
+            }
         }
 
         // Page indicator (only if more than one page)
@@ -261,22 +268,22 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
             detail_spans.push(Span::styled(format!(" -{del}"), Style::default().fg(theme::error())));
         }
         if let Some(ref review) = pr.review_decision {
-            let (icon, color) = match review.as_str() {
+            let (review_icon, review_color) = match review.as_str() {
                 "APPROVED" => (" ✓", theme::success()),
                 "CHANGES_REQUESTED" => (" ✗", theme::error()),
                 "REVIEW_REQUIRED" => (" ●", theme::warning()),
                 _ => (" ?", theme::text_muted()),
             };
-            detail_spans.push(Span::styled(icon, Style::default().fg(color)));
+            detail_spans.push(Span::styled(review_icon, Style::default().fg(review_color)));
         }
         if let Some(ref checks) = pr.checks_status {
-            let (icon, color) = match checks.as_str() {
+            let (check_icon, check_color) = match checks.as_str() {
                 "passing" => (" ●", theme::success()),
                 "failing" => (" ●", theme::error()),
                 "pending" => (" ●", theme::warning()),
                 _ => (" ●", theme::text_muted()),
             };
-            detail_spans.push(Span::styled(icon, Style::default().fg(color)));
+            detail_spans.push(Span::styled(check_icon, Style::default().fg(check_color)));
         }
         if detail_spans.len() > 1 {
             lines.push(Line::from(detail_spans));
@@ -433,7 +440,8 @@ pub(crate) fn render_sidebar(frame: &mut Frame<'_>, state: &State, area: Rect) {
     frame.render_widget(help_paragraph, sidebar_layout[1]);
 }
 
-/// Render a single context line
+/// Render a single context line in the sidebar panel list.
+#[expect(clippy::too_many_arguments, reason = "render_context_line needs all these params for sidebar display")]
 fn render_context_line(
     lines: &mut Vec<Line<'static>>,
     ctx: &crate::state::ContextElement,

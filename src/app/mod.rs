@@ -1,9 +1,16 @@
+/// Application actions and command dispatch.
 pub(crate) mod actions;
+/// Context management: preparation, detachment, defaults.
 mod context;
+/// Keyboard/mouse event handling and routing.
 pub(crate) mod events;
+/// Panel trait bridge: rendering, context collection, registry lookup.
 pub(crate) mod panels;
+/// Centralized prompt assembly for all LLM providers.
 pub(crate) mod prompt_builder;
+/// Reverie sub-agent: trigger, tools, and lifecycle.
 pub(crate) mod reverie;
+/// Main event loop, streaming, tool pipeline, watchers.
 mod run;
 
 pub(crate) use context::{ensure_default_agent, ensure_default_contexts};
@@ -24,19 +31,29 @@ pub(crate) type PendingDone = (usize, usize, usize, usize, Option<String>);
 
 /// Reverie stream state — holds the receiver channel for a running reverie.
 pub(crate) struct ReverieStream {
+    /// Receiver for stream events from the reverie's API call.
     pub rx: Receiver<crate::infra::api::StreamEvent>,
+    /// Pending tool calls accumulated during the reverie stream.
     pub pending_tools: Vec<ToolUse>,
     /// Whether the reverie called Report this turn (to detect missing Report)
     pub report_called: bool,
 }
 
+/// Top-level application state container for the TUI event loop.
 pub(crate) struct App {
+    /// Shared runtime state (context, messages, config, flags).
     pub state: State,
+    /// Streaming text typewriter buffer for smooth character-by-character output.
     pub typewriter: TypewriterBuffer,
+    /// Deferred stream-done data waiting for typewriter drain.
     pub pending_done: Option<PendingDone>,
+    /// Pending tool calls accumulated during streaming.
     pub pending_tools: Vec<ToolUse>,
+    /// Sender for cache update requests to the background cache thread.
     pub cache_tx: Sender<CacheUpdate>,
+    /// Optional file-system watcher for auto-refresh on file changes.
     pub file_watcher: Option<FileWatcher>,
+    /// GitHub event watcher for PR/issue notifications.
     pub gh_watcher: GhWatcher,
     /// Tracks which file paths are being watched
     pub watched_file_paths: std::collections::HashSet<String>,

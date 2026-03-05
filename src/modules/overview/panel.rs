@@ -8,6 +8,7 @@ use crate::state::{ContextType, State};
 use super::render;
 use cp_base::panels::scroll_key_action;
 
+/// Panel that displays overview statistics, token usage, and context elements.
 pub(super) struct OverviewPanel;
 
 impl Panel for OverviewPanel {
@@ -71,9 +72,45 @@ impl Panel for OverviewPanel {
 
         text
     }
+
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(
+        &self,
+        _ctx: &crate::state::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut crate::state::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &crate::state::ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }
 
 impl OverviewPanel {
+    /// Generate the plain-text context content for the LLM.
     fn generate_context_content(state: &State) -> String {
         super::context::generate_context_content(state)
     }

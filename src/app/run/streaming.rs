@@ -10,6 +10,7 @@ use crate::state::cache::{CacheUpdate, process_cache_request};
 use crate::state::{State, StreamPhase, get_context_type_meta};
 
 impl App {
+    /// Drain the stream-event channel and apply each event (chunks, tools, done, errors).
     pub(super) fn process_stream_events(&mut self, rx: &Receiver<StreamEvent>) {
         let _guard = crate::profile!("app::stream_events");
         while let Ok(evt) = rx.try_recv() {
@@ -39,7 +40,7 @@ impl App {
                 StreamEvent::Error(e) => {
                     self.typewriter.reset();
                     // Log every error to disk for debugging
-                    let attempt = self.state.api_retry_count + 1;
+                    let attempt = self.state.api_retry_count.saturating_add(1);
                     let will_retry = attempt <= MAX_API_RETRIES;
                     let provider = format!("{:?}", self.state.llm_provider);
                     let model = self.state.current_model();
@@ -55,26 +56,28 @@ impl App {
                         model,
                         e
                     );
-                    let _r = crate::state::persistence::log_error(&log_msg);
+                    let _log = crate::state::persistence::log_error(&log_msg);
 
                     // Check if we should retry
                     if will_retry {
-                        self.state.api_retry_count += 1;
+                        self.state.api_retry_count = self.state.api_retry_count.saturating_add(1);
                         self.pending_retry_error = Some(e);
                     } else {
                         // Max retries reached, show error
                         self.state.api_retry_count = 0;
                         // Track consecutive failed continuations for backoff
                         let spine = cp_mod_spine::types::SpineState::get_mut(&mut self.state);
-                        spine.config.consecutive_continuation_errors += 1;
+                        spine.config.consecutive_continuation_errors =
+                            spine.config.consecutive_continuation_errors.saturating_add(1);
                         spine.config.last_continuation_error_ms = Some(crate::app::panels::now_ms());
-                        let _r = apply_action(&mut self.state, Action::StreamError(e));
+                        let _action = apply_action(&mut self.state, Action::StreamError(e));
                     }
                 }
             }
         }
     }
 
+    /// If a retryable error is pending, clear partial state and re-launch the stream.
     pub(super) fn handle_retry(&mut self, tx: &Sender<StreamEvent>) {
         if let Some(_error) = self.pending_retry_error.take() {
             // Still streaming, retry the request
@@ -108,6 +111,7 @@ impl App {
         }
     }
 
+    /// Flush buffered typewriter characters into the assistant message.
     pub(super) fn process_typewriter(&mut self) {
         let _guard = crate::profile!("app::typewriter");
         if self.state.flags.stream.phase.is_streaming()
@@ -118,6 +122,7 @@ impl App {
         }
     }
 
+    /// Poll for completed API-key validation results and store them in state.
     pub(super) fn process_api_check_results(&mut self) {
         if let Some(rx) = &self.api_check_rx
             && let Ok(result) = rx.try_recv()
@@ -153,6 +158,7 @@ impl App {
         );
     }
 
+    /// Finalize a completed stream: apply `StreamDone`, reset counters, and unblock spine.
     pub(super) fn finalize_stream(&mut self) {
         if !self.state.flags.stream.phase.is_streaming() {
             return;

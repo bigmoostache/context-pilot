@@ -21,6 +21,8 @@ use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
 
 impl App {
+    /// Main event loop: processes input, stream events, tools, spine, and rendering.
+    #[expect(clippy::too_many_arguments, reason = "event-loop entry point bundles terminal + channels")]
     pub(crate) fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
@@ -218,6 +220,7 @@ impl App {
         Ok(())
     }
 
+    /// Dispatch an `Action` through `apply_action` and handle the resulting side-effects.
     fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
         // Any action triggers a re-render
         self.state.flags.ui.dirty = true;

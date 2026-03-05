@@ -18,15 +18,18 @@ pub(crate) enum WatchEvent {
 
 /// File watcher that monitors open files and directories
 pub(crate) struct FileWatcher {
+    /// The underlying OS file-system watcher.
     watcher: RecommendedWatcher,
     /// Maps canonical path -> original path (for returning original path in events)
     watched_files: Arc<Mutex<HashMap<PathBuf, String>>>,
     /// Maps canonical path -> original path
     watched_dirs: Arc<Mutex<HashMap<PathBuf, String>>>,
+    /// Receiver end of the watch-event channel.
     event_rx: Receiver<WatchEvent>,
 }
 
 impl FileWatcher {
+    /// Create a new file watcher backed by the OS recommended watcher.
     pub(crate) fn new() -> notify::Result<Self> {
         let (tx, rx) = mpsc::channel();
         let watched_files: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
@@ -133,7 +136,7 @@ impl FileWatcher {
         let canonical = path_buf.canonicalize().unwrap_or_else(|_| path_buf.clone());
 
         // Unwatch the old inode (may already be gone after kernel removed it)
-        let _r = self.watcher.unwatch(&canonical);
+        let _unwatch = self.watcher.unwatch(&canonical);
 
         // Re-watch the path (now points to the new inode)
         self.watcher.watch(&canonical, RecursiveMode::NonRecursive)?;

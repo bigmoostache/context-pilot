@@ -7,42 +7,48 @@ use crate::ui::{helpers::wrap_text, theme};
 /// Format: \x00{index}\x00 where index is the `paste_buffers` index.
 const SENTINEL_CHAR: char = '\x00';
 
-/// Placeholder prefix/suffix used in display text for paste placeholders.
+/// Placeholder prefix used in display text for paste placeholders.
 /// These are Unicode private-use-area characters unlikely to appear in normal text.
 const PASTE_PLACEHOLDER_START: char = '\u{E000}';
+/// Placeholder suffix used in display text for paste placeholders.
 const PASTE_PLACEHOLDER_END: char = '\u{E001}';
 
 /// Pre-process input string: replace sentinel markers with display placeholders,
 /// adjusting cursor position accordingly. Returns (`display_string`, `adjusted_cursor`).
 fn expand_paste_sentinels(
-    input: &str,
-    cursor: usize,
+    raw_input: &str,
+    raw_cursor: usize,
     paste_buffers: &[String],
     paste_buffer_labels: &[Option<String>],
 ) -> (String, usize) {
-    if !input.contains(SENTINEL_CHAR) {
-        return (input.to_string(), cursor);
+    if !raw_input.contains(SENTINEL_CHAR) {
+        return (raw_input.to_string(), raw_cursor);
     }
 
     let mut result = String::new();
-    let mut new_cursor = cursor;
+    let mut new_cursor = raw_cursor;
     let mut i = 0;
-    let bytes = input.as_bytes();
+    let bytes = raw_input.as_bytes();
 
     while i < bytes.len() {
-        if bytes[i] == 0 {
+        let Some(&byte_val) = bytes.get(i) else { break };
+        if byte_val == 0 {
             // Found sentinel start — find the index and closing \x00
             let start = i;
-            i += 1;
+            i = i.saturating_add(1);
             let idx_start = i;
-            while i < bytes.len() && bytes[i] != 0 {
-                i += 1;
+            while i < bytes.len() {
+                let Some(&inner_byte) = bytes.get(i) else { break };
+                if inner_byte == 0 {
+                    break;
+                }
+                i = i.saturating_add(1);
             }
             if i < bytes.len() {
                 // Found closing \x00
-                let idx_str = input.get(idx_start..i).unwrap_or("");
-                i += 1; // skip closing \x00
-                let sentinel_len = i - start;
+                let idx_str = raw_input.get(idx_start..i).unwrap_or("");
+                i = i.saturating_add(1); // skip closing \x00
+                let sentinel_len = i.saturating_sub(start);
 
                 if let Ok(idx) = idx_str.parse::<usize>() {
                     let label = paste_buffer_labels.get(idx).and_then(|l| l.as_ref());
@@ -55,7 +61,7 @@ fn expand_paste_sentinels(
                             format!(
                                 "{}📋 Paste #{} ({} lines, {} tok){}",
                                 PASTE_PLACEHOLDER_START,
-                                idx + 1,
+                                idx.saturating_add(1),
                                 line_count,
                                 token_count,
                                 PASTE_PLACEHOLDER_END
@@ -71,39 +77,43 @@ fn expand_paste_sentinels(
                     let placeholder_len = placeholder.len();
 
                     // Adjust cursor if it's after this sentinel
-                    if cursor > start {
-                        if cursor >= start + sentinel_len {
+                    if raw_cursor > start {
+                        if raw_cursor >= start.saturating_add(sentinel_len) {
                             // Cursor is past the sentinel — adjust by difference
-                            new_cursor = new_cursor + placeholder_len - sentinel_len;
+                            new_cursor = new_cursor.saturating_add(placeholder_len).saturating_sub(sentinel_len);
                         } else {
                             // Cursor is inside the sentinel — place it at end of placeholder
-                            new_cursor = result.len() + placeholder_len;
+                            new_cursor = result.len().saturating_add(placeholder_len);
                         }
                     }
 
                     result.push_str(placeholder);
                 } else {
                     // Invalid index — keep as-is
-                    result.push_str(input.get(start..i).unwrap_or(""));
+                    result.push_str(raw_input.get(start..i).unwrap_or(""));
                 }
             } else {
                 // No closing \x00 — keep as-is
-                result.push_str(input.get(start..).unwrap_or(""));
+                result.push_str(raw_input.get(start..).unwrap_or(""));
             }
         } else {
-            let ch = input.get(i..).unwrap_or("").chars().next().unwrap_or('\0');
-            result.push(ch);
-            i += ch.len_utf8();
+            let remainder_ch = raw_input.get(i..).unwrap_or("").chars().next().unwrap_or('\0');
+            result.push(remainder_ch);
+            i = i.saturating_add(remainder_ch.len_utf8());
         }
     }
 
     (result, new_cursor)
 }
 
-/// Render input area to lines
+/// Render input area to lines.
+///
+/// Handles cursor rendering, paste placeholder expansion, command highlighting,
+/// and command hint display.
+#[expect(clippy::too_many_arguments, reason = "render parameters are cohesive and all required for input display")]
 pub(super) fn render_input(
-    input: &str,
-    cursor: usize,
+    raw_input: &str,
+    raw_cursor: usize,
     viewport_width: u16,
     base_style: Style,
     command_ids: &[String],
@@ -113,24 +123,30 @@ pub(super) fn render_input(
     let mut lines: Vec<Line<'static>> = Vec::new();
     let role_icon = icons::msg_user();
     let role_color = theme::user();
-    let prefix_width = 8;
-    let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
+    let prefix_width: usize = 8;
+    let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
     let cursor_char = "\u{258e}";
 
-    // Keep originals before shadowing (needed for send-hint condition)
-    let original_input = input;
-    let original_cursor = cursor;
+    // Keep originals before reassignment (needed for send-hint condition)
+    let original_input = raw_input;
+    let original_cursor = raw_cursor;
 
     // Pre-process: expand paste sentinels to display placeholders
-    let (display_input, display_cursor) = expand_paste_sentinels(input, cursor, paste_buffers, paste_buffer_labels);
+    let (display_input, display_cursor) =
+        expand_paste_sentinels(raw_input, raw_cursor, paste_buffers, paste_buffer_labels);
     let input = &display_input;
-    let cursor = display_cursor;
+    let cursor_pos = display_cursor;
 
     // Insert cursor character at cursor position
-    let input_with_cursor = if cursor >= input.len() {
+    let input_with_cursor = if cursor_pos >= input.len() {
         format!("{input}{cursor_char}")
     } else {
-        format!("{}{}{}", input.get(..cursor).unwrap_or(""), cursor_char, input.get(cursor..).unwrap_or(""))
+        format!(
+            "{}{}{}",
+            input.get(..cursor_pos).unwrap_or(""),
+            cursor_char,
+            input.get(cursor_pos..).unwrap_or("")
+        )
     };
 
     if input.is_empty() {
@@ -163,10 +179,14 @@ pub(super) fn render_input(
                     let clean = line_text.replace([PASTE_PLACEHOLDER_START, PASTE_PLACEHOLDER_END], "");
                     if clean.contains(cursor_char) {
                         let parts: Vec<&str> = clean.splitn(2, cursor_char).collect();
+                        let first_part = parts.first().copied().unwrap_or("");
                         vec![
-                            Span::styled(parts[0].to_string(), Style::default().fg(theme::accent())),
+                            Span::styled(first_part.to_string(), Style::default().fg(theme::accent())),
                             Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()),
-                            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Style::default().fg(theme::accent())),
+                            Span::styled(
+                                parts.get(1).unwrap_or(&"").to_string(),
+                                Style::default().fg(theme::accent()),
+                            ),
                         ]
                     } else {
                         vec![Span::styled(clean, Style::default().fg(theme::accent()))]
@@ -247,8 +267,11 @@ fn build_input_spans(line_text: &str, cursor_char: &str, command_ids: &[String])
     spans
 }
 
+/// Represents a segment of input text, either plain text or a paste placeholder.
 enum InputSegment {
+    /// Normal text content.
     Text(String),
+    /// Content of a paste placeholder (between start/end markers).
     PastePlaceholder(String),
 }
 
@@ -256,25 +279,25 @@ enum InputSegment {
 fn split_paste_placeholders(line: &str) -> Vec<InputSegment> {
     let mut segments = Vec::new();
     let mut current = String::new();
-    let mut chars = line.chars();
+    let mut char_iter = line.chars();
 
-    while let Some(ch) = chars.next() {
-        if ch == PASTE_PLACEHOLDER_START {
+    while let Some(next_ch) = char_iter.next() {
+        if next_ch == PASTE_PLACEHOLDER_START {
             // Flush current text
             if !current.is_empty() {
                 segments.push(InputSegment::Text(std::mem::take(&mut current)));
             }
             // Collect until PASTE_PLACEHOLDER_END
             let mut placeholder = String::new();
-            for ch in chars.by_ref() {
-                if ch == PASTE_PLACEHOLDER_END {
+            for inner_ch in char_iter.by_ref() {
+                if inner_ch == PASTE_PLACEHOLDER_END {
                     break;
                 }
-                placeholder.push(ch);
+                placeholder.push(inner_ch);
             }
             segments.push(InputSegment::PastePlaceholder(placeholder));
         } else {
-            current.push(ch);
+            current.push(next_ch);
         }
     }
     if !current.is_empty() {
@@ -285,15 +308,18 @@ fn split_paste_placeholders(line: &str) -> Vec<InputSegment> {
 
 /// Build spans for a plain text segment (no paste placeholders).
 fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full_line: &str) -> Vec<Span<'static>> {
+    /// Push text with cursor highlighting into spans.
     fn push_with_cursor(spans: &mut Vec<Span<'static>>, text: &str, cursor_char: &str, color: Color) {
         if text.contains(cursor_char) {
             let parts: Vec<&str> = text.splitn(2, cursor_char).collect();
-            if !parts[0].is_empty() {
-                spans.push(Span::styled(parts[0].to_string(), Style::default().fg(color)));
+            let first_part = parts.first().copied().unwrap_or("");
+            if !first_part.is_empty() {
+                spans.push(Span::styled(first_part.to_string(), Style::default().fg(color)));
             }
             spans.push(Span::styled(cursor_char.to_string(), Style::default().fg(theme::accent()).bold()));
-            if parts.len() > 1 && !parts[1].is_empty() {
-                spans.push(Span::styled(parts[1].to_string(), Style::default().fg(color)));
+            let second_part = parts.get(1).copied().unwrap_or("");
+            if !second_part.is_empty() {
+                spans.push(Span::styled(second_part.to_string(), Style::default().fg(color)));
             }
         } else if !text.is_empty() {
             spans.push(Span::styled(text.to_string(), Style::default().fg(color)));
@@ -305,7 +331,7 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
     // Strip cursor char to get the "clean" text for analysis
     let clean_text = text.replace(cursor_char, "");
     let trimmed = clean_text.trim_start();
-    let leading_spaces = clean_text.len() - trimmed.len();
+    let leading_spaces = clean_text.len().saturating_sub(trimmed.len());
 
     // Check if text starts with / and find the command token
     let (matched_cmd_len, is_command) = if trimmed.starts_with('/') && !command_ids.is_empty() {
@@ -314,7 +340,7 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
         let cmd_id = after_slash.get(..cmd_end).unwrap_or("");
         if command_ids.iter().any(|id| id == cmd_id) {
             // +1 for the slash itself
-            (leading_spaces + 1 + cmd_end, true)
+            (leading_spaces.saturating_add(1).saturating_add(cmd_end), true)
         } else {
             (0, false)
         }
@@ -329,13 +355,13 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
         let mut chars_consumed: usize = 0;
         let mut in_cmd = true;
 
-        for ch in text.chars() {
+        for text_ch in text.chars() {
             // Skip cursor char for counting purposes
-            if ch.to_string() == cursor_char {
+            if text_ch.to_string() == cursor_char {
                 if in_cmd {
-                    cmd_part.push(ch);
+                    cmd_part.push(text_ch);
                 } else {
-                    rest_part.push(ch);
+                    rest_part.push(text_ch);
                 }
                 continue;
             }
@@ -343,11 +369,11 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
                 in_cmd = false;
             }
             if in_cmd {
-                cmd_part.push(ch);
+                cmd_part.push(text_ch);
             } else {
-                rest_part.push(ch);
+                rest_part.push(text_ch);
             }
-            chars_consumed += 1;
+            chars_consumed = chars_consumed.saturating_add(1);
         }
 
         // Split cmd_part and rest_part by cursor_char for cursor rendering
@@ -383,8 +409,11 @@ fn build_command_hints(clean_line: &str, command_ids: &[String]) -> Vec<Span<'st
     };
 
     // Don't show hints if exact match already typed
-    if matches.len() == 1 && matches[0] == partial {
-        return vec![];
+    if matches.len() == 1 {
+        let first_match = matches.first().map_or("", |s| s.as_str());
+        if first_match == partial {
+            return vec![];
+        }
     }
 
     if matches.is_empty() {

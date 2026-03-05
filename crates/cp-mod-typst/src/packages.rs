@@ -185,7 +185,7 @@ pub fn resolve_package_path(namespace: &str, name: &str, version: &str, sub_path
 
 /// List all cached packages. Returns Vec<(namespace, name, version)>.
 #[must_use]
-pub fn list_cached_packages() -> Vec<(String, String, String)> {
+pub fn list_cached() -> Vec<(String, String, String)> {
     let root = package_cache_root();
     let mut packages = Vec::new();
 

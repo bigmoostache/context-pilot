@@ -4,9 +4,7 @@ use std::collections::HashMap;
 use super::context::{ContextElement, ContextType};
 use super::data::config::SidebarMode;
 use super::data::message::Message;
-use super::flags::{
-    ConfigFlags, HighlightFn, StateFlags, StreamPhase, StreamingTool, UiFlags,
-};
+use super::flags::{StatusBools, ConfigOverlay, HighlightFn, StreamPhase, StreamingTool, UiState};
 use crate::cast::SafeCast as _;
 use crate::config::llm_types::{LlmProvider, ModelInfo as _};
 use crate::tools::ToolDefinition;
@@ -33,7 +31,7 @@ pub struct State {
     /// Index of the currently selected context panel in the sidebar.
     pub selected_context: usize,
     /// Boolean status flags, organized by domain.
-    pub flags: StateFlags,
+    pub flags: StatusBools,
     /// Tool call currently being streamed (advisory, for UI rendering).
     pub streaming_tool: Option<StreamingTool>,
     /// Selected bar in config view (0=budget, 1=threshold, 2=target)
@@ -160,10 +158,10 @@ impl Default for State {
             paste_buffers: vec![],
             paste_buffer_labels: vec![],
             selected_context: 0,
-            flags: StateFlags {
-                ui: UiFlags { dirty: true, ..UiFlags::default() },
-                config: ConfigFlags { reverie_enabled: true, ..ConfigFlags::default() },
-                ..StateFlags::default()
+            flags: StatusBools {
+                ui: UiState { dirty: true, ..UiState::default() },
+                config: ConfigOverlay { reverie_enabled: true, ..ConfigOverlay::default() },
+                ..StatusBools::default()
             },
             streaming_tool: None,
             last_stop_reason: None,

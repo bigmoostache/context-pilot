@@ -26,9 +26,9 @@ pub(super) fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'s
     text.push(Line::from(""));
 
     // Open panels: context elements + system prompt + tool definitions
-    let panel_count = state.context.len() + 2;
+    let panel_count = state.context.len().saturating_add(2);
     let fixed_count = state.context.iter().filter(|c| c.context_type.is_fixed()).count();
-    let dynamic_count = panel_count - fixed_count - 2; // subtract system + tools
+    let dynamic_count = panel_count.saturating_sub(fixed_count).saturating_sub(2); // subtract system + tools
 
     text.push(Line::from(vec![
         Span::styled(" ".to_string(), base_style),
@@ -59,7 +59,7 @@ pub(super) fn render_statistics(state: &State, base_style: Style) -> Vec<Line<'s
     if total_todos > 0 {
         let done_todos = ts.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
         let in_progress = ts.todos.iter().filter(|t| t.status == TodoStatus::InProgress).count();
-        let pending = total_todos - done_todos - in_progress;
+        let pending = total_todos.saturating_sub(done_todos).saturating_sub(in_progress);
 
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),

@@ -18,6 +18,7 @@ fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: false, tool_name: tool.name.clone() }
 }
 
+/// Helper to build an error `ToolResult` from a tool and content.
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, tool_name: tool.name.clone() }
 }
@@ -187,7 +188,7 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
     let panel_content = format!("{header}{output}");
     let context_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid += 1;
+    state.global_next_uid = state.global_next_uid.saturating_add(1);
 
     let mut elem = ContextElement {
         id: context_id.clone(),
@@ -248,7 +249,7 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str) ->
     // Create a dynamic panel for the result
     let context_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid += 1;
+    state.global_next_uid = state.global_next_uid.saturating_add(1);
 
     let mut elem = ContextElement {
         id: context_id.clone(),
@@ -300,7 +301,7 @@ fn exec_update(tool: &ToolUse, package: Option<&str>) -> ToolResult {
         }
     } else {
         // List all cached packages
-        let cached = packages::list_cached_packages();
+        let cached = packages::list_cached();
         if cached.is_empty() {
             return ok_result(
                 tool,

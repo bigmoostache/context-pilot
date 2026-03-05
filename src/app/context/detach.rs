@@ -10,6 +10,7 @@ use crate::modules::conversation::refresh::estimate_message_tokens;
 use crate::state::{
     ContextElement, ContextType, Message, MessageStatus, MessageType, compute_total_pages, estimate_tokens,
 };
+use cp_base::panels::time_arith;
 
 /// Check if `idx` is a turn boundary — a safe place to split the conversation.
 /// A turn boundary is after a complete assistant turn:
@@ -17,7 +18,9 @@ use crate::state::{
 /// - After a tool result, IF the next message is a user text message (end of tool loop)
 /// - After a tool result that is the last message (shouldn't happen but handle gracefully)
 fn is_turn_boundary(messages: &[Message], idx: usize) -> bool {
-    let msg = &messages[idx];
+    let Some(msg) = messages.get(idx) else {
+        return false;
+    };
 
     // Skip Deleted/Detached messages — not meaningful boundaries
     if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
@@ -31,7 +34,8 @@ fn is_turn_boundary(messages: &[Message], idx: usize) -> bool {
 
     // After a tool result, if next non-skipped message is a user text message
     if msg.msg_type == MessageType::ToolResult {
-        for next in &messages[idx + 1..] {
+        let rest = messages.get(idx.saturating_add(1)..).unwrap_or_default();
+        for next in rest {
             if next.status == MessageStatus::Deleted || next.status == MessageStatus::Detached {
                 continue;
             }
@@ -45,7 +49,8 @@ fn is_turn_boundary(messages: &[Message], idx: usize) -> bool {
 
 /// Format a range of messages into a text chunk (delegates to shared function).
 fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> String {
-    crate::state::format_messages_to_chunk(&messages[start..end])
+    let slice = messages.get(start..end).unwrap_or_default();
+    crate::state::format_messages_to_chunk(slice)
 }
 
 /// Detach oldest conversation messages into frozen `ConversationHistory` panels
@@ -73,10 +78,10 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
 
         // 2. Quick check: if we can't possibly satisfy both chunk minimums
         //    while leaving enough in the tip, bail early.
-        if active_count < DETACH_CHUNK_MIN_MESSAGES + DETACH_KEEP_MIN_MESSAGES {
+        if active_count < DETACH_CHUNK_MIN_MESSAGES.saturating_add(DETACH_KEEP_MIN_MESSAGES) {
             break;
         }
-        if total_tokens < DETACH_CHUNK_MIN_TOKENS + DETACH_KEEP_MIN_TOKENS {
+        if total_tokens < DETACH_CHUNK_MIN_TOKENS.saturating_add(DETACH_KEEP_MIN_TOKENS) {
             break;
         }
 
@@ -90,14 +95,14 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
             if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
                 continue;
             }
-            active_seen += 1;
-            tokens_seen += estimate_message_tokens(msg);
+            active_seen = active_seen.saturating_add(1);
+            tokens_seen = tokens_seen.saturating_add(estimate_message_tokens(msg));
 
             if active_seen >= DETACH_CHUNK_MIN_MESSAGES
                 && tokens_seen >= DETACH_CHUNK_MIN_TOKENS
                 && is_turn_boundary(&state.messages, idx)
             {
-                boundary = Some(idx + 1); // exclusive end
+                boundary = Some(idx.saturating_add(1)); // exclusive end
                 break;
             }
         }
@@ -108,11 +113,12 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
         };
 
         // 4. Verify the remaining tip satisfies both keep minimums
-        let remaining_active = state.messages[boundary..]
+        let remaining_msgs = state.messages.get(boundary..).unwrap_or_default();
+        let remaining_active = remaining_msgs
             .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .count();
-        let remaining_tokens: usize = state.messages[boundary..]
+        let remaining_tokens: usize = remaining_msgs
             .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .map(estimate_message_tokens)
@@ -123,18 +129,19 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
         }
 
         // 4. Collect message IDs for the chunk name
-        let first_timestamp = state.messages[..boundary]
+        let chunk_msgs = state.messages.get(..boundary).unwrap_or_default();
+        let first_timestamp = chunk_msgs
             .iter()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .map_or(0, |m| m.timestamp_ms);
-        let last_timestamp = state.messages[..boundary]
+        let last_timestamp = chunk_msgs
             .iter()
             .rev()
             .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .map_or(0, |m| m.timestamp_ms);
 
         // 5. Collect Message objects for UI rendering + format chunk content for LLM
-        let history_msgs: Vec<Message> = state.messages[..boundary]
+        let history_msgs: Vec<Message> = chunk_msgs
             .iter()
             .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
             .cloned()
@@ -158,9 +165,8 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
         let chunk_name = {
             // Format timestamps as short time strings (HH:MM)
             fn ms_to_short_time(ms: u64) -> String {
-                let secs = ms / 1000;
-                let hours = (secs % 86400) / 3600;
-                let minutes = (secs % 3600) / 60;
+                let secs = time_arith::ms_to_secs(ms);
+                let (hours, minutes, _seconds) = time_arith::secs_to_hms(secs);
                 format!("{hours:02}:{minutes:02}")
             }
             if first_timestamp > 0 && last_timestamp > 0 {
@@ -171,7 +177,7 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
         };
 
         let panel_global_uid = format!("UID_{}_P", state.global_next_uid);
-        state.global_next_uid += 1;
+        state.global_next_uid = state.global_next_uid.saturating_add(1);
 
         state.context.push(ContextElement {
             id: panel_id,

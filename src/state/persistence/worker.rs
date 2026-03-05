@@ -6,10 +6,12 @@ use std::path::PathBuf;
 use crate::infra::constants::{STATES_DIR, STORE_DIR};
 use crate::state::WorkerState;
 
+/// Build the path to the worker states directory.
 fn states_dir() -> PathBuf {
     PathBuf::from(STORE_DIR).join(STATES_DIR)
 }
 
+/// Build the filesystem path for a worker with the given ID.
 fn worker_path(worker_id: &str) -> PathBuf {
     states_dir().join(format!("{worker_id}.json"))
 }
