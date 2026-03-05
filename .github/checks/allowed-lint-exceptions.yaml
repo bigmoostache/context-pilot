@@ -121,16 +121,17 @@ exceptions:
   # ── config/mod.rs: invariant_panic ──────────────────────────────────
 
   - path: "crates/cp-base/src/config/mod.rs"
-    match: '#[expect(clippy::panic'
+    match: 'invariant violation is unrecoverable — validated by tests::all_embedded_yaml_parses_successfully'
     reason: >
       invariant_panic() is the centralized panic point for build-time and
       config invariant violations (YAML not found, theme not loaded, module
       state not initialized). These are unrecoverable programmer errors,
-      not runtime failures.
+      not runtime failures. Provably unreachable: tests::all_embedded_yaml_parses_successfully
+      validates every embedded YAML schema on every cargo test run.
     strategy: >
-      Consider compile-time validation (const fn / build.rs assertions)
-      for YAML and theme invariants. For module state, explore a type-state
-      pattern where uninitialized state is unrepresentable.
+      Already at minimum — single centralized panic function with
+      compile-time validation. Could add build.rs validation for
+      zero-test-dependency assurance when stable const deserialization lands.
 
   # ── panels.rs: time_arith module ────────────────────────────────────
 

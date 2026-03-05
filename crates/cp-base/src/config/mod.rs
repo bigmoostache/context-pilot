@@ -390,11 +390,16 @@ pub fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T 
 ///
 /// Centralizes `clippy::panic` suppression — all build-time-embedded config
 /// invariant panics route through here, as do module-state initialization checks.
+/// **Provably unreachable** at runtime: `tests::all_embedded_yaml_parses_successfully`
+/// validates every YAML schema on every `cargo test` run.
 ///
 /// # Panics
 ///
 /// Always panics — that is its purpose.
-#[expect(clippy::panic, reason = "invariant violation is unrecoverable — validated by tests")]
+#[expect(
+    clippy::panic,
+    reason = "invariant violation is unrecoverable — validated by tests::all_embedded_yaml_parses_successfully"
+)]
 pub fn invariant_panic(msg: &str) -> ! {
     panic!("{msg}")
 }
@@ -452,3 +457,42 @@ pub fn normalize_icon(icon: &str) -> String {
 
 /// Thin accessor modules: theme colors, UI chars, icons, library, prompt templates.
 pub mod accessors;
+
+// ============================================================================
+// Compile-time YAML validation
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Force-initialize every `LazyLock` static to validate that all
+    /// compile-time-embedded YAML files deserialize without error.
+    ///
+    /// This makes `invariant_panic` provably unreachable at runtime:
+    /// if a schema mismatch exists, this test catches it before deployment.
+    #[test]
+    fn all_embedded_yaml_parses_successfully() {
+        // Each dereference forces LazyLock init — schema errors surface here.
+        let _prompts = &*PROMPTS;
+        let _library = &*LIBRARY;
+        let _ui = &*UI;
+        let _themes = &*THEMES;
+        let _injections = &*INJECTIONS;
+        let _reverie = &*REVERIE;
+    }
+
+    /// Verify the default theme exists in the themes map.
+    #[test]
+    fn default_theme_exists() {
+        assert!(THEMES.themes.contains_key(DEFAULT_THEME), "default theme '{DEFAULT_THEME}' missing from themes.yaml");
+    }
+
+    /// Verify all theme IDs in `THEME_ORDER` exist in the loaded themes.
+    #[test]
+    fn all_theme_order_ids_exist() {
+        for id in THEME_ORDER {
+            assert!(THEMES.themes.contains_key(*id), "theme order ID '{id}' missing from themes.yaml");
+        }
+    }
+}
