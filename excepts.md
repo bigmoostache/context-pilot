@@ -7,11 +7,6 @@ crates/cp-base/src/config/mod.rs:
   388: #[expect(clippy::panic, reason = "invariant violation is unrecoverable — validated by tests")]
   389  pub fn yaml_invariant_panic(msg: &str) -> ! {
 
-crates/cp-base/src/state/runtime.rs:
-   18  /// Runtime state (messages loaded in memory)
-   19: #[expect(clippy::struct_excessive_bools, reason = "Runtime state legitimately needs many boolean flags")]
-   20  pub struct State {
-
 crates/cp-console-server/src/main.rs:
   355      #[cfg(unix)]
   356:     #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
@@ -20,11 +15,11 @@ crates/cp-console-server/src/main.rs:
 
 # `#[expect]` Audit — Final Status
 
-**110 → 4** annotations remaining. **106 slain.**
+**110 → 3** annotations remaining. **107 slain.**
 
 ---
 
-## Remaining `#[expect]` Annotations (4 total)
+## Remaining `#[expect]` Annotations (3 total)
 
 ### 1. `cast.rs:1` — `allow_attributes`
 
@@ -62,28 +57,7 @@ pub fn yaml_invariant_panic(msg: &str) -> ! {
 
 ---
 
-### 3. `runtime.rs:19` — `struct_excessive_bools`
-
-```rust
-#[expect(clippy::struct_excessive_bools, reason = "Runtime state legitimately needs many boolean flags")]
-pub struct State {
-    // ... 60+ fields, 12+ booleans:
-    // is_streaming, is_tooling, user_scrolled, dirty, dev_mode, perf_enabled,
-    // config_view, config_secondary_mode, reverie_enabled, api_check_in_progress,
-    // reload_pending, waiting_for_panels
-}
-```
-
-**Justification:** `State` is the God struct — the single mutable root for all runtime state. Its 12+ boolean flags are genuinely independent status bits: `is_streaming` (LLM active), `dirty` (UI redraw needed), `dev_mode` (debug overlay), `reload_pending` (hot-reload queued), etc. They don't encode a hidden enum (the classic bool-smell). They're independent toggles checked in different subsystems. The struct is large because it's the root of a TUI application, not because of poor design.
-
-**Strategies to eliminate:**
-- **Domain sub-structs:** Decompose State into `StreamState { is_streaming, is_tooling, last_stop_reason, streaming_estimated_tokens }`, `UiState { dirty, dev_mode, perf_enabled, config_view, user_scrolled, scroll_offset, ... }`, `LifecycleState { reload_pending, waiting_for_panels, api_check_in_progress }`. Each sub-struct has ≤3 bools (under clippy's threshold). State becomes a composition of typed domains. Touches ~1000 call sites (`state.is_streaming` → `state.stream.is_streaming`) but is scriptable.
-- **Bitflags crate:** Replace independent bools with a `bitflags! { struct StateFlags: u32 { const STREAMING = 0x01; const DIRTY = 0x02; ... } }`. Single field, no bool count. Access via `state.flags.contains(StateFlags::STREAMING)`. Slightly less readable at call sites but eliminates the lint entirely.
-- **ECS-style components:** Move boolean flags into the `module_data` TypeMap as typed marker structs (e.g., `state.set_ext(Streaming)` / `state.get_ext::<Streaming>().is_some()`). Radical decomposition that leverages existing infrastructure. Probably over-engineered for simple flags.
-
----
-
-### 4. `server/main.rs:356` — `unsafe_code`
+### 3. `server/main.rs:356` — `unsafe_code`
 
 ```rust
 #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
@@ -108,5 +82,4 @@ pub struct State {
 |---|------|------|-----------|---------------|
 | 1 | `cast.rs` | `allow_attributes` | 🟡 | `num` crate or `TryFrom` blanket impls |
 | 2 | `config/mod.rs` | `panic` | 🟢 | `build.rs` compile-time YAML validation |
-| 3 | `runtime.rs` | `struct_excessive_bools` | 🟡 | Domain sub-structs (scriptable, ~1000 callsites) |
-| 4 | `server/main.rs` | `unsafe_code` | 🔴 | Irreducible — FFI boundary to kernel syscall |
+| 3 | `server/main.rs` | `unsafe_code` | 🔴 | Irreducible — FFI boundary to kernel syscall |
