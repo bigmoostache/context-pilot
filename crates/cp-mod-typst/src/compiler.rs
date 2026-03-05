@@ -17,6 +17,10 @@ use typst::{Library, World};
 
 use crate::packages;
 use cp_base::cast::SafeCast;
+use std::fmt::Write as _;
+
+/// Successful compilation output: PDF bytes, warning text, and accessed file paths.
+pub type CompileOutput = (Vec<u8>, String, Vec<PathBuf>);
 
 /// Compile a `.typ` file to PDF bytes.
 ///
@@ -27,7 +31,7 @@ use cp_base::cast::SafeCast;
 ///
 /// Returns `Err` if the source path cannot be resolved, compilation fails,
 /// or PDF export encounters errors.
-pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf>), String> {
+pub fn compile_to_pdf(source_path: &str) -> Result<CompileOutput, String> {
     let abs_path =
         PathBuf::from(source_path).canonicalize().map_err(|e| format!("Cannot resolve path '{source_path}': {e}"))?;
 
@@ -38,7 +42,7 @@ pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf
     let project_root = find_project_root(&abs_path).unwrap_or_else(|| root.clone());
 
     let rel_path =
-        abs_path.strip_prefix(&project_root).map_err(|_| "Source path not under project root".to_string())?;
+        abs_path.strip_prefix(&project_root).map_err(|_e| "Source path not under project root".to_string())?;
 
     let main_id = FileId::new(None, VirtualPath::new(rel_path));
     let world = ContextPilotWorld::new(project_root, main_id)?;
@@ -53,7 +57,7 @@ pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf
             let pdf_bytes = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).map_err(|errors| {
                 let mut msg = String::new();
                 for diag in &errors {
-                    msg.push_str(&format!("pdf error: {}\n", diag.message));
+                    let _r = write!(msg, "pdf error: {}\n", diag.message);
                 }
                 msg
             })?;
@@ -70,9 +74,9 @@ pub fn compile_to_pdf(source_path: &str) -> Result<(Vec<u8>, String, Vec<PathBuf
         Err(errors) => {
             let mut msg = String::new();
             for diag in &errors {
-                msg.push_str(&format!("error: {}\n", diag.message));
+                let _r = write!(msg, "error: {}\n", diag.message);
                 for hint in &diag.hints {
-                    msg.push_str(&format!("  hint: {hint}\n"));
+                    let _r = write!(msg, "  hint: {hint}\n");
                 }
             }
             if !warnings.is_empty() {
@@ -241,21 +245,21 @@ impl World for ContextPilotWorld {
         }
 
         // Resolve via our unified path resolver (handles local + packages)
-        let path = self.resolve_path(id).map_err(|_| FileError::AccessDenied)?;
+        let path = self.resolve_path(id).map_err(|_e| FileError::AccessDenied)?;
         if let Ok(mut set) = self.accessed_files.lock() {
             let _ = set.insert(path.clone());
         }
-        let content = fs::read_to_string(&path).map_err(|_| FileError::NotFound(path))?;
+        let content = fs::read_to_string(&path).map_err(|_e| FileError::NotFound(path))?;
         Ok(Source::new(id, content))
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
         // Resolve via our unified path resolver (handles local + packages)
-        let path = self.resolve_path(id).map_err(|_| FileError::AccessDenied)?;
+        let path = self.resolve_path(id).map_err(|_e| FileError::AccessDenied)?;
         if let Ok(mut set) = self.accessed_files.lock() {
             let _ = set.insert(path.clone());
         }
-        let data = fs::read(&path).map_err(|_| FileError::NotFound(path))?;
+        let data = fs::read(&path).map_err(|_e| FileError::NotFound(path))?;
         Ok(Bytes::new(data))
     }
 

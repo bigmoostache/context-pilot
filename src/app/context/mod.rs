@@ -228,21 +228,22 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
 
     let defaults = modules::all_fixed_panel_defaults();
 
-    for (pos, (module_id, is_core, ct, name, cache_deprecated)) in defaults.iter().enumerate() {
+    for (pos, d) in defaults.iter().enumerate() {
         // Core modules always get their panels; non-core only if active
-        if !is_core && !state.active_modules.contains(*module_id) {
+        if !d.is_core && !state.active_modules.contains(d.module_id) {
             continue;
         }
 
         // Skip if panel already exists
-        if state.context.iter().any(|c| c.context_type == *ct) {
+        if state.context.iter().any(|c| c.context_type == d.context_type) {
             continue;
         }
 
         // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
         let id = format!("P{}", pos + 1);
         let insert_pos = (pos + 1).min(state.context.len()); // +1 to account for Conversation at index 0
-        let elem = modules::make_default_context_element(&id, ct.clone(), name, *cache_deprecated);
+        let elem =
+            modules::make_default_context_element(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
         state.context.insert(insert_pos, elem);
     }
 
@@ -251,9 +252,9 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
 
     // Assign UIDs to all existing fixed panels (needed for panels/ storage)
     // Library panels don't need UIDs (rendered from in-memory state)
-    for (_, _, ct, _, _) in &defaults {
-        if *ct != ContextType::LIBRARY && state.context.iter().any(|c| c.context_type == *ct) {
-            assign_panel_uid(state, ct.as_str());
+    for d in &defaults {
+        if d.context_type != ContextType::LIBRARY && state.context.iter().any(|c| c.context_type == d.context_type) {
+            assign_panel_uid(state, d.context_type.as_str());
         }
     }
 }

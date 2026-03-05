@@ -80,6 +80,7 @@ fn parse_skip_callbacks(input: &serde_json::Value) -> Vec<String> {
 }
 
 /// Match changed files against active callback patterns.
+///
 /// Returns a list of callbacks that matched, each with their matched files.
 /// Also validates `skip_callbacks` names and returns warnings for non-existent or non-matching ones.
 #[must_use]

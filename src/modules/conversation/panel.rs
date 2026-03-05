@@ -104,7 +104,7 @@ impl ConversationPanel {
             && cached.content_hash == full_hash
         {
             // Full cache hit - return cached lines (just clone the Rc's inner vec)
-            return (*cached.lines).clone();
+            return cached.lines.to_vec();
         }
 
         // Cache miss - need to rebuild
@@ -167,7 +167,7 @@ impl ConversationPanel {
                 let is_streaming_this = state.flags.stream.phase.is_streaming() && is_last && msg.role == "assistant";
 
                 // Skip empty text messages (unless streaming)
-                if msg.message_type == MessageType::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
+                if msg.msg_type == MessageType::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
                     continue;
                 }
 
@@ -192,7 +192,7 @@ impl ConversationPanel {
                 if !is_streaming_this {
                     let _r = state.message_cache.insert(
                         msg.id.clone(),
-                        MessageRenderCache { lines: Rc::new(lines.clone()), content_hash: hash, viewport_width },
+                        MessageRenderCache { lines: Rc::from(lines.as_slice()), content_hash: hash, viewport_width },
                     );
                 }
 
@@ -235,7 +235,7 @@ impl ConversationPanel {
                 );
                 let line_count = input_lines.len();
                 state.input_cache =
-                    Some(InputRenderCache { lines: Rc::new(input_lines.clone()), input_hash, viewport_width });
+                    Some(InputRenderCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
                 text.extend(input_lines);
                 // Update autocomplete with input visual line count
                 if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
@@ -255,7 +255,7 @@ impl ConversationPanel {
             );
             let line_count = input_lines.len();
             state.input_cache =
-                Some(InputRenderCache { lines: Rc::new(input_lines.clone()), input_hash, viewport_width });
+                Some(InputRenderCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
             text.extend(input_lines);
             // Update autocomplete with input visual line count
             if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
@@ -269,7 +269,7 @@ impl ConversationPanel {
         }
 
         // Store in full content cache
-        state.full_content_cache = Some(FullContentCache { lines: Rc::new(text.clone()), content_hash: full_hash });
+        state.full_content_cache = Some(FullContentCache { lines: Rc::from(text.as_slice()), content_hash: full_hash });
 
         text
     }

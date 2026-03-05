@@ -4,8 +4,8 @@
 //! All methods here delegate to the active provider's model enum.
 
 use super::runtime::State;
-use crate::cast::SafeCast;
-use crate::llm_types::{LlmProvider, ModelInfo};
+use crate::cast::SafeCast as _;
+use crate::llm_types::{LlmProvider, ModelInfo as _};
 
 // =============================================================================
 // Model selection & context window

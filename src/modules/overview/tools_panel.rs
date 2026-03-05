@@ -1,10 +1,11 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Style};
 
 use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel};
 use crate::state::State;
 use cp_base::panels::scroll_key_action;
+use std::fmt::Write as _;
 
 pub(super) struct ToolsPanel;
 
@@ -65,7 +66,7 @@ fn generate_tools_context(state: &State) -> String {
     output.push_str("|----------|------|--------|-------------|\n");
     for tool in &state.tools {
         let status = if tool.enabled { "\u{2713}" } else { "\u{2717}" };
-        output.push_str(&format!("| {} | {} | {} | {} |\n", tool.category, tool.id, status, tool.short_desc));
+        let _r = write!(output, "| {} | {} | {} | {} |\n", tool.category, tool.id, status, tool.short_desc);
     }
 
     output

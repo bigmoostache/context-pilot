@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::config::theme;
 use cp_base::panels::scroll_key_action;
@@ -74,7 +74,7 @@ impl Panel for FirecrawlResultPanel {
                 ctx.token_count = token_count;
             }
             ctx.cache_deprecated = false;
-            let _ = update_if_changed(ctx, &content);
+            let _: bool = update_if_changed(ctx, &content);
             true
         } else {
             false

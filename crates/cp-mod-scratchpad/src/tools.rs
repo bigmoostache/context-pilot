@@ -2,6 +2,7 @@ use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{ScratchpadCell, ScratchpadState};
+use std::fmt::Write as _;
 
 /// Create a new scratchpad cell
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -99,7 +100,7 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if deleted_count < ids_to_delete.len() {
         let missing_count = ids_to_delete.len() - deleted_count;
-        output.push_str(&format!(", {missing_count} not found"));
+        let _r = write!(output, ", {missing_count} not found");
     }
 
     // Update Scratchpad panel timestamp if any cells were deleted

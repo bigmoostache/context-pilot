@@ -352,7 +352,7 @@ impl Module for PromptModule {
 /// Visualizer for prompt/agent/skill/command tool results.
 /// Highlights entity names, shows active status, and differentiates CRUD operations visually.
 fn visualize_prompt_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123);
     let info_color = Color::Rgb(139, 233, 253);
@@ -377,7 +377,7 @@ fn visualize_prompt_output(content: &str, width: usize) -> Vec<ratatui::text::Li
             Style::default().fg(warning_color)
         } else if line.contains("agent") || line.contains("skill") || line.contains("command") {
             Style::default().fg(info_color)
-        } else if line.contains("'") {
+        } else if line.contains('\'') {
             // Entity names in quotes
             Style::default().fg(info_color)
         } else {

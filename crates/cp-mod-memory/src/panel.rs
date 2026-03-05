@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
 use cp_base::config::theme;
@@ -10,6 +10,7 @@ use cp_base::ui::{Cell, TextCell, render_table, render_table_text};
 
 use crate::types::{MemoryImportance, MemoryState};
 use cp_base::panels::scroll_key_action;
+use std::fmt::Write as _;
 
 pub(crate) struct MemoryPanel;
 
@@ -65,16 +66,16 @@ impl MemoryPanel {
                 if i > 0 {
                     output.push('\n');
                 }
-                output.push_str(&format!("{}:\n", memory.id));
-                output.push_str(&format!("  tl_dr: {}\n", memory.tl_dr));
-                output.push_str(&format!("  importance: {}\n", memory.importance.as_str()));
+                let _r = writeln!(output, "{}:", memory.id);
+                let _r = writeln!(output, "  tl_dr: {}", memory.tl_dr);
+                let _r = writeln!(output, "  importance: {}", memory.importance.as_str());
                 if !memory.labels.is_empty() {
-                    output.push_str(&format!("  labels: [{}]\n", memory.labels.join(", ")));
+                    let _r = writeln!(output, "  labels: [{}]", memory.labels.join(", "));
                 }
                 if !memory.contents.is_empty() {
                     output.push_str("  contents: |\n");
                     for line in memory.contents.lines() {
-                        output.push_str(&format!("    {line}\n"));
+                        let _r = writeln!(output, "    {line}");
                     }
                 }
             }
@@ -100,7 +101,7 @@ impl Panel for MemoryPanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::MEMORY {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &memory_content);
+                let _: bool = cp_base::panels::update_if_changed(ctx, &memory_content);
                 break;
             }
         }

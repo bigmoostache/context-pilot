@@ -67,17 +67,16 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
             // so git push/pull/fetch can authenticate via HTTPS automatically.
             let github_token = std::env::var("GITHUB_TOKEN").ok();
             let askpass_tempfile = github_token.as_ref().and_then(|token| {
-                let mut tmp = std::env::temp_dir();
-                tmp.push(format!("cpilot_askpass_{}", std::process::id()));
+                let askpass_path = std::env::temp_dir().join(format!("cpilot_askpass_{}", std::process::id()));
                 let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
-                if std::fs::write(&tmp, &script).is_ok() {
+                if std::fs::write(&askpass_path, &script).is_ok() {
                     #[cfg(unix)]
                     {
                         use std::os::unix::fs::PermissionsExt;
-                        let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o700)).ok();
+                        let _ = std::fs::set_permissions(&askpass_path, std::fs::Permissions::from_mode(0o700)).ok();
                     }
-                    let _ = cmd.env("GIT_ASKPASS", &tmp);
-                    Some(tmp)
+                    let _ = cmd.env("GIT_ASKPASS", &askpass_path);
+                    Some(askpass_path)
                 } else {
                     None
                 }

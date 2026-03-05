@@ -60,35 +60,35 @@ impl Module for TreeModule {
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ts = TreeState::get(state);
         json!({
-            "tree_filter": ts.tree_filter,
-            "tree_descriptions": ts.tree_descriptions,
+            "tree_filter": ts.filter,
+            "tree_descriptions": ts.descriptions,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(v) = data.get("tree_filter").and_then(|v| v.as_str()) {
-            TreeState::get_mut(state).tree_filter = v.to_string();
+            TreeState::get_mut(state).filter = v.to_string();
         }
         if let Some(arr) = data.get("tree_descriptions")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            TreeState::get_mut(state).tree_descriptions = v;
+            TreeState::get_mut(state).descriptions = v;
         }
         // Legacy: load tree_open_folders from global config if present (migration)
         if let Some(arr) = data.get("tree_open_folders")
             && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone())
         {
             let ts = TreeState::get_mut(state);
-            ts.tree_open_folders = v;
-            if !ts.tree_open_folders.contains(&".".to_string()) {
-                ts.tree_open_folders.insert(0, ".".to_string());
+            ts.open_folders = v;
+            if !ts.open_folders.contains(&".".to_string()) {
+                ts.open_folders.insert(0, ".".to_string());
             }
         }
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         json!({
-            "tree_open_folders": TreeState::get(state).tree_open_folders,
+            "tree_open_folders": TreeState::get(state).open_folders,
         })
     }
 
@@ -97,10 +97,10 @@ impl Module for TreeModule {
             && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone())
         {
             let ts = TreeState::get_mut(state);
-            ts.tree_open_folders = v;
+            ts.open_folders = v;
             // Ensure root is always open
-            if !ts.tree_open_folders.contains(&".".to_string()) {
-                ts.tree_open_folders.insert(0, ".".to_string());
+            if !ts.open_folders.contains(&".".to_string()) {
+                ts.open_folders.insert(0, ".".to_string());
             }
         }
     }
@@ -210,7 +210,7 @@ impl Module for TreeModule {
     }
 
     fn watch_paths(&self, state: &State) -> Vec<cp_base::panels::WatchSpec> {
-        TreeState::get(state).tree_open_folders.iter().map(|f| cp_base::panels::WatchSpec::Dir(f.clone())).collect()
+        TreeState::get(state).open_folders.iter().map(|f| cp_base::panels::WatchSpec::Dir(f.clone())).collect()
     }
 
     fn should_invalidate_on_fs_change(
@@ -226,7 +226,7 @@ impl Module for TreeModule {
 /// Visualizer for tree tool results.
 /// Shows tree operations with colored indicators and highlights changed descriptions.
 fn visualize_tree_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123);
     let info_color = Color::Rgb(139, 233, 253);

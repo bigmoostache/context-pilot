@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_base::panels::now_ms;
 
 use super::manager::server_request;
@@ -21,7 +21,7 @@ pub(crate) struct FilePoller {
 impl FilePoller {
     /// Consume self and poll until `stop` is set. Designed for `thread::spawn`.
     pub(crate) fn run(mut self) {
-        use std::io::{Read, Seek, SeekFrom};
+        use std::io::{Read as _, Seek as _, SeekFrom};
 
         loop {
             if self.stop.load(Ordering::Relaxed) {

@@ -7,6 +7,7 @@ use crate::tools::ToolDefinition;
 use crate::tools::{PreFlightResult, ToolResult, ToolUse};
 
 /// A function that transforms tool result content into styled terminal lines.
+///
 /// Receives the raw content string and available display width.
 /// Used by modules to register custom visualizations for their tool results.
 pub type ToolVisualizer = fn(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>>;

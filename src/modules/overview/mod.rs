@@ -366,7 +366,7 @@ impl Module for OverviewModule {
 /// Visualizer for core tool results.
 /// Colors closed panel names, highlights enabled/disabled tool status, and shows module activation state changes.
 fn visualize_core_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123);
     let info_color = Color::Rgb(139, 233, 253);
@@ -389,7 +389,7 @@ fn visualize_core_output(content: &str, width: usize) -> Vec<ratatui::text::Line
             Style::default().fg(warning_color)
         } else if line.contains("Reloading") || line.contains("TUI") {
             Style::default().fg(info_color)
-        } else if line.starts_with("P") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
+        } else if line.starts_with('P') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Panel IDs like P1, P2
             Style::default().fg(info_color)
         } else {

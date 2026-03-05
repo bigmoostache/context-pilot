@@ -1,4 +1,4 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use crate::app::panels::{ContextItem, Panel, paginate_content};
 use crate::modules::conversation::render;

@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 use crate::cli_parser::{self, TypstCommand};
 use crate::packages;
+use std::fmt::Write as _;
 
 /// Helper to build a `ToolResult` from a tool and content.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
@@ -35,12 +36,10 @@ pub(crate) fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Dispatch to subcommand handler
     match parsed {
-        TypstCommand::Compile { input, output, root } => {
-            exec_compile(tool, state, &input, output.as_deref(), root.as_deref())
-        }
+        TypstCommand::Compile { input, output, root: _ } => exec_compile(tool, &input, output.as_deref()),
         TypstCommand::Init { template, directory } => exec_init(tool, state, &template, directory.as_deref()),
         TypstCommand::Fonts { variants } => exec_fonts(tool, state, variants),
-        TypstCommand::Query { input, selector, field } => exec_query(tool, state, &input, &selector, field.as_deref()),
+        TypstCommand::Query { input, selector, field: _ } => exec_query(tool, state, &input, &selector),
         TypstCommand::Update { package } => exec_update(tool, package.as_deref()),
         TypstCommand::Watch { input, output } => exec_watch(tool, &input, output.as_deref()),
         TypstCommand::Unwatch { input } => exec_unwatch(tool, &input),
@@ -49,13 +48,7 @@ pub(crate) fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Subcommand: compile — compile .typ to PDF via embedded compiler.
-fn exec_compile(
-    tool: &ToolUse,
-    _state: &mut State,
-    input: &str,
-    output: Option<&str>,
-    _root: Option<&str>,
-) -> ToolResult {
+fn exec_compile(tool: &ToolUse, input: &str, output: Option<&str>) -> ToolResult {
     // Default output: same name with .pdf extension
     let output_path = output.map_or_else(
         || {
@@ -127,7 +120,7 @@ fn exec_init(tool: &ToolUse, _state: &mut State, template_spec: &str, directory:
         pkg_dir.display()
     );
     for f in &files_copied {
-        result.push_str(&format!("  {f}\n"));
+        let _r = write!(result, "  {f}\n");
     }
 
     ok_result(tool, result)
@@ -231,7 +224,7 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
 
 /// Subcommand: query — query document metadata/labels.
 /// Read-only → creates a dynamic context panel.
-fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str, _field: Option<&str>) -> ToolResult {
+fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str) -> ToolResult {
     // Compile the document to get metadata
     let abs_path = match PathBuf::from(input).canonicalize() {
         Ok(p) => p,
@@ -317,7 +310,7 @@ fn exec_update(tool: &ToolUse, package: Option<&str>) -> ToolResult {
 
         let mut result = format!("Cached packages ({}):\n", cached.len());
         for (ns, name, ver) in &cached {
-            result.push_str(&format!("  @{ns}/{name}:{ver}\n"));
+            let _r = write!(result, "  @{ns}/{name}:{ver}\n");
         }
         result.push_str("\nUse 'typst update @preview/name:version' to re-download a specific package.");
         ok_result(tool, result)
@@ -436,7 +429,7 @@ fn exec_watchlist(tool: &ToolUse) -> ToolResult {
 
     let mut output = format!("Typst Watchlist ({} documents):\n\n", watchlist.entries.len());
     for (source, entry) in watchlist.list() {
-        output.push_str(&format!("  {} → {} ({} deps)\n", source, entry.output, entry.deps.len()));
+        let _r = write!(output, "  {} → {} ({} deps)\n", source, entry.output, entry.deps.len());
     }
     output.push_str("\nUse 'typst unwatch <file.typ>' to remove.");
     ok_result(tool, output)

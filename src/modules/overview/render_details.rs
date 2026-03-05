@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_mod_memory::{MemoryImportance, MemoryState};
 use cp_mod_prompt::PromptState;

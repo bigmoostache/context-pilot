@@ -1,0 +1,1594 @@
+Clippy Lints Total number: 796
+Filter:
+absolute_paths
+restriction allow
+absurd_extreme_comparisons
+correctness deny
+alloc_instead_of_core
+restriction allow
+allow_attributes
+restriction allow
+allow_attributes_without_reason
+restriction allow
+almost_complete_range ¶ 📋
+suspicious warn
+almost_swapped
+correctness deny
+approx_constant
+correctness deny
+arbitrary_source_item_ordering
+restriction allow
+arc_with_non_send_sync
+suspicious warn
+arithmetic_side_effects
+restriction allow
+as_conversions
+restriction allow
+as_pointer_underscore
+restriction allow
+as_ptr_cast_mut
+nursery allow
+as_underscore
+restriction allow
+assertions_on_constants
+style warn
+assertions_on_result_states
+restriction allow
+assign_op_pattern
+style warn
+assigning_clones
+pedantic allow
+async_yields_async
+correctness deny
+await_holding_invalid_type
+suspicious warn
+await_holding_lock
+suspicious warn
+await_holding_refcell_ref
+suspicious warn
+bad_bit_mask
+correctness deny
+big_endian_bytes
+restriction allow
+bind_instead_of_map
+complexity warn
+blanket_clippy_restriction_lints
+suspicious warn
+blocks_in_conditions
+style warn
+bool_assert_comparison
+style warn
+bool_comparison
+complexity warn
+bool_to_int_with_if
+pedantic allow
+borrow_as_ptr
+pedantic allow
+borrow_deref_ref
+complexity warn
+borrow_interior_mutable_const
+style warn
+borrowed_box
+complexity warn
+box_collection
+perf warn
+box_default
+style warn
+boxed_local
+perf warn
+branches_sharing_code
+nursery allow
+builtin_type_shadow
+style warn
+byte_char_slices
+style warn
+bytes_count_to_len
+complexity warn
+bytes_nth
+style warn
+cargo_common_metadata
+cargo allow
+case_sensitive_file_extension_comparisons
+pedantic allow
+cast_abs_to_unsigned
+suspicious warn
+cast_enum_constructor
+suspicious warn
+cast_enum_truncation
+suspicious warn
+cast_lossless
+pedantic allow
+cast_nan_to_int
+suspicious warn
+cast_possible_truncation
+pedantic allow
+cast_possible_wrap
+pedantic allow
+cast_precision_loss
+pedantic allow
+cast_ptr_alignment
+pedantic allow
+cast_sign_loss
+pedantic allow
+cast_slice_different_sizes
+correctness deny
+cast_slice_from_raw_parts
+suspicious warn
+cfg_not_test
+restriction allow
+char_indices_as_byte_indices
+correctness deny
+char_lit_as_u8
+complexity warn
+chars_last_cmp
+style warn
+chars_next_cmp
+style warn
+checked_conversions
+pedantic allow
+clear_with_drain
+nursery allow
+clone_on_copy
+complexity warn
+clone_on_ref_ptr
+restriction allow
+cloned_instead_of_copied
+pedantic allow
+cloned_ref_to_slice_refs
+perf warn
+cmp_null
+style warn
+cmp_owned
+perf warn
+coerce_container_to_any
+nursery allow
+cognitive_complexity
+restriction allow
+collapsible_else_if
+style warn
+collapsible_if
+style warn
+collapsible_match
+style warn
+collapsible_str_replace
+perf warn
+collection_is_never_read
+nursery allow
+comparison_chain
+pedantic allow
+comparison_to_empty
+style warn
+confusing_method_to_numeric_cast
+suspicious warn
+const_is_empty
+suspicious warn
+copy_iterator
+pedantic allow
+crate_in_macro_def
+suspicious warn
+create_dir
+restriction allow
+crosspointer_transmute
+suspicious warn
+dbg_macro
+restriction allow
+debug_assert_with_mut_call
+nursery allow
+decimal_literal_representation
+restriction allow
+declare_interior_mutable_const
+suspicious warn
+default_constructed_unit_structs
+complexity warn
+default_instead_of_iter_empty
+style warn
+default_numeric_fallback
+restriction allow
+default_trait_access
+pedantic allow
+default_union_representation
+restriction allow
+deprecated_cfg_attr
+complexity warn
+deprecated_clippy_cfg_attr
+suspicious warn
+deprecated_semver
+correctness deny
+deref_addrof
+complexity warn
+deref_by_slicing
+restriction allow
+derivable_impls
+complexity warn
+derive_ord_xor_partial_ord
+correctness deny
+derive_partial_eq_without_eq
+nursery allow
+derived_hash_with_manual_eq
+correctness deny
+disallowed_macros
+style warn
+disallowed_methods
+style warn
+disallowed_names
+style warn
+disallowed_script_idents
+restriction allow
+disallowed_types
+style warn
+diverging_sub_expression
+complexity warn
+doc_broken_link
+pedantic allow
+doc_comment_double_space_linebreaks
+pedantic allow
+doc_include_without_cfg
+restriction allow
+doc_lazy_continuation
+style warn
+doc_link_code
+nursery allow
+doc_link_with_quotes
+pedantic allow
+doc_markdown
+pedantic allow
+doc_nested_refdefs
+suspicious warn
+doc_overindented_list_items
+style warn
+doc_paragraphs_missing_punctuation
+restriction allow
+doc_suspicious_footnotes
+suspicious warn
+double_comparisons
+complexity warn
+double_ended_iterator_last
+perf warn
+double_must_use
+style warn
+double_parens
+complexity warn
+drain_collect
+perf warn
+drop_non_drop
+suspicious warn
+duplicate_mod
+suspicious warn
+duplicate_underscore_argument
+style warn
+duplicated_attributes
+suspicious warn
+duration_subsec
+complexity warn
+eager_transmute
+correctness deny
+elidable_lifetime_names
+pedantic allow
+else_if_without_else
+restriction allow
+empty_docs
+suspicious warn
+empty_drop
+restriction allow
+empty_enum_variants_with_brackets
+restriction allow
+empty_enums
+pedantic allow
+empty_line_after_doc_comments
+suspicious warn
+empty_line_after_outer_attr
+suspicious warn
+empty_loop
+suspicious warn
+empty_structs_with_brackets
+restriction allow
+enum_clike_unportable_variant
+correctness deny
+enum_glob_use
+pedantic allow
+enum_variant_names
+style warn
+eq_op
+correctness deny
+equatable_if_let
+nursery allow
+erasing_op
+correctness deny
+err_expect
+style warn
+error_impl_error
+restriction allow
+excessive_nesting
+complexity warn
+excessive_precision
+style warn
+exhaustive_enums
+restriction allow
+exhaustive_structs
+restriction allow
+exit
+restriction allow
+expect_fun_call
+perf warn
+expect_used
+restriction allow
+expl_impl_clone_on_copy
+pedantic allow
+explicit_auto_deref
+complexity warn
+explicit_counter_loop
+complexity warn
+explicit_deref_methods
+pedantic allow
+explicit_into_iter_loop
+pedantic allow
+explicit_iter_loop
+pedantic allow
+explicit_write
+complexity warn
+extend_with_drain
+perf warn
+extra_unused_lifetimes
+complexity warn
+extra_unused_type_parameters
+complexity warn
+fallible_impl_from
+nursery allow
+field_reassign_with_default
+style warn
+field_scoped_visibility_modifiers
+restriction allow
+filetype_is_file
+restriction allow
+filter_map_bool_then
+style warn
+filter_map_identity
+complexity warn
+filter_map_next
+pedantic allow
+filter_next
+complexity warn
+flat_map_identity
+complexity warn
+flat_map_option
+pedantic allow
+float_arithmetic
+restriction allow
+float_cmp
+pedantic allow
+float_cmp_const
+restriction allow
+float_equality_without_abs
+suspicious warn
+fn_params_excessive_bools
+pedantic allow
+fn_to_numeric_cast
+style warn
+fn_to_numeric_cast_any
+restriction allow
+fn_to_numeric_cast_with_truncation
+style warn
+for_kv_map
+style warn
+forget_non_drop
+suspicious warn
+format_collect
+pedantic allow
+format_in_format_args
+perf warn
+format_push_string
+pedantic allow
+four_forward_slashes
+suspicious warn
+from_iter_instead_of_collect
+pedantic allow
+from_over_into
+style warn
+from_raw_with_void_ptr
+suspicious warn
+from_str_radix_10
+style warn
+future_not_send
+nursery allow
+get_first
+style warn
+get_last_with_len
+complexity warn
+get_unwrap
+restriction allow
+host_endian_bytes
+restriction allow
+identity_op
+complexity warn
+if_let_mutex
+correctness deny
+if_not_else
+pedantic allow
+if_same_then_else
+style warn
+if_then_some_else_none
+restriction allow
+ifs_same_cond
+correctness deny
+ignore_without_reason
+pedantic allow
+ignored_unit_patterns
+pedantic allow
+impl_hash_borrow_with_str_and_bytes
+correctness deny
+impl_trait_in_params
+restriction allow
+implicit_clone
+pedantic allow
+implicit_hasher
+pedantic allow
+implicit_return
+restriction allow
+implicit_saturating_add
+style warn
+implicit_saturating_sub
+style warn
+implied_bounds_in_impls
+complexity warn
+impossible_comparisons
+correctness deny
+imprecise_flops
+nursery allow
+incompatible_msrv
+suspicious warn
+inconsistent_digit_grouping
+style warn
+inconsistent_struct_constructor
+pedantic allow
+index_refutable_slice
+pedantic allow
+indexing_slicing
+restriction allow
+ineffective_bit_mask
+correctness deny
+ineffective_open_options
+suspicious warn
+inefficient_to_string
+pedantic allow
+infallible_destructuring_match
+style warn
+infallible_try_from
+suspicious warn
+infinite_iter
+correctness deny
+infinite_loop
+restriction allow
+inherent_to_string
+style warn
+inherent_to_string_shadow_display
+correctness deny
+init_numbered_fields
+style warn
+inline_always
+pedantic allow
+inline_asm_x86_att_syntax
+restriction allow
+inline_asm_x86_intel_syntax
+restriction allow
+inline_fn_without_body
+correctness deny
+inspect_for_each
+complexity warn
+int_plus_one
+complexity warn
+integer_division
+restriction allow
+integer_division_remainder_used
+restriction allow
+into_iter_on_ref
+style warn
+into_iter_without_iter
+pedantic allow
+invalid_regex
+correctness deny
+invalid_upcast_comparisons
+pedantic allow
+inverted_saturating_sub
+correctness deny
+invisible_characters
+correctness deny
+io_other_error
+style warn
+ip_constant
+pedantic allow
+is_digit_ascii_radix
+style warn
+items_after_statements
+pedantic allow
+items_after_test_module
+style warn
+iter_cloned_collect
+style warn
+iter_count
+complexity warn
+iter_filter_is_ok
+pedantic allow
+iter_filter_is_some
+pedantic allow
+iter_kv_map
+complexity warn
+iter_next_loop
+correctness deny
+iter_next_slice
+style warn
+iter_not_returning_iterator
+pedantic allow
+iter_nth
+style warn
+iter_nth_zero
+style warn
+iter_on_empty_collections
+nursery allow
+iter_on_single_items
+nursery allow
+iter_out_of_bounds
+suspicious warn
+iter_over_hash_type
+restriction allow
+iter_overeager_cloned
+perf warn
+iter_skip_next
+style warn
+iter_skip_zero
+correctness deny
+iter_with_drain
+nursery allow
+iter_without_into_iter
+pedantic allow
+iterator_step_by_zero
+correctness deny
+join_absolute_paths
+suspicious warn
+just_underscores_and_digits
+style warn
+large_const_arrays
+perf warn
+large_digit_groups
+pedantic allow
+large_enum_variant
+perf warn
+large_futures
+pedantic allow
+large_include_file
+restriction allow
+large_stack_arrays
+pedantic allow
+large_stack_frames
+nursery allow
+large_types_passed_by_value
+pedantic allow
+legacy_numeric_constants
+style warn
+len_without_is_empty
+style warn
+len_zero
+style warn
+let_and_return
+style warn
+let_underscore_future
+suspicious warn
+let_underscore_lock
+correctness deny
+let_underscore_must_use
+restriction allow
+let_underscore_untyped
+restriction allow
+let_unit_value
+style warn
+let_with_type_underscore
+complexity warn
+lines_filter_map_ok
+suspicious warn
+linkedlist
+pedantic allow
+lint_groups_priority
+correctness deny
+literal_string_with_formatting_args
+nursery allow
+little_endian_bytes
+restriction allow
+lossy_float_literal
+restriction allow
+macro_metavars_in_unsafe
+suspicious warn
+macro_use_imports
+pedantic allow
+main_recursion
+style warn
+manual_abs_diff
+complexity warn
+manual_assert
+pedantic allow
+manual_async_fn
+style warn
+manual_bits
+style warn
+manual_c_str_literals
+complexity warn
+manual_clamp
+complexity warn
+manual_contains
+perf warn
+manual_dangling_ptr
+style warn
+manual_div_ceil
+complexity warn
+manual_filter
+complexity warn
+manual_filter_map
+complexity warn
+manual_find
+complexity warn
+manual_find_map
+complexity warn
+manual_flatten
+complexity warn
+manual_hash_one
+complexity warn
+manual_ignore_case_cmp
+perf warn
+manual_inspect
+complexity warn
+manual_instant_elapsed
+pedantic allow
+manual_is_ascii_check
+style warn
+manual_is_finite
+style warn
+manual_is_infinite
+style warn
+manual_is_multiple_of
+complexity warn
+manual_is_power_of_two
+pedantic allow
+manual_is_variant_and
+pedantic allow
+manual_let_else
+pedantic allow
+manual_main_separator_str
+complexity warn
+manual_map
+style warn
+manual_memcpy
+perf warn
+manual_midpoint
+pedantic allow
+manual_next_back
+style warn
+manual_non_exhaustive
+style warn
+manual_ok_err
+complexity warn
+manual_ok_or
+style warn
+manual_option_as_slice
+complexity warn
+manual_pattern_char_comparison
+style warn
+manual_range_contains
+style warn
+manual_range_patterns
+complexity warn
+manual_rem_euclid
+complexity warn
+manual_repeat_n
+style warn
+manual_retain
+perf warn
+manual_rotate
+style warn
+manual_saturating_arithmetic
+style warn
+manual_slice_fill
+style warn
+manual_slice_size_calculation
+complexity warn
+manual_split_once
+complexity warn
+manual_str_repeat
+perf warn
+manual_string_new
+pedantic allow
+manual_strip
+complexity warn
+manual_swap
+complexity warn
+manual_try_fold
+perf warn
+manual_unwrap_or
+complexity warn
+manual_unwrap_or_default
+suspicious warn
+manual_while_let_some
+style warn
+many_single_char_names
+pedantic allow
+map_all_any_identity
+complexity warn
+map_clone
+style warn
+map_collect_result_unit
+style warn
+map_entry
+perf warn
+map_err_ignore
+restriction allow
+map_flatten
+complexity warn
+map_identity
+complexity warn
+map_unwrap_or
+pedantic allow
+map_with_unused_argument_over_ranges
+restriction allow
+match_as_ref
+complexity warn
+match_bool
+pedantic allow
+match_like_matches_macro
+style warn
+match_overlapping_arm
+style warn
+match_ref_pats
+style warn
+match_result_ok
+style warn
+match_same_arms
+pedantic allow
+match_single_binding
+complexity warn
+match_str_case_mismatch
+correctness deny
+match_wild_err_arm
+pedantic allow
+match_wildcard_for_single_variants
+pedantic allow
+maybe_infinite_iter
+pedantic allow
+mem_forget
+restriction allow
+mem_replace_option_with_none
+style warn
+mem_replace_option_with_some
+style warn
+mem_replace_with_default
+style warn
+mem_replace_with_uninit
+correctness deny
+min_ident_chars
+restriction allow
+min_max
+correctness deny
+mismatching_type_param_order
+pedantic allow
+misnamed_getters
+suspicious warn
+misrefactored_assign_op
+suspicious warn
+missing_assert_message
+restriction allow
+missing_asserts_for_indexing
+restriction allow
+missing_const_for_fn
+nursery allow
+missing_const_for_thread_local
+perf warn
+missing_docs_in_private_items
+restriction allow
+missing_enforced_import_renames
+style warn
+missing_errors_doc
+pedantic allow
+missing_fields_in_debug
+pedantic allow
+missing_inline_in_public_items
+restriction allow
+missing_panics_doc
+pedantic allow
+missing_safety_doc
+style warn
+missing_spin_loop
+perf warn
+missing_trait_methods
+restriction allow
+missing_transmute_annotations
+suspicious warn
+mistyped_literal_suffixes
+correctness deny
+mixed_attributes_style
+style warn
+mixed_case_hex_literals
+style warn
+mixed_read_write_in_expression
+restriction allow
+mod_module_files
+restriction allow
+module_inception
+style warn
+module_name_repetitions
+restriction allow
+modulo_arithmetic
+restriction allow
+modulo_one
+correctness deny
+multi_assignments
+suspicious warn
+multiple_bound_locations
+suspicious warn
+multiple_crate_versions
+cargo allow
+multiple_inherent_impl
+restriction allow
+multiple_unsafe_ops_per_block
+restriction allow
+must_use_candidate
+pedantic allow
+must_use_unit
+style warn
+mut_from_ref
+correctness deny
+mut_mut
+pedantic allow
+mut_mutex_lock
+style warn
+mut_range_bound
+suspicious warn
+mutable_key_type
+suspicious warn
+mutex_atomic
+restriction allow
+mutex_integer
+restriction allow
+naive_bytecount
+pedantic allow
+needless_arbitrary_self_type
+complexity warn
+needless_as_bytes
+complexity warn
+needless_bitwise_bool
+pedantic allow
+needless_bool
+complexity warn
+needless_bool_assign
+complexity warn
+needless_borrow
+style warn
+needless_borrowed_reference
+complexity warn
+needless_borrows_for_generic_args
+style warn
+needless_character_iteration
+suspicious warn
+needless_collect
+nursery allow
+needless_continue
+pedantic allow
+needless_doctest_main
+style warn
+needless_else
+style warn
+needless_for_each
+pedantic allow
+needless_ifs
+complexity warn
+needless_late_init
+style warn
+needless_lifetimes
+complexity warn
+needless_match
+complexity warn
+needless_maybe_sized
+suspicious warn
+needless_option_as_deref
+complexity warn
+needless_option_take
+complexity warn
+needless_parens_on_range_literals
+style warn
+needless_pass_by_ref_mut
+nursery allow
+needless_pass_by_value
+pedantic allow
+needless_pub_self
+style warn
+needless_question_mark
+complexity warn
+needless_range_loop
+style warn
+needless_raw_string_hashes
+pedantic allow
+needless_raw_strings
+restriction allow
+needless_return
+style warn
+needless_return_with_question_mark
+style warn
+needless_splitn
+complexity warn
+needless_update
+complexity warn
+neg_cmp_op_on_partial_ord
+complexity warn
+neg_multiply
+style warn
+negative_feature_names
+cargo allow
+never_loop
+correctness deny
+new_ret_no_self
+style warn
+new_without_default
+style warn
+no_effect
+complexity warn
+no_effect_replace
+suspicious warn
+no_effect_underscore_binding
+pedantic allow
+no_mangle_with_rust_abi
+pedantic allow
+non_ascii_literal
+restriction allow
+non_canonical_clone_impl
+suspicious warn
+non_canonical_partial_ord_impl
+suspicious warn
+non_minimal_cfg
+style warn
+non_octal_unix_permissions
+correctness deny
+non_send_fields_in_send_ty
+nursery allow
+non_std_lazy_statics
+pedantic allow
+non_zero_suggestions
+restriction allow
+nonminimal_bool
+complexity warn
+nonsensical_open_options
+correctness deny
+nonstandard_macro_braces
+nursery allow
+not_unsafe_ptr_arg_deref
+correctness deny
+obfuscated_if_else
+style warn
+octal_escapes
+suspicious warn
+ok_expect
+style warn
+only_used_in_recursion
+complexity warn
+op_ref
+style warn
+option_as_ref_cloned
+pedantic allow
+option_as_ref_deref
+complexity warn
+option_env_unwrap
+correctness deny
+option_filter_map
+complexity warn
+option_if_let_else
+nursery allow
+option_map_or_none
+style warn
+option_map_unit_fn
+complexity warn
+option_option
+pedantic allow
+or_fun_call
+nursery allow
+or_then_unwrap
+complexity warn
+out_of_bounds_indexing
+correctness deny
+overly_complex_bool_expr
+correctness deny
+owned_cow
+style warn
+panic
+restriction allow
+panic_in_result_fn
+restriction allow
+panicking_overflow_checks
+correctness deny
+panicking_unwrap
+correctness deny
+partial_pub_fields
+restriction allow
+partialeq_ne_impl
+complexity warn
+partialeq_to_none
+style warn
+path_buf_push_overwrite
+nursery allow
+path_ends_with_ext
+suspicious warn
+pathbuf_init_then_push
+restriction allow
+pattern_type_mismatch
+restriction allow
+permissions_set_readonly_false
+suspicious warn
+pointer_format
+restriction allow
+pointers_in_nomem_asm_block
+suspicious warn
+possible_missing_comma
+correctness deny
+possible_missing_else
+suspicious warn
+precedence
+complexity warn
+precedence_bits
+restriction allow
+print_in_format_impl
+suspicious warn
+print_literal
+style warn
+print_stderr
+restriction allow
+print_stdout
+restriction allow
+print_with_newline
+style warn
+println_empty_string
+style warn
+ptr_arg
+style warn
+ptr_as_ptr
+pedantic allow
+ptr_cast_constness
+pedantic allow
+ptr_eq
+style warn
+ptr_offset_with_cast
+complexity warn
+pub_underscore_fields
+pedantic allow
+pub_use
+restriction allow
+pub_with_shorthand
+restriction allow
+pub_without_shorthand
+restriction allow
+question_mark
+style warn
+question_mark_used
+restriction allow
+range_minus_one
+pedantic allow
+range_plus_one
+pedantic allow
+range_zip_with_len
+complexity warn
+rc_buffer
+restriction allow
+rc_clone_in_vec_init
+suspicious warn
+rc_mutex
+restriction allow
+read_line_without_trim
+correctness deny
+read_zero_byte_vec
+nursery allow
+readonly_write_lock
+perf warn
+recursive_format_impl
+correctness deny
+redundant_allocation
+perf warn
+redundant_as_str
+complexity warn
+redundant_async_block
+complexity warn
+redundant_at_rest_pattern
+complexity warn
+redundant_clone
+nursery allow
+redundant_closure
+style warn
+redundant_closure_call
+complexity warn
+redundant_closure_for_method_calls
+pedantic allow
+redundant_comparisons
+correctness deny
+redundant_else
+pedantic allow
+redundant_feature_names
+cargo allow
+redundant_field_names
+style warn
+redundant_guards
+complexity warn
+redundant_iter_cloned
+perf warn
+redundant_locals
+suspicious warn
+redundant_pattern
+style warn
+redundant_pattern_matching
+style warn
+redundant_pub_crate
+nursery allow
+redundant_slicing
+complexity warn
+redundant_static_lifetimes
+style warn
+redundant_test_prefix
+restriction allow
+redundant_type_annotations
+restriction allow
+ref_as_ptr
+pedantic allow
+ref_binding_to_reference
+pedantic allow
+ref_option
+pedantic allow
+ref_option_ref
+pedantic allow
+ref_patterns
+restriction allow
+regex_creation_in_loops
+perf warn
+renamed_function_params
+restriction allow
+repeat_once
+complexity warn
+repeat_vec_with_capacity
+suspicious warn
+replace_box
+perf warn
+repr_packed_without_abi
+suspicious warn
+reserve_after_initialization
+complexity warn
+rest_pat_in_fully_bound_structs
+restriction allow
+result_filter_map
+complexity warn
+result_large_err
+perf warn
+result_map_or_into_option
+style warn
+result_map_unit_fn
+complexity warn
+result_unit_err
+style warn
+return_and_then
+restriction allow
+return_self_not_must_use
+pedantic allow
+reversed_empty_ranges
+correctness deny
+same_functions_in_if_condition
+pedantic allow
+same_item_push
+style warn
+same_name_method
+restriction allow
+search_is_some
+complexity warn
+seek_from_current
+complexity warn
+seek_to_start_instead_of_rewind
+complexity warn
+self_assignment
+correctness deny
+self_named_constructors
+style warn
+self_named_module_files
+restriction allow
+self_only_used_in_recursion
+pedantic allow
+semicolon_if_nothing_returned
+pedantic allow
+semicolon_inside_block
+restriction allow
+semicolon_outside_block
+restriction allow
+separated_literal_suffix
+restriction allow
+serde_api_misuse
+correctness deny
+set_contains_or_insert
+nursery allow
+shadow_reuse
+restriction allow
+shadow_same
+restriction allow
+shadow_unrelated
+restriction allow
+short_circuit_statement
+complexity warn
+should_implement_trait
+style warn
+should_panic_without_expect
+pedantic allow
+significant_drop_in_scrutinee
+nursery allow
+significant_drop_tightening
+nursery allow
+similar_names
+pedantic allow
+single_call_fn
+restriction allow
+single_char_add_str
+style warn
+single_char_lifetime_names
+restriction allow
+single_char_pattern
+pedantic allow
+single_component_path_imports
+style warn
+single_element_loop
+complexity warn
+single_match
+style warn
+single_match_else
+pedantic allow
+single_option_map
+nursery allow
+single_range_in_vec_init
+suspicious warn
+size_of_in_element_count
+correctness deny
+size_of_ref
+suspicious warn
+skip_while_next
+complexity warn
+sliced_string_as_bytes
+perf warn
+slow_vector_initialization
+perf warn
+stable_sort_primitive
+pedantic allow
+std_instead_of_alloc
+restriction allow
+std_instead_of_core
+restriction allow
+str_split_at_newline
+pedantic allow
+str_to_string
+restriction allow
+string_add
+restriction allow
+string_add_assign
+pedantic allow
+string_extend_chars
+style warn
+string_from_utf8_as_bytes
+complexity warn
+string_lit_as_bytes
+nursery allow
+string_lit_chars_any
+restriction allow
+string_slice
+restriction allow
+strlen_on_c_strings
+complexity warn
+struct_excessive_bools
+pedantic allow
+struct_field_names
+pedantic allow
+suboptimal_flops
+nursery allow
+suspicious_arithmetic_impl
+suspicious warn
+suspicious_assignment_formatting
+suspicious warn
+suspicious_command_arg_space
+suspicious warn
+suspicious_doc_comments
+suspicious warn
+suspicious_else_formatting
+suspicious warn
+suspicious_map
+suspicious warn
+suspicious_op_assign_impl
+suspicious warn
+suspicious_open_options
+suspicious warn
+suspicious_operation_groupings
+nursery allow
+suspicious_splitn
+correctness deny
+suspicious_to_owned
+suspicious warn
+suspicious_unary_op_formatting
+suspicious warn
+suspicious_xor_used_as_pow
+restriction allow
+swap_ptr_to_ref
+suspicious warn
+swap_with_temporary
+complexity warn
+tabs_in_doc_comments
+style warn
+temporary_assignment
+complexity warn
+test_attr_in_doctest
+suspicious warn
+tests_outside_test_module
+restriction allow
+to_digit_is_some
+style warn
+to_string_in_format_args
+perf warn
+to_string_trait_impl
+style warn
+todo
+restriction allow
+too_long_first_doc_paragraph
+nursery allow
+too_many_arguments
+complexity warn
+too_many_lines
+pedantic allow
+toplevel_ref_arg
+style warn
+trailing_empty_array
+nursery allow
+trait_duplication_in_bounds
+nursery allow
+transmute_bytes_to_str
+complexity warn
+transmute_int_to_bool
+complexity warn
+transmute_int_to_non_zero
+complexity warn
+transmute_null_to_fn
+correctness deny
+transmute_ptr_to_ptr
+pedantic allow
+transmute_ptr_to_ref
+complexity warn
+transmute_undefined_repr
+nursery allow
+transmutes_expressible_as_ptr_casts
+complexity warn
+transmuting_null
+correctness deny
+trim_split_whitespace
+style warn
+trivial_regex
+nursery allow
+trivially_copy_pass_by_ref
+pedantic allow
+try_err
+restriction allow
+tuple_array_conversions
+nursery allow
+type_complexity
+complexity warn
+type_id_on_box
+suspicious warn
+type_repetition_in_bounds
+nursery allow
+unbuffered_bytes
+perf warn
+unchecked_time_subtraction
+pedantic allow
+unconditional_recursion
+suspicious warn
+undocumented_unsafe_blocks
+restriction allow
+unicode_not_nfc
+pedantic allow
+unimplemented
+restriction allow
+uninhabited_references
+nursery allow
+uninit_assumed_init
+correctness deny
+uninit_vec
+correctness deny
+uninlined_format_args
+pedantic allow
+unit_arg
+complexity warn
+unit_cmp
+correctness deny
+unit_hash
+correctness deny
+unit_return_expecting_ord
+correctness deny
+unnecessary_box_returns
+pedantic allow
+unnecessary_cast
+complexity warn
+unnecessary_clippy_cfg
+suspicious warn
+unnecessary_debug_formatting
+pedantic allow
+unnecessary_fallible_conversions
+style warn
+unnecessary_filter_map
+complexity warn
+unnecessary_find_map
+complexity warn
+unnecessary_first_then_check
+complexity warn
+unnecessary_fold
+style warn
+unnecessary_get_then_check
+suspicious warn
+unnecessary_join
+pedantic allow
+unnecessary_lazy_evaluations
+style warn
+unnecessary_literal_bound
+pedantic allow
+unnecessary_literal_unwrap
+complexity warn
+unnecessary_map_on_constructor
+complexity warn
+unnecessary_map_or
+style warn
+unnecessary_min_or_max
+complexity warn
+unnecessary_mut_passed
+style warn
+unnecessary_operation
+complexity warn
+unnecessary_option_map_or_else
+suspicious warn
+unnecessary_owned_empty_strings
+style warn
+unnecessary_result_map_or_else
+suspicious warn
+unnecessary_safety_comment
+restriction allow
+unnecessary_safety_doc
+restriction allow
+unnecessary_self_imports
+restriction allow
+unnecessary_semicolon
+pedantic allow
+unnecessary_sort_by
+complexity warn
+unnecessary_struct_initialization
+nursery allow
+unnecessary_to_owned
+perf warn
+unnecessary_unwrap
+complexity warn
+unnecessary_wraps
+pedantic allow
+unneeded_field_pattern
+restriction allow
+unneeded_struct_pattern
+style warn
+unneeded_wildcard_pattern
+complexity warn
+unnested_or_patterns
+pedantic allow
+unreachable
+restriction allow
+unreadable_literal
+pedantic allow
+unsafe_derive_deserialize
+pedantic allow
+unsafe_removed_from_name
+style warn
+unseparated_literal_suffix
+restriction allow
+unsound_collection_transmute
+correctness deny
+unused_async
+pedantic allow
+unused_enumerate_index
+style warn
+unused_format_specs
+complexity warn
+unused_io_amount
+correctness deny
+unused_peekable
+nursery allow
+unused_result_ok
+restriction allow
+unused_rounding
+nursery allow
+unused_self
+pedantic allow
+unused_trait_names
+restriction allow
+unused_unit
+style warn
+unusual_byte_groupings
+style warn
+unwrap_in_result
+restriction allow
+unwrap_or_default
+style warn
+unwrap_used
+restriction allow
+upper_case_acronyms
+style warn
+use_debug
+restriction allow
+use_self
+nursery allow
+used_underscore_binding
+pedantic allow
+used_underscore_items
+pedantic allow
+useless_asref
+complexity warn
+useless_attribute
+correctness deny
+useless_concat
+complexity warn
+useless_conversion
+complexity warn
+useless_format
+complexity warn
+useless_let_if_seq
+nursery allow
+useless_nonzero_new_unchecked
+complexity warn
+useless_transmute
+complexity warn
+useless_vec
+perf warn
+vec_box
+complexity warn
+vec_init_then_push
+perf warn
+vec_resize_to_zero
+correctness deny
+verbose_bit_mask
+pedantic allow
+verbose_file_reads
+restriction allow
+volatile_composites
+nursery allow
+waker_clone_wake
+perf warn
+while_float
+nursery allow
+while_immutable_condition
+correctness deny
+while_let_loop
+complexity warn
+while_let_on_iterator
+style warn
+wildcard_dependencies
+cargo allow
+wildcard_enum_match_arm
+restriction allow
+wildcard_imports
+pedantic allow
+wildcard_in_or_patterns
+complexity warn
+write_literal
+style warn
+write_with_newline
+style warn
+writeln_empty_string
+style warn
+wrong_self_convention
+style warn
+wrong_transmute
+correctness deny
+zero_divided_by_zero
+complexity warn
+zero_prefixed_literal
+complexity warn
+zero_ptr
+style warn
+zero_repeat_side_effects
+suspicious warn
+zero_sized_map_values
+pedantic allow
+zombie_processes
+suspicious warn
+zst_offset
+correctness deny

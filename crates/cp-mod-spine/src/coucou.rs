@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_base::panels::now_ms;
 use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
@@ -79,7 +79,7 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
         if ch.is_ascii_digit() {
             current_num.push(ch);
         } else {
-            let val: u64 = current_num.parse().map_err(|_| format!("Invalid number in duration: '{s}'"))?;
+            let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{s}'"))?;
             current_num.clear();
             match ch {
                 'h' | 'H' => total_ms += val * 3_600_000,
@@ -92,7 +92,7 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
 
     // Trailing number without unit → seconds
     if !current_num.is_empty() {
-        let val: u64 = current_num.parse().map_err(|_| format!("Invalid number in duration: '{s}'"))?;
+        let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{s}'"))?;
         total_ms += val * 1_000;
     }
 
@@ -126,12 +126,12 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
         return Err("Expected time format: HH:MM or HH:MM:SS".to_string());
     }
 
-    let year: i64 = date_parts[0].parse().map_err(|_| "Invalid year")?;
-    let month: i64 = date_parts[1].parse().map_err(|_| "Invalid month")?;
-    let day: i64 = date_parts[2].parse().map_err(|_| "Invalid day")?;
-    let hour: i64 = time_parts[0].parse().map_err(|_| "Invalid hour")?;
-    let min: i64 = time_parts[1].parse().map_err(|_| "Invalid minute")?;
-    let sec: i64 = if time_parts.len() > 2 { time_parts[2].parse().map_err(|_| "Invalid second")? } else { 0 };
+    let year: i64 = date_parts[0].parse().map_err(|_e| "Invalid year")?;
+    let month: i64 = date_parts[1].parse().map_err(|_e| "Invalid month")?;
+    let day: i64 = date_parts[2].parse().map_err(|_e| "Invalid day")?;
+    let hour: i64 = time_parts[0].parse().map_err(|_e| "Invalid hour")?;
+    let min: i64 = time_parts[1].parse().map_err(|_e| "Invalid minute")?;
+    let sec: i64 = if time_parts.len() > 2 { time_parts[2].parse().map_err(|_e| "Invalid second")? } else { 0 };
 
     // Simple days-since-epoch calculation (good enough for scheduling)
     // Using a basic algorithm for dates after 2000
@@ -242,7 +242,7 @@ impl Watcher for CoucouWatcher {
         self.registered_at_ms
     }
 
-    fn source_tag(&self) -> &str {
+    fn source_tag(&self) -> &'static str {
         "coucou"
     }
 

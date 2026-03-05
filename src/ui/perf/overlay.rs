@@ -7,10 +7,9 @@ use super::super::helpers::Cell;
 use super::super::{chars, theme};
 use super::{FRAME_BUDGET_30FPS, FRAME_BUDGET_60FPS, PERF};
 use cp_base::cast::SafeCast;
-use ratatui::{
-    prelude::*,
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
-};
+use ratatui::Frame;
+use ratatui::prelude::{Color, Line, Rect, Span, Style};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 
 pub(crate) fn render_perf_overlay(frame: &mut Frame<'_>, area: Rect) {
     use super::super::helpers::render_table;

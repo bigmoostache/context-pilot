@@ -106,7 +106,7 @@ pub fn fire_callback(
         watcher_id: format!("callback_{}_{}", def.id, session_key),
         session_name: session_key.clone(),
         callback_name: def.name.clone(),
-        callback_tag: format!("callback_{}", def.id),
+        callback_tag: Box::leak(format!("callback_{}", def.id).into_boxed_str()),
         success_message: def.success_message.clone(),
         blocking: is_blocking,
         tool_use_id: blocking_tool_use_id.map(ToString::to_string),
@@ -187,6 +187,7 @@ fn shell_escape(s: &str) -> String {
 // ============================================================
 
 /// A watcher that monitors a callback's console session.
+///
 /// NO panel is created upfront — only on failure/timeout via `create_panel` in `WatcherResult`.
 /// On exit 0: returns `success_message` + log file path, kills session.
 /// On exit != 0: returns error output + deferred panel info for `tool_cleanup` to create.
@@ -199,7 +200,7 @@ pub struct CallbackWatcher {
     /// Human-readable callback name.
     pub callback_name: String,
     /// Source tag for watcher registry filtering (e.g., "`callback_CB3`").
-    pub callback_tag: String,
+    pub callback_tag: &'static str,
     /// Custom message to display on success (exit 0).
     pub success_message: Option<String>,
     /// Whether this watcher blocks the tool pipeline (sentinel replacement).
@@ -323,8 +324,8 @@ impl Watcher for CallbackWatcher {
         self.registered_at_ms
     }
 
-    fn source_tag(&self) -> &str {
-        &self.callback_tag
+    fn source_tag(&self) -> &'static str {
+        self.callback_tag
     }
 
     fn suicide(&self, state: &State) -> bool {

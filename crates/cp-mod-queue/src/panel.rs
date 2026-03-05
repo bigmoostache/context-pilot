@@ -1,10 +1,11 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
 
 use crate::types::QueueState;
+use std::fmt::Write as _;
 
 pub(crate) struct QueuePanel;
 
@@ -24,7 +25,7 @@ impl Panel for QueuePanel {
                 // This ensures the panel sorts correctly in context ordering —
                 // unchanged panels stay near the top (cache-friendly), changed panels
                 // float to the end (near conversation) so they don't break the prefix.
-                let _ = cp_base::panels::update_if_changed(ctx, &content);
+                let _: bool = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }
@@ -108,7 +109,7 @@ impl QueuePanel {
             text.push_str("Queue active — 0 actions queued.\n");
         } else {
             let status = if qs.active { "Active" } else { "Paused" };
-            text.push_str(&format!("Queue {} — {} action(s) queued:\n\n", status, qs.queued_calls.len()));
+            let _r = write!(text, "Queue {} — {} action(s) queued:\n\n", status, qs.queued_calls.len());
             for call in &qs.queued_calls {
                 let params = serde_json::to_string(&call.input).unwrap_or_default();
                 let short = if params.len() > 120 {
@@ -120,7 +121,7 @@ impl QueuePanel {
                 } else {
                     params
                 };
-                text.push_str(&format!("{}. {}({})\n", call.index, call.tool_name, short));
+                let _r = writeln!(text, "{}. {}({})", call.index, call.tool_name, short);
             }
         }
         text

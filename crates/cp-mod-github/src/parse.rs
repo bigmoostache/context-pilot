@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-use sha2::{Digest, Sha256};
+use sha2::{Digest as _, Sha256};
 
 use cp_base::modules::run_with_timeout;
 
@@ -41,7 +41,8 @@ pub fn extract_header(headers: &str, name: &str) -> Option<String> {
 /// Try to extract X-Poll-Interval from raw output.
 #[must_use]
 pub fn extract_poll_interval(stdout: &str) -> Option<u64> {
-    extract_header(stdout, "x-poll-interval").and_then(|v| v.parse::<u64>().ok())
+    let v = extract_header(stdout, "x-poll-interval")?;
+    v.parse::<u64>().ok()
 }
 
 /// SHA-256 hex digest of a string — used for change detection.

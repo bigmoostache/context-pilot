@@ -7,7 +7,7 @@
 //!
 //! No more AutoContinuation trait — all triggers go through the watcher → notification pipeline.
 
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_base::config::{INJECTIONS, PROMPTS};
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State};
@@ -82,7 +82,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             .messages
             .iter()
             .rev()
-            .find(|m| m.role == "user" && m.message_type != cp_base::state::MessageType::ToolResult);
+            .find(|m| m.role == "user" && m.msg_type != cp_base::state::MessageType::ToolResult);
         if let Some(msg) = last_non_error_user {
             let content = msg.content.trim();
             let is_synthetic = content.starts_with("/* Auto-continuation:")
@@ -112,9 +112,10 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             let reason = guard.block_reason(state);
             // Deduplicate block notifications
             let source_tag = format!("guard_rail:{}", guard.name());
-            let already_notified = SpineState::get(state).notifications.iter().any(|n| {
-                !n.is_processed() && n.notification_type == NotificationType::Custom && n.source == source_tag
-            });
+            let already_notified = SpineState::get(state)
+                .notifications
+                .iter()
+                .any(|n| !n.is_processed() && n.kind == NotificationType::Custom && n.source == source_tag);
             if !already_notified {
                 drop(SpineState::create_notification(
                     state,
@@ -155,9 +156,8 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
 fn build_continuation_from_notifications(state: &State) -> ContinuationAction {
     let unprocessed = SpineState::unprocessed_notifications(state);
 
-    let all_transparent = unprocessed
-        .iter()
-        .all(|n| matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume));
+    let all_transparent =
+        unprocessed.iter().all(|n| matches!(n.kind, NotificationType::UserMessage | NotificationType::ReloadResume));
 
     if all_transparent {
         return build_transparent_continuation(&unprocessed, state);
@@ -166,13 +166,13 @@ fn build_continuation_from_notifications(state: &State) -> ContinuationAction {
     // Non-transparent notifications — build explanatory synthetic message
     let explain: Vec<&Notification> = unprocessed
         .iter()
-        .filter(|n| !matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume))
+        .filter(|n| !matches!(n.kind, NotificationType::UserMessage | NotificationType::ReloadResume))
         .copied()
         .collect();
 
     let mut parts = Vec::new();
     for n in &explain {
-        parts.push(format!("[{}] {} — {}", n.id, n.notification_type.label(), n.content));
+        parts.push(format!("[{}] {} — {}", n.id, n.kind.label(), n.content));
     }
     let msg = INJECTIONS
         .spine
@@ -185,7 +185,7 @@ fn build_continuation_from_notifications(state: &State) -> ContinuationAction {
 
 /// Handle transparent notifications (`UserMessage` / `ReloadResume`).
 fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) -> ContinuationAction {
-    let has_user_message = unprocessed.iter().any(|n| n.notification_type == NotificationType::UserMessage);
+    let has_user_message = unprocessed.iter().any(|n| n.kind == NotificationType::UserMessage);
 
     if has_user_message {
         // User sent a message — check if conversation already ends with user turn
@@ -213,8 +213,8 @@ fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) 
 pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool {
     match action {
         ContinuationAction::SyntheticMessage(content) => {
-            let _ = state.push_user_message(content);
-            let _ = state.push_empty_assistant();
+            let _: usize = state.push_user_message(content);
+            let _: usize = state.push_empty_assistant();
             state.begin_streaming();
             true
         }
@@ -227,10 +227,10 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
                 .map(|m| m.role.as_str());
 
             if last_role != Some("user") {
-                let _ = state.push_user_message(INJECTIONS.spine.continue_msg.trim_end().to_string());
+                let _: usize = state.push_user_message(INJECTIONS.spine.continue_msg.trim_end().to_string());
             }
 
-            let _ = state.push_empty_assistant();
+            let _: usize = state.push_empty_assistant();
             state.begin_streaming();
             true
         }
@@ -263,11 +263,13 @@ fn check_context_threshold(state: &mut State) {
     let usage_pct =
         if budget_tokens > 0 { (total_tokens.to_f64() / budget_tokens.to_f64() * 100.0).min(100.0) } else { 0.0 };
 
+    // Template placeholders are `.replace()` targets, not format args.
+    // Built via concat! to avoid clippy::literal_string_with_formatting_args.
     let content = PROMPTS
         .context_threshold_notification
-        .replace("{usage_pct}", &format!("{usage_pct:.0}"))
-        .replace("{used_tokens}", &total_tokens.to_string())
-        .replace("{budget_tokens}", &budget_tokens.to_string());
+        .replace(concat!("{", "usage_pct", "}"), &format!("{usage_pct:.0}"))
+        .replace(concat!("{", "used_tokens", "}"), &total_tokens.to_string())
+        .replace(concat!("{", "budget_tokens", "}"), &budget_tokens.to_string());
 
     drop(SpineState::create_notification(state, NotificationType::Custom, source_tag.to_string(), content));
 }

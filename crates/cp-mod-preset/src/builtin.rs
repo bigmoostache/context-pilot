@@ -34,7 +34,7 @@ pub fn ensure_builtin_presets() {
     }
 
     for preset in builtin_preset_definitions() {
-        let path = dir.join(format!("{}.json", preset.preset_name));
+        let path = dir.join(format!("{}.json", preset.name));
         if !path.exists()
             && let Ok(json) = serde_json::to_string_pretty(&preset)
         {
@@ -56,7 +56,7 @@ fn builtin_preset_definitions() -> Vec<Preset> {
     yaml.presets
         .into_iter()
         .map(|entry| Preset {
-            preset_name: entry.name,
+            name: entry.name,
             description: entry.description,
             built_in: true,
             worker_state: PresetWorkerState {

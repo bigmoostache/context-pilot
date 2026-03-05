@@ -20,6 +20,9 @@ use crate::state::{Message, State};
 use crate::ui::help::CommandPalette;
 use crate::ui::typewriter::TypewriterBuffer;
 
+/// Deferred `StreamDone` data: (input_tokens, output_tokens, cache_hit, cache_miss, stop_reason).
+type PendingDone = (usize, usize, usize, usize, Option<String>);
+
 /// Reverie stream state — holds the receiver channel for a running reverie.
 struct ReverieStream {
     rx: Receiver<crate::infra::api::StreamEvent>,
@@ -31,7 +34,7 @@ struct ReverieStream {
 pub(crate) struct App {
     pub state: State,
     typewriter: TypewriterBuffer,
-    pending_done: Option<(usize, usize, usize, usize, Option<String>)>,
+    pending_done: Option<PendingDone>,
     pending_tools: Vec<ToolUse>,
     cache_tx: Sender<CacheUpdate>,
     file_watcher: Option<FileWatcher>,

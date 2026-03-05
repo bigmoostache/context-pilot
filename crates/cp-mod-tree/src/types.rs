@@ -32,11 +32,11 @@ build/
 #[derive(Debug)]
 pub struct TreeState {
     /// Gitignore-style filter patterns controlling which files/folders are shown.
-    pub tree_filter: String,
+    pub filter: String,
     /// Paths of folders currently open (expanded) in the tree view.
-    pub tree_open_folders: Vec<String>,
+    pub open_folders: Vec<String>,
     /// User-written descriptions attached to files/folders.
-    pub tree_descriptions: Vec<TreeFileDescription>,
+    pub descriptions: Vec<TreeFileDescription>,
 }
 
 impl Default for TreeState {
@@ -49,11 +49,7 @@ impl TreeState {
     /// Create a default tree state (root folder open, standard filter).
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            tree_filter: DEFAULT_TREE_FILTER.to_string(),
-            tree_open_folders: vec![".".to_string()],
-            tree_descriptions: vec![],
-        }
+        Self { filter: DEFAULT_TREE_FILTER.to_string(), open_folders: vec![".".to_string()], descriptions: vec![] }
     }
 
     /// Get shared ref from State's `TypeMap`.

@@ -36,7 +36,7 @@ impl InvalidationRule {
 /// Each rule says: "if the mutating command matches this pattern,
 /// then invalidate all panels matching these patterns."
 pub(crate) fn build_invalidation_rules() -> Vec<InvalidationRule> {
-    [
+    vec![
         // =====================================================================
         // Issues
         // =====================================================================

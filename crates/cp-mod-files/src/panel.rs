@@ -2,9 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_base::config::constants::PANEL_MAX_LOAD_BYTES;
 use cp_base::config::theme;
 use cp_base::panels::scroll_key_action;
@@ -77,7 +77,7 @@ impl Panel for FilePanel {
         }
         ctx.cache_deprecated = false;
         let content_ref = ctx.cached_content.clone().unwrap_or_default();
-        let _ = update_if_changed(ctx, &content_ref);
+        let _: bool = update_if_changed(ctx, &content_ref);
         true
     }
 

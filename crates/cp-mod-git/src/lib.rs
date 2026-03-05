@@ -12,6 +12,7 @@ mod tools;
 pub mod types;
 
 use cp_base::cast::SafeCast;
+use std::fmt::Write as _;
 pub use types::{GitChangeType, GitFileChange, GitState};
 
 /// Refresh git status (branch, file changes) into `GitState`.
@@ -24,12 +25,12 @@ pub fn refresh_git_status(state: &mut State) {
         Command::new("git").args(["rev-parse", "--git-dir"]).output().map(|o| o.status.success()).unwrap_or(false);
 
     let gs = GitState::get_mut(state);
-    gs.git_is_repo = is_repo;
+    gs.is_repo = is_repo;
 
     if !is_repo {
-        gs.git_branch = None;
-        gs.git_branches = vec![];
-        gs.git_file_changes = vec![];
+        gs.branch = None;
+        gs.branches = vec![];
+        gs.file_changes = vec![];
         return;
     }
 
@@ -39,15 +40,15 @@ pub fn refresh_git_status(state: &mut State) {
         if branch.is_empty() {
             // Detached HEAD
             if let Ok(o2) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output() {
-                gs.git_branch = Some(format!("detached:{}", String::from_utf8_lossy(&o2.stdout).trim()));
+                gs.branch = Some(format!("detached:{}", String::from_utf8_lossy(&o2.stdout).trim()));
             }
         } else {
-            gs.git_branch = Some(branch);
+            gs.branch = Some(branch);
         }
     }
 
     // Get file changes with numstat
-    let diff_base = gs.git_diff_base.clone();
+    let diff_base = gs.diff_base.clone();
     let diff_args = diff_base
         .as_ref()
         .map_or_else(|| vec!["diff", "--numstat", "HEAD"], |base| vec!["diff", "--numstat", base.as_str()]);
@@ -117,7 +118,7 @@ pub fn refresh_git_status(state: &mut State) {
     }
 
     let gs = GitState::get_mut(state);
-    gs.git_file_changes = file_changes;
+    gs.file_changes = file_changes;
 }
 
 /// Timeout for git commands (seconds)
@@ -166,13 +167,13 @@ impl Module for GitModule {
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let gs = GitState::get(state);
         json!({
-            "git_diff_base": gs.git_diff_base,
+            "git_diff_base": gs.diff_base,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(v) = data.get("git_diff_base").and_then(|v| v.as_str()) {
-            GitState::get_mut(state).git_diff_base = Some(v.to_string());
+            GitState::get_mut(state).diff_base = Some(v.to_string());
         }
     }
 
@@ -240,14 +241,14 @@ impl Module for GitModule {
 
     fn overview_context_section(&self, state: &State) -> Option<String> {
         let gs = GitState::get(state);
-        if !gs.git_is_repo {
+        if !gs.is_repo {
             return None;
         }
         let mut output = String::new();
-        if let Some(branch) = &gs.git_branch {
-            output.push_str(&format!("\nGit Branch: {branch}\n"));
+        if let Some(branch) = &gs.branch {
+            let _r = write!(output, "\nGit Branch: {branch}\n");
         }
-        if gs.git_file_changes.is_empty() {
+        if gs.file_changes.is_empty() {
             output.push_str("Git Status: Working tree clean\n");
         } else {
             output.push_str("\nGit Changes:\n\n");
@@ -255,19 +256,17 @@ impl Module for GitModule {
             output.push_str("|------|---|---|-----|\n");
             let mut total_add: i32 = 0;
             let mut total_del: i32 = 0;
-            for file in &gs.git_file_changes {
+            for file in &gs.file_changes {
                 total_add += file.additions;
                 total_del += file.deletions;
                 let net = file.additions - file.deletions;
                 let net_str = if net >= 0 { format!("+{net}") } else { format!("{net}") };
-                output.push_str(&format!(
-                    "| {} | +{} | -{} | {} |\n",
-                    file.path, file.additions, file.deletions, net_str
-                ));
+                let _r =
+                    write!(output, "| {} | +{} | -{} | {} |\n", file.path, file.additions, file.deletions, net_str);
             }
             let total_net = total_add - total_del;
             let total_net_str = if total_net >= 0 { format!("+{total_net}") } else { format!("{total_net}") };
-            output.push_str(&format!("| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |\n"));
+            let _r = write!(output, "| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |\n");
         }
         Some(output)
     }
@@ -308,7 +307,7 @@ impl Module for GitModule {
 /// Color-codes git command output with branch names in cyan, status indicators,
 /// diff hunks with +/- in green/red, file names in yellow.
 fn visualize_git_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123); // Green
     let error_color = Color::Rgb(255, 85, 85); // Red
@@ -347,7 +346,7 @@ fn visualize_git_output(content: &str, width: usize) -> Vec<ratatui::text::Line<
         } else if line.starts_with("modified:") || line.starts_with("new file:") || line.starts_with("deleted:") {
             // Git status file indicators
             Style::default().fg(warning_color)
-        } else if line.starts_with("#") {
+        } else if line.starts_with('#') {
             // Git comments
             Style::default().fg(secondary_color)
         } else {

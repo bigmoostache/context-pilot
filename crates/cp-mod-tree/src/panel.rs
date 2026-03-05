@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::config::theme;
 use cp_base::panels::{CacheRequest, CacheUpdate};
@@ -39,9 +39,9 @@ impl Panel for TreePanel {
             context_type: ContextType::new(ContextType::TREE),
             data: Box::new(TreeCacheRequest {
                 context_id: ctx.id.clone(),
-                tree_filter: ts.tree_filter.clone(),
-                tree_open_folders: ts.tree_open_folders.clone(),
-                tree_descriptions: ts.tree_descriptions.clone(),
+                tree_filter: ts.filter.clone(),
+                tree_open_folders: ts.open_folders.clone(),
+                tree_descriptions: ts.descriptions.clone(),
             }),
         })
     }

@@ -117,7 +117,7 @@ impl LlmClient for AnthropicClient {
         // Handle cleaner mode or custom system prompt
         let system_prompt = if let Some(ref prompt) = request.system_prompt {
             if let Some(ref context) = request.extra_context {
-                let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", context);
+                let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
                 api_messages
                     .push(ApiMessage { role: "user".to_string(), content: vec![ContentBlock::Text { text: msg }] });
             }
@@ -175,10 +175,12 @@ impl LlmClient for AnthropicClient {
                     line_count += 1;
                 }
                 Err(e) => {
-                    let tool_ctx =
-                        current_tool.as_ref().map_or("No tool in progress".to_string(), |(id, name, partial)| {
+                    let tool_ctx = current_tool.as_ref().map_or_else(
+                        || "No tool in progress".to_string(),
+                        |(id, name, partial)| {
                             format!("In-flight tool: {} (id={}), partial: {} bytes", name, id, partial.len())
-                        });
+                        },
+                    );
                     let recent =
                         if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
                     return Err(LlmError::StreamRead(format!(

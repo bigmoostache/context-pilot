@@ -15,7 +15,7 @@ impl InvalidationRule {
 }
 
 pub(crate) fn build_invalidation_rules() -> Vec<InvalidationRule> {
-    [
+    vec![
         // NUCLEAR — invalidate ALL GitResult panels
         InvalidationRule::new(
             r"^git\s+(checkout|switch|merge|rebase|reset|pull|filter-branch|filter-repo)\b",

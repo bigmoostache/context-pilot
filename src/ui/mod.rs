@@ -8,7 +8,9 @@ mod sidebar;
 pub(crate) use crate::infra::constants::theme;
 pub(crate) mod typewriter;
 
-use ratatui::{prelude::*, widgets::Block};
+use ratatui::Frame;
+use ratatui::prelude::{Constraint, Direction, Layout, Rect, Style};
+use ratatui::widgets::Block;
 
 use crate::app::panels;
 use crate::infra::constants::STATUS_BAR_HEIGHT;
@@ -121,7 +123,7 @@ fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let context_type = state
         .context
         .get(state.selected_context)
-        .map_or(ContextType::new(ContextType::CONVERSATION), |c| c.context_type.clone());
+        .map_or_else(|| ContextType::new(ContextType::CONVERSATION), |c| c.context_type.clone());
 
     let panel = panels::get_panel(&context_type);
 

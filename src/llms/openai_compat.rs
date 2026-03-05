@@ -78,7 +78,7 @@ pub(crate) fn collect_included_tool_ids(messages: &[Message], pending_tool_resul
     for (idx, msg) in messages.iter().enumerate() {
         if msg.status == MessageStatus::Deleted
             || msg.status == MessageStatus::Detached
-            || msg.message_type != MessageType::ToolCall
+            || msg.msg_type != MessageType::ToolCall
         {
             continue;
         }
@@ -90,7 +90,7 @@ pub(crate) fn collect_included_tool_ids(messages: &[Message], pending_tool_resul
             .filter(|m| {
                 m.status != MessageStatus::Deleted
                     && m.status != MessageStatus::Detached
-                    && m.message_type == MessageType::ToolResult
+                    && m.msg_type == MessageType::ToolResult
             })
             .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
 
@@ -335,7 +335,7 @@ fn build_from_raw(
         }
 
         // Tool results
-        if msg.message_type == MessageType::ToolResult {
+        if msg.msg_type == MessageType::ToolResult {
             for result in &msg.tool_results {
                 if included_tool_ids.contains(&result.tool_use_id) {
                     out.push(OaiMessage {
@@ -353,7 +353,7 @@ fn build_from_raw(
         // Merge into the last assistant message if possible, so consecutive
         // tool calls from the same turn become one assistant message with
         // multiple tool_calls (required by OpenAI-compat APIs).
-        if msg.message_type == MessageType::ToolCall {
+        if msg.msg_type == MessageType::ToolCall {
             let calls: Vec<OaiToolCall> = msg
                 .tool_uses
                 .iter()

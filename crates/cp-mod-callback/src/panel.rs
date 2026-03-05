@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use ratatui::prelude::*;
+use ratatui::prelude::{Color, Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
 use cp_base::config::constants::STORE_DIR;

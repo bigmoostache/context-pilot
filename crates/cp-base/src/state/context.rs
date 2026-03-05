@@ -43,7 +43,8 @@ pub fn init_context_type_registry(metadata: Vec<ContextTypeMeta>) {
 
 /// Look up metadata for a context type string.
 pub fn get_context_type_meta(ct: &str) -> Option<&'static ContextTypeMeta> {
-    CONTEXT_TYPE_REGISTRY.get().and_then(|registry| registry.iter().find(|m| m.context_type == ct))
+    let registry = CONTEXT_TYPE_REGISTRY.get()?;
+    registry.iter().find(|m| m.context_type == ct)
 }
 
 /// Return the canonical fixed panel order, derived from the registry.
@@ -243,7 +244,8 @@ impl ContextElement {
     /// Get a typed value from the metadata bag.
     #[must_use]
     pub fn get_meta<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
-        self.metadata.get(key).and_then(|v| serde_json::from_value(v.clone()).ok())
+        let v = self.metadata.get(key)?;
+        serde_json::from_value(v.clone()).ok()
     }
 
     /// Set a typed value in the metadata bag.
@@ -256,7 +258,8 @@ impl ContextElement {
     /// Fast path: get a metadata value as &str (avoids clone/deser for the common string case).
     #[must_use]
     pub fn get_meta_str(&self, key: &str) -> Option<&str> {
-        self.metadata.get(key).and_then(|v| v.as_str())
+        let v = self.metadata.get(key)?;
+        v.as_str()
     }
 
     /// Fast path: get a metadata `value.to_usize()`.

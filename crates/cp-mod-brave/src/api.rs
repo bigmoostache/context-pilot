@@ -2,6 +2,7 @@ use reqwest::blocking::Client;
 use std::time::Duration;
 
 use crate::types::{BraveSearchResponse, LLMContextResponse, RichCallbackResponse};
+use std::fmt::Write as _;
 
 const BRAVE_BASE_URL: &str = "https://api.search.brave.com/res/v1";
 const TIMEOUT_SECS: u64 = 10;
@@ -75,18 +76,18 @@ impl BraveClient {
     /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn search(&self, p: &SearchParams<'_>) -> Result<(BraveSearchResponse, Option<serde_json::Value>), String> {
         let mut url = format!("{}/web/search?q={}", BRAVE_BASE_URL, urlenc(p.query));
-        url.push_str(&format!("&count={}", p.count));
+        let _r = write!(url, "&count={}", p.count);
         url.push_str("&extra_snippets=true");
         url.push_str("&enable_rich_callback=1");
-        url.push_str(&format!("&country={}", urlenc(p.country)));
-        url.push_str(&format!("&search_lang={}", urlenc(p.search_lang)));
-        url.push_str(&format!("&safesearch={}", urlenc(p.safe_search)));
+        let _r = write!(url, "&country={}", urlenc(p.country));
+        let _r = write!(url, "&search_lang={}", urlenc(p.search_lang));
+        let _r = write!(url, "&safesearch={}", urlenc(p.safe_search));
 
         if let Some(f) = p.freshness {
-            url.push_str(&format!("&freshness={}", urlenc(f)));
+            let _r = write!(url, "&freshness={}", urlenc(f));
         }
         if let Some(g) = p.goggles_id {
-            url.push_str(&format!("&goggles_id={}", urlenc(g)));
+            let _r = write!(url, "&goggles_id={}", urlenc(g));
         }
 
         let response = self.get_with_retry(&url)?;
@@ -110,20 +111,20 @@ impl BraveClient {
     /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn llm_context(&self, p: &LLMContextParams<'_>) -> Result<LLMContextResponse, String> {
         let mut url = format!("{}/llm/context?q={}", BRAVE_BASE_URL, urlenc(p.query));
-        url.push_str(&format!("&maximum_number_of_tokens={}", p.max_tokens));
-        url.push_str(&format!("&count={}", p.count));
-        url.push_str(&format!("&context_threshold_mode={}", urlenc(p.threshold_mode)));
-        url.push_str(&format!("&country={}", urlenc(p.country)));
+        let _r = write!(url, "&maximum_number_of_tokens={}", p.max_tokens);
+        let _r = write!(url, "&count={}", p.count);
+        let _r = write!(url, "&context_threshold_mode={}", urlenc(p.threshold_mode));
+        let _r = write!(url, "&country={}", urlenc(p.country));
         // Hardcoded optimal defaults
         url.push_str("&maximum_number_of_urls=20");
         url.push_str("&maximum_number_of_snippets=50");
         url.push_str("&maximum_number_of_tokens_per_url=4096");
 
         if let Some(f) = p.freshness {
-            url.push_str(&format!("&freshness={}", urlenc(f)));
+            let _r = write!(url, "&freshness={}", urlenc(f));
         }
         if let Some(g) = p.goggles {
-            url.push_str(&format!("&goggles={}", urlenc(g)));
+            let _r = write!(url, "&goggles={}", urlenc(g));
         }
 
         let response = self.get_with_retry(&url)?;
@@ -182,7 +183,7 @@ fn urlenc(s: &str) -> String {
                 result.push(b as char);
             }
             _ => {
-                result.push_str(&format!("%{b:02X}"));
+                let _r = write!(result, "%{b:02X}");
             }
         }
     }

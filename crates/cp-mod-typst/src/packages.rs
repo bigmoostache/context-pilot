@@ -177,7 +177,7 @@ pub fn resolve_package_path(namespace: &str, name: &str, version: &str, sub_path
     let full_path = pkg_dir.join(sub_path);
 
     if !full_path.exists() {
-        return Err(format!("File {:?} not found in package {}", sub_path, spec.to_spec_string()));
+        return Err(format!("File {} not found in package {}", sub_path.display(), spec.to_spec_string()));
     }
 
     Ok(full_path)

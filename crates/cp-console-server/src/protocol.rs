@@ -88,7 +88,7 @@ pub(crate) fn interpret_escapes(input: &str) -> Vec<u8> {
                     let hi = bytes[i + 2];
                     let lo = bytes[i + 3];
                     if let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo)) {
-                        out.push(h << 4 | l);
+                        out.push((h << 4) | l);
                         i += 4;
                     } else {
                         out.push(b'\\');

@@ -1,4 +1,4 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use crate::modules::all_modules;
 use crate::state::{State, get_context_type_meta};
@@ -100,7 +100,7 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
     let mut text: Vec<Line<'_>> = Vec::new();
     let gs = cp_mod_git::GitState::get(state);
 
-    if !gs.git_is_repo {
+    if !gs.is_repo {
         return text;
     }
 
@@ -111,7 +111,7 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
     text.push(Line::from(""));
 
     // Branch name
-    if let Some(branch) = &gs.git_branch {
+    if let Some(branch) = &gs.branch {
         let branch_color = if branch.starts_with("detached:") { theme::warning() } else { theme::accent() };
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
@@ -120,7 +120,7 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
         ]));
     }
 
-    if gs.git_file_changes.is_empty() {
+    if gs.file_changes.is_empty() {
         text.push(Line::from(vec![
             Span::styled(" ".to_string(), base_style),
             Span::styled("Working tree clean".to_string(), Style::default().fg(theme::success())),
@@ -139,7 +139,7 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
         ];
 
         let rows: Vec<Vec<Cell>> = gs
-            .git_file_changes
+            .file_changes
             .iter()
             .map(|file| {
                 total_add += file.additions;

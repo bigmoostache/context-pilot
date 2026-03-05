@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fs;
 use std::hash::BuildHasher;
-use std::io::{BufRead, BufReader, Write as IoWrite};
+use std::io::{BufRead as _, BufReader, Write as _};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -15,7 +15,7 @@ use crate::CONSOLE_DIR;
 use crate::pollers::{FilePoller, StatusPoller};
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 /// Socket path for the console server.
 fn server_socket_path() -> PathBuf {
@@ -33,7 +33,7 @@ fn server_pid_path() -> PathBuf {
 /// 3. In target/debug/ (cargo run)
 fn server_binary_path() -> PathBuf {
     let exe = std::env::current_exe().unwrap_or_default();
-    let next_to_exe = exe.parent().unwrap_or(std::path::Path::new(".")).join("cp-console-server");
+    let next_to_exe = exe.parent().unwrap_or_else(|| std::path::Path::new(".")).join("cp-console-server");
     if next_to_exe.exists() {
         return next_to_exe;
     }
@@ -79,8 +79,8 @@ pub fn log_file_path(key: &str) -> PathBuf {
 pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Value, String> {
     let sock_path = server_socket_path();
     let stream = UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {e}"))?;
-    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok();
-    let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok();
+    let _: Option<()> = stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok();
+    let _: Option<()> = stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok();
 
     let mut writer = stream.try_clone().map_err(|e| format!("Clone failed: {e}"))?;
     let reader = BufReader::new(stream);
@@ -92,7 +92,7 @@ pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Valu
 
     let mut resp_line = String::new();
     let mut buf_reader = reader;
-    let _ = buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {e}"))?;
+    let _: usize = buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {e}"))?;
 
     let resp: serde_json::Value =
         serde_json::from_str(resp_line.trim()).map_err(|e| format!("Parse response failed: {e}"))?;
@@ -125,19 +125,19 @@ pub fn find_or_create_server() -> Result<(), String> {
     // Server not running — spawn it
     let binary = server_binary_path();
     if !binary.exists() {
-        return Err(format!("Console server binary not found at {binary:?}"));
+        return Err(format!("Console server binary not found at {}", binary.display()));
     }
 
     let sock_path = server_socket_path();
     let sock_str = sock_path.to_string_lossy().to_string();
 
     // Remove stale socket/pid files
-    let _ = fs::remove_file(&sock_path).ok();
-    let _ = fs::remove_file(server_pid_path()).ok();
+    let _: Option<()> = fs::remove_file(&sock_path).ok();
+    let _: Option<()> = fs::remove_file(server_pid_path()).ok();
 
     let mut cmd = Command::new(&binary);
-    let _ = cmd.arg(&sock_str);
-    let _ = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    let _: &mut Command = cmd.arg(&sock_str);
+    let _: &mut Command = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
 
     drop(cmd.spawn().map_err(|e| format!("Failed to spawn console server: {e}"))?);
 
@@ -200,6 +200,23 @@ pub struct SessionHandle {
     pub finished_at: Arc<Mutex<Option<u64>>>,
     /// Signal to stop background poller threads.
     stop_polling: Arc<AtomicBool>,
+}
+
+/// Parameters for reconnecting to an existing server-managed session.
+#[derive(Debug)]
+pub struct ReconnectMeta {
+    /// Unique session key.
+    pub name: String,
+    /// Shell command that was executed.
+    pub command: String,
+    /// Working directory (None = project root).
+    pub cwd: Option<String>,
+    /// Server-reported PID.
+    pub pid: u32,
+    /// Absolute path to the log file.
+    pub log_path_str: String,
+    /// Timestamp (ms since epoch) when originally spawned.
+    pub started_at: u64,
 }
 
 impl SessionHandle {
@@ -276,14 +293,8 @@ impl SessionHandle {
 
     /// Reconnect to a server-managed session after TUI reload.
     #[must_use]
-    pub fn reconnect(
-        name: String,
-        command: String,
-        cwd: Option<String>,
-        pid: u32,
-        log_path_str: String,
-        started_at: u64,
-    ) -> Self {
+    pub fn reconnect(meta: ReconnectMeta) -> Self {
+        let ReconnectMeta { name, command, cwd, pid, log_path_str, started_at } = meta;
         let log_path = PathBuf::from(&log_path_str);
         let status = Arc::new(Mutex::new(ProcessStatus::Running));
         let buffer = RingBuffer::new();
@@ -430,5 +441,5 @@ impl SessionHandle {
     }
 
     /// No-op for backward compat — server holds the stdin, not us.
-    pub const fn leak_stdin(&self) {}
+    pub const fn leak_stdin() {}
 }

@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Color, Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
 use cp_base::config::theme;
@@ -9,6 +9,7 @@ use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::watchers::WatcherRegistry;
 
 use crate::types::{NotificationType, SpineState};
+use std::fmt::Write as _;
 
 pub(crate) struct SpinePanel;
 
@@ -40,7 +41,7 @@ impl SpinePanel {
         } else {
             for n in &unprocessed {
                 let ts = format_timestamp(n.timestamp_ms);
-                output.push_str(&format!("[{}] {} {} — {}\n", n.id, ts, n.notification_type.label(), n.content));
+                let _r = writeln!(output, "[{}] {} {} — {}", n.id, ts, n.kind.label(), n.content);
             }
         }
 
@@ -48,7 +49,7 @@ impl SpinePanel {
             output.push_str("\n=== Blocked (awaiting guard rail clearance) ===\n");
             for n in &blocked {
                 let ts = format_timestamp(n.timestamp_ms);
-                output.push_str(&format!("[{}] {} {} — {}\n", n.id, ts, n.notification_type.label(), n.content));
+                let _r = writeln!(output, "[{}] {} {} — {}", n.id, ts, n.kind.label(), n.content);
             }
         }
 
@@ -56,20 +57,17 @@ impl SpinePanel {
             output.push_str("\n=== Recent Processed ===\n");
             for n in &recent_processed {
                 let ts = format_timestamp(n.timestamp_ms);
-                output.push_str(&format!("[{}] {} {} — {}\n", n.id, ts, n.notification_type.label(), n.content));
+                let _r = writeln!(output, "[{}] {} {} — {}", n.id, ts, n.kind.label(), n.content);
             }
         }
 
         // Show spine config summary
         output.push_str("\n=== Spine Config ===\n");
-        output.push_str(&format!(
-            "continue_until_todos_done: {}\n",
-            SpineState::get(state).config.continue_until_todos_done
-        ));
-        output
-            .push_str(&format!("auto_continuation_count: {}\n", SpineState::get(state).config.auto_continuation_count));
+        let _r =
+            writeln!(output, "continue_until_todos_done: {}", SpineState::get(state).config.continue_until_todos_done);
+        let _r = writeln!(output, "auto_continuation_count: {}", SpineState::get(state).config.auto_continuation_count);
         if let Some(v) = SpineState::get(state).config.max_auto_retries {
-            output.push_str(&format!("max_auto_retries: {v}\n"));
+            let _r = writeln!(output, "max_auto_retries: {v}");
         }
 
         // Show active watchers
@@ -81,7 +79,7 @@ impl SpinePanel {
                 for w in watchers {
                     let age_s = (now.saturating_sub(w.registered_ms())) / 1000;
                     let mode = if w.is_blocking() { "blocking" } else { "async" };
-                    output.push_str(&format!("[{}] {} ({}, {}s ago)\n", w.id(), w.description(), mode, age_s));
+                    let _r = writeln!(output, "[{}] {} ({}, {}s ago)", w.id(), w.description(), mode, age_s);
                 }
             }
         }
@@ -106,7 +104,7 @@ impl Panel for SpinePanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::SPINE {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &content);
+                let _: bool = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }
@@ -137,9 +135,9 @@ impl Panel for SpinePanel {
             // Calculate wrap width: viewport minus the prefix "N999 HH:MM:SS TYPE — "
             let viewport = state.last_viewport_width as usize;
             for n in &unprocessed {
-                let type_color = notification_type_color(n.notification_type);
+                let type_color = notification_type_color(n.kind);
                 let ts = format_timestamp(n.timestamp_ms);
-                let prefix = format!("{} {} {} — ", n.id, ts, n.notification_type.label());
+                let prefix = format!("{} {} {} — ", n.id, ts, n.kind.label());
                 let prefix_width = UnicodeWidthStr::width(prefix.as_str());
                 let content_max = if viewport > prefix_width + 10 { viewport - prefix_width } else { 40 };
                 let wrapped = wrap_text_simple(&n.content, content_max);
@@ -148,7 +146,7 @@ impl Panel for SpinePanel {
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", n.id), Style::default().fg(type_color).bold()),
                     Span::styled(format!("{ts} "), Style::default().fg(theme::text_muted())),
-                    Span::styled(n.notification_type.label().to_string(), Style::default().fg(type_color)),
+                    Span::styled(n.kind.label().to_string(), Style::default().fg(type_color)),
                     Span::styled(
                         format!(" — {}", wrapped.first().map_or("", |s| s.as_str())),
                         Style::default().fg(theme::text()),
@@ -182,9 +180,9 @@ impl Panel for SpinePanel {
 
             let viewport = state.last_viewport_width as usize;
             for n in &blocked {
-                let type_color = notification_type_color(n.notification_type);
+                let type_color = notification_type_color(n.kind);
                 let ts = format_timestamp(n.timestamp_ms);
-                let prefix = format!("{} {} {} — ", n.id, ts, n.notification_type.label());
+                let prefix = format!("{} {} {} — ", n.id, ts, n.kind.label());
                 let prefix_width = UnicodeWidthStr::width(prefix.as_str());
                 let content_max = if viewport > prefix_width + 10 { viewport - prefix_width } else { 40 };
                 let wrapped = wrap_text_simple(&n.content, content_max);
@@ -192,7 +190,7 @@ impl Panel for SpinePanel {
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", n.id), Style::default().fg(type_color)),
                     Span::styled(format!("{ts} "), Style::default().fg(theme::text_muted())),
-                    Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::warning())),
+                    Span::styled(n.kind.label().to_string(), Style::default().fg(theme::warning())),
                     Span::styled(
                         format!(" — {}", wrapped.first().map_or("", |s| s.as_str())),
                         Style::default().fg(theme::text_muted()),
@@ -222,9 +220,9 @@ impl Panel for SpinePanel {
 
             let viewport = state.last_viewport_width as usize;
             for n in &recent_processed {
-                let type_color = notification_type_color(n.notification_type);
+                let type_color = notification_type_color(n.kind);
                 let ts = format_timestamp(n.timestamp_ms);
-                let prefix = format!("{} {} {} — ", n.id, ts, n.notification_type.label());
+                let prefix = format!("{} {} {} — ", n.id, ts, n.kind.label());
                 let prefix_width = UnicodeWidthStr::width(prefix.as_str());
                 let content_max = if viewport > prefix_width + 10 { viewport - prefix_width } else { 40 };
                 let wrapped = wrap_text_simple(&n.content, content_max);
@@ -233,7 +231,7 @@ impl Panel for SpinePanel {
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", n.id), Style::default().fg(type_color)),
                     Span::styled(format!("{ts} "), Style::default().fg(theme::text_muted())),
-                    Span::styled(n.notification_type.label().to_string(), Style::default().fg(theme::text_muted())),
+                    Span::styled(n.kind.label().to_string(), Style::default().fg(theme::text_muted())),
                     Span::styled(
                         format!(" — {}", wrapped.first().map_or("", |s| s.as_str())),
                         Style::default().fg(theme::text_muted()),

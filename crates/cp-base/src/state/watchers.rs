@@ -84,7 +84,7 @@ pub trait Watcher: Send + Sync {
     fn registered_ms(&self) -> u64;
 
     /// Source tag for categorizing notifications (e.g., "console").
-    fn source_tag(&self) -> &str;
+    fn source_tag(&self) -> &'static str;
 
     /// Whether this watcher should be silently removed. Called every poll
     /// cycle. Return `true` if the watched resource no longer exists

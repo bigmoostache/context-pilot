@@ -4,7 +4,7 @@
 //! and for the input area, avoiding re-wrapping on every frame.
 
 use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::hash::{Hash, Hasher as _};
 use std::rc::Rc;
 
 use ratatui::text::Line;
@@ -13,7 +13,7 @@ use ratatui::text::Line;
 #[derive(Debug, Clone)]
 pub struct MessageRenderCache {
     /// Pre-rendered lines for this message
-    pub lines: Rc<Vec<Line<'static>>>,
+    pub lines: Rc<[Line<'static>]>,
     /// Hash of content that affects rendering
     pub content_hash: u64,
     /// Viewport width used for wrapping
@@ -24,7 +24,7 @@ pub struct MessageRenderCache {
 #[derive(Debug, Clone)]
 pub struct InputRenderCache {
     /// Pre-rendered lines for input
-    pub lines: Rc<Vec<Line<'static>>>,
+    pub lines: Rc<[Line<'static>]>,
     /// Hash of input + cursor position
     pub input_hash: u64,
     /// Viewport width used for wrapping
@@ -35,7 +35,7 @@ pub struct InputRenderCache {
 #[derive(Debug, Clone)]
 pub struct FullContentCache {
     /// Complete rendered output
-    pub lines: Rc<Vec<Line<'static>>>,
+    pub lines: Rc<[Line<'static>]>,
     /// Hash of all inputs that affect rendering
     pub content_hash: u64,
 }

@@ -44,14 +44,14 @@ impl PreFlightResult {
 
     /// Append a blocking error (builder pattern).
     #[must_use]
-    pub fn error(mut self, msg: impl Into<String>) -> Self {
+    pub fn error<M: Into<String>>(mut self, msg: M) -> Self {
         self.errors.push(msg.into());
         self
     }
 
     /// Append a non-blocking warning (builder pattern).
     #[must_use]
-    pub fn warning(mut self, msg: impl Into<String>) -> Self {
+    pub fn warning<M: Into<String>>(mut self, msg: M) -> Self {
         self.warnings.push(msg.into());
         self
     }

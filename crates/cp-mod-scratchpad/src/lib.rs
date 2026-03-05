@@ -20,7 +20,7 @@ use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::ScratchpadPanel;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_base::modules::Module;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -180,7 +180,7 @@ impl Module for ScratchpadModule {
 /// Visualizer for scratchpad tool results.
 /// Highlights cell titles and shows creation vs edit vs deletion actions.
 fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123);
     let info_color = Color::Rgb(139, 233, 253);
@@ -203,10 +203,10 @@ fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<ratatui::text
             Style::default().fg(info_color)
         } else if line.starts_with("Deleted") {
             Style::default().fg(error_color)
-        } else if line.starts_with("C") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
+        } else if line.starts_with('C') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Cell IDs like C1, C2
             Style::default().fg(info_color)
-        } else if line.contains(":") {
+        } else if line.contains(':') {
             // Cell titles
             Style::default().fg(secondary_color)
         } else {

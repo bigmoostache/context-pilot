@@ -398,8 +398,14 @@ impl State {
     /// Find the first available context ID (fills gaps instead of always incrementing)
     #[must_use]
     pub fn next_available_context_id(&self) -> String {
-        let used_ids: std::collections::HashSet<usize> =
-            self.context.iter().filter_map(|c| c.id.strip_prefix('P').and_then(|n| n.parse().ok())).collect();
+        let used_ids: std::collections::HashSet<usize> = self
+            .context
+            .iter()
+            .filter_map(|c| {
+                let n = c.id.strip_prefix('P')?;
+                n.parse().ok()
+            })
+            .collect();
         let id = (9..).find(|n| !used_ids.contains(n)).unwrap_or(9);
         format!("P{id}")
     }

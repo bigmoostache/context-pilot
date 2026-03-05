@@ -5,6 +5,7 @@ use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use super::diff::generate_unified_diff;
+use std::fmt::Write as _;
 
 /// Normalize a string for matching: trim trailing whitespace per line, normalize line endings
 fn normalize_for_match(s: &str) -> String {
@@ -183,17 +184,18 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Warn if file was not open in context (edit still succeeded via unique match)
     if !is_open {
-        result_msg.push_str(&format!(
-            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify.\n"
-        ));
+        let _r = writeln!(
+            result_msg,
+            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
+        );
     }
 
     // Header line
     if replace_all && replaced > 1 {
-        result_msg
-            .push_str(&format!("Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)\n"));
+        let _r =
+            write!(result_msg, "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)\n");
     } else {
-        result_msg.push_str(&format!("Edited '{path_str}': ~{lines_changed} lines changed\n"));
+        let _r = writeln!(result_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
     }
 
     // Add diff markers for UI rendering

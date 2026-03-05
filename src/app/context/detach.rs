@@ -25,17 +25,17 @@ fn is_turn_boundary(messages: &[Message], idx: usize) -> bool {
     }
 
     // After an assistant text message (not a tool call)
-    if msg.role == "assistant" && msg.message_type == MessageType::TextMessage {
+    if msg.role == "assistant" && msg.msg_type == MessageType::TextMessage {
         return true;
     }
 
     // After a tool result, if next non-skipped message is a user text message
-    if msg.message_type == MessageType::ToolResult {
+    if msg.msg_type == MessageType::ToolResult {
         for next in &messages[idx + 1..] {
             if next.status == MessageStatus::Deleted || next.status == MessageStatus::Detached {
                 continue;
             }
-            return next.role == "user" && next.message_type == MessageType::TextMessage;
+            return next.role == "user" && next.msg_type == MessageType::TextMessage;
         }
         return true; // Last message in conversation
     }

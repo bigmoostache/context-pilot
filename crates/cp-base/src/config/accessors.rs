@@ -17,12 +17,14 @@ static CACHED_THEME_IDX: AtomicU8 = AtomicU8::new(u8::MAX);
 
 /// Resolve a theme-order index to its theme reference.
 fn theme_by_index(idx: u8) -> Option<&'static Theme> {
-    THEME_ORDER.get(idx as usize).and_then(|id| THEMES.themes.get(*id))
+    let id = THEME_ORDER.get(idx as usize)?;
+    THEMES.themes.get(*id)
 }
 
 /// Find the index of `theme_id` in [`THEME_ORDER`], or `None` if absent.
 fn theme_index(theme_id: &str) -> Option<u8> {
-    THEME_ORDER.iter().position(|&id| id == theme_id).and_then(|i| u8::try_from(i).ok())
+    let i = THEME_ORDER.iter().position(|&id| id == theme_id)?;
+    u8::try_from(i).ok()
 }
 
 /// Set the active theme ID (call when state is loaded or theme changes).

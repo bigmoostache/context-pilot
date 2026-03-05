@@ -19,7 +19,7 @@ pub mod types;
 pub const CONSOLE_DIR: &str = "console";
 
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::Write as _;
 
 use serde_json::json;
 
@@ -34,7 +34,7 @@ use self::panel::ConsolePanel;
 use self::types::{ConsoleState, SessionMeta};
 
 pub use self::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/console.yaml")));
@@ -72,7 +72,7 @@ impl Module for ConsoleModule {
         state.set_ext(ConsoleState::new());
         // Clean up log files
         for log in paths {
-            let _ = std::fs::remove_file(&log).ok();
+            let _: Option<()> = std::fs::remove_file(&log).ok();
         }
     }
 
@@ -87,7 +87,7 @@ impl Module for ConsoleModule {
                 // Leak stdin so script doesn't see EOF when TUI exits for reload.
                 // This keeps the pipe fd open (no EOF → script stays alive).
                 // After reload, send_keys already fails with "stdin unavailable".
-                handle.leak_stdin();
+                SessionHandle::leak_stdin();
 
                 drop(sessions_map.insert(
                     name.clone(),
@@ -145,14 +145,14 @@ impl Module for ConsoleModule {
         // Phase 1: Reconnect sessions (no &mut State needed)
         let mut reconnected: Vec<(String, SessionHandle)> = Vec::new();
         for (name, meta) in &sessions_map {
-            let handle = SessionHandle::reconnect(
-                name.clone(),
-                meta.command.clone(),
-                meta.cwd.clone(),
-                meta.pid,
-                meta.log_path.clone(),
-                meta.started_at,
-            );
+            let handle = SessionHandle::reconnect(manager::ReconnectMeta {
+                name: name.clone(),
+                command: meta.command.clone(),
+                cwd: meta.cwd.clone(),
+                pid: meta.pid,
+                log_path_str: meta.log_path.clone(),
+                started_at: meta.started_at,
+            });
             reconnected.push((name.clone(), handle));
         }
 
@@ -317,7 +317,7 @@ impl Module for ConsoleModule {
         }
         // Delete log file
         if !log_path.is_empty() {
-            let _ = std::fs::remove_file(&log_path).ok();
+            let _: Option<()> = std::fs::remove_file(&log_path).ok();
         }
         Some(Ok(format!("console: {name}")))
     }
@@ -341,7 +341,7 @@ impl Module for ConsoleModule {
 /// Visualizer for console tool results.
 /// Visualizer for console tool results — color-codes success/error/info lines.
 fn visualize_console_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123);
     let info_color = Color::Rgb(139, 233, 253);

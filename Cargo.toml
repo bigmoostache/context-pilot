@@ -841,6 +841,152 @@ rc_mutex = "deny"
 string_slice = "deny"
 
 # ============================
+# Pedantic/Restriction/Nursery — Tier additions
+# ============================
+# Catches `"hello {name}"` without format! — false-positives on .replace() templates
+literal_string_with_formatting_args = "deny"
+# PathBuf::push with absolute path silently overwrites — always a bug
+path_buf_push_overwrite = "deny"
+# Operator precedence bugs in grouped comparisons
+suspicious_operation_groupings = "deny"
+# `2 ^ 8` is XOR not pow — always a bug
+suspicious_xor_used_as_pow = "deny"
+# Panicking inside `-> Result` defeats the purpose
+panic_in_result_fn = "deny"
+# `.unwrap()` inside `-> Result` — propagate instead
+unwrap_in_result = "deny"
+# `.ok()` discarded silently — handle the Result
+unused_result_ok = "deny"
+# `impl<B, A> Foo<A, B>` — param order mismatch
+mismatching_type_param_order = "deny"
+# Use std LazyLock instead of lazy_static (edition 2024)
+non_std_lazy_statics = "deny"
+# Tests belong in `#[cfg(test)] mod tests`
+tests_outside_test_module = "deny"
+# `.unwrap_or(expensive())` — use `unwrap_or_else`
+or_fun_call = "deny"
+# `.collect().iter()` — skip the collect
+needless_collect = "deny"
+# `set.contains() + set.insert()` — use entry API
+set_contains_or_insert = "deny"
+# `.as_ref().cloned()` → `.clone()`
+option_as_ref_cloned = "deny"
+# `"foo".as_bytes()` → `b"foo"`
+string_lit_as_bytes = "deny"
+# Concise doc summary paragraphs
+too_long_first_doc_paragraph = "deny"
+# `push_str(&format!(...))` → `write!`
+format_push_string = "deny"
+# `.split("x")` → `.split('x')`
+single_char_pattern = "deny"
+# `{:?}` where `{}` works (Display impl available)
+unnecessary_debug_formatting = "deny"
+# Trailing `;` in expression position
+unnecessary_semicolon = "deny"
+# `.map_err(|_| ...)` loses error info
+map_err_ignore = "deny"
+# Use `fs::read_to_string` instead of open+read
+verbose_file_reads = "deny"
+# `PathBuf::new()` + `.push()` → `PathBuf::from()`
+pathbuf_init_then_push = "deny"
+# Trait impl renames parameters vs trait definition
+renamed_function_params = "deny"
+# `{:?}` in production code — prefer Display
+use_debug = "deny"
+# `let x: Foo = Foo::new()` — redundant annotation
+redundant_type_annotations = "deny"
+
+# ============================
+# Nursery — remaining (warn)
+# ============================
+clear_with_drain = "warn"
+coerce_container_to_any = "warn"
+doc_link_code = "warn"
+equatable_if_let = "warn"
+iter_on_empty_collections = "warn"
+iter_on_single_items = "warn"
+iter_with_drain = "warn"
+large_stack_frames = "warn"
+non_send_fields_in_send_ty = "warn"
+nonstandard_macro_braces = "warn"
+read_zero_byte_vec = "warn"
+single_option_map = "warn"
+trailing_empty_array = "warn"
+transmute_undefined_repr = "warn"
+trivial_regex = "warn"
+tuple_array_conversions = "warn"
+uninhabited_references = "warn"
+unused_peekable = "warn"
+unused_rounding = "warn"
+useless_let_if_seq = "warn"
+volatile_composites = "warn"
+
+# ============================
+# Pedantic — remaining (warn)
+# ============================
+expl_impl_clone_on_copy = "warn"
+format_collect = "warn"
+inline_always = "warn"
+invalid_upcast_comparisons = "warn"
+ip_constant = "warn"
+large_digit_groups = "warn"
+linkedlist = "warn"
+macro_use_imports = "warn"
+manual_is_power_of_two = "warn"
+manual_midpoint = "warn"
+maybe_infinite_iter = "warn"
+mut_mut = "warn"
+naive_bytecount = "warn"
+no_effect_underscore_binding = "warn"
+pub_underscore_fields = "warn"
+ref_binding_to_reference = "warn"
+self_only_used_in_recursion = "warn"
+# =====================
+similar_names = "warn"
+too_many_lines = "warn"
+unchecked_time_subtraction = "warn"
+unicode_not_nfc = "warn"
+unnecessary_literal_bound = "warn"
+
+# ============================
+# Restriction — remaining (warn)
+# ============================
+as_pointer_underscore = "warn"
+as_underscore = "warn"
+assertions_on_result_states = "warn"
+cognitive_complexity = "warn"
+create_dir = "warn"
+decimal_literal_representation = "warn"
+deref_by_slicing = "warn"
+doc_include_without_cfg = "warn"
+field_scoped_visibility_modifiers = "warn"
+filetype_is_file = "warn"
+if_then_some_else_none = "warn"
+impl_trait_in_params = "warn"
+integer_division_remainder_used = "warn"
+iter_over_hash_type = "warn"
+large_include_file = "warn"
+let_underscore_untyped = "warn"
+missing_asserts_for_indexing = "warn"
+mixed_read_write_in_expression = "warn"
+module_name_repetitions = "warn"
+multiple_inherent_impl = "warn"
+mutex_integer = "warn"
+needless_raw_strings = "warn"
+non_zero_suggestions = "warn"
+partial_pub_fields = "warn"
+precedence_bits = "warn"
+rc_buffer = "warn"
+redundant_test_prefix = "warn"
+return_and_then = "warn"
+same_name_method = "warn"
+string_lit_chars_any = "warn"
+try_err = "warn"
+unnecessary_self_imports = "warn"
+unneeded_field_pattern = "warn"
+unused_trait_names = "warn"
+
+# ============================
 # Cargo → warn
 # ============================
 # Ensures proper Cargo.toml metadata (description, license, etc.)

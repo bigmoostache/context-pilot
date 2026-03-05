@@ -34,7 +34,7 @@ impl ClaudeCodeClient {
 
         // Handle cleaner mode extra context
         if let Some(ref context) = request.extra_context {
-            let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", context);
+            let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
             json_messages.push(serde_json::json!({
                 "role": "user",
                 "content": msg
@@ -261,7 +261,13 @@ impl ClaudeCodeClient {
                     }
                     "message_stop" => break,
                     "error" => {
-                        crate::llms::log_sse_error("claude_code", json_str, total_bytes, line_count, &last_lines);
+                        crate::llms::log_sse_error(&crate::llms::SseErrorContext {
+                            provider: "claude_code",
+                            json_str,
+                            total_bytes,
+                            line_count,
+                            last_lines: &last_lines,
+                        });
                         break;
                     }
                     _ => {}

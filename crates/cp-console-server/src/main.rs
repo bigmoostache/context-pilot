@@ -30,7 +30,7 @@
 //! on next launch or module reload.
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead as _, BufReader, Write as _};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -109,7 +109,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
 
     // Create/truncate log file
     if let Some(parent) = log.parent() {
-        let _ = std::fs::create_dir_all(parent).ok();
+        let _: Option<()> = std::fs::create_dir_all(parent).ok();
     }
 
     let log_file = match std::fs::File::create(&log) {
@@ -122,11 +122,11 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
     };
 
     let mut cmd = Command::new("sh");
-    let _ = cmd.args(["-c", command]);
-    let _ = cmd.stdin(Stdio::piped()).stdout(log_file).stderr(log_err);
+    let _: &mut Command = cmd.args(["-c", command]);
+    let _: &mut Command = cmd.stdin(Stdio::piped()).stdout(log_file).stderr(log_err);
 
     if let Some(dir) = cwd {
-        let _ = cmd.current_dir(dir);
+        let _: &mut Command = cmd.current_dir(dir);
     }
 
     let mut child = match cmd.spawn() {
@@ -349,7 +349,7 @@ fn main() {
     let pid_path = format!("{}.pid", socket_path.trim_end_matches(".sock"));
 
     // Remove stale socket
-    let _ = std::fs::remove_file(&socket_path).ok();
+    let _: Option<()> = std::fs::remove_file(&socket_path).ok();
 
     // Become a session leader so children get SIGHUP when the server dies.
     #[cfg(unix)]
@@ -358,12 +358,12 @@ fn main() {
     // and is called once at startup before any child processes are spawned.
     {
         unsafe {
-            let _ = libc::setsid();
+            let _: libc::pid_t = libc::setsid();
         }
     }
 
     // Write PID file
-    let _ = std::fs::write(&pid_path, format!("{}", std::process::id())).ok();
+    let _: Option<()> = std::fs::write(&pid_path, format!("{}", std::process::id())).ok();
 
     // Bind socket
     let Ok(listener) = UnixListener::bind(&socket_path) else {
@@ -372,7 +372,7 @@ fn main() {
     };
 
     // Set socket to non-blocking so we can check SHUTDOWN_REQUESTED between accepts
-    let _ = listener.set_nonblocking(true).ok();
+    let _: Option<()> = listener.set_nonblocking(true).ok();
 
     let sessions: Sessions = Arc::new(Mutex::new(HashMap::new()));
 
@@ -402,8 +402,8 @@ fn main() {
 
     // Cleanup: kill children, remove socket/pid files
     kill_all_sessions(&sessions);
-    let _ = std::fs::remove_file(&socket_path).ok();
-    let _ = std::fs::remove_file(&pid_path).ok();
+    let _: Option<()> = std::fs::remove_file(&socket_path).ok();
+    let _: Option<()> = std::fs::remove_file(&pid_path).ok();
 }
 
 /// Register SIGINT and SIGHUP handlers via `signal-hook`.

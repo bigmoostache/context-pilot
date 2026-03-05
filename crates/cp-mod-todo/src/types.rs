@@ -19,7 +19,7 @@ pub enum TodoStatus {
 impl TodoStatus {
     /// Theme icon for this status (e.g., "○ ", "◐ ", "● ").
     #[must_use]
-    pub fn icon(&self) -> String {
+    pub fn icon(self) -> String {
         match self {
             Self::Pending => icons::todo_pending(),
             Self::InProgress => icons::todo_in_progress(),

@@ -57,7 +57,7 @@ impl App {
                                     uid: None,
                                     role: "assistant".to_string(),
                                     content: String::new(),
-                                    message_type: crate::state::MessageType::TextMessage,
+                                    msg_type: crate::state::MessageType::TextMessage,
                                     status: crate::state::MessageStatus::Full,
                                     content_token_count: 0,
                                     input_tokens: 0,
@@ -201,12 +201,13 @@ impl App {
                         && !QueueState::is_queue_tool(&tool.name);
                     if should_queue {
                         let qs = QueueState::get_mut(&mut self.state);
-                        let idx = qs.enqueue(
-                            tool.name.clone(),
-                            tool.id.clone(),
-                            tool.input.clone(),
-                            crate::app::panels::now_ms(),
-                        );
+                        let idx = qs.enqueue(cp_mod_queue::QueuedToolCall {
+                            index: 0,
+                            tool_name: tool.name.clone(),
+                            tool_use_id: tool.id.clone(),
+                            input: tool.input.clone(),
+                            queued_at: crate::app::panels::now_ms(),
+                        });
                         let params = serde_json::to_string(&tool.input).unwrap_or_default();
                         let short = if params.len() > 120 {
                             let mut end = 117;
@@ -236,7 +237,7 @@ impl App {
                         uid: None,
                         role: "assistant".to_string(),
                         content: String::new(),
-                        message_type: crate::state::MessageType::ToolCall,
+                        msg_type: crate::state::MessageType::ToolCall,
                         status: crate::state::MessageStatus::Full,
                         content_token_count: 0,
                         input_tokens: 0,
@@ -253,7 +254,7 @@ impl App {
                         uid: None,
                         role: "user".to_string(),
                         content: String::new(),
-                        message_type: crate::state::MessageType::ToolResult,
+                        msg_type: crate::state::MessageType::ToolResult,
                         status: crate::state::MessageStatus::Full,
                         content_token_count: 0,
                         input_tokens: 0,
@@ -337,7 +338,7 @@ impl App {
                     uid: None,
                     role: "user".to_string(),
                     content: REVERIE.report_nudge.trim_end().to_string(),
-                    message_type: crate::state::MessageType::TextMessage,
+                    msg_type: crate::state::MessageType::TextMessage,
                     status: crate::state::MessageStatus::Full,
                     content_token_count: 0,
                     input_tokens: 0,

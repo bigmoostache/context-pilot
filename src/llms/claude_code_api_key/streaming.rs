@@ -54,13 +54,16 @@ pub(super) struct StreamUsage {
     pub cache_read: Option<usize>,
 }
 
+/// Parsed SSE stream result: (input_tokens, output_tokens, cache_hit, cache_miss, stop_reason).
+pub(super) type SseStreamResult = (usize, usize, usize, usize, Option<String>);
+
 /// Parse an SSE stream from a Claude API response, sending events to the channel.
 /// Returns (`input_tokens`, `output_tokens`, `cache_hit_tokens`, `cache_miss_tokens`, `stop_reason`).
 pub(super) fn parse_sse_stream(
     response: reqwest::blocking::Response,
     resp_headers: &str,
     tx: &Sender<StreamEvent>,
-) -> Result<(usize, usize, usize, usize, Option<String>), LlmError> {
+) -> Result<SseStreamResult, LlmError> {
     let mut reader = BufReader::new(response);
     let mut input_tokens = 0;
     let mut output_tokens = 0;

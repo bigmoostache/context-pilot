@@ -43,9 +43,17 @@ pub(crate) fn init_registry() {
     crate::state::init_context_type_registry(metadata);
 }
 
+/// Metadata for a fixed panel default.
+pub(crate) struct FixedPanelDefault {
+    pub module_id: &'static str,
+    pub is_core: bool,
+    pub context_type: ContextType,
+    pub display_name: &'static str,
+    pub cache_deprecated: bool,
+}
+
 /// Collect all fixed panel defaults in canonical order (derived from the registry).
-/// Returns (`module_id`, `is_core`, `context_type`, `display_name`, `cache_deprecated`) for each fixed panel.
-pub(crate) fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType, &'static str, bool)> {
+pub(crate) fn all_fixed_panel_defaults() -> Vec<FixedPanelDefault> {
     // Build a lookup from context_type to module defaults
     let modules = all_modules();
     let mut lookup: HashMap<ContextType, (&str, bool, &str, bool)> = HashMap::new();
@@ -60,7 +68,13 @@ pub(crate) fn all_fixed_panel_defaults() -> Vec<(&'static str, bool, ContextType
         .iter()
         .filter_map(|ct_str| {
             let ct = ContextType::new(ct_str);
-            lookup.get(&ct).map(|(mid, is_core, name, cache_dep)| (*mid, *is_core, ct, *name, *cache_dep))
+            lookup.get(&ct).map(|(mid, is_core, name, cache_dep)| FixedPanelDefault {
+                module_id: mid,
+                is_core: *is_core,
+                context_type: ct,
+                display_name: name,
+                cache_deprecated: *cache_dep,
+            })
         })
         .collect()
 }

@@ -29,7 +29,7 @@ impl App {
         self.gh_watcher.sync_watches(&panels);
 
         // Sync branch PR watch — poll for PRs on the current git branch
-        let branch = cp_mod_git::GitState::get(&self.state).git_branch.as_deref();
+        let branch = cp_mod_git::GitState::get(&self.state).branch.as_deref();
         self.gh_watcher.sync_branch_pr(branch, Some(&token));
     }
 

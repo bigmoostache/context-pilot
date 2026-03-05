@@ -65,7 +65,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
 
         // Handle cleaner mode extra context
         if let Some(ref context) = request.extra_context {
-            let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", context);
+            let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
             json_messages.push(serde_json::json!({
                 "role": "user",
                 "content": msg

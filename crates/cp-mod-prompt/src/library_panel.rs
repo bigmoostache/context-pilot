@@ -1,10 +1,11 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Color, Line, Span, Style};
 
 use crate::types::PromptState;
 use cp_base::config::{INJECTIONS, theme};
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State};
 use cp_base::ui::{Cell, render_table};
+use std::fmt::Write as _;
 
 pub(crate) struct LibraryPanel;
 
@@ -278,7 +279,7 @@ impl Panel for LibraryPanel {
                 content.push('\n');
                 content.push_str(&INJECTIONS.editor_warnings.prompt.close_hint);
                 content.push_str("\n\n");
-                content.push_str(&format!("Editing {} '{}' ({}):\n\n", type_str, item.id, item.name));
+                let _r = write!(content, "Editing {} '{}' ({}):\n\n", type_str, item.id, item.name);
                 content.push_str(&item.content);
                 content.push('\n');
 
@@ -292,7 +293,7 @@ impl Panel for LibraryPanel {
         content.push_str("|------|------|--------|-------------|\n");
         for agent in &ps.agents {
             let active = if ps.active_agent_id.as_deref() == Some(&agent.id) { "✓" } else { "" };
-            content.push_str(&format!("| {} | {} | {} | {} |\n", agent.id, agent.name, active, agent.description));
+            let _r = write!(content, "| {} | {} | {} | {} |\n", agent.id, agent.name, active, agent.description);
         }
 
         // Skills table
@@ -302,7 +303,7 @@ impl Panel for LibraryPanel {
             content.push_str("|------|------|--------|-------------|\n");
             for skill in &ps.skills {
                 let loaded = if ps.loaded_skill_ids.contains(&skill.id) { "✓" } else { "" };
-                content.push_str(&format!("| {} | {} | {} | {} |\n", skill.id, skill.name, loaded, skill.description));
+                let _r = write!(content, "| {} | {} | {} | {} |\n", skill.id, skill.name, loaded, skill.description);
             }
         }
 
@@ -312,7 +313,7 @@ impl Panel for LibraryPanel {
             content.push_str("| Command | Name | Description |\n");
             content.push_str("|---------|------|-------------|\n");
             for cmd in &ps.commands {
-                content.push_str(&format!("| /{} | {} | {} |\n", cmd.id, cmd.name, cmd.description));
+                let _r = write!(content, "| /{} | {} | {} |\n", cmd.id, cmd.name, cmd.description);
             }
         }
 

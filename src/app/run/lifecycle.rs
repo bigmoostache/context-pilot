@@ -3,7 +3,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 use crossterm::event;
-use ratatui::prelude::*;
+use ratatui::prelude::{CrosstermBackend, Terminal};
 
 use crate::app::actions::{Action, ActionResult, apply_action};
 use crate::app::events::handle_event;

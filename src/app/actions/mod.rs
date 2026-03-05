@@ -41,7 +41,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 };
                 if should_trigger {
                     // Populate entries for root directory
-                    let filter = cp_mod_tree::TreeState::get(state).tree_filter.clone();
+                    let filter = cp_mod_tree::TreeState::get(state).filter.clone();
                     let entries = cp_mod_tree::list_dir_entries(&filter, "", "");
                     if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
                         ac.activate(anchor_pos);

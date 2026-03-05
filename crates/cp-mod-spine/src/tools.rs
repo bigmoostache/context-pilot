@@ -2,7 +2,7 @@ use cp_base::state::{ContextType, State};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::SpineState;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 /// Execute the `notification_mark_processed` tool
 pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -30,7 +30,7 @@ pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolR
         match status {
             Some(true) => already.push(id.as_str()),
             Some(false) => {
-                let _ = SpineState::mark_notification_processed(state, id);
+                let _: bool = SpineState::mark_notification_processed(state, id);
                 marked.push(id.as_str());
             }
             None => not_found.push(id.as_str()),

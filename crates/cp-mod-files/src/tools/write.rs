@@ -3,6 +3,7 @@ use std::path::Path;
 
 use cp_base::state::{ContextElement, ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
+use std::fmt::Write as _;
 
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
@@ -90,10 +91,10 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     result_msg.push_str("```diff\n");
     for (i, line) in contents.lines().enumerate() {
         if i >= 20 {
-            result_msg.push_str(&format!("+ ... ({} more lines)\n", line_count - 20));
+            let _r = writeln!(result_msg, "+ ... ({} more lines)", line_count - 20);
             break;
         }
-        result_msg.push_str(&format!("+ {line}\n"));
+        let _r = writeln!(result_msg, "+ {line}");
     }
     result_msg.push_str("```");
 

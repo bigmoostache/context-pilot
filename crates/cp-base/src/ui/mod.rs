@@ -3,7 +3,7 @@
 //! Provides Cell, Align, and render_table so that extracted module crates
 //! can render tables without depending on the main binary.
 
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
 use crate::config::theme;
@@ -39,11 +39,11 @@ pub struct Cell {
 
 impl Cell {
     /// Create a left-aligned cell with the given text and style.
-    pub fn new(text: impl Into<String>, style: Style) -> Self {
+    pub fn new<T: Into<String>>(text: T, style: Style) -> Self {
         Self { text: text.into(), style, align: Align::Left }
     }
     /// Create a right-aligned cell with the given text and style.
-    pub fn right(text: impl Into<String>, style: Style) -> Self {
+    pub fn right<T: Into<String>>(text: T, style: Style) -> Self {
         Self { text: text.into(), style, align: Align::Right }
     }
 }
@@ -162,11 +162,11 @@ pub struct TextCell {
 
 impl TextCell {
     /// Create a left-aligned text cell.
-    pub fn left(text: impl Into<String>) -> Self {
+    pub fn left<T: Into<String>>(text: T) -> Self {
         Self { text: text.into(), align: Align::Left }
     }
     /// Create a right-aligned text cell.
-    pub fn right(text: impl Into<String>) -> Self {
+    pub fn right<T: Into<String>>(text: T) -> Self {
         Self { text: text.into(), align: Align::Right }
     }
 }
@@ -263,7 +263,7 @@ pub fn find_size_pattern(line: &str) -> Option<usize> {
     while num_start > 0 && bytes[num_start - 1].is_ascii_digit() {
         num_start -= 1;
     }
-    if num_start > 0 && bytes[num_start - 1] == b' ' { Some(num_start - 1) } else { None }
+    (num_start > 0 && bytes[num_start - 1] == b' ').then(|| num_start - 1)
 }
 
 /// Find children count pattern in tree output (e.g., "(5 children)" or "(1 child)")

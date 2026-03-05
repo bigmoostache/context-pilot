@@ -17,7 +17,9 @@ use std::process::ExitCode;
 use std::sync::Mutex;
 use std::sync::mpsc;
 
-use ratatui::prelude::*;
+use ratatui::prelude::{
+    Color, Constraint, CrosstermBackend, Direction, Layout, Line, Modifier, Rect, Span, Style, Terminal,
+};
 
 // ─── Boot Screen ────────────────────────────────────────────────────────────
 // Phased loading with visual progress — no more black void on startup.

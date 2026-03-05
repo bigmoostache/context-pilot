@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Style};
 
 use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel};

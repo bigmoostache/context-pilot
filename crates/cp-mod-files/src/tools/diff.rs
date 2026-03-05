@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 /// Generate a unified diff showing changes between old and new strings
 pub(crate) fn generate_unified_diff(old: &str, new: &str) -> String {
     let old_lines: Vec<&str> = old.lines().collect();
@@ -9,13 +10,13 @@ pub(crate) fn generate_unified_diff(old: &str, new: &str) -> String {
     for op in diff_ops {
         match op {
             DiffOp::Equal(line) => {
-                result.push_str(&format!("  {line}\n"));
+                let _r = writeln!(result, "  {line}");
             }
             DiffOp::Delete(line) => {
-                result.push_str(&format!("- {line}\n"));
+                let _r = writeln!(result, "- {line}");
             }
             DiffOp::Insert(line) => {
-                result.push_str(&format!("+ {line}\n"));
+                let _r = writeln!(result, "+ {line}");
             }
         }
     }
@@ -76,13 +77,13 @@ fn compute_diff<'a>(old_lines: &[&'a str], new_lines: &[&'a str]) -> Vec<DiffOp<
 ///
 /// Note: O(m*n) space. Acceptable for typical file edits.
 fn lcs<'a>(old: &[&'a str], new: &[&'a str]) -> Vec<(usize, usize)> {
-    let m = old.len();
-    let n = new.len();
+    let old_len = old.len();
+    let new_len = new.len();
 
-    let mut lengths = vec![vec![0; n + 1]; m + 1];
+    let mut lengths = vec![vec![0; new_len + 1]; old_len + 1];
 
-    for i in 1..=m {
-        for j in 1..=n {
+    for i in 1..=old_len {
+        for j in 1..=new_len {
             if old[i - 1] == new[j - 1] {
                 lengths[i][j] = lengths[i - 1][j - 1] + 1;
             } else {
@@ -92,8 +93,8 @@ fn lcs<'a>(old: &[&'a str], new: &[&'a str]) -> Vec<(usize, usize)> {
     }
 
     let mut result = Vec::new();
-    let mut i = m;
-    let mut j = n;
+    let mut i = old_len;
+    let mut j = new_len;
 
     while i > 0 && j > 0 {
         if old[i - 1] == new[j - 1] {

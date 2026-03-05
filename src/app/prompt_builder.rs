@@ -42,7 +42,10 @@ pub(crate) fn assemble_prompt(
     let fake_panels = prepare_panel_messages(context_items);
 
     if !fake_panels.is_empty() {
-        inject_panel_messages(&mut api_messages, &fake_panels, messages, current_ms, seed_content);
+        inject_panel_messages(
+            &mut api_messages,
+            &PanelInjection { fake_panels: &fake_panels, messages, current_ms, seed_content },
+        );
     }
 
     // ── Phase 2: Conversation messages ──────────────────────────
@@ -57,7 +60,7 @@ pub(crate) fn assemble_prompt(
 
         let mut content_blocks: Vec<ContentBlock> = Vec::new();
 
-        if msg.message_type == MessageType::ToolResult {
+        if msg.msg_type == MessageType::ToolResult {
             for result in &msg.tool_results {
                 content_blocks.push(ContentBlock::ToolResult {
                     tool_use_id: result.tool_use_id.clone(),
@@ -70,7 +73,7 @@ pub(crate) fn assemble_prompt(
             continue;
         }
 
-        if msg.message_type == MessageType::ToolCall {
+        if msg.msg_type == MessageType::ToolCall {
             if let Some(blocks) = build_tool_call_blocks(msg, messages, idx) {
                 if let Some(last_api_msg) = api_messages.last_mut()
                     && last_api_msg.role == "assistant"
@@ -107,15 +110,17 @@ pub(crate) fn assemble_prompt(
 
 // ── Panel injection ─────────────────────────────────────────────
 
-/// Inject context panels as fake tool call/result message pairs.
-fn inject_panel_messages(
-    api_messages: &mut Vec<ApiMessage>,
-    fake_panels: &[crate::llms::FakePanelMessage],
-    messages: &[Message],
+/// Context needed for panel injection into the prompt.
+struct PanelInjection<'a> {
+    fake_panels: &'a [crate::llms::FakePanelMessage],
+    messages: &'a [Message],
     current_ms: u64,
-    seed_content: Option<&str>,
-) {
-    for (idx, panel) in fake_panels.iter().enumerate() {
+    seed_content: Option<&'a str>,
+}
+
+/// Inject context panels as fake tool call/result message pairs.
+fn inject_panel_messages(api_messages: &mut Vec<ApiMessage>, ctx: &PanelInjection<'_>) {
+    for (idx, panel) in ctx.fake_panels.iter().enumerate() {
         let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
         let text = if idx == 0 { format!("{}\n\n{}", panel_header_text(), timestamp_text) } else { timestamp_text };
 
@@ -140,7 +145,7 @@ fn inject_panel_messages(
     }
 
     // Footer after all panels
-    let footer = panel_footer_text(messages, current_ms);
+    let footer = panel_footer_text(ctx.messages, ctx.current_ms);
     api_messages.push(ApiMessage {
         role: "assistant".to_string(),
         content: vec![
@@ -161,7 +166,7 @@ fn inject_panel_messages(
     });
 
     // Re-inject seed/system prompt after panels
-    if let Some(seed) = seed_content {
+    if let Some(seed) = ctx.seed_content {
         let header = &INJECTIONS.providers.seed_reinjection_header;
         api_messages.push(ApiMessage {
             role: "user".to_string(),
@@ -183,7 +188,7 @@ fn build_tool_call_blocks(msg: &Message, messages: &[Message], idx: usize) -> Op
     let has_matching_result = messages[idx + 1..]
         .iter()
         .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-        .filter(|m| m.message_type == MessageType::ToolResult)
+        .filter(|m| m.msg_type == MessageType::ToolResult)
         .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
 
     if !has_matching_result {

@@ -64,10 +64,12 @@ impl QueueState {
     }
 
     /// Queue a tool call. Returns the assigned index.
-    pub fn enqueue(&mut self, tool_name: String, tool_use_id: String, input: serde_json::Value, now_ms: u64) -> usize {
+    pub fn enqueue(&mut self, call: QueuedToolCall) -> usize {
         let index = self.next_index;
         self.next_index += 1;
-        self.queued_calls.push(QueuedToolCall { index, tool_name, tool_use_id, input, queued_at: now_ms });
+        let mut call = call;
+        call.index = index;
+        self.queued_calls.push(call);
         index
     }
 

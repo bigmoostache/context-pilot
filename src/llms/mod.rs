@@ -240,7 +240,7 @@ pub(crate) fn panel_timestamp_text(timestamp_ms: u64) -> String {
 
     let iso_time = ms_to_iso8601(timestamp_ms);
 
-    prompts::panel_timestamp().replace("{iso_time}", &iso_time)
+    prompts::panel_timestamp().replace(concat!("{", "iso_time", "}"), &iso_time)
 }
 
 /// Generate the footer text for dynamic panel display, including message timestamps
@@ -264,9 +264,9 @@ pub(crate) fn panel_footer_text(messages: &[Message], current_ms: u64) -> String
                 "just now".to_string()
             };
             let line = prompts::panel_footer_msg_line()
-                .replace("{role}", &msg.role)
-                .replace("{iso_time}", &iso_time)
-                .replace("{time_delta}", &time_delta);
+                .replace(concat!("{", "role", "}"), &msg.role)
+                .replace(concat!("{", "iso_time", "}"), &iso_time)
+                .replace(concat!("{", "time_delta", "}"), &time_delta);
             lines.push_str(&line);
             lines.push('\n');
         }
@@ -274,8 +274,8 @@ pub(crate) fn panel_footer_text(messages: &[Message], current_ms: u64) -> String
     };
 
     prompts::panel_footer()
-        .replace("{message_timestamps}", &message_timestamps)
-        .replace("{current_datetime}", &ms_to_iso8601(current_ms))
+        .replace(concat!("{", "message_timestamps", "}"), &message_timestamps)
+        .replace(concat!("{", "current_datetime", "}"), &ms_to_iso8601(current_ms))
 }
 
 /// Prepare context items for injection as fake tool call/result pairs.
@@ -284,11 +284,10 @@ pub(crate) fn panel_footer_text(messages: &[Message], current_ms: u64) -> String
 /// - Returns `FakePanelMessage` structs that providers can convert to their format
 pub(crate) fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakePanelMessage> {
     // Filter out Conversation panel (id="chat") -- it's the live message feed, not a context panel
-    let filtered: Vec<&ContextItem> =
-        context_items.iter().filter(|item| !item.content.is_empty()).filter(|item| item.id != "chat").collect();
-
-    filtered
-        .into_iter()
+    context_items
+        .iter()
+        .filter(|item| !item.content.is_empty())
+        .filter(|item| item.id != "chat")
         .map(|item| FakePanelMessage {
             panel_id: item.id.clone(),
             timestamp_ms: item.last_refresh_ms,
@@ -361,14 +360,17 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value>
     json_messages
 }
 
+/// Context for logging an SSE error event.
+pub(crate) struct SseErrorContext<'a> {
+    pub provider: &'a str,
+    pub json_str: &'a str,
+    pub total_bytes: usize,
+    pub line_count: usize,
+    pub last_lines: &'a [String],
+}
+
 /// Log an SSE error event to `.context-pilot/errors/sse_errors.log` for post-mortem debugging.
-pub(crate) fn log_sse_error(
-    provider: &str,
-    json_str: &str,
-    total_bytes: usize,
-    line_count: usize,
-    last_lines: &[String],
-) {
+pub(crate) fn log_sse_error(ctx: &SseErrorContext<'_>) {
     use std::io::Write;
 
     let dir = std::path::Path::new(".context-pilot").join("errors");
@@ -376,13 +378,14 @@ pub(crate) fn log_sse_error(
     let path = dir.join("sse_errors.log");
 
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-    let recent = if last_lines.is_empty() { "(none)".to_string() } else { last_lines.join("\n") };
+    let recent = if ctx.last_lines.is_empty() { "(none)".to_string() } else { ctx.last_lines.join("\n") };
     let entry = format!(
-        "[{ts}] SSE error event ({provider})\n\
-         Stream position: {total_bytes} bytes, {line_count} lines\n\
-         Error data: {json_str}\n\
+        "[{ts}] SSE error event ({})\n\
+         Stream position: {} bytes, {} lines\n\
+         Error data: {}\n\
          Last SSE lines:\n{recent}\n\
-         ---\n"
+         ---\n",
+        ctx.provider, ctx.total_bytes, ctx.line_count, ctx.json_str
     );
 
     let _r = std::fs::OpenOptions::new()

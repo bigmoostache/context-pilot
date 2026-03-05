@@ -122,7 +122,7 @@ impl Module for GithubModule {
 /// Visualizer for `gh_execute` tool results.
 /// Color-codes PR/issue output with status badges, labels, authors, and highlights URLs and PR numbers.
 fn visualize_gh_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123); // Green for open/merged
     let error_color = Color::Rgb(255, 85, 85); // Red for closed
@@ -152,10 +152,10 @@ fn visualize_gh_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'
             Style::default().fg(warning_color)
         } else if line.contains("http://") || line.contains("https://") {
             Style::default().fg(link_color)
-        } else if line.contains("#") && line.chars().any(|c| c.is_ascii_digit()) {
+        } else if line.contains('#') && line.chars().any(|c| c.is_ascii_digit()) {
             // PR/issue numbers like #123
             Style::default().fg(info_color)
-        } else if line.starts_with("#") {
+        } else if line.starts_with('#') {
             // Comments
             Style::default().fg(secondary_color)
         } else {

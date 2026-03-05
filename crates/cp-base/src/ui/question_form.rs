@@ -16,7 +16,7 @@ pub struct QuestionOption {
 #[derive(Debug, Clone)]
 pub struct Question {
     /// The complete question text.
-    pub question: String,
+    pub text: String,
     /// Very short label (max 12 chars) for compact display.
     pub header: String,
     /// Available choices (an "Other" free-text option is appended automatically).

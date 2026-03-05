@@ -20,7 +20,7 @@ use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolParam, Tool
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TodoPanel;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_base::modules::Module;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -225,7 +225,7 @@ impl Module for TodoModule {
 /// Visualizer for todo tool results.
 /// Shows todo status with colored indicators and highlights created/updated item names.
 fn visualize_todo_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123); // Green for done
     let warning_color = Color::Rgb(241, 250, 140); // Yellow for in_progress
@@ -253,7 +253,7 @@ fn visualize_todo_output(content: &str, width: usize) -> Vec<ratatui::text::Line
             Style::default().fg(error_color)
         } else if line.contains("Updated") {
             Style::default().fg(success_color)
-        } else if line.starts_with("X") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
+        } else if line.starts_with('X') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Todo IDs like X1, X2
             Style::default().fg(info_color)
         } else if line.contains("→") {

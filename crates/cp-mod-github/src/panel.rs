@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use super::GH_CMD_TIMEOUT_SECS;
 use cp_base::config::constants::MAX_RESULT_CONTENT_BYTES;

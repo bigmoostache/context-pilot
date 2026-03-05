@@ -1,0 +1,62 @@
+# ============================================================================
+# clippy.toml — Architecture-Enforcing Lint Configuration
+# ============================================================================
+# Maximum strictness. Every threshold tightened below defaults.
+# Use #[expect(lint, reason = "...")] for justified exceptions.
+#
+# IMPORTANT: All [[array-of-tables]] entries (disallowed-types, disallowed-methods)
+# MUST be at the END of the file. TOML spec: bare key=value pairs after [[table]]
+# are parsed as part of that table, not as top-level keys.
+
+# ── Complexity & Size ────────────────────────────────────────────────────────
+
+cognitive-complexity-threshold = 7
+too-many-arguments-threshold = 4
+type-complexity-threshold = 150
+enum-variant-size-threshold = 128
+future-size-threshold = 2048
+max-struct-bools = 3
+max-fn-params-bools = 2
+array-size-threshold = 512
+vec-box-size-threshold = 4096
+single-char-binding-names-threshold = 2
+too-many-lines-threshold = 60
+max-trait-bounds = 4
+
+# ── Disallowed Names ─────────────────────────────────────────────────────────
+
+disallowed-names = ["foo", "bar", "baz", "tmp", "thing"]
+
+# ── API & Export Behavior ────────────────────────────────────────────────────
+
+avoid-breaking-exported-api = false
+warn-on-all-wildcard-imports = true
+allow-unwrap-in-tests = false
+allow-expect-in-tests = false
+allow-panic-in-tests = false
+allow-dbg-in-tests = false
+
+# ── Identifier Quality ───────────────────────────────────────────────────────
+
+min-ident-chars-threshold = 3
+allowed-idents-below-min-chars = ["i", "j", "k", "n", "x", "y", "w", "h", "s", "f", "id", "tx", "rx", "ms", "_"]
+
+# ── Documentation ────────────────────────────────────────────────────────────
+
+doc-valid-idents = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "DirectX", "ECMAScript", "GPLv2", "GPLv3", "GitHub", "GitLab", "IPv4", "IPv6", "ClojureScript", "CoffeeScript", "JavaScript", "TypeScript", "NaN", "NixOS", "OAuth", "OpenAI", "OpenDNS", "OpenGL", "OpenMP", "OpenSSH", "OpenSSL", "OpenStreetMap", "OpenTelemetry", "PostgreSQL", "FreeBSD", "NetBSD", "OpenBSD", "TeX", "LaTeX", "BibTeX", "BibLaTeX", "MinGW", "CamelCase", "GraphQL", "PostScript", "WebAssembly", "WebSocket", "WebSockets", "PowerShell", "ContextPilot", "ClaudeCode", "DeepSeek", "Ratatui", "Crossterm"]
+
+# ── Disallowed Types (MUST be last — TOML array-of-tables) ───────────────────
+
+[[disallowed-types]]
+path = "std::collections::LinkedList"
+reason = "Almost never the right choice. Use Vec or VecDeque."
+
+# ── Disallowed Methods (MUST be last — TOML array-of-tables) ─────────────────
+
+[[disallowed-methods]]
+path = "std::mem::forget"
+reason = "Memory leak by design. Use ManuallyDrop if truly needed."
+
+[[disallowed-methods]]
+path = "std::process::exit"
+reason = "Abrupt termination. Return from main or use a shutdown signal."

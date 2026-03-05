@@ -2,7 +2,7 @@ use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::api::{BraveClient, LLMContextParams, SearchParams};
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 
 /// Dispatch brave tool calls.
 pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
@@ -14,7 +14,7 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
 }
 
 fn get_client() -> Result<BraveClient, String> {
-    let api_key = std::env::var("BRAVE_API_KEY").map_err(|_| "BRAVE_API_KEY not set".to_string())?;
+    let api_key = std::env::var("BRAVE_API_KEY").map_err(|_e| "BRAVE_API_KEY not set".to_string())?;
     BraveClient::new(api_key)
 }
 

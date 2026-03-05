@@ -50,7 +50,7 @@ impl App {
                     self.state.input_cursor = anchor + 1 + new_query.len(); // +1 for '@'
 
                     // Refresh entries for the new directory
-                    let filter = cp_mod_tree::TreeState::get(&self.state).tree_filter.clone();
+                    let filter = cp_mod_tree::TreeState::get(&self.state).filter.clone();
                     let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
                         return;
                     };
@@ -103,7 +103,7 @@ impl App {
                     }
 
                     // Refresh matches
-                    let filter = cp_mod_tree::TreeState::get(&self.state).tree_filter.clone();
+                    let filter = cp_mod_tree::TreeState::get(&self.state).filter.clone();
                     let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
                         return;
                     };
@@ -140,7 +140,7 @@ impl App {
                     self.state.input_cursor += c.len_utf8();
 
                     // Refresh matches with new query
-                    let filter = cp_mod_tree::TreeState::get(&self.state).tree_filter.clone();
+                    let filter = cp_mod_tree::TreeState::get(&self.state).filter.clone();
                     let Some(ac) = self.state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() else {
                         return;
                     };

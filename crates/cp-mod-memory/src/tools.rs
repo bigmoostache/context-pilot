@@ -3,6 +3,7 @@ use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{MemoryImportance, MemoryItem, MemoryState};
+use std::fmt::Write as _;
 
 fn validate_tldr(text: &str) -> Result<(), String> {
     let tokens = estimate_tokens(text);
@@ -74,7 +75,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut output = String::new();
 
     if !created.is_empty() {
-        output.push_str(&format!("Created {} memory(s):\n{}", created.len(), created.join("\n")));
+        let _r = write!(output, "Created {} memory(s):\n{}", created.len(), created.join("\n"));
         state.touch_panel(ContextType::MEMORY);
     }
 
@@ -82,7 +83,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         if !output.is_empty() {
             output.push_str("\n\n");
         }
-        output.push_str(&format!("Errors ({}):\n{}", errors.len(), errors.join("\n")));
+        let _r = write!(output, "Errors ({}):\n{}", errors.len(), errors.join("\n"));
     }
 
     ToolResult::new(tool.id.clone(), output, created.is_empty())
@@ -97,7 +98,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_string(), true);
     }
 
-    let mut updated: Vec<String> = Vec::new();
+    let mut modified: Vec<String> = Vec::new();
     let mut deleted: Vec<String> = Vec::new();
     let mut not_found: Vec<String> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
@@ -171,7 +172,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
 
                 if !changes.is_empty() {
-                    updated.push(format!("{}: {}", id, changes.join(", ")));
+                    modified.push(format!("{}: {}", id, changes.join(", ")));
                 }
             }
             None => {
@@ -181,36 +182,36 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Update Memory panel timestamp if anything changed
-    if !updated.is_empty() || !deleted.is_empty() {
+    if !modified.is_empty() || !deleted.is_empty() {
         state.touch_panel(ContextType::MEMORY);
     }
 
     let mut output = String::new();
 
-    if !updated.is_empty() {
-        output.push_str(&format!("Updated {}:\n{}", updated.len(), updated.join("\n")));
+    if !modified.is_empty() {
+        let _r = write!(output, "Updated {}:\n{}", modified.len(), modified.join("\n"));
     }
 
     if !deleted.is_empty() {
         if !output.is_empty() {
             output.push_str("\n\n");
         }
-        output.push_str(&format!("Deleted: {}", deleted.join(", ")));
+        let _r = write!(output, "Deleted: {}", deleted.join(", "));
     }
 
     if !not_found.is_empty() {
         if !output.is_empty() {
             output.push_str("\n\n");
         }
-        output.push_str(&format!("Not found: {}", not_found.join(", ")));
+        let _r = write!(output, "Not found: {}", not_found.join(", "));
     }
 
     if !errors.is_empty() {
         if !output.is_empty() {
             output.push_str("\n\n");
         }
-        output.push_str(&format!("Errors:\n{}", errors.join("\n")));
+        let _r = write!(output, "Errors:\n{}", errors.join("\n"));
     }
 
-    ToolResult::new(tool.id.clone(), output, updated.is_empty() && deleted.is_empty())
+    ToolResult::new(tool.id.clone(), output, modified.is_empty() && deleted.is_empty())
 }

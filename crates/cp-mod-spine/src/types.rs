@@ -20,7 +20,7 @@ pub enum NotificationType {
 impl NotificationType {
     /// Human-readable label (e.g., "User Message", "Reload Resume").
     #[must_use]
-    pub const fn label(&self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::UserMessage => "User Message",
             Self::ReloadResume => "Reload Resume",
@@ -47,7 +47,8 @@ pub struct Notification {
     /// Notification ID (e.g., "N1", "N2")
     pub id: String,
     /// What type of notification this is
-    pub notification_type: NotificationType,
+    #[serde(rename = "notification_type")]
+    pub kind: NotificationType,
     /// Who created it (message ID, module name, etc.)
     pub source: String,
     /// Notification status: unprocessed → blocked (by guard rail) or processed (handled).
@@ -62,10 +63,10 @@ pub struct Notification {
 impl Notification {
     /// Create a new notification with the given fields
     #[must_use]
-    pub fn new(id: String, notification_type: NotificationType, source: String, content: String) -> Self {
+    pub fn new(id: String, kind: NotificationType, source: String, content: String) -> Self {
         Self {
             id,
-            notification_type,
+            kind,
             source,
             status: NotificationStatus::Unprocessed,
             timestamp_ms: cp_base::panels::now_ms(),
@@ -196,17 +197,12 @@ impl SpineState {
     }
 
     /// Create a new notification and add it. Returns the notification ID.
-    pub fn create_notification(
-        state: &mut State,
-        notification_type: NotificationType,
-        source: String,
-        content: String,
-    ) -> String {
+    pub fn create_notification(state: &mut State, kind: NotificationType, source: String, content: String) -> String {
         let id = {
             let ss = Self::get_mut(state);
             let id = format!("N{}", ss.next_notification_id);
             ss.next_notification_id += 1;
-            ss.notifications.push(Notification::new(id.clone(), notification_type, source, content));
+            ss.notifications.push(Notification::new(id.clone(), kind, source, content));
             // Inline gc: cap at 100
             if ss.notifications.len() > 100 {
                 let excess = ss.notifications.len() - 100;
@@ -304,7 +300,7 @@ impl SpineState {
             let mut changed = false;
             for n in &mut ss.notifications {
                 if n.is_unprocessed()
-                    && matches!(n.notification_type, NotificationType::UserMessage | NotificationType::ReloadResume)
+                    && matches!(n.kind, NotificationType::UserMessage | NotificationType::ReloadResume)
                 {
                     n.status = NotificationStatus::Processed;
                     changed = true;

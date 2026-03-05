@@ -20,12 +20,13 @@ use std::any::Any;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ratatui::prelude::*;
-use sha2::{Digest, Sha256};
+use ratatui::Frame;
+use ratatui::prelude::{Line, Rect, Style};
+use sha2::{Digest as _, Sha256};
 
 use crossterm::event::{KeyCode, KeyEvent};
 
-use crate::cast::SafeCast;
+use crate::cast::SafeCast as _;
 use crate::config::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::state::{Action, ContextElement, ContextType, State};
 
@@ -182,6 +183,7 @@ pub fn mark_panels_dirty(state: &mut State, context_type: &str) {
 }
 
 /// Paginate content for LLM context output.
+///
 /// Returns the original content unchanged when `total_pages` <= 1.
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
 /// and prepends a page header.
@@ -233,10 +235,10 @@ pub struct ContextItem {
 
 impl ContextItem {
     /// Create a context item from its components.
-    pub fn new(
-        id: impl Into<String>,
-        header: impl Into<String>,
-        content: impl Into<String>,
+    pub fn new<I: Into<String>, H: Into<String>, C: Into<String>>(
+        id: I,
+        header: H,
+        content: C,
         last_refresh_ms: u64,
     ) -> Self {
         Self { id: id.into(), header: header.into(), content: content.into(), last_refresh_ms }

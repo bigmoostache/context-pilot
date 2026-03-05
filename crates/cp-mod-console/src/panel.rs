@@ -1,4 +1,4 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::config::{chars, theme};
 use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
@@ -119,7 +119,7 @@ impl Panel for ConsolePanel {
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
         ctx.cache_deprecated = false;
-        let _ = update_if_changed(ctx, &content);
+        let _: bool = update_if_changed(ctx, &content);
 
         // Also update status metadata from session handle
         if let Some(session_name) = ctx.get_meta_str("console_name").map(ToString::to_string) {
@@ -150,7 +150,7 @@ impl Panel for ConsolePanel {
         let (content, command, status) = state.context.get(state.selected_context).map_or_else(
             || (String::new(), String::new(), String::new()),
             |ctx| {
-                let content = ctx.cached_content.as_ref().cloned().unwrap_or_else(|| {
+                let content = ctx.cached_content.clone().unwrap_or_else(|| {
                     if ctx.cache_deprecated { "Loading...".to_string() } else { "No output".to_string() }
                 });
                 let cmd = ctx.get_meta_str("console_command").unwrap_or("").to_string();

@@ -6,6 +6,7 @@
 use crate::infra::tools::{ParamType, ToolDefinition, ToolResult, ToolTexts, ToolUse};
 use crate::state::State;
 use cp_base::config::REVERIE;
+use std::fmt::Write as _;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/reverie.yaml")));
@@ -20,7 +21,7 @@ pub(crate) fn build_tool_restrictions_text(tools: &[ToolDefinition]) -> String {
 
     for tool in tools {
         if tool.reverie_allowed {
-            text.push_str(&format!("\n- {}", tool.id));
+            let _r = write!(text, "\n- {}", tool.id);
         }
     }
 
@@ -98,7 +99,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
     if state.reveries.contains_key(&agent_id) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: REVERIE.errors.already_running.replace("{agent_id}", &agent_id),
+            content: REVERIE.errors.already_running.replace(concat!("{", "agent_id", "}"), &agent_id),
             is_error: true,
             tool_name: tool.name.clone(),
         };

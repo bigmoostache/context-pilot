@@ -1,4 +1,4 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use crate::types::PromptState;
 use cp_base::config::theme;

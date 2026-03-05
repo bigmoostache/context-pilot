@@ -265,7 +265,7 @@ impl ModelInfo for GroqModel {
     }
 
     fn context_window(&self) -> usize {
-        131_072 // All models have 131K context
+        0x0002_0000 // All models have 131K context
     }
 
     fn input_price_per_mtok(&self) -> f32 {
@@ -340,7 +340,7 @@ impl ModelInfo for DeepSeekModel {
     fn max_output_tokens(&self) -> u32 {
         match self {
             Self::DeepseekChat => 8_192,
-            Self::DeepseekReasoner => 16_384,
+            Self::DeepseekReasoner => 0x4000,
         }
     }
 }

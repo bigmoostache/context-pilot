@@ -15,6 +15,7 @@ use cp_mod_console::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_mod_queue::QueueState;
 
 use crate::app::App;
+use std::fmt::Write as _;
 
 // ─── Tool pipeline ──────────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ impl App {
             id: tool_id,
             uid: Some(tool_uid),
             role: "assistant".to_string(),
-            message_type: MessageType::ToolCall,
+            msg_type: MessageType::ToolCall,
             content: String::new(),
             content_token_count: 0,
             status: MessageStatus::Full,
@@ -96,7 +97,13 @@ impl App {
                 } else if QueueState::get(&self.state).active && !QueueState::is_queue_tool(&tool.name) {
                     // Queue intercept: enqueue instead of executing
                     let qs = QueueState::get_mut(&mut self.state);
-                    let idx = qs.enqueue(tool.name.clone(), tool.id.clone(), tool.input.clone(), now_ms());
+                    let idx = qs.enqueue(cp_mod_queue::QueuedToolCall {
+                        index: 0,
+                        tool_name: tool.name.clone(),
+                        tool_use_id: tool.id.clone(),
+                        input: tool.input.clone(),
+                        queued_at: now_ms(),
+                    });
                     let params = serde_json::to_string(&tool.input).unwrap_or_default();
                     let short = if params.len() > 120 {
                         let mut end = 117;
@@ -109,14 +116,14 @@ impl App {
                     };
                     let mut msg = format!("Queued as #{}: {}({})", idx, tool.name, short);
                     if pf.has_warnings() {
-                        msg.push_str(&format!("\n{}", pf.format_errors()));
+                        let _r = write!(msg, "\n{}", pf.format_errors());
                     }
                     crate::infra::tools::ToolResult::new(tool.id.clone(), msg, false)
                 } else {
                     // Execute normally
                     let mut result = execute_tool(tool, &mut self.state);
                     if pf.has_warnings() {
-                        result.content.push_str(&format!("\n{}", pf.format_errors()));
+                        let _r = write!(result.content, "\n{}", pf.format_errors());
                     }
                     result
                 }
@@ -255,7 +262,7 @@ impl App {
             id: result_id,
             uid: Some(result_uid),
             role: "user".to_string(),
-            message_type: MessageType::ToolResult,
+            msg_type: MessageType::ToolResult,
             content: String::new(),
             content_token_count: 0,
             status: MessageStatus::Full,
@@ -281,7 +288,7 @@ impl App {
             id: assistant_id,
             uid: Some(assistant_uid),
             role: "assistant".to_string(),
-            message_type: MessageType::TextMessage,
+            msg_type: MessageType::TextMessage,
             content: String::new(),
             content_token_count: 0,
             status: MessageStatus::Full,
@@ -426,7 +433,7 @@ impl App {
             id: result_id,
             uid: Some(result_uid),
             role: "user".to_string(),
-            message_type: MessageType::ToolResult,
+            msg_type: MessageType::ToolResult,
             content: String::new(),
             content_token_count: 0,
             status: MessageStatus::Full,
@@ -452,7 +459,7 @@ impl App {
             id: assistant_id,
             uid: Some(assistant_uid),
             role: "assistant".to_string(),
-            message_type: MessageType::TextMessage,
+            msg_type: MessageType::TextMessage,
             content: String::new(),
             content_token_count: 0,
             status: MessageStatus::Full,

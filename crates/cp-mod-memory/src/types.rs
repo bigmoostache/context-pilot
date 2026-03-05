@@ -35,7 +35,7 @@ impl FromStr for MemoryImportance {
 impl MemoryImportance {
     /// String representation for serialization/display.
     #[must_use]
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Low => "low",
             Self::Medium => "medium",

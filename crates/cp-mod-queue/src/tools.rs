@@ -2,6 +2,7 @@ use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::QueueState;
+use std::fmt::Write as _;
 
 /// Execute `Queue_activate`: start intercepting tool calls.
 pub(crate) fn execute_activate(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -73,15 +74,15 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let mut msg = String::new();
     if !removed.is_empty() {
-        msg.push_str(&format!("Removed: #{}", removed.join(", #")));
+        let _r = write!(msg, "Removed: #{}", removed.join(", #"));
     }
     if !not_found.is_empty() {
         if !msg.is_empty() {
             msg.push_str(". ");
         }
-        msg.push_str(&format!("Not found: #{}", not_found.join(", #")));
+        let _r = write!(msg, "Not found: #{}", not_found.join(", #"));
     }
-    msg.push_str(&format!(". {} action(s) remaining.", qs.queued_calls.len()));
+    let _r = write!(msg, ". {} action(s) remaining.", qs.queued_calls.len());
 
     ToolResult {
         tool_use_id: tool.id.clone(),

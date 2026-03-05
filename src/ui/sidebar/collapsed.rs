@@ -1,4 +1,4 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Constraint, Direction, Frame, Layout, Line, Rect, Span, Style};
 
 use super::super::{helpers::format_number, theme};
 use crate::state::{ContextType, State};

@@ -38,7 +38,7 @@ pub enum ProcessStatus {
 impl ProcessStatus {
     /// Human-readable label (e.g., "running", "exited(0)", "failed(1)").
     #[must_use]
-    pub fn label(&self) -> String {
+    pub fn label(self) -> String {
         match self {
             Self::Running => "running".to_string(),
             Self::Finished(code) => format!("exited({code})"),
@@ -49,15 +49,15 @@ impl ProcessStatus {
 
     /// Whether the process has reached a terminal state (not running).
     #[must_use]
-    pub const fn is_terminal(&self) -> bool {
+    pub const fn is_terminal(self) -> bool {
         !matches!(self, Self::Running)
     }
 
     /// Exit code if terminal (Killed → -9), None if still running.
     #[must_use]
-    pub const fn exit_code(&self) -> Option<i32> {
+    pub const fn exit_code(self) -> Option<i32> {
         match self {
-            Self::Finished(c) | Self::Failed(c) => Some(*c),
+            Self::Finished(c) | Self::Failed(c) => Some(c),
             Self::Running => None,
             Self::Killed => Some(-9),
         }
@@ -263,7 +263,7 @@ impl Watcher for ConsoleWatcher {
         self.registered_at_ms
     }
 
-    fn source_tag(&self) -> &str {
+    fn source_tag(&self) -> &'static str {
         "console"
     }
 

@@ -24,7 +24,7 @@ use cp_base::tools::{ParamType, PreFlightResult, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::SpinePanel;
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 use cp_base::modules::Module;
 
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -226,7 +226,7 @@ impl Module for SpineModule {
 /// Visualizer for spine tool results.
 /// Shows configuration changes with before/after values and highlights notification IDs.
 fn visualize_spine_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123);
     let info_color = Color::Rgb(139, 233, 253);
@@ -247,10 +247,10 @@ fn visualize_spine_output(content: &str, width: usize) -> Vec<ratatui::text::Lin
             Style::default().fg(success_color)
         } else if line.starts_with("Updated") || line.contains("→") {
             Style::default().fg(info_color)
-        } else if line.contains("=") || line.contains(":") {
+        } else if line.contains('=') || line.contains(':') {
             // Config key-value pairs
             Style::default().fg(info_color)
-        } else if line.starts_with("N") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
+        } else if line.starts_with('N') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Notification IDs like N1, N2
             Style::default().fg(warning_color)
         } else {

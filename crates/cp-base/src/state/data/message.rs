@@ -64,8 +64,8 @@ pub struct Message {
     /// Role string (`"user"` or `"assistant"`).
     pub role: String,
     /// Discriminator for message shape.
-    #[serde(default)]
-    pub message_type: MessageType,
+    #[serde(default, rename = "message_type")]
+    pub msg_type: MessageType,
     /// Text content (user input, assistant response, or empty for pure tool messages).
     pub content: String,
     /// Estimated token count for `content`.
@@ -96,7 +96,7 @@ impl Message {
             id,
             uid: Some(uid),
             role: "user".to_string(),
-            message_type: MessageType::TextMessage,
+            msg_type: MessageType::TextMessage,
             content,
             content_token_count: token_count,
             status: MessageStatus::Full,
@@ -114,7 +114,7 @@ impl Message {
             id,
             uid: Some(uid),
             role: "assistant".to_string(),
-            message_type: MessageType::TextMessage,
+            msg_type: MessageType::TextMessage,
             content: String::new(),
             content_token_count: 0,
             status: MessageStatus::Full,
@@ -141,13 +141,13 @@ pub mod test_helpers {
 
     impl MessageBuilder {
         /// Internal base constructor — sets role, type, and empty content.
-        fn base(id: String, role: &str, message_type: MessageType) -> Self {
+        fn base(id: String, role: &str, msg_type: MessageType) -> Self {
             Self {
                 msg: Message {
                     id,
                     uid: None,
                     role: role.to_string(),
-                    message_type,
+                    msg_type,
                     content: String::new(),
                     content_token_count: 0,
                     status: MessageStatus::Full,
@@ -221,31 +221,38 @@ pub mod test_helpers {
 }
 
 /// Format a slice of messages into a text chunk for `ConversationHistory` panels.
+///
 /// Skips Deleted/Detached messages. Uses the same format the LLM sees:
 /// tool calls as `tool_call name(json)`, tool results as raw content,
 /// and text messages as `[role]: content`.
 #[must_use]
 pub fn format_messages_to_chunk(messages: &[Message]) -> String {
+    use std::fmt::Write as _;
+
     let mut output = String::new();
     for msg in messages {
         if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
             continue;
         }
-        match msg.message_type {
+        match msg.msg_type {
             MessageType::ToolCall => {
                 for tu in &msg.tool_uses {
-                    output +=
-                        &format!("tool_call {}({})\n", tu.name, serde_json::to_string(&tu.input).unwrap_or_default());
+                    let _r = writeln!(
+                        output,
+                        "tool_call {}({})",
+                        tu.name,
+                        serde_json::to_string(&tu.input).unwrap_or_default()
+                    );
                 }
             }
             MessageType::ToolResult => {
                 for tr in &msg.tool_results {
-                    output += &format!("{}\n", tr.content);
+                    let _r = writeln!(output, "{}", tr.content);
                 }
             }
             MessageType::TextMessage => {
                 if !msg.content.is_empty() {
-                    output += &format!("[{}]: {}\n", msg.role, msg.content);
+                    let _r = writeln!(output, "[{}]: {}", msg.role, msg.content);
                 }
             }
         }

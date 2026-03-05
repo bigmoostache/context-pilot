@@ -1,10 +1,11 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::{ContextType, State, estimate_tokens};
 
 use crate::types::{LogEntry, LogsState};
+use std::fmt::Write as _;
 
 /// Fixed panel for timestamped log entries with tree-structured summaries.
 /// Un-deletable, always present when the logs module is active.
@@ -25,37 +26,44 @@ impl LogsPanel {
         let top_level: Vec<&LogEntry> = ls.logs.iter().filter(|l| l.is_top_level()).collect();
 
         for log in &top_level {
-            format_log_entry(&mut output, log, &ls.logs, &ls.open_log_ids, 0);
+            format_log_entry(&mut output, log, &LogTreeContext { all_logs: &ls.logs, open_ids: &ls.open_log_ids }, 0);
         }
         output.trim_end().to_string()
     }
 }
 
+/// Shared context for recursive log entry formatting/rendering.
+struct LogTreeContext<'a> {
+    all_logs: &'a [LogEntry],
+    open_ids: &'a [String],
+}
+
 /// Recursively format a log entry with indentation for tree display.
-fn format_log_entry(output: &mut String, entry: &LogEntry, all_logs: &[LogEntry], open_ids: &[String], depth: usize) {
+fn format_log_entry(output: &mut String, entry: &LogEntry, ctx: &LogTreeContext<'_>, depth: usize) {
     let indent = "  ".repeat(depth);
     let time_str = format_timestamp(entry.timestamp_ms);
 
     if entry.is_summary() {
-        let is_open = open_ids.contains(&entry.id);
+        let is_open = ctx.open_ids.contains(&entry.id);
         let icon = if is_open { "▼" } else { "▶" };
         let child_count = entry.children_ids.len();
         if is_open {
-            output.push_str(&format!("{}{} [{}] {} {}\n", indent, icon, entry.id, time_str, entry.content));
+            let _r = write!(output, "{}{} [{}] {} {}\n", indent, icon, entry.id, time_str, entry.content);
             // Show children indented
             for child_id in &entry.children_ids {
-                if let Some(child) = all_logs.iter().find(|l| l.id == *child_id) {
-                    format_log_entry(output, child, all_logs, open_ids, depth + 1);
+                if let Some(child) = ctx.all_logs.iter().find(|l| l.id == *child_id) {
+                    format_log_entry(output, child, ctx, depth + 1);
                 }
             }
         } else {
-            output.push_str(&format!(
+            let _r = write!(
+                output,
                 "{}{} [{}] {} {} ({} children)\n",
                 indent, icon, entry.id, time_str, entry.content, child_count
-            ));
+            );
         }
     } else {
-        output.push_str(&format!("{}[{}] {} {}\n", indent, entry.id, time_str, entry.content));
+        let _r = write!(output, "{}[{}] {} {}\n", indent, entry.id, time_str, entry.content);
     }
 }
 
@@ -100,25 +108,19 @@ impl Panel for LogsPanel {
         let top_level: Vec<&LogEntry> = ls.logs.iter().filter(|l| l.is_top_level()).collect();
 
         for log in &top_level {
-            render_log_entry(&mut lines, log, &ls.logs, &ls.open_log_ids, 0);
+            render_log_entry(&mut lines, log, &LogTreeContext { all_logs: &ls.logs, open_ids: &ls.open_log_ids }, 0);
         }
         lines
     }
 }
 
 /// Recursively render a log entry as styled TUI lines.
-fn render_log_entry(
-    lines: &mut Vec<Line<'static>>,
-    entry: &LogEntry,
-    all_logs: &[LogEntry],
-    open_ids: &[String],
-    depth: usize,
-) {
+fn render_log_entry(lines: &mut Vec<Line<'static>>, entry: &LogEntry, ctx: &LogTreeContext<'_>, depth: usize) {
     let indent = "  ".repeat(depth);
     let time_str = format_timestamp(entry.timestamp_ms);
 
     if entry.is_summary() {
-        let is_open = open_ids.contains(&entry.id);
+        let is_open = ctx.open_ids.contains(&entry.id);
         let icon = if is_open { "▼" } else { "▶" };
         let child_count = entry.children_ids.len();
 
@@ -138,8 +140,8 @@ fn render_log_entry(
 
         if is_open {
             for child_id in &entry.children_ids {
-                if let Some(child) = all_logs.iter().find(|l| l.id == *child_id) {
-                    render_log_entry(lines, child, all_logs, open_ids, depth + 1);
+                if let Some(child) = ctx.all_logs.iter().find(|l| l.id == *child_id) {
+                    render_log_entry(lines, child, ctx, depth + 1);
                 }
             }
         }

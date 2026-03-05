@@ -1,6 +1,7 @@
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::modules::all_modules;
 use crate::state::State;
+use std::fmt::Write as _;
 
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(ids) = tool.input.get("ids").and_then(|v| v.as_array()) else {
@@ -73,28 +74,28 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut output = String::new();
 
     if !closed.is_empty() {
-        output.push_str(&format!("Closed {}:\n{}", closed.len(), closed.join("\n")));
+        let _r = write!(output, "Closed {}:\n{}", closed.len(), closed.join("\n"));
     }
 
     if !skipped.is_empty() {
         if !output.is_empty() {
             output.push_str("\n\n");
         }
-        output.push_str(&format!("Skipped {}:\n{}", skipped.len(), skipped.join("\n")));
+        let _r = write!(output, "Skipped {}:\n{}", skipped.len(), skipped.join("\n"));
     }
 
     if !not_found.is_empty() {
         if !output.is_empty() {
             output.push_str("\n\n");
         }
-        output.push_str(&format!("Not found: {}", not_found.join(", ")));
+        let _r = write!(output, "Not found: {}", not_found.join(", "));
     }
 
     if !errors.is_empty() {
         if !output.is_empty() {
             output.push_str("\n\n");
         }
-        output.push_str(&format!("Errors:\n{}", errors.join("\n")));
+        let _r = write!(output, "Errors:\n{}", errors.join("\n"));
     }
 
     ToolResult::new(tool.id.clone(), output, closed.is_empty() && skipped.is_empty())

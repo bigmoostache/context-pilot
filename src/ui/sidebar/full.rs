@@ -18,7 +18,7 @@ pub(super) fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String>
             ts.todos.iter().filter(|t| !matches!(t.status, cp_mod_todo::TodoStatus::Done)).count()
         }
         "library" => cp_mod_prompt::types::PromptState::get(state).loaded_skill_ids.len(),
-        "tree" => cp_mod_tree::TreeState::get(state).tree_open_folders.len(),
+        "tree" => cp_mod_tree::TreeState::get(state).open_folders.len(),
         "memory" => cp_mod_memory::MemoryState::get(state).memories.len(),
         "spine" => cp_mod_spine::SpineState::unprocessed_notifications(state).len(),
         "logs" => {

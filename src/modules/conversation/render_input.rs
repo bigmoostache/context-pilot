@@ -1,4 +1,4 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Color, Line, Span, Style};
 
 use crate::infra::constants::icons;
 use crate::ui::{helpers::wrap_text, theme};

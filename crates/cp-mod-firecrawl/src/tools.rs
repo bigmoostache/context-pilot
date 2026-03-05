@@ -2,7 +2,8 @@ use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::api::{FirecrawlClient, MapParams, ScrapeParams, SearchParams};
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
+use std::fmt::Write as _;
 
 /// Dispatch firecrawl tool calls.
 pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
@@ -15,7 +16,7 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
 }
 
 fn get_client() -> Result<FirecrawlClient, String> {
-    let key = std::env::var("FIRECRAWL_API_KEY").map_err(|_| "FIRECRAWL_API_KEY not set".to_string())?;
+    let key = std::env::var("FIRECRAWL_API_KEY").map_err(|_e| "FIRECRAWL_API_KEY not set".to_string())?;
     FirecrawlClient::new(key)
 }
 
@@ -81,13 +82,13 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
             if let Some(ref meta) = data.metadata {
                 content.push_str("## Metadata\n\n");
                 if let Some(ref t) = meta.title {
-                    content.push_str(&format!("**Title:** {t}\n"));
+                    let _r = writeln!(content, "**Title:** {t}");
                 }
                 if let Some(ref d) = meta.description {
-                    content.push_str(&format!("**Description:** {d}\n"));
+                    let _r = writeln!(content, "**Description:** {d}");
                 }
                 if let Some(ref u) = meta.source_url {
-                    content.push_str(&format!("**URL:** {u}\n"));
+                    let _r = writeln!(content, "**URL:** {u}");
                 }
                 content.push('\n');
             }
@@ -105,7 +106,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
             {
                 content.push_str("## Links\n\n");
                 for link in links {
-                    content.push_str(&format!("- {link}\n"));
+                    let _r = writeln!(content, "- {link}");
                 }
             }
 
@@ -186,7 +187,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let page_title = result.title.as_deref().unwrap_or("untitled");
                 let page_url = result.url.as_deref().unwrap_or("unknown");
 
-                content.push_str(&format!("## Result {} — {} ({})\n\n", i + 1, page_title, page_url));
+                let _r = write!(content, "## Result {} — {} ({})\n\n", i + 1, page_title, page_url);
 
                 if let Some(ref md) = result.markdown {
                     content.push_str(md);
@@ -201,7 +202,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 {
                     content.push_str("**Links:**\n");
                     for link in links.iter().take(10) {
-                        content.push_str(&format!("- {link}\n"));
+                        let _r = writeln!(content, "- {link}");
                     }
                     content.push('\n');
                 }

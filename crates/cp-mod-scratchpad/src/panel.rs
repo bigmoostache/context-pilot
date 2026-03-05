@@ -1,11 +1,12 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel, scroll_key_action};
 use cp_base::state::{Action, ContextType, State, estimate_tokens};
 
 use crate::types::ScratchpadState;
+use std::fmt::Write as _;
 
 pub(crate) struct ScratchpadPanel;
 
@@ -19,7 +20,7 @@ impl ScratchpadPanel {
 
         let mut output = String::new();
         for cell in &ss.scratchpad_cells {
-            output.push_str(&format!("=== [{}] {} ===\n", cell.id, cell.title));
+            let _r = writeln!(output, "=== [{}] {} ===", cell.id, cell.title);
             output.push_str(&cell.content);
             output.push_str("\n\n");
         }
@@ -44,7 +45,7 @@ impl Panel for ScratchpadPanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::SCRATCHPAD {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &content);
+                let _: bool = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }

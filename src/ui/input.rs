@@ -130,13 +130,13 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 
     // Git branch (if available)
     let gs = cp_mod_git::GitState::get(state);
-    if let Some(branch) = &gs.git_branch {
+    if let Some(branch) = &gs.branch {
         spans.push(Span::styled(format!(" {branch} "), Style::default().fg(Color::White).bg(Color::Blue)));
         spans.push(Span::styled(" ", base_style));
     }
 
     // Git change stats (if there are any changes)
-    if !gs.git_file_changes.is_empty() {
+    if !gs.file_changes.is_empty() {
         use cp_mod_git::GitChangeType;
 
         let mut total_additions: i32 = 0;
@@ -145,7 +145,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
         let mut modified_count = 0;
         let mut deleted_count = 0;
 
-        for file in &gs.git_file_changes {
+        for file in &gs.file_changes {
             total_additions += file.additions;
             total_deletions += file.deletions;
             match file.change_type {
@@ -261,7 +261,7 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
     // Question text
     lines.push(Line::from(vec![
         Span::styled(format!(" {} ", q.header), Style::default().fg(theme::bg_base()).bg(theme::accent()).bold()),
-        Span::styled(format!(" {}", q.question), Style::default().fg(theme::text()).bold()),
+        Span::styled(format!(" {}", q.text), Style::default().fg(theme::text()).bold()),
     ]));
     lines.push(Line::from(""));
 

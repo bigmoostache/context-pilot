@@ -36,15 +36,15 @@ pub struct GitFileChange {
 #[derive(Debug)]
 pub struct GitState {
     /// Current branch name (None if detached HEAD).
-    pub git_branch: Option<String>,
+    pub branch: Option<String>,
     /// All local branches: (name, `is_current`).
-    pub git_branches: Vec<(String, bool)>,
+    pub branches: Vec<(String, bool)>,
     /// Whether the project root is inside a git repository.
-    pub git_is_repo: bool,
-    /// File-level diff stats against `git_diff_base`.
-    pub git_file_changes: Vec<GitFileChange>,
+    pub is_repo: bool,
+    /// File-level diff stats against `diff_base`.
+    pub file_changes: Vec<GitFileChange>,
     /// Ref used as diff base (e.g., "main", "HEAD~3"). None = default branch.
-    pub git_diff_base: Option<String>,
+    pub diff_base: Option<String>,
 }
 
 impl Default for GitState {
@@ -57,13 +57,7 @@ impl GitState {
     /// Create a fresh state with no git info.
     #[must_use]
     pub const fn new() -> Self {
-        Self {
-            git_branch: None,
-            git_branches: vec![],
-            git_is_repo: false,
-            git_file_changes: vec![],
-            git_diff_base: None,
-        }
+        Self { branch: None, branches: vec![], is_repo: false, file_changes: vec![], diff_base: None }
     }
     /// Get shared ref from State's `TypeMap`.
     ///

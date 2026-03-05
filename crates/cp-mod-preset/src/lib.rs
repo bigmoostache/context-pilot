@@ -14,8 +14,6 @@ pub mod types;
 /// Presets subdirectory
 pub const PRESETS_DIR: &str = "presets";
 
-use std::collections::HashSet;
-
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
 use cp_base::state::{ContextType, State};
@@ -25,21 +23,24 @@ use cp_base::tools::{ToolResult, ToolUse};
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/preset.yaml")));
 
+use crate::types::{DefaultsInitializer, ModuleRegistry, ToolDefBuilder};
+use std::fmt::Write as _;
+
 /// Injected callbacks for module-registry operations that live in the binary.
 /// The crate doesn't depend on the binary — these function pointers bridge the gap.
 #[derive(Debug, Clone, Copy)]
 pub struct PresetModule {
-    pub(crate) all_modules: fn() -> Vec<Box<dyn Module>>,
-    pub(crate) active_tool_defs: fn(&HashSet<String>) -> Vec<ToolDefinition>,
-    pub(crate) ensure_defaults: fn(&mut State),
+    pub(crate) all_modules: ModuleRegistry,
+    pub(crate) active_tool_defs: ToolDefBuilder,
+    pub(crate) ensure_defaults: DefaultsInitializer,
 }
 
 impl PresetModule {
     /// Create a new `PresetModule` with injected function pointers for module registry access.
     pub fn new(
-        all_modules: fn() -> Vec<Box<dyn Module>>,
-        active_tool_defs: fn(&HashSet<String>) -> Vec<ToolDefinition>,
-        ensure_defaults: fn(&mut State),
+        all_modules: ModuleRegistry,
+        active_tool_defs: ToolDefBuilder,
+        ensure_defaults: DefaultsInitializer,
     ) -> Self {
         Self { all_modules, active_tool_defs, ensure_defaults }
     }
@@ -112,9 +113,15 @@ impl Module for PresetModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "preset_snapshot_myself" => Some(tools::execute_snapshot(tool, state, self.all_modules)),
-            "preset_load" => {
-                Some(tools::execute_load(tool, state, self.all_modules, self.active_tool_defs, self.ensure_defaults))
-            }
+            "preset_load" => Some(tools::execute_load(
+                tool,
+                state,
+                &tools::LoadCallbacks {
+                    all_modules: self.all_modules,
+                    active_tool_defs: self.active_tool_defs,
+                    ensure_defaults: self.ensure_defaults,
+                },
+            )),
             _ => None,
         }
     }
@@ -137,7 +144,7 @@ impl Module for PresetModule {
         output.push_str("|------|------|-------------|\n");
         for p in &presets {
             let ptype = if p.built_in { "built-in" } else { "custom" };
-            output.push_str(&format!("| {} | {} | {} |\n", p.name, ptype, p.description));
+            let _r = write!(output, "| {} | {} | {} |\n", p.name, ptype, p.description);
         }
         Some(output)
     }
@@ -146,7 +153,7 @@ impl Module for PresetModule {
 /// Visualizer for preset tool results.
 /// Shows preset name and lists captured modules/tools with colored indicators.
 fn visualize_preset_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let success_color = Color::Rgb(80, 250, 123);
     let info_color = Color::Rgb(139, 233, 253);
@@ -164,7 +171,7 @@ fn visualize_preset_output(content: &str, width: usize) -> Vec<ratatui::text::Li
             Style::default().fg(error_color)
         } else if line.starts_with("Snapshot saved:") || line.starts_with("Loaded preset") {
             Style::default().fg(success_color)
-        } else if line.contains("'") {
+        } else if line.contains('\'') {
             // Preset names in quotes
             Style::default().fg(info_color)
         } else {

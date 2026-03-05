@@ -9,6 +9,7 @@ use cp_base::state::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{CallbackDefinition, CallbackState};
+use std::fmt::Write;
 
 /// Create a new callback with its script file.
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -135,13 +136,13 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         "Created callback {anchor_id} [{vessel_name}]:\n  Pattern: {chart_pattern}\n  Blocking: {blocking}\n  Script: .context-pilot/scripts/{vessel_name}.sh",
     );
     if let Some(ref sm) = success_message {
-        msg.push_str(&format!("\n  Success message: {sm}"));
+        let _r = write!(msg, "\n  Success message: {sm}");
     }
     if let Some(t) = timeout_secs {
-        msg.push_str(&format!("\n  Timeout: {t}s"));
+        let _r = write!(msg, "\n  Timeout: {t}s");
     }
     let scope = if is_global { "global" } else { "local (per-file)" };
-    msg.push_str(&format!("\n  Scope: {scope}"));
+    let _r = write!(msg, "\n  Scope: {scope}");
     msg.push_str("\n  Status: active ✓");
 
     ToolResult::new(tool.id.clone(), msg, false)

@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::config::constants::MAX_RESULT_CONTENT_BYTES;
 use cp_base::config::theme;

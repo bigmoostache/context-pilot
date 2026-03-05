@@ -9,7 +9,7 @@ mod tools;
 /// Memory state types: `MemoryItem`, `MemoryImportance`, `MemoryState`.
 pub mod types;
 
-use cp_base::cast::SafeCast;
+use cp_base::cast::SafeCast as _;
 pub use types::{MemoryImportance, MemoryItem, MemoryState};
 
 /// Maximum token length for memory `tl_dr` field (enforced on create/update)
@@ -204,7 +204,7 @@ impl Module for MemoryModule {
 /// Visualizer for memory tool results.
 /// Colors importance levels and highlights created/updated memory summaries.
 fn visualize_memory_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let critical_color = Color::Rgb(255, 85, 85); // Red for critical
     let high_color = Color::Rgb(255, 184, 108); // Orange for high
@@ -233,7 +233,7 @@ fn visualize_memory_output(content: &str, width: usize) -> Vec<ratatui::text::Li
             Style::default().fg(medium_color)
         } else if line.contains("low") {
             Style::default().fg(low_color)
-        } else if line.starts_with("M") && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
+        } else if line.starts_with('M') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
             // Memory IDs like M1, M2
             Style::default().fg(low_color)
         } else {

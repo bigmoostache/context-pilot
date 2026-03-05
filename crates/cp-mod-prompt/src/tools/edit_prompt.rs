@@ -3,6 +3,7 @@ use crate::types::{PromptState, PromptType};
 use cp_base::panels::now_ms;
 use cp_base::state::{ContextType, State, estimate_tokens};
 use cp_base::tools::{ToolResult, ToolUse};
+use std::fmt::Write as _;
 
 /// Unified diff-based edit tool for agents, skills, and commands.
 /// Uses the same `old_string/new_string` pattern as the file Edit tool.
@@ -153,15 +154,16 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut result_msg = String::new();
 
     if replace_all && replaced > 1 {
-        result_msg.push_str(&format!(
+        let _r = write!(
+            result_msg,
             "Edited {} '{}': {} replacements (~{} lines changed each)\n",
             entity_type.label(),
             id,
             replaced,
             lines_changed
-        ));
+        );
     } else {
-        result_msg.push_str(&format!("Edited {} '{}': ~{} lines changed\n", entity_type.label(), id, lines_changed));
+        let _r = write!(result_msg, "Edited {} '{}': ~{} lines changed\n", entity_type.label(), id, lines_changed);
     }
 
     result_msg.push_str("```diff\n");
@@ -203,24 +205,24 @@ fn generate_unified_diff(old: &str, new: &str) -> String {
         if lcs_idx < lcs.len() {
             let (lcs_old, lcs_new) = lcs[lcs_idx];
             while old_idx < lcs_old {
-                result.push_str(&format!("- {}\n", old_lines[old_idx]));
+                let _r = write!(result, "- {}\n", old_lines[old_idx]);
                 old_idx += 1;
             }
             while new_idx < lcs_new {
-                result.push_str(&format!("+ {}\n", new_lines[new_idx]));
+                let _r = write!(result, "+ {}\n", new_lines[new_idx]);
                 new_idx += 1;
             }
-            result.push_str(&format!("  {}\n", old_lines[old_idx]));
+            let _r = write!(result, "  {}\n", old_lines[old_idx]);
             old_idx += 1;
             new_idx += 1;
             lcs_idx += 1;
         } else {
             while old_idx < old_lines.len() {
-                result.push_str(&format!("- {}\n", old_lines[old_idx]));
+                let _r = write!(result, "- {}\n", old_lines[old_idx]);
                 old_idx += 1;
             }
             while new_idx < new_lines.len() {
-                result.push_str(&format!("+ {}\n", new_lines[new_idx]));
+                let _r = write!(result, "+ {}\n", new_lines[new_idx]);
                 new_idx += 1;
             }
         }
@@ -230,12 +232,12 @@ fn generate_unified_diff(old: &str, new: &str) -> String {
 }
 
 fn lcs<'a>(old: &[&'a str], new: &[&'a str]) -> Vec<(usize, usize)> {
-    let m = old.len();
-    let n = new.len();
-    let mut lengths = vec![vec![0; n + 1]; m + 1];
+    let old_len = old.len();
+    let new_len = new.len();
+    let mut lengths = vec![vec![0; new_len + 1]; old_len + 1];
 
-    for i in 1..=m {
-        for j in 1..=n {
+    for i in 1..=old_len {
+        for j in 1..=new_len {
             if old[i - 1] == new[j - 1] {
                 lengths[i][j] = lengths[i - 1][j - 1] + 1;
             } else {
@@ -245,8 +247,8 @@ fn lcs<'a>(old: &[&'a str], new: &[&'a str]) -> Vec<(usize, usize)> {
     }
 
     let mut result = Vec::new();
-    let mut i = m;
-    let mut j = n;
+    let mut i = old_len;
+    let mut j = new_len;
     while i > 0 && j > 0 {
         if old[i - 1] == new[j - 1] {
             result.push((i - 1, j - 1));

@@ -82,7 +82,7 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             options.push(QuestionOption { label, description });
         }
 
-        questions.push(Question { question, header, options, multi_select });
+        questions.push(Question { text: question, header, options, multi_select });
     }
 
     // Store the pending form in state

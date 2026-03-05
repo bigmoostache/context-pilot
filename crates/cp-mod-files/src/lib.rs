@@ -219,13 +219,14 @@ impl Module for FilesModule {
 }
 
 /// Visualizer for Edit and Write tool results.
+///
 /// Also reused by cp-mod-prompt for `Edit_prompt`.
 /// Parses diff blocks and renders deleted lines in red, added lines in green.
 /// Callback summary blocks get compact styled rendering (only status word colored).
 /// Non-diff content is rendered in secondary text color.
 #[must_use]
 pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let error_color = Color::Rgb(255, 85, 85);
     let success_color = Color::Rgb(80, 250, 123);
@@ -263,7 +264,11 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'s
             };
             let display = truncate_line(line, width);
             lines.push(Line::from(Span::styled(display, style)));
-        } else if let Some(styled) = style_callback_line(line, width, cb_blue, success_color, error_color, cb_dim) {
+        } else if let Some(styled) = style_callback_line(
+            line,
+            width,
+            &CallbackColors { blue: cb_blue, green: success_color, red: error_color, dim: cb_dim },
+        ) {
             lines.push(styled);
         } else {
             // Non-diff content: plain secondary text
@@ -284,71 +289,72 @@ fn truncate_line(line: &str, width: usize) -> String {
     }
 }
 
-/// Style callback-related lines in tool results.
-/// Format: "Callbacks:" header, "· name ✓ log: path", "· name ✗ P20", "    error line"
-/// Only the status symbol (✓/✗/⏳) is colored. Rest is dim.
-fn style_callback_line(
-    line: &str,
-    width: usize,
+/// Color palette for callback line styling.
+struct CallbackColors {
     blue: ratatui::style::Color,
     green: ratatui::style::Color,
     red: ratatui::style::Color,
     dim: ratatui::style::Color,
-) -> Option<ratatui::text::Line<'static>> {
-    use ratatui::prelude::*;
+}
+
+/// Style callback-related lines in tool results.
+/// Format: "Callbacks:" header, "· name ✓ log: path", "· name ✗ P20", "    error line"
+/// Only the status symbol (✓/✗/⏳) is colored. Rest is dim.
+fn style_callback_line(line: &str, width: usize, colors: &CallbackColors) -> Option<ratatui::text::Line<'static>> {
+    use ratatui::prelude::{Color, Line, Span, Style};
 
     let trimmed = line.trim();
 
     // "Callbacks:" header
     if trimmed == "Callbacks:" {
-        return Some(Line::from(Span::styled(truncate_line(trimmed, width), Style::default().fg(dim))));
+        return Some(Line::from(Span::styled(truncate_line(trimmed, width), Style::default().fg(colors.dim))));
     }
 
     // "· name passed ..." or "· name FAILED ..." or "· name running"
     if let Some(rest) = trimmed.strip_prefix("· ") {
         let mut spans = Vec::new();
-        spans.push(Span::styled("· ", Style::default().fg(dim)));
+        spans.push(Span::styled("· ", Style::default().fg(colors.dim)));
 
         // Find the status word and split around it
         if let Some(pos) = rest.find(" passed") {
             let name = rest.get(..pos).unwrap_or("");
             let after = rest.get(pos + 7..).unwrap_or(""); // skip " passed"
-            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
-            spans.push(Span::styled(" passed", Style::default().fg(green)));
+            spans.push(Span::styled(name.to_string(), Style::default().fg(colors.dim)));
+            spans.push(Span::styled(" passed", Style::default().fg(colors.green)));
             if !after.is_empty() {
-                spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
+                spans.push(Span::styled(after.to_string(), Style::default().fg(colors.dim)));
             }
         } else if let Some(pos) = rest.find(" FAILED") {
             let name = rest.get(..pos).unwrap_or("");
             let after = rest.get(pos + 7..).unwrap_or(""); // skip " FAILED"
-            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
-            spans.push(Span::styled(" FAILED", Style::default().fg(red)));
+            spans.push(Span::styled(name.to_string(), Style::default().fg(colors.dim)));
+            spans.push(Span::styled(" FAILED", Style::default().fg(colors.red)));
             if !after.is_empty() {
-                spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
+                spans.push(Span::styled(after.to_string(), Style::default().fg(colors.dim)));
             }
         } else if let Some(pos) = rest.find(" TIMED OUT") {
             let name = rest.get(..pos).unwrap_or("");
             let after = rest.get(pos + 10..).unwrap_or(""); // skip " TIMED OUT"
-            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
-            spans.push(Span::styled(" TIMED OUT", Style::default().fg(red)));
+            spans.push(Span::styled(name.to_string(), Style::default().fg(colors.dim)));
+            spans.push(Span::styled(" TIMED OUT", Style::default().fg(colors.red)));
             if !after.is_empty() {
-                spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
+                spans.push(Span::styled(after.to_string(), Style::default().fg(colors.dim)));
             }
         } else if let Some(pos) = rest.find(" dispatched") {
             let name = rest.get(..pos).unwrap_or("");
-            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
-            spans.push(Span::styled(" dispatched", Style::default().fg(blue)));
+            spans.push(Span::styled(name.to_string(), Style::default().fg(colors.dim)));
+            spans.push(Span::styled(" dispatched", Style::default().fg(colors.blue)));
         } else if let Some(pos) = rest.find(" skipped") {
             let name = rest.get(..pos).unwrap_or("");
             let after = rest.get(pos + 8..).unwrap_or(""); // skip " skipped"
-            spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
-            spans.push(Span::styled(" skipped", Style::default().fg(dim)));
+            spans.push(Span::styled(name.to_string(), Style::default().fg(colors.dim)));
+            spans.push(Span::styled(" skipped", Style::default().fg(colors.dim)));
             if !after.is_empty() {
-                spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
+                spans.push(Span::styled(after.to_string(), Style::default().fg(colors.dim)));
             }
         } else {
             // Fallback: just dim
-            spans.push(Span::styled(rest.to_string(), Style::default().fg(dim)));
+            spans.push(Span::styled(rest.to_string(), Style::default().fg(colors.dim)));
         }
         return Some(Line::from(spans));
     }
@@ -356,7 +362,7 @@ fn style_callback_line(
     // Indented error lines (4 spaces)
     if line.starts_with("    ") && !line.trim().is_empty() {
         let display = truncate_line(line, width);
-        return Some(Line::from(Span::styled(display, Style::default().fg(red))));
+        return Some(Line::from(Span::styled(display, Style::default().fg(colors.red))));
     }
 
     // [skip_callbacks warnings: ...]

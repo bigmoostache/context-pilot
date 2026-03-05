@@ -4,11 +4,19 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::state::ContextType;
 
+/// Function pointer that returns all registered modules.
+pub type ModuleRegistry = fn() -> Vec<Box<dyn cp_base::modules::Module>>;
+/// Function pointer that builds active tool definitions from enabled module IDs.
+pub type ToolDefBuilder = fn(&std::collections::HashSet<String>) -> Vec<cp_base::tools::ToolDefinition>;
+/// Function pointer that ensures default fixed panels exist for active modules.
+pub type DefaultsInitializer = fn(&mut cp_base::state::State);
+
 /// A named preset that captures a worker's full configuration state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Preset {
     /// Preset identifier (alphanumeric + hyphens).
-    pub preset_name: String,
+    #[serde(rename = "preset_name")]
+    pub name: String,
     /// Human-readable description of what this preset is for.
     pub description: String,
     /// Whether this is a built-in (non-deletable) preset.

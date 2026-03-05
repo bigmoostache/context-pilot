@@ -11,6 +11,7 @@ use cp_mod_queue::QueueState;
 use cp_mod_spine::{NotificationType, SpineState};
 
 use crate::app::App;
+use std::fmt::Write as _;
 
 impl App {
     /// Non-blocking check: poll `WatcherRegistry` for satisfied conditions.
@@ -62,7 +63,9 @@ impl App {
                     self.state.context.push(ctx);
                     // Enrich the result description with the panel reference
                     // Panel is already populated and exited — no console_wait needed.
-                    result.description.push_str(&format!(" → see {panel_id} (already loaded, read it directly)"));
+                    result.description.push_str(" → see ");
+                    result.description.push_str(&panel_id);
+                    result.description.push_str(" (already loaded, read it directly)");
                 }
                 // Auto-close panels for watchers that request it
                 if result.close_panel
@@ -143,7 +146,9 @@ impl App {
                 self.state.context.push(ctx);
                 // Point the LLM at exactly which panel to read for the error
                 // Panel is already populated and exited — no console_wait needed.
-                result.description.push_str(&format!(" → see {panel_id} (already loaded, read it directly)"));
+                result.description.push_str(" → see ");
+                result.description.push_str(&panel_id);
+                result.description.push_str(" (already loaded, read it directly)");
             }
         }
 
@@ -228,7 +233,7 @@ impl App {
             id: result_id,
             uid: Some(result_uid),
             role: "user".to_string(),
-            message_type: MessageType::ToolResult,
+            msg_type: MessageType::ToolResult,
             content: String::new(),
             content_token_count: 0,
 
@@ -254,7 +259,7 @@ impl App {
             id: assistant_id,
             uid: Some(assistant_uid),
             role: "assistant".to_string(),
-            message_type: MessageType::TextMessage,
+            msg_type: MessageType::TextMessage,
             content: String::new(),
             content_token_count: 0,
 
@@ -362,7 +367,7 @@ impl App {
             id: result_id,
             uid: Some(result_uid),
             role: "user".to_string(),
-            message_type: MessageType::ToolResult,
+            msg_type: MessageType::ToolResult,
             content: String::new(),
             content_token_count: 0,
 
@@ -423,7 +428,7 @@ pub(super) fn execute_queue_flush(
         } else {
             result.content.clone()
         };
-        summary.push_str(&format!("{}. {} → {} ({})\n", call.index, call.tool_name, status, short));
+        let _r = write!(summary, "{}. {} → {} ({})\n", call.index, call.tool_name, status, short);
         flushed.push(FlushedTool { tool: queued_tool, result });
     }
 

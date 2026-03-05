@@ -2,6 +2,7 @@ use cp_base::cast::SafeCast;
 
 use crate::modules::all_modules;
 use crate::state::{State, estimate_tokens, get_context_type_meta};
+use std::fmt::Write as _;
 
 /// Estimate tokens for all enabled tool definitions as they'd appear in the API request.
 pub(crate) fn estimate_tool_definitions_tokens(state: &State) -> usize {
@@ -58,13 +59,14 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     output.push_str("Context Elements:\n");
 
     accumulated += system_prompt_tokens;
-    output.push_str(&format!("  -- system-prompt (×2): {system_prompt_tokens} tokens (acc: {accumulated})\n"));
+    let _r = write!(output, "  -- system-prompt (×2): {system_prompt_tokens} tokens (acc: {accumulated})\n");
 
     accumulated += tool_def_tokens;
     let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
-    output.push_str(&format!(
+    let _r = write!(
+        output,
         "  -- tool-definitions ({enabled_count} enabled): {tool_def_tokens} tokens (acc: {accumulated})\n"
-    ));
+    );
 
     // --- Panels sorted by last_refresh_ms, with Conversation forced to end ---
     let mut sorted_contexts: Vec<&crate::state::ContextElement> = state.context.iter().collect();
@@ -89,27 +91,25 @@ pub(crate) fn generate_context_content(state: &State) -> String {
         accumulated += ctx.token_count;
 
         if details.is_empty() {
-            output.push_str(&format!(
+            let _r = write!(
+                output,
                 "  {} {}: {} tokens {} {} (acc: {})\n",
                 ctx.id, type_name, ctx.token_count, cost, hit_miss, accumulated
-            ));
+            );
         } else {
-            output.push_str(&format!(
+            let _r = write!(
+                output,
                 "  {} {} ({}): {} tokens {} {} (acc: {})\n",
                 ctx.id, type_name, details, ctx.token_count, cost, hit_miss, accumulated
-            ));
+            );
         }
     }
 
     // Statistics
     let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
     let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
-    output.push_str(&format!(
-        "\nMessages: {} ({} user, {} assistant)\n",
-        state.messages.len(),
-        user_msgs,
-        assistant_msgs
-    ));
+    let _r =
+        write!(output, "\nMessages: {} ({} user, {} assistant)\n", state.messages.len(), user_msgs, assistant_msgs);
 
     // Module-specific overview sections (todos, memories, git status, etc.)
     for module in &modules {

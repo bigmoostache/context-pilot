@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::config::theme;
 use cp_base::panels::{ContextItem, Panel};
@@ -8,6 +8,10 @@ use cp_base::state::{ContextType, State, estimate_tokens};
 
 use crate::types::{TodoItem, TodoState, TodoStatus};
 use cp_base::panels::scroll_key_action;
+use std::fmt::Write as _;
+
+/// Flattened todo entry for rendering: (indent, id, name, status, description).
+type TodoLine = (usize, String, String, TodoStatus, String);
 
 pub(crate) struct TodoPanel;
 
@@ -20,7 +24,7 @@ impl TodoPanel {
             let mut line = format!("{}[{}] {} {}", prefix, status_char, todo.id, todo.name);
 
             if !todo.description.is_empty() {
-                line.push_str(&format!(" - {}", todo.description));
+                let _r = write!(line, " - {}", todo.description);
             }
             line.push('\n');
 
@@ -61,7 +65,7 @@ impl Panel for TodoPanel {
         for ctx in &mut state.context {
             if ctx.context_type == ContextType::TODO {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &todo_content);
+                let _: bool = cp_base::panels::update_if_changed(ctx, &todo_content);
                 break;
             }
         }
@@ -92,7 +96,7 @@ impl Panel for TodoPanel {
                 todos: &[TodoItem],
                 parent_id: Option<&String>,
                 indent: usize,
-                lines: &mut Vec<(usize, String, String, TodoStatus, String)>,
+                lines: &mut Vec<TodoLine>,
             ) {
                 for todo in todos.iter().filter(|t| t.parent_id.as_ref() == parent_id) {
                     lines.push((indent, todo.id.clone(), todo.name.clone(), todo.status, todo.description.clone()));
@@ -100,7 +104,7 @@ impl Panel for TodoPanel {
                 }
             }
 
-            let mut todo_lines: Vec<(usize, String, String, TodoStatus, String)> = Vec::new();
+            let mut todo_lines: Vec<TodoLine> = Vec::new();
             collect_todo_lines(&ts.todos, None, 0, &mut todo_lines);
 
             for (indent, id, name, status, description) in todo_lines {

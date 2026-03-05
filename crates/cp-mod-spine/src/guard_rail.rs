@@ -13,7 +13,7 @@ use crate::types::SpineState;
 /// (disabled by default).
 pub(crate) trait GuardRailStopLogic: Send + Sync {
     /// Human-readable name for logging/debugging
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     /// Check if this guard rail should block auto-continuation.
     /// Returns true if the limit has been exceeded.
@@ -47,7 +47,7 @@ pub(crate) fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
 pub(crate) struct MaxOutputTokensGuard;
 
 impl GuardRailStopLogic for MaxOutputTokensGuard {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "MaxOutputTokens"
     }
 
@@ -72,7 +72,7 @@ impl GuardRailStopLogic for MaxOutputTokensGuard {
 pub(crate) struct MaxCostGuard;
 
 impl GuardRailStopLogic for MaxCostGuard {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "MaxCost"
     }
 
@@ -107,7 +107,7 @@ impl MaxCostGuard {
 pub(crate) struct MaxStreamCostGuard;
 
 impl GuardRailStopLogic for MaxStreamCostGuard {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "MaxStreamCost"
     }
 
@@ -146,7 +146,7 @@ impl MaxStreamCostGuard {
 pub(crate) struct MaxDurationGuard;
 
 impl GuardRailStopLogic for MaxDurationGuard {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "MaxDuration"
     }
 
@@ -181,7 +181,7 @@ impl GuardRailStopLogic for MaxDurationGuard {
 pub(crate) struct MaxMessagesGuard;
 
 impl GuardRailStopLogic for MaxMessagesGuard {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "MaxMessages"
     }
 
@@ -208,7 +208,7 @@ impl GuardRailStopLogic for MaxMessagesGuard {
 pub(crate) struct MaxAutoRetriesGuard;
 
 impl GuardRailStopLogic for MaxAutoRetriesGuard {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "MaxAutoRetries"
     }
 

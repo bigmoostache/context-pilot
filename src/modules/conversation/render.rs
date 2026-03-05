@@ -1,4 +1,4 @@
-use ratatui::prelude::*;
+use ratatui::prelude::{Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
 use crate::infra::constants::icons;
@@ -33,7 +33,7 @@ pub(crate) fn render_message(
     let mut lines: Vec<Line<'static>> = Vec::new();
 
     // Handle tool call messages — YAML-style parameter display
-    if msg.message_type == MessageType::ToolCall {
+    if msg.msg_type == MessageType::ToolCall {
         let icon = icons::msg_tool_call();
         let prefix_width = UnicodeWidthStr::width(icon.as_str()) + 1; // icon display width + space
         let wrap_width = (viewport_width as usize).saturating_sub(prefix_width + 2).max(20);
@@ -64,7 +64,7 @@ pub(crate) fn render_message(
     }
 
     // Handle tool result messages
-    if msg.message_type == MessageType::ToolResult {
+    if msg.msg_type == MessageType::ToolResult {
         for result in &msg.tool_results {
             let (status_icon, status_color) = if result.is_error {
                 (icons::msg_error(), theme::warning())

@@ -78,11 +78,16 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
 
     // Fixed panels (P0-P7)
     let defaults = crate::modules::all_fixed_panel_defaults();
-    for (pos, (_, _, ct, name, cache_deprecated)) in defaults.iter().enumerate() {
+    for (pos, d) in defaults.iter().enumerate() {
         let id = format!("P{pos}");
-        if *ct == ContextType::SYSTEM {
-            context.push(crate::modules::make_default_context_element(&id, ct.clone(), name, *cache_deprecated));
-        } else if let Some(uid) = important.get(ct)
+        if d.context_type == ContextType::SYSTEM {
+            context.push(crate::modules::make_default_context_element(
+                &id,
+                d.context_type.clone(),
+                d.display_name,
+                d.cache_deprecated,
+            ));
+        } else if let Some(uid) = important.get(&d.context_type)
             && let Some(panel_data) = panel::load_panel(uid)
         {
             context.push(panel_to_context(&panel_data, &id));

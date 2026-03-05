@@ -5,10 +5,8 @@ use std::path::Path;
 use cp_base::config::constants::STORE_DIR;
 
 use crate::PRESETS_DIR;
-use crate::types::{Preset, PresetPanelConfig, PresetWorkerState};
-use cp_base::modules::Module;
+use crate::types::{DefaultsInitializer, ModuleRegistry, Preset, PresetPanelConfig, PresetWorkerState, ToolDefBuilder};
 use cp_base::state::{ContextType, State, make_default_context_element};
-use cp_base::tools::ToolDefinition;
 use cp_base::tools::{ToolResult, ToolUse};
 use cp_mod_prompt::PromptState;
 
@@ -31,7 +29,7 @@ fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn execute_snapshot(tool: &ToolUse, state: &State, all_modules: fn() -> Vec<Box<dyn Module>>) -> ToolResult {
+pub(crate) fn execute_snapshot(tool: &ToolUse, state: &State, all_modules: ModuleRegistry) -> ToolResult {
     let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
     };
@@ -115,7 +113,7 @@ pub(crate) fn execute_snapshot(tool: &ToolUse, state: &State, all_modules: fn() 
         .collect();
 
     let preset = Preset {
-        preset_name: name.to_string(),
+        name: name.to_string(),
         description: description.to_string(),
         built_in: false,
         worker_state: PresetWorkerState {
@@ -155,13 +153,14 @@ pub(crate) fn execute_snapshot(tool: &ToolUse, state: &State, all_modules: fn() 
     )
 }
 
-pub(crate) fn execute_load(
-    tool: &ToolUse,
-    state: &mut State,
-    all_modules: fn() -> Vec<Box<dyn Module>>,
-    active_tool_defs: fn(&HashSet<String>) -> Vec<ToolDefinition>,
-    ensure_defaults: fn(&mut State),
-) -> ToolResult {
+/// Bundled function pointers for preset load operations.
+pub(crate) struct LoadCallbacks {
+    pub all_modules: ModuleRegistry,
+    pub active_tool_defs: ToolDefBuilder,
+    pub ensure_defaults: DefaultsInitializer,
+}
+
+pub(crate) fn execute_load(tool: &ToolUse, state: &mut State, cb: &LoadCallbacks) -> ToolResult {
     let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
     };
@@ -202,7 +201,7 @@ pub(crate) fn execute_load(
     // If system doesn't exist, keep current active_agent_id
 
     // 2. Set active_modules — ensure core modules are always included
-    let modules = all_modules();
+    let modules = (cb.all_modules)();
     let core_ids: HashSet<String> = modules.iter().filter(|m| m.is_core()).map(|m| m.id().to_string()).collect();
     let mut new_active: HashSet<String> = ws.active_modules.iter().cloned().collect();
     // Always include core modules
@@ -216,7 +215,7 @@ pub(crate) fn execute_load(
 
     // 3. Rebuild tools from active modules, then apply disabled_tools
     let disabled_set: HashSet<&str> = ws.disabled_tools.iter().map(String::as_str).collect();
-    let mut new_tools = active_tool_defs(&state.active_modules);
+    let mut new_tools = (cb.active_tool_defs)(&state.active_modules);
     for t in &mut new_tools {
         if t.id != "tool_manage" && t.id != "module_toggle" && disabled_set.contains(t.id.as_str()) {
             t.enabled = false;
@@ -307,7 +306,7 @@ pub(crate) fn execute_load(
     }
 
     // 7. Ensure default fixed panels exist for newly activated modules
-    ensure_defaults(state);
+    (cb.ensure_defaults)(state);
 
     // 8. Mark all panels as cache_deprecated
     for ctx in &mut state.context {
@@ -367,7 +366,7 @@ pub fn list_presets_with_info() -> Vec<PresetInfo> {
                 && let Ok(preset) = serde_json::from_str::<Preset>(&contents)
             {
                 presets.push(PresetInfo {
-                    name: preset.preset_name,
+                    name: preset.name,
                     description: preset.description,
                     built_in: preset.built_in,
                 });

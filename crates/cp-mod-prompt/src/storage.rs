@@ -5,6 +5,9 @@ use cp_base::config::constants::STORE_DIR;
 
 use crate::types::{PromptItem, PromptType};
 
+/// (agents, skills, commands) loaded from disk + built-ins.
+pub(crate) type AllPrompts = (Vec<PromptItem>, Vec<PromptItem>, Vec<PromptItem>);
+
 /// Subdirectory names under .context-pilot/ for each prompt type
 const fn subdir_for(pt: PromptType) -> &'static str {
     match pt {
@@ -115,7 +118,7 @@ pub(crate) fn delete_prompt_from_dir(dir: &Path, id: &str) {
 
 /// Load all prompts from all three directories + built-ins from library.yaml.
 /// Returns (agents, skills, commands).
-pub(crate) fn load_all_prompts() -> (Vec<PromptItem>, Vec<PromptItem>, Vec<PromptItem>) {
+pub(crate) fn load_all_prompts() -> AllPrompts {
     use cp_base::config::library;
 
     let mut agents = load_prompts_from_dir(&dir_for(PromptType::Agent), PromptType::Agent);
