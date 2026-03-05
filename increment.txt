@@ -518,3 +518,8 @@
 19:57:16.874038132 fmt src/ui/help/config_overlay.rs
 19:57:16.919647994 fmt src/app/reverie/streaming.rs
 19:59:31.694081476 fmt crates/cp-base/src/lib.rs
+20:01:09.489728973 fmt crates/cp-mod-callback/src/lib.rs
+20:01:19.916081096 fmt crates/cp-mod-callback/src/lib.rs
+20:05:05.015238553 fmt crates/cp-mod-typst/src/lib.rs
+20:05:15.887377808 fmt crates/cp-mod-typst/src/lib.rs
+20:05:22.357935817 fmt crates/cp-mod-typst/src/lib.rs

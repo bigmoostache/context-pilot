@@ -50,24 +50,22 @@ exceptions:
       Same as above — proc-macro or build.rs per-type generation.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'cast_possible_truncation, clippy::cast_sign_loss, reason = "SafeCast: intentional raw cast"'
+    match: 'f64 SafeCast impl: saturating casts necessarily use raw'
     reason: >
-      Per-method #[expect] on f64 and f32 SafeCast impls. Methods casting
-      to unsigned types (to_u8..to_usize) trigger both cast_possible_truncation
-      and cast_sign_loss. Identity methods (f64::to_f64, f32::to_f32) and
-      lossless conversions (f32::to_f64 via f64::from) have no annotation.
+      Concrete f64 SafeCast impl. Only cast_possible_truncation and
+      cast_sign_loss fire — reduced from 5 lints in the old #[allow].
+      Uses #[expect] (compiler-verified) instead of #[allow].
     strategy: >
-      Already at maximum precision — each method carries only the lints
-      that actually fire for that specific cast. No further reduction possible.
+      No further reduction — truncation and sign_loss are inherent
+      to f64→integer casts. Identity to_f64 triggers nothing.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'cast_possible_truncation, reason = "SafeCast: intentional raw cast"'
+    match: 'f32 SafeCast impl: saturating casts necessarily use raw'
     reason: >
-      Per-method #[expect] on f64 and f32 SafeCast impls for signed/float
-      target casts (to_i32, to_i64, f64::to_f32) where only truncation
-      fires, not sign loss.
+      Concrete f32 SafeCast impl. Same as f64 — only truncation and
+      sign_loss fire. Uses #[expect] instead of #[allow].
     strategy: >
-      Already at maximum precision — no further reduction possible.
+      No further reduction — same as f64.
 
   # ── config/mod.rs: invariant_panic ──────────────────────────────────
 

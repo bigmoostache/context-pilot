@@ -18,6 +18,7 @@ chrono.workspace = true
 typst = "0.13"
 typst-pdf = "0.13"
 reqwest = { workspace = true }
+ratatui.workspace = true
 flate2 = "1"
 tar = "0.4"
 

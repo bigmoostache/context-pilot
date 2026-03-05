@@ -6,8 +6,8 @@ pub mod autocomplete;
 pub mod context;
 /// Serializable data structures: config, messages, persistence types.
 pub mod data;
-/// Model/provider dispatch helpers (context window, pricing, output limits).
-mod model_helpers;
+/// Stream-phase state machine, boolean flag structs, and streaming-tool advisory state.
+pub mod flags;
 /// Runtime state: the in-memory `State` struct with all live fields.
 pub mod runtime;
 /// Watcher trait and registry for async condition monitoring.

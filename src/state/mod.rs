@@ -10,7 +10,8 @@ pub(crate) use cp_base::state::context::{
 };
 pub(crate) use cp_base::state::data::config::{PanelData, SharedConfig, WorkerState};
 pub(crate) use cp_base::state::data::message::{Message, MessageStatus, MessageType, format_messages_to_chunk};
-pub(crate) use cp_base::state::runtime::{State, StreamPhase, StreamingTool};
+pub(crate) use cp_base::state::flags::{StreamPhase, StreamingTool};
+pub(crate) use cp_base::state::runtime::State;
 pub(crate) use cp_base::ui::render_cache::{FullCache, InputCache, MessageCache, hash_values};
 
 // ── Submodule re-exports (accessed via path, e.g. crate::state::config::SCHEMA_VERSION) ──

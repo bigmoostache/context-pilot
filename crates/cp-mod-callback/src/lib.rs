@@ -52,6 +52,10 @@ impl Module for CallbackModule {
         "Auto-fire bash scripts when files are edited"
     }
 
+    fn is_core(&self) -> bool {
+        false
+    }
+
     fn is_global(&self) -> bool {
         true
     }
