@@ -197,7 +197,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Add diff markers for UI rendering
-    result_msg.push_str("`diff\n");
+    result_msg.push_str("```diff\n");
 
     // Generate unified diff by comparing old and new line by line
     let diff_lines = generate_unified_diff(old_string, new_string);

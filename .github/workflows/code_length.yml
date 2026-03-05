@@ -13,7 +13,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check file lengths (max 500 lines)
-        run: .github/workflows/check-file-lengths.sh
+        run: .github/checks/check-file-lengths.sh
 
       - name: Check folder sizes (max 8 entries, excluding root)
-        run: .github/workflows/check-folder-sizes.sh
+        run: .github/checks/check-folder-sizes.sh
+
+      - name: Check lint exception registry
+        run: .github/checks/check-lint-exceptions.sh

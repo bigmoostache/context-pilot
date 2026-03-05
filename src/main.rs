@@ -153,7 +153,10 @@ use crossterm::{
 use app::{App, ensure_default_agent, ensure_default_contexts};
 use infra::api::StreamEvent;
 use state::cache::CacheUpdate;
-use state::persistence::{boot_assemble_state, boot_load_config, boot_load_messages, boot_load_panels, load_state};
+use state::persistence::{
+    boot_assemble_state, boot_extract_module_data, boot_init_modules, boot_load_config, boot_load_messages,
+    boot_load_panels, load_state,
+};
 
 fn main() -> ExitCode {
     init_file_logger();
@@ -217,6 +220,7 @@ fn main() -> ExitCode {
         BootStep { label: "Loading config", detail: None, done: false },
         BootStep { label: "Loading panels", detail: None, done: false },
         BootStep { label: "Loading messages", detail: None, done: false },
+        BootStep { label: "Assembling state", detail: None, done: false },
         BootStep { label: "Initializing modules", detail: None, done: false },
         BootStep { label: "Preparing workspace", detail: None, done: false },
     ];
@@ -230,6 +234,7 @@ fn main() -> ExitCode {
     let mut state = if new_format {
         // Phase 1: Load config + worker state
         let cfg = boot_load_config();
+        let module_data = boot_extract_module_data(&cfg);
         steps[0].done = true;
         render_boot_screen(&mut terminal, &steps);
 
@@ -246,14 +251,29 @@ fn main() -> ExitCode {
         steps[2].done = true;
         render_boot_screen(&mut terminal, &steps);
 
-        // Phase 4: Assemble state + init modules
-        boot_assemble_state(cfg, panels, messages)
+        // Phase 4: Assemble state (without module init)
+        let mut state = boot_assemble_state(cfg, panels, messages);
+        steps[3].done = true;
+        render_boot_screen(&mut terminal, &steps);
+
+        // Phase 5: Initialize modules (with per-module progress)
+        boot_init_modules(&mut state, &module_data, |module_name| {
+            steps[4].detail = Some(module_name.to_string());
+            render_boot_screen(&mut terminal, &steps);
+        });
+        steps[4].done = true;
+        steps[5].detail = Some("registering types".to_string());
+        render_boot_screen(&mut terminal, &steps);
+
+        state
     } else {
         // Fresh start — no files to load, just create default state
         let s = load_state();
         steps[0].done = true;
         steps[1].done = true;
         steps[2].done = true;
+        steps[3].done = true;
+        steps[4].done = true;
         render_boot_screen(&mut terminal, &steps);
         s
     };
@@ -277,14 +297,12 @@ fn main() -> ExitCode {
             .collect();
         state.context.retain(|c| known_types.contains(c.context_type.as_str()));
     }
-    steps[3].done = true;
-    render_boot_screen(&mut terminal, &steps);
 
-    // Phase 5: Prepare workspace
+    // Phase 6: Prepare workspace
     ensure_default_contexts(&mut state);
     ensure_default_agent(&mut state);
     cp_mod_preset::builtin::ensure_builtin_presets();
-    steps[4].done = true;
+    steps[5].done = true;
     render_boot_screen(&mut terminal, &steps);
 
     // Create channels

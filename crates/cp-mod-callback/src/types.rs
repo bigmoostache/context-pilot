@@ -3,6 +3,11 @@ use std::collections::HashSet;
 use cp_base::state::State;
 use serde::{Deserialize, Serialize};
 
+/// Serde default helper for `is_global` backward compatibility.
+const fn default_true() -> bool {
+    true
+}
+
 /// A callback rule that fires when matching files are edited.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallbackDefinition {
@@ -22,8 +27,10 @@ pub struct CallbackDefinition {
     pub success_message: Option<String>,
     /// Working directory for the script (defaults to project root)
     pub cwd: Option<String>,
-    /// Won't run simultaneously with itself
-    pub one_at_a_time: bool,
+    /// Global callbacks fire once per batch with `$CP_CHANGED_FILES` (plural).
+    /// Local callbacks fire once per changed file with `$CP_CHANGED_FILE` (singular).
+    #[serde(default = "default_true")]
+    pub is_global: bool,
     /// If true, this is a built-in callback (not user-created, no external script).
     /// The command is stored in `built_in_command` and executed directly.
     #[serde(default)]

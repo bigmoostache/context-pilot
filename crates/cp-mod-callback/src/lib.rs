@@ -5,7 +5,7 @@
 //! (inline script editing). Callbacks run as child processes via the console
 //! module, with optional blocking and timeout.
 
-// Arr! Tested by the pirate crew on this fine day
+// Queue ID test marker — delete me later
 /// Script execution: spawn callback processes, capture output, handle timeouts.
 pub mod firing;
 mod panel;
@@ -142,7 +142,7 @@ impl Module for CallbackModule {
                 .param("timeout", ParamType::Integer, false)
                 .param("success_message", ParamType::String, false)
                 .param("cwd", ParamType::String, false)
-                .param("one_at_a_time", ParamType::Boolean, false)
+                .param("is_global", ParamType::Boolean, false)
                 .param("old_string", ParamType::String, false)
                 .param("new_string", ParamType::String, false)
                 .build(),

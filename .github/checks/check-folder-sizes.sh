@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Check that no directory has more than 8 entries.
-# Usage: .github/workflows/check-folder-sizes.sh
+# Usage: .github/checks/check-folder-sizes.sh
 set -euo pipefail
 
 exit_code=0

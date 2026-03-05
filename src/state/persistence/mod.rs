@@ -5,6 +5,9 @@
 //! - `WorkerState` (states/{worker}.json) - Worker-specific state
 //! - `PanelData` (panels/{uid}.json) - Dynamic panel metadata
 //! - Messages (messages/{uid}.yaml) - Conversation messages
+mod boot;
+
+pub(crate) use boot::{boot_extract_module_data, boot_init_modules};
 pub(crate) mod config;
 pub(crate) mod message;
 pub(crate) mod panel;
@@ -156,7 +159,9 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
         .max()
         .map_or(1, |n| n + 1);
 
-    let mut state = State {
+    // Module init + data loading is driven by main.rs via boot_init_modules()
+    // so it can render per-module progress on the loading screen.
+    State {
         context: panels.context,
         messages,
         selected_context: cfg.shared.selected_context,
@@ -167,38 +172,9 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
         input: cfg.shared.draft_input,
         input_cursor: cfg.shared.draft_cursor,
         sidebar_mode: cfg.shared.sidebar_mode,
-        active_theme: cfg.shared.active_theme.clone(),
+        active_theme: cfg.shared.active_theme,
         ..State::default()
-    };
-
-    // Initialize module-owned state before loading persisted data
-    for module in crate::modules::all_modules() {
-        module.init_state(&mut state);
     }
-
-    // Load module data from config
-    let null = serde_json::Value::Null;
-    for module in crate::modules::all_modules() {
-        let data = if module.is_global() {
-            cfg.shared.modules.get(module.id()).unwrap_or(&null)
-        } else {
-            cfg.worker.modules.get(module.id()).unwrap_or(&null)
-        };
-        module.load_module_data(data, &mut state);
-
-        let worker_data = cfg.worker.modules.get(&format!("{}_worker", module.id())).unwrap_or(&null);
-        module.load_worker_data(worker_data, &mut state);
-    }
-
-    if state.tools.is_empty() {
-        state.tools = crate::modules::active_tool_definitions(&state.active_modules);
-    }
-
-    let _r = dotenvy::dotenv().ok();
-    cp_mod_github::GithubState::get_mut(&mut state).github_token = std::env::var("GITHUB_TOKEN").ok();
-
-    set_active_theme(&state.active_theme);
-    state
 }
 
 // ─── Legacy Entry Point ─────────────────────────────────────────────────────
@@ -208,9 +184,12 @@ pub(crate) fn load_state() -> State {
     if new_format_exists() {
         // Existing project — use phased boot (monolithic path for non-TUI callers)
         let cfg = boot_load_config();
+        let module_data = boot_extract_module_data(&cfg);
         let panels = boot_load_panels(&cfg);
         let messages = boot_load_messages(&panels.message_uids);
-        boot_assemble_state(cfg, panels, messages)
+        let mut state = boot_assemble_state(cfg, panels, messages);
+        boot_init_modules(&mut state, &module_data, |_| {});
+        state
     } else {
         // Fresh start - create default state
         let mut state = State::default();

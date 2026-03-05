@@ -178,6 +178,9 @@ impl App {
             if self.state.flags.lifecycle.reload_pending {
                 self.writer.flush();
                 save_state(&self.state);
+                // Write reload flag AFTER save_state — otherwise save_state
+                // overwrites config.json with reload_requested: false.
+                crate::infra::tools::write_reload_flag();
                 break;
             }
 

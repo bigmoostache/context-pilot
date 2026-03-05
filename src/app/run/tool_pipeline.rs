@@ -3,7 +3,7 @@ use std::sync::mpsc::Sender;
 use crate::app::actions::clean_llm_id_prefix;
 use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
-use crate::infra::tools::{execute_tool, perform_reload};
+use crate::infra::tools::execute_tool;
 use crate::modules::pre_flight::pre_flight_tool;
 use crate::state::persistence::build_message_op;
 use crate::state::{Message, MessageStatus, MessageType, StreamPhase, ToolResultRecord, ToolUseRecord};
@@ -19,6 +19,31 @@ use crate::app::App;
 // ─── Tool pipeline ──────────────────────────────────────────────────────────
 
 impl App {
+    /// Create and persist a `tool_call` message for a single `ToolUse`.
+    /// Used for both direct tool calls and queue-flushed replays.
+    fn save_tool_call_message(&mut self, tool: &cp_base::tools::ToolUse) {
+        let tool_id = format!("T{}", self.state.next_tool_id);
+        let tool_uid = format!("UID_{}_T", self.state.global_next_uid);
+        self.state.next_tool_id += 1;
+        self.state.global_next_uid += 1;
+
+        let tool_msg = Message {
+            id: tool_id,
+            uid: Some(tool_uid),
+            role: "assistant".to_string(),
+            message_type: MessageType::ToolCall,
+            content: String::new(),
+            content_token_count: 0,
+            status: MessageStatus::Full,
+            tool_uses: vec![ToolUseRecord { id: tool.id.clone(), name: tool.name.clone(), input: tool.input.clone() }],
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: now_ms(),
+        };
+        self.save_message_async(&tool_msg);
+        self.state.messages.push(tool_msg);
+    }
+
     pub(super) fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>) {
         if !self.state.flags.stream.phase.is_streaming()
             || self.pending_done.is_none()
@@ -39,8 +64,9 @@ impl App {
 
         self.state.flags.ui.dirty = true;
         self.state.flags.stream.phase.transition(StreamPhase::ExecutingTools);
-        let tools = std::mem::take(&mut self.pending_tools);
+        let mut tools = std::mem::take(&mut self.pending_tools);
         let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
+        let mut flushed_tools: Vec<super::tool_cleanup::FlushedTool> = Vec::new();
 
         // Finalize current assistant message
         if let Some(msg) = self.state.messages.last_mut()
@@ -52,36 +78,15 @@ impl App {
             self.writer.send_message(op);
         }
 
-        // Create tool call messages
+        // Create tool call messages and execute tools
         for tool in &tools {
-            let tool_id = format!("T{}", self.state.next_tool_id);
-            let tool_uid = format!("UID_{}_T", self.state.global_next_uid);
-            self.state.next_tool_id += 1;
-            self.state.global_next_uid += 1;
-
-            let tool_msg = Message {
-                id: tool_id,
-                uid: Some(tool_uid),
-                role: "assistant".to_string(),
-                message_type: MessageType::ToolCall,
-                content: String::new(),
-                content_token_count: 0,
-                status: MessageStatus::Full,
-                tool_uses: vec![ToolUseRecord {
-                    id: tool.id.clone(),
-                    name: tool.name.clone(),
-                    input: tool.input.clone(),
-                }],
-                tool_results: Vec::new(),
-                input_tokens: 0,
-                timestamp_ms: now_ms(),
-            };
-            self.save_message_async(&tool_msg);
-            self.state.messages.push(tool_msg);
+            self.save_tool_call_message(tool);
 
             let result = if tool.name == "Queue_execute" {
-                // Queue flush: execute all queued calls through normal dispatch
-                super::tool_cleanup::execute_queue_flush(tool, &mut self.state)
+                // Queue flush: execute all queued calls, collect them for pipeline replay
+                let (summary_result, flushed) = super::tool_cleanup::execute_queue_flush(tool, &mut self.state);
+                flushed_tools = flushed;
+                summary_result
             } else {
                 // Pre-flight: schema check + module semantic check (ALWAYS runs, queue or not)
                 let pf = pre_flight_tool(tool, &self.state, &self.state.active_modules.clone());
@@ -117,6 +122,20 @@ impl App {
                 }
             };
             tool_results.push(result);
+        }
+
+        // === QUEUE FLUSH REPLAY ===
+        // If Queue_execute fired, extend the tools/results vecs with the flushed items.
+        // This way callbacks, sentinels, reload checks, and sleep detection see ALL tools —
+        // not just the Queue_execute wrapper.
+        if !flushed_tools.is_empty() {
+            for ft in &flushed_tools {
+                self.save_tool_call_message(&ft.tool);
+            }
+            for ft in flushed_tools {
+                tools.push(ft.tool);
+                tool_results.push(ft.result);
+            }
         }
 
         // Check if any tool triggered a question form (blocking)
@@ -248,9 +267,8 @@ impl App {
         self.save_message_async(&result_msg);
         self.state.messages.push(result_msg);
 
-        // Check if reload was requested - exit pipeline, main loop will break
+        // Check if reload was requested — main loop will handle flag + exit
         if self.state.flags.lifecycle.reload_pending {
-            perform_reload(&self.state);
             return;
         }
 
@@ -422,7 +440,6 @@ impl App {
 
         // Check if reload was requested
         if self.state.flags.lifecycle.reload_pending {
-            perform_reload(&self.state);
             return;
         }
 

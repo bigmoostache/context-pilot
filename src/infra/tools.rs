@@ -21,21 +21,15 @@ pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResul
     ToolResult::new(tool.id.clone(), "Reload initiated. Restarting TUI...".to_string(), false)
 }
 
-/// Set the reload flag in config.json so `run.sh` restarts the TUI.
+/// Write `reload_requested: true` into config.json so `run.sh` restarts the TUI.
 ///
-/// Callers must `return` immediately after — the main event loop checks
-/// `state.flags.lifecycle.reload_pending` and exits cleanly through `main()`.
-/// Terminal cleanup is handled by `main()` on normal return.
-pub(crate) fn perform_reload(state: &State) {
-    use crate::state::persistence::save_state;
+/// Called by the main event loop AFTER `save_state()` — otherwise `save_state`
+/// overwrites the flag back to `false`. The main loop already handles terminal
+/// cleanup and state persistence; this just sets the restart trigger.
+pub(crate) fn write_reload_flag() {
     use std::fs;
-
     let config_path = ".context-pilot/config.json";
 
-    // Save state before exiting
-    save_state(state);
-
-    // Read config, set reload_requested to true, and save
     if let Ok(json) = fs::read_to_string(config_path) {
         let updated = if json.contains("\"reload_requested\":") {
             json.replace("\"reload_requested\": false", "\"reload_requested\": true")

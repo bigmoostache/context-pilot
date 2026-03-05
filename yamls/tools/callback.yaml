@@ -13,7 +13,7 @@ tools:
       timeout: "Max execution time in seconds (required if blocking)"
       success_message: "Custom message on success (e.g., 'Build passed ✓')"
       cwd: "Working directory (defaults to project root)"
-      one_at_a_time: "Don't run simultaneously with itself (default: false)"
+      is_global: "Global (true, default): fires once per batch with $CP_CHANGED_FILES. Local (false): fires once per changed file with $CP_CHANGED_FILE."
       old_string: "For diff-based script update: exact text to find"
       new_string: "For diff-based script update: replacement text"
 

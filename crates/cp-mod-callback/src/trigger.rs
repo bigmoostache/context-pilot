@@ -12,6 +12,7 @@ use cp_base::state::State;
 use crate::types::{CallbackDefinition, CallbackState};
 
 /// A callback that matched one or more changed files and is ready to fire.
+// Queue ID test marker — delete me later
 #[derive(Debug, Clone)]
 pub struct MatchedCallback {
     /// The callback definition

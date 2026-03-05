@@ -35,12 +35,13 @@ pub(crate) fn run_typst_compile(args: &[String]) -> Result<String, (String, i32)
 /// or `Err((message, 1))` on compilation failure.
 pub(crate) fn run_typst_recompile_watched(args: &[String]) -> Result<String, (String, i32)> {
     if args.is_empty() {
-        return Ok(String::new());
+        // Exit 7 = "nothing to do" — callback system treats this as silent success
+        return Err((String::new(), 7));
     }
 
     let watchlist = cp_mod_typst::watchlist::Watchlist::load();
     if watchlist.entries.is_empty() {
-        return Ok(String::new());
+        return Err((String::new(), 7));
     }
 
     // Find all watched documents affected by the changed files

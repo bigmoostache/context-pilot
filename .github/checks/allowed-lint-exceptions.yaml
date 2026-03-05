@@ -50,7 +50,7 @@ exceptions:
       Same as above — proc-macro or build.rs per-type generation.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'reason = "SafeCast implementations necessarily use raw as casts"'
+    match: 'impl SafeCast for f64'
     reason: >
       Concrete f64 SafeCast impl. Cannot use #[expect] because not every
       lint fires on every method (e.g. to_f64 is identity, no cast_precision_loss).

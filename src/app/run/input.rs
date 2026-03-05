@@ -1,7 +1,6 @@
 use crossterm::event;
 
 use crate::app::actions::Action;
-use crate::infra::tools::perform_reload;
 
 use crate::app::App;
 
@@ -270,8 +269,7 @@ impl App {
                         "quit" => return None, // Signal quit
                         "reload" => {
                             self.state.flags.lifecycle.reload_pending = true;
-                            perform_reload(&self.state);
-                            return None;
+                            return Some(Action::None);
                         }
                         "config" => return Some(Action::ToggleConfigView),
                         _ => {

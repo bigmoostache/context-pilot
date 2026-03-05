@@ -152,7 +152,8 @@ impl App {
                 // Dispatch through reverie tool router
                 // Queue_execute needs special handling (flush lives in tool_cleanup, not the module)
                 let result = if tool.name == "Queue_execute" {
-                    super::tool_cleanup::execute_queue_flush(tool, &mut self.state)
+                    // Reverie doesn't need flushed tools (no callbacks) — just the summary
+                    super::tool_cleanup::execute_queue_flush(tool, &mut self.state).0
                 } else if tool.name == "Queue_activate" {
                     // Toggle the reverie's own queue flag, NOT the main worker's QueueState.active
                     if let Some(rev) = self.state.reveries.get_mut(&agent_id) {

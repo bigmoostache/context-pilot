@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Check that no .rs file exceeds 500 lines.
-# Usage: .github/workflows/check-file-lengths.sh
+# Usage: .github/checks/check-file-lengths.sh
 set -euo pipefail
 
 exit_code=0

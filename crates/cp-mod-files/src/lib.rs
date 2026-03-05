@@ -242,7 +242,7 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'s
             in_diff_block = true;
             continue;
         }
-        if line.trim() == "`" && in_diff_block {
+        if line.trim() == "```" && in_diff_block {
             in_diff_block = false;
             continue;
         }

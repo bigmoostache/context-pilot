@@ -2,6 +2,7 @@
 //!
 //! Separated from trigger.rs which handles file collection and pattern matching.
 
+// Queue ID test marker — delete me later
 use cp_base::config::constants::STORE_DIR;
 use cp_base::panels::now_ms;
 use cp_base::state::State;
@@ -15,6 +16,9 @@ use crate::trigger::{MatchedCallback, build_changed_files_env};
 /// Fire a single callback by spawning its script via the console server.
 /// Creates a console session + watcher (no panel — deferred until failure).
 ///
+/// For global callbacks, `single_file` is `None` and `$CP_CHANGED_FILES` contains all files.
+/// For local callbacks, `single_file` is `Some(path)` and `$CP_CHANGED_FILE` contains that one file.
+///
 /// # Errors
 ///
 /// Returns `Err(message)` if the script fails to execute or times out.
@@ -22,20 +26,17 @@ pub fn fire_callback(
     state: &mut State,
     matched: &MatchedCallback,
     blocking_tool_use_id: Option<&str>,
+    single_file: Option<&str>,
 ) -> Result<String, String> {
     let def = &matched.definition;
 
-    // one_at_a_time: skip if this callback already has a running watcher
-    if def.one_at_a_time {
-        let tag = format!("callback_{}", def.id);
-        let registry = WatcherRegistry::get(state);
-        if registry.has_watcher_with_tag(&tag) {
-            return Err(format!("Callback '{}' skipped (one_at_a_time: already running)", def.name,));
-        }
-    }
-
     // Build the command with env vars baked in
-    let changed_files_env = build_changed_files_env(&matched.matched_files);
+    // Global: CP_CHANGED_FILES (plural, all matched files)
+    // Local:  CP_CHANGED_FILE  (singular, one file per invocation)
+    let (env_key, env_val) = single_file.map_or_else(
+        || ("CP_CHANGED_FILES", build_changed_files_env(&matched.matched_files)),
+        |file| ("CP_CHANGED_FILE", file.to_string()),
+    );
     let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
 
     // Use the callback's cwd if set, otherwise project root
@@ -46,8 +47,8 @@ pub fn fire_callback(
     let command = if def.built_in {
         let base_cmd = def.built_in_command.as_deref().unwrap_or("echo 'no built_in_command set'");
         format!(
-            "CP_CHANGED_FILES={changed_files} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} {cmd}",
-            changed_files = shell_escape(&changed_files_env),
+            "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} {cmd}",
+            changed = shell_escape(&env_val),
             root = shell_escape(&project_root),
             name = shell_escape(&def.name),
             cmd = base_cmd,
@@ -67,8 +68,8 @@ pub fn fire_callback(
         }
 
         format!(
-            "CP_CHANGED_FILES={changed_files} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} bash {script}",
-            changed_files = shell_escape(&changed_files_env),
+            "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} bash {script}",
+            changed = shell_escape(&env_val),
             root = shell_escape(&project_root),
             name = shell_escape(&def.name),
             script = shell_escape(&script_path_str),
@@ -131,16 +132,22 @@ pub fn fire_callback(
 }
 
 /// Fire all matched non-blocking callbacks.
-/// Returns one summary line per callback in compact format: "· name dispatched"
+/// Global: fires once with all files. Local: fires once per matched file.
+/// Returns one summary line per invocation in compact format.
 pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) -> Vec<String> {
     let mut summaries = Vec::new();
     for cb in callbacks {
-        match fire_callback(state, cb, None) {
-            Ok(_session_key) => {
-                summaries.push(format!("· {} dispatched", cb.definition.name));
+        if cb.definition.is_global {
+            match fire_callback(state, cb, None, None) {
+                Ok(_) => summaries.push(format!("· {} dispatched", cb.definition.name)),
+                Err(e) => summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e)),
             }
-            Err(e) => {
-                summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e));
+        } else {
+            for file in &cb.matched_files {
+                match fire_callback(state, cb, None, Some(file)) {
+                    Ok(_) => summaries.push(format!("· {} dispatched ({})", cb.definition.name, file)),
+                    Err(e) => summaries.push(format!("· {} FAILED to spawn for {}: {}", cb.definition.name, file, e)),
+                }
             }
         }
     }
@@ -148,17 +155,22 @@ pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) ->
 }
 
 /// Fire all matched blocking callbacks.
+/// Global: fires once with all files. Local: fires once per matched file.
 /// Each gets a sentinel `tool_use_id` so `tool_pipeline` can track them.
-/// Returns one summary line per callback: "· name running (blocking)"
 pub fn fire_blocking_callbacks(state: &mut State, callbacks: &[MatchedCallback], tool_use_id: &str) -> Vec<String> {
     let mut summaries = Vec::new();
     for cb in callbacks {
-        match fire_callback(state, cb, Some(tool_use_id)) {
-            Ok(_session_key) => {
-                summaries.push(format!("· {} running (blocking)", cb.definition.name));
+        if cb.definition.is_global {
+            match fire_callback(state, cb, Some(tool_use_id), None) {
+                Ok(_) => summaries.push(format!("· {} running (blocking)", cb.definition.name)),
+                Err(e) => summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e)),
             }
-            Err(e) => {
-                summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e));
+        } else {
+            for file in &cb.matched_files {
+                match fire_callback(state, cb, Some(tool_use_id), Some(file)) {
+                    Ok(_) => summaries.push(format!("· {} running (blocking, {})", cb.definition.name, file)),
+                    Err(e) => summaries.push(format!("· {} FAILED to spawn for {}: {}", cb.definition.name, file, e)),
+                }
             }
         }
     }
@@ -248,11 +260,9 @@ impl Watcher for CallbackWatcher {
         }
 
         if exit_code == 0 {
-            let log_path = cp_mod_console::manager::log_file_path(&self.session_name);
-            let log_path_str = log_path.to_string_lossy();
             let msg = self.success_message.as_ref().map_or_else(
-                || format!("· {} passed. Log: {}", self.callback_name, log_path_str),
-                |sm| format!("· {} passed ({}). Log: {}", self.callback_name, sm, log_path_str),
+                || format!("· {} passed", self.callback_name),
+                |sm| format!("· {} passed ({})", self.callback_name, sm),
             );
             Some(WatcherResult {
                 description: msg,
@@ -263,13 +273,8 @@ impl Watcher for CallbackWatcher {
                 processed_already: true,
             })
         } else {
-            let last_lines = handle.buffer.last_n_lines(3);
-            let msg = format!(
-                "· {} FAILED (exit {})\n{}",
-                self.callback_name,
-                exit_code,
-                last_lines.lines().map(|l| format!("    {l}")).collect::<Vec<_>>().join("\n"),
-            );
+            // Panel content is already final — the pipeline waited for process exit before resuming
+            let msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
             Some(WatcherResult {
                 description: msg,
                 panel_id: None,

@@ -45,7 +45,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let timeout_secs = tool.input.get("timeout").and_then(serde_json::Value::as_u64);
     let success_message = tool.input.get("success_message").and_then(|v| v.as_str()).map(ToString::to_string);
     let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(ToString::to_string);
-    let one_at_a_time = tool.input.get("one_at_a_time").and_then(serde_json::Value::as_bool).unwrap_or(false);
+    let is_global = tool.input.get("is_global").and_then(serde_json::Value::as_bool).unwrap_or(true);
 
     // Blocking callbacks require a timeout
     if blocking && timeout_secs.is_none() {
@@ -54,6 +54,11 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             "Blocking callbacks require a 'timeout' parameter (max execution time in seconds).".to_string(),
             true,
         );
+    }
+
+    // Validate script env var usage matches scope
+    if let Err(e) = validate_script_env_vars(&cargo_script, is_global) {
+        return ToolResult::new(tool.id.clone(), e, true);
     }
 
     // Check for duplicate name
@@ -115,7 +120,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         timeout_secs,
         success_message: success_message.clone(),
         cwd,
-        one_at_a_time,
+        is_global,
         built_in: false,
         built_in_command: None,
     };
@@ -135,7 +140,8 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(t) = timeout_secs {
         msg.push_str(&format!("\n  Timeout: {t}s"));
     }
-    msg.push_str(&format!("\n  One at a time: {one_at_a_time}"));
+    let scope = if is_global { "global" } else { "local (per-file)" };
+    msg.push_str(&format!("\n  Scope: {scope}"));
     msg.push_str("\n  Status: active ✓");
 
     ToolResult::new(tool.id.clone(), msg, false)
@@ -223,9 +229,10 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         def.cwd = Some(cwd.to_string());
         changes.push(format!("cwd → {cwd}"));
     }
-    if let Some(oaat) = tool.input.get("one_at_a_time").and_then(serde_json::Value::as_bool) {
-        def.one_at_a_time = oaat;
-        changes.push(format!("one_at_a_time → {oaat}"));
+    if let Some(is_global) = tool.input.get("is_global").and_then(serde_json::Value::as_bool) {
+        def.is_global = is_global;
+        let scope = if is_global { "global" } else { "local" };
+        changes.push(format!("scope → {scope}"));
     }
 
     // Handle script updates
@@ -349,4 +356,45 @@ pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         format!("Callback {} [{}] deleted{}", anchor_id, sunken_def.name, script_msg),
         false,
     )
+}
+
+/// Validate that a callback script uses the correct env var for its scope.
+/// Global scripts must use `$CP_CHANGED_FILES` (plural), not singular.
+/// Local scripts must use `$CP_CHANGED_FILE` (singular), not plural.
+fn validate_script_env_vars(script: &str, is_global: bool) -> Result<(), String> {
+    if is_global {
+        // Check for singular (without trailing S) — but not plural (with S)
+        // Match: $CP_CHANGED_FILE followed by non-S char, or ${CP_CHANGED_FILE}
+        if script.contains("${CP_CHANGED_FILE}") || has_singular_env_var(script) {
+            return Err("Global callbacks should use $CP_CHANGED_FILES (plural), not $CP_CHANGED_FILE (singular). \
+                 Global callbacks receive all changed files at once."
+                .to_string());
+        }
+    } else {
+        // Check for plural ($CP_CHANGED_FILES or ${CP_CHANGED_FILES})
+        if script.contains("CP_CHANGED_FILES") {
+            return Err("Local callbacks should use $CP_CHANGED_FILE (singular), not $CP_CHANGED_FILES (plural). \
+                 Local callbacks fire once per file and receive one file path."
+                .to_string());
+        }
+    }
+    Ok(())
+}
+
+/// Check if script contains `$CP_CHANGED_FILE` (singular) without a trailing `S`.
+/// Avoids false positives on `$CP_CHANGED_FILES`.
+fn has_singular_env_var(script: &str) -> bool {
+    let needle = "$CP_CHANGED_FILE";
+    let mut start = 0;
+    while let Some(pos) = script[start..].find(needle) {
+        let abs_pos = start + pos + needle.len();
+        // If the next char is 'S' or 's', this is actually $CP_CHANGED_FILES — skip it
+        match script.as_bytes().get(abs_pos) {
+            Some(b'S' | b's') => {
+                start = abs_pos;
+            }
+            _ => return true,
+        }
+    }
+    false
 }

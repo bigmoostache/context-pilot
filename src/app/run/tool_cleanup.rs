@@ -61,7 +61,8 @@ impl App {
                     }
                     self.state.context.push(ctx);
                     // Enrich the result description with the panel reference
-                    result.description.push_str(&format!("\nSee panel {panel_id} for full output."));
+                    // Panel is already populated and exited — no console_wait needed.
+                    result.description.push_str(&format!(" → see {panel_id} (already loaded, read it directly)"));
                 }
                 // Auto-close panels for watchers that request it
                 if result.close_panel
@@ -110,13 +111,43 @@ impl App {
         }
 
         // All blocking watchers done — merge accumulated results and resume pipeline.
-        let blocking_results = std::mem::take(&mut self.accumulated_blocking_results);
+        let mut blocking_results = std::mem::take(&mut self.accumulated_blocking_results);
 
         let Some(mut tool_results) = self.pending_console_wait_tool_results.take() else {
             return;
         };
 
-        // Replace sentinels with real results
+        // Handle deferred panel creation FIRST — so descriptions include panel IDs
+        // before we copy them into tool results during sentinel replacement.
+        for result in &mut blocking_results {
+            if let Some(ref dp) = result.create_panel {
+                let panel_id = self.state.next_available_context_id();
+                let uid = format!("UID_{}_P", self.state.global_next_uid);
+                self.state.global_next_uid += 1;
+
+                let mut ctx = crate::state::make_default_context_element(
+                    &panel_id,
+                    cp_base::state::ContextType::new(cp_base::state::ContextType::CONSOLE),
+                    &dp.display_name,
+                    true,
+                );
+                ctx.uid = Some(uid);
+                ctx.set_meta("console_name", &dp.session_key);
+                ctx.set_meta("console_command", &dp.command);
+                ctx.set_meta("console_description", &dp.description);
+                ctx.set_meta("callback_id", &dp.callback_id);
+                ctx.set_meta("callback_name", &dp.callback_name);
+                if let Some(ref dir) = dp.cwd {
+                    ctx.set_meta("console_cwd", dir);
+                }
+                self.state.context.push(ctx);
+                // Point the LLM at exactly which panel to read for the error
+                // Panel is already populated and exited — no console_wait needed.
+                result.description.push_str(&format!(" → see {panel_id} (already loaded, read it directly)"));
+            }
+        }
+
+        // Replace sentinels with real results (descriptions now include panel IDs)
         for tr in &mut tool_results {
             if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
                 // Console wait sentinel: replace entirely with watcher result
@@ -152,32 +183,6 @@ impl App {
                         tr.content = format!("{original_content}\nCallbacks:\n{merged_descriptions}");
                     }
                 }
-            }
-        }
-
-        // Handle deferred panel creation for blocking results too (e.g. failed blocking callbacks)
-        for result in &blocking_results {
-            if let Some(ref dp) = result.create_panel {
-                let panel_id = self.state.next_available_context_id();
-                let uid = format!("UID_{}_P", self.state.global_next_uid);
-                self.state.global_next_uid += 1;
-
-                let mut ctx = crate::state::make_default_context_element(
-                    &panel_id,
-                    cp_base::state::ContextType::new(cp_base::state::ContextType::CONSOLE),
-                    &dp.display_name,
-                    true,
-                );
-                ctx.uid = Some(uid);
-                ctx.set_meta("console_name", &dp.session_key);
-                ctx.set_meta("console_command", &dp.command);
-                ctx.set_meta("console_description", &dp.description);
-                ctx.set_meta("callback_id", &dp.callback_id);
-                ctx.set_meta("callback_name", &dp.callback_name);
-                if let Some(ref dir) = dp.cwd {
-                    ctx.set_meta("console_cwd", dir);
-                }
-                self.state.context.push(ctx);
             }
         }
 
@@ -237,7 +242,6 @@ impl App {
         self.state.messages.push(result_msg);
 
         if self.state.flags.lifecycle.reload_pending {
-            crate::infra::tools::perform_reload(&self.state);
             return;
         }
 
@@ -375,30 +379,42 @@ impl App {
 
 // ─── Queue flush (called from tool_pipeline.rs) ─────────────────────────────
 
-/// Execute all queued tool calls in order, returning a summary result.
+/// Flushed tool execution pair: the original `ToolUse` and its result.
+pub(super) struct FlushedTool {
+    pub tool: cp_base::tools::ToolUse,
+    pub result: crate::infra::tools::ToolResult,
+}
+
+/// Execute all queued tool calls in order.
+/// Returns (`summary_result`, `flushed_tools`) so the pipeline can run callbacks/sentinels
+/// on the individual tools — not just the `Queue_execute` wrapper.
 pub(super) fn execute_queue_flush(
     tool: &cp_base::tools::ToolUse,
     state: &mut State,
-) -> crate::infra::tools::ToolResult {
+) -> (crate::infra::tools::ToolResult, Vec<FlushedTool>) {
     let qs = QueueState::get_mut(state);
     if qs.queued_calls.is_empty() {
-        return crate::infra::tools::ToolResult::new(
-            tool.id.clone(),
-            "Queue is empty — nothing to execute.".to_string(),
-            false,
+        return (
+            crate::infra::tools::ToolResult::new(
+                tool.id.clone(),
+                "Queue is empty — nothing to execute.".to_string(),
+                false,
+            ),
+            Vec::new(),
         );
     }
     let calls = qs.flush();
     qs.active = false;
 
-    // All hands on deck — execute each queued order in sequence
     let mut summary = format!("Executed {} queued action(s):\n", calls.len());
+    let mut flushed = Vec::with_capacity(calls.len());
+
     for call in &calls {
-        let queued_tool = cp_base::tools::ToolUse {
-            id: call.tool_use_id.clone(),
-            name: call.tool_name.clone(),
-            input: call.input.clone(),
-        };
+        // Generate a fresh tool_use_id to avoid collision with the intercept-time message.
+        // The original id was already used in the "Queued as #N" tool_result at intercept time.
+        let fresh_id = format!("flush_{}_{}", call.index, call.tool_use_id);
+        let queued_tool =
+            cp_base::tools::ToolUse { id: fresh_id, name: call.tool_name.clone(), input: call.input.clone() };
         let result = execute_tool(&queued_tool, state);
         let status = if result.is_error { "ERROR" } else { "ok" };
         let short = if result.content.len() > 100 {
@@ -408,6 +424,8 @@ pub(super) fn execute_queue_flush(
             result.content.clone()
         };
         summary.push_str(&format!("{}. {} → {} ({})\n", call.index, call.tool_name, status, short));
+        flushed.push(FlushedTool { tool: queued_tool, result });
     }
-    crate::infra::tools::ToolResult::new(tool.id.clone(), summary, false)
+
+    (crate::infra::tools::ToolResult::new(tool.id.clone(), summary, false), flushed)
 }

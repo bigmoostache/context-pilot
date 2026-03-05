@@ -132,7 +132,7 @@ fn ensure_typst_callback(state: &mut State) {
         timeout_secs: Some(60),
         success_message: None,
         cwd: None,
-        one_at_a_time: false,
+        is_global: true,
         built_in: true,
         built_in_command: Some(script),
     });

@@ -24,11 +24,11 @@ impl CallbackPanel {
 
         let mut lines = Vec::new();
         lines.push(
-            "| ID | Name | Pattern | Description | Blocking | Timeout | Active | 1-at-a-time | Success Msg | CWD |"
+            "| ID | Name | Pattern | Description | Blocking | Timeout | Active | Scope | Success Msg | CWD |"
                 .to_string(),
         );
         lines.push(
-            "|------|------|---------|-------------|----------|---------|--------|-------------|-------------|-----|"
+            "|------|------|---------|-------------|----------|---------|--------|-------|-------------|-----|"
                 .to_string(),
         );
 
@@ -38,11 +38,11 @@ impl CallbackPanel {
             let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s"));
             let success = def.success_message.as_deref().unwrap_or("—");
             let cwd = def.cwd.as_deref().unwrap_or("project root");
-            let one_at = if def.one_at_a_time { "yes" } else { "no" };
+            let scope = if def.is_global { "global" } else { "local" };
 
             lines.push(format!(
                 "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
-                def.id, def.name, def.pattern, def.description, blocking, timeout, active, one_at, success, cwd
+                def.id, def.name, def.pattern, def.description, blocking, timeout, active, scope, success, cwd
             ));
         }
 
@@ -116,7 +116,7 @@ impl Panel for CallbackPanel {
         let blocking_width = 8; // "Blocking"
         let timeout_width = 7; // "Timeout"
         let active_width = 6; // "Active"
-        let one_at_width = 11; // "1-at-a-time"
+        let scope_width = 6; // "Scope" / "global" / "local"
         let successes: Vec<String> =
             cs.definitions.iter().map(|d| d.success_message.as_deref().unwrap_or("—").to_string()).collect();
         let success_width = successes.iter().map(|s| UnicodeWidthStr::width(s.as_str())).max().unwrap_or(11).max(11);
@@ -139,7 +139,7 @@ impl Panel for CallbackPanel {
             + separator_width
             + active_width
             + separator_width
-            + one_at_width
+            + scope_width
             + separator_width
             + success_width
             + separator_width
@@ -156,7 +156,7 @@ impl Panel for CallbackPanel {
             let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
             let blocking = if def.blocking { "yes" } else { "no" };
             let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s"));
-            let one_at = if def.one_at_a_time { "yes" } else { "no" };
+            let scope = if def.is_global { "global" } else { "local" };
             let wrapped = wrap_text_simple(&def.description, desc_max);
 
             for (line_idx, line) in wrapped.iter().enumerate() {
@@ -169,7 +169,7 @@ impl Panel for CallbackPanel {
                         Cell::new(blocking, normal),
                         Cell::new(&timeout, normal),
                         Cell::new(active, normal),
-                        Cell::new(one_at, muted),
+                        Cell::new(scope, muted),
                         Cell::new(&successes[i], muted),
                         Cell::new(&cwds[i], muted),
                     ]);
@@ -198,7 +198,7 @@ impl Panel for CallbackPanel {
             Cell::new("Blocking", normal),
             Cell::new("Timeout", normal),
             Cell::new("Active", normal),
-            Cell::new("1-at-a-time", normal),
+            Cell::new("Scope", normal),
             Cell::new("Success Msg", normal),
             Cell::new("CWD", normal),
         ];

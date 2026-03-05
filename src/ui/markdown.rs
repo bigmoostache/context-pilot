@@ -21,10 +21,10 @@ fn markdown_display_width(text: &str) -> usize {
                 }
             }
             '*' | '_' => {
-                // Check for double (bold) or single (italic)
+                // Check for double (bold) — single markers are treated as plain text
                 if chars.peek() == Some(&c) {
                     let _r = chars.next(); // consume second marker
-                    // Count until closing **
+                    // Count until closing **/__
                     while let Some(next) = chars.next() {
                         if next == c && chars.peek() == Some(&c) {
                             let _r = chars.next();
@@ -33,13 +33,8 @@ fn markdown_display_width(text: &str) -> usize {
                         width += 1;
                     }
                 } else {
-                    // Single marker (italic) - count until closing
-                    for next in chars.by_ref() {
-                        if next == c {
-                            break;
-                        }
-                        width += 1;
-                    }
+                    // Single * or _ — treat as literal character
+                    width += 1;
                 }
             }
             '[' => {
@@ -315,9 +310,8 @@ pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'st
 
         let style = match level {
             1 => Style::default().fg(theme::accent()).bold(),
-            2 => Style::default().fg(theme::accent()),
-            3 => Style::default().fg(theme::accent()).italic(),
-            _ => Style::default().fg(theme::text_secondary()).italic(),
+            2 | 3 => Style::default().fg(theme::accent()),
+            _ => Style::default().fg(theme::text_secondary()),
         };
 
         return vec![Span::styled(content.to_string(), style)];
@@ -346,7 +340,7 @@ pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'st
         return spans;
     }
 
-    // Regular line - parse inline markdown
+    // Regular line — preserve leading whitespace, parse inline markdown on the rest
     parse_inline_markdown(line)
 }
 
@@ -380,7 +374,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 }
             }
             '*' | '_' => {
-                // Check for bold (**) or italic (*)
+                // Check for bold (**/__) — single markers are plain text
                 let is_double = chars.peek() == Some(&c);
 
                 if is_double {
@@ -404,28 +398,8 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                         spans.push(Span::styled(bold_text, Style::default().fg(theme::text()).bold()));
                     }
                 } else {
-                    // Italic text - look for closing marker
-                    if !current.is_empty() {
-                        spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
-                    }
-
-                    let mut italic_text = String::new();
-                    let mut found_close = false;
-                    for next in chars.by_ref() {
-                        if next == c {
-                            found_close = true;
-                            break;
-                        }
-                        italic_text.push(next);
-                    }
-
-                    if found_close && !italic_text.is_empty() {
-                        spans.push(Span::styled(italic_text, Style::default().fg(theme::text()).italic()));
-                    } else {
-                        // Not actually italic, restore
-                        current.push(c);
-                        current.push_str(&italic_text);
-                    }
+                    // Single * or _ — treat as literal character
+                    current.push(c);
                 }
             }
             '[' => {
