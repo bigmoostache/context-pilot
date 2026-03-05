@@ -38,7 +38,7 @@ mod tests {
     //! into its typed struct. If a schema drifts from the Rust types, these
     //! tests catch it before the binary is ever produced.
 
-    use super::config::{InjectionsConfig, LibraryConfig, PromptsConfig, ReverieConfig, ThemesConfig, UiConfig};
+    use super::config::{Injections, Library, Prompts, Reverie, Themes, Ui};
     use super::tools::ToolTexts;
 
     /// Validate all 6 config YAML files by forcing `LazyLock` initialization.
@@ -92,26 +92,24 @@ mod tests {
     #[test]
     fn config_yaml_direct_parse() {
         drop(
-            serde_yaml::from_str::<PromptsConfig>(include_str!("../../../yamls/prompts.yaml"))
+            serde_yaml::from_str::<Prompts>(include_str!("../../../yamls/prompts.yaml"))
                 .expect("prompts.yaml schema mismatch"),
         );
         drop(
-            serde_yaml::from_str::<LibraryConfig>(include_str!("../../../yamls/library.yaml"))
+            serde_yaml::from_str::<Library>(include_str!("../../../yamls/library.yaml"))
                 .expect("library.yaml schema mismatch"),
         );
+        drop(serde_yaml::from_str::<Ui>(include_str!("../../../yamls/ui.yaml")).expect("ui.yaml schema mismatch"));
         drop(
-            serde_yaml::from_str::<UiConfig>(include_str!("../../../yamls/ui.yaml")).expect("ui.yaml schema mismatch"),
-        );
-        drop(
-            serde_yaml::from_str::<ThemesConfig>(include_str!("../../../yamls/themes.yaml"))
+            serde_yaml::from_str::<Themes>(include_str!("../../../yamls/themes.yaml"))
                 .expect("themes.yaml schema mismatch"),
         );
         drop(
-            serde_yaml::from_str::<InjectionsConfig>(include_str!("../../../yamls/injections.yaml"))
+            serde_yaml::from_str::<Injections>(include_str!("../../../yamls/injections.yaml"))
                 .expect("injections.yaml schema mismatch"),
         );
         drop(
-            serde_yaml::from_str::<ReverieConfig>(include_str!("../../../yamls/reverie.yaml"))
+            serde_yaml::from_str::<Reverie>(include_str!("../../../yamls/reverie.yaml"))
                 .expect("reverie.yaml schema mismatch"),
         );
     }

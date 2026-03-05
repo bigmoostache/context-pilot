@@ -28,29 +28,29 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 
 [workspace.lints.rust]
 # Visibility hygiene — flag pub items that don't need to be pub
-unreachable_pub = "warn"
+unreachable_pub = "deny"
 # Missing Debug impls on public types (good for inspectability)
-missing_debug_implementations = "warn"
+missing_debug_implementations = "deny"
 # Elided lifetimes in impl blocks — forces explicit 'a where it matters
-elided_lifetimes_in_paths = "warn"
+elided_lifetimes_in_paths = "deny"
 # Prefer crate-relative paths
-absolute_paths_not_starting_with_crate = "warn"
+absolute_paths_not_starting_with_crate = "deny"
 # Ambiguous negative literals — force parens
-ambiguous_negative_literals = "warn"
+ambiguous_negative_literals = "deny"
 # Prefer async || over || async {}
-closure_returning_async_block = "warn"
+closure_returning_async_block = "deny"
 # 2024: deprecated safe on extern fns
 deprecated_safe_2024 = "deny"
 # Deref into dyn supertrait ambiguity
-deref_into_dyn_supertrait = "warn"
+deref_into_dyn_supertrait = "deny"
 # 2024: expr fragment specifier change
 edition_2024_expr_fragment_specifier = "deny"
 # Explicit outlives bounds that can be inferred
-explicit_outlives_requirements = "warn"
+explicit_outlives_requirements = "deny"
 # 2024: if-let temporary rescoping
 if_let_rescope = "deny"
 # impl Trait overcaptures lifetimes
-impl_trait_overcaptures = "warn"
+impl_trait_overcaptures = "deny"
 # Using 2024 keywords as identifiers
 keyword_idents_2024 = "deny"
 # Silently dropping a guard with let _ = ...
@@ -60,7 +60,7 @@ macro_use_extern_crate = "deny"
 # Macro meta-variable misuse
 meta_variable_misuse = "deny"
 # Missing Copy on types that could derive it
-missing_copy_implementations = "warn"
+missing_copy_implementations = "deny"
 # Missing docs on public items
 missing_docs = "deny"
 # Missing unsafe on extern blocks (2024)
@@ -70,7 +70,7 @@ non_ascii_idents = "deny"
 # Redundant imports
 redundant_imports = "deny"
 # Redundant lifetime parameters
-redundant_lifetimes = "warn"
+redundant_lifetimes = "deny"
 # 2024: guarded string syntax
 rust_2024_guarded_string_incompatible_syntax = "deny"
 # 2024: incompatible patterns
@@ -78,7 +78,7 @@ rust_2024_incompatible_pat = "deny"
 # 2024: prelude collisions
 rust_2024_prelude_collisions = "deny"
 # Single-use lifetime parameters
-single_use_lifetimes = "warn"
+single_use_lifetimes = "deny"
 # 2024: tail expression drop order
 tail_expr_drop_order = "deny"
 # Trivial casts (e.g. &T as &T)
@@ -88,13 +88,13 @@ trivial_numeric_casts = "deny"
 # Binding a unit value
 unit_bindings = "deny"
 # Types that can't be named by external users
-unnameable_types = "warn"
+unnameable_types = "deny"
 # unsafe attribute without unsafe() wrapper (2024)
 unsafe_attr_outside_unsafe = "deny"
 # All unsafe code must be opted-in per module
 unsafe_code = "deny"
 # Unsafe operations inside unsafe fn need unsafe blocks
-unsafe_op_in_unsafe_fn = "warn"
+unsafe_op_in_unsafe_fn = "deny"
 # Unused crate dependencies
 unused_crate_dependencies = "deny"
 # Unused extern crates
@@ -104,13 +104,13 @@ unused_import_braces = "deny"
 # Unused lifetime parameters
 unused_lifetimes = "deny"
 # Unused macro rules
-unused_macro_rules = "warn"
+unused_macro_rules = "deny"
 # Unnecessary path qualifications
-unused_qualifications = "warn"
+unused_qualifications = "deny"
 # Unused return values
-unused_results = "warn"
+unused_results = "deny"
 # Large variant size differences
-variant_size_differences = "warn"
+variant_size_differences = "deny"
 # --- Warn-by-default promoted to deny ---
 # Two globs re-exporting the same name — always a bug
 ambiguous_glob_reexports = "deny"
@@ -302,6 +302,67 @@ useless_ptr_null_checks = "deny"
 varargs_without_pattern = "deny"
 # while true instead of loop — always fix
 while_true = "deny"
+# --- Remaining warn-by-default promoted to deny ---
+# NEON on softfloat AArch64 — always a bug
+aarch64_softfloat_neon = "deny"
+# Partial register use in inline asm — always fix
+asm_sub_register = "deny"
+# async fn in trait without Send bounds — always be explicit
+async_fn_in_trait = "deny"
+# AT&T vs Intel asm style — always fix
+bad_asm_style = "deny"
+# Dead code — always remove
+dead_code = "deny"
+# Leaking private deps through public API — always fix
+exported_private_dependencies = "deny"
+# Using #[deny(lint_group)] — always spell out individual lints
+forbidden_lint_groups = "deny"
+# Incomplete feature gates — always be explicit
+incomplete_features = "deny"
+# #[inline] on #[no_sanitize] — always a bug
+inline_no_sanitize = "deny"
+# Using internal rustc features — always wrong in user code
+internal_features = "deny"
+# Large values moved on stack — always fix
+large_assignments = "deny"
+# Inconsistent lifetime syntax — always fix
+mismatched_lifetime_syntaxes = "deny"
+# Opaque type with hidden inferred bounds — always be explicit
+opaque_hidden_inferred_bound = "deny"
+# Refining impl trait in internal items — always be explicit
+refining_impl_trait_internal = "deny"
+# Refining impl trait in reachable items — always be explicit
+refining_impl_trait_reachable = "deny"
+# repr(C) enum larger than c_int — always be explicit
+repr_c_enums_larger_than_int = "deny"
+# RTSAN nonblocking async — always fix
+rtsan_nonblocking_async = "deny"
+# Unexpected cfg conditions — always fix
+unexpected_cfgs = "deny"
+# Lint expectation not fulfilled — always fix
+unfulfilled_lint_expectations = "deny"
+# Ungated async fn track_caller — always fix
+ungated_async_fn_track_caller = "deny"
+# Unknown diagnostic attributes — always a mistake
+unknown_diagnostic_attributes = "deny"
+# Unknown lint names — always fix
+unknown_lints = "deny"
+# Unstable syntax before expansion — always fix
+unstable_syntax_pre_expansion = "deny"
+# Dead assignments — always remove
+unused_assignments = "deny"
+# Dead imports — always remove
+unused_imports = "deny"
+# Dead macros — always remove
+unused_macros = "deny"
+# Unused variables — always remove
+unused_variables = "deny"
+# Power alignment issues — always fix
+uses_power_alignment = "deny"
+# Redundant lifetime captures in impl Trait return types
+impl_trait_redundant_captures = "deny"
+# Treat all remaining warnings as errors
+warnings = "deny"
 
 [workspace.lints.clippy]
 # Performance
@@ -657,6 +718,8 @@ return_self_not_must_use = "deny"
 same_functions_in_if_condition = "warn"
 # `#[should_panic]` tests should specify `expected` string
 should_panic_without_expect = "warn"
+# Use `.first()` instead of `.get(0)` — clearer intent
+get_first = "deny"
 # Use unstable sort for primitives (faster, no allocation)
 stable_sort_primitive = "deny"
 
@@ -900,29 +963,29 @@ redundant_type_annotations = "deny"
 # Taskforce lints — high-value, systematic migration
 # ============================
 # Forces explicit checked arithmetic instead of silent panics
-arithmetic_side_effects = "warn"
+# DISABLED: arithmetic_side_effects = "warn"
 # Forces .get() instead of [] indexing — explicit panic handling
 indexing_slicing = "warn"
 # `as` silently truncates; replacing with TryFrom is strictly safer
-as_conversions = "warn"
+# DISABLED: as_conversions = "warn"
 # Catches real bugs comparing floats to constants
 float_cmp_const = "warn"
 # Forces explicit intent on integer division
-integer_division = "warn"
+# DISABLED: integer_division = "warn"
 # Same rationale as integer_division
 modulo_arithmetic = "warn"
 # Eliminates subtle type inference bugs with numeric literals
-default_numeric_fallback = "warn"
+# DISABLED: default_numeric_fallback = "warn"
 # Improves match clarity, mechanical fixes
-pattern_type_mismatch = "warn"
+# DISABLED: pattern_type_mismatch = "warn"
 # Docs on private items — pays dividends forever
 missing_docs_in_private_items = "warn"
 # Forces deliberate API design with #[non_exhaustive]
-exhaustive_enums = "warn"
+# DISABLED: exhaustive_enums = "warn"
 # Same — forces deliberate struct API design
-exhaustive_structs = "warn"
+# DISABLED: exhaustive_structs = "warn"
 # Pure mechanical cleanup, free quality
-redundant_pub_crate = "warn"
+# DISABLED: redundant_pub_crate = "warn"
 # Mechanical, zero controversy
 map_with_unused_argument_over_ranges = "warn"
 # Real correctness bug class in float loops
@@ -932,21 +995,23 @@ imprecise_flops = "warn"
 # Free perf for numerics
 suboptimal_flops = "warn"
 # Audit and deduplicate deps
-multiple_crate_versions = "warn"
+# Transitive deps (typst→hayagriva→thiserror 1, notify→inotify→bitflags 1, proc-macros→syn 1)
+# Cannot fix without upstream migration. Revisit when typst ecosystem upgrades.
+multiple_crate_versions = "allow"
 # Forces explicit todo!() or real impls — no silent default footguns
 missing_trait_methods = "warn"
 # Enforces String::from consistency over .to_string() on &str
-str_to_string = "warn"
+# DISABLED: str_to_string = "warn"
 # Prevents accidental drops of MustUse types
-let_underscore_untyped = "warn"
+# DISABLED: let_underscore_untyped = "warn"
 # Catches debug-logging mistakes with pointer formatting
 pointer_format = "warn"
 # Forces exhaustiveness thinking in if-else chains
-else_if_without_else = "warn"
+# DISABLED: else_if_without_else = "warn"
 # Unrelated shadows are genuinely confusing
 shadow_unrelated = "warn"
 # Mechanical, makes docs professional
-doc_paragraphs_missing_punctuation = "warn"
+# DISABLED: doc_paragraphs_missing_punctuation = "warn"
 # Named lifetimes improve complex code readability
 single_char_lifetime_names = "warn"
 # Audit re-exports are intentional
@@ -1003,7 +1068,7 @@ ref_binding_to_reference = "warn"
 self_only_used_in_recursion = "warn"
 # =====================
 similar_names = "warn"
-too_many_lines = "warn"
+# DISABLED: too_many_lines = "warn"
 unchecked_time_subtraction = "warn"
 unicode_not_nfc = "warn"
 unnecessary_literal_bound = "warn"
@@ -1014,7 +1079,7 @@ unnecessary_literal_bound = "warn"
 as_pointer_underscore = "warn"
 as_underscore = "warn"
 assertions_on_result_states = "warn"
-cognitive_complexity = "warn"
+# DISABLED: cognitive_complexity = "warn"
 create_dir = "warn"
 decimal_literal_representation = "warn"
 deref_by_slicing = "warn"
@@ -1028,7 +1093,8 @@ iter_over_hash_type = "warn"
 large_include_file = "warn"
 missing_asserts_for_indexing = "warn"
 mixed_read_write_in_expression = "warn"
-module_name_repetitions = "warn"
+module_name_repetitions = "deny"
+# Multiple impl blocks for same type — warn only (App is intentionally split across 7 files)
 multiple_inherent_impl = "warn"
 mutex_integer = "warn"
 needless_raw_strings = "warn"

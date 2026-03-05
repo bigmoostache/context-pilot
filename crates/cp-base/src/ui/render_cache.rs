@@ -11,7 +11,7 @@ use ratatui::text::Line;
 
 /// Cached rendered lines for a message (using Rc to avoid clones)
 #[derive(Debug, Clone)]
-pub struct MessageRenderCache {
+pub struct MessageCache {
     /// Pre-rendered lines for this message
     pub lines: Rc<[Line<'static>]>,
     /// Hash of content that affects rendering
@@ -22,7 +22,7 @@ pub struct MessageRenderCache {
 
 /// Cached rendered lines for input area (using Rc to avoid clones)
 #[derive(Debug, Clone)]
-pub struct InputRenderCache {
+pub struct InputCache {
     /// Pre-rendered lines for input
     pub lines: Rc<[Line<'static>]>,
     /// Hash of input + cursor position
@@ -33,7 +33,7 @@ pub struct InputRenderCache {
 
 /// Top-level cache for entire conversation content
 #[derive(Debug, Clone)]
-pub struct FullContentCache {
+pub struct FullCache {
     /// Complete rendered output
     pub lines: Rc<[Line<'static>]>,
     /// Hash of all inputs that affect rendering

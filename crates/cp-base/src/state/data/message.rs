@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 /// Discriminator for the three message shapes in a conversation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[expect(clippy::module_name_repetitions, reason = "52 callsites via re-export — 'Type' is a reserved word")]
 pub enum MessageType {
     /// Plain text (user or assistant).
     #[default]
@@ -16,6 +17,7 @@ pub enum MessageType {
 /// Message status for context management
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[expect(clippy::module_name_repetitions, reason = "58 callsites via re-export — 'Status' alone is too generic")]
 pub enum MessageStatus {
     /// Included in full in the LLM prompt.
     #[default]

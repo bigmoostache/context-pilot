@@ -267,7 +267,7 @@ impl Panel for CallbackPanel {
         let token_count = estimate_tokens(&content);
 
         for ctx in &mut state.context {
-            if ctx.context_type == ContextType::CALLBACK {
+            if ctx.context_type.as_str() == ContextType::CALLBACK {
                 ctx.token_count = token_count;
                 let _ = cp_base::panels::update_if_changed(ctx, &content);
                 break;
@@ -280,7 +280,7 @@ impl Panel for CallbackPanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::CALLBACK)
+            .find(|c| c.context_type.as_str() == ContextType::CALLBACK)
             .map_or(("", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Callbacks", content, last_refresh_ms)]
     }

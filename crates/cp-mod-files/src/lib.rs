@@ -122,7 +122,8 @@ impl Module for FilesModule {
                             .canonicalize()
                             .map_or_else(|_| path_str.to_string(), |cp| cp.to_string_lossy().to_string());
                         let is_open = state.context.iter().any(|c| {
-                            c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(&canonical)
+                            c.context_type.as_str() == ContextType::FILE
+                                && c.get_meta_str("file_path") == Some(&canonical)
                         });
                         if !is_open {
                             pf.warnings.push(format!("File '{path_str}' is not open in context. Edit will proceed if old_string has a unique match, but open the file to see current content."));

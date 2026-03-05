@@ -12,6 +12,10 @@
 //! Usage: `use cp_base::cast::SafeCast;` then `value.to_u16()`, etc.
 
 /// Trait for safe saturating casts between numeric types.
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "Trait is re-exported and used as SafeCast::method() — 'Safe' alone is meaningless"
+)]
 pub trait SafeCast {
     /// Saturating cast to `u8` — clamps to `0..=255`.
     fn to_u8(self) -> u8;
@@ -33,6 +37,7 @@ pub trait SafeCast {
     fn to_f64(self) -> f64;
 }
 
+/// Implement `SafeCast` for an unsigned integer type using saturating semantics.
 macro_rules! impl_safe_cast_unsigned {
     ($t:ty) => {
         #[allow(trivial_numeric_casts, trivial_casts, clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_precision_loss, reason = "macro-generated identity casts (e.g. u32 as u32) are unavoidable — expect() would fail on non-identity expansions")]
@@ -77,6 +82,7 @@ macro_rules! impl_safe_cast_unsigned {
     };
 }
 
+/// Implement `SafeCast` for a signed integer type using saturating/clamping semantics.
 macro_rules! impl_safe_cast_signed {
     ($t:ty) => {
         #[allow(

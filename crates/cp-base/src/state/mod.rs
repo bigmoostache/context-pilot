@@ -14,8 +14,9 @@ pub mod runtime;
 pub mod watchers;
 
 // Re-exports for convenience
-pub use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderCache, hash_values};
+pub use crate::ui::render_cache::{FullCache, InputCache, MessageCache, hash_values};
 pub use actions::{Action, ActionResult};
+#[expect(clippy::module_name_repetitions, reason = "Re-exporting SharedConfig — name is better with prefix")]
 pub use data::config::{ImportantPanelUids, PanelData, SharedConfig, SidebarMode, WorkerState};
 
 pub use context::{
@@ -25,12 +26,17 @@ pub use context::{
 pub use data::message::{
     Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord, format_messages_to_chunk,
 };
+#[expect(clippy::module_name_repetitions, reason = "StateFlags — renaming loses clarity")]
 pub use runtime::{ConfigFlags, LifecycleFlags, State, StateFlags, StreamFlags, StreamPhase, StreamingTool, UiFlags};
 
 // ─── Reverie State ──────────────────────────────────────────────────────────
 // Ephemeral sub-agent state — lives as Option<ReverieState> on the main State.
 
 /// Ephemeral reverie sub-agent state (context optimizer, cartographer).
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "ReverieState/ReverieType are re-exported — 'State'/'Type' conflict with other items"
+)]
 pub mod reverie {
     use super::data::message::Message;
 

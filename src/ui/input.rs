@@ -1,5 +1,5 @@
 use ratatui::{
-    prelude::*,
+    prelude::{Color, Frame, Line, Rect, Span, Style},
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
@@ -18,7 +18,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     let mut spans = vec![Span::styled(" ", base_style)];
 
     // === Primary status badge (mutually exclusive, priority order) ===
-    let has_question_form = state.get_ext::<cp_base::ui::PendingQuestionForm>().is_some();
+    let has_question_form = state.get_ext::<cp_base::ui::PendingForm>().is_some();
     let has_timed_watcher = {
         use cp_base::state::watchers::WatcherRegistry;
         state
@@ -237,7 +237,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
 }
 
 /// Calculate the height needed for the question form
-pub(super) fn calculate_question_form_height(form: &cp_base::ui::PendingQuestionForm) -> u16 {
+pub(super) fn calculate_question_form_height(form: &cp_base::ui::PendingForm) -> u16 {
     let q = &form.questions[form.current_question];
     // Header line + question text + blank + options (including Other) + blank + nav hint
     let option_lines = q.options.len().to_u16() + 1; // +1 for "Other"
@@ -248,7 +248,7 @@ pub(super) fn calculate_question_form_height(form: &cp_base::ui::PendingQuestion
 
 /// Render the question form at the bottom of the screen
 pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: Rect) {
-    let Some(form) = state.get_ext::<cp_base::ui::PendingQuestionForm>() else { return };
+    let Some(form) = state.get_ext::<cp_base::ui::PendingForm>() else { return };
 
     let q_idx = form.current_question;
     let q = &form.questions[q_idx];

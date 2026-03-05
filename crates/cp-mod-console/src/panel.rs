@@ -197,7 +197,7 @@ impl Panel for ConsolePanel {
         state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::CONSOLE)
+            .filter(|c| c.context_type.as_str() == ContextType::CONSOLE)
             .filter_map(|c| {
                 let desc =
                     c.get_meta_str("console_description").or_else(|| c.get_meta_str("console_command")).unwrap_or("?");

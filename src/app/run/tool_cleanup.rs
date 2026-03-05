@@ -319,7 +319,7 @@ impl App {
         }
 
         // Also clean up the question form state if it was pending
-        drop(self.state.module_data.remove(&std::any::TypeId::of::<cp_base::ui::PendingQuestionForm>()));
+        drop(self.state.module_data.remove(&std::any::TypeId::of::<cp_base::ui::PendingForm>()));
 
         // Clear any accumulated blocking results from partial callback completions
         self.accumulated_blocking_results.clear();

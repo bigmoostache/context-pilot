@@ -29,7 +29,7 @@ fn touch_logs_panel(state: &mut State) {
     let token_count = estimate_tokens(&content);
     let now = now_ms();
     for ctx in &mut state.context {
-        if ctx.context_type == ContextType::LOGS {
+        if ctx.context_type.as_str() == ContextType::LOGS {
             ctx.token_count = token_count;
             ctx.last_refresh_ms = now;
         }
@@ -209,7 +209,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
     let Some(panel_idx) = state.context.iter().position(|c| c.id == panel_id) else {
         return ToolResult::new(tool.id.clone(), format!("Panel '{panel_id}' not found"), true);
     };
-    if state.context[panel_idx].context_type != ContextType::CONVERSATION_HISTORY {
+    if state.context[panel_idx].context_type.as_str() != ContextType::CONVERSATION_HISTORY {
         return ToolResult::new(
             tool.id.clone(),
             format!(

@@ -23,7 +23,7 @@ impl App {
             .state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::GITHUB_RESULT)
+            .filter(|c| c.context_type.as_str() == ContextType::GITHUB_RESULT)
             .filter_map(|c| c.get_meta_str("result_command").map(|cmd| (c.id.clone(), cmd.to_string(), token.clone())))
             .collect();
         self.gh_watcher.sync_watches(&panels);

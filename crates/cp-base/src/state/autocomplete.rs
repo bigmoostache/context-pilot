@@ -13,6 +13,10 @@ const MAX_VISIBLE: usize = 10;
 
 /// A single entry in the autocomplete list.
 #[derive(Debug, Clone)]
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "Used via re-export as AutocompleteEntry — 'Entry' alone is ambiguous"
+)]
 pub struct AutocompleteEntry {
     /// Display name (just the file/folder name, not the full path).
     pub name: String,
@@ -22,6 +26,10 @@ pub struct AutocompleteEntry {
 
 /// State for the @-triggered file path autocomplete popup.
 #[derive(Debug, Clone)]
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "Used via re-export as AutocompleteState — 'State' conflicts with runtime State"
+)]
 pub struct AutocompleteState {
     /// Whether the autocomplete popup is currently visible.
     pub active: bool,
@@ -167,7 +175,7 @@ impl AutocompleteState {
     #[must_use]
     pub fn visible_matches(&self) -> &[AutocompleteEntry] {
         let end = (self.scroll_offset + MAX_VISIBLE).min(self.matches.len());
-        &self.matches[self.scroll_offset..end]
+        self.matches.get(self.scroll_offset..end).unwrap_or_default()
     }
 
     /// Get the directory prefix for the current query.

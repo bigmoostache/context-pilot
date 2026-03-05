@@ -13,8 +13,8 @@ pub mod question_form;
 /// Render cache types for conversation panel performance.
 pub mod render_cache;
 
-pub use question_form::{PendingQuestionForm, Question, QuestionAnswer, QuestionOption};
-pub use render_cache::{FullContentCache, InputRenderCache, MessageRenderCache, hash_values};
+pub use question_form::{PendingForm, Question, QuestionAnswer, QuestionOption};
+pub use render_cache::{FullCache, InputCache, MessageCache, hash_values};
 
 /// Column alignment for table cells
 #[derive(Debug, Clone, Copy, Default)]
@@ -67,7 +67,7 @@ fn pad_to_width(text: &str, target: usize, align: Align) -> String {
 ///
 /// Returns `Vec<Line>` with aligned columns using ` │ ` separators and `─┼─` header underline.
 #[must_use]
-pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Cell]>, indent: usize) -> Vec<Line<'a>> {
+pub fn render_table(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Cell]>, indent: usize) -> Vec<Line<'static>> {
     let num_cols = header.len();
 
     // Compute column widths from header + all rows + footer using display width
@@ -76,15 +76,15 @@ pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Ce
 
     for row in rows {
         for (col, cell) in row.iter().enumerate() {
-            if col < num_cols {
-                col_widths[col] = col_widths[col].max(UnicodeWidthStr::width(cell.text.as_str()));
+            if let Some(w) = col_widths.get_mut(col) {
+                *w = (*w).max(UnicodeWidthStr::width(cell.text.as_str()));
             }
         }
     }
     if let Some(f) = footer {
         for (col, cell) in f.iter().enumerate() {
-            if col < num_cols {
-                col_widths[col] = col_widths[col].max(UnicodeWidthStr::width(cell.text.as_str()));
+            if let Some(w) = col_widths.get_mut(col) {
+                *w = (*w).max(UnicodeWidthStr::width(cell.text.as_str()));
             }
         }
     }
@@ -127,7 +127,7 @@ pub fn render_table<'a>(header: &[Cell], rows: &[Vec<Cell>], footer: Option<&[Ce
             if col > 0 {
                 spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
             }
-            let w = col_widths[col];
+            let w = col_widths.get(col).copied().unwrap_or(0);
             let padded = pad_to_width(&hdr.text, w, hdr.align);
             spans.push(Span::styled(padded, Style::default().fg(theme::accent()).bold()));
         }
@@ -193,8 +193,8 @@ pub fn render_table_text(header: &[&str], rows: &[Vec<TextCell>]) -> String {
 
     for row in rows {
         for (col, cell) in row.iter().enumerate() {
-            if col < num_cols {
-                col_widths[col] = col_widths[col].max(UnicodeWidthStr::width(cell.text.as_str()));
+            if let Some(w) = col_widths.get_mut(col) {
+                *w = (*w).max(UnicodeWidthStr::width(cell.text.as_str()));
             }
         }
     }
@@ -216,7 +216,7 @@ pub fn render_table_text(header: &[&str], rows: &[Vec<TextCell>]) -> String {
         if col > 0 {
             output.push_str(" │ ");
         }
-        output.push_str(&pad(hdr, col_widths[col], Align::Left));
+        output.push_str(&pad(hdr, col_widths.get(col).copied().unwrap_or(0), Align::Left));
     }
     output.push('\n');
 
@@ -260,10 +260,10 @@ pub fn find_size_pattern(line: &str) -> Option<usize> {
     }
     let bytes = trimmed.as_bytes();
     let mut num_start = bytes.len() - 1;
-    while num_start > 0 && bytes[num_start - 1].is_ascii_digit() {
+    while num_start > 0 && bytes.get(num_start - 1).is_some_and(u8::is_ascii_digit) {
         num_start -= 1;
     }
-    (num_start > 0 && bytes[num_start - 1] == b' ').then(|| num_start - 1)
+    (num_start > 0 && bytes.get(num_start - 1).copied() == Some(b' ')).then(|| num_start - 1)
 }
 
 /// Find children count pattern in tree output (e.g., "(5 children)" or "(1 child)")

@@ -63,7 +63,7 @@ impl Panel for TodoPanel {
         let token_count = estimate_tokens(&todo_content);
 
         for ctx in &mut state.context {
-            if ctx.context_type == ContextType::TODO {
+            if ctx.context_type.as_str() == ContextType::TODO {
                 ctx.token_count = token_count;
                 let _ = cp_base::panels::update_if_changed(ctx, &todo_content);
                 break;
@@ -77,7 +77,7 @@ impl Panel for TodoPanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::TODO)
+            .find(|c| c.context_type.as_str() == ContextType::TODO)
             .map_or(("P3", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Todo List", content, last_refresh_ms)]
     }

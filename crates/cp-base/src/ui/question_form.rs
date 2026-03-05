@@ -54,7 +54,7 @@ impl QuestionAnswer {
 
 /// The full pending question form state, stored in `State.module_data` via ext.
 #[derive(Debug, Clone)]
-pub struct PendingQuestionForm {
+pub struct PendingForm {
     /// The `tool_use_id` this form was created for (needed to produce `ToolResult`)
     pub tool_use_id: String,
     /// The questions to present
@@ -69,7 +69,7 @@ pub struct PendingQuestionForm {
     pub result_json: Option<String>,
 }
 
-impl PendingQuestionForm {
+impl PendingForm {
     /// Create a new question form from a tool call and its questions.
     #[must_use]
     pub fn new(tool_use_id: String, questions: Vec<Question>) -> Self {
@@ -80,25 +80,29 @@ impl PendingQuestionForm {
     /// Total number of options for the current question (including "Other")
     #[must_use]
     pub fn current_option_count(&self) -> usize {
-        self.questions[self.current_question].options.len() + 1 // +1 for "Other"
+        let Some(q) = self.questions.get(self.current_question) else { return 1 };
+        q.options.len() + 1 // +1 for "Other"
     }
 
     /// Index of the "Other" option for the current question
     #[must_use]
     pub fn other_index(&self) -> usize {
-        self.questions[self.current_question].options.len()
+        let Some(q) = self.questions.get(self.current_question) else { return 0 };
+        q.options.len()
     }
 
     /// Whether current question is multi-select
     #[must_use]
     pub fn is_multi_select(&self) -> bool {
-        self.questions[self.current_question].multi_select
+        let Some(q) = self.questions.get(self.current_question) else { return false };
+        q.multi_select
     }
 
     /// Move cursor up
     pub fn cursor_up(&mut self) {
-        let other_idx = self.questions[self.current_question].options.len();
-        let ans = &mut self.answers[self.current_question];
+        let Some(q) = self.questions.get(self.current_question) else { return };
+        let other_idx = q.options.len();
+        let Some(ans) = self.answers.get_mut(self.current_question) else { return };
         if ans.cursor > 0 {
             ans.cursor -= 1;
         }
@@ -107,9 +111,10 @@ impl PendingQuestionForm {
 
     /// Move cursor down
     pub fn cursor_down(&mut self) {
-        let option_count = self.questions[self.current_question].options.len() + 1;
-        let other_idx = self.questions[self.current_question].options.len();
-        let ans = &mut self.answers[self.current_question];
+        let Some(q) = self.questions.get(self.current_question) else { return };
+        let option_count = q.options.len() + 1;
+        let other_idx = q.options.len();
+        let Some(ans) = self.answers.get_mut(self.current_question) else { return };
         let max = option_count - 1;
         if ans.cursor < max {
             ans.cursor += 1;
@@ -120,21 +125,27 @@ impl PendingQuestionForm {
     /// Toggle selection on current cursor position (for multi-select or single-select)
     pub fn toggle_selection(&mut self) {
         let q_idx = self.current_question;
-        let ans = &mut self.answers[q_idx];
-        let cursor = ans.cursor;
-        let other_idx = self.questions[q_idx].options.len();
+        let cursor = {
+            let Some(ans) = self.answers.get(q_idx) else { return };
+            ans.cursor
+        };
+        let Some(q) = self.questions.get(q_idx) else { return };
+        let other_idx = q.options.len();
+        let multi_select = q.multi_select;
 
         if cursor == other_idx {
             // "Other" selected — start typing mode
-            ans.typing_other = true;
+            let Some(other_ans) = self.answers.get_mut(q_idx) else { return };
+            other_ans.typing_other = true;
             // Clear other selections if single-select
-            if !self.questions[q_idx].multi_select {
-                ans.selected.clear();
+            if !multi_select {
+                other_ans.selected.clear();
             }
             return;
         }
 
-        if self.questions[q_idx].multi_select {
+        let Some(ans) = self.answers.get_mut(q_idx) else { return };
+        if multi_select {
             // Toggle in selected list
             if let Some(pos) = ans.selected.iter().position(|&s| s == cursor) {
                 _ = ans.selected.remove(pos);
@@ -153,10 +164,14 @@ impl PendingQuestionForm {
     /// Handle Enter: for single-select, select current + advance. For multi-select, advance.
     pub fn handle_enter(&mut self) {
         let q_idx = self.current_question;
-        let ans = &self.answers[q_idx];
+        let Some(q) = self.questions.get(q_idx) else { return };
+        let multi_select = q.multi_select;
+        let Some(ans) = self.answers.get(q_idx) else { return };
+        let selected_empty = ans.selected.is_empty();
+        let typing_other = ans.typing_other;
 
         // For single-select: if nothing selected and not typing other, select current cursor
-        if !self.questions[q_idx].multi_select && ans.selected.is_empty() && !ans.typing_other {
+        if !multi_select && selected_empty && !typing_other {
             self.toggle_selection();
         }
 
@@ -180,7 +195,7 @@ impl PendingQuestionForm {
 
         let mut answers_json = Vec::new();
         for (i, q) in self.questions.iter().enumerate() {
-            let ans = &self.answers[i];
+            let Some(ans) = self.answers.get(i) else { continue };
 
             let selected: Vec<String> =
                 ans.selected.iter().filter_map(|&idx| q.options.get(idx).map(|o| o.label.clone())).collect();
@@ -204,7 +219,7 @@ impl PendingQuestionForm {
 
     /// Type a character into the "Other" text field
     pub fn type_char(&mut self, c: char) {
-        let ans = &mut self.answers[self.current_question];
+        let Some(ans) = self.answers.get_mut(self.current_question) else { return };
         if ans.typing_other {
             ans.other_text.push(c);
         }
@@ -212,7 +227,7 @@ impl PendingQuestionForm {
 
     /// Backspace in the "Other" text field
     pub fn backspace(&mut self) {
-        let ans = &mut self.answers[self.current_question];
+        let Some(ans) = self.answers.get_mut(self.current_question) else { return };
         if ans.typing_other {
             _ = ans.other_text.pop();
         }
@@ -235,7 +250,7 @@ impl PendingQuestionForm {
     /// Check if the current question has been answered (selection or other text)
     #[must_use]
     pub fn current_question_answered(&self) -> bool {
-        let ans = &self.answers[self.current_question];
+        let Some(ans) = self.answers.get(self.current_question) else { return false };
         !ans.selected.is_empty() || (ans.typing_other && !ans.other_text.is_empty())
     }
 }

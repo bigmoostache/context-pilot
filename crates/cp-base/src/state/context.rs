@@ -14,6 +14,10 @@ use crate::config::{active_theme, normalize_icon};
 
 /// Metadata for a context type, provided by the owning module.
 #[derive(Debug, Clone, Copy)]
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "Used via re-export throughout codebase — 'TypeMeta' alone is too generic"
+)]
 pub struct ContextTypeMeta {
     /// The context type string (e.g., "todo", "`git_result`")
     pub context_type: &'static str,
@@ -33,6 +37,7 @@ pub struct ContextTypeMeta {
     pub needs_async_wait: bool,
 }
 
+/// Global registry of context type metadata, populated once at startup.
 static CONTEXT_TYPE_REGISTRY: OnceLock<Vec<ContextTypeMeta>> = OnceLock::new();
 
 /// Initialize the global context type registry. Called once at startup.
@@ -71,6 +76,7 @@ pub fn fixed_panel_order() -> Vec<&'static str> {
 /// enum serialization.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
+#[expect(clippy::module_name_repetitions, reason = "381 callsites via re-export — 'Type' is a reserved word")]
 pub struct ContextType(String);
 
 impl ContextType {
@@ -165,23 +171,10 @@ impl std::fmt::Display for ContextType {
     }
 }
 
-/// Allow `ctx.context_type == "todo"` comparisons
-impl PartialEq<&str> for ContextType {
-    fn eq(&self, other: &&str) -> bool {
-        self.0.as_str() == *other
-    }
-}
-
-/// Allow `"todo" == ctx.context_type` comparisons
-impl PartialEq<ContextType> for &str {
-    fn eq(&self, other: &ContextType) -> bool {
-        *self == other.0.as_str()
-    }
-}
-
 /// A single context panel in the LLM prompt — the core unit of the context window.
 /// Fixed panels (P1–P7) are always present; dynamic panels (P8+) are created by tools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[expect(clippy::module_name_repetitions, reason = "78 callsites via re-export — 'Element' alone is too generic")]
 pub struct ContextElement {
     /// Display ID (e.g., P1, P2, ... for UI/LLM)
     pub id: String,

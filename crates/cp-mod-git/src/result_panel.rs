@@ -99,7 +99,7 @@ impl Panel for GitResultPanel {
 
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
-            && ctx.context_type == ContextType::GIT_RESULT
+            && ctx.context_type.as_str() == ContextType::GIT_RESULT
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
             let short = if cmd.len() > 40 {
@@ -115,7 +115,7 @@ impl Panel for GitResultPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
         for ctx in &state.context {
-            if ctx.context_type != ContextType::GIT_RESULT {
+            if ctx.context_type.as_str() != ContextType::GIT_RESULT {
                 continue;
             }
             let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
@@ -130,7 +130,8 @@ impl Panel for GitResultPanel {
         let mut text: Vec<Line<'_>> = Vec::new();
 
         // Find the selected GitResult panel
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == ContextType::GIT_RESULT);
+        let ctx =
+            state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == ContextType::GIT_RESULT);
 
         let Some(ctx) = ctx else {
             text.push(Line::from(vec![Span::styled(" No git result panel", Style::default().fg(theme::text_muted()))]));

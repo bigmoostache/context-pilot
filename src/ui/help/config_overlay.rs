@@ -1,5 +1,5 @@
 use ratatui::{
-    prelude::*,
+    prelude::{Color, Frame, Line, Rect, Span, Style},
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 

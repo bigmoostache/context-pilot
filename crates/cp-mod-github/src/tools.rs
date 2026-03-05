@@ -52,7 +52,8 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
         CommandClass::ReadOnly => {
             // Search for existing GithubResult panel with same command
             let existing_idx = state.context.iter().position(|c| {
-                c.context_type == ContextType::GITHUB_RESULT && c.get_meta_str("result_command") == Some(command)
+                c.context_type.as_str() == ContextType::GITHUB_RESULT
+                    && c.get_meta_str("result_command") == Some(command)
             });
 
             if let Some(idx) = existing_idx {
@@ -93,7 +94,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
             // Invalidate affected panels using heuristics
             let invalidations = super::cache_invalidation::find_invalidations(command);
             for ctx in &mut state.context {
-                if ctx.context_type == ContextType::GITHUB_RESULT {
+                if ctx.context_type.as_str() == ContextType::GITHUB_RESULT {
                     let matches = ctx
                         .get_meta_str("result_command")
                         .is_some_and(|cmd| invalidations.iter().any(|re| re.is_match(cmd)));

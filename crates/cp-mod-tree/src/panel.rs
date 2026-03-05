@@ -77,7 +77,7 @@ impl Panel for TreePanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Find tree context and use cached content
         for ctx in &state.context {
-            if ctx.context_type == ContextType::TREE {
+            if ctx.context_type.as_str() == ContextType::TREE {
                 if let Some(content) = &ctx.cached_content
                     && !content.is_empty()
                 {
@@ -95,7 +95,7 @@ impl Panel for TreePanel {
         let tree_content = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::TREE)
+            .find(|c| c.context_type.as_str() == ContextType::TREE)
             .and_then(|ctx| ctx.cached_content.as_ref())
             .cloned()
             .unwrap_or_else(|| "Loading...".to_string());

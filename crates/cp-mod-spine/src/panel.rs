@@ -102,7 +102,7 @@ impl Panel for SpinePanel {
         let token_count = estimate_tokens(&content);
 
         for ctx in &mut state.context {
-            if ctx.context_type == ContextType::SPINE {
+            if ctx.context_type.as_str() == ContextType::SPINE {
                 ctx.token_count = token_count;
                 let _ = cp_base::panels::update_if_changed(ctx, &content);
                 break;
@@ -115,7 +115,7 @@ impl Panel for SpinePanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::SPINE)
+            .find(|c| c.context_type.as_str() == ContextType::SPINE)
             .map_or(("P9", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Spine", content, last_refresh_ms)]
     }

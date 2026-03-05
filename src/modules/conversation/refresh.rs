@@ -32,7 +32,7 @@ pub(crate) fn refresh_conversation_context(state: &mut State) {
 
     // Update the Conversation context element's token count
     for ctx in &mut state.context {
-        if ctx.context_type == ContextType::CONVERSATION {
+        if ctx.context_type.as_str() == ContextType::CONVERSATION {
             ctx.token_count = total_tokens;
             break;
         }

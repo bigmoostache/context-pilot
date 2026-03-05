@@ -1,9 +1,9 @@
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::State;
-use cp_base::ui::{PendingQuestionForm, Question, QuestionOption};
+use cp_base::ui::{PendingForm, Question, QuestionOption};
 
 /// Execute the `ask_user_question` tool.
-/// Parses input, validates constraints, stores `PendingQuestionForm` in state.
+/// Parses input, validates constraints, stores `PendingForm` in state.
 /// Returns a placeholder result — the real result is produced when the user
 /// submits or dismisses the form (handled by app.rs).
 pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -86,7 +86,7 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Store the pending form in state
-    let form = PendingQuestionForm::new(tool.id.clone(), questions);
+    let form = PendingForm::new(tool.id.clone(), questions);
     state.set_ext(form);
 
     // Return a placeholder — the real result is injected by app.rs when user responds

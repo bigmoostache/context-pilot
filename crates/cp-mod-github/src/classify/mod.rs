@@ -188,7 +188,7 @@ pub fn classify_gh(args: &[String]) -> CommandClass {
     if group == "api" {
         let rest: Vec<&str> = args.iter().skip(1).map(String::as_str).collect();
         let has_mutating_method = rest.windows(2).any(|w| {
-            let (Some(flag), Some(method)) = (w.get(0), w.get(1)) else {
+            let (Some(flag), Some(method)) = (w.first(), w.get(1)) else {
                 return false;
             };
             (*flag == "--method" || *flag == "-X")

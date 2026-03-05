@@ -7,7 +7,7 @@ use super::data::message::Message;
 use crate::cast::SafeCast as _;
 use crate::llm_types::{LlmProvider, ModelInfo as _};
 use crate::tools::ToolDefinition;
-use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderCache};
+use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
 // =============================================================================
 // Runtime State
@@ -253,11 +253,11 @@ pub struct State {
     /// Last viewport width used for render cache invalidation.
     pub last_viewport_width: u16,
     /// Cached rendered lines per message ID
-    pub message_cache: HashMap<String, MessageRenderCache>,
+    pub message_cache: HashMap<String, MessageCache>,
     /// Cached rendered lines for input area
-    pub input_cache: Option<InputRenderCache>,
+    pub input_cache: Option<InputCache>,
     /// Full content cache (entire conversation output)
-    pub full_content_cache: Option<FullContentCache>,
+    pub full_content_cache: Option<FullCache>,
 
     // === Callback hooks (set by binary, used by extracted module crates) ===
     /// Syntax highlighting function (provided by binary's highlight module).
@@ -390,7 +390,7 @@ impl State {
 
     /// Update the `last_refresh_ms` timestamp for a panel by its context type
     pub fn touch_panel(&mut self, context_type: &str) {
-        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == context_type) {
+        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type.as_str() == context_type) {
             ctx.last_refresh_ms = crate::panels::now_ms();
             ctx.cache_deprecated = true;
         }
@@ -440,7 +440,7 @@ impl State {
         let (id, uid) = self.alloc_user_ids();
         let msg = Message::new_user(id, uid, content, token_count);
 
-        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
+        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
             ctx.token_count += token_count;
             ctx.last_refresh_ms = crate::panels::now_ms();
         }

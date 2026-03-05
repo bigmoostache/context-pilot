@@ -43,7 +43,7 @@ impl Panel for ScratchpadPanel {
         let token_count = estimate_tokens(&content);
 
         for ctx in &mut state.context {
-            if ctx.context_type == ContextType::SCRATCHPAD {
+            if ctx.context_type.as_str() == ContextType::SCRATCHPAD {
                 ctx.token_count = token_count;
                 let _ = cp_base::panels::update_if_changed(ctx, &content);
                 break;
@@ -57,7 +57,7 @@ impl Panel for ScratchpadPanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::SCRATCHPAD)
+            .find(|c| c.context_type.as_str() == ContextType::SCRATCHPAD)
             .map_or(("P7", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Scratchpad", content, last_refresh_ms)]
     }

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 /// Prompt templates used when assembling context panels for LLM calls.
 /// Loaded from `yamls/prompts.yaml`.
 #[derive(Debug, Deserialize)]
-pub struct PromptsConfig {
+pub struct Prompts {
     /// Templates for panel header/footer/timestamp formatting.
     pub panel: PanelPrompts,
     /// Message injected when context crosses the cleaning threshold.
@@ -22,7 +22,7 @@ pub struct PromptsConfig {
 /// Seed data for the prompt library: built-in agents, skills, and commands.
 /// Loaded from `yamls/library.yaml`.
 #[derive(Debug, Deserialize)]
-pub struct LibraryConfig {
+pub struct Library {
     /// ID of the agent used when none is explicitly selected.
     pub default_agent_id: String,
     /// Built-in agent definitions (system prompts).
@@ -75,7 +75,7 @@ pub struct PanelPrompts {
 /// LLM-facing behavioral text injected at runtime — not UI strings.
 /// Loaded from `yamls/injections.yaml`.
 #[derive(Debug, Deserialize)]
-pub struct InjectionsConfig {
+pub struct Injections {
     /// Synthetic messages for the spine auto-continuation engine.
     pub spine: SpineInjections,
     /// Warning banners shown inside callback/prompt editor panels.
@@ -175,7 +175,7 @@ pub struct ProviderInjections {
 /// Configuration for reverie sub-agents (background context optimizer, cartographer).
 /// Loaded from `yamls/reverie.yaml`.
 #[derive(Debug, Deserialize)]
-pub struct ReverieConfig {
+pub struct Reverie {
     /// System prompt given to reverie sub-agents.
     pub system_prompt: String,
     /// First user message that kicks off the reverie session.
@@ -219,7 +219,7 @@ pub struct ReverieErrors {
 /// UI configuration — display strings, category labels.
 /// Loaded from `yamls/ui.yaml`.
 #[derive(Debug, Deserialize)]
-pub struct UiConfig {
+pub struct Ui {
     /// Display names for tool category groupings in the tools panel.
     pub tool_categories: ToolCategories,
 }
@@ -304,7 +304,7 @@ pub struct TodoIcons {
 /// All available themes, keyed by theme ID.
 /// Loaded from `yamls/themes.yaml`.
 #[derive(Debug, Deserialize, Clone)]
-pub struct ThemesConfig {
+pub struct Themes {
     /// Map of theme ID → theme definition.
     pub themes: HashMap<String, Theme>,
 }
@@ -409,21 +409,21 @@ pub mod constants;
 pub mod llm_types;
 
 /// Prompt templates — panel header/footer/timestamp formatting.
-pub static PROMPTS: LazyLock<PromptsConfig> =
+pub static PROMPTS: LazyLock<Prompts> =
     LazyLock::new(|| parse_yaml("prompts.yaml", include_str!("../../../../yamls/prompts.yaml")));
 /// Seed library — built-in agents, skills, and commands.
-pub static LIBRARY: LazyLock<LibraryConfig> =
+pub static LIBRARY: LazyLock<Library> =
     LazyLock::new(|| parse_yaml("library.yaml", include_str!("../../../../yamls/library.yaml")));
 /// UI strings — tool category labels.
-pub static UI: LazyLock<UiConfig> = LazyLock::new(|| parse_yaml("ui.yaml", include_str!("../../../../yamls/ui.yaml")));
+pub static UI: LazyLock<Ui> = LazyLock::new(|| parse_yaml("ui.yaml", include_str!("../../../../yamls/ui.yaml")));
 /// Theme definitions — icons and color palettes.
-pub static THEMES: LazyLock<ThemesConfig> =
+pub static THEMES: LazyLock<Themes> =
     LazyLock::new(|| parse_yaml("themes.yaml", include_str!("../../../../yamls/themes.yaml")));
 /// LLM-facing injections — spine messages, editor warnings, guardrails.
-pub static INJECTIONS: LazyLock<InjectionsConfig> =
+pub static INJECTIONS: LazyLock<Injections> =
     LazyLock::new(|| parse_yaml("injections.yaml", include_str!("../../../../yamls/injections.yaml")));
 /// Reverie sub-agent configuration — system prompt, tool restrictions, errors.
-pub static REVERIE: LazyLock<ReverieConfig> =
+pub static REVERIE: LazyLock<Reverie> =
     LazyLock::new(|| parse_yaml("reverie.yaml", include_str!("../../../../yamls/reverie.yaml")));
 
 /// Get a theme by ID, falling back to default, then to any available theme.

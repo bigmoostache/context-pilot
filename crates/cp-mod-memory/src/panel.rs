@@ -99,7 +99,7 @@ impl Panel for MemoryPanel {
         let token_count = estimate_tokens(&memory_content);
 
         for ctx in &mut state.context {
-            if ctx.context_type == ContextType::MEMORY {
+            if ctx.context_type.as_str() == ContextType::MEMORY {
                 ctx.token_count = token_count;
                 let _ = cp_base::panels::update_if_changed(ctx, &memory_content);
                 break;
@@ -112,7 +112,7 @@ impl Panel for MemoryPanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::MEMORY)
+            .find(|c| c.context_type.as_str() == ContextType::MEMORY)
             .map_or(("P4", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Memories", content, last_refresh_ms)]
     }

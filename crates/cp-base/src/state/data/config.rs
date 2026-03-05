@@ -53,6 +53,7 @@ pub const SCHEMA_VERSION: u32 = 1;
 /// Shared configuration (config.json)
 /// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[expect(clippy::module_name_repetitions, reason = "Used via re-export — 'Shared' alone conveys no meaning")]
 pub struct SharedConfig {
     // === Infrastructure ===
     /// Schema version for forward/backward compatibility
@@ -189,14 +190,17 @@ pub struct PanelData {
 /// Maps `ContextType` to panel UID string.
 pub type ImportantPanelUids = HashMap<ContextType, String>;
 
+/// Returns the default schema version (1) for serde `default` attributes.
 const fn default_schema_version() -> u32 {
     1
 }
 
+/// Returns the default theme ID string for serde `default` attributes.
 fn default_theme() -> String {
     crate::config::DEFAULT_THEME.to_string()
 }
 
+/// Returns 1, used as serde `default` for ID counters that start at 1.
 const fn default_one() -> usize {
     1
 }

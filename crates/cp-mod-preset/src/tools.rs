@@ -297,7 +297,7 @@ pub(crate) fn execute_load(tool: &ToolUse, state: &mut State, cb: &LoadCallbacks
         let skill_contents: Vec<(String, String)> =
             PromptState::get(state).skills.iter().map(|s| (s.id.clone(), s.content.clone())).collect();
         for ctx in &mut state.context {
-            if ctx.context_type == ContextType::SKILL
+            if ctx.context_type.as_str() == ContextType::SKILL
                 && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(ToString::to_string)
                 && let Some((_, content)) = skill_contents.iter().find(|(id, _)| *id == skill_id)
             {

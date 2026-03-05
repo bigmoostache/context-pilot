@@ -95,7 +95,7 @@ impl App {
                 }
 
                 // Handle question form events if form is active (mutates state directly)
-                if let Some(form) = self.state.get_ext::<cp_base::ui::PendingQuestionForm>()
+                if let Some(form) = self.state.get_ext::<cp_base::ui::PendingForm>()
                     && !form.resolved
                 {
                     self.handle_question_form_event(&evt);

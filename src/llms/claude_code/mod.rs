@@ -17,7 +17,7 @@ use serde_json::Value;
 use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_VERSION, library};
-use crate::infra::tools::{ToolUse, build_api_tools};
+use crate::infra::tools::{ToolUse, build_api};
 use cp_base::cast::SafeCast as _;
 use cp_base::config::INJECTIONS;
 
@@ -447,7 +447,7 @@ impl ClaudeCodeClient {
                 {"type": "text", "text": system_text}
             ],
             "messages": json_messages,
-            "tools": build_api_tools(&request.tools),
+            "tools": build_api(&request.tools),
             "stream": true
         });
 

@@ -80,7 +80,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
     let defaults = crate::modules::all_fixed_panel_defaults();
     for (pos, d) in defaults.iter().enumerate() {
         let id = format!("P{pos}");
-        if d.context_type == ContextType::SYSTEM {
+        if d.context_type.as_str() == ContextType::SYSTEM {
             context.push(crate::modules::make_default_context_element(
                 &id,
                 d.context_type.clone(),
@@ -296,9 +296,9 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     // Build important_panel_uids
     let mut important_uids: HashMap<ContextType, String> = HashMap::new();
     for ctx in &state.context {
-        let dominated = (ctx.context_type.is_fixed() || ctx.context_type == ContextType::CONVERSATION)
-            && ctx.context_type != ContextType::SYSTEM
-            && ctx.context_type != ContextType::LIBRARY;
+        let dominated = (ctx.context_type.is_fixed() || ctx.context_type.as_str() == ContextType::CONVERSATION)
+            && ctx.context_type.as_str() != ContextType::SYSTEM
+            && ctx.context_type.as_str() != ContextType::LIBRARY;
         if dominated && let Some(uid) = &ctx.uid {
             let _r = important_uids.insert(ctx.context_type.clone(), uid.clone());
         }
@@ -308,7 +308,9 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let panel_uid_to_local_id: HashMap<String, String> = state
         .context
         .iter()
-        .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type != ContextType::CONVERSATION)
+        .filter(|c| {
+            c.uid.is_some() && !c.context_type.is_fixed() && c.context_type.as_str() != ContextType::CONVERSATION
+        })
         .filter_map(|c| c.uid.as_ref().map(|uid| (uid.clone(), c.id.clone())))
         .collect();
 
@@ -334,7 +336,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for ctx in &state.context {
-        if ctx.context_type == ContextType::SYSTEM || ctx.context_type == ContextType::LIBRARY {
+        if ctx.context_type.as_str() == ContextType::SYSTEM || ctx.context_type.as_str() == ContextType::LIBRARY {
             continue;
         }
         if let Some(uid) = &ctx.uid {
@@ -345,9 +347,9 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
                 name: ctx.name.clone(),
                 token_count: ctx.token_count,
                 last_refresh_ms: ctx.last_refresh_ms,
-                message_uids: if ctx.context_type == ContextType::CONVERSATION {
+                message_uids: if ctx.context_type.as_str() == ContextType::CONVERSATION {
                     state.messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
-                } else if ctx.context_type == ContextType::CONVERSATION_HISTORY {
+                } else if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY {
                     ctx.history_messages
                         .as_ref()
                         .map(|msgs| msgs.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect())
@@ -368,7 +370,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     // History messages for ConversationHistory panels
     let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
     for ctx in &state.context {
-        if ctx.context_type == ContextType::CONVERSATION_HISTORY
+        if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY
             && let Some(ref msgs) = ctx.history_messages
         {
             for msg in msgs {

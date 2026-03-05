@@ -43,7 +43,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let already_open = state
         .context
         .iter_mut()
-        .find(|c| c.context_type == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str));
+        .find(|c| c.context_type.as_str() == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str));
 
     if let Some(ctx) = already_open {
         // Update existing context element

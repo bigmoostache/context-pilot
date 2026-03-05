@@ -313,7 +313,9 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StopStreaming => {
             if state.flags.stream.phase.is_streaming() {
                 state.flags.stream.phase.transition(StreamPhase::Idle);
-                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
+                if let Some(ctx) =
+                    state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION)
+                {
                     ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
                 }
                 state.streaming_estimated_tokens = 0;

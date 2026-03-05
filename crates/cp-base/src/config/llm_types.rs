@@ -227,8 +227,17 @@ impl ModelInfo for GrokModel {
     fn max_output_tokens(&self) -> u32 {
         128_000
     }
+
+    fn cache_hit_price_per_mtok(&self) -> f32 {
+        // Grok has no prompt caching — fall back to input price
+        self.input_price_per_mtok()
+    }
+
+    fn cache_miss_price_per_mtok(&self) -> f32 {
+        // Grok has no prompt caching — fall back to input price
+        self.input_price_per_mtok()
+    }
 }
-/// Groq-hosted model variants.
 /// - GPT-OSS models: Support BOTH custom tools AND built-in tools (browser search, code exec)
 /// - Llama models: Custom tools only
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -284,6 +293,16 @@ impl ModelInfo for GroqModel {
             Self::Llama33_70b => 0.79,
             Self::Llama31_8b => 0.08,
         }
+    }
+
+    fn cache_hit_price_per_mtok(&self) -> f32 {
+        // Groq has no prompt caching — fall back to input price
+        self.input_price_per_mtok()
+    }
+
+    fn cache_miss_price_per_mtok(&self) -> f32 {
+        // Groq has no prompt caching — fall back to input price
+        self.input_price_per_mtok()
     }
 
     fn max_output_tokens(&self) -> u32 {

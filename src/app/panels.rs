@@ -5,7 +5,7 @@
 //! (rendering with theme/profiling, panel registry).
 
 use ratatui::{
-    prelude::*,
+    prelude::{Frame, Line, Rect, Span, Style},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 

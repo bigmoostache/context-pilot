@@ -31,7 +31,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
         CommandClass::ReadOnly => {
             // Search for existing GitResult panel with same command
             let existing_idx = state.context.iter().position(|c| {
-                c.context_type == ContextType::GIT_RESULT && c.get_meta_str("result_command") == Some(command)
+                c.context_type.as_str() == ContextType::GIT_RESULT && c.get_meta_str("result_command") == Some(command)
             });
 
             if let Some(idx) = existing_idx {
@@ -94,7 +94,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                 cp_base::panels::mark_panels_dirty(state, ContextType::GIT_RESULT);
             } else {
                 for ctx in &mut state.context {
-                    if ctx.context_type == ContextType::GIT_RESULT
+                    if ctx.context_type.as_str() == ContextType::GIT_RESULT
                         && let Some(cmd) = ctx.get_meta_str("result_command")
                         && invalidations.iter().any(|re| re.is_match(cmd))
                     {

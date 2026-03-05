@@ -220,7 +220,7 @@ fn assign_panel_uid(state: &mut State, context_type: &str) {
 /// P6 = Spine, P7 = Logs, P8 = Git, P9 = Scratchpad
 pub(crate) fn ensure_default_contexts(state: &mut State) {
     // Ensure Conversation exists (special: no numbered Px, always first in context list)
-    if !state.context.iter().any(|c| c.context_type == ContextType::CONVERSATION) {
+    if !state.context.iter().any(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
         let elem =
             modules::make_default_context_element("chat", ContextType::new(ContextType::CONVERSATION), "Chat", true);
         state.context.insert(0, elem);
@@ -253,7 +253,9 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
     // Assign UIDs to all existing fixed panels (needed for panels/ storage)
     // Library panels don't need UIDs (rendered from in-memory state)
     for d in &defaults {
-        if d.context_type != ContextType::LIBRARY && state.context.iter().any(|c| c.context_type == d.context_type) {
+        if d.context_type.as_str() != ContextType::LIBRARY
+            && state.context.iter().any(|c| c.context_type == d.context_type)
+        {
             assign_panel_uid(state, d.context_type.as_str());
         }
     }

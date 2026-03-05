@@ -175,7 +175,7 @@ pub fn update_if_changed(ctx: &mut ContextElement, content: &str) -> bool {
 /// Also sets `state.dirty = true` so the UI re-renders.
 pub fn mark_panels_dirty(state: &mut State, context_type: &str) {
     for ctx in &mut state.context {
-        if ctx.context_type == context_type {
+        if ctx.context_type.as_str() == context_type {
             ctx.cache_deprecated = true;
         }
     }

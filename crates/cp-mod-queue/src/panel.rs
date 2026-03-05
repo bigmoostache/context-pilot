@@ -19,7 +19,7 @@ impl Panel for QueuePanel {
         let content = Self::format_context_text(state);
         let token_count = estimate_tokens(&content);
         for ctx in &mut state.context {
-            if ctx.context_type == ContextType::QUEUE {
+            if ctx.context_type.as_str() == ContextType::QUEUE {
                 ctx.token_count = token_count;
                 // Hash content and only bump last_refresh_ms when it actually changes.
                 // This ensures the panel sorts correctly in context ordering —
@@ -36,7 +36,7 @@ impl Panel for QueuePanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::QUEUE)
+            .find(|c| c.context_type.as_str() == ContextType::QUEUE)
             .map_or(("P11", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Queue", content, last_refresh_ms)]
     }

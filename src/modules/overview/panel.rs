@@ -21,7 +21,7 @@ impl Panel for OverviewPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Use cached content if available (set by refresh)
-        if let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::OVERVIEW)
+        if let Some(ctx) = state.context.iter().find(|c| c.context_type.as_str() == ContextType::OVERVIEW)
             && let Some(content) = &ctx.cached_content
         {
             return vec![ContextItem::new(&ctx.id, "Statistics", content.clone(), ctx.last_refresh_ms)];
@@ -32,7 +32,7 @@ impl Panel for OverviewPanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type == ContextType::OVERVIEW)
+            .find(|c| c.context_type.as_str() == ContextType::OVERVIEW)
             .map_or(("P5", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Statistics", output, last_refresh_ms)]
     }
@@ -44,7 +44,7 @@ impl Panel for OverviewPanel {
         let content = Self::generate_context_content(state);
         let token_count = crate::state::estimate_tokens(&content);
 
-        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::OVERVIEW) {
+        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::OVERVIEW) {
             ctx.token_count = token_count;
             ctx.cached_content = Some(content.clone());
             let _r = crate::app::panels::update_if_changed(ctx, &content);

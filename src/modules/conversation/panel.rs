@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    prelude::*,
+    prelude::{Frame, Line, Margin, Rect, Span, Style},
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
@@ -10,9 +10,7 @@ use cp_mod_prompt::PromptState;
 
 use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel};
-use crate::state::{
-    ContextType, FullContentCache, InputRenderCache, MessageRenderCache, MessageStatus, MessageType, State, hash_values,
-};
+use crate::state::{ContextType, FullCache, InputCache, MessageCache, MessageStatus, MessageType, State, hash_values};
 use crate::ui::theme;
 use cp_base::panels::scroll_key_action;
 
@@ -64,7 +62,7 @@ impl ConversationPanel {
 
         // Hash conversation history panel count (invalidate when panels added/removed)
         let history_count =
-            state.context.iter().filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY).count();
+            state.context.iter().filter(|c| c.context_type.as_str() == ContextType::CONVERSATION_HISTORY).count();
         std::hash::Hash::hash(&history_count, &mut hasher);
 
         // Hash all message content that affects rendering
@@ -120,7 +118,7 @@ impl ConversationPanel {
         // Prepend frozen `ConversationHistory` panels (oldest first)
         {
             let mut history_panels: Vec<_> =
-                state.context.iter().filter(|c| c.context_type == ContextType::CONVERSATION_HISTORY).collect();
+                state.context.iter().filter(|c| c.context_type.as_str() == ContextType::CONVERSATION_HISTORY).collect();
             history_panels.sort_by_key(|c| c.last_refresh_ms);
 
             for ctx in &history_panels {
@@ -192,7 +190,7 @@ impl ConversationPanel {
                 if !is_streaming_this {
                     let _r = state.message_cache.insert(
                         msg.id.clone(),
-                        MessageRenderCache { lines: Rc::from(lines.as_slice()), content_hash: hash, viewport_width },
+                        MessageCache { lines: Rc::from(lines.as_slice()), content_hash: hash, viewport_width },
                     );
                 }
 
@@ -235,7 +233,7 @@ impl ConversationPanel {
                 );
                 let line_count = input_lines.len();
                 state.input_cache =
-                    Some(InputRenderCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
+                    Some(InputCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
                 text.extend(input_lines);
                 // Update autocomplete with input visual line count
                 if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
@@ -255,7 +253,7 @@ impl ConversationPanel {
             );
             let line_count = input_lines.len();
             state.input_cache =
-                Some(InputRenderCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
+                Some(InputCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
             text.extend(input_lines);
             // Update autocomplete with input visual line count
             if let Some(ac) = state.get_ext_mut::<cp_base::autocomplete::AutocompleteState>() {
@@ -269,7 +267,7 @@ impl ConversationPanel {
         }
 
         // Store in full content cache
-        state.full_content_cache = Some(FullContentCache { lines: Rc::from(text.as_slice()), content_hash: full_hash });
+        state.full_content_cache = Some(FullCache { lines: Rc::from(text.as_slice()), content_hash: full_hash });
 
         text
     }

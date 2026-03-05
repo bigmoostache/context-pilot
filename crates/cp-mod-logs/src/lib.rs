@@ -62,7 +62,7 @@ pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<(PathBu
 
     // Build write op for each chunk (sorted by index for deterministic output)
     let mut sorted_chunk_keys: Vec<_> = chunks.keys().copied().collect();
-    sorted_chunk_keys.sort();
+    sorted_chunk_keys.sort_unstable();
     for idx in sorted_chunk_keys {
         if let Some(chunk_logs) = chunks.get(&idx) {
             let path = dir.join(format!("chunk_{idx}.json"));
@@ -285,7 +285,7 @@ impl Module for LogsModule {
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match state.context.iter().find(|c| c.id == id) {
                         None => pf.errors.push(format!("Panel '{id}' not found")),
-                        Some(ctx) if ctx.context_type != ContextType::CONVERSATION_HISTORY => {
+                        Some(ctx) if ctx.context_type.as_str() != ContextType::CONVERSATION_HISTORY => {
                             pf.errors.push(format!(
                                 "Panel '{id}' is not a conversation history panel — use Close_panel instead"
                             ));

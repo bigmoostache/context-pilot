@@ -37,6 +37,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
+/// JSON protocol types and escape-sequence helpers shared with the TUI client.
 mod protocol;
 use protocol::{Request, Response, SessionInfo, interpret_escapes};
 
@@ -48,15 +49,22 @@ static SHUTDOWN_REQUESTED: LazyLock<Arc<AtomicBool>> = LazyLock::new(|| Arc::new
 // Session management
 // ---------------------------------------------------------------------------
 
+/// State of a single managed child process.
 struct Session {
+    /// PID of the child process.
     pid: u32,
+    /// Handle to the child's stdin pipe, used by `"send"` commands.
     stdin: Option<std::process::ChildStdin>,
+    /// Current lifecycle status of the child process.
     status: SessionStatus,
 }
 
+/// Lifecycle status of a managed session.
 #[derive(Clone)]
 enum SessionStatus {
+    /// The child process is still running.
     Running,
+    /// The child process has exited with the given exit code.
     Exited(i32),
 }
 
@@ -69,6 +77,7 @@ impl Session {
         }
     }
 
+    /// Return a human-readable status string for use in responses.
     fn status_str(&self) -> String {
         match &self.status {
             SessionStatus::Running => "running".to_string(),
@@ -76,6 +85,7 @@ impl Session {
         }
     }
 
+    /// Return the exit code if the session has terminated, otherwise `None`.
     const fn exit_code(&self) -> Option<i32> {
         match &self.status {
             SessionStatus::Running => None,
@@ -83,11 +93,13 @@ impl Session {
         }
     }
 
+    /// Return `true` if the session has reached a terminal (exited) state.
     const fn is_terminal(&self) -> bool {
         matches!(self.status, SessionStatus::Exited(_))
     }
 }
 
+/// Return `true` if the process with the given PID is still alive (non-blocking signal-0 probe).
 fn is_pid_alive(pid: u32) -> bool {
     Command::new("kill")
         .args(["-0", &pid.to_string()])
@@ -98,13 +110,28 @@ fn is_pid_alive(pid: u32) -> bool {
         .unwrap_or(false)
 }
 
+/// Shared, thread-safe map from session key to [`Session`].
 type Sessions = Arc<Mutex<HashMap<String, Session>>>;
 
 // ---------------------------------------------------------------------------
 // Command handlers
 // ---------------------------------------------------------------------------
 
-fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str>, log_path: &str) -> Response {
+/// Parameters for spawning a new child process.
+struct CreateParams<'req> {
+    /// Session key that identifies the target child process.
+    key: &'req str,
+    /// Shell command to execute.
+    command: &'req str,
+    /// Optional working directory for the spawned process.
+    cwd: Option<&'req str>,
+    /// Path of the log file for stdout/stderr redirection.
+    log_path: &'req str,
+}
+
+/// Spawn a new child process and register it under `key`, redirecting output to `log_path`.
+fn handle_create(sessions: &Sessions, params: &CreateParams<'_>) -> Response {
+    let CreateParams { key, command, cwd, log_path } = params;
     let log = PathBuf::from(log_path);
 
     // Create/truncate log file
@@ -157,6 +184,7 @@ fn handle_create(sessions: &Sessions, key: &str, command: &str, cwd: Option<&str
     Response::ok_pid(pid)
 }
 
+/// Write `input` (with escape sequences interpreted) to the stdin of session `key`.
 fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     let bytes = interpret_escapes(input);
 
@@ -183,6 +211,7 @@ fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     result.map_or_else(|e| Response::err(format!("Write failed: {e}")), |()| Response::ok())
 }
 
+/// Terminate the child process for session `key` (SIGTERM then SIGKILL if needed).
 fn handle_kill(sessions: &Sessions, key: &str) -> Response {
     // Extract pid under lock (lock auto-drops after match expression)
     let pid = match sessions.lock().unwrap_or_else(PoisonError::into_inner).get_mut(key) {
@@ -209,6 +238,7 @@ fn handle_kill(sessions: &Sessions, key: &str) -> Response {
     Response::ok()
 }
 
+/// Kill (if still running) and remove the session for `key` from the session map.
 fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     let removed = sessions.lock().unwrap_or_else(PoisonError::into_inner).remove(key);
     if let Some(mut session) = removed {
@@ -224,6 +254,7 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     Response::ok()
 }
 
+/// Query the current status and exit code of session `key`.
 fn handle_status(sessions: &Sessions, key: &str) -> Response {
     let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
     let Some(session) = map.get_mut(key) else {
@@ -236,6 +267,7 @@ fn handle_status(sessions: &Sessions, key: &str) -> Response {
     Response::ok_status(status, exit_code)
 }
 
+/// Return a snapshot of all currently registered sessions and their statuses.
 fn handle_list(sessions: &Sessions) -> Response {
     let infos: Vec<SessionInfo> = {
         let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
@@ -260,7 +292,9 @@ fn handle_list(sessions: &Sessions) -> Response {
 
 /// Per-connection handler. Owns the stream and sessions Arc for `thread::spawn`.
 struct ConnectionHandler {
+    /// Unix socket stream for this client connection.
     stream: UnixStream,
+    /// Shared session map passed down from the accept loop.
     sessions: Sessions,
 }
 
@@ -299,7 +333,7 @@ impl ConnectionHandler {
                     if key.is_empty() || command.is_empty() || log_path.is_empty() {
                         Response::err("Missing key, command, or log_path")
                     } else {
-                        handle_create(&sessions, key, command, req.cwd.as_deref(), log_path)
+                        handle_create(&sessions, &CreateParams { key, command, cwd: req.cwd.as_deref(), log_path })
                     }
                 }
                 "send" => {
@@ -341,6 +375,7 @@ impl ConnectionHandler {
 // Main: daemonize and listen
 // ---------------------------------------------------------------------------
 
+/// Entry point: parse arguments, bind the Unix socket, and start the accept loop.
 fn main() {
     let Some(socket_path) = std::env::args().nth(1) else {
         drop(writeln!(std::io::stderr(), "Usage: cp-console-server <socket_path>"));
@@ -354,9 +389,9 @@ fn main() {
     // Become a session leader so children get SIGHUP when the server dies.
     #[cfg(unix)]
     #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
-    // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
-    // and is called once at startup before any child processes are spawned.
     {
+        // SAFETY: setsid() is async-signal-safe (POSIX), has no preconditions,
+        // and is called once at startup before any child processes are spawned.
         unsafe {
             let _: libc::pid_t = libc::setsid();
         }

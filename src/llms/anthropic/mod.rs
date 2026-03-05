@@ -12,7 +12,7 @@ use super::error::LlmError;
 use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_ENDPOINT, API_VERSION, library};
 use crate::infra::tools::ToolUse;
-use crate::infra::tools::build_api_tools;
+use crate::infra::tools::build_api;
 use cp_base::config::INJECTIONS;
 
 mod messages;
@@ -131,7 +131,7 @@ impl LlmClient for AnthropicClient {
             max_tokens: request.max_output_tokens,
             system: system_prompt,
             messages: api_messages,
-            tools: build_api_tools(&request.tools),
+            tools: build_api(&request.tools),
             stream: true,
         };
 

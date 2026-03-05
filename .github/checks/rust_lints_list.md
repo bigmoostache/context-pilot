@@ -1,0 +1,258 @@
+[allowed by default]
+
+
+absolute_paths_not_starting_with_crate
+ambiguous_negative_literals
+async-idents #irrelevant alias of keyword_idents_2018
+closure_returning_async_block
+deprecated_safe_2024
+deref_into_dyn_supertrait
+disjoint-capture-migration #irrelevant alias of rust_2021_incompatible_closure_captures
+edition_2024_expr_fragment_specifier
+elided-lifetime-in-path #irrelevant alias of elided_lifetimes_in_paths
+elided_lifetimes_in_paths
+explicit_outlives_requirements
+ffi_unwind_calls #irrelevant no direct FFI usage
+fuzzy_provenance_casts #irrelevant strict provenance experimental
+if_let_rescope
+impl_trait_overcaptures
+impl_trait_redundant_captures
+keyword-idents #irrelevant alias of keyword_idents_2018
+keyword_idents_2018 #irrelevant already on edition 2024
+keyword_idents_2024
+let_underscore_drop
+linker_messages #irrelevant platform-dependent noise
+lossy_provenance_casts #irrelevant strict provenance experimental
+macro_use_extern_crate
+meta_variable_misuse
+missing_copy_implementations
+missing_debug_implementations
+missing_docs
+missing_unsafe_on_extern
+multiple_supertrait_upcastable #irrelevant nightly only
+must_not_suspend #irrelevant nightly only
+non_ascii_idents
+non_exhaustive_omitted_patterns #irrelevant noisy with external types
+or-patterns-back-compat #irrelevant alias of rust_2021_incompatible_or_patterns
+redundant_imports
+redundant_lifetimes
+resolving_to_items_shadowing_supertrait_items #irrelevant future edition prep
+rust_2021_incompatible_closure_captures #irrelevant already on edition 2024
+rust_2021_incompatible_or_patterns #irrelevant already on edition 2024
+rust_2021_prefixes_incompatible_syntax #irrelevant already on edition 2024
+rust_2021_prelude_collisions #irrelevant already on edition 2024
+rust_2024_guarded_string_incompatible_syntax
+rust_2024_incompatible_pat
+rust_2024_prelude_collisions
+shadowing_supertrait_items #irrelevant future edition prep
+single-use-lifetime #irrelevant alias of single_use_lifetimes
+single_use_lifetimes
+tail_expr_drop_order
+trivial_casts
+trivial_numeric_casts
+unit_bindings
+unnameable_types
+unqualified_local_imports #irrelevant unstable (rust#138299)
+unreachable_pub
+unsafe_attr_outside_unsafe
+unsafe_code
+unsafe_op_in_unsafe_fn
+unstable_features #irrelevant deprecated lint, does nothing
+unused_crate_dependencies
+unused_extern_crates
+unused_import_braces
+unused_lifetimes
+unused_macro_rules
+unused_qualifications
+unused_results
+variant_size_differences
+
+[warn by default]
+
+
+aarch64_softfloat_neon
+ambiguous_glob_reexports
+ambiguous_wide_pointer_comparisons
+anonymous_parameters
+array_into_iter
+asm_sub_register
+async_fn_in_trait
+bad_asm_style
+bare-trait-object #irrelevant alias of bare_trait_objects
+bare_trait_objects
+boxed_slice_into_iter
+break_with_label_and_loop
+clashing_extern_declarations
+coherence_leak_check
+confusable_idents
+const_evaluatable_unchecked
+const_item_interior_mutations
+const_item_mutation
+dangling_pointers_from_locals
+dangling_pointers_from_temporaries
+dead_code
+deprecated
+deprecated_where_clause_location
+double_negations
+drop_bounds
+dropping_copy_types
+dropping_references
+duplicate_macro_attributes
+dyn_drop
+ellipsis_inclusive_range_patterns
+exported_private_dependencies
+for_loops_over_fallibles
+forbidden_lint_groups
+forgetting_copy_types
+forgetting_references
+function_casts_as_integer
+function_item_references
+hidden_glob_reexports
+improper_ctypes
+improper_ctypes_definitions
+incomplete_features
+inline_always_mismatching_target_features #irrelevant unknown on current rustc
+inline_no_sanitize
+integer_to_ptr_transmutes
+internal_features
+invalid_from_utf8
+invalid_nan_comparisons
+invalid_value
+irrefutable_let_patterns
+large_assignments
+late_bound_lifetime_arguments
+malformed_diagnostic_attributes
+malformed_diagnostic_format_literals
+map_unit_fn
+mismatched_lifetime_syntaxes
+misplaced_diagnostic_attributes
+missing_abi
+mixed_script_confusables
+named_arguments_used_positionally
+no_mangle_generic_items
+non-fmt-panic #irrelevant alias of non_fmt_panics
+non_camel_case_types
+non_contiguous_range_endpoints
+non_fmt_panics
+non_local_definitions
+non_shorthand_field_patterns
+non_snake_case
+non_upper_case_globals
+noop_method_call
+opaque_hidden_inferred_bound
+overlapping-patterns #irrelevant alias of overlapping_range_endpoints
+overlapping_range_endpoints
+path_statements
+private_bounds
+private_interfaces
+ptr_to_integer_transmute_in_consts
+redundant-semicolon #irrelevant alias of redundant_semicolons
+redundant_semicolons
+refining_impl_trait_internal
+refining_impl_trait_reachable
+renamed_and_removed_lints
+repr_c_enums_larger_than_int
+rtsan_nonblocking_async
+self_constructor_from_outer_item
+special_module_name
+stable_features
+static-mut-ref #irrelevant alias of static_mut_refs
+static_mut_refs
+suspicious_double_ref_op
+tail_call_track_caller #irrelevant unknown on current rustc
+trivial_bounds
+type_alias_bounds
+tyvar_behind_raw_pointer
+uncommon_codepoints
+unconditional_recursion
+uncovered_param_in_projection
+unexpected_cfgs
+unfulfilled_lint_expectations
+ungated_async_fn_track_caller
+uninhabited_static
+unknown_diagnostic_attributes
+unknown_lints
+unnameable_test_items
+unnecessary_transmutes
+unpredictable_function_pointer_comparisons
+unreachable_code
+unreachable_patterns
+unstable-name-collision #irrelevant alias of unstable_name_collisions
+unstable_name_collisions
+unstable_syntax_pre_expansion
+unsupported_calling_conventions
+unsupported_fn_ptr_calling_conventions #irrelevant removed (hard error)
+unused-doc-comment #irrelevant alias of unused_doc_comments
+unused-tuple-struct-fields #irrelevant renamed to dead_code
+unused_allocation
+unused_assignments
+unused_associated_type_bounds
+unused_attributes
+unused_braces
+unused_comparisons
+unused_doc_comments
+unused_features
+unused_imports
+unused_labels
+unused_macros
+unused_must_use
+unused_mut
+unused_parens
+unused_unsafe
+unused_variables
+useless_ptr_null_checks
+uses_power_alignment
+varargs_without_pattern
+warnings
+while_true
+
+[deny by default]
+
+ambiguous_associated_items
+ambiguous_glob_imports
+arithmetic_overflow
+binary_asm_labels
+bindings_with_variant_name
+conflicting_repr_hints
+dangerous_implicit_autorefs
+default_overrides_default_fields
+dependency_on_unit_never_type_fallback
+deref_nullptr
+elided_lifetimes_in_associated_constant
+enum_intrinsics_non_enums
+exceeding-bitshifts #irrelevant alias of arithmetic_overflow
+explicit_builtin_cfgs_in_flags
+ill_formed_attribute_input
+incomplete_include
+ineffective_unstable_trait_impl
+invalid_atomic_ordering
+invalid_doc_attributes
+invalid_from_utf8_unchecked
+invalid_macro_export_arguments
+invalid_null_arguments
+invalid_reference_casting
+invalid_type_param_default
+legacy_derive_helpers
+let_underscore_lock
+long_running_const_eval
+macro_expanded_macro_exports_accessed_by_absolute_paths
+mutable_transmutes
+named_asm_labels
+never_type_fallback_flowing_into_unsafe
+no_mangle_const_items
+out_of_scope_macro_calls
+overflowing_literals
+patterns_in_fns_without_body
+private_macro_use
+proc_macro_derive_resolution_fallback
+pub_use_of_private_extern_crate
+repr_transparent_non_zst_fields
+semicolon_in_expressions_from_macros
+soft_unstable
+test_unstable_lint
+text_direction_codepoint_in_comment
+text_direction_codepoint_in_literal
+unconditional_panic
+undropped_manually_drops
+unknown_crate_types
+useless_deprecated

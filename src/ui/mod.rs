@@ -96,7 +96,7 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
 
 fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     // Check if question form is active — render it at bottom of content area
-    if let Some(form) = state.get_ext::<cp_base::ui::PendingQuestionForm>()
+    if let Some(form) = state.get_ext::<cp_base::ui::PendingForm>()
         && !form.resolved
     {
         // Split: content panel on top, question form at bottom

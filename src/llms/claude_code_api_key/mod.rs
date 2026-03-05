@@ -16,7 +16,7 @@ use serde_json::Value;
 use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent, api_messages_to_cc_json};
 use crate::infra::constants::library;
-use crate::infra::tools::build_api_tools;
+use crate::infra::tools::build_api;
 use cp_base::config::INJECTIONS;
 
 use helpers::{
@@ -197,7 +197,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
                 {"type": "text", "text": system_text}
             ],
             "messages": json_messages,
-            "tools": build_api_tools(&request.tools),
+            "tools": build_api(&request.tools),
             "stream": true
         });
 

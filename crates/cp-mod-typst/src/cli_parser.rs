@@ -160,7 +160,7 @@ fn parse_query(args: &[String]) -> Result<TypstCommand, String> {
     }
 
     // Length already checked above (args.len() >= 2)
-    let (Some(input), Some(selector)) = (args.get(0).cloned(), args.get(1).cloned()) else {
+    let (Some(input), Some(selector)) = (args.first().cloned(), args.get(1).cloned()) else {
         return Err("Usage: typst query <input.typ> <selector> [--field <field>]".to_string());
     };
     let mut field = None;

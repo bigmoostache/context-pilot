@@ -52,7 +52,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     save_message(&user_msg);
 
     // Add user message tokens to Conversation context and update timestamp
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
         ctx.token_count += user_token_estimate;
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
@@ -99,7 +99,7 @@ pub(crate) fn handle_clear_conversation(state: &mut State) -> ActionResult {
     state.messages.clear();
     state.input.clear();
     // Reset token count for Conversation context and update timestamp
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
         ctx.token_count = 0;
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }

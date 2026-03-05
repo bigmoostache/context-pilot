@@ -233,12 +233,12 @@ impl App {
     }
 
     /// Handle keyboard events when a question form is active.
-    /// Mutates the `PendingQuestionForm` directly in state.
+    /// Mutates the `PendingForm` directly in state.
     pub(super) fn handle_question_form_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
 
-        let Some(form) = self.state.get_ext_mut::<cp_base::ui::PendingQuestionForm>() else { return };
+        let Some(form) = self.state.get_ext_mut::<cp_base::ui::PendingForm>() else { return };
 
         // Check if currently typing in "Other" field
         let typing_other = form.answers[form.current_question].typing_other;

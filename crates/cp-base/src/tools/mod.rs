@@ -119,10 +119,14 @@ impl ParamType {
                 for param in params {
                     let mut schema = param.param_type.to_json_schema();
                     if let Some(desc) = &param.description {
-                        schema["description"] = json!(desc);
+                        if let Some(obj) = schema.as_object_mut() {
+                            drop(obj.insert("description".to_string(), json!(desc)));
+                        }
                     }
                     if let Some(enum_vals) = &param.enum_values {
-                        schema["enum"] = json!(enum_vals);
+                        if let Some(obj) = schema.as_object_mut() {
+                            drop(obj.insert("enum".to_string(), json!(enum_vals)));
+                        }
                     }
                     drop(properties.insert(param.name.clone(), schema));
                     if param.required {
@@ -233,7 +237,7 @@ impl ToolDefinition {
     /// Panics via [`invariant_panic`](crate::config::invariant_panic) if
     /// the tool ID is missing — indicates a code/YAML mismatch caught during development.
     #[must_use]
-    pub fn from_yaml<'a>(id: &str, texts: &'a ToolTexts) -> ToolDefBuilder<'a> {
+    pub fn from_yaml<'yaml>(id: &str, texts: &'yaml ToolTexts) -> ToolDefBuilder<'yaml> {
         let text = texts
             .tools
             .get(id)
@@ -259,10 +263,14 @@ impl ToolDefinition {
         for param in &self.params {
             let mut schema = param.param_type.to_json_schema();
             if let Some(desc) = &param.description {
-                schema["description"] = json!(desc);
+                if let Some(obj) = schema.as_object_mut() {
+                    drop(obj.insert("description".to_string(), json!(desc)));
+                }
             }
             if let Some(enum_vals) = &param.enum_values {
-                schema["enum"] = json!(enum_vals);
+                if let Some(obj) = schema.as_object_mut() {
+                    drop(obj.insert("enum".to_string(), json!(enum_vals)));
+                }
             }
             drop(properties.insert(param.name.clone(), schema));
             if param.required {
@@ -282,13 +290,13 @@ impl ToolDefinition {
 /// Schema structure (types, required, enums) lives in Rust;
 /// descriptions (sentences) come from YAML automatically.
 #[derive(Debug)]
-pub struct ToolDefBuilder<'a> {
+pub struct ToolDefBuilder<'yaml> {
     /// Tool identifier.
     id: String,
     /// LLM-facing description (from YAML).
     description: String,
     /// Parameter description map (name → description text).
-    param_descs: &'a HashMap<String, String>,
+    param_descs: &'yaml HashMap<String, String>,
     /// Accumulated parameters.
     params: Vec<ToolParam>,
     /// Sidebar one-liner.
@@ -412,7 +420,7 @@ impl ToolDefBuilder<'_> {
 
 /// Build the JSON array of enabled tool schemas for the LLM API.
 #[must_use]
-pub fn build_api_tools(tools: &[ToolDefinition]) -> Value {
+pub fn build_api(tools: &[ToolDefinition]) -> Value {
     let enabled: Vec<Value> = tools
         .iter()
         .filter(|t| t.enabled)

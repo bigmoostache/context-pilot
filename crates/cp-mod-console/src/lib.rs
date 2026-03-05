@@ -260,7 +260,7 @@ impl Module for ConsoleModule {
                 if let Some(panel_id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match state.context.iter().find(|c| c.id == panel_id) {
                         None => pf.errors.push(format!("Panel '{panel_id}' not found")),
-                        Some(ctx) if ctx.context_type != ContextType::CONSOLE => {
+                        Some(ctx) if ctx.context_type.as_str() != ContextType::CONSOLE => {
                             pf.errors.push(format!("Panel '{panel_id}' is not a console panel"));
                         }
                         Some(ctx) => {
