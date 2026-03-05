@@ -18,105 +18,23 @@ exceptions:
   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
 
   - path: "crates/cp-base/src/cast.rs"
-    match: "u32→f32: 24-bit mantissa cannot represent all 32-bit values"
+    match: "lossy int→float: mantissa too narrow — inherent floating-point limitation"
     reason: >
-      u32 Safe impl: lossy cast to f32. 24-bit mantissa too narrow.
+      Module-level #[expect] on mod lossy_float covers all 12 lossy
+      int→float casts (u32/u64/u128/usize/i32/i64/isize → f32/f64).
+      Mantissa width (24-bit f32, 53-bit f64) fundamentally cannot
+      represent all values of wider integer types.
     strategy: >
       Irreducible — fundamental floating-point limitation.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: "u64→f32: 24-bit mantissa cannot represent all 64-bit values"
+    match: "saturating float→int: no TryFrom<float> for integers in std"
     reason: >
-      u64 Safe impl: lossy cast to f32.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "u64→f64: 53-bit mantissa cannot represent all 64-bit values"
-    reason: >
-      u64 Safe impl: lossy cast to f64. 53-bit mantissa too narrow.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "u128→f32: 24-bit mantissa cannot represent all 128-bit values"
-    reason: >
-      u128 Safe impl: lossy cast to f32.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "u128→f64: 53-bit mantissa cannot represent all 128-bit values"
-    reason: >
-      u128 Safe impl: lossy cast to f64.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "usize→f32: 24-bit mantissa cannot represent all pointer-width values"
-    reason: >
-      usize Safe impl: lossy cast to f32.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "usize→f64: 53-bit mantissa cannot represent all pointer-width values"
-    reason: >
-      usize Safe impl: lossy cast to f64.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "i32→f32: 24-bit mantissa cannot represent all 32-bit signed values"
-    reason: >
-      i32 Safe impl: lossy cast to f32. 24-bit mantissa too narrow.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "i64→f32: 24-bit mantissa cannot represent all 64-bit signed values"
-    reason: >
-      i64 Safe impl: lossy cast to f32.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "i64→f64: 53-bit mantissa cannot represent all 64-bit signed values"
-    reason: >
-      i64 Safe impl: lossy cast to f64.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "isize→f32: 24-bit mantissa cannot represent all pointer-width signed values"
-    reason: >
-      isize Safe impl: lossy cast to f32.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "isize→f64: 53-bit mantissa cannot represent all pointer-width signed values"
-    reason: >
-      isize Safe impl: lossy cast to f64.
-    strategy: >
-      Irreducible — fundamental floating-point limitation.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "f64 Safe impl: saturating float"
-    reason: >
-      f64→integer casts in Safe impl. No TryFrom exists for
-      float→int in std. Raw `as` with bounds checking is the
-      only option.
+      Module-level #[expect] on mod float_to_int covers f64 and f32
+      Safe impls. No TryFrom<f64/f32> for integer types exists in std,
+      so raw `as` with manual bounds checking is the only path.
     strategy: >
       Irreducible until std provides TryFrom<f64> for integers.
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: "f32 Safe impl: saturating float"
-    reason: >
-      f32→integer casts in Safe impl. Same as f64 — no TryFrom
-      path in std for float→int conversion.
-    strategy: >
-      Irreducible until std provides TryFrom<f32> for integers.
 
   # ── config/mod.rs: invariant_panic ──────────────────────────────────
 

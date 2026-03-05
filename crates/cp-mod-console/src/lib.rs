@@ -118,10 +118,7 @@ impl Module for ConsoleModule {
         }
     }
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        // Ensure the console server is running
-        if let Err(e) = manager::find_or_create_server() {
-            drop(writeln!(std::io::stderr(), "Console server startup failed: {e}"));
-        }
+        // Server already started in init_state — no need to call find_or_create_server again.
 
         // Restore counter
         if let Some(v) = data.get("next_session_id").and_then(serde_json::Value::as_u64) {

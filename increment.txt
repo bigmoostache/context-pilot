@@ -601,3 +601,4 @@
 22:18:29.612127005 fmt crates/cp-base/src/config/mod.rs
 22:18:38.452743479 fmt crates/cp-base/src/config/mod.rs
 22:24:08.115219544 fmt src/app/run/streaming.rs
+00:02:40.679601901 fmt crates/cp-base/src/cast.rs

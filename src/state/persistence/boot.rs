@@ -39,6 +39,7 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
 
     let null = serde_json::Value::Null;
     for module in &modules {
+        progress(module.name());
         let data = if module.is_global() {
             module_data.global.get(module.id()).unwrap_or(&null)
         } else {
