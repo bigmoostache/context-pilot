@@ -12,18 +12,6 @@ crates/cp-base/src/state/runtime.rs:
    19: #[expect(clippy::struct_excessive_bools, reason = "Runtime state legitimately needs many boolean flags")]
    20  pub struct State {
 
-  267      /// Prefer this over `get_ext().expect()` — the panic lives here once,
-  268:     /// so callers don't need `#[expect(clippy::expect_used)]`.
-  269      ///
-
-  273      #[must_use]
-  274:     #[expect(clippy::expect_used, reason = "centralized panic — callers use ext() to avoid per-site #[expect]")]
-  275      pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
-
-  283      /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
-  284:     #[expect(clippy::expect_used, reason = "centralized panic — callers use ext_mut() to avoid per-site #[expect]")]
-  285      pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
-
 crates/cp-console-server/src/main.rs:
   355      #[cfg(unix)]
   356:     #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
@@ -32,11 +20,11 @@ crates/cp-console-server/src/main.rs:
 
 # `#[expect]` Audit — Final Status
 
-**110 → 6** annotations remaining. **104 slain.**
+**110 → 4** annotations remaining. **106 slain.**
 
 ---
 
-## Remaining `#[expect]` Annotations (6 total)
+## Remaining `#[expect]` Annotations (4 total)
 
 ### 1. `cast.rs:1` — `allow_attributes`
 
@@ -95,40 +83,7 @@ pub struct State {
 
 ---
 
-### 4. `runtime.rs:274` — `expect_used` (`ext()`)
-
-```rust
-#[expect(clippy::expect_used, reason = "centralized panic — callers use ext() to avoid per-site #[expect]")]
-pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
-    self.get_ext::<T>().expect("module state not initialized — was init_state() called?")
-}
-```
-
-**Justification:** This is the centralized TypeMap accessor that 24+ call sites use instead of `get_ext().expect()`. Without this helper, every single module state access would need its own `#[expect(clippy::expect_used)]`. The panic message is specific ("was init_state() called?") and only fires on a programming error (module forgot to register its state during initialization). The `get_ext()` fallible alternative exists for cases where absence is expected.
-
-**Strategies to eliminate:**
-- **Init-time registration with compile-time proof:** Use a type-state pattern where `Module::init_state()` returns a `Registered<T>` token. `ext::<T>()` requires `Registered<T>` as a parameter, making it impossible to call without prior registration. The token proves initialization happened — no runtime check needed. Complex lifetime/generics work.
-- **`Default` fallback:** Change `ext<T>()` to `ext<T: Default>()` that calls `get_ext::<T>().unwrap_or_default()`. Never panics. Requires all module state types to implement `Default` (most already do since they derive it). Silently returns empty state on programming errors instead of crashing — trades safety for debuggability.
-- **Lazy initialization:** Replace `ext()` with `ext_or_init<T: Default>()` that inserts `T::default()` if missing, then returns the reference. Combines accessor + initialization. Eliminates the panic at the cost of masking forgotten `init_state()` calls.
-
----
-
-### 5. `runtime.rs:284` — `expect_used` (`ext_mut()`)
-
-```rust
-#[expect(clippy::expect_used, reason = "centralized panic — callers use ext_mut() to avoid per-site #[expect]")]
-pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
-    self.get_ext_mut::<T>().expect("module state not initialized — was init_state() called?")
-}
-```
-
-**Justification:** Mutable variant of #5. Same centralization rationale — 20+ call sites use this instead of scattered `.expect()` calls. Same panic condition (programming error: module state not registered).
-
-**Strategies to eliminate:** Same as #4 — any strategy applied to `ext()` would be applied identically to `ext_mut()`. These two annotations live and die together.
-
----
-
-### 6. `server/main.rs:356` — `unsafe_code`
+### 4. `server/main.rs:356` — `unsafe_code`
 
 ```rust
 #[expect(unsafe_code, reason = "setsid() requires unsafe — async-signal-safe, no preconditions")]
@@ -154,5 +109,4 @@ pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
 | 1 | `cast.rs` | `allow_attributes` | 🟡 | `num` crate or `TryFrom` blanket impls |
 | 2 | `config/mod.rs` | `panic` | 🟢 | `build.rs` compile-time YAML validation |
 | 3 | `runtime.rs` | `struct_excessive_bools` | 🟡 | Domain sub-structs (scriptable, ~1000 callsites) |
-| 4–5 | `runtime.rs` | `expect_used` (×2) | 🟡 | `Default` fallback or lazy init |
-| 6 | `server/main.rs` | `unsafe_code` | 🔴 | Irreducible — FFI boundary to kernel syscall |
+| 4 | `server/main.rs` | `unsafe_code` | 🔴 | Irreducible — FFI boundary to kernel syscall |
