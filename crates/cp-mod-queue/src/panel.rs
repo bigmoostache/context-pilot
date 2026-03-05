@@ -8,6 +8,7 @@ use cp_base::state::runtime::State;
 use crate::types::QueueState;
 use std::fmt::Write as _;
 
+/// Panel that renders the current queue status and queued tool calls.
 pub(crate) struct QueuePanel;
 
 impl Panel for QueuePanel {
@@ -41,6 +42,38 @@ impl Panel for QueuePanel {
             .map_or(("P11", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Queue", content, last_refresh_ms)]
     }
+
+    fn handle_key(&self, _key: &crossterm::event::KeyEvent, _state: &State) -> Option<cp_base::state::actions::Action> {
+        None
+    }
+    fn needs_cache(&self) -> bool {
+        false
+    }
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+    fn build_cache_request(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+    fn suicide(&self, _ctx: &cp_base::state::context::ContextElement, _state: &State) -> bool {
+        false
+    }
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         let qs = QueueState::get(state);
@@ -110,7 +143,7 @@ impl QueuePanel {
             text.push_str("Queue active — 0 actions queued.\n");
         } else {
             let status = if qs.active { "Active" } else { "Paused" };
-            let _r = write!(text, "Queue {} — {} action(s) queued:\n\n", status, qs.queued_calls.len());
+            let _r1 = write!(text, "Queue {} — {} action(s) queued:\n\n", status, qs.queued_calls.len());
             for call in &qs.queued_calls {
                 let params = serde_json::to_string(&call.input).unwrap_or_default();
                 let short = if params.len() > 120 {
@@ -122,7 +155,7 @@ impl QueuePanel {
                 } else {
                     params
                 };
-                let _r = writeln!(text, "{}. {}({})", call.index, call.tool_name, short);
+                let _r2 = writeln!(text, "{}. {}({})", call.index, call.tool_name, short);
             }
         }
         text

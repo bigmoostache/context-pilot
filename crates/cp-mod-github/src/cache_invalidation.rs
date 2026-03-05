@@ -15,6 +15,7 @@ use regex::Regex;
 /// then all panels whose command matches any entry in `invalidates` should
 /// be marked as cache-deprecated.
 pub(crate) struct InvalidationRule {
+    /// Regex that matches the mutating command string.
     pub trigger: Regex,
     /// Invalidation patterns as template strings. May contain backreferences
     /// like `\1`, `\2` which will be substituted with captured groups from
@@ -23,6 +24,7 @@ pub(crate) struct InvalidationRule {
 }
 
 impl InvalidationRule {
+    /// Create a rule from a trigger pattern and invalidation pattern templates.
     fn new(trigger: &str, invalidates: &[&str]) -> Option<Self> {
         Some(Self {
             trigger: Regex::new(trigger).ok()?,

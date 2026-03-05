@@ -14,6 +14,7 @@ use cp_base::state::runtime::State;
 use crate::types::{GithubResultRequest, GithubState};
 use cp_base::panels::scroll_key_action;
 
+/// Panel for displaying cached `gh` command results.
 pub(crate) struct GithubResultPanel;
 
 impl Panel for GithubResultPanel {

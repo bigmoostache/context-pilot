@@ -104,6 +104,7 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
     best_match.map(|(line, _, preview)| (line, preview))
 }
 
+/// Execute the Edit tool: replace `old_string` with `new_string` in a file.
 pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Get file_path (required)
     let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {

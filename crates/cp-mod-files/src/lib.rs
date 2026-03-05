@@ -4,7 +4,9 @@
 //! `Edit` (`old_string/new_string` diff replacement), `Write` (create or fully
 //! overwrite). File panels auto-refresh on filesystem changes via the watcher.
 
+/// File panel rendering and caching.
 mod panel;
+/// Tool implementations for Open, Edit, and Write.
 mod tools;
 
 use cp_base::modules::ToolVisualizer;
@@ -18,6 +20,7 @@ use self::panel::FilePanel;
 use cp_base::modules::Module;
 use cp_base::tools::pre_flight::PreFlightResult;
 
+/// Lazily parsed tool YAML definitions for the files module.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/files.yaml")));
 
@@ -335,9 +338,13 @@ fn truncate_line(line: &str, width: usize) -> String {
 
 /// Color palette for callback line styling.
 struct CallbackColors {
+    /// Color for dispatched/pending status.
     blue: ratatui::style::Color,
+    /// Color for passed/success status.
     green: ratatui::style::Color,
+    /// Color for failed/error status.
     red: ratatui::style::Color,
+    /// Color for dimmed/secondary text.
     dim: ratatui::style::Color,
 }
 

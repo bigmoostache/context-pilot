@@ -91,6 +91,7 @@ impl GuardRailStopLogic for MaxCostGuard {
 }
 
 impl MaxCostGuard {
+    /// Calculate the total estimated session cost in USD.
     fn calculate_cost(state: &State) -> f64 {
         let hit_cost = State::token_cost(state.cache_hit_tokens, state.cache_hit_price_per_mtok());
         let miss_cost = State::token_cost(state.cache_miss_tokens, state.cache_miss_price_per_mtok());
@@ -129,6 +130,7 @@ impl GuardRailStopLogic for MaxStreamCostGuard {
 }
 
 impl MaxStreamCostGuard {
+    /// Calculate the cost of the current stream in USD.
     fn calculate_stream_cost(state: &State) -> f64 {
         let hit_cost = State::token_cost(state.stream_cache_hit_tokens, state.cache_hit_price_per_mtok());
         let miss_cost = State::token_cost(state.stream_cache_miss_tokens, state.cache_miss_price_per_mtok());
@@ -155,6 +157,7 @@ impl GuardRailStopLogic for MaxDurationGuard {
             (SpineState::get(state).config.max_duration_secs, SpineState::get(state).config.autonomous_start_ms)
         {
             let elapsed_ms = now_ms().saturating_sub(start_ms);
+            #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
             let elapsed_secs = elapsed_ms / 1000;
             elapsed_secs >= max_secs
         } else {
@@ -163,6 +166,7 @@ impl GuardRailStopLogic for MaxDurationGuard {
     }
 
     fn block_reason(&self, state: &State) -> String {
+        #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
         let elapsed_secs =
             SpineState::get(state).config.autonomous_start_ms.map_or(0, |start| now_ms().saturating_sub(start) / 1000);
         format!(

@@ -4,6 +4,7 @@ use cp_base::state::context::{ContextElement, ContextType};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
+/// Execute the Open tool: add one or more files to the context.
 pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Accept both a single string and an array of strings
     let paths: Vec<String> = match tool.input.get("path") {
@@ -29,6 +30,7 @@ pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), content, has_error)
 }
 
+/// Open a single file and add it as a context element, returning a status message.
 fn open_single_file(path: &str, state: &mut State) -> String {
     // Check if file exists (quick metadata check, not a full read)
     let path_obj = Path::new(path);

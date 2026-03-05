@@ -42,15 +42,21 @@ pub struct BranchPrUpdate {
 
 /// State for background polling of the current branch's PR
 struct BranchPrWatch {
+    /// Branch name being watched.
     branch: String,
+    /// GitHub token for API authentication.
     github_token: Arc<SecretBox<String>>,
+    /// Timestamp of the last poll attempt (milliseconds).
     last_poll_ms: u64,
+    /// SHA-256 hash of the last output, used for change detection.
     last_output_hash: Option<String>,
 }
 
 /// Per-panel watch state
 struct GhWatch {
+    /// Panel context ID this watch belongs to.
     context_id: String,
+    /// GitHub token for API authentication.
     github_token: Arc<SecretBox<String>>,
     /// Pre-parsed args (excludes "gh" prefix)
     args: Vec<String>,
@@ -68,8 +74,11 @@ struct GhWatch {
 
 /// Background watcher that polls `GithubResult` panels for changes.
 pub struct Watcher {
+    /// Per-panel watch states, keyed by context ID.
     watches: Arc<Mutex<HashMap<String, GhWatch>>>,
+    /// Optional watch state for the current branch's PR.
     branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,
+    /// Handle to the background polling thread.
     _thread: JoinHandle<()>,
 }
 
@@ -172,8 +181,11 @@ pub fn is_api_command(args: &[String]) -> bool {
 
 /// Background polling loop state. Owns the shared data for `thread::spawn`.
 struct GhPollLoop {
+    /// Shared per-panel watch states.
     watches: Arc<Mutex<HashMap<String, GhWatch>>>,
+    /// Shared branch PR watch state.
     branch_pr_watch: Arc<Mutex<Option<BranchPrWatch>>>,
+    /// Channel for sending cache updates to the main thread.
     cache_tx: Sender<CacheUpdate>,
 }
 
@@ -298,7 +310,9 @@ impl GhPollLoop {
 
 /// Outcome of an API poll attempt
 struct ApiPollOutcome {
+    /// New content if changed: `(new_etag, response_body)`.
     content: Option<(Option<String>, String)>,
+    /// Updated poll interval from `X-Poll-Interval` header, if present.
     poll_interval: Option<u64>,
 }
 

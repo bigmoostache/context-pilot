@@ -15,19 +15,23 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     }
 }
 
+/// Build a `FirecrawlClient` from the `FIRECRAWL_API_KEY` env var.
 fn get_client() -> Result<FirecrawlClient, String> {
     let key = std::env::var("FIRECRAWL_API_KEY").map_err(|_e| "FIRECRAWL_API_KEY not set".to_string())?;
     FirecrawlClient::new(key)
 }
 
+/// Build a successful `ToolResult`.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: false, tool_name: tool.name.clone() }
 }
 
+/// Build an error `ToolResult`.
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, tool_name: tool.name.clone() }
 }
 
+/// Execute the `firecrawl_scrape` tool: scrape a single URL for content.
 fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
@@ -117,6 +121,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => err_result(tool, e),
     }
 }
+/// Execute the `firecrawl_search` tool: search and scrape in one call.
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
@@ -217,6 +222,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => err_result(tool, e),
     }
 }
+/// Execute the `firecrawl_map` tool: discover all URLs on a domain.
 fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,

@@ -14,6 +14,7 @@ use std::fmt::Write as _;
 /// Flattened todo entry for rendering: (indent, id, name, status, description).
 type TodoLine = (usize, String, String, TodoStatus, String);
 
+/// Panel that renders the hierarchical todo list in the sidebar.
 pub(crate) struct TodoPanel;
 
 impl TodoPanel {
@@ -82,6 +83,41 @@ impl Panel for TodoPanel {
             .map_or(("P3", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Todo List", content, last_refresh_ms)]
     }
+
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &cp_base::state::context::ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut text: Vec<Line<'_>> = Vec::new();

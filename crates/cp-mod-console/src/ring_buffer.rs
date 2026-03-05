@@ -3,8 +3,10 @@ use std::sync::{Arc, Mutex};
 /// Maximum ring buffer size in bytes (256 KB).
 pub const RING_BUFFER_CAPACITY: usize = 256 * 1024;
 
+/// Internal mutable state of the ring buffer, protected by a mutex.
 #[derive(Debug)]
 struct RingBufferInner {
+    /// Backing byte storage (fixed-size circular buffer).
     buf: Vec<u8>,
     /// Current write position in the circular buffer
     write_pos: usize,
@@ -18,6 +20,7 @@ struct RingBufferInner {
 /// Clone is cheap — it shares the inner buffer via Arc.
 #[derive(Debug, Clone)]
 pub struct RingBuffer {
+    /// Shared inner state behind an `Arc<Mutex>`.
     inner: Arc<Mutex<RingBufferInner>>,
 }
 

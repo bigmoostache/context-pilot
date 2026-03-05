@@ -477,6 +477,7 @@ name = "cp-mod-console"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "crossterm",
  "ratatui",
  "regex",
  "serde",
@@ -526,6 +527,7 @@ dependencies = [
  "ratatui",
  "regex",
  "secrecy",
+ "serde_json",
  "sha2",
 ]
 
@@ -583,6 +585,7 @@ name = "cp-mod-queue"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "crossterm",
  "ratatui",
  "serde",
  "serde_json",

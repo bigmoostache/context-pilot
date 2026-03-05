@@ -5,6 +5,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::types::{TodoItem, TodoState, TodoStatus};
 use std::fmt::Write as _;
 
+/// Execute `todo_create` tool — add one or more todo items with optional nesting.
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(todos) = tool.input.get("todos").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'todos' array parameter".to_string(), true);
@@ -90,6 +91,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), output, created.is_empty())
 }
 
+/// Execute `todo_update` tool — modify status, name, description, or delete todos.
 pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
@@ -323,6 +325,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), output, modified.is_empty() && deleted.is_empty() && propagated.is_empty())
 }
 
+/// Execute `todo_move` tool — reorder a todo by placing it after another.
 pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'id' parameter".to_string(), true);

@@ -12,9 +12,13 @@ use crate::types::ProcessStatus;
 
 /// Tails a log file, pushing new bytes into a shared ring buffer.
 pub(crate) struct FilePoller {
+    /// Path to the log file being tailed.
     pub path: PathBuf,
+    /// Shared ring buffer that receives new bytes.
     pub buffer: RingBuffer,
+    /// Signal flag to stop the polling loop.
     pub stop: Arc<AtomicBool>,
+    /// Current byte offset in the log file.
     pub offset: u64,
 }
 
@@ -63,9 +67,13 @@ impl FilePoller {
 
 /// Periodically asks the console server for process status updates.
 pub(crate) struct StatusPoller {
+    /// Server-side session key used to query status.
     pub key: String,
+    /// Shared process status, updated when the process exits.
     pub status: Arc<Mutex<ProcessStatus>>,
+    /// Timestamp (ms) when the process finished, if it has.
     pub finished_at: Arc<Mutex<Option<u64>>>,
+    /// Signal flag to stop the polling loop.
     pub stop: Arc<AtomicBool>,
 }
 

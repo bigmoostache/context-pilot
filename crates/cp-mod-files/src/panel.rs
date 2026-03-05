@@ -14,12 +14,17 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 
+/// Data sent to the background cache thread for a file panel refresh.
 pub(crate) struct FileCacheRequest {
+    /// Identifier of the context element to update.
     pub context_id: String,
+    /// Absolute path to the file on disk.
     pub file_path: String,
+    /// Hash of the currently cached source (used to skip unchanged files).
     pub current_source_hash: Option<String>,
 }
 
+/// Panel implementation for displaying file contents with syntax highlighting.
 pub(crate) struct FilePanel;
 
 impl Panel for FilePanel {
@@ -175,8 +180,8 @@ impl Panel for FilePanel {
                     Span::styled(" ", base_style),
                 ];
 
-                for (color, text) in spans {
-                    line_spans.push(Span::styled(text.clone(), Style::default().fg(*color)));
+                for (color, span_text) in spans {
+                    line_spans.push(Span::styled(span_text.clone(), Style::default().fg(*color)));
                 }
 
                 text.push(Line::from(line_spans));
@@ -186,6 +191,8 @@ impl Panel for FilePanel {
         text
     }
 
-    fn cache_refresh_interval_ms(&self) -> Option<u64> { None }
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
     fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }

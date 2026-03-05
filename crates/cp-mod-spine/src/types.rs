@@ -2,6 +2,7 @@ use cp_base::state::context::ContextType;
 use cp_base::state::runtime::State;
 use serde::{Deserialize, Serialize};
 
+/// Serde default returning `true`.
 const fn default_true() -> bool {
     true
 }

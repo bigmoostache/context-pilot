@@ -5,7 +5,9 @@
 //! intercepts tool calls in the pipeline, stores them, and replays on flush.
 //! Reverie sub-agents get their own activation flag sharing the same queue storage.
 
+/// Queue sidebar panel rendering.
 mod panel;
+/// Tool execution handlers for queue commands.
 mod tools;
 /// Queue state types: `QueueState`, `QueuedToolCall`.
 pub mod types;
@@ -23,6 +25,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use self::panel::QueuePanel;
 use cp_base::cast::SafeCast as _;
 
+/// Lazily parsed tool descriptions from the queue YAML definition.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/queue.yaml")));
 
@@ -185,5 +188,64 @@ impl Module for QueueModule {
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Queue", "Batch tool execution queue — queue actions and flush them atomically")]
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+    fn is_core(&self) -> bool {
+        false
+    }
+    fn is_global(&self) -> bool {
+        false
+    }
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+    fn tool_visualizers(&self) -> Vec<(&'static str, cp_base::modules::ToolVisualizer)> {
+        vec![]
+    }
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+        None
+    }
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+    fn on_close_context(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+    fn on_user_message(&self, _state: &mut State) {}
+    fn on_stream_stop(&self, _state: &mut State) {}
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        vec![]
+    }
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }

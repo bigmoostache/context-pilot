@@ -4,7 +4,9 @@
 //! Cells are stored per-worker and shown in a fixed panel. Useful for the AI to
 //! maintain intermediate state during multi-step tasks.
 
+/// Panel rendering for scratchpad cells.
 mod panel;
+/// Tool implementations for creating, editing, and wiping scratchpad cells.
 mod tools;
 /// Scratchpad state types: `ScratchpadCell`, `ScratchpadState`.
 pub mod types;
@@ -25,6 +27,7 @@ use self::panel::ScratchpadPanel;
 use cp_base::cast::SafeCast as _;
 use cp_base::modules::Module;
 
+/// Lazily-parsed tool descriptions loaded from the scratchpad YAML definition.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/scratchpad.yaml")));
 
@@ -197,7 +200,7 @@ impl Module for ScratchpadModule {
     fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
         None
     }
-    fn context_detail(&self, _ctx: &crate::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
         None
     }
     fn overview_context_section(&self, _state: &State) -> Option<String> {
@@ -212,19 +215,19 @@ impl Module for ScratchpadModule {
     }
     fn on_close_context(
         &self,
-        _ctx: &crate::state::context::ContextElement,
+        _ctx: &cp_base::state::context::ContextElement,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
     }
     fn on_user_message(&self, _state: &mut State) {}
     fn on_stream_stop(&self, _state: &mut State) {}
-    fn watch_paths(&self, _state: &State) -> Vec<crate::panels::WatchSpec> {
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
         vec![]
     }
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &crate::state::context::ContextElement,
+        _ctx: &cp_base::state::context::ContextElement,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

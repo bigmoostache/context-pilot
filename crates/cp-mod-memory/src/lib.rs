@@ -4,7 +4,9 @@
 //! survive across sessions and workers. Each has a tl;dr summary (capped at
 //! 80 tokens) shown in the panel, with optional rich body text shown when opened.
 
+/// Panel rendering and context generation for memory items.
 mod panel;
+/// Tool execution handlers for `memory_create` and `memory_update`.
 mod tools;
 /// Memory state types: `MemoryItem`, `MemoryImportance`, `MemoryState`.
 pub mod types;
@@ -28,6 +30,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use self::panel::MemoryPanel;
 use cp_base::modules::Module;
 
+/// Lazily parsed tool descriptions from the memory YAML definition.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/memory.yaml")));
 
@@ -200,6 +203,69 @@ impl Module for MemoryModule {
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Memory", "Store persistent memories across the conversation")]
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+
+    fn is_core(&self) -> bool {
+        false
+    }
+
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+        None
+    }
+
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    fn on_close_context(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+
+    fn on_user_message(&self, _state: &mut State) {}
+
+    fn on_stream_stop(&self, _state: &mut State) {}
+
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        vec![]
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }
 

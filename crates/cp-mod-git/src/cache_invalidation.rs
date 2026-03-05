@@ -1,11 +1,15 @@
 use regex::Regex;
 
+/// A rule mapping a mutating git command pattern to panels it should invalidate.
 pub(crate) struct InvalidationRule {
+    /// Regex matching the mutating git command.
     pub trigger: Regex,
+    /// Patterns of git commands whose cached results become stale.
     pub invalidates: Vec<String>,
 }
 
 impl InvalidationRule {
+    /// Create a rule from a trigger pattern and a list of invalidation patterns.
     fn new(trigger: &str, invalidates: &[&str]) -> Option<Self> {
         Some(Self {
             trigger: Regex::new(trigger).ok()?,
@@ -14,6 +18,7 @@ impl InvalidationRule {
     }
 }
 
+/// Build the full list of cache invalidation rules for git commands.
 pub(crate) fn build_invalidation_rules() -> Vec<InvalidationRule> {
     vec![
         // NUCLEAR — invalidate ALL GitResult panels
@@ -61,6 +66,7 @@ pub(crate) fn build_invalidation_rules() -> Vec<InvalidationRule> {
     .collect()
 }
 
+/// Return regexes matching git commands whose caches should be invalidated by `mutating_command`.
 pub(crate) fn find_invalidations(mutating_command: &str) -> Vec<Regex> {
     let rules = build_invalidation_rules();
     let mut result = Vec::new();

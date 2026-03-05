@@ -4,45 +4,47 @@ use std::time::Duration;
 use crate::types::{BraveSearchResponse, LLMContextResponse, RichCallbackResponse};
 use std::fmt::Write as _;
 
+/// Base URL for the Brave Search v1 REST API.
 const BRAVE_BASE_URL: &str = "https://api.search.brave.com/res/v1";
+/// HTTP request timeout in seconds.
 const TIMEOUT_SECS: u64 = 10;
 
 /// Parameters for a Brave web search request.
 #[derive(Debug)]
-pub struct SearchParams<'a> {
+pub struct SearchParams<'req> {
     /// Search query string.
-    pub query: &'a str,
+    pub query: &'req str,
     /// Number of results to return (1-20).
     pub count: u32,
     /// Recency filter (e.g., "pd", "pw", "pm", "py", or date range).
-    pub freshness: Option<&'a str>,
+    pub freshness: Option<&'req str>,
     /// Two-letter ISO country code.
-    pub country: &'a str,
+    pub country: &'req str,
     /// Result language ISO 639-1 code.
-    pub search_lang: &'a str,
+    pub search_lang: &'req str,
     /// Safe search level: "off", "moderate", or "strict".
-    pub safe_search: &'a str,
+    pub safe_search: &'req str,
     /// Brave Goggle URL for domain re-ranking.
-    pub goggles_id: Option<&'a str>,
+    pub goggles_id: Option<&'req str>,
 }
 
 /// Parameters for a Brave LLM context request.
 #[derive(Debug)]
-pub struct LLMContextParams<'a> {
+pub struct LLMContextParams<'req> {
     /// Search query string.
-    pub query: &'a str,
+    pub query: &'req str,
     /// Approximate max tokens in response (1024-32768).
     pub max_tokens: u32,
     /// Max search results to consider (1-50).
     pub count: u32,
     /// Relevance threshold: "strict", "balanced", "lenient", or "disabled".
-    pub threshold_mode: &'a str,
+    pub threshold_mode: &'req str,
     /// Recency filter.
-    pub freshness: Option<&'a str>,
+    pub freshness: Option<&'req str>,
     /// Two-letter ISO country code.
-    pub country: &'a str,
+    pub country: &'req str,
     /// Brave Goggle URL or inline definition.
-    pub goggles: Option<&'a str>,
+    pub goggles: Option<&'req str>,
 }
 
 /// HTTP client for the Brave Search API.
@@ -76,18 +78,18 @@ impl BraveClient {
     /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn search(&self, p: &SearchParams<'_>) -> Result<(BraveSearchResponse, Option<serde_json::Value>), String> {
         let mut url = format!("{}/web/search?q={}", BRAVE_BASE_URL, urlenc(p.query));
-        let _r = write!(url, "&count={}", p.count);
+        let _r1 = write!(url, "&count={}", p.count);
         url.push_str("&extra_snippets=true");
         url.push_str("&enable_rich_callback=1");
-        let _r = write!(url, "&country={}", urlenc(p.country));
-        let _r = write!(url, "&search_lang={}", urlenc(p.search_lang));
-        let _r = write!(url, "&safesearch={}", urlenc(p.safe_search));
+        let _r2 = write!(url, "&country={}", urlenc(p.country));
+        let _r3 = write!(url, "&search_lang={}", urlenc(p.search_lang));
+        let _r4 = write!(url, "&safesearch={}", urlenc(p.safe_search));
 
         if let Some(f) = p.freshness {
-            let _r = write!(url, "&freshness={}", urlenc(f));
+            let _r5 = write!(url, "&freshness={}", urlenc(f));
         }
         if let Some(g) = p.goggles_id {
-            let _r = write!(url, "&goggles_id={}", urlenc(g));
+            let _r6 = write!(url, "&goggles_id={}", urlenc(g));
         }
 
         let response = self.get_with_retry(&url)?;
@@ -111,20 +113,20 @@ impl BraveClient {
     /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn llm_context(&self, p: &LLMContextParams<'_>) -> Result<LLMContextResponse, String> {
         let mut url = format!("{}/llm/context?q={}", BRAVE_BASE_URL, urlenc(p.query));
-        let _r = write!(url, "&maximum_number_of_tokens={}", p.max_tokens);
-        let _r = write!(url, "&count={}", p.count);
-        let _r = write!(url, "&context_threshold_mode={}", urlenc(p.threshold_mode));
-        let _r = write!(url, "&country={}", urlenc(p.country));
+        let _r1 = write!(url, "&maximum_number_of_tokens={}", p.max_tokens);
+        let _r2 = write!(url, "&count={}", p.count);
+        let _r3 = write!(url, "&context_threshold_mode={}", urlenc(p.threshold_mode));
+        let _r4 = write!(url, "&country={}", urlenc(p.country));
         // Hardcoded optimal defaults
         url.push_str("&maximum_number_of_urls=20");
         url.push_str("&maximum_number_of_snippets=50");
         url.push_str("&maximum_number_of_tokens_per_url=4096");
 
         if let Some(f) = p.freshness {
-            let _r = write!(url, "&freshness={}", urlenc(f));
+            let _r5 = write!(url, "&freshness={}", urlenc(f));
         }
         if let Some(g) = p.goggles {
-            let _r = write!(url, "&goggles={}", urlenc(g));
+            let _r6 = write!(url, "&goggles={}", urlenc(g));
         }
 
         let response = self.get_with_retry(&url)?;
@@ -190,6 +192,7 @@ fn urlenc(s: &str) -> String {
     result
 }
 
+/// Truncate a string to at most `max` bytes on a char boundary.
 fn truncate(s: &str, max: usize) -> &str {
     if s.len() <= max { s } else { s.get(..s.floor_char_boundary(max)).unwrap_or("") }
 }

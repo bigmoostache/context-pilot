@@ -14,12 +14,17 @@ const MAX_CONTEXT_CHARS: usize = 8_000;
 
 /// Cache request payload: pre-read ring buffer data on the main thread.
 struct ConsoleCacheRequest {
+    /// Panel context ID this request belongs to.
     context_id: String,
+    /// Snapshot of the ring buffer content.
     buffer_content: String,
+    /// Monotonic byte count at read time (for change detection).
     total_written: u64,
+    /// Previous source hash to skip no-op refreshes.
     current_source_hash: Option<String>,
 }
 
+/// Panel implementation for console session output.
 pub(crate) struct ConsolePanel;
 
 impl Panel for ConsolePanel {
@@ -197,6 +202,14 @@ impl Panel for ConsolePanel {
 
         lines
     }
+
+    fn handle_key(&self, _key: &crossterm::event::KeyEvent, _state: &State) -> Option<cp_base::state::actions::Action> {
+        None
+    }
+
+    fn refresh(&self, _state: &mut State) {}
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state

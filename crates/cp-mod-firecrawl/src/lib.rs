@@ -20,6 +20,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
+/// Lazily-loaded tool description texts parsed from the YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/firecrawl.yaml")));
 

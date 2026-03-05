@@ -15,6 +15,7 @@ use super::GIT_STATUS_REFRESH_MS;
 use crate::types::GitResultRequest;
 use cp_base::panels::scroll_key_action;
 
+/// Panel that displays and auto-refreshes the output of a read-only git command.
 pub(crate) struct GitResultPanel;
 
 impl Panel for GitResultPanel {
@@ -166,4 +167,10 @@ impl Panel for GitResultPanel {
 
         text
     }
+
+    fn refresh(&self, _state: &mut State) {}
+    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+        false
+    }
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }

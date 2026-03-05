@@ -20,9 +20,13 @@ use cp_base::tools::{ToolResult, ToolUse};
 /// and re-registered into `WatcherRegistry` on load.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct CoucouData {
+    /// Unique watcher ID for registry lookup.
     pub watcher_id: String,
+    /// The user's reminder message.
     pub message: String,
+    /// When this coucou was registered (ms since epoch).
     pub registered_at_ms: u64,
+    /// When the notification should fire (ms since epoch).
     pub fire_at_ms: u64,
 }
 
@@ -123,8 +127,8 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
     let time_str = time_with_tz.trim_end_matches('Z');
     let time_parts: Vec<&str> = time_str.split(':').collect();
     let (hour_s, min_s, sec_s) = match time_parts.as_slice() {
-        [h, m] => (*h, *m, "0"),
-        [h, m, s, ..] => (*h, *m, *s),
+        [hr, mn] => (*hr, *mn, "0"),
+        [hr, mn, sc, ..] => (*hr, *mn, *sc),
         _ => return Err("Expected time format: HH:MM or HH:MM:SS".to_string()),
     };
 
@@ -137,20 +141,20 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
 
     // Simple days-since-epoch calculation (good enough for scheduling)
     // Using a basic algorithm for dates after 2000
-    let mut days: i64 = 0;
+    let mut epoch_days: i64 = 0;
     for y in 1970..year {
-        days = days.saturating_add(if is_leap_year(y) { 366 } else { 365 });
+        epoch_days = epoch_days.saturating_add(if is_leap_year(y) { 366 } else { 365 });
     }
     let month_days = [31, if is_leap_year(year) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     for day_count in month_days.iter().take(month.saturating_sub(1).to_usize()) {
         if month > 12 {
             break;
         }
-        days = days.saturating_add((*day_count).to_i64());
+        epoch_days = epoch_days.saturating_add((*day_count).to_i64());
     }
-    days = days.saturating_add(day.saturating_sub(1));
+    epoch_days = epoch_days.saturating_add(day.saturating_sub(1));
 
-    let total_secs = days
+    let total_secs = epoch_days
         .saturating_mul(86400)
         .saturating_add(hour.saturating_mul(3600))
         .saturating_add(min.saturating_mul(60))
@@ -162,11 +166,14 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
     Ok(total_secs.to_u64().saturating_mul(1000))
 }
 
+/// Check whether a given year is a leap year.
+#[expect(clippy::integer_division_remainder_used, reason = "calendar modulo arithmetic")]
 const fn is_leap_year(y: i64) -> bool {
     (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
 }
 
 /// Format milliseconds as a human-friendly duration string.
+#[expect(clippy::integer_division_remainder_used, reason = "intentional truncating time arithmetic")]
 fn format_duration(ms: u64) -> String {
     let total_secs = ms / 1000;
     let hours = total_secs / 3600;
@@ -207,6 +214,18 @@ pub(crate) struct CoucouWatcher {
 }
 
 impl Watcher for CoucouWatcher {
+    fn is_easy_bash(&self) -> bool {
+        false
+    }
+
+    fn is_persistent(&self) -> bool {
+        false
+    }
+
+    fn suicide(&self, _state: &State) -> bool {
+        false
+    }
+
     fn id(&self) -> &str {
         &self.watcher_id
     }
@@ -261,6 +280,7 @@ impl Watcher for CoucouWatcher {
 // Tool execution
 // ============================================================
 
+/// Monotonic counter for generating unique coucou watcher IDs.
 static COUCOU_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Execute the coucou tool — schedule a notification.

@@ -6,6 +6,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use std::fmt::Write as _;
 
+/// Execute the Write tool: create or overwrite a file and update context.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);

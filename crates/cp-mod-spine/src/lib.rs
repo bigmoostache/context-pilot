@@ -7,8 +7,11 @@
 pub(crate) mod coucou;
 /// Auto-continuation engine: `should_auto_continue()`, message injection, guard rail checks.
 pub mod engine;
+/// Guard rail implementations: safety limits for auto-continuation.
 pub(crate) mod guard_rail;
+/// Spine panel: notification display and context rendering.
 mod panel;
+/// Tool execution: `notification_mark_processed`, `spine_configure`.
 pub(crate) mod tools;
 /// Notification, spine config, and state types.
 pub mod types;
@@ -29,6 +32,7 @@ use self::panel::SpinePanel;
 use cp_base::cast::SafeCast as _;
 use cp_base::modules::Module;
 
+/// Lazily-parsed tool text definitions for spine tools.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/spine.yaml")));
 
@@ -37,6 +41,73 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 pub struct SpineModule;
 
 impl Module for SpineModule {
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+
+    fn is_core(&self) -> bool {
+        false
+    }
+
+    fn is_global(&self) -> bool {
+        false
+    }
+
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+        None
+    }
+
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    fn on_close_context(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        vec![]
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "spine"
     }
@@ -276,7 +347,7 @@ fn prune_notifications(notifications: &mut Vec<Notification>) {
     if processed_count <= 10 {
         return;
     }
-    let mut processed_seen = 0;
+    let mut processed_seen = 0_usize;
     let drop_count = processed_count.saturating_sub(10);
     notifications.retain(|n| {
         if n.is_processed() {

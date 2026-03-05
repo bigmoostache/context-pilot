@@ -8,8 +8,10 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 
+/// Context type identifier for Brave result panels.
 pub(crate) const BRAVE_PANEL_TYPE: &str = "brave_result";
 
+/// Metadata key used to persist panel content across reloads.
 const META_CONTENT: &str = "result_content";
 
 /// Create a dynamic panel with the given title and content.
@@ -44,7 +46,9 @@ pub struct Results;
 
 /// Cache request for restoring content from metadata after reload
 struct BraveRestoreRequest {
+    /// Panel context ID to restore.
     context_id: String,
+    /// Full content string to re-populate.
     content: String,
 }
 

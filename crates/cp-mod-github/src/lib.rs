@@ -7,9 +7,11 @@
 pub(crate) mod cache_invalidation;
 /// Command classification: read-only vs mutating `gh` subcommands.
 pub mod classify;
+/// GitHub result panel: renders `gh` command output with caching and pagination.
 mod panel;
 /// Output parsing: extract PR/issue data from `gh` CLI output.
 pub mod parse;
+/// Tool implementations for `gh_execute`.
 mod tools;
 /// GitHub state types: `GithubState`, `GhCommand`, `GhWatch`.
 pub mod types;
@@ -32,6 +34,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use self::panel::GithubResultPanel;
 use cp_base::modules::Module;
 
+/// Lazily parsed tool texts loaded from the GitHub YAML definition.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/github.yaml")));
 

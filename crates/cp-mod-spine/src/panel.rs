@@ -12,9 +12,11 @@ use cp_base::state::watchers::WatcherRegistry;
 use crate::types::{NotificationType, SpineState};
 use std::fmt::Write as _;
 
+/// Panel for displaying spine notifications, watchers, and config.
 pub(crate) struct SpinePanel;
 
 /// Format a millisecond timestamp as HH:MM:SS
+#[expect(clippy::integer_division_remainder_used, reason = "intentional truncating time arithmetic")]
 fn format_timestamp(ms: u64) -> String {
     let secs = ms / 1000;
     let hours = (secs % 86400) / 3600;
@@ -64,11 +66,12 @@ impl SpinePanel {
 
         // Show spine config summary
         output.push_str("\n=== Spine Config ===\n");
-        let _r =
+        let _r1 =
             writeln!(output, "continue_until_todos_done: {}", SpineState::get(state).config.continue_until_todos_done);
-        let _r = writeln!(output, "auto_continuation_count: {}", SpineState::get(state).config.auto_continuation_count);
+        let _r2 =
+            writeln!(output, "auto_continuation_count: {}", SpineState::get(state).config.auto_continuation_count);
         if let Some(v) = SpineState::get(state).config.max_auto_retries {
-            let _r = writeln!(output, "max_auto_retries: {v}");
+            let _r3 = writeln!(output, "max_auto_retries: {v}");
         }
 
         // Show active watchers
@@ -78,9 +81,10 @@ impl SpinePanel {
                 output.push_str("\n=== Active Watchers ===\n");
                 let now = now_ms();
                 for w in watchers {
+                    #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
                     let age_s = (now.saturating_sub(w.registered_ms())) / 1000;
                     let mode = if w.is_blocking() { "blocking" } else { "async" };
-                    let _r = writeln!(output, "[{}] {} ({}, {}s ago)", w.id(), w.description(), mode, age_s);
+                    let _r4 = writeln!(output, "[{}] {} ({}, {}s ago)", w.id(), w.description(), mode, age_s);
                 }
             }
         }
@@ -90,6 +94,41 @@ impl SpinePanel {
 }
 
 impl Panel for SpinePanel {
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &State,
+    ) -> Option<cp_base::panels::CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(
+        &self,
+        _update: cp_base::panels::CacheUpdate,
+        _ctx: &mut cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &cp_base::state::context::ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         scroll_key_action(key)
     }
@@ -281,6 +320,7 @@ impl Panel for SpinePanel {
                 )]));
                 let now = now_ms();
                 for w in watchers {
+                    #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
                     let age_s = (now.saturating_sub(w.registered_ms())) / 1000;
                     let mode_color = if w.is_blocking() { theme::warning() } else { theme::text_secondary() };
                     let mode_label = if w.is_blocking() { "⏳" } else { "👁" };
@@ -297,6 +337,7 @@ impl Panel for SpinePanel {
     }
 }
 
+/// Map a notification type to its display color.
 fn notification_type_color(nt: NotificationType) -> Color {
     match nt {
         NotificationType::UserMessage => theme::user(),

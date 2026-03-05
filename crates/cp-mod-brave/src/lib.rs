@@ -19,6 +19,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
+/// Lazily-loaded tool description texts parsed from the YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/brave.yaml")));
 
@@ -139,7 +140,7 @@ impl Module for BraveModule {
         vec![]
     }
 
-    fn tool_visualizers(&self) -> Vec<(&'static str, cp_base::tools::ToolVisualizer)> {
+    fn tool_visualizers(&self) -> Vec<(&'static str, cp_base::modules::ToolVisualizer)> {
         vec![]
     }
 

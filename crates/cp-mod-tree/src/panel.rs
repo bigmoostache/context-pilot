@@ -12,13 +12,19 @@ use cp_base::ui::{find_children_pattern, find_size_pattern};
 use crate::types::TreeState;
 use cp_base::panels::scroll_key_action;
 
+/// Data payload sent to the background cache worker for tree generation.
 pub(crate) struct TreeCacheRequest {
+    /// Context element identifier.
     pub context_id: String,
+    /// Gitignore-style filter applied to the tree.
     pub tree_filter: String,
+    /// Paths of currently expanded folders.
     pub tree_open_folders: Vec<String>,
+    /// File/folder description annotations.
     pub tree_descriptions: Vec<crate::types::TreeFileDescription>,
 }
 
+/// Panel that renders the directory tree in the sidebar.
 pub(crate) struct TreePanel;
 
 impl Panel for TreePanel {
@@ -138,4 +144,12 @@ impl Panel for TreePanel {
 
         text
     }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+        false
+    }
+    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }

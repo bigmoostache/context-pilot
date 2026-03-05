@@ -234,6 +234,7 @@ impl Watcher for ConsoleWatcher {
             return None;
         }
 
+        #[expect(clippy::integer_division_remainder_used, reason = "ms→s truncation")]
         let elapsed_s = now.saturating_sub(self.registered_at_ms) / 1000;
 
         if self.easy_bash {
@@ -278,5 +279,17 @@ impl Watcher for ConsoleWatcher {
 
     fn is_easy_bash(&self) -> bool {
         self.easy_bash
+    }
+
+    fn is_persistent(&self) -> bool {
+        false
+    }
+
+    fn fire_at_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn message(&self) -> Option<&str> {
+        None
     }
 }

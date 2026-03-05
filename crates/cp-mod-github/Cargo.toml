@@ -15,6 +15,7 @@ ratatui.workspace = true
 crossterm.workspace = true
 regex.workspace = true
 sha2.workspace = true
+serde_json.workspace = true
 secrecy = { version = "0.10", features = ["serde"] }
 
 [lints]

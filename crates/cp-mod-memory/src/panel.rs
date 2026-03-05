@@ -3,16 +3,20 @@ use ratatui::prelude::{Line, Span, Style};
 use unicode_width::UnicodeWidthStr;
 
 use cp_base::config::accessors::theme;
-use cp_base::panels::{ContextItem, Panel};
+use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel};
 use cp_base::state::actions::Action;
+use cp_base::state::context::ContextElement;
 use cp_base::state::context::{ContextType, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::ui::{Cell, TextCell, render_table, render_table_text};
+use ratatui::Frame;
+use ratatui::prelude::Rect;
 
 use crate::types::{MemoryImportance, MemoryState};
 use cp_base::panels::scroll_key_action;
 use std::fmt::Write as _;
 
+/// Panel that renders memory items and provides LLM context.
 pub(crate) struct MemoryPanel;
 
 impl MemoryPanel {
@@ -67,16 +71,16 @@ impl MemoryPanel {
                 if i > 0 {
                     output.push('\n');
                 }
-                let _r = writeln!(output, "{}:", memory.id);
-                let _r = writeln!(output, "  tl_dr: {}", memory.tl_dr);
-                let _r = writeln!(output, "  importance: {}", memory.importance.as_str());
+                let _r1 = writeln!(output, "{}:", memory.id);
+                let _r2 = writeln!(output, "  tl_dr: {}", memory.tl_dr);
+                let _r3 = writeln!(output, "  importance: {}", memory.importance.as_str());
                 if !memory.labels.is_empty() {
-                    let _r = writeln!(output, "  labels: [{}]", memory.labels.join(", "));
+                    let _r4 = writeln!(output, "  labels: [{}]", memory.labels.join(", "));
                 }
                 if !memory.contents.is_empty() {
                     output.push_str("  contents: |\n");
                     for line in memory.contents.lines() {
-                        let _r = writeln!(output, "    {line}");
+                        let _r5 = writeln!(output, "    {line}");
                     }
                 }
             }
@@ -117,6 +121,32 @@ impl Panel for MemoryPanel {
             .map_or(("P4", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Memories", content, last_refresh_ms)]
     }
+
+    fn needs_cache(&self) -> bool {
+        false
+    }
+
+    fn refresh_cache(&self, _request: CacheRequest) -> Option<CacheUpdate> {
+        None
+    }
+
+    fn build_cache_request(&self, _ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+        None
+    }
+
+    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut ContextElement, _state: &mut State) -> bool {
+        false
+    }
+
+    fn cache_refresh_interval_ms(&self) -> Option<u64> {
+        None
+    }
+
+    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+        false
+    }
+
+    fn render(&self, _frame: &mut Frame<'_>, _state: &mut State, _area: Rect) {}
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut text: Vec<Line<'_>> = Vec::new();

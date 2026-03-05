@@ -6,7 +6,9 @@
 
 /// Session management: spawn/reconnect via Unix socket server, kill, orphan cleanup.
 pub mod manager;
+/// Panel rendering for console session output.
 mod panel;
+/// Background polling threads for log tailing and process status.
 mod pollers;
 /// Thread-safe ring buffer for capturing process output.
 pub mod ring_buffer;
@@ -38,6 +40,7 @@ use self::types::{ConsoleState, SessionMeta};
 pub use self::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
 use cp_base::cast::SafeCast as _;
 
+/// Lazily parsed tool descriptions from the console YAML definition.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/console.yaml")));
 
@@ -341,6 +344,69 @@ impl Module for ConsoleModule {
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Console", "Spawn and manage child processes")]
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+
+    fn is_core(&self) -> bool {
+        false
+    }
+
+    fn is_global(&self) -> bool {
+        false
+    }
+
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+
+    fn fixed_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+
+    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+        vec![]
+    }
+
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+
+    fn on_user_message(&self, _state: &mut State) {}
+
+    fn on_stream_stop(&self, _state: &mut State) {}
+
+    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
+        vec![]
+    }
+
+    fn should_invalidate_on_fs_change(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _changed_path: &str,
+        _is_dir_event: bool,
+    ) -> bool {
+        false
+    }
+
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }
 

@@ -329,19 +329,26 @@ pub fn list_dir_entries(
 }
 
 /// Context passed through tree recursion to avoid excessive parameters.
-struct TreeContext<'a> {
-    gitignore: Option<&'a ignore::gitignore::Gitignore>,
-    open_set: &'a HashSet<String>,
-    desc_map: &'a std::collections::HashMap<String, &'a TreeFileDescription>,
+struct TreeContext<'tree> {
+    /// Optional gitignore matcher for filtering entries.
+    gitignore: Option<&'tree ignore::gitignore::Gitignore>,
+    /// Set of folder paths currently expanded in the tree.
+    open_set: &'tree HashSet<String>,
+    /// Map from path to file/folder description annotation.
+    desc_map: &'tree std::collections::HashMap<String, &'tree TreeFileDescription>,
 }
 
 /// Recursive traversal state for a single tree node.
-struct TreeNode<'a> {
-    dir: &'a Path,
-    path_str: &'a str,
-    prefix: &'a str,
+struct TreeNode<'tree> {
+    /// Filesystem directory path for this node.
+    dir: &'tree Path,
+    /// Normalized string representation of the path.
+    path_str: &'tree str,
+    /// Indentation prefix for tree drawing characters.
+    prefix: &'tree str,
 }
 
+/// Recursively build the tree output string for a single directory node.
 fn build_tree_new(node: &TreeNode<'_>, ctx: &TreeContext<'_>, output: &mut String) {
     let Ok(entries) = fs::read_dir(node.dir) else { return };
 

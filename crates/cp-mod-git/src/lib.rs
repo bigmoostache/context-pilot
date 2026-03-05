@@ -4,9 +4,13 @@
 //! auto-refreshing dynamic panels. Mutating commands (commit, push, merge, etc.)
 //! execute directly and return output. Shell operators are blocked for safety.
 
+/// Cache invalidation rules for git result panels.
 pub(crate) mod cache_invalidation;
+/// Git command classification (read-only vs mutating).
 mod classify;
+/// Panel implementation for displaying git command results.
 mod result_panel;
+/// Tool execution logic for `git_execute`.
 mod tools;
 /// Git state types: `GitState`, `GitFileChange`, `GitChangeType`.
 pub mod types;
@@ -141,6 +145,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use self::result_panel::GitResultPanel;
 use cp_base::modules::Module;
 
+/// Parsed tool description YAML for the git module.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/git.yaml")));
 
@@ -301,6 +306,42 @@ impl Module for GitModule {
     fn watcher_immediate_refresh(&self) -> bool {
         false // Prevent feedback loop: git status writes .git/index
     }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+    fn is_core(&self) -> bool {
+        false
+    }
+    fn is_global(&self) -> bool {
+        false
+    }
+    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::PreFlightResult> {
+        None
+    }
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+    fn on_close_context(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+    fn on_user_message(&self, _state: &mut State) {}
+    fn on_stream_stop(&self, _state: &mut State) {}
 }
 
 /// Visualizer for `git_execute` tool results.

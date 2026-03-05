@@ -5,7 +5,9 @@
 //! panel auto-refreshes on filesystem changes and provides @-autocomplete
 //! with directory entries.
 
+/// Panel implementation for the directory tree view.
 mod panel;
+/// Tool implementations for tree filtering, toggling, and describing.
 mod tools;
 /// Tree state types: `TreeState`, `TreeFileDescription`.
 pub mod types;
@@ -28,6 +30,7 @@ pub use types::{DEFAULT_TREE_FILTER, TreeFileDescription, TreeState};
 // Re-export directory listing for autocomplete
 pub use self::tools::list_dir_entries;
 
+/// Lazily parsed tool definitions loaded from the YAML spec.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/tree.yaml")));
 
@@ -222,6 +225,44 @@ impl Module for TreeModule {
         is_dir_event: bool,
     ) -> bool {
         is_dir_event && ctx.context_type.as_str() == ContextType::TREE
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+    fn is_core(&self) -> bool {
+        false
+    }
+    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+        vec![]
+    }
+    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
+        None
+    }
+    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+        None
+    }
+    fn overview_context_section(&self, _state: &State) -> Option<String> {
+        None
+    }
+    fn overview_render_sections(
+        &self,
+        _state: &State,
+        _base_style: ratatui::prelude::Style,
+    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+        vec![]
+    }
+    fn on_close_context(
+        &self,
+        _ctx: &cp_base::state::context::ContextElement,
+        _state: &mut State,
+    ) -> Option<Result<String, String>> {
+        None
+    }
+    fn on_user_message(&self, _state: &mut State) {}
+    fn on_stream_stop(&self, _state: &mut State) {}
+    fn watcher_immediate_refresh(&self) -> bool {
+        true
     }
 }
 

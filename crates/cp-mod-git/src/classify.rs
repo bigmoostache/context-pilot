@@ -4,7 +4,9 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CommandClass {
+    /// Command only reads repository state (safe to cache and auto-refresh).
     ReadOnly,
+    /// Command modifies repository state (execute once, return output).
     Mutating,
 }
 

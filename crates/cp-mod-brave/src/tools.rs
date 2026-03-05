@@ -13,18 +13,22 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     }
 }
 
+/// Build a `BraveClient` from the `BRAVE_API_KEY` env var.
 fn get_client() -> Result<BraveClient, String> {
     let api_key = std::env::var("BRAVE_API_KEY").map_err(|_e| "BRAVE_API_KEY not set".to_string())?;
     BraveClient::new(api_key)
 }
 
+/// Build a successful `ToolResult`.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: false, tool_name: tool.name.clone() }
 }
 
+/// Build an error `ToolResult`.
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, tool_name: tool.name.clone() }
 }
+/// Execute the `brave_search` tool: web search with snippet results.
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,
@@ -86,6 +90,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => err_result(tool, e),
     }
 }
+/// Execute the `brave_llm_context` tool: LLM-optimized content extraction.
 fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
     let client = match get_client() {
         Ok(c) => c,

@@ -10,6 +10,7 @@ use cp_base::state::runtime::State;
 use crate::types::ScratchpadState;
 use std::fmt::Write as _;
 
+/// Panel that renders scratchpad cells and provides their content as LLM context.
 pub(crate) struct ScratchpadPanel;
 
 impl ScratchpadPanel {

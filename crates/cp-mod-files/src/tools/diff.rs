@@ -24,10 +24,14 @@ pub(crate) fn generate_unified_diff(old: &str, new: &str) -> String {
     result
 }
 
+/// A single diff operation on a line.
 #[derive(Debug, Clone, PartialEq)]
 enum DiffOp<'src> {
+    /// Line is unchanged between old and new.
     Equal(&'src str),
+    /// Line was removed from the old text.
     Delete(&'src str),
+    /// Line was added in the new text.
     Insert(&'src str),
 }
 
