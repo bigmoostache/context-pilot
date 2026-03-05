@@ -14,7 +14,7 @@ pub(crate) mod streaming;
 pub(crate) use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern};
 
 use crate::infra::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
-use crate::state::{ContextElement, ContextType, State};
+use crate::state::{ContextElement, ContextType, State, StreamPhase};
 use cp_mod_prompt::PromptState;
 
 /// If cursor is inside a paste sentinel (\x00{idx}\x00), eject it to after the sentinel.
@@ -317,8 +317,8 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Nothing
         }
         Action::StopStreaming => {
-            if state.flags.stream.is_streaming {
-                state.flags.stream.is_streaming = false;
+            if state.flags.stream.phase.is_streaming() {
+                state.flags.stream.phase.transition(StreamPhase::Idle);
                 if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {
                     ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
                 }

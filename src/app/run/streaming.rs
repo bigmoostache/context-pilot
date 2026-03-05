@@ -7,13 +7,13 @@ use crate::infra::constants::{DEFAULT_WORKER_ID, MAX_API_RETRIES};
 use crate::app::App;
 use crate::app::context::{get_active_agent_content, prepare_stream_context};
 use crate::state::cache::{CacheUpdate, process_cache_request};
-use crate::state::{State, get_context_type_meta};
+use crate::state::{State, StreamPhase, get_context_type_meta};
 
 impl App {
     pub(super) fn process_stream_events(&mut self, rx: &Receiver<StreamEvent>) {
         let _guard = crate::profile!("app::stream_events");
         while let Ok(evt) = rx.try_recv() {
-            if !self.state.flags.stream.is_streaming {
+            if !self.state.flags.stream.phase.is_streaming() {
                 continue;
             }
             self.state.flags.ui.dirty = true;
@@ -73,7 +73,7 @@ impl App {
     pub(super) fn handle_retry(&mut self, tx: &Sender<StreamEvent>) {
         if let Some(_error) = self.pending_retry_error.take() {
             // Still streaming, retry the request
-            if self.state.flags.stream.is_streaming {
+            if self.state.flags.stream.phase.is_streaming() {
                 // Clear any partial assistant message content before retrying
                 if let Some(msg) = self.state.messages.last_mut()
                     && msg.role == "assistant"
@@ -105,7 +105,7 @@ impl App {
 
     pub(super) fn process_typewriter(&mut self) {
         let _guard = crate::profile!("app::typewriter");
-        if self.state.flags.stream.is_streaming
+        if self.state.flags.stream.phase.is_streaming()
             && let Some(chars) = self.typewriter.take_chars()
         {
             let _r = apply_action(&mut self.state, Action::AppendChars(chars));
@@ -127,7 +127,7 @@ impl App {
 
     /// Continue streaming after tool execution (called when panels are ready).
     pub(super) fn continue_streaming(&mut self, tx: &Sender<StreamEvent>) {
-        self.state.flags.stream.is_tooling = false;
+        self.state.flags.stream.phase.transition(StreamPhase::Receiving);
         let ctx = prepare_stream_context(&mut self.state, true, None);
         let system_prompt = get_active_agent_content(&self.state);
         self.typewriter.reset();
@@ -149,7 +149,7 @@ impl App {
     }
 
     pub(super) fn finalize_stream(&mut self) {
-        if !self.state.flags.stream.is_streaming {
+        if !self.state.flags.stream.phase.is_streaming() {
             return;
         }
         // Don't finalize while waiting for panels or deferred sleep —

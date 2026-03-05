@@ -14,7 +14,51 @@ mod ui;
 
 use std::io::{self, Write};
 use std::process::ExitCode;
+use std::sync::Mutex;
 use std::sync::mpsc;
+
+// ─── File Logger ────────────────────────────────────────────────────────────
+// Minimal `log` backend that appends trace-level messages to a single file.
+// Registered once at startup; no-ops if the file can't be opened.
+
+struct FileLogger(Mutex<Option<std::fs::File>>);
+
+impl log::Log for FileLogger {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        // Only accept our own state-machine traces — ignore noise from mio, polling, inotify, etc.
+        metadata.level() <= log::Level::Trace && metadata.target().starts_with("cp_base")
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if self.enabled(record.metadata())
+            && let Ok(mut guard) = self.0.lock()
+            && let Some(f) = guard.as_mut()
+        {
+            let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+            drop(writeln!(f, "[{ts}] {} — {}", record.level(), record.args()));
+        }
+    }
+
+    fn flush(&self) {
+        if let Ok(mut guard) = self.0.lock()
+            && let Some(f) = guard.as_mut()
+        {
+            drop(Write::flush(f));
+        }
+    }
+}
+
+/// Best-effort logger init: writes to `.context-pilot/state-machine.log`.
+/// Silently no-ops if the file or logger registration fails.
+fn init_file_logger() {
+    let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(".context-pilot/state-machine.log")
+    else {
+        return;
+    };
+    let logger = Box::leak(Box::new(FileLogger(Mutex::new(Some(file)))));
+    drop(log::set_logger(logger));
+    log::set_max_level(log::LevelFilter::Trace);
+}
 
 use crossterm::{
     ExecutableCommand,
@@ -29,6 +73,8 @@ use state::cache::CacheUpdate;
 use state::persistence::load_state;
 
 fn main() -> ExitCode {
+    init_file_logger();
+
     // Parse CLI args
     let args: Vec<String> = std::env::args().collect();
     let resume_stream = args.iter().any(|a| a == "--resume-stream");

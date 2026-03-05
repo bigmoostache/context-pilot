@@ -6,7 +6,7 @@ use crate::infra::api::StreamEvent;
 use crate::infra::tools::{execute_tool, perform_reload};
 use crate::modules::pre_flight::pre_flight_tool;
 use crate::state::persistence::build_message_op;
-use crate::state::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
+use crate::state::{Message, MessageStatus, MessageType, StreamPhase, ToolResultRecord, ToolUseRecord};
 
 use super::streaming::{has_dirty_file_panels, has_dirty_panels, trigger_dirty_panel_refresh};
 use cp_mod_callback::firing as callback_firing;
@@ -20,7 +20,7 @@ use crate::app::App;
 
 impl App {
     pub(super) fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>) {
-        if !self.state.flags.stream.is_streaming
+        if !self.state.flags.stream.phase.is_streaming()
             || self.pending_done.is_none()
             || !self.typewriter.pending_chars.is_empty()
             || self.pending_tools.is_empty()
@@ -38,7 +38,7 @@ impl App {
         let _guard = crate::profile!("app::tool_exec");
 
         self.state.flags.ui.dirty = true;
-        self.state.flags.stream.is_tooling = true;
+        self.state.flags.stream.phase.transition(StreamPhase::ExecutingTools);
         let tools = std::mem::take(&mut self.pending_tools);
         let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
 

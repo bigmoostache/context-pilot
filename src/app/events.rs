@@ -59,7 +59,7 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             }
 
             // Escape stops streaming
-            if key.code == KeyCode::Esc && state.flags.stream.is_streaming {
+            if key.code == KeyCode::Esc && state.flags.stream.phase.is_streaming() {
                 return Some(Action::StopStreaming);
             }
 

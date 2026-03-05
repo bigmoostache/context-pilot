@@ -68,7 +68,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends
-    if state.flags.stream.is_streaming {
+    if state.flags.stream.phase.is_streaming() {
         let insert_pos = state.messages.len().saturating_sub(1);
         state.messages.insert(insert_pos, user_msg);
         return ActionResult::Save;

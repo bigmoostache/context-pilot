@@ -427,6 +427,7 @@ name = "cp-base"
 version = "0.1.0"
 dependencies = [
  "crossterm",
+ "log",
  "ratatui",
  "serde",
  "serde_json",
@@ -4025,6 +4026,7 @@ dependencies = [
  "cp-mod-typst",
  "crossterm",
  "dotenvy",
+ "log",
  "notify",
  "ratatui",
  "regex",

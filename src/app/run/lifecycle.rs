@@ -204,7 +204,7 @@ impl App {
             }
 
             // Adaptive poll: sleep longer when idle, shorter when actively streaming
-            let poll_ms = if self.state.flags.stream.is_streaming || self.state.flags.ui.dirty {
+            let poll_ms = if self.state.flags.stream.phase.is_streaming() || self.state.flags.ui.dirty {
                 EVENT_POLL_MS // 8ms — responsive during streaming/active updates
             } else {
                 50 // 50ms when idle — still responsive for typing, much less CPU
@@ -324,7 +324,7 @@ impl App {
         if !SpineState::get(&self.state).config.continue_until_todos_done {
             return;
         }
-        if self.state.flags.stream.is_streaming {
+        if self.state.flags.stream.phase.is_streaming() {
             return;
         }
         // Deduplicate: don't create if one already exists unprocessed
@@ -357,7 +357,7 @@ impl App {
         }
 
         // Check if there's any active operation that needs spinner animation
-        let has_active_spinner = self.state.flags.stream.is_streaming
+        let has_active_spinner = self.state.flags.stream.phase.is_streaming()
             || self.state.flags.lifecycle.api_check_in_progress
             || self.state.context.iter().any(|c| c.cached_content.is_none() && c.context_type.needs_cache());
 

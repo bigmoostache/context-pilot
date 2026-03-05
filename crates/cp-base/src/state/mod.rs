@@ -25,7 +25,7 @@ pub use context::{
 pub use data::message::{
     Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord, format_messages_to_chunk,
 };
-pub use runtime::{ConfigFlags, LifecycleFlags, State, StateFlags, StreamFlags, UiFlags};
+pub use runtime::{ConfigFlags, LifecycleFlags, State, StateFlags, StreamFlags, StreamPhase, UiFlags};
 
 // ─── Reverie State ──────────────────────────────────────────────────────────
 // Ephemeral sub-agent state — lives as Option<ReverieState> on the main State.

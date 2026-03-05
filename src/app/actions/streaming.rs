@@ -1,5 +1,5 @@
 use crate::state::persistence::log_error;
-use crate::state::{ContextType, State, estimate_tokens};
+use crate::state::{ContextType, State, StreamPhase, estimate_tokens};
 
 use super::ActionResult;
 use super::helpers::clean_llm_id_prefix;
@@ -34,7 +34,7 @@ pub(crate) fn handle_stream_done(
     cache_miss_tokens: usize,
     stop_reason: Option<&str>,
 ) -> ActionResult {
-    state.flags.stream.is_streaming = false;
+    state.flags.stream.phase.transition(StreamPhase::Idle);
     state.last_stop_reason = stop_reason.map(ToString::to_string);
 
     // Set tick stats (this tick only)
@@ -77,7 +77,7 @@ pub(crate) fn handle_stream_done(
 
 /// Handle `StreamError` action — clean up streaming state, log error
 pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
-    state.flags.stream.is_streaming = false;
+    state.flags.stream.phase.transition(StreamPhase::Idle);
 
     // Remove estimated tokens on error from Conversation context
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::CONVERSATION) {

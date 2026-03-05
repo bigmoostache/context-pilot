@@ -856,6 +856,7 @@ categories.workspace = true
 
 [dependencies]
 cp-base.workspace = true
+log = "0.4"
 cp-mod-console = { path = "crates/cp-mod-console" }
 cp-mod-callback = { path = "crates/cp-mod-callback" }
 cp-mod-scratchpad = { path = "crates/cp-mod-scratchpad" }

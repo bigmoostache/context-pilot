@@ -60,7 +60,7 @@ impl ConversationPanel {
         // Hash viewport width
         std::hash::Hash::hash(&viewport_width, &mut hasher);
         std::hash::Hash::hash(&state.flags.ui.dev_mode, &mut hasher);
-        std::hash::Hash::hash(&state.flags.stream.is_streaming, &mut hasher);
+        std::hash::Hash::hash(&state.flags.stream.phase.is_streaming(), &mut hasher);
 
         // Hash conversation history panel count (invalidate when panels added/removed)
         let history_count =
@@ -158,7 +158,7 @@ impl ConversationPanel {
                 }
 
                 let is_last = last_msg_id.as_ref() == Some(&msg.id);
-                let is_streaming_this = state.flags.stream.is_streaming && is_last && msg.role == "assistant";
+                let is_streaming_this = state.flags.stream.phase.is_streaming() && is_last && msg.role == "assistant";
 
                 // Skip empty text messages (unless streaming)
                 if msg.message_type == MessageType::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
@@ -266,7 +266,7 @@ impl Panel for ConversationPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        if state.flags.stream.is_streaming { "Conversation *".to_string() } else { "Conversation".to_string() }
+        if state.flags.stream.phase.is_streaming() { "Conversation *".to_string() } else { "Conversation".to_string() }
     }
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {

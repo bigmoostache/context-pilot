@@ -15,16 +15,60 @@ use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderC
 /// Takes (`file_path`, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>
 pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>;
 
-/// Boolean status flags extracted from [`State`].
+/// The phase of the LLM stream lifecycle.
 ///
-/// Each flag is an independent toggle checked by different subsystems — they don't encode
-/// a hidden enum. Grouped here purely to keep the parent struct focused on domain data.
+/// Encodes the only three legal combinations of the old `is_streaming` / `is_tooling`
+/// booleans. The fourth combination (`tooling=true, streaming=false`) was always
+/// illegal — this enum makes it unrepresentable.
+///
+/// Transitions are tracked via [`StreamPhase::transition`] using `#[track_caller]`
+/// so every state change logs its source location automatically.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StreamPhase {
+    /// Not streaming — between conversation turns.
+    #[default]
+    Idle,
+    /// Actively receiving tokens from the LLM.
+    Receiving,
+    /// Stream is active but currently executing tool calls.
+    ExecutingTools,
+}
+
+impl StreamPhase {
+    /// Transition to a new phase, recording the caller's source location.
+    ///
+    /// This is the **only** way to change the stream phase. Every callsite is
+    /// automatically captured via `#[track_caller]` — no manual strings needed.
+    /// Enable the `RUST_LOG=trace` env var (once a logger is wired) to see transitions.
+    #[track_caller]
+    pub fn transition(&mut self, to: Self) {
+        let from = *self;
+        if from != to {
+            let loc = std::panic::Location::caller();
+            // No-op until a log backend (env_logger, tracing, etc.) is registered in the binary.
+            log::trace!("[StreamPhase] {from:?} → {to:?} ({}:{})", loc.file(), loc.line(),);
+        }
+        *self = to;
+    }
+
+    /// Whether we're in any streaming state (receiving tokens or executing tools).
+    #[must_use]
+    pub const fn is_streaming(self) -> bool {
+        matches!(self, Self::Receiving | Self::ExecutingTools)
+    }
+
+    /// Whether we're currently executing tool calls (subset of streaming).
+    #[must_use]
+    pub const fn is_tooling(self) -> bool {
+        matches!(self, Self::ExecutingTools)
+    }
+}
+
+/// Stream-related state: the current [`StreamPhase`] plus independent scroll tracking.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct StreamFlags {
-    /// Whether a stream is actively receiving tokens from the LLM.
-    pub is_streaming: bool,
-    /// Whether the system is currently executing tool calls (between stream ticks).
-    pub is_tooling: bool,
+    /// Current phase of the LLM stream lifecycle.
+    pub phase: StreamPhase,
     /// Whether the user has manually scrolled (disables auto-scroll to bottom).
     pub user_scrolled: bool,
 }
@@ -389,9 +433,10 @@ impl State {
         self.messages.len() - 1
     }
 
-    /// Prepare state for a new stream: set `is_streaming`, clear stop reason, reset tick counters.
+    /// Prepare state for a new stream: transition to [`StreamPhase::Receiving`],
+    /// clear stop reason, reset tick counters.
     pub fn begin_streaming(&mut self) {
-        self.flags.stream.is_streaming = true;
+        self.flags.stream.phase.transition(StreamPhase::Receiving);
         self.last_stop_reason = None;
         self.streaming_estimated_tokens = 0;
         self.tick_cache_hit_tokens = 0;
@@ -405,7 +450,7 @@ impl std::fmt::Debug for State {
         f.debug_struct("State")
             .field("context_len", &self.context.len())
             .field("messages_len", &self.messages.len())
-            .field("is_streaming", &self.flags.stream.is_streaming)
+            .field("stream_phase", &self.flags.stream.phase)
             .field("module_data_keys", &self.module_data.len())
             .finish_non_exhaustive()
     }
