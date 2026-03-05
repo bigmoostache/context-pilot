@@ -36,7 +36,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     input::render_status_bar(frame, state, main_layout[1]);
 
     // Render performance overlay if enabled
-    if state.flags.perf_enabled {
+    if state.flags.ui.perf_enabled {
         perf::render_perf_overlay(frame, area);
     }
 
@@ -54,7 +54,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     }
 
     // Render config overlay if open
-    if state.flags.config_view {
+    if state.flags.config.config_view {
         help::config_overlay::render_config_overlay(frame, state, area);
     }
 

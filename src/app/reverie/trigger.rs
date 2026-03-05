@@ -17,7 +17,7 @@ use cp_base::state::reverie::{ReverieState, ReverieType};
 /// Call this after `prepare_stream_context()` has refreshed token counts.
 pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
     // Guard: reverie disabled by user
-    if !state.flags.reverie_enabled {
+    if !state.flags.config.reverie_enabled {
         return false;
     }
 
@@ -57,7 +57,7 @@ pub(crate) fn start_manual_reverie(state: &mut State, agent_id: String, context:
 
     // Guard: reverie disabled (the tool handler already checks this,
     // but belt-and-suspenders never hurt a sailor)
-    if !state.flags.reverie_enabled {
+    if !state.flags.config.reverie_enabled {
         return false;
     }
 

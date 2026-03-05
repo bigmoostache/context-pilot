@@ -61,15 +61,15 @@ impl App {
                     if let Some(action) = self.handle_palette_event(&evt) {
                         self.handle_action(action, tx);
                     }
-                    self.state.flags.dirty = true;
+                    self.state.flags.ui.dirty = true;
 
                     // Render immediately after input for instant feedback
-                    if self.state.flags.dirty {
+                    if self.state.flags.ui.dirty {
                         let _r = terminal.draw(|frame| {
                             ui::render(frame, &mut self.state);
                             self.command_palette.render(frame, &self.state);
                         })?;
-                        self.state.flags.dirty = false;
+                        self.state.flags.ui.dirty = false;
                         self.last_render_ms = current_ms;
                     }
                     continue;
@@ -80,15 +80,15 @@ impl App {
                     && ac.active
                 {
                     self.handle_autocomplete_event(&evt);
-                    self.state.flags.dirty = true;
+                    self.state.flags.ui.dirty = true;
 
                     // Render immediately
-                    if self.state.flags.dirty {
+                    if self.state.flags.ui.dirty {
                         let _r = terminal.draw(|frame| {
                             ui::render(frame, &mut self.state);
                             self.command_palette.render(frame, &self.state);
                         })?;
-                        self.state.flags.dirty = false;
+                        self.state.flags.ui.dirty = false;
                         self.last_render_ms = current_ms;
                     }
                     continue;
@@ -99,15 +99,15 @@ impl App {
                     && !form.resolved
                 {
                     self.handle_question_form_event(&evt);
-                    self.state.flags.dirty = true;
+                    self.state.flags.ui.dirty = true;
 
                     // Render immediately
-                    if self.state.flags.dirty {
+                    if self.state.flags.ui.dirty {
                         let _r = terminal.draw(|frame| {
                             ui::render(frame, &mut self.state);
                             self.command_palette.render(frame, &self.state);
                         })?;
-                        self.state.flags.dirty = false;
+                        self.state.flags.ui.dirty = false;
                         self.last_render_ms = current_ms;
                     }
                     continue;
@@ -123,18 +123,18 @@ impl App {
                 // Check for Ctrl+P to open palette
                 if let Action::OpenCommandPalette = action {
                     self.command_palette.open(&self.state);
-                    self.state.flags.dirty = true;
+                    self.state.flags.ui.dirty = true;
                 } else {
                     self.handle_action(action, tx);
                 }
 
                 // Render immediately after input for instant feedback
-                if self.state.flags.dirty {
+                if self.state.flags.ui.dirty {
                     let _r = terminal.draw(|frame| {
                         ui::render(frame, &mut self.state);
                         self.command_palette.render(frame, &self.state);
                     })?;
-                    self.state.flags.dirty = false;
+                    self.state.flags.ui.dirty = false;
                     self.last_render_ms = current_ms;
                 }
             }
@@ -175,7 +175,7 @@ impl App {
             self.check_reverie_end_turn();
 
             // Check if TUI reload was requested (by system_reload tool)
-            if self.state.flags.reload_pending {
+            if self.state.flags.lifecycle.reload_pending {
                 self.writer.flush();
                 save_state(&self.state);
                 break;
@@ -194,17 +194,17 @@ impl App {
             self.update_spinner_animation();
 
             // Render if dirty and enough time has passed (capped at ~28fps)
-            if self.state.flags.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
+            if self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
                 let _r = terminal.draw(|frame| {
                     ui::render(frame, &mut self.state);
                     self.command_palette.render(frame, &self.state);
                 })?;
-                self.state.flags.dirty = false;
+                self.state.flags.ui.dirty = false;
                 self.last_render_ms = current_ms;
             }
 
             // Adaptive poll: sleep longer when idle, shorter when actively streaming
-            let poll_ms = if self.state.flags.is_streaming || self.state.flags.dirty {
+            let poll_ms = if self.state.flags.stream.is_streaming || self.state.flags.ui.dirty {
                 EVENT_POLL_MS // 8ms — responsive during streaming/active updates
             } else {
                 50 // 50ms when idle — still responsive for typing, much less CPU
@@ -217,7 +217,7 @@ impl App {
 
     fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
         // Any action triggers a re-render
-        self.state.flags.dirty = true;
+        self.state.flags.ui.dirty = true;
         match apply_action(&mut self.state, action) {
             ActionResult::StopStream => {
                 self.typewriter.reset();
@@ -284,7 +284,7 @@ impl App {
                 // burning CPU/disk on every tick (~125/sec) when persistently blocked.
                 if self.state.guard_rail_blocked.as_ref() != Some(&reason) {
                     self.state.guard_rail_blocked = Some(reason);
-                    self.state.flags.dirty = true;
+                    self.state.flags.ui.dirty = true;
                     self.save_state_async();
                 }
             }
@@ -312,7 +312,7 @@ impl App {
                         tx.clone(),
                     );
                     self.save_state_async();
-                    self.state.flags.dirty = true;
+                    self.state.flags.ui.dirty = true;
                 }
             }
         }
@@ -324,7 +324,7 @@ impl App {
         if !SpineState::get(&self.state).config.continue_until_todos_done {
             return;
         }
-        if self.state.flags.is_streaming {
+        if self.state.flags.stream.is_streaming {
             return;
         }
         // Deduplicate: don't create if one already exists unprocessed
@@ -357,8 +357,8 @@ impl App {
         }
 
         // Check if there's any active operation that needs spinner animation
-        let has_active_spinner = self.state.flags.is_streaming
-            || self.state.flags.api_check_in_progress
+        let has_active_spinner = self.state.flags.stream.is_streaming
+            || self.state.flags.lifecycle.api_check_in_progress
             || self.state.context.iter().any(|c| c.cached_content.is_none() && c.context_type.needs_cache());
 
         if has_active_spinner {
@@ -366,7 +366,7 @@ impl App {
             // Increment spinner frame (wraps around automatically with u64)
             self.state.spinner_frame = self.state.spinner_frame.wrapping_add(1);
             // Mark dirty to trigger re-render with new spinner frame
-            self.state.flags.dirty = true;
+            self.state.flags.ui.dirty = true;
         }
     }
 }

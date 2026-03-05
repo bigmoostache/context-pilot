@@ -178,7 +178,7 @@ pub fn mark_panels_dirty(state: &mut State, context_type: &str) {
             ctx.cache_deprecated = true;
         }
     }
-    state.flags.dirty = true;
+    state.flags.ui.dirty = true;
 }
 
 /// Paginate content for LLM context output.

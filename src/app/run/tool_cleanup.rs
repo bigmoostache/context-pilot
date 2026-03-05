@@ -236,7 +236,7 @@ impl App {
         self.save_message_async(&result_msg);
         self.state.messages.push(result_msg);
 
-        if self.state.flags.reload_pending {
+        if self.state.flags.lifecycle.reload_pending {
             crate::infra::tools::perform_reload(&self.state);
             return;
         }
@@ -278,11 +278,11 @@ impl App {
         }
 
         self.save_state_async();
-        self.state.flags.dirty = true;
+        self.state.flags.ui.dirty = true;
 
         let _ = super::streaming::trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
         if super::streaming::has_dirty_file_panels(&self.state) {
-            self.state.flags.waiting_for_panels = true;
+            self.state.flags.lifecycle.waiting_for_panels = true;
             self.wait_started_ms = now_ms();
         } else {
             self.continue_streaming(tx);

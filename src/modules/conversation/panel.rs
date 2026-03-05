@@ -59,8 +59,8 @@ impl ConversationPanel {
 
         // Hash viewport width
         std::hash::Hash::hash(&viewport_width, &mut hasher);
-        std::hash::Hash::hash(&state.flags.dev_mode, &mut hasher);
-        std::hash::Hash::hash(&state.flags.is_streaming, &mut hasher);
+        std::hash::Hash::hash(&state.flags.ui.dev_mode, &mut hasher);
+        std::hash::Hash::hash(&state.flags.stream.is_streaming, &mut hasher);
 
         // Hash conversation history panel count (invalidate when panels added/removed)
         let history_count =
@@ -128,7 +128,7 @@ impl ConversationPanel {
                     // Render each frozen message with full formatting
                     for msg in msgs {
                         let lines =
-                            render::render_message(msg, viewport_width, base_style, false, state.flags.dev_mode);
+                            render::render_message(msg, viewport_width, base_style, false, state.flags.ui.dev_mode);
                         text.extend(lines);
                     }
 
@@ -158,7 +158,7 @@ impl ConversationPanel {
                 }
 
                 let is_last = last_msg_id.as_ref() == Some(&msg.id);
-                let is_streaming_this = state.flags.is_streaming && is_last && msg.role == "assistant";
+                let is_streaming_this = state.flags.stream.is_streaming && is_last && msg.role == "assistant";
 
                 // Skip empty text messages (unless streaming)
                 if msg.message_type == MessageType::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
@@ -166,7 +166,7 @@ impl ConversationPanel {
                 }
 
                 // Compute hash for this message
-                let hash = Self::compute_message_hash(msg, viewport_width, state.flags.dev_mode);
+                let hash = Self::compute_message_hash(msg, viewport_width, state.flags.ui.dev_mode);
 
                 // Check per-message cache
                 if let Some(cached) = state.message_cache.get(&msg.id)
@@ -180,7 +180,7 @@ impl ConversationPanel {
 
                 // Cache miss - render message
                 let lines =
-                    render::render_message(msg, viewport_width, base_style, is_streaming_this, state.flags.dev_mode);
+                    render::render_message(msg, viewport_width, base_style, is_streaming_this, state.flags.ui.dev_mode);
 
                 // Store in per-message cache (but not for streaming message)
                 if !is_streaming_this {
@@ -266,7 +266,7 @@ impl Panel for ConversationPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        if state.flags.is_streaming { "Conversation *".to_string() } else { "Conversation".to_string() }
+        if state.flags.stream.is_streaming { "Conversation *".to_string() } else { "Conversation".to_string() }
     }
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
@@ -361,10 +361,10 @@ impl Panel for ConversationPanel {
         state.max_scroll = max_scroll;
 
         // Auto-scroll to bottom when not manually scrolled
-        if state.flags.user_scrolled && state.scroll_offset >= max_scroll - 0.5 {
-            state.flags.user_scrolled = false;
+        if state.flags.stream.user_scrolled && state.scroll_offset >= max_scroll - 0.5 {
+            state.flags.stream.user_scrolled = false;
         }
-        if !state.flags.user_scrolled {
+        if !state.flags.stream.user_scrolled {
             state.scroll_offset = max_scroll;
         }
         state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);

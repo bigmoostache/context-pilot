@@ -15,36 +15,68 @@ use crate::ui::render_cache::{FullContentCache, InputRenderCache, MessageRenderC
 /// Takes (`file_path`, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>
 pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>;
 
-/// Boolean status flags extracted from [`State`] to satisfy `clippy::struct_excessive_bools`.
+/// Boolean status flags extracted from [`State`].
 ///
 /// Each flag is an independent toggle checked by different subsystems — they don't encode
-/// a hidden enum. Grouped here purely to keep the parent struct under clippy's 3-bool threshold.
+/// a hidden enum. Grouped here purely to keep the parent struct focused on domain data.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct StateFlags {
+pub struct StreamFlags {
     /// Whether a stream is actively receiving tokens from the LLM.
     pub is_streaming: bool,
     /// Whether the system is currently executing tool calls (between stream ticks).
     pub is_tooling: bool,
     /// Whether the user has manually scrolled (disables auto-scroll to bottom).
     pub user_scrolled: bool,
+}
+
+/// UI and lifecycle status flags — separated from [`StreamFlags`] to stay under
+/// clippy's 3-bool threshold per struct.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct UiFlags {
     /// Whether the UI needs to be redrawn.
     pub dirty: bool,
     /// Dev mode — shows additional debug info like token counts.
     pub dev_mode: bool,
     /// Performance monitoring overlay enabled (F12 to toggle).
     pub perf_enabled: bool,
+}
+
+/// Configuration overlay flags.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ConfigFlags {
     /// Configuration view is open (Ctrl+H to toggle).
     pub config_view: bool,
     /// Whether config overlay is showing secondary model selection (Tab toggles).
     pub config_secondary_mode: bool,
     /// Whether the reverie system is enabled (auto-trigger on threshold breach).
     pub reverie_enabled: bool,
+}
+
+/// Lifecycle flags for async operations and reload state.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LifecycleFlags {
     /// Whether an API check is in progress.
     pub api_check_in_progress: bool,
     /// Reload pending (set by `system_reload`, triggers reload after tool result saved).
     pub reload_pending: bool,
     /// Waiting for file panels to load before continuing stream.
     pub waiting_for_panels: bool,
+}
+
+/// Composite of all boolean status flags, organized by domain.
+///
+/// Access individual flags via domain sub-structs: `flags.stream.is_streaming`,
+/// `flags.ui.dirty`, `flags.config.reverie_enabled`, `flags.lifecycle.reload_pending`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct StateFlags {
+    /// Streaming and scrolling state.
+    pub stream: StreamFlags,
+    /// UI rendering and debug toggles.
+    pub ui: UiFlags,
+    /// Configuration overlay state.
+    pub config: ConfigFlags,
+    /// Async operation and reload lifecycle.
+    pub lifecycle: LifecycleFlags,
 }
 
 /// Runtime state (messages loaded in memory)
@@ -63,7 +95,7 @@ pub struct State {
     pub paste_buffer_labels: Vec<Option<String>>,
     /// Index of the currently selected context panel in the sidebar.
     pub selected_context: usize,
-    /// Boolean status flags (streaming, dirty, dev_mode, etc.)
+    /// Boolean status flags, organized by domain.
     pub flags: StateFlags,
     /// Selected bar in config view (0=budget, 1=threshold, 2=target)
     pub config_selected_bar: usize,
@@ -189,7 +221,11 @@ impl Default for State {
             paste_buffers: vec![],
             paste_buffer_labels: vec![],
             selected_context: 0,
-            flags: StateFlags { dirty: true, reverie_enabled: true, ..StateFlags::default() },
+            flags: StateFlags {
+                ui: UiFlags { dirty: true, ..UiFlags::default() },
+                config: ConfigFlags { reverie_enabled: true, ..ConfigFlags::default() },
+                ..StateFlags::default()
+            },
             last_stop_reason: None,
             scroll_offset: 0.0,
             scroll_accel: 1.0,
@@ -262,7 +298,7 @@ impl State {
     ///
     /// Prefer this over `get_ext().expect()` — the panic lives in
     /// [`invariant_panic`](crate::config::invariant_panic) once,
-    /// so callers don't need `#[expect(clippy::expect_used)]`.
+    /// so callers don't need `expect(clippy::expect_used)`.
     ///
     /// # Panics
     ///
@@ -296,7 +332,7 @@ impl State {
             ctx.last_refresh_ms = crate::panels::now_ms();
             ctx.cache_deprecated = true;
         }
-        self.flags.dirty = true;
+        self.flags.ui.dirty = true;
     }
 
     /// Find the first available context ID (fills gaps instead of always incrementing)
@@ -355,7 +391,7 @@ impl State {
 
     /// Prepare state for a new stream: set `is_streaming`, clear stop reason, reset tick counters.
     pub fn begin_streaming(&mut self) {
-        self.flags.is_streaming = true;
+        self.flags.stream.is_streaming = true;
         self.last_stop_reason = None;
         self.streaming_estimated_tokens = 0;
         self.tick_cache_hit_tokens = 0;
@@ -369,7 +405,7 @@ impl std::fmt::Debug for State {
         f.debug_struct("State")
             .field("context_len", &self.context.len())
             .field("messages_len", &self.messages.len())
-            .field("is_streaming", &self.flags.is_streaming)
+            .field("is_streaming", &self.flags.stream.is_streaming)
             .field("module_data_keys", &self.module_data.len())
             .finish_non_exhaustive()
     }

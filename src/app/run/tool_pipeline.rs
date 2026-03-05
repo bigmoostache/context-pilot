@@ -20,7 +20,7 @@ use crate::app::App;
 
 impl App {
     pub(super) fn handle_tool_execution(&mut self, tx: &Sender<StreamEvent>) {
-        if !self.state.flags.is_streaming
+        if !self.state.flags.stream.is_streaming
             || self.pending_done.is_none()
             || !self.typewriter.pending_chars.is_empty()
             || self.pending_tools.is_empty()
@@ -28,7 +28,7 @@ impl App {
             return;
         }
         // Don't process new tools while waiting for panels or deferred sleep
-        if self.state.flags.waiting_for_panels || self.deferred_tool_sleeping {
+        if self.state.flags.lifecycle.waiting_for_panels || self.deferred_tool_sleeping {
             return;
         }
         // Don't process tools while a question form is pending user response
@@ -37,8 +37,8 @@ impl App {
         }
         let _guard = crate::profile!("app::tool_exec");
 
-        self.state.flags.dirty = true;
-        self.state.flags.is_tooling = true;
+        self.state.flags.ui.dirty = true;
+        self.state.flags.stream.is_tooling = true;
         let tools = std::mem::take(&mut self.pending_tools);
         let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
 
@@ -249,7 +249,7 @@ impl App {
         self.state.messages.push(result_msg);
 
         // Check if reload was requested - exit pipeline, main loop will break
-        if self.state.flags.reload_pending {
+        if self.state.flags.lifecycle.reload_pending {
             perform_reload(&self.state);
             return;
         }
@@ -306,7 +306,7 @@ impl App {
         // Check if we need to wait for panels before continuing stream
         if has_dirty_file_panels(&self.state) {
             // Set waiting flag — main loop will check and continue streaming when ready
-            self.state.flags.waiting_for_panels = true;
+            self.state.flags.lifecycle.waiting_for_panels = true;
             self.wait_started_ms = now_ms();
         } else {
             // No dirty panels — continue streaming immediately
@@ -317,7 +317,7 @@ impl App {
     /// Non-blocking check: if we're waiting for file panels to load,
     /// check if they're ready (or timed out) and continue streaming.
     pub(super) fn check_waiting_for_panels(&mut self, tx: &Sender<StreamEvent>) {
-        if !self.state.flags.waiting_for_panels {
+        if !self.state.flags.lifecycle.waiting_for_panels {
             return;
         }
 
@@ -325,8 +325,8 @@ impl App {
         let timed_out = now_ms().saturating_sub(self.wait_started_ms) >= 5_000;
 
         if panels_ready || timed_out {
-            self.state.flags.waiting_for_panels = false;
-            self.state.flags.dirty = true;
+            self.state.flags.lifecycle.waiting_for_panels = false;
+            self.state.flags.ui.dirty = true;
             self.continue_streaming(tx);
         }
     }
@@ -345,7 +345,7 @@ impl App {
 
         self.deferred_tool_sleeping = false;
         self.deferred_tool_sleep_until_ms = 0;
-        self.state.flags.dirty = true;
+        self.state.flags.ui.dirty = true;
 
         // Deferred sleep expired — continue streaming
         self.continue_streaming(tx);
@@ -421,7 +421,7 @@ impl App {
         self.state.messages.push(result_msg);
 
         // Check if reload was requested
-        if self.state.flags.reload_pending {
+        if self.state.flags.lifecycle.reload_pending {
             perform_reload(&self.state);
             return;
         }
@@ -462,12 +462,12 @@ impl App {
         }
 
         self.save_state_async();
-        self.state.flags.dirty = true;
+        self.state.flags.ui.dirty = true;
 
         // Continue streaming
         let _ = trigger_dirty_panel_refresh(&self.state, &self.cache_tx);
         if has_dirty_file_panels(&self.state) {
-            self.state.flags.waiting_for_panels = true;
+            self.state.flags.lifecycle.waiting_for_panels = true;
             self.wait_started_ms = now_ms();
         } else {
             self.continue_streaming(tx);

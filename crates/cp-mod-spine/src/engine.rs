@@ -32,7 +32,7 @@ pub enum SpineDecision {
 /// The caller (app.rs) is responsible for actually starting the stream.
 pub fn check_spine(state: &mut State) -> SpineDecision {
     // Never launch if already streaming
-    if state.flags.is_streaming {
+    if state.flags.stream.is_streaming {
         return SpineDecision::Idle;
     }
 

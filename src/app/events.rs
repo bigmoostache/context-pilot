@@ -54,12 +54,12 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             }
 
             // Config view handles its own keys when open
-            if state.flags.config_view {
+            if state.flags.config.config_view {
                 return Some(handle_config_event(key, state));
             }
 
             // Escape stops streaming
-            if key.code == KeyCode::Esc && state.flags.is_streaming {
+            if key.code == KeyCode::Esc && state.flags.stream.is_streaming {
                 return Some(Action::StopStreaming);
             }
 
@@ -133,7 +133,7 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
 
 /// Handle key events when config view is open
 const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
-    let secondary = state.flags.config_secondary_mode;
+    let secondary = state.flags.config.config_secondary_mode;
     match key.code {
         // Escape closes config
         KeyCode::Esc => Action::ToggleConfigView,

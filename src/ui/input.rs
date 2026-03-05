@@ -32,13 +32,13 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
             format!(" BLOCKED: {reason} "),
             Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
         ));
-    } else if state.flags.is_streaming && !state.flags.is_tooling {
+    } else if state.flags.stream.is_streaming && !state.flags.stream.is_tooling {
         // STREAMING — actively receiving tokens from API
         spans.push(Span::styled(
             format!(" {spin} STREAMING "),
             Style::default().fg(theme::bg_base()).bg(theme::success()).bold(),
         ));
-    } else if state.flags.is_streaming && state.flags.is_tooling {
+    } else if state.flags.stream.is_streaming && state.flags.stream.is_tooling {
         // TOOLING — stream active but executing tool calls (same blue as branch name)
         spans.push(Span::styled(format!(" {spin} TOOLING "), Style::default().fg(Color::White).bg(Color::Blue).bold()));
     } else if has_question_form {
@@ -95,7 +95,7 @@ pub(super) fn render_status_bar(frame: &mut Frame<'_>, state: &State, area: Rect
     spans.push(Span::styled(" ", base_style));
 
     // Stop reason from last stream (highlight max_tokens as warning)
-    if !state.flags.is_streaming
+    if !state.flags.stream.is_streaming
         && let Some(ref reason) = state.last_stop_reason
     {
         let (label, style) = if reason == "max_tokens" {

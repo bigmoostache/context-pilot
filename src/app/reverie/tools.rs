@@ -81,7 +81,7 @@ pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
 /// happens in the event loop when it processes this result.
 pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolResult {
     // Guard: reverie disabled
-    if !state.flags.reverie_enabled {
+    if !state.flags.config.reverie_enabled {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: REVERIE.errors.reverie_disabled.clone(),
