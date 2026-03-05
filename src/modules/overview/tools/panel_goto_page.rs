@@ -1,7 +1,7 @@
 use crate::app::panels::paginate_content;
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{State, estimate_tokens};
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 /// Execute the `panel_goto_page` tool to navigate paginated panels.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(panel_id) = tool.input.get("panel_id").and_then(serde_json::Value::as_str) else {

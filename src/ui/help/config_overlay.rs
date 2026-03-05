@@ -6,7 +6,7 @@ use ratatui::{
 use crate::infra::config::{THEME_ORDER, get_theme};
 use crate::infra::constants::{chars, theme};
 use crate::state::State;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Render the configuration overlay (Ctrl+H) centered on the given area.
 pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, state: &State, area: Rect) {

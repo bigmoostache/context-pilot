@@ -1,11 +1,11 @@
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 use crate::app::panels::{ContextItem, collect_all_context, refresh_all_panels};
 use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::refresh_conversation_context;
 use crate::modules;
 use crate::state::cache::hash_content;
-use crate::state::{ContextType, Message, State, estimate_tokens};
+use crate::state::{Kind, Message, State, estimate_tokens};
 
 mod detach;
 
@@ -223,9 +223,8 @@ fn assign_panel_uid(state: &mut State, context_type: &str) {
 /// P6 = Spine, P7 = Logs, P8 = Git, P9 = Scratchpad
 pub(crate) fn ensure_default_contexts(state: &mut State) {
     // Ensure Conversation exists (special: no numbered Px, always first in context list)
-    if !state.context.iter().any(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
-        let elem =
-            modules::make_default_context_element("chat", ContextType::new(ContextType::CONVERSATION), "Chat", true);
+    if !state.context.iter().any(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+        let elem = modules::make_default_entry("chat", Kind::new(Kind::CONVERSATION), "Chat", true);
         state.context.insert(0, elem);
     }
 
@@ -245,20 +244,17 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
         // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
         let id = format!("P{}", pos.saturating_add(1));
         let insert_pos = pos.saturating_add(1).min(state.context.len()); // +1 to account for Conversation at index 0
-        let elem =
-            modules::make_default_context_element(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
+        let elem = modules::make_default_entry(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
         state.context.insert(insert_pos, elem);
     }
 
     // Assign UID to Conversation (needed for panels/ storage — it holds message_uids)
-    assign_panel_uid(state, ContextType::CONVERSATION);
+    assign_panel_uid(state, Kind::CONVERSATION);
 
     // Assign UIDs to all existing fixed panels (needed for panels/ storage)
     // Library panels don't need UIDs (rendered from in-memory state)
     for d in &defaults {
-        if d.context_type.as_str() != ContextType::LIBRARY
-            && state.context.iter().any(|c| c.context_type == d.context_type)
-        {
+        if d.context_type.as_str() != Kind::LIBRARY && state.context.iter().any(|c| c.context_type == d.context_type) {
             assign_panel_uid(state, d.context_type.as_str());
         }
     }

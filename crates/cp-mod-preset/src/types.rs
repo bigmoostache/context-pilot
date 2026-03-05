@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 
 /// Function pointer that returns all registered modules.
 pub type ModuleRegistry = fn() -> Vec<Box<dyn cp_base::modules::Module>>;
@@ -49,7 +49,7 @@ pub struct PresetWorkerState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PresetPanelConfig {
     /// Panel type (File, Glob, Grep, Tmux, Skill, etc.).
-    pub panel_type: ContextType,
+    pub panel_type: Kind,
     /// Display name for the panel tab.
     pub name: String,
     /// File path (for File panels).

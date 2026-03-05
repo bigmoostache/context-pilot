@@ -8,7 +8,7 @@ use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::actions::Action;
-use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 
 use crate::types::{GithubResultRequest, GithubState};
@@ -26,16 +26,16 @@ impl Panel for GithubResultPanel {
         Some(120_000) // Fallback timer; GhWatcher also polls via ETag/hash every 60s
     }
 
-    fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?.to_string();
         let token = GithubState::get(state).github_token.as_ref()?;
         Some(CacheRequest {
-            context_type: ContextType::new(ContextType::GITHUB_RESULT),
+            context_type: Kind::new(Kind::GITHUB_RESULT),
             data: Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone() }),
         })
     }
 
-    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
         match update {
             CacheUpdate::Content { content, token_count, .. } => {
                 ctx.cached_content = Some(content);
@@ -111,7 +111,7 @@ impl Panel for GithubResultPanel {
 
     fn refresh(&self, _state: &mut State) {}
 
-    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
 
@@ -119,7 +119,7 @@ impl Panel for GithubResultPanel {
 
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
-            && ctx.context_type.as_str() == ContextType::GITHUB_RESULT
+            && ctx.context_type.as_str() == Kind::GITHUB_RESULT
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
             let short = if cmd.len() > 40 {
@@ -135,7 +135,7 @@ impl Panel for GithubResultPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
         for ctx in &state.context {
-            if ctx.context_type.as_str() != ContextType::GITHUB_RESULT {
+            if ctx.context_type.as_str() != Kind::GITHUB_RESULT {
                 continue;
             }
             let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
@@ -149,8 +149,7 @@ impl Panel for GithubResultPanel {
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut text: Vec<Line<'_>> = Vec::new();
 
-        let ctx =
-            state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == ContextType::GITHUB_RESULT);
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
 
         let Some(ctx) = ctx else {
             text.push(Line::from(vec![Span::styled(

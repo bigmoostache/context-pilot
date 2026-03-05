@@ -2,7 +2,7 @@
 //!
 //! Handles all subcommands: compile, init, fonts, query, update.
 
-use cp_base::state::context::{ContextElement, ContextType};
+use cp_base::state::context::{Entry, Kind};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use std::collections::HashSet;
@@ -190,10 +190,10 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-    let mut elem = ContextElement {
+    let mut elem = Entry {
         id: context_id.clone(),
         uid: Some(uid),
-        context_type: ContextType::new("typst_result"),
+        context_type: Kind::new("typst_result"),
         name: "Typst Fonts".to_string(),
         token_count: 0,
         metadata: std::collections::HashMap::new(),
@@ -251,10 +251,10 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str) ->
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-    let mut elem = ContextElement {
+    let mut elem = Entry {
         id: context_id.clone(),
         uid: Some(uid),
-        context_type: ContextType::new("typst_result"),
+        context_type: Kind::new("typst_result"),
         name: format!("Typst Query: {selector}"),
         token_count: 0,
         metadata: std::collections::HashMap::new(),

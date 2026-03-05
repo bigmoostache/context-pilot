@@ -1,6 +1,6 @@
 use cp_base::config::INJECTIONS;
 use cp_base::panels::now_ms;
-use cp_base::state::context::{ContextType, make_default_context_element};
+use cp_base::state::context::{Kind, make_default_entry};
 use cp_base::state::runtime::State;
 use cp_base::state::watchers::WatcherRegistry;
 use cp_base::tools::{ToolResult, ToolUse};
@@ -65,7 +65,7 @@ fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> 
     state
         .context
         .iter()
-        .find(|c| c.id == panel_id && c.context_type.as_str() == ContextType::CONSOLE)
+        .find(|c| c.id == panel_id && c.context_type.as_str() == Kind::CONSOLE)
         .and_then(|c| c.get_meta_str("console_name").map(ToString::to_string))
         .ok_or_else(|| format!("Console panel '{panel_id}' not found"))
 }
@@ -106,7 +106,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
-    let mut ctx = make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
+    let mut ctx = make_default_entry(&panel_id, Kind::new(Kind::CONSOLE), display_name, true);
     ctx.uid = Some(uid);
     ctx.set_meta("console_name", &session_key);
     ctx.set_meta("console_command", &command);
@@ -359,7 +359,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_id = state.next_available_context_id();
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
-    let mut ctx = make_default_context_element(&panel_id, ContextType::new(ContextType::CONSOLE), display_name, true);
+    let mut ctx = make_default_entry(&panel_id, Kind::new(Kind::CONSOLE), display_name, true);
     ctx.uid = Some(uid);
     ctx.set_meta("console_name", &session_key);
     ctx.set_meta("console_command", &command);

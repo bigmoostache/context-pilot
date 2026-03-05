@@ -1,5 +1,5 @@
 /// Actions for list continuation behavior
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Describes what action to take when Enter is pressed on a list item.
 pub(super) enum ListAction {

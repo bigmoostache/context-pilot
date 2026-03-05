@@ -3,7 +3,7 @@ use std::sync::mpsc::Sender;
 use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
 use crate::infra::tools::execute_tool;
-use crate::state::{Message, MessageStatus, MessageType, State, ToolResultRecord};
+use crate::state::{Message, MsgKind, MsgStatus, State, ToolResultRecord};
 
 use cp_base::state::watchers::WatcherRegistry;
 use cp_mod_console::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
@@ -46,9 +46,9 @@ impl App {
                     let uid = format!("UID_{}_P", self.state.global_next_uid);
                     self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
 
-                    let mut ctx = crate::state::make_default_context_element(
+                    let mut ctx = crate::state::make_default_entry(
                         &panel_id,
-                        cp_base::state::context::ContextType::new(cp_base::state::context::ContextType::CONSOLE),
+                        cp_base::state::context::Kind::new(cp_base::state::context::Kind::CONSOLE),
                         &dp.display_name,
                         true,
                     );
@@ -129,9 +129,9 @@ impl App {
                 let uid = format!("UID_{}_P", self.state.global_next_uid);
                 self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
 
-                let mut ctx = crate::state::make_default_context_element(
+                let mut ctx = crate::state::make_default_entry(
                     &panel_id,
-                    cp_base::state::context::ContextType::new(cp_base::state::context::ContextType::CONSOLE),
+                    cp_base::state::context::Kind::new(cp_base::state::context::Kind::CONSOLE),
                     &dp.display_name,
                     true,
                 );
@@ -233,11 +233,11 @@ impl App {
             id: result_id,
             uid: Some(result_global_uid),
             role: "user".to_string(),
-            msg_type: MessageType::ToolResult,
+            msg_type: MsgKind::ToolResult,
             content: String::new(),
             content_token_count: 0,
 
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,
@@ -259,11 +259,11 @@ impl App {
             id: assistant_id,
             uid: Some(assistant_global_uid),
             role: "assistant".to_string(),
-            msg_type: MessageType::TextMessage,
+            msg_type: MsgKind::TextMessage,
             content: String::new(),
             content_token_count: 0,
 
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
@@ -367,11 +367,11 @@ impl App {
             id: result_id,
             uid: Some(result_global_uid),
             role: "user".to_string(),
-            msg_type: MessageType::ToolResult,
+            msg_type: MsgKind::ToolResult,
             content: String::new(),
             content_token_count: 0,
 
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,

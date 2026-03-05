@@ -1,5 +1,5 @@
 use crate::state::persistence::log_error;
-use crate::state::{ContextType, State, StreamPhase, estimate_tokens};
+use crate::state::{Kind, State, StreamPhase, estimate_tokens};
 
 use super::ActionResult;
 use super::helpers::clean_llm_id_prefix;
@@ -16,7 +16,7 @@ pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult
         let added = new_estimate.saturating_sub(state.streaming_estimated_tokens);
 
         if added > 0 {
-            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
                 ctx.token_count = ctx.token_count.saturating_add(added);
             }
             state.streaming_estimated_tokens = new_estimate;
@@ -61,7 +61,7 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
     apply_token_usage(state, &usage);
 
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         // Remove our estimate, add actual
         ctx.token_count =
             ctx.token_count.saturating_sub(state.streaming_estimated_tokens).saturating_add(event.output_tokens);
@@ -106,7 +106,7 @@ pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResul
     state.flags.stream.phase.transition(StreamPhase::Idle);
 
     // Remove estimated tokens on error from Conversation context
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
     }
     state.streaming_estimated_tokens = 0;

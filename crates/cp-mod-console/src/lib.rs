@@ -27,9 +27,9 @@ use serde_json::json;
 
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
-use cp_base::state::context::{ContextType, ContextTypeMeta};
+use cp_base::state::context::{Kind, TypeMeta};
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -37,7 +37,7 @@ use self::manager::SessionHandle;
 use self::panel::ConsolePanel;
 use self::types::{ConsoleState, SessionMeta};
 
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Lazily parsed tool descriptions from the console YAML definition.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -186,26 +186,26 @@ impl Module for ConsoleModule {
             cs.sessions.keys().cloned().collect()
         };
         state.context.retain(|c| {
-            if c.context_type.as_str() != ContextType::CONSOLE {
+            if c.context_type.as_str() != Kind::CONSOLE {
                 return true; // keep non-console panels
             }
             c.get_meta_str("console_name").is_some_and(|name| live_names.contains(name))
         });
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::CONSOLE)]
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::CONSOLE)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::CONSOLE => Some(Box::new(ConsolePanel)),
+            Kind::CONSOLE => Some(Box::new(ConsolePanel)),
             _ => None,
         }
     }
 
-    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
-        vec![ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<TypeMeta> {
+        vec![TypeMeta {
             context_type: "console",
             icon_id: "tmux", // Reuse tmux icon for now
             is_fixed: false,
@@ -257,14 +257,14 @@ impl Module for ConsoleModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "console_send_keys" | "console_wait" | "console_watch" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(panel_id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match state.context.iter().find(|c| c.id == panel_id) {
                         None => pf.errors.push(format!("Panel '{panel_id}' not found")),
-                        Some(ctx) if ctx.context_type.as_str() != ContextType::CONSOLE => {
+                        Some(ctx) if ctx.context_type.as_str() != Kind::CONSOLE => {
                             pf.errors.push(format!("Panel '{panel_id}' is not a console panel"));
                         }
                         Some(ctx) => {
@@ -308,10 +308,10 @@ impl Module for ConsoleModule {
 
     fn on_close_context(
         &self,
-        ctx: &cp_base::state::context::ContextElement,
+        ctx: &cp_base::state::context::Entry,
         state: &mut State,
     ) -> Option<Result<String, String>> {
-        if ctx.context_type.as_str() != ContextType::CONSOLE {
+        if ctx.context_type.as_str() != Kind::CONSOLE {
             return None;
         }
         let name = ctx.get_meta_str("console_name").unwrap_or_default().to_string();
@@ -332,8 +332,8 @@ impl Module for ConsoleModule {
         Some(Ok(format!("console: {name}")))
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
-        (ctx.context_type.as_str() == ContextType::CONSOLE).then(|| {
+    fn context_detail(&self, ctx: &cp_base::state::context::Entry) -> Option<String> {
+        (ctx.context_type.as_str() == Kind::CONSOLE).then(|| {
             let desc =
                 ctx.get_meta_str("console_description").or_else(|| ctx.get_meta_str("console_command")).unwrap_or("?");
             let status = ctx.get_meta_str("console_status").unwrap_or("?");
@@ -363,11 +363,11 @@ impl Module for ConsoleModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
@@ -397,7 +397,7 @@ impl Module for ConsoleModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

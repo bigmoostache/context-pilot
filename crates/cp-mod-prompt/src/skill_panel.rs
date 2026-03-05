@@ -5,7 +5,7 @@ use crate::types::PromptState;
 use cp_base::config::accessors::theme;
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action};
 use cp_base::state::actions::Action;
-use cp_base::state::context::{ContextElement, ContextType, estimate_tokens};
+use cp_base::state::context::{Entry, Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 
 /// Panel displaying a single loaded skill's content.
@@ -24,11 +24,11 @@ impl Panel for SkillPanel {
         None
     }
 
-    fn build_cache_request(&self, _ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, _ctx: &Entry, _state: &State) -> Option<CacheRequest> {
         None
     }
 
-    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut ContextElement, _state: &mut State) -> bool {
+    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut Entry, _state: &mut State) -> bool {
         false
     }
 
@@ -36,7 +36,7 @@ impl Panel for SkillPanel {
         None
     }
 
-    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
 
@@ -46,7 +46,7 @@ impl Panel for SkillPanel {
         // Find the skill name from the selected context element
         let selected = state.context.get(state.selected_context);
         if let Some(ctx) = selected
-            && ctx.context_type == ContextType::new(ContextType::SKILL)
+            && ctx.context_type == Kind::new(Kind::SKILL)
             && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id")
             && let Some(skill) = PromptState::get(state).skills.iter().find(|s| s.id == skill_id)
         {
@@ -90,7 +90,7 @@ impl Panel for SkillPanel {
             .context
             .iter()
             .enumerate()
-            .filter(|(_, c)| c.context_type == ContextType::new(ContextType::SKILL))
+            .filter(|(_, c)| c.context_type == Kind::new(Kind::SKILL))
             .filter_map(|(idx, c)| c.get_meta_str("skill_prompt_id").map(|sid| (sid.to_string(), c.id.clone(), idx)))
             .collect();
 
@@ -121,7 +121,7 @@ impl Panel for SkillPanel {
         // Skill panels are sent to LLM as context
         let mut items = Vec::new();
         for ctx in &state.context {
-            if ctx.context_type == ContextType::new(ContextType::SKILL)
+            if ctx.context_type == Kind::new(Kind::SKILL)
                 && let Some(content) = &ctx.cached_content
             {
                 items.push(ContextItem::new(&ctx.id, &ctx.name, content.clone(), ctx.last_refresh_ms));

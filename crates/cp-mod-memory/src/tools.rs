@@ -1,5 +1,5 @@
 use super::MEMORY_TLDR_MAX_TOKENS;
-use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -79,7 +79,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if !created.is_empty() {
         let _r = write!(output, "Created {} memory(s):\n{}", created.len(), created.join("\n"));
-        state.touch_panel(ContextType::MEMORY);
+        state.touch_panel(Kind::MEMORY);
     }
 
     if !errors.is_empty() {
@@ -187,7 +187,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update Memory panel timestamp if anything changed
     if !modified.is_empty() || !deleted.is_empty() {
-        state.touch_panel(ContextType::MEMORY);
+        state.touch_panel(Kind::MEMORY);
     }
 
     let mut output = String::new();

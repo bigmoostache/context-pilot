@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use ignore::gitignore::GitignoreBuilder;
 use sha2::{Digest as _, Sha256};
 
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -14,7 +14,7 @@ use std::fmt::Write as _;
 
 /// Mark tree context cache as deprecated (needs refresh)
 fn invalidate_tree_cache(state: &mut State) {
-    cp_base::panels::mark_panels_dirty(state, ContextType::TREE);
+    cp_base::panels::mark_panels_dirty(state, Kind::TREE);
 }
 
 /// Generate tree string without mutating state (for read-only rendering)
@@ -273,7 +273,7 @@ pub fn list_dir_entries(
     tree_filter: &str,
     dir_prefix: &str,
     name_prefix: &str,
-) -> Vec<cp_base::state::autocomplete::AutocompleteEntry> {
+) -> Vec<cp_base::state::autocomplete::Completion> {
     let root = PathBuf::from(".");
 
     // Build gitignore matcher from filter
@@ -295,7 +295,7 @@ pub fn list_dir_entries(
     let Ok(read) = fs::read_dir(&dir_path) else { return Vec::new() };
     let prefix_lower = name_prefix.to_lowercase();
 
-    let mut entries: Vec<cp_base::state::autocomplete::AutocompleteEntry> = read
+    let mut entries: Vec<cp_base::state::autocomplete::Completion> = read
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
@@ -314,7 +314,7 @@ pub fn list_dir_entries(
                 return None;
             }
 
-            Some(cp_base::state::autocomplete::AutocompleteEntry { name, is_dir })
+            Some(cp_base::state::autocomplete::Completion { name, is_dir })
         })
         .collect();
 

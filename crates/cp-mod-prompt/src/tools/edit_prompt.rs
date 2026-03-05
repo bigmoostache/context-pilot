@@ -1,7 +1,7 @@
 use crate::storage;
 use crate::types::{PromptState, PromptType};
 use cp_base::panels::now_ms;
-use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use std::fmt::Write as _;
@@ -42,7 +42,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     if !is_open {
         // Auto-open the prompt and fail with a helpful message
         PromptState::get_mut(state).open_prompt_id = Some(id.to_string());
-        state.touch_panel(ContextType::LIBRARY);
+        state.touch_panel(Kind::LIBRARY);
         return ToolResult::new(
             tool.id.clone(),
             format!(
@@ -116,7 +116,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             };
             a.content = new_content;
             storage::save_prompt_to_dir(&storage::dir_for(PromptType::Agent), a);
-            state.touch_panel(ContextType::SYSTEM);
+            state.touch_panel(Kind::SYSTEM);
         }
         EntityType::Skill => {
             let Some(s) = ps_mut.skills.iter_mut().find(|s| s.id == id) else {
@@ -148,7 +148,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::LIBRARY);
 
     // Format result as unified diff (same format as file Edit tool)
     let lines_changed = new_string.lines().count().max(old_string.lines().count());

@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 use crate::app::panels::Panel;
 use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use crate::infra::tools::{ToolResult, ToolUse};
-use crate::state::{ContextType, State};
+use crate::state::{Kind, State};
 
 /// Lazily parsed tool text definitions for core tools.
 static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -41,11 +41,11 @@ pub(crate) use cp_mod_typst::TypstModule;
 // Re-export Module trait and helpers from cp-base
 pub(crate) use cp_base::modules::{Module, ToolVisualizer};
 
-/// Initialize the global `ContextType` registry from all modules.
+/// Initialize the global `Kind` registry from all modules.
 /// Must be called once at startup, before any `is_fixed()` / `icon()` / `needs_cache()` calls.
 pub(crate) fn init_registry() {
     let modules = all_modules();
-    let metadata: Vec<crate::state::ContextTypeMeta> = modules.iter().flat_map(|m| m.context_type_metadata()).collect();
+    let metadata: Vec<crate::state::TypeMeta> = modules.iter().flat_map(|m| m.context_type_metadata()).collect();
     crate::state::init_context_type_registry(metadata);
 }
 
@@ -56,7 +56,7 @@ pub(crate) struct FixedPanelDefault {
     /// Whether this module is a core (non-deactivatable) module.
     pub is_core: bool,
     /// The context type of this fixed panel.
-    pub context_type: ContextType,
+    pub context_type: Kind,
     /// Human-readable display name for the panel.
     pub display_name: &'static str,
     /// Whether the cache for this panel is deprecated.
@@ -70,7 +70,7 @@ type FixedPanelLookup<'lookup> = (&'lookup str, bool, &'lookup str, bool);
 pub(crate) fn all_fixed_panel_defaults() -> Vec<FixedPanelDefault> {
     // Build a lookup from context_type to module defaults
     let modules = all_modules();
-    let mut lookup: HashMap<ContextType, FixedPanelLookup<'_>> = HashMap::new();
+    let mut lookup: HashMap<Kind, FixedPanelLookup<'_>> = HashMap::new();
     for module in &modules {
         for (ct, name, cache_dep) in module.fixed_panel_defaults() {
             let _r = lookup.insert(ct, (module.id(), module.is_core(), name, cache_dep));
@@ -81,7 +81,7 @@ pub(crate) fn all_fixed_panel_defaults() -> Vec<FixedPanelDefault> {
     crate::state::fixed_panel_order()
         .iter()
         .filter_map(|ct_str| {
-            let ct = ContextType::new(ct_str);
+            let ct = Kind::new(ct_str);
             lookup.get(&ct).map(|(mid, is_core, name, cache_dep)| FixedPanelDefault {
                 module_id: mid,
                 is_core: *is_core,
@@ -93,14 +93,14 @@ pub(crate) fn all_fixed_panel_defaults() -> Vec<FixedPanelDefault> {
         .collect()
 }
 
-/// Create a default `ContextElement` for a fixed panel
-pub(crate) fn make_default_context_element(
+/// Create a default `Entry` for a fixed panel
+pub(crate) fn make_default_entry(
     id: &str,
-    context_type: ContextType,
+    context_type: Kind,
     name: &str,
     cache_deprecated: bool,
-) -> crate::state::ContextElement {
-    cp_base::state::context::make_default_context_element(id, context_type, name, cache_deprecated)
+) -> crate::state::Entry {
+    cp_base::state::context::make_default_entry(id, context_type, name, cache_deprecated)
 }
 
 /// Returns all registered modules.
@@ -184,7 +184,7 @@ pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &
 }
 
 /// Create a panel for the given context type by asking all modules.
-pub(crate) fn create_panel(context_type: &ContextType) -> Option<Box<dyn Panel>> {
+pub(crate) fn create_panel(context_type: &Kind) -> Option<Box<dyn Panel>> {
     for module in all_modules() {
         if let Some(panel) = module.create_panel(context_type) {
             return Some(panel);

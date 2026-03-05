@@ -1,4 +1,4 @@
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use unicode_width::UnicodeWidthStr as _;
 
 /// Truncate a string to fit within `max_width` display columns, appending '…' if truncated.

@@ -6,7 +6,7 @@ use crate::infra::api::StreamEvent;
 use crate::infra::tools::execute_tool;
 use crate::modules::pre_flight::pre_flight_tool;
 use crate::state::persistence::build_message_op;
-use crate::state::{Message, MessageStatus, MessageType, StreamPhase, ToolResultRecord, ToolUseRecord};
+use crate::state::{Message, MsgKind, MsgStatus, StreamPhase, ToolResultRecord, ToolUseRecord};
 
 use super::streaming::{has_dirty_file_panels, has_dirty_panels, trigger_dirty_panel_refresh};
 use cp_mod_callback::firing as callback_firing;
@@ -21,6 +21,21 @@ use std::fmt::Write as _;
 
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
+    /// Accumulate token stats from the intermediate stream into tick/stream/total counters.
+    const fn accumulate_pending_token_stats(&mut self) {
+        if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = self.pending_done {
+            self.state.tick_cache_hit_tokens = cache_hit_tokens;
+            self.state.tick_cache_miss_tokens = cache_miss_tokens;
+            self.state.tick_output_tokens = output_tokens;
+            self.state.stream_cache_hit_tokens = self.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
+            self.state.stream_cache_miss_tokens = self.state.stream_cache_miss_tokens.saturating_add(cache_miss_tokens);
+            self.state.stream_output_tokens = self.state.stream_output_tokens.saturating_add(output_tokens);
+            self.state.cache_hit_tokens = self.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
+            self.state.cache_miss_tokens = self.state.cache_miss_tokens.saturating_add(cache_miss_tokens);
+            self.state.total_output_tokens = self.state.total_output_tokens.saturating_add(output_tokens);
+        }
+    }
+
     /// Create and persist a `tool_call` message for a single `ToolUse`.
     /// Used for both direct tool calls and queue-flushed replays.
     fn save_tool_call_message(&mut self, tool: &cp_base::tools::ToolUse) {
@@ -33,10 +48,10 @@ impl App {
             id: tool_id,
             uid: Some(tool_global_uid),
             role: "assistant".to_string(),
-            msg_type: MessageType::ToolCall,
+            msg_type: MsgKind::ToolCall,
             content: String::new(),
             content_token_count: 0,
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: vec![ToolUseRecord { id: tool.id.clone(), name: tool.name.clone(), input: tool.input.clone() }],
             tool_results: Vec::new(),
             input_tokens: 0,
@@ -264,10 +279,10 @@ impl App {
             id: result_id,
             uid: Some(result_global_uid),
             role: "user".to_string(),
-            msg_type: MessageType::ToolResult,
+            msg_type: MsgKind::ToolResult,
             content: String::new(),
             content_token_count: 0,
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,
@@ -290,10 +305,10 @@ impl App {
             id: assistant_id,
             uid: Some(assistant_global_uid),
             role: "assistant".to_string(),
-            msg_type: MessageType::TextMessage,
+            msg_type: MsgKind::TextMessage,
             content: String::new(),
             content_token_count: 0,
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
@@ -304,17 +319,7 @@ impl App {
         self.state.streaming_estimated_tokens = 0;
 
         // Accumulate token stats from intermediate stream before discarding pending_done
-        if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = self.pending_done {
-            self.state.tick_cache_hit_tokens = cache_hit_tokens;
-            self.state.tick_cache_miss_tokens = cache_miss_tokens;
-            self.state.tick_output_tokens = output_tokens;
-            self.state.stream_cache_hit_tokens = self.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
-            self.state.stream_cache_miss_tokens = self.state.stream_cache_miss_tokens.saturating_add(cache_miss_tokens);
-            self.state.stream_output_tokens = self.state.stream_output_tokens.saturating_add(output_tokens);
-            self.state.cache_hit_tokens = self.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
-            self.state.cache_miss_tokens = self.state.cache_miss_tokens.saturating_add(cache_miss_tokens);
-            self.state.total_output_tokens = self.state.total_output_tokens.saturating_add(output_tokens);
-        }
+        self.accumulate_pending_token_stats();
 
         self.save_state_async();
 
@@ -435,10 +440,10 @@ impl App {
             id: result_id,
             uid: Some(result_global_uid),
             role: "user".to_string(),
-            msg_type: MessageType::ToolResult,
+            msg_type: MsgKind::ToolResult,
             content: String::new(),
             content_token_count: 0,
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: Vec::new(),
             tool_results: tool_result_records,
             input_tokens: 0,
@@ -461,10 +466,10 @@ impl App {
             id: assistant_id,
             uid: Some(assistant_global_uid),
             role: "assistant".to_string(),
-            msg_type: MessageType::TextMessage,
+            msg_type: MsgKind::TextMessage,
             content: String::new(),
             content_token_count: 0,
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
@@ -475,17 +480,7 @@ impl App {
         self.state.streaming_estimated_tokens = 0;
 
         // Accumulate token stats from intermediate stream
-        if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = self.pending_done {
-            self.state.tick_cache_hit_tokens = cache_hit_tokens;
-            self.state.tick_cache_miss_tokens = cache_miss_tokens;
-            self.state.tick_output_tokens = output_tokens;
-            self.state.stream_cache_hit_tokens = self.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
-            self.state.stream_cache_miss_tokens = self.state.stream_cache_miss_tokens.saturating_add(cache_miss_tokens);
-            self.state.stream_output_tokens = self.state.stream_output_tokens.saturating_add(output_tokens);
-            self.state.cache_hit_tokens = self.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
-            self.state.cache_miss_tokens = self.state.cache_miss_tokens.saturating_add(cache_miss_tokens);
-            self.state.total_output_tokens = self.state.total_output_tokens.saturating_add(output_tokens);
-        }
+        self.accumulate_pending_token_stats();
 
         self.save_state_async();
         self.state.flags.ui.dirty = true;

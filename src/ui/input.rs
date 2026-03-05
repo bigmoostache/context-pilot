@@ -7,7 +7,7 @@ use super::{helpers::spinner, theme};
 use crate::llms::{LlmProvider, ModelInfo as _};
 use crate::state::State;
 
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use cp_mod_prompt::types::PromptState;
 use cp_mod_queue::types::QueueState;
 
@@ -396,7 +396,7 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
 }
 
 /// Calculate the height needed for the autocomplete popup.
-pub(super) fn calculate_autocomplete_height(ac: &cp_base::state::autocomplete::AutocompleteState) -> u16 {
+pub(super) fn calculate_autocomplete_height(ac: &cp_base::state::autocomplete::Suggestions) -> u16 {
     let visible = ac.visible_matches().len().to_u16();
     // matches + border chrome (2)
     (visible.saturating_add(2)).clamp(4, 12)
@@ -404,7 +404,7 @@ pub(super) fn calculate_autocomplete_height(ac: &cp_base::state::autocomplete::A
 
 /// Render the @ autocomplete popup above the input area (bottom of content panel, growing upward).
 pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, area: Rect) {
-    let ac = match state.get_ext::<cp_base::state::autocomplete::AutocompleteState>() {
+    let ac = match state.get_ext::<cp_base::state::autocomplete::Suggestions>() {
         Some(ac) if ac.active => ac,
         _ => return,
     };

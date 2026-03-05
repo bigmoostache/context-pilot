@@ -16,9 +16,9 @@ pub const PRESETS_DIR: &str = "presets";
 
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -108,10 +108,10 @@ impl Module for PresetModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, _state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, _state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "preset_load" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
                     let presets = tools::list_presets_with_info();
                     if !presets.iter().any(|p| p.name == name) {
@@ -122,7 +122,7 @@ impl Module for PresetModule {
                 Some(pf)
             }
             "preset_snapshot_myself" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
                     let replace = tool.input.get("replace").and_then(|v| v.as_str());
                     let presets = tools::list_presets_with_info();
@@ -156,23 +156,23 @@ impl Module for PresetModule {
         vec![("preset_snapshot_myself", visualize_preset_output), ("preset_load", visualize_preset_output)]
     }
 
-    fn create_panel(&self, _context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, _context_type: &Kind) -> Option<Box<dyn Panel>> {
         None
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
         vec![]
     }
 
@@ -180,7 +180,7 @@ impl Module for PresetModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
         None
     }
 
@@ -209,7 +209,7 @@ impl Module for PresetModule {
 
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -229,7 +229,7 @@ impl Module for PresetModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

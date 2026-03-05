@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -130,7 +130,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let is_open = state
         .context
         .iter()
-        .any(|c| c.context_type.as_str() == ContextType::FILE && c.get_meta_str("file_path") == Some(&canonical));
+        .any(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical));
 
     // Read file
     let mut content = match fs::read_to_string(path) {
@@ -180,7 +180,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(ctx) = state
         .context
         .iter_mut()
-        .find(|c| c.context_type.as_str() == ContextType::FILE && c.get_meta_str("file_path") == Some(&canonical))
+        .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical))
     {
         ctx.token_count = estimate_tokens(&content);
     }

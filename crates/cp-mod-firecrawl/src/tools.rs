@@ -2,7 +2,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::api::{FirecrawlClient, MapParams, ScrapeParams, SearchParams};
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use std::fmt::Write as _;
 
 /// Dispatch firecrawl tool calls.

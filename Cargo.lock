@@ -609,6 +609,7 @@ dependencies = [
 name = "cp-mod-spine"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "cp-base",
  "crossterm",
  "ratatui",

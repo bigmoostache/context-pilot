@@ -1,5 +1,5 @@
 use super::theme;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use ratatui::prelude::{Span, Style};
 
 /// Calculate the display width of text after stripping markdown markers.

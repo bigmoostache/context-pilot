@@ -9,14 +9,10 @@
 //! and `clippy::cast_sign_loss`. All conversions use saturating semantics —
 //! values that don't fit clamp to the target type's MIN/MAX.
 //!
-//! Usage: `use cp_base::cast::SafeCast;` then `value.to_u16()`, etc.
+//! Usage: `use cp_base::cast::Safe;` then `value.to_u16()`, etc.
 
 /// Trait for safe saturating casts between numeric types.
-#[expect(
-    clippy::module_name_repetitions,
-    reason = "Trait is re-exported and used as SafeCast::method() — 'Safe' alone is meaningless"
-)]
-pub trait SafeCast {
+pub trait Safe {
     /// Saturating cast to `u8` — clamps to `0..=255`.
     fn to_u8(self) -> u8;
     /// Saturating cast to `u16` — clamps to `0..=65535`.
@@ -37,11 +33,11 @@ pub trait SafeCast {
     fn to_f64(self) -> f64;
 }
 
-/// Implement `SafeCast` for an unsigned integer type using saturating semantics.
+/// Implement `Safe` for an unsigned integer type using saturating semantics.
 macro_rules! impl_safe_cast_unsigned {
     ($t:ty) => {
         #[allow(trivial_numeric_casts, trivial_casts, clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_precision_loss, reason = "macro-generated identity casts (e.g. u32 as u32) are unavoidable — expect() would fail on non-identity expansions")]
-        impl SafeCast for $t {
+        impl Safe for $t {
             #[inline]
             fn to_u8(self) -> u8 {
                 if self > u8::MAX as $t { u8::MAX } else { self as u8 }
@@ -82,7 +78,7 @@ macro_rules! impl_safe_cast_unsigned {
     };
 }
 
-/// Implement `SafeCast` for a signed integer type using saturating/clamping semantics.
+/// Implement `Safe` for a signed integer type using saturating/clamping semantics.
 macro_rules! impl_safe_cast_signed {
     ($t:ty) => {
         #[allow(
@@ -95,7 +91,7 @@ macro_rules! impl_safe_cast_signed {
             clippy::cast_precision_loss,
             reason = "macro-generated identity casts are unavoidable — expect() would fail on non-identity expansions"
         )]
-        impl SafeCast for $t {
+        impl Safe for $t {
             #[inline]
             fn to_u8(self) -> u8 {
                 if self < 0 {
@@ -173,9 +169,9 @@ impl_safe_cast_signed!(isize);
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    reason = "f64 SafeCast impl: saturating casts necessarily use raw `as`"
+    reason = "f64 Safe impl: saturating casts necessarily use raw `as`"
 )]
-impl SafeCast for f64 {
+impl Safe for f64 {
     #[inline]
     fn to_u8(self) -> u8 {
         if self < 0.0 {
@@ -235,9 +231,9 @@ impl SafeCast for f64 {
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    reason = "f32 SafeCast impl: saturating casts necessarily use raw `as`"
+    reason = "f32 Safe impl: saturating casts necessarily use raw `as`"
 )]
-impl SafeCast for f32 {
+impl Safe for f32 {
     #[inline]
     fn to_u8(self) -> u8 {
         if self < 0.0 {

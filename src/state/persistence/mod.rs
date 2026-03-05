@@ -1,7 +1,7 @@
 //! Persistence module for multi-worker state management
 //!
 //! This module handles the file-based persistence of:
-//! - `SharedConfig` (config.json) - Global settings shared across workers
+//! - `config::Shared` (config.json) - Global settings shared across workers
 //! - `WorkerState` (states/{worker}.json) - Worker-specific state
 //! - `PanelData` (panels/{uid}.json) - Dynamic panel metadata
 //! - Messages (messages/{uid}.yaml) - Conversation messages
@@ -29,7 +29,7 @@ use cp_mod_logs::types::LogsState;
 
 use crate::infra::config::set_active_theme;
 use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
-use crate::state::{ContextElement, ContextType, Message, PanelData, SharedConfig, State, WorkerState};
+use crate::state::{Entry, Kind, Message, PanelData, SharedConfig, State, WorkerState};
 
 /// Errors directory name
 const ERRORS_DIR: &str = "errors";
@@ -53,7 +53,7 @@ pub(crate) struct BootConfig {
 /// Phase 2 result: context panels + message UIDs to load next.
 pub(crate) struct BootPanels {
     /// Loaded context elements (panels).
-    pub context: Vec<ContextElement>,
+    pub context: Vec<Entry>,
     /// UIDs of conversation messages to load in phase 3.
     pub message_uids: Vec<String>,
     /// Total number of panels loaded from disk.
@@ -69,12 +69,12 @@ pub(crate) fn boot_load_config() -> BootConfig {
 
 /// Phase 2: Build context panels from panel JSONs on disk.
 pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
-    let mut context: Vec<ContextElement> = Vec::new();
+    let mut context: Vec<Entry> = Vec::new();
     let important = &cfg.worker.important_panel_uids;
     let mut panel_count: usize = 0;
 
     // Conversation panel
-    if let Some(uid) = important.get(&ContextType::new(ContextType::CONVERSATION))
+    if let Some(uid) = important.get(&Kind::new(Kind::CONVERSATION))
         && let Some(panel_data) = panel::load_panel(uid)
     {
         context.push(panel_to_context(&panel_data, "chat"));
@@ -85,8 +85,8 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
     let defaults = crate::modules::all_fixed_panel_defaults();
     for (pos, d) in defaults.iter().enumerate() {
         let id = format!("P{pos}");
-        if d.context_type.as_str() == ContextType::SYSTEM {
-            context.push(crate::modules::make_default_context_element(
+        if d.context_type.as_str() == Kind::SYSTEM {
+            context.push(crate::modules::make_default_entry(
                 &id,
                 d.context_type.clone(),
                 d.display_name,
@@ -101,7 +101,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
     }
 
     // Dynamic panels (P8+)
-    let mut dynamic_panels: Vec<(String, ContextElement)> = cfg
+    let mut dynamic_panels: Vec<(String, Entry)> = cfg
         .worker
         .panel_uid_to_local_id
         .iter()
@@ -109,7 +109,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
             panel::load_panel(uid).map(|p| {
                 let mut elem = panel_to_context(&p, local_id);
 
-                if p.panel_type.as_str() == ContextType::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
+                if p.panel_type.as_str() == Kind::CONVERSATION_HISTORY && !p.message_uids.is_empty() {
                     let msgs: Vec<Message> =
                         p.message_uids.iter().filter_map(|msg_uid| load_message(msg_uid)).collect();
                     if !msgs.is_empty() {
@@ -141,7 +141,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
 
     // Extract message UIDs for Phase 3
     let message_uids: Vec<String> = important
-        .get(&ContextType::new(ContextType::CONVERSATION))
+        .get(&Kind::new(Kind::CONVERSATION))
         .and_then(|uid| panel::load_panel(uid))
         .map(|p| p.message_uids)
         .unwrap_or_default();
@@ -215,9 +215,9 @@ pub(crate) fn load_state() -> State {
     }
 }
 
-/// Convert `PanelData` to `ContextElement`
-fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
-    ContextElement {
+/// Convert `PanelData` to `Entry`
+fn panel_to_context(panel: &PanelData, local_id: &str) -> Entry {
+    Entry {
         id: local_id.to_string(),
         uid: Some(panel.uid.clone()),
         context_type: panel.panel_type.clone(),
@@ -240,7 +240,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> ContextElement {
     }
 }
 
-/// Convert `PanelData` to `ContextElement`
+/// Convert `PanelData` to `Entry`
 /// This serializes all config, worker state, panels, and history messages
 /// into a batch of file write/delete operations.
 pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
@@ -275,7 +275,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         }
     }
 
-    // SharedConfig
+    // Shared config
     let shared_config = SharedConfig {
         schema_version: crate::state::config::SCHEMA_VERSION,
         reload_requested: false,
@@ -300,11 +300,11 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     );
 
     // Build important_panel_uids
-    let mut important_uids: HashMap<ContextType, String> = HashMap::new();
+    let mut important_uids: HashMap<Kind, String> = HashMap::new();
     for ctx in &state.context {
-        let dominated = (ctx.context_type.is_fixed() || ctx.context_type.as_str() == ContextType::CONVERSATION)
-            && ctx.context_type.as_str() != ContextType::SYSTEM
-            && ctx.context_type.as_str() != ContextType::LIBRARY;
+        let dominated = (ctx.context_type.is_fixed() || ctx.context_type.as_str() == Kind::CONVERSATION)
+            && ctx.context_type.as_str() != Kind::SYSTEM
+            && ctx.context_type.as_str() != Kind::LIBRARY;
         if dominated && let Some(uid) = &ctx.uid {
             let _r = important_uids.insert(ctx.context_type.clone(), String::clone(uid));
         }
@@ -314,9 +314,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let panel_uid_to_local_id: HashMap<String, String> = state
         .context
         .iter()
-        .filter(|c| {
-            c.uid.is_some() && !c.context_type.is_fixed() && c.context_type.as_str() != ContextType::CONVERSATION
-        })
+        .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type.as_str() != Kind::CONVERSATION)
         .filter_map(|c| c.uid.as_ref().map(|uid: &String| (uid.clone(), c.id.clone())))
         .collect();
 
@@ -342,7 +340,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for ctx in &state.context {
-        if ctx.context_type.as_str() == ContextType::SYSTEM || ctx.context_type.as_str() == ContextType::LIBRARY {
+        if ctx.context_type.as_str() == Kind::SYSTEM || ctx.context_type.as_str() == Kind::LIBRARY {
             continue;
         }
         if let Some(uid) = &ctx.uid {
@@ -353,9 +351,9 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
                 name: ctx.name.clone(),
                 token_count: ctx.token_count,
                 last_refresh_ms: ctx.last_refresh_ms,
-                message_uids: if ctx.context_type.as_str() == ContextType::CONVERSATION {
+                message_uids: if ctx.context_type.as_str() == Kind::CONVERSATION {
                     state.messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
-                } else if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY {
+                } else if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY {
                     ctx.history_messages
                         .as_ref()
                         .map(|msgs: &Vec<Message>| {
@@ -378,7 +376,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     // History messages for ConversationHistory panels
     let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
     for ctx in &state.context {
-        if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY
+        if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY
             && let Some(ref msgs) = ctx.history_messages
         {
             for msg in msgs {

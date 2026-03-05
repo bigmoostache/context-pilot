@@ -1,5 +1,5 @@
 use cp_base::panels::{mark_panels_dirty, now_ms};
-use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
@@ -30,7 +30,7 @@ fn touch_logs_panel(state: &mut State) {
     let token_count = estimate_tokens(&content);
     let now = now_ms();
     for ctx in &mut state.context {
-        if ctx.context_type.as_str() == ContextType::LOGS {
+        if ctx.context_type.as_str() == Kind::LOGS {
             ctx.token_count = token_count;
             ctx.last_refresh_ms = now;
         }
@@ -217,7 +217,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
     let Some(panel) = state.context.get(panel_idx) else {
         return ToolResult::new(tool.id.clone(), format!("Panel index {panel_idx} out of bounds"), true);
     };
-    if panel.context_type.as_str() != ContextType::CONVERSATION_HISTORY {
+    if panel.context_type.as_str() != Kind::CONVERSATION_HISTORY {
         return ToolResult::new(
             tool.id.clone(),
             format!("Panel '{}' is not a conversation history panel (type: {:?})", panel_id, panel.context_type),
@@ -305,7 +305,7 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
         }
         if mem_count > 0 {
             output_parts.push(format!("Created {mem_count} memory(ies)"));
-            mark_panels_dirty(state, ContextType::MEMORY);
+            mark_panels_dirty(state, Kind::MEMORY);
         }
     }
 

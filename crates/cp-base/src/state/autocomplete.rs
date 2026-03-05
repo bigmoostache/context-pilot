@@ -13,11 +13,7 @@ const MAX_VISIBLE: usize = 10;
 
 /// A single entry in the autocomplete list.
 #[derive(Debug, Clone)]
-#[expect(
-    clippy::module_name_repetitions,
-    reason = "Used via re-export as AutocompleteEntry — 'Entry' alone is ambiguous"
-)]
-pub struct AutocompleteEntry {
+pub struct Completion {
     /// Display name (just the file/folder name, not the full path).
     pub name: String,
     /// Whether this entry is a directory.
@@ -26,11 +22,7 @@ pub struct AutocompleteEntry {
 
 /// State for the @-triggered file path autocomplete popup.
 #[derive(Debug, Clone)]
-#[expect(
-    clippy::module_name_repetitions,
-    reason = "Used via re-export as AutocompleteState — 'State' conflicts with runtime State"
-)]
-pub struct AutocompleteState {
+pub struct Suggestions {
     /// Whether the autocomplete popup is currently visible.
     pub active: bool,
     /// Byte position of the '@' character in state.input.
@@ -42,7 +34,7 @@ pub struct AutocompleteState {
     /// The partial name being matched (e.g., "m" for query "src/ui/m").
     pub name_prefix: String,
     /// Entries in the current directory that match the prefix.
-    pub matches: Vec<AutocompleteEntry>,
+    pub matches: Vec<Completion>,
     /// Index of the currently highlighted match (0-based).
     pub selected: usize,
     /// Scroll offset for the visible window into matches.
@@ -52,13 +44,13 @@ pub struct AutocompleteState {
     pub input_visual_lines: u16,
 }
 
-impl Default for AutocompleteState {
+impl Default for Suggestions {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl AutocompleteState {
+impl Suggestions {
     /// Create a new inactive autocomplete state with all fields zeroed.
     #[must_use]
     pub const fn new() -> Self {
@@ -131,7 +123,7 @@ impl AutocompleteState {
     }
 
     /// Replace the current match list with new entries.
-    pub fn set_matches(&mut self, entries: Vec<AutocompleteEntry>) {
+    pub fn set_matches(&mut self, entries: Vec<Completion>) {
         self.matches = entries;
         self.selected = 0;
         self.scroll_offset = 0;
@@ -159,7 +151,7 @@ impl AutocompleteState {
 
     /// Get the currently selected match, if any.
     #[must_use]
-    pub fn selected_match(&self) -> Option<&AutocompleteEntry> {
+    pub fn selected_match(&self) -> Option<&Completion> {
         self.matches.get(self.selected)
     }
 
@@ -173,7 +165,7 @@ impl AutocompleteState {
 
     /// The visible window of matches for rendering.
     #[must_use]
-    pub fn visible_matches(&self) -> &[AutocompleteEntry] {
+    pub fn visible_matches(&self) -> &[Completion] {
         let end = self.scroll_offset.saturating_add(MAX_VISIBLE).min(self.matches.len());
         self.matches.get(self.scroll_offset..end).unwrap_or_default()
     }

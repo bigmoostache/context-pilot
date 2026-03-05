@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use cp_base::state::context::{ContextElement, ContextType};
+use cp_base::state::context::{Entry, Kind};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -59,10 +59,10 @@ fn open_single_file(path: &str, state: &mut State) -> String {
 
     // Create context element WITHOUT reading file content
     // Background cache system will populate it
-    let mut elem = ContextElement {
+    let mut elem = Entry {
         id: context_id.clone(),
         uid: Some(uid),
-        context_type: ContextType::new(ContextType::FILE),
+        context_type: Kind::new(Kind::FILE),
         name: file_name,
         token_count: 0, // Will be updated by cache
         metadata: std::collections::HashMap::new(),

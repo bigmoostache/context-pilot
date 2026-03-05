@@ -5,7 +5,7 @@ use unicode_width::UnicodeWidthStr;
 use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel, now_ms, scroll_key_action};
 use cp_base::state::actions::Action;
-use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::state::watchers::WatcherRegistry;
 
@@ -100,7 +100,7 @@ impl Panel for SpinePanel {
 
     fn build_cache_request(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &State,
     ) -> Option<cp_base::panels::CacheRequest> {
         None
@@ -109,7 +109,7 @@ impl Panel for SpinePanel {
     fn apply_cache_update(
         &self,
         _update: cp_base::panels::CacheUpdate,
-        _ctx: &mut cp_base::state::context::ContextElement,
+        _ctx: &mut cp_base::state::context::Entry,
         _state: &mut State,
     ) -> bool {
         false
@@ -119,7 +119,7 @@ impl Panel for SpinePanel {
         None
     }
 
-    fn suicide(&self, _ctx: &cp_base::state::context::ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
         false
     }
 
@@ -138,7 +138,7 @@ impl Panel for SpinePanel {
         let token_count = estimate_tokens(&content);
 
         for ctx in &mut state.context {
-            if ctx.context_type.as_str() == ContextType::SPINE {
+            if ctx.context_type.as_str() == Kind::SPINE {
                 ctx.token_count = token_count;
                 let _ = cp_base::panels::update_if_changed(ctx, &content);
                 break;
@@ -151,7 +151,7 @@ impl Panel for SpinePanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type.as_str() == ContextType::SPINE)
+            .find(|c| c.context_type.as_str() == Kind::SPINE)
             .map_or(("P9", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Spine", content, last_refresh_ms)]
     }

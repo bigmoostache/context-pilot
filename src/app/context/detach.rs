@@ -7,9 +7,7 @@ use crate::infra::constants::{
     DETACH_CHUNK_MIN_MESSAGES, DETACH_CHUNK_MIN_TOKENS, DETACH_KEEP_MIN_MESSAGES, DETACH_KEEP_MIN_TOKENS,
 };
 use crate::modules::conversation::refresh::estimate_message_tokens;
-use crate::state::{
-    ContextElement, ContextType, Message, MessageStatus, MessageType, compute_total_pages, estimate_tokens,
-};
+use crate::state::{Entry, Kind, Message, MsgKind, MsgStatus, compute_total_pages, estimate_tokens};
 use cp_base::panels::time_arith;
 
 /// Check if `idx` is a turn boundary — a safe place to split the conversation.
@@ -23,23 +21,23 @@ fn is_turn_boundary(messages: &[Message], idx: usize) -> bool {
     };
 
     // Skip Deleted/Detached messages — not meaningful boundaries
-    if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
+    if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
         return false;
     }
 
     // After an assistant text message (not a tool call)
-    if msg.role == "assistant" && msg.msg_type == MessageType::TextMessage {
+    if msg.role == "assistant" && msg.msg_type == MsgKind::TextMessage {
         return true;
     }
 
     // After a tool result, if next non-skipped message is a user text message
-    if msg.msg_type == MessageType::ToolResult {
+    if msg.msg_type == MsgKind::ToolResult {
         let rest = messages.get(idx.saturating_add(1)..).unwrap_or_default();
         for next in rest {
-            if next.status == MessageStatus::Deleted || next.status == MessageStatus::Detached {
+            if next.status == MsgStatus::Deleted || next.status == MsgStatus::Detached {
                 continue;
             }
-            return next.role == "user" && next.msg_type == MessageType::TextMessage;
+            return next.role == "user" && next.msg_type == MsgKind::TextMessage;
         }
         return true; // Last message in conversation
     }
@@ -64,15 +62,12 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
 pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
     loop {
         // 1. Count active (non-Deleted, non-Detached) messages and total tokens
-        let active_count = state
-            .messages
-            .iter()
-            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .count();
+        let active_count =
+            state.messages.iter().filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached).count();
         let total_tokens: usize = state
             .messages
             .iter()
-            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
             .map(estimate_message_tokens)
             .sum();
 
@@ -92,7 +87,7 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
         let mut boundary = None;
 
         for (idx, msg) in state.messages.iter().enumerate() {
-            if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
+            if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
                 continue;
             }
             active_seen = active_seen.saturating_add(1);
@@ -114,13 +109,11 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
 
         // 4. Verify the remaining tip satisfies both keep minimums
         let remaining_msgs = state.messages.get(boundary..).unwrap_or_default();
-        let remaining_active = remaining_msgs
-            .iter()
-            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-            .count();
+        let remaining_active =
+            remaining_msgs.iter().filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached).count();
         let remaining_tokens: usize = remaining_msgs
             .iter()
-            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
             .map(estimate_message_tokens)
             .sum();
 
@@ -132,18 +125,18 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
         let chunk_msgs = state.messages.get(..boundary).unwrap_or_default();
         let first_timestamp = chunk_msgs
             .iter()
-            .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .find(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
             .map_or(0, |m| m.timestamp_ms);
         let last_timestamp = chunk_msgs
             .iter()
             .rev()
-            .find(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .find(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
             .map_or(0, |m| m.timestamp_ms);
 
         // 5. Collect Message objects for UI rendering + format chunk content for LLM
         let history_msgs: Vec<Message> = chunk_msgs
             .iter()
-            .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
+            .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
             .cloned()
             .collect();
 
@@ -179,10 +172,10 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
         let panel_global_uid = format!("UID_{}_P", state.global_next_uid);
         state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-        state.context.push(ContextElement {
+        state.context.push(Entry {
             id: panel_id,
             uid: Some(panel_global_uid),
-            context_type: ContextType::new(ContextType::CONVERSATION_HISTORY),
+            context_type: Kind::new(Kind::CONVERSATION_HISTORY),
             name: chunk_name,
             token_count,
             metadata: std::collections::HashMap::new(),

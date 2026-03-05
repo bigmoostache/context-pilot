@@ -558,3 +558,7 @@
 21:06:56.986955522 fmt src/modules/conversation/render_input.rs
 21:06:57.038226975 fmt src/ui/sidebar/full.rs
 21:13:46.999674054 fmt src/modules/conversation/render.rs
+21:39:54.186478418 fmt src/llms/mod.rs
+21:40:22.520205450 fmt crates/cp-mod-spine/src/coucou.rs
+21:41:35.975194688 fmt src/llms/mod.rs
+21:41:35.991191716 fmt crates/cp-mod-spine/src/coucou.rs

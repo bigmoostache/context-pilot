@@ -3,7 +3,7 @@ use std::sync::mpsc::Receiver;
 use crate::app::panels::now_ms;
 use crate::infra::watcher::WatchEvent;
 use crate::state::cache::{CacheRequest, CacheUpdate, process_cache_request};
-use crate::state::{ContextType, State};
+use crate::state::{Kind, State};
 
 use crate::app::App;
 
@@ -24,7 +24,7 @@ impl App {
             .state
             .context
             .iter()
-            .filter(|c| c.context_type.as_str() == ContextType::GITHUB_RESULT)
+            .filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT)
             .filter_map(|c| c.get_meta_str("result_command").map(|cmd| (c.id.clone(), cmd.to_string(), token.clone())))
             .collect();
         self.gh_watcher.sync_watches(&panels);
@@ -81,9 +81,7 @@ impl App {
             // ModuleSpecific: match by context_type
             if let CacheUpdate::ModuleSpecific { ref context_type, ref data, .. } = update {
                 // Special case: BranchPrUpdate targets GithubState, not a panel
-                if context_type.as_str() == ContextType::GITHUB_RESULT
-                    && data.is::<cp_mod_github::watcher::BranchPrUpdate>()
-                {
+                if context_type.as_str() == Kind::GITHUB_RESULT && data.is::<cp_mod_github::watcher::BranchPrUpdate>() {
                     if let CacheUpdate::ModuleSpecific { data: owned_data, .. } = update
                         && let Ok(pr_update) = owned_data.downcast::<cp_mod_github::watcher::BranchPrUpdate>()
                     {

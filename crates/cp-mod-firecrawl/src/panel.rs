@@ -5,7 +5,7 @@ use cp_base::config::accessors::theme;
 use cp_base::panels::scroll_key_action;
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::actions::Action;
-use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 
 /// Context type identifier for Firecrawl result panels.
@@ -22,12 +22,8 @@ pub fn create(state: &mut State, title: &str, content: &str) -> String {
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-    let mut elem = cp_base::state::context::make_default_context_element(
-        &panel_id,
-        ContextType::new(FIRECRAWL_PANEL_TYPE),
-        title,
-        false,
-    );
+    let mut elem =
+        cp_base::state::context::make_default_entry(&panel_id, Kind::new(FIRECRAWL_PANEL_TYPE), title, false);
     elem.uid = Some(uid);
     elem.cached_content = Some(content.to_string());
     elem.token_count = estimate_tokens(content);
@@ -57,19 +53,19 @@ impl Panel for Results {
         true
     }
 
-    fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
         // Only need to restore if cached_content is missing (post-reload)
         if ctx.cached_content.is_some() {
             return None;
         }
         let content = ctx.metadata.get(META_CONTENT)?.as_str()?;
         Some(CacheRequest {
-            context_type: ContextType::new(FIRECRAWL_PANEL_TYPE),
+            context_type: Kind::new(FIRECRAWL_PANEL_TYPE),
             data: Box::new(FirecrawlRestoreRequest { context_id: ctx.id.clone(), content: content.to_string() }),
         })
     }
 
-    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
         if let CacheUpdate::Content { content, token_count, .. } = update {
             ctx.cached_content = Some(content.clone());
             ctx.full_token_count = token_count;
@@ -108,7 +104,7 @@ impl Panel for Results {
         state
             .context
             .iter()
-            .filter(|c| c.context_type == ContextType::new(FIRECRAWL_PANEL_TYPE))
+            .filter(|c| c.context_type == Kind::new(FIRECRAWL_PANEL_TYPE))
             .filter_map(|c| {
                 let content = c.cached_content.as_ref()?;
                 let output = paginate_content(content, c.current_page, c.total_pages);
@@ -123,17 +119,15 @@ impl Panel for Results {
         None
     }
 
-    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
 
     fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let ctx = state
-            .context
-            .get(state.selected_context)
-            .filter(|c| c.context_type == ContextType::new(FIRECRAWL_PANEL_TYPE));
+        let ctx =
+            state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(FIRECRAWL_PANEL_TYPE));
 
         let Some(ctx) = ctx else {
             return vec![Line::from(vec![Span::styled(

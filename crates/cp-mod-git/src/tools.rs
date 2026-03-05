@@ -3,7 +3,7 @@ use std::process::Command;
 use super::GIT_CMD_TIMEOUT_SECS;
 use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -32,7 +32,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
         CommandClass::ReadOnly => {
             // Search for existing GitResult panel with same command
             let existing_idx = state.context.iter().position(|c| {
-                c.context_type.as_str() == ContextType::GIT_RESULT && c.get_meta_str("result_command") == Some(command)
+                c.context_type.as_str() == Kind::GIT_RESULT && c.get_meta_str("result_command") == Some(command)
             });
 
             if let Some(ctx_elem) = existing_idx.and_then(|idx| state.context.get_mut(idx)) {
@@ -46,12 +46,8 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                 let uid = format!("UID_{}_P", state.global_next_uid);
                 state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-                let mut elem = cp_base::state::context::make_default_context_element(
-                    &panel_id,
-                    ContextType::new(ContextType::GIT_RESULT),
-                    command,
-                    true,
-                );
+                let mut elem =
+                    cp_base::state::context::make_default_entry(&panel_id, Kind::new(Kind::GIT_RESULT), command, true);
                 elem.uid = Some(uid);
                 elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);
@@ -92,10 +88,10 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
             let invalidations = super::cache_invalidation::find_invalidations(command);
             if invalidations.is_empty() {
                 // Unknown mutating command -> blanket invalidation (safe default)
-                cp_base::panels::mark_panels_dirty(state, ContextType::GIT_RESULT);
+                cp_base::panels::mark_panels_dirty(state, Kind::GIT_RESULT);
             } else {
                 for ctx in &mut state.context {
-                    if ctx.context_type.as_str() == ContextType::GIT_RESULT
+                    if ctx.context_type.as_str() == Kind::GIT_RESULT
                         && let Some(cached_cmd) = ctx.get_meta_str("result_command")
                         && invalidations.iter().any(|re| re.is_match(cached_cmd))
                     {

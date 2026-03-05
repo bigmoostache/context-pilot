@@ -7,7 +7,7 @@ use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::actions::Action;
-use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 
 use super::GIT_CMD_TIMEOUT_SECS;
@@ -27,15 +27,15 @@ impl Panel for GitResultPanel {
         Some(GIT_STATUS_REFRESH_MS)
     }
 
-    fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?;
         Some(CacheRequest {
-            context_type: ContextType::new(ContextType::GIT_RESULT),
+            context_type: Kind::new(Kind::GIT_RESULT),
             data: Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_string() }),
         })
     }
 
-    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
         match update {
             CacheUpdate::Content { content, token_count, .. } => {
                 ctx.cached_content = Some(content);
@@ -101,7 +101,7 @@ impl Panel for GitResultPanel {
 
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
-            && ctx.context_type.as_str() == ContextType::GIT_RESULT
+            && ctx.context_type.as_str() == Kind::GIT_RESULT
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
             let short = if cmd.len() > 40 {
@@ -117,7 +117,7 @@ impl Panel for GitResultPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
         for ctx in &state.context {
-            if ctx.context_type.as_str() != ContextType::GIT_RESULT {
+            if ctx.context_type.as_str() != Kind::GIT_RESULT {
                 continue;
             }
             let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
@@ -132,8 +132,7 @@ impl Panel for GitResultPanel {
         let mut text: Vec<Line<'_>> = Vec::new();
 
         // Find the selected GitResult panel
-        let ctx =
-            state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == ContextType::GIT_RESULT);
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
 
         let Some(ctx) = ctx else {
             text.push(Line::from(vec![Span::styled(" No git result panel", Style::default().fg(theme::text_muted()))]));
@@ -169,7 +168,7 @@ impl Panel for GitResultPanel {
     }
 
     fn refresh(&self, _state: &mut State) {}
-    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
     fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}

@@ -2,7 +2,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::api::{BraveClient, LLMContextParams, SearchParams};
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Dispatch brave tool calls.
 pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

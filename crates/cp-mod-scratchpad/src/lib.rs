@@ -17,14 +17,14 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::ScratchpadPanel;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use cp_base::modules::Module;
 
 /// Lazily-parsed tool descriptions loaded from the scratchpad YAML definition.
@@ -73,17 +73,17 @@ impl Module for ScratchpadModule {
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::SCRATCHPAD)]
+    fn fixed_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::SCRATCHPAD)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::SCRATCHPAD), "Scratch", false)]
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
+        vec![(Kind::new(Kind::SCRATCHPAD), "Scratch", false)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::SCRATCHPAD => Some(Box::new(ScratchpadPanel)),
+            Kind::SCRATCHPAD => Some(Box::new(ScratchpadPanel)),
             _ => None,
         }
     }
@@ -115,10 +115,10 @@ impl Module for ScratchpadModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "scratchpad_edit_cell" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(cell_id) = tool.input.get("cell_id").and_then(|v| v.as_str()) {
                     let ss = ScratchpadState::get(state);
                     if !ss.scratchpad_cells.iter().any(|c| c.id == cell_id) {
@@ -128,7 +128,7 @@ impl Module for ScratchpadModule {
                 Some(pf)
             }
             "scratchpad_wipe" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(ids) = tool.input.get("cell_ids").and_then(|v| v.as_array())
                     && !ids.is_empty()
                 {
@@ -164,8 +164,8 @@ impl Module for ScratchpadModule {
         ]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
-        vec![cp_base::state::context::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
+        vec![cp_base::state::context::TypeMeta {
             context_type: "scratchpad",
             icon_id: "scratchpad",
             is_fixed: true,
@@ -194,13 +194,13 @@ impl Module for ScratchpadModule {
         serde_json::Value::Null
     }
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
     fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
         None
     }
-    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
         None
     }
     fn overview_context_section(&self, _state: &State) -> Option<String> {
@@ -215,7 +215,7 @@ impl Module for ScratchpadModule {
     }
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -227,7 +227,7 @@ impl Module for ScratchpadModule {
     }
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

@@ -1,9 +1,9 @@
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::SpineState;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Execute the `notification_mark_processed` tool
 pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -179,7 +179,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
         changes.push("reset runtime counters".to_string());
     }
 
-    state.touch_panel(ContextType::SPINE);
+    state.touch_panel(Kind::SPINE);
 
     if changes.is_empty() {
         ToolResult::new(

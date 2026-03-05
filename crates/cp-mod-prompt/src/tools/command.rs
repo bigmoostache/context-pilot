@@ -1,6 +1,6 @@
 use crate::storage;
 use crate::types::{PromptItem, PromptState, PromptType};
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -43,7 +43,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Command), &item);
     PromptState::get_mut(state).commands.push(item);
 
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::LIBRARY);
 
     ToolResult::new(tool.id.clone(), format!("Created command '{name}' with ID '{id}' (use as /{id})"), false)
 }
@@ -68,7 +68,7 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cmd = ps.commands.remove(idx);
     storage::delete_prompt_from_dir(&storage::dir_for(PromptType::Command), id);
 
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::LIBRARY);
 
     ToolResult::new(tool.id.clone(), format!("Deleted command '{}' ({})", cmd.name, id), false)
 }

@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 /// Discriminator for the three message shapes in a conversation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[expect(clippy::module_name_repetitions, reason = "52 callsites via re-export — 'Type' is a reserved word")]
-pub enum MessageType {
+pub enum MsgKind {
     /// Plain text (user or assistant).
     #[default]
     TextMessage,
@@ -17,8 +16,7 @@ pub enum MessageType {
 /// Message status for context management
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-#[expect(clippy::module_name_repetitions, reason = "58 callsites via re-export — 'Status' alone is too generic")]
-pub enum MessageStatus {
+pub enum MsgStatus {
     /// Included in full in the LLM prompt.
     #[default]
     Full,
@@ -67,7 +65,7 @@ pub struct Message {
     pub role: String,
     /// Discriminator for message shape.
     #[serde(default, rename = "message_type")]
-    pub msg_type: MessageType,
+    pub msg_type: MsgKind,
     /// Text content (user input, assistant response, or empty for pure tool messages).
     pub content: String,
     /// Estimated token count for `content`.
@@ -75,7 +73,7 @@ pub struct Message {
     pub content_token_count: usize,
     /// Message status for context management.
     #[serde(default)]
-    pub status: MessageStatus,
+    pub status: MsgStatus,
     /// Tool uses in this message (for assistant messages).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_uses: Vec<ToolUseRecord>,
@@ -98,10 +96,10 @@ impl Message {
             id,
             uid: Some(uid),
             role: "user".to_string(),
-            msg_type: MessageType::TextMessage,
+            msg_type: MsgKind::TextMessage,
             content,
             content_token_count: token_count,
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
@@ -116,10 +114,10 @@ impl Message {
             id,
             uid: Some(uid),
             role: "assistant".to_string(),
-            msg_type: MessageType::TextMessage,
+            msg_type: MsgKind::TextMessage,
             content: String::new(),
             content_token_count: 0,
-            status: MessageStatus::Full,
+            status: MsgStatus::Full,
             tool_uses: Vec::new(),
             tool_results: Vec::new(),
             input_tokens: 0,
@@ -131,7 +129,7 @@ impl Message {
 /// Test helpers for building Message instances with sensible defaults.
 /// Not gated behind `#[cfg(test)]` so downstream crates can use them.
 pub mod test_helpers {
-    use super::{Message, MessageStatus, MessageType, ToolResultRecord, ToolUseRecord};
+    use super::{Message, MsgKind, MsgStatus, ToolResultRecord, ToolUseRecord};
 
     /// Builder for constructing test messages with sensible defaults.
     /// Auto-increments IDs per role prefix (U1, A1, T1, R1).
@@ -143,7 +141,7 @@ pub mod test_helpers {
 
     impl MessageBuilder {
         /// Internal base constructor — sets role, type, and empty content.
-        fn base(id: String, role: &str, msg_type: MessageType) -> Self {
+        fn base(id: String, role: &str, msg_type: MsgKind) -> Self {
             Self {
                 msg: Message {
                     id,
@@ -152,7 +150,7 @@ pub mod test_helpers {
                     msg_type,
                     content: String::new(),
                     content_token_count: 0,
-                    status: MessageStatus::Full,
+                    status: MsgStatus::Full,
                     tool_uses: Vec::new(),
                     tool_results: Vec::new(),
                     input_tokens: 0,
@@ -166,7 +164,7 @@ pub mod test_helpers {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let mut b = Self::base(format!("U{n}"), "user", MessageType::TextMessage);
+            let mut b = Self::base(format!("U{n}"), "user", MsgKind::TextMessage);
             b.msg.content = content.to_string();
             b
         }
@@ -176,7 +174,7 @@ pub mod test_helpers {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let mut b = Self::base(format!("A{n}"), "assistant", MessageType::TextMessage);
+            let mut b = Self::base(format!("A{n}"), "assistant", MsgKind::TextMessage);
             b.msg.content = content.to_string();
             b
         }
@@ -187,7 +185,7 @@ pub mod test_helpers {
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
             let id = format!("T{n}");
-            let mut b = Self::base(id.clone(), "assistant", MessageType::ToolCall);
+            let mut b = Self::base(id.clone(), "assistant", MsgKind::ToolCall);
             b.msg.tool_uses.push(ToolUseRecord { id, name: name.to_string(), input });
             b
         }
@@ -197,7 +195,7 @@ pub mod test_helpers {
             use std::sync::atomic::{AtomicUsize, Ordering};
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let mut b = Self::base(format!("R{n}"), "user", MessageType::ToolResult);
+            let mut b = Self::base(format!("R{n}"), "user", MsgKind::ToolResult);
             b.msg.tool_results.push(ToolResultRecord {
                 tool_use_id: tool_use_id.to_string(),
                 content: content.to_string(),
@@ -209,7 +207,7 @@ pub mod test_helpers {
 
         /// Override the message status (builder pattern).
         #[must_use]
-        pub const fn status(mut self, s: MessageStatus) -> Self {
+        pub const fn status(mut self, s: MsgStatus) -> Self {
             self.msg.status = s;
             self
         }
@@ -233,11 +231,11 @@ pub fn format_messages_to_chunk(messages: &[Message]) -> String {
 
     let mut output = String::new();
     for msg in messages {
-        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
+        if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
             continue;
         }
         match msg.msg_type {
-            MessageType::ToolCall => {
+            MsgKind::ToolCall => {
                 for tu in &msg.tool_uses {
                     let _r = writeln!(
                         output,
@@ -247,12 +245,12 @@ pub fn format_messages_to_chunk(messages: &[Message]) -> String {
                     );
                 }
             }
-            MessageType::ToolResult => {
+            MsgKind::ToolResult => {
                 for tr in &msg.tool_results {
                     let _r = writeln!(output, "{}", tr.content);
                 }
             }
-            MessageType::TextMessage => {
+            MsgKind::TextMessage => {
                 if !msg.content.is_empty() {
                     let _r = writeln!(output, "[{}]: {}", msg.role, msg.content);
                 }

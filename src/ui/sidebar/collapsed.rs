@@ -1,7 +1,7 @@
 use ratatui::prelude::{Constraint, Direction, Frame, Layout, Line, Rect, Span, Style};
 
 use super::super::{helpers::format_number, theme};
-use crate::state::{ContextType, State};
+use crate::state::{Kind, State};
 
 use super::full::fixed_panel_badge;
 
@@ -53,44 +53,25 @@ pub(crate) fn render_sidebar_collapsed(frame: &mut Frame<'_>, state: &State, are
     // Separate fixed and dynamic, skip conversation (rendered separately)
     let (fixed_indices, dynamic_indices): (Vec<_>, Vec<_>) = sorted_indices
         .into_iter()
-        .filter(|&i| {
-            state.context.get(i).is_some_and(|c| c.context_type != ContextType::new(ContextType::CONVERSATION))
-        })
+        .filter(|&i| state.context.get(i).is_some_and(|c| c.context_type != Kind::new(Kind::CONVERSATION)))
         .partition(|&i| state.context.get(i).is_some_and(|c| c.context_type.is_fixed()));
 
     // Conversation entry
-    if let Some(conv_idx) =
-        state.context.iter().position(|c| c.context_type == ContextType::new(ContextType::CONVERSATION))
-    {
-        render_collapsed_line(&mut lines, &CollapsedLineCtx {
-            idx: conv_idx,
-            state,
-            base_style,
-            badge: None,
-        });
+    if let Some(conv_idx) = state.context.iter().position(|c| c.context_type == Kind::new(Kind::CONVERSATION)) {
+        render_collapsed_line(&mut lines, &CollapsedLineCtx { idx: conv_idx, state, base_style, badge: None });
     }
 
     // Fixed panels
     for &i in &fixed_indices {
         let badge = state.context.get(i).and_then(|c| fixed_panel_badge(c.context_type.as_str(), state));
-        render_collapsed_line(&mut lines, &CollapsedLineCtx {
-            idx: i,
-            state,
-            base_style,
-            badge: badge.as_deref(),
-        });
+        render_collapsed_line(&mut lines, &CollapsedLineCtx { idx: i, state, base_style, badge: badge.as_deref() });
     }
 
     // Dynamic panels separator + entries
     if !dynamic_indices.is_empty() {
         lines.push(Line::from(vec![Span::styled("  ──────────", Style::default().fg(theme::border_muted()))]));
         for &i in &dynamic_indices {
-            render_collapsed_line(&mut lines, &CollapsedLineCtx {
-                idx: i,
-                state,
-                base_style,
-                badge: None,
-            });
+            render_collapsed_line(&mut lines, &CollapsedLineCtx { idx: i, state, base_style, badge: None });
         }
     }
 

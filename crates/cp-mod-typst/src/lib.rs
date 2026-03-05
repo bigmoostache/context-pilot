@@ -19,9 +19,9 @@ pub mod watchlist;
 
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
-use cp_base::state::context::{ContextElement, ContextType, ContextTypeMeta};
+use cp_base::state::context::{Entry, Kind, TypeMeta};
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -105,27 +105,27 @@ impl Module for TypstModule {
         }
     }
 
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<Verdict> {
         None
     }
 
-    fn create_panel(&self, _context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, _context_type: &Kind) -> Option<Box<dyn Panel>> {
         None
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
-    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
+    fn context_type_metadata(&self) -> Vec<TypeMeta> {
         vec![]
     }
 
@@ -137,7 +137,7 @@ impl Module for TypstModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &Entry) -> Option<String> {
         None
     }
 
@@ -153,7 +153,7 @@ impl Module for TypstModule {
         vec![]
     }
 
-    fn on_close_context(&self, _ctx: &ContextElement, _state: &mut State) -> Option<Result<String, String>> {
+    fn on_close_context(&self, _ctx: &Entry, _state: &mut State) -> Option<Result<String, String>> {
         None
     }
 
@@ -169,7 +169,7 @@ impl Module for TypstModule {
         vec![]
     }
 
-    fn should_invalidate_on_fs_change(&self, _ctx: &ContextElement, _changed_path: &str, _is_dir_event: bool) -> bool {
+    fn should_invalidate_on_fs_change(&self, _ctx: &Entry, _changed_path: &str, _is_dir_event: bool) -> bool {
         false
     }
 

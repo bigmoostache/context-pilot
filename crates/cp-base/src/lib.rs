@@ -11,7 +11,7 @@ pub mod config;
 pub mod modules;
 /// Panel trait and caching infrastructure for context elements.
 pub mod panels;
-/// State types: runtime State, `SharedConfig`, `WorkerState`, Messages, Actions.
+/// State types: runtime State, `config::Shared`, `WorkerState`, Messages, Actions.
 pub mod state;
 /// Tool definition types and YAML-driven builder.
 pub mod tools;

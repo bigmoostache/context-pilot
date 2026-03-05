@@ -7,7 +7,7 @@ use crate::ui::{
     helpers::{Cell, format_number, render_table},
     theme,
 };
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use cp_mod_git::types::GitChangeType;
 
 /// Horizontal separator line.
@@ -255,7 +255,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
     ]);
 
     // --- Panels sorted by last_refresh_ms, with Conversation forced to end ---
-    let mut sorted_contexts: Vec<&crate::state::ContextElement> = state.context.iter().collect();
+    let mut sorted_contexts: Vec<&crate::state::Entry> = state.context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
 
     // Partition: conversation ("chat") always last

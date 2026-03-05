@@ -14,7 +14,7 @@ use crate::app::panels::ContextItem;
 use crate::llms::{
     ApiMessage, ContentBlock, panel_footer_text, panel_header_text, panel_timestamp_text, prepare_panel_messages,
 };
-use crate::state::{Message, MessageStatus, MessageType};
+use crate::state::{Message, MsgKind, MsgStatus};
 use cp_base::config::INJECTIONS;
 
 /// Assemble the full prompt as `Vec<ApiMessage>`.
@@ -50,7 +50,7 @@ pub(crate) fn assemble_prompt(
 
     // ── Phase 2: Conversation messages ──────────────────────────
     for (idx, msg) in messages.iter().enumerate() {
-        if msg.status == MessageStatus::Deleted || msg.status == MessageStatus::Detached {
+        if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
             continue;
         }
 
@@ -60,7 +60,7 @@ pub(crate) fn assemble_prompt(
 
         let mut content_blocks: Vec<ContentBlock> = Vec::new();
 
-        if msg.msg_type == MessageType::ToolResult {
+        if msg.msg_type == MsgKind::ToolResult {
             for result in &msg.tool_results {
                 content_blocks.push(ContentBlock::ToolResult {
                     tool_use_id: result.tool_use_id.clone(),
@@ -73,7 +73,7 @@ pub(crate) fn assemble_prompt(
             continue;
         }
 
-        if msg.msg_type == MessageType::ToolCall {
+        if msg.msg_type == MsgKind::ToolCall {
             if let Some(blocks) = build_tool_call_blocks(msg, messages, idx) {
                 if let Some(last_api_msg) = api_messages.last_mut()
                     && last_api_msg.role == "assistant"
@@ -192,8 +192,8 @@ fn build_tool_call_blocks(msg: &Message, messages: &[Message], idx: usize) -> Op
     let rest = messages.get(idx.saturating_add(1)..).unwrap_or_default();
     let has_matching_result = rest
         .iter()
-        .filter(|m| m.status != MessageStatus::Deleted && m.status != MessageStatus::Detached)
-        .filter(|m| m.msg_type == MessageType::ToolResult)
+        .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
+        .filter(|m| m.msg_type == MsgKind::ToolResult)
         .any(|m| m.tool_results.iter().any(|r| tool_use_ids.contains(&r.tool_use_id.as_str())));
 
     if !has_matching_result {

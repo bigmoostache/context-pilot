@@ -1,5 +1,5 @@
 use crate::types::PromptState;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -23,7 +23,7 @@ pub(crate) fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let previous = PromptState::get(state).open_prompt_id.clone();
     PromptState::get_mut(state).open_prompt_id = Some(id.clone());
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::LIBRARY);
 
     let msg = previous.map_or_else(
         || format!("Opened '{id}' in Library editor. Content is now visible in the Library panel."),
@@ -40,7 +40,7 @@ pub(crate) fn close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     PromptState::get_mut(state).open_prompt_id = None;
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::LIBRARY);
 
     ToolResult::new(
         tool.id.clone(),

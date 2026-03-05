@@ -15,7 +15,7 @@ use crate::CONSOLE_DIR;
 use crate::pollers::{FilePoller, StatusPoller};
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Socket path for the console server.
 fn server_socket_path() -> PathBuf {

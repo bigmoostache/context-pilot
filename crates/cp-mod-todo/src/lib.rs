@@ -17,14 +17,14 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TodoPanel;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use cp_base::modules::Module;
 
 /// Lazily parsed tool definitions loaded from the YAML spec.
@@ -73,17 +73,17 @@ impl Module for TodoModule {
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::TODO)]
+    fn fixed_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::TODO)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::TODO), "WIP", false)]
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
+        vec![(Kind::new(Kind::TODO), "WIP", false)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::TODO => Some(Box::new(TodoPanel)),
+            Kind::TODO => Some(Box::new(TodoPanel)),
             _ => None,
         }
     }
@@ -134,10 +134,10 @@ impl Module for TodoModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "todo_create" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(todos) = tool.input.get("todos").and_then(|v| v.as_array()) {
                     let ts = TodoState::get(state);
                     for todo in todos {
@@ -151,7 +151,7 @@ impl Module for TodoModule {
                 Some(pf)
             }
             "todo_update" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) {
                     let ts = TodoState::get(state);
                     for update in updates {
@@ -165,7 +165,7 @@ impl Module for TodoModule {
                 Some(pf)
             }
             "todo_move" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 let ts = TodoState::get(state);
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
                     && !ts.todos.iter().any(|t| t.id == id)
@@ -200,8 +200,8 @@ impl Module for TodoModule {
         ]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
-        vec![cp_base::state::context::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
+        vec![cp_base::state::context::TypeMeta {
             context_type: "todo",
             icon_id: "todo",
             is_fixed: true,
@@ -244,7 +244,7 @@ impl Module for TodoModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
@@ -252,7 +252,7 @@ impl Module for TodoModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
         None
     }
 
@@ -266,7 +266,7 @@ impl Module for TodoModule {
 
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -282,7 +282,7 @@ impl Module for TodoModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

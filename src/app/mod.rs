@@ -87,7 +87,7 @@ pub(crate) struct App {
     pub writer: PersistenceWriter,
     /// Last poll time per panel ID — tracks when we last submitted a cache request
     /// for timer-based panels (Tmux, Git, `GitResult`, `GithubResult`, Glob, Grep).
-    /// Separate from `ContextElement.last_refresh_ms` which tracks actual content changes.
+    /// Separate from `Entry.last_refresh_ms` which tracks actual content changes.
     pub last_poll_ms: std::collections::HashMap<String, u64>,
     /// Pending tool results when a question form is blocking (`ask_user_question`)
     pub pending_question_tool_results: Option<Vec<ToolResult>>,

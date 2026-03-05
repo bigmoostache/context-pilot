@@ -17,7 +17,7 @@ pub mod types;
 
 use types::{GitChangeType, GitFileChange, GitState};
 
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use std::fmt::Write as _;
 
 /// Refresh git status (branch, file changes) into `GitState`.
@@ -138,7 +138,7 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
@@ -186,21 +186,21 @@ impl Module for GitModule {
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::GIT_RESULT)]
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::GIT_RESULT)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::GIT_RESULT => Some(Box::new(GitResultPanel)),
+            Kind::GIT_RESULT => Some(Box::new(GitResultPanel)),
             _ => None,
         }
     }
@@ -227,8 +227,8 @@ impl Module for GitModule {
         vec![("git_execute", visualize_git_output)]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
-        vec![cp_base::state::context::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
+        vec![cp_base::state::context::TypeMeta {
             context_type: "git_result",
             icon_id: "git",
             is_fixed: false,
@@ -240,8 +240,8 @@ impl Module for GitModule {
         }]
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
-        (ctx.context_type.as_str() == ContextType::GIT_RESULT)
+    fn context_detail(&self, ctx: &cp_base::state::context::Entry) -> Option<String> {
+        (ctx.context_type.as_str() == Kind::GIT_RESULT)
             .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_string())
     }
 
@@ -297,11 +297,11 @@ impl Module for GitModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        ctx: &cp_base::state::context::ContextElement,
+        ctx: &cp_base::state::context::Entry,
         changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {
-        ctx.context_type.as_str() == ContextType::GIT_RESULT && changed_path.starts_with(".git/")
+        ctx.context_type.as_str() == Kind::GIT_RESULT && changed_path.starts_with(".git/")
     }
 
     fn watcher_immediate_refresh(&self) -> bool {
@@ -321,7 +321,7 @@ impl Module for GitModule {
         serde_json::Value::Null
     }
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::PreFlightResult> {
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::Verdict> {
         None
     }
     fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
@@ -336,7 +336,7 @@ impl Module for GitModule {
     }
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None

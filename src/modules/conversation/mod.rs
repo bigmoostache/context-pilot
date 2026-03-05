@@ -8,10 +8,12 @@ pub(crate) mod refresh;
 pub(crate) mod render;
 /// Input rendering with cursor, paste placeholders, and command highlighting.
 mod render_input;
+/// Best-effort JSON field extraction for streaming tool call display.
+mod render_json;
 
 use crate::app::panels::Panel;
 use crate::infra::tools::{ToolDefinition, ToolResult, ToolUse};
-use crate::state::{ContextType, ContextTypeMeta, State};
+use crate::state::{Kind, State, TypeMeta};
 
 use self::panel::ConversationPanel;
 use super::Module;
@@ -36,9 +38,9 @@ impl Module for ConversationModule {
         true
     }
 
-    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
+    fn context_type_metadata(&self) -> Vec<TypeMeta> {
         vec![
-            ContextTypeMeta {
+            TypeMeta {
                 context_type: "conversation",
                 icon_id: "conversation",
                 is_fixed: false,
@@ -48,7 +50,7 @@ impl Module for ConversationModule {
                 short_name: "chat",
                 needs_async_wait: false,
             },
-            ContextTypeMeta {
+            TypeMeta {
                 context_type: "system",
                 icon_id: "system",
                 is_fixed: false,
@@ -61,9 +63,9 @@ impl Module for ConversationModule {
         ]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::CONVERSATION => Some(Box::new(ConversationPanel)),
+            Kind::CONVERSATION => Some(Box::new(ConversationPanel)),
             _ => None,
         }
     }
@@ -96,19 +98,19 @@ impl Module for ConversationModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<crate::infra::tools::PreFlightResult> {
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<crate::infra::tools::Verdict> {
         None
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
@@ -120,7 +122,7 @@ impl Module for ConversationModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &crate::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &crate::state::Entry) -> Option<String> {
         None
     }
 
@@ -136,11 +138,7 @@ impl Module for ConversationModule {
         vec![]
     }
 
-    fn on_close_context(
-        &self,
-        _ctx: &crate::state::ContextElement,
-        _state: &mut State,
-    ) -> Option<Result<String, String>> {
+    fn on_close_context(&self, _ctx: &crate::state::Entry, _state: &mut State) -> Option<Result<String, String>> {
         None
     }
 
@@ -158,7 +156,7 @@ impl Module for ConversationModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &crate::state::ContextElement,
+        _ctx: &crate::state::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

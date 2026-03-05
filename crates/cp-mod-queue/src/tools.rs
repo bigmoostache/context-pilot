@@ -50,7 +50,7 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Execute `Queue_undo`: remove specific queued action(s) by index.
 pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
     let indices: Vec<usize> = match tool.input.get("indices").and_then(|v| v.as_array()) {
-        Some(arr) => arr.iter().filter_map(|v| v.as_u64().map(cp_base::cast::SafeCast::to_usize)).collect(),
+        Some(arr) => arr.iter().filter_map(|v| v.as_u64().map(cp_base::cast::Safe::to_usize)).collect(),
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),

@@ -6,7 +6,7 @@ use cp_base::config::constants;
 
 use crate::PRESETS_DIR;
 use crate::types::{DefaultsInitializer, ModuleRegistry, Preset, PresetPanelConfig, PresetWorkerState, ToolDefBuilder};
-use cp_base::state::context::{ContextType, make_default_context_element};
+use cp_base::state::context::{Kind, make_default_entry};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use cp_mod_prompt::types::PromptState;
@@ -257,7 +257,7 @@ pub(crate) fn execute_load(tool: &ToolUse, state: &mut State, cb: &LoadCallbacks
         let uid = format!("UID_{}_P", state.global_next_uid);
         state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-        let mut elem = make_default_context_element(&context_id, panel_cfg.panel_type.clone(), &panel_cfg.name, true);
+        let mut elem = make_default_entry(&context_id, panel_cfg.panel_type.clone(), &panel_cfg.name, true);
         elem.uid = Some(uid);
         if let Some(ref v) = panel_cfg.file_path {
             elem.set_meta("file_path", v);
@@ -305,7 +305,7 @@ pub(crate) fn execute_load(tool: &ToolUse, state: &mut State, cb: &LoadCallbacks
         let skill_contents: Vec<(String, String)> =
             PromptState::get(state).skills.iter().map(|s| (s.id.clone(), s.content.clone())).collect();
         for ctx in &mut state.context {
-            if ctx.context_type.as_str() == ContextType::SKILL
+            if ctx.context_type.as_str() == Kind::SKILL
                 && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(ToString::to_string)
                 && let Some((_, content)) = skill_contents.iter().find(|(id, _)| *id == skill_id)
             {

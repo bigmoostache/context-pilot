@@ -3,7 +3,7 @@ use ratatui::prelude::{Line, Span, Style};
 use cp_base::config::accessors::{chars, theme};
 use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
-use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 
 use crate::types::ConsoleState;
@@ -36,7 +36,7 @@ impl Panel for ConsolePanel {
         Some(200)
     }
 
-    fn suicide(&self, ctx: &ContextElement, state: &State) -> bool {
+    fn suicide(&self, ctx: &Entry, state: &State) -> bool {
         let Some(session_name) = ctx.get_meta_str("console_name") else { return false };
 
         // Callback consoles: suicide if a newer console with the same callback_id exists.
@@ -45,7 +45,7 @@ impl Panel for ConsolePanel {
             let my_ts = ctx.last_refresh_ms;
             let has_newer = state.context.iter().any(|c| {
                 c.id != ctx.id
-                    && c.context_type == ContextType::new(ContextType::CONSOLE)
+                    && c.context_type == Kind::new(Kind::CONSOLE)
                     && c.get_meta_str("callback_id") == Some(cb_id)
                     && c.last_refresh_ms > my_ts
             });
@@ -64,14 +64,14 @@ impl Panel for ConsolePanel {
         !cs.sessions.contains_key(session_name)
     }
 
-    fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let session_name = ctx.get_meta_str("console_name")?;
         let cs = ConsoleState::get(state);
         let handle = cs.sessions.get(session_name)?;
         let (buffer_content, total_written) = handle.buffer.read_all();
 
         Some(CacheRequest {
-            context_type: ContextType::new(ContextType::CONSOLE),
+            context_type: Kind::new(Kind::CONSOLE),
             data: Box::new(ConsoleCacheRequest {
                 context_id: ctx.id.clone(),
                 buffer_content,
@@ -118,7 +118,7 @@ impl Panel for ConsolePanel {
         Some(CacheUpdate::Content { context_id, content: truncated, token_count })
     }
 
-    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, state: &mut State) -> bool {
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, state: &mut State) -> bool {
         let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
@@ -215,7 +215,7 @@ impl Panel for ConsolePanel {
         state
             .context
             .iter()
-            .filter(|c| c.context_type.as_str() == ContextType::CONSOLE)
+            .filter(|c| c.context_type.as_str() == Kind::CONSOLE)
             .filter_map(|c| {
                 let desc =
                     c.get_meta_str("console_description").or_else(|| c.get_meta_str("console_command")).unwrap_or("?");

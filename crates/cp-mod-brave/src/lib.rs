@@ -14,7 +14,7 @@ pub mod types;
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
-use cp_base::state::context::{ContextType, ContextTypeMeta};
+use cp_base::state::context::{Kind, TypeMeta};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
@@ -48,8 +48,8 @@ impl Module for BraveModule {
         true
     }
 
-    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
-        vec![ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<TypeMeta> {
+        vec![TypeMeta {
             context_type: "brave_result",
             icon_id: "search",
             is_fixed: false,
@@ -61,8 +61,8 @@ impl Module for BraveModule {
         }]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new("brave_result")]
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new("brave_result")]
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
@@ -97,7 +97,7 @@ impl Module for BraveModule {
         tools::dispatch(tool, state)
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         (context_type.as_str() == panel::BRAVE_PANEL_TYPE).then(|| {
             let panel: Box<dyn Panel> = Box::new(panel::Results);
             panel
@@ -128,15 +128,15 @@ impl Module for BraveModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::PreFlightResult> {
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::Verdict> {
         None
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
@@ -148,7 +148,7 @@ impl Module for BraveModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
         None
     }
 
@@ -166,7 +166,7 @@ impl Module for BraveModule {
 
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -182,7 +182,7 @@ impl Module for BraveModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

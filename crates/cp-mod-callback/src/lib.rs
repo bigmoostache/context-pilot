@@ -23,15 +23,15 @@ use serde_json::json;
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
-use cp_base::state::context::{ContextType, ContextTypeMeta};
+use cp_base::state::context::{Kind, TypeMeta};
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::CallbackPanel;
 use self::types::CallbackState;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Lazily parsed tool texts from the callback YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -107,23 +107,23 @@ impl Module for CallbackModule {
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::CALLBACK)]
+    fn fixed_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::CALLBACK)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::CALLBACK), "Callbacks", false)]
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
+        vec![(Kind::new(Kind::CALLBACK), "Callbacks", false)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::CALLBACK => Some(Box::new(CallbackPanel)),
+            Kind::CALLBACK => Some(Box::new(CallbackPanel)),
             _ => None,
         }
     }
 
-    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
-        vec![ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<TypeMeta> {
+        vec![TypeMeta {
             context_type: "callback",
             icon_id: "spine", // Reuse spine icon (⚡) for now
             is_fixed: true,
@@ -173,10 +173,10 @@ impl Module for CallbackModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "Callback_upsert" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 let action = tool.input.get("action").and_then(|v| v.as_str()).unwrap_or("");
                 if (action == "update" || action == "delete")
                     && let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
@@ -189,7 +189,7 @@ impl Module for CallbackModule {
                 Some(pf)
             }
             "Callback_open_editor" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let cs = CallbackState::get(state);
                     if !cs.definitions.iter().any(|d| d.id == id) {
@@ -199,7 +199,7 @@ impl Module for CallbackModule {
                 Some(pf)
             }
             "Callback_close_editor" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 let cs = CallbackState::get(state);
                 if cs.editor_open.is_none() {
                     pf.warnings.push("No callback editor is currently open".to_string());
@@ -207,7 +207,7 @@ impl Module for CallbackModule {
                 Some(pf)
             }
             "Callback_toggle" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let cs = CallbackState::get(state);
                     if !cs.definitions.iter().any(|d| d.id == id) {
@@ -230,15 +230,15 @@ impl Module for CallbackModule {
         }
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
-        (ctx.context_type.as_str() == ContextType::CALLBACK).then_some("callbacks".to_string())
+    fn context_detail(&self, ctx: &cp_base::state::context::Entry) -> Option<String> {
+        (ctx.context_type.as_str() == Kind::CALLBACK).then_some("callbacks".to_string())
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![("Callback", "Auto-fire scripts on file edits")]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
@@ -264,7 +264,7 @@ impl Module for CallbackModule {
 
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -280,7 +280,7 @@ impl Module for CallbackModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

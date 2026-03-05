@@ -1,4 +1,4 @@
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 use crate::modules::all_modules;
 use crate::state::{State, estimate_tokens, get_context_type_meta};
@@ -69,7 +69,7 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     );
 
     // --- Panels sorted by last_refresh_ms, with Conversation forced to end ---
-    let mut sorted_contexts: Vec<&crate::state::ContextElement> = state.context.iter().collect();
+    let mut sorted_contexts: Vec<&crate::state::Entry> = state.context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
 
     // Partition: conversation ("chat") always last

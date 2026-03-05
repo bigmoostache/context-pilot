@@ -5,11 +5,11 @@
 
 // ── Re-exports from cp_base sub-modules ──
 pub(crate) use cp_base::state::context::{
-    ContextElement, ContextType, ContextTypeMeta, compute_total_pages, estimate_tokens, fixed_panel_order,
-    get_context_type_meta, init_context_type_registry, make_default_context_element,
+    Entry, Kind, TypeMeta, compute_total_pages, estimate_tokens, fixed_panel_order, get_context_type_meta,
+    init_context_type_registry, make_default_entry,
 };
-pub(crate) use cp_base::state::data::config::{PanelData, SharedConfig, WorkerState};
-pub(crate) use cp_base::state::data::message::{Message, MessageStatus, MessageType, format_messages_to_chunk};
+pub(crate) use cp_base::state::data::config::{PanelData, Shared as SharedConfig, WorkerState};
+pub(crate) use cp_base::state::data::message::{Message, MsgKind, MsgStatus, format_messages_to_chunk};
 pub(crate) use cp_base::state::flags::{StreamPhase, StreamingTool};
 pub(crate) use cp_base::state::runtime::State;
 pub(crate) use cp_base::ui::render_cache::{FullCache, InputCache, MessageCache, hash_values};

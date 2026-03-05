@@ -14,15 +14,15 @@ mod tools_panel;
 use serde_json::json;
 
 use crate::app::panels::Panel;
-use crate::infra::tools::{ParamType, PreFlightResult, ToolDefinition, ToolParam, ToolTexts};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts, Verdict};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::modules::ToolVisualizer;
-use crate::state::{ContextType, ContextTypeMeta, State};
+use crate::state::{Kind, State, TypeMeta};
 
 use self::panel::OverviewPanel;
 use self::tools_panel::ToolsPanel;
 use super::Module;
-use cp_base::cast::SafeCast;
+use cp_base::cast::Safe;
 
 /// Lazily parsed tool text definitions for core tools.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -160,7 +160,7 @@ impl Module for OverviewModule {
             state.cleaning_target_proportion = v.to_f32();
         }
         if let Some(v) = data.get("context_budget") {
-            state.context_budget = v.as_u64().map(SafeCast::to_usize);
+            state.context_budget = v.as_u64().map(Safe::to_usize);
         }
         if let Some(v) = data.get("global_next_uid").and_then(serde_json::Value::as_u64) {
             state.global_next_uid = v.to_usize();
@@ -186,15 +186,12 @@ impl Module for OverviewModule {
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::OVERVIEW), ContextType::new(ContextType::TOOLS)]
+    fn fixed_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::OVERVIEW), Kind::new(Kind::TOOLS)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![
-            (ContextType::new(ContextType::OVERVIEW), "Statistics", false),
-            (ContextType::new(ContextType::TOOLS), "Configuration", false),
-        ]
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
+        vec![(Kind::new(Kind::OVERVIEW), "Statistics", false), (Kind::new(Kind::TOOLS), "Configuration", false)]
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
@@ -204,9 +201,9 @@ impl Module for OverviewModule {
         ]
     }
 
-    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
+    fn context_type_metadata(&self) -> Vec<TypeMeta> {
         vec![
-            ContextTypeMeta {
+            TypeMeta {
                 context_type: "overview",
                 icon_id: "overview",
                 is_fixed: true,
@@ -216,7 +213,7 @@ impl Module for OverviewModule {
                 short_name: "world",
                 needs_async_wait: false,
             },
-            ContextTypeMeta {
+            TypeMeta {
                 context_type: "tools",
                 icon_id: "overview",
                 is_fixed: true,
@@ -229,10 +226,10 @@ impl Module for OverviewModule {
         ]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::OVERVIEW => Some(Box::new(OverviewPanel)),
-            ContextType::TOOLS => Some(Box::new(ToolsPanel)),
+            Kind::OVERVIEW => Some(Box::new(OverviewPanel)),
+            Kind::TOOLS => Some(Box::new(ToolsPanel)),
             _ => None,
         }
     }
@@ -286,10 +283,10 @@ impl Module for OverviewModule {
         defs
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "Close_panel" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(ids) = tool.input.get("ids").and_then(serde_json::Value::as_array) {
                     for id_val in ids {
                         if let Some(id) = id_val.as_str() {
@@ -306,7 +303,7 @@ impl Module for OverviewModule {
                 Some(pf)
             }
             "tool_manage" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) {
                     for change in changes {
                         if let Some(tool_id) = change.get("tool").and_then(serde_json::Value::as_str) {
@@ -321,7 +318,7 @@ impl Module for OverviewModule {
                 Some(pf)
             }
             "panel_goto_page" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(panel_id) = tool.input.get("panel_id").and_then(serde_json::Value::as_str) {
                     match state.context.iter().find(|c| c.id == panel_id) {
                         None => pf.errors.push(format!("Panel '{panel_id}' not found")),
@@ -375,7 +372,7 @@ impl Module for OverviewModule {
 
     fn reset_state(&self, _state: &mut State) {}
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
@@ -383,7 +380,7 @@ impl Module for OverviewModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &crate::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &crate::state::Entry) -> Option<String> {
         None
     }
 
@@ -399,11 +396,7 @@ impl Module for OverviewModule {
         vec![]
     }
 
-    fn on_close_context(
-        &self,
-        _ctx: &crate::state::ContextElement,
-        _state: &mut State,
-    ) -> Option<Result<String, String>> {
+    fn on_close_context(&self, _ctx: &crate::state::Entry, _state: &mut State) -> Option<Result<String, String>> {
         None
     }
 
@@ -417,7 +410,7 @@ impl Module for OverviewModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &crate::state::ContextElement,
+        _ctx: &crate::state::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

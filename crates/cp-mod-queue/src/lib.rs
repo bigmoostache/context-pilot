@@ -16,14 +16,14 @@ use types::QueueState;
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::QueuePanel;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Lazily parsed tool descriptions from the queue YAML definition.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -75,17 +75,17 @@ impl Module for QueueModule {
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::QUEUE)]
+    fn fixed_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::QUEUE)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::QUEUE), "Queue", false)]
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
+        vec![(Kind::new(Kind::QUEUE), "Queue", false)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::QUEUE => Some(Box::new(QueuePanel)),
+            Kind::QUEUE => Some(Box::new(QueuePanel)),
             _ => None,
         }
     }
@@ -121,32 +121,32 @@ impl Module for QueueModule {
                 .build(),
         ]
     }
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         let qs = QueueState::get(state);
         match tool.name.as_str() {
             "Queue_activate" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if qs.active {
                     pf.warnings.push("Queue is already active".to_string());
                 }
                 Some(pf)
             }
             "Queue_pause" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if !qs.active {
                     pf.warnings.push("Queue is not active".to_string());
                 }
                 Some(pf)
             }
             "Queue_execute" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if qs.queued_calls.is_empty() {
                     pf.warnings.push("Queue is empty — nothing to execute".to_string());
                 }
                 Some(pf)
             }
             "Queue_undo" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(indices) = tool.input.get("indices").and_then(|v| v.as_array()) {
                     for idx_val in indices {
                         if let Some(idx) = idx_val.as_i64()
@@ -173,8 +173,8 @@ impl Module for QueueModule {
         }
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
-        vec![cp_base::state::context::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
+        vec![cp_base::state::context::TypeMeta {
             context_type: "queue",
             icon_id: "queue",
             is_fixed: true,
@@ -203,7 +203,7 @@ impl Module for QueueModule {
         serde_json::Value::Null
     }
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
     fn tool_visualizers(&self) -> Vec<(&'static str, cp_base::modules::ToolVisualizer)> {
@@ -212,7 +212,7 @@ impl Module for QueueModule {
     fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
         None
     }
-    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
         None
     }
     fn overview_context_section(&self, _state: &State) -> Option<String> {
@@ -227,7 +227,7 @@ impl Module for QueueModule {
     }
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -239,7 +239,7 @@ impl Module for QueueModule {
     }
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

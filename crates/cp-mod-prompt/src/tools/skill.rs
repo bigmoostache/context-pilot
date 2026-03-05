@@ -1,6 +1,6 @@
 use crate::storage;
 use crate::types::{PromptItem, PromptState, PromptType};
-use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -43,7 +43,7 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Skill), &item);
     PromptState::get_mut(state).skills.push(item);
 
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::LIBRARY);
 
     ToolResult::new(tool.id.clone(), format!("Created skill '{name}' with ID '{id}'"), false)
 }
@@ -74,7 +74,7 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let skill = PromptState::get_mut(state).skills.remove(idx);
     storage::delete_prompt_from_dir(&storage::dir_for(PromptType::Skill), id);
 
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::LIBRARY);
 
     ToolResult::new(tool.id.clone(), format!("Deleted skill '{}' ({})", skill.name, id), false)
 }
@@ -102,19 +102,14 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), format!("Skill '{id}' is already loaded"), true);
     }
 
-    // Create ContextElement for the skill panel
+    // Create Entry for the skill panel
     let panel_id = state.next_available_context_id();
     let content = format!("[{}] {}\n\n{}", skill.id, skill.name, skill.content);
     let tokens = estimate_tokens(&content);
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-    let mut elem = cp_base::state::context::make_default_context_element(
-        &panel_id,
-        ContextType::new(ContextType::SKILL),
-        &skill.name,
-        false,
-    );
+    let mut elem = cp_base::state::context::make_default_entry(&panel_id, Kind::new(Kind::SKILL), &skill.name, false);
     elem.uid = Some(uid);
     elem.token_count = tokens;
     elem.set_meta("skill_prompt_id", &id.to_string());
@@ -124,7 +119,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.context.push(elem);
     PromptState::get_mut(state).loaded_skill_ids.push(id.to_string());
 
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::LIBRARY);
 
     ToolResult::new(
         tool.id.clone(),
@@ -152,7 +147,7 @@ pub(crate) fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.context.retain(|c| c.get_meta_str("skill_prompt_id") != Some(id));
     PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != id);
 
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::LIBRARY);
 
     let name =
         PromptState::get(state).skills.iter().find(|s| s.id == id).map_or_else(|| id.to_string(), |s| s.name.clone());

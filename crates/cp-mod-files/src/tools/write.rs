@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use cp_base::state::context::{ContextElement, ContextType, estimate_tokens};
+use cp_base::state::context::{Entry, Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use std::fmt::Write as _;
@@ -45,7 +45,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let already_open = state
         .context
         .iter_mut()
-        .find(|c| c.context_type.as_str() == ContextType::FILE && c.get_meta_str("file_path") == Some(path_str));
+        .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(path_str));
 
     if let Some(ctx) = already_open {
         // Update existing context element
@@ -59,10 +59,10 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
         let file_name = path.file_name().map_or_else(|| path_str.to_string(), |n| n.to_string_lossy().to_string());
 
-        let mut elem = ContextElement {
+        let mut elem = Entry {
             id: context_id,
             uid: Some(uid),
-            context_type: ContextType::new(ContextType::FILE),
+            context_type: Kind::new(Kind::FILE),
             name: file_name,
             token_count,
             metadata: std::collections::HashMap::new(),
@@ -83,7 +83,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         state.context.push(elem);
 
         // Invalidate tree cache
-        cp_base::panels::mark_panels_dirty(state, ContextType::TREE);
+        cp_base::panels::mark_panels_dirty(state, Kind::TREE);
     }
 
     let action = if is_new { "Created" } else { "Wrote" };

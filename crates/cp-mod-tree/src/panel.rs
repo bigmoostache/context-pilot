@@ -5,7 +5,7 @@ use cp_base::config::accessors::theme;
 use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::panels::{ContextItem, Panel, paginate_content};
 use cp_base::state::actions::Action;
-use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::ui::{find_children_pattern, find_size_pattern};
 
@@ -40,10 +40,10 @@ impl Panel for TreePanel {
         "Directory Tree".to_string()
     }
 
-    fn build_cache_request(&self, ctx: &ContextElement, state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let ts = TreeState::get(state);
         Some(CacheRequest {
-            context_type: ContextType::new(ContextType::TREE),
+            context_type: Kind::new(Kind::TREE),
             data: Box::new(TreeCacheRequest {
                 context_id: ctx.id.clone(),
                 tree_filter: ts.filter.clone(),
@@ -53,7 +53,7 @@ impl Panel for TreePanel {
         })
     }
 
-    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
         let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
@@ -84,7 +84,7 @@ impl Panel for TreePanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Find tree context and use cached content
         for ctx in &state.context {
-            if ctx.context_type.as_str() == ContextType::TREE {
+            if ctx.context_type.as_str() == Kind::TREE {
                 if let Some(content) = &ctx.cached_content
                     && !content.is_empty()
                 {
@@ -102,7 +102,7 @@ impl Panel for TreePanel {
         let tree_content = state
             .context
             .iter()
-            .find(|c| c.context_type.as_str() == ContextType::TREE)
+            .find(|c| c.context_type.as_str() == Kind::TREE)
             .and_then(|ctx| ctx.cached_content.as_ref())
             .cloned()
             .unwrap_or_else(|| "Loading...".to_string());
@@ -148,7 +148,7 @@ impl Panel for TreePanel {
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
         None
     }
-    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
     fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}

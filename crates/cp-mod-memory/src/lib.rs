@@ -13,7 +13,7 @@ pub mod types;
 
 use types::MemoryState;
 
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Maximum token length for memory `tl_dr` field (enforced on create/update)
 pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
@@ -22,9 +22,9 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -86,17 +86,17 @@ impl Module for MemoryModule {
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::MEMORY)]
+    fn fixed_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::MEMORY)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::MEMORY), "Memories", false)]
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
+        vec![(Kind::new(Kind::MEMORY), "Memories", false)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::MEMORY => Some(Box::new(MemoryPanel)),
+            Kind::MEMORY => Some(Box::new(MemoryPanel)),
             _ => None,
         }
     }
@@ -149,10 +149,10 @@ impl Module for MemoryModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "memory_update" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) {
                     let ms = MemoryState::get(state);
                     for update in updates {
@@ -181,8 +181,8 @@ impl Module for MemoryModule {
         vec![("memory_create", visualize_memory_output), ("memory_update", visualize_memory_output)]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
-        vec![cp_base::state::context::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
+        vec![cp_base::state::context::TypeMeta {
             context_type: "memory",
             icon_id: "memory",
             is_fixed: true,
@@ -220,7 +220,7 @@ impl Module for MemoryModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
@@ -228,7 +228,7 @@ impl Module for MemoryModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
         None
     }
 
@@ -242,7 +242,7 @@ impl Module for MemoryModule {
 
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -258,7 +258,7 @@ impl Module for MemoryModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

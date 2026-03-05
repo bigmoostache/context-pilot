@@ -6,7 +6,7 @@ use cp_base::config::INJECTIONS;
 use cp_base::config::accessors::theme;
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action};
 use cp_base::state::actions::Action;
-use cp_base::state::context::{ContextElement, ContextType};
+use cp_base::state::context::{Entry, Kind};
 use cp_base::state::runtime::State;
 use cp_base::ui::{Cell, render_table};
 use std::fmt::Write as _;
@@ -27,11 +27,11 @@ impl Panel for LibraryPanel {
         None
     }
 
-    fn build_cache_request(&self, _ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, _ctx: &Entry, _state: &State) -> Option<CacheRequest> {
         None
     }
 
-    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut ContextElement, _state: &mut State) -> bool {
+    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut Entry, _state: &mut State) -> bool {
         false
     }
 
@@ -39,7 +39,7 @@ impl Panel for LibraryPanel {
         None
     }
 
-    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
 
@@ -271,7 +271,7 @@ impl Panel for LibraryPanel {
     fn refresh(&self, state: &mut State) {
         // Compute token count from context content and track content changes
         let items = self.context(state);
-        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == ContextType::new(ContextType::LIBRARY)) {
+        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == Kind::new(Kind::LIBRARY)) {
             let total: usize = items.iter().map(|i| cp_base::state::context::estimate_tokens(&i.content)).sum();
             ctx.token_count = total;
             // Build combined content for hash tracking
@@ -281,7 +281,7 @@ impl Panel for LibraryPanel {
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        let Some(ctx) = state.context.iter().find(|c| c.context_type == ContextType::new(ContextType::LIBRARY)) else {
+        let Some(ctx) = state.context.iter().find(|c| c.context_type == Kind::new(Kind::LIBRARY)) else {
             return Vec::new();
         };
 

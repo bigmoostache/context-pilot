@@ -14,31 +14,27 @@ pub mod runtime;
 pub mod watchers;
 
 // ─── Reverie State ──────────────────────────────────────────────────────────
-// Ephemeral sub-agent state — lives as Option<ReverieState> on the main State.
+// Ephemeral sub-agent state — lives as Option<reverie::Session> on the main State.
 
 /// Ephemeral reverie sub-agent state (context optimizer, cartographer).
-#[expect(
-    clippy::module_name_repetitions,
-    reason = "ReverieState/ReverieType are re-exported — 'State'/'Type' conflict with other items"
-)]
 pub mod reverie {
     use super::data::message::Message;
 
-    /// The type of reverie running.
+    /// The kind of reverie running.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum ReverieType {
+    pub enum Kind {
         /// Context optimizer — reshapes context for relevance and budget.
         ContextOptimizer,
     }
 
     /// Ephemeral state for an active reverie session.
     ///
-    /// Lives as `Option<ReverieState>` on the main `State` struct.
+    /// Lives as `Option<reverie::Session>` on the main `State` struct.
     /// Not persisted — discarded after each run (fresh start every time).
     #[derive(Debug, Clone)]
-    pub struct ReverieState {
+    pub struct Session {
         /// What kind of reverie this is.
-        pub reverie_type: ReverieType,
+        pub kind: Kind,
         /// Agent ID driving this reverie (e.g., "cleaner"). The agent's content
         /// is injected into the P-reverie panel, NOT as a system prompt.
         pub agent_id: String,
@@ -56,12 +52,12 @@ pub mod reverie {
         pub queue_active: bool,
     }
 
-    impl ReverieState {
+    impl Session {
         /// Create a new reverie session driven by the given agent.
         #[must_use]
-        pub const fn new(reverie_type: ReverieType, agent_id: String, context: Option<String>) -> Self {
+        pub const fn new(kind: Kind, agent_id: String, context: Option<String>) -> Self {
             Self {
-                reverie_type,
+                kind,
                 agent_id,
                 context,
                 messages: Vec::new(),
@@ -73,7 +69,7 @@ pub mod reverie {
         }
     }
 
-    impl std::fmt::Display for ReverieType {
+    impl std::fmt::Display for Kind {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
                 Self::ContextOptimizer => write!(f, "Context Optimizer"),

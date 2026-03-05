@@ -4,14 +4,14 @@ use std::path::PathBuf;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use cp_base::config::accessors::theme;
 use cp_base::config::constants;
 use cp_base::panels::scroll_key_action;
 use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::actions::Action;
-use cp_base::state::context::{ContextElement, ContextType, compute_total_pages, estimate_tokens};
+use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 
 /// Data sent to the background cache thread for a file panel refresh.
@@ -32,7 +32,7 @@ impl Panel for FilePanel {
         true
     }
 
-    fn suicide(&self, ctx: &ContextElement, _state: &State) -> bool {
+    fn suicide(&self, ctx: &Entry, _state: &State) -> bool {
         // Only check when still loading — don't kill panels with content
         if ctx.cached_content.is_some() {
             return false;
@@ -52,10 +52,10 @@ impl Panel for FilePanel {
         state.context.get(state.selected_context).map_or_else(|| "File".to_string(), |ctx| ctx.name.clone())
     }
 
-    fn build_cache_request(&self, ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
         let path = ctx.get_meta_str("file_path")?;
         Some(CacheRequest {
-            context_type: ContextType::new(ContextType::FILE),
+            context_type: Kind::new(Kind::FILE),
             data: Box::new(FileCacheRequest {
                 context_id: ctx.id.clone(),
                 file_path: path.to_string(),
@@ -64,7 +64,7 @@ impl Panel for FilePanel {
         })
     }
 
-    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut ContextElement, _state: &mut State) -> bool {
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
         let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
@@ -122,7 +122,7 @@ impl Panel for FilePanel {
         state
             .context
             .iter()
-            .filter(|c| c.context_type.as_str() == ContextType::FILE)
+            .filter(|c| c.context_type.as_str() == Kind::FILE)
             .filter_map(|c| {
                 let path = c.get_meta_str("file_path")?;
                 // Use cached content only - no blocking file reads

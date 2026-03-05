@@ -18,9 +18,9 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -53,12 +53,12 @@ impl Module for TreeModule {
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(TreeState::new());
-        state.set_ext(cp_base::state::autocomplete::AutocompleteState::new());
+        state.set_ext(cp_base::state::autocomplete::Suggestions::new());
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(TreeState::new());
-        state.set_ext(cp_base::state::autocomplete::AutocompleteState::new());
+        state.set_ext(cp_base::state::autocomplete::Suggestions::new());
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
@@ -109,17 +109,17 @@ impl Module for TreeModule {
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::TREE)]
+    fn fixed_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::TREE)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::TREE), "Tree", true)]
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
+        vec![(Kind::new(Kind::TREE), "Tree", true)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::TREE => Some(Box::new(TreePanel)),
+            Kind::TREE => Some(Box::new(TreePanel)),
             _ => None,
         }
     }
@@ -157,10 +157,10 @@ impl Module for TreeModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, _state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, _state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "tree_toggle" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(paths) = tool.input.get("paths").and_then(|v| v.as_array()) {
                     for path_val in paths {
                         if let Some(path) = path_val.as_str() {
@@ -196,8 +196,8 @@ impl Module for TreeModule {
         ]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
-        vec![cp_base::state::context::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
+        vec![cp_base::state::context::TypeMeta {
             context_type: "tree",
             icon_id: "tree",
             is_fixed: true,
@@ -219,11 +219,11 @@ impl Module for TreeModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        ctx: &cp_base::state::context::ContextElement,
+        ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         is_dir_event: bool,
     ) -> bool {
-        is_dir_event && ctx.context_type.as_str() == ContextType::TREE
+        is_dir_event && ctx.context_type.as_str() == Kind::TREE
     }
 
     fn dependencies(&self) -> &[&'static str] {
@@ -232,13 +232,13 @@ impl Module for TreeModule {
     fn is_core(&self) -> bool {
         false
     }
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
     fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
         None
     }
-    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
         None
     }
     fn overview_context_section(&self, _state: &State) -> Option<String> {
@@ -253,7 +253,7 @@ impl Module for TreeModule {
     }
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None

@@ -13,7 +13,7 @@ use super::BootConfig;
 /// Module data maps extracted from `BootConfig` before consumption.
 /// Passed to `boot_init_modules` so main.rs can render per-module progress.
 pub(crate) struct BootModuleData {
-    /// Global module data (from `SharedConfig.modules`)
+    /// Global module data (from `config::Shared.modules`)
     pub global: HashMap<String, serde_json::Value>,
     /// Worker module data (from `WorkerState.modules`)
     pub worker: HashMap<String, serde_json::Value>,

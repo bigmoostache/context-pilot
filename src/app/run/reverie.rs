@@ -58,8 +58,8 @@ impl App {
                                     uid: None,
                                     role: "assistant".to_string(),
                                     content: String::new(),
-                                    msg_type: crate::state::MessageType::TextMessage,
-                                    status: crate::state::MessageStatus::Full,
+                                    msg_type: crate::state::MsgKind::TextMessage,
+                                    status: crate::state::MsgStatus::Full,
                                     content_token_count: 0,
                                     input_tokens: 0,
                                     timestamp_ms: crate::app::panels::now_ms(),
@@ -80,7 +80,7 @@ impl App {
                     StreamEvent::Done { .. } => {
                         if let Some(rev) = self.state.reveries.get_mut(&agent_id) {
                             if let Some(msg) = rev.messages.last_mut() {
-                                msg.status = crate::state::MessageStatus::Full;
+                                msg.status = crate::state::MsgStatus::Full;
                             }
                             rev.is_streaming = false;
                         }
@@ -232,8 +232,8 @@ impl App {
                         uid: None,
                         role: "assistant".to_string(),
                         content: String::new(),
-                        msg_type: crate::state::MessageType::ToolCall,
-                        status: crate::state::MessageStatus::Full,
+                        msg_type: crate::state::MsgKind::ToolCall,
+                        status: crate::state::MsgStatus::Full,
                         content_token_count: 0,
                         input_tokens: 0,
                         timestamp_ms: crate::app::panels::now_ms(),
@@ -249,8 +249,8 @@ impl App {
                         uid: None,
                         role: "user".to_string(),
                         content: String::new(),
-                        msg_type: crate::state::MessageType::ToolResult,
-                        status: crate::state::MessageStatus::Full,
+                        msg_type: crate::state::MsgKind::ToolResult,
+                        status: crate::state::MsgStatus::Full,
                         content_token_count: 0,
                         input_tokens: 0,
                         timestamp_ms: crate::app::panels::now_ms(),
@@ -333,8 +333,8 @@ impl App {
                     uid: None,
                     role: "user".to_string(),
                     content: REVERIE.report_nudge.trim_end().to_string(),
-                    msg_type: crate::state::MessageType::TextMessage,
-                    status: crate::state::MessageStatus::Full,
+                    msg_type: crate::state::MsgKind::TextMessage,
+                    status: crate::state::MsgStatus::Full,
                     content_token_count: 0,
                     input_tokens: 0,
                     timestamp_ms: crate::app::panels::now_ms(),

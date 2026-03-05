@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::state::context::ContextType;
+use crate::state::context::Kind;
 
 // =============================================================================
 // Sidebar Mode
@@ -46,15 +46,14 @@ impl SidebarMode {
 // MULTI-WORKER STATE STRUCTS
 // =============================================================================
 
-/// Current schema version for `SharedConfig` and `WorkerState`.
+/// Current schema version for `Shared` config and `WorkerState`.
 /// Increment when making breaking changes to the persistence format.
 pub const SCHEMA_VERSION: u32 = 1;
 
-/// Shared configuration (config.json)
+/// Shared configuration (`config.json`)
 /// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[expect(clippy::module_name_repetitions, reason = "Used via re-export — 'Shared' alone conveys no meaning")]
-pub struct SharedConfig {
+pub struct Shared {
     // === Infrastructure ===
     /// Schema version for forward/backward compatibility
     #[serde(default = "default_schema_version")]
@@ -88,7 +87,7 @@ pub struct SharedConfig {
     pub modules: HashMap<String, serde_json::Value>,
 }
 
-impl Default for SharedConfig {
+impl Default for Shared {
     fn default() -> Self {
         Self {
             schema_version: SCHEMA_VERSION,
@@ -157,7 +156,7 @@ pub struct PanelData {
     /// UID of this panel
     pub uid: String,
     /// Panel type
-    pub panel_type: ContextType,
+    pub panel_type: Kind,
     /// Display name
     pub name: String,
     /// Token count (preserved across sessions)
@@ -187,8 +186,8 @@ pub struct PanelData {
 }
 
 /// UIDs for important/fixed panels that a worker uses.
-/// Maps `ContextType` to panel UID string.
-pub type ImportantPanelUids = HashMap<ContextType, String>;
+/// Maps `Kind` to panel UID string.
+pub type ImportantPanelUids = HashMap<Kind, String>;
 
 /// Returns the default schema version (1) for serde `default` attributes.
 const fn default_schema_version() -> u32 {

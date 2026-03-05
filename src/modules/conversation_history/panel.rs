@@ -4,7 +4,7 @@ use ratatui::prelude::{Line, Span, Style};
 use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel, paginate_content};
 use crate::modules::conversation::render;
-use crate::state::{ContextType, State};
+use crate::state::{Kind, State};
 use crate::ui::theme;
 use cp_base::panels::scroll_key_action;
 
@@ -21,7 +21,7 @@ impl Panel for ConversationHistoryPanel {
         state
             .context
             .get(state.selected_context)
-            .filter(|c| c.context_type.as_str() == ContextType::CONVERSATION_HISTORY)
+            .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)
             .map_or_else(|| "Chat History".to_string(), |c| c.name.clone())
     }
 
@@ -29,7 +29,7 @@ impl Panel for ConversationHistoryPanel {
         state
             .context
             .iter()
-            .filter(|c| c.context_type.as_str() == ContextType::CONVERSATION_HISTORY)
+            .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)
             .filter_map(|c| {
                 let content = c.cached_content.as_ref()?;
                 let output = paginate_content(content, c.current_page, c.total_pages);
@@ -44,7 +44,7 @@ impl Panel for ConversationHistoryPanel {
 
         // Render only the currently selected context element
         let ctx = match state.context.get(state.selected_context) {
-            Some(c) if c.context_type.as_str() == ContextType::CONVERSATION_HISTORY => c,
+            Some(c) if c.context_type.as_str() == Kind::CONVERSATION_HISTORY => c,
             _ => {
                 lines.push(Line::from(vec![Span::styled(
                     "No conversation history.".to_string(),
@@ -94,18 +94,14 @@ impl Panel for ConversationHistoryPanel {
         None
     }
 
-    fn build_cache_request(
-        &self,
-        _ctx: &crate::state::ContextElement,
-        _state: &State,
-    ) -> Option<cp_base::panels::CacheRequest> {
+    fn build_cache_request(&self, _ctx: &crate::state::Entry, _state: &State) -> Option<cp_base::panels::CacheRequest> {
         None
     }
 
     fn apply_cache_update(
         &self,
         _update: cp_base::panels::CacheUpdate,
-        _ctx: &mut crate::state::ContextElement,
+        _ctx: &mut crate::state::Entry,
         _state: &mut State,
     ) -> bool {
         false
@@ -115,7 +111,7 @@ impl Panel for ConversationHistoryPanel {
         None
     }
 
-    fn suicide(&self, _ctx: &crate::state::ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &crate::state::Entry, _state: &State) -> bool {
         false
     }
 

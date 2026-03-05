@@ -16,7 +16,7 @@ use typst::utils::LazyHash;
 use typst::{Library, World};
 
 use crate::packages;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use std::fmt::Write as _;
 
 /// Successful compilation output: PDF bytes, warning text, and accessed file paths.

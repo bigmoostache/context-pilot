@@ -5,6 +5,7 @@
 
 mod check_api;
 mod message_format;
+mod stream_types;
 
 use std::env;
 use std::fs;
@@ -21,8 +22,9 @@ use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_VERSION, library};
 use crate::infra::tools::{ToolUse, build_api};
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use cp_base::config::INJECTIONS;
+use stream_types::StreamMessage;
 
 /// API endpoint with beta flag required for Claude 4.5 access
 const CLAUDE_CODE_ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
@@ -473,72 +475,6 @@ impl Default for ClaudeCodeClient {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Content block metadata from SSE stream events.
-#[derive(Debug, Deserialize)]
-struct StreamContentBlock {
-    /// Block type (e.g. `text`, `tool_use`)
-    #[serde(rename = "type")]
-    block_type: Option<String>,
-    /// Block ID (for `tool_use` blocks)
-    id: Option<String>,
-    /// Tool name (for `tool_use` blocks)
-    name: Option<String>,
-}
-
-/// Delta payload from SSE stream events.
-#[derive(Debug, Deserialize)]
-struct StreamDelta {
-    /// Delta type (e.g. `text_delta`, `input_json_delta`)
-    #[serde(rename = "type")]
-    delta_type: Option<String>,
-    /// Text content delta
-    text: Option<String>,
-    /// Partial JSON for tool input
-    partial_json: Option<String>,
-    /// Stop reason (e.g. `end_turn`, `tool_use`)
-    stop_reason: Option<String>,
-}
-
-/// Message body from `message_start` events.
-#[derive(Debug, Deserialize)]
-struct StreamMessageBody {
-    /// Token usage statistics
-    usage: Option<StreamUsage>,
-}
-
-/// Top-level SSE stream event from the Claude Code API.
-#[derive(Debug, Deserialize)]
-struct StreamMessage {
-    /// Event type (e.g. `content_block_start`, `message_delta`)
-    #[serde(rename = "type")]
-    event_type: String,
-    /// Content block metadata (for `block_start` events)
-    content_block: Option<StreamContentBlock>,
-    /// Delta payload (for delta events)
-    delta: Option<StreamDelta>,
-    /// Token usage statistics
-    usage: Option<StreamUsage>,
-    /// Message body (for `message_start` events)
-    message: Option<StreamMessageBody>,
-}
-
-/// Token usage statistics from the Claude Code API.
-#[derive(Debug, Deserialize)]
-struct StreamUsage {
-    /// Number of input tokens consumed
-    #[serde(rename = "input_tokens")]
-    input: Option<usize>,
-    /// Number of output tokens generated
-    #[serde(rename = "output_tokens")]
-    output: Option<usize>,
-    /// Number of tokens written to cache
-    #[serde(rename = "cache_creation_input_tokens")]
-    cache_creation: Option<usize>,
-    /// Number of tokens read from cache
-    #[serde(rename = "cache_read_input_tokens")]
-    cache_read: Option<usize>,
 }
 
 impl LlmClient for ClaudeCodeClient {

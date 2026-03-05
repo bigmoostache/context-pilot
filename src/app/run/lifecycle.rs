@@ -10,7 +10,7 @@ use crate::app::events::handle_event;
 use crate::app::panels::now_ms;
 use crate::infra::api::{StreamEvent, StreamParams, start_streaming};
 use crate::infra::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, RENDER_THROTTLE_MS};
-use crate::state::ContextType;
+use crate::state::Kind;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::{check_ownership, save_state};
 use crate::ui;
@@ -86,7 +86,7 @@ impl App {
                 }
 
                 // Handle autocomplete events if popup is active
-                if let Some(ac) = self.state.get_ext::<cp_base::state::autocomplete::AutocompleteState>()
+                if let Some(ac) = self.state.get_ext::<cp_base::state::autocomplete::Suggestions>()
                     && ac.active
                 {
                     self.handle_autocomplete_event(&evt);
@@ -254,7 +254,7 @@ impl App {
                 for module in crate::modules::all_modules() {
                     module.on_stream_stop(&mut self.state);
                 }
-                self.state.touch_panel(ContextType::SPINE);
+                self.state.touch_panel(Kind::SPINE);
                 if let Some(msg) = self.state.messages.last()
                     && msg.role == "assistant"
                 {

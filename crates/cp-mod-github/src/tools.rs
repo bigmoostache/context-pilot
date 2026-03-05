@@ -5,7 +5,7 @@ use super::classify::CommandClass;
 use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::mark_panels_dirty;
-use cp_base::state::context::{ContextType, make_default_context_element};
+use cp_base::state::context::{Kind, make_default_entry};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -53,8 +53,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
         CommandClass::ReadOnly => {
             // Search for existing GithubResult panel with same command
             let existing_idx = state.context.iter().position(|c| {
-                c.context_type.as_str() == ContextType::GITHUB_RESULT
-                    && c.get_meta_str("result_command") == Some(command)
+                c.context_type.as_str() == Kind::GITHUB_RESULT && c.get_meta_str("result_command") == Some(command)
             });
 
             if let Some(ctx) = existing_idx.and_then(|idx| state.context.get_mut(idx)) {
@@ -68,12 +67,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                 let uid = format!("UID_{}_P", state.global_next_uid);
                 state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-                let mut elem = make_default_context_element(
-                    &panel_id,
-                    ContextType::new(ContextType::GITHUB_RESULT),
-                    command,
-                    true,
-                );
+                let mut elem = make_default_entry(&panel_id, Kind::new(Kind::GITHUB_RESULT), command, true);
                 elem.uid = Some(uid);
                 elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);
@@ -95,7 +89,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
             // Invalidate affected panels using heuristics
             let invalidations = super::cache_invalidation::find_invalidations(command);
             for ctx in &mut state.context {
-                if ctx.context_type.as_str() == ContextType::GITHUB_RESULT {
+                if ctx.context_type.as_str() == Kind::GITHUB_RESULT {
                     let matches = ctx
                         .get_meta_str("result_command")
                         .is_some_and(|cached_cmd| invalidations.iter().any(|re| re.is_match(cached_cmd)));
@@ -105,7 +99,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                 }
             }
             // Always invalidate Git status (PRs/merges can affect it)
-            mark_panels_dirty(state, ContextType::GIT);
+            mark_panels_dirty(state, Kind::GIT);
 
             match result {
                 Ok(output) => {

@@ -61,7 +61,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Touch the callback panel to trigger re-render with editor content
     for ctx in &mut state.context {
-        if ctx.context_type.as_str() == cp_base::state::context::ContextType::CALLBACK {
+        if ctx.context_type.as_str() == cp_base::state::context::Kind::CALLBACK {
             ctx.last_refresh_ms = 0; // Force refresh
             break;
         }
@@ -85,7 +85,7 @@ pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Touch the callback panel to trigger re-render
     for ctx in &mut state.context {
-        if ctx.context_type.as_str() == cp_base::state::context::ContextType::CALLBACK {
+        if ctx.context_type.as_str() == cp_base::state::context::Kind::CALLBACK {
             ctx.last_refresh_ms = 0;
             break;
         }

@@ -14,7 +14,7 @@ pub mod types;
 
 use types::{LogEntry, LogsState};
 
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Logs subdirectory (chunked JSON files, global across workers)
 pub const LOGS_DIR: &str = "logs";
@@ -29,9 +29,9 @@ use std::path::PathBuf;
 use cp_base::config::constants;
 use cp_base::modules::{Module, ToolVisualizer};
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -247,10 +247,10 @@ impl Module for LogsModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "log_summarize" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(ids) = tool.input.get("log_ids").and_then(|v| v.as_array()) {
                     let logs = &LogsState::get(state).logs;
                     for id_val in ids {
@@ -264,7 +264,7 @@ impl Module for LogsModule {
                 Some(pf)
             }
             "log_toggle" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let logs = &LogsState::get(state).logs;
                     match logs.iter().find(|l| l.id == id) {
@@ -278,7 +278,7 @@ impl Module for LogsModule {
                 Some(pf)
             }
             "Close_conversation_history" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 // Queue must be active for destructive history panel operations
                 if !cp_mod_queue::types::QueueState::get(state).active {
                     pf.errors.push(
@@ -291,7 +291,7 @@ impl Module for LogsModule {
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match state.context.iter().find(|c| c.id == id) {
                         None => pf.errors.push(format!("Panel '{id}' not found")),
-                        Some(ctx) if ctx.context_type.as_str() != ContextType::CONVERSATION_HISTORY => {
+                        Some(ctx) if ctx.context_type.as_str() != Kind::CONVERSATION_HISTORY => {
                             pf.errors.push(format!(
                                 "Panel '{id}' is not a conversation history panel — use Close_panel instead"
                             ));
@@ -304,7 +304,9 @@ impl Module for LogsModule {
                     let max_tokens = cp_mod_memory::MEMORY_TLDR_MAX_TOKENS;
                     for (i, mem) in memories.iter().enumerate() {
                         if let Some(content) = mem.get("content").and_then(|v| v.as_str()) {
-                            let approx_tokens = cp_base::panels::time_arith::div_const::<3>(content.split_whitespace().count().saturating_mul(4));
+                            let approx_tokens = cp_base::panels::time_arith::div_const::<3>(
+                                content.split_whitespace().count().saturating_mul(4),
+                            );
                             if approx_tokens > max_tokens {
                                 pf.errors.push(format!(
                                     "Memory #{} content too long: ~{} tokens (max {}). Shorten it.",
@@ -341,27 +343,27 @@ impl Module for LogsModule {
         ]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::LOGS => Some(Box::new(panel::LogsPanel)),
+            Kind::LOGS => Some(Box::new(panel::LogsPanel)),
             _ => None,
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::LOGS)]
+    fn fixed_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::LOGS)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::LOGS), "Logs", true)]
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
+        vec![(Kind::new(Kind::LOGS), "Logs", true)]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
-        vec![cp_base::state::context::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
+        vec![cp_base::state::context::TypeMeta {
             context_type: "logs",
             icon_id: "memory",
             is_fixed: true,
@@ -381,7 +383,7 @@ impl Module for LogsModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
         None
     }
 
@@ -399,7 +401,7 @@ impl Module for LogsModule {
 
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -411,7 +413,7 @@ impl Module for LogsModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

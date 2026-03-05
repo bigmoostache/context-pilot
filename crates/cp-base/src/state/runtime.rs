@@ -1,11 +1,11 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-use super::context::{ContextElement, ContextType};
+use super::context::{Entry, Kind};
 use super::data::config::SidebarMode;
 use super::data::message::Message;
 use super::flags::{ConfigOverlay, HighlightFn, StatusBools, StreamPhase, StreamingTool, UiState};
-use crate::cast::SafeCast as _;
+use crate::cast::Safe as _;
 use crate::config::llm_types::{LlmProvider, ModelInfo as _};
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
@@ -17,7 +17,7 @@ use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 /// Runtime state (messages loaded in memory)
 pub struct State {
     /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
-    pub context: Vec<ContextElement>,
+    pub context: Vec<Entry>,
     /// Conversation messages (user, assistant, `tool_call`, `tool_result`).
     pub messages: Vec<Message>,
     /// Current user input text in the editor.
@@ -88,7 +88,7 @@ pub struct State {
     pub sidebar_mode: SidebarMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
-    pub reveries: HashMap<String, super::reverie::ReverieState>,
+    pub reveries: HashMap<String, super::reverie::Session>,
     /// Accumulated `prompt_cache_hit_tokens` across all API calls (persisted)
     pub cache_hit_tokens: usize,
     /// Accumulated `prompt_cache_miss_tokens` across all API calls (persisted)
@@ -316,7 +316,7 @@ impl State {
         let (id, uid) = self.alloc_user_ids();
         let msg = Message::new_user(id, uid, content, token_count);
 
-        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type.as_str() == ContextType::CONVERSATION) {
+        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
             ctx.token_count = ctx.token_count.saturating_add(token_count);
             ctx.last_refresh_ms = crate::panels::now_ms();
         }

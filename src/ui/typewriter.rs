@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use crate::infra::constants::{
     TYPEWRITER_DEFAULT_DELAY_MS, TYPEWRITER_MAX_DELAY_MS, TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MOVING_AVG_SIZE,
 };
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Buffered typewriter animation: accumulates streaming chunks and releases
 /// characters at a smoothed rate for a natural typing effect.

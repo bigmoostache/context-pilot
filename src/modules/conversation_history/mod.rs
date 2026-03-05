@@ -3,7 +3,7 @@ mod panel;
 
 use crate::app::panels::Panel;
 use crate::infra::tools::{ToolDefinition, ToolResult, ToolUse};
-use crate::state::{ContextType, ContextTypeMeta, State};
+use crate::state::{Kind, State, TypeMeta};
 use cp_base::config::INJECTIONS;
 
 use self::panel::ConversationHistoryPanel;
@@ -29,8 +29,8 @@ impl Module for ConversationHistoryModule {
         true
     }
 
-    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
-        vec![ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<TypeMeta> {
+        vec![TypeMeta {
             context_type: "conversation_history",
             icon_id: "conversation",
             is_fixed: false,
@@ -42,25 +42,21 @@ impl Module for ConversationHistoryModule {
         }]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::CONVERSATION_HISTORY)]
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::CONVERSATION_HISTORY)]
     }
 
-    fn on_close_context(
-        &self,
-        ctx: &crate::state::ContextElement,
-        _state: &mut State,
-    ) -> Option<Result<String, String>> {
-        if ctx.context_type.as_str() == ContextType::CONVERSATION_HISTORY {
+    fn on_close_context(&self, ctx: &crate::state::Entry, _state: &mut State) -> Option<Result<String, String>> {
+        if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY {
             let msg = INJECTIONS.redirects.conversation_history_close.trim_end().replace("{id}", &ctx.id);
             return Some(Err(msg));
         }
         None
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::CONVERSATION_HISTORY => Some(Box::new(ConversationHistoryPanel)),
+            Kind::CONVERSATION_HISTORY => Some(Box::new(ConversationHistoryPanel)),
             _ => None,
         }
     }
@@ -93,15 +89,15 @@ impl Module for ConversationHistoryModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<crate::infra::tools::PreFlightResult> {
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<crate::infra::tools::Verdict> {
         None
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
@@ -113,7 +109,7 @@ impl Module for ConversationHistoryModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &crate::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &crate::state::Entry) -> Option<String> {
         None
     }
 
@@ -143,7 +139,7 @@ impl Module for ConversationHistoryModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &crate::state::ContextElement,
+        _ctx: &crate::state::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

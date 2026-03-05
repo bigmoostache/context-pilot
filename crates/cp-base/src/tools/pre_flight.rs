@@ -10,18 +10,14 @@
 /// Result of pre-flight validation. Errors block execution; warnings are
 /// attached to the result but the tool still runs.
 #[derive(Debug, Clone, Default)]
-#[expect(
-    clippy::module_name_repetitions,
-    reason = "Used via re-export as PreFlightResult — 'Result' alone conflicts with std::result::Result"
-)]
-pub struct PreFlightResult {
+pub struct Verdict {
     /// Blocking errors — tool execution will be refused.
     pub errors: Vec<String>,
     /// Non-blocking warnings — included in the result but tool runs.
     pub warnings: Vec<String>,
 }
 
-impl PreFlightResult {
+impl Verdict {
     /// Empty result (no errors, no warnings).
     #[must_use]
     pub fn new() -> Self {
@@ -60,7 +56,7 @@ impl PreFlightResult {
         self
     }
 
-    /// Merge another `PreFlightResult` into this one.
+    /// Merge another `Verdict` into this one.
     pub fn merge(&mut self, other: Self) {
         self.errors.extend(other.errors);
         self.warnings.extend(other.warnings);

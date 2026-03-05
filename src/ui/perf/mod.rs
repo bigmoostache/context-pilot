@@ -8,7 +8,7 @@ mod overlay;
 pub(crate) use overlay::render_perf_overlay;
 
 use crate::infra::constants::PERF_STATS_REFRESH_MS;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};

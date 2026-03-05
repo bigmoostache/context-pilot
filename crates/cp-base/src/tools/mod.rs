@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-// Re-export so downstream `use cp_base::tools::PreFlightResult` keeps working.
+// Re-export so downstream `use cp_base::tools::pre_flight::Verdict` keeps working.
 /// Pre-flight validation for tool calls (parameter checks before execution).
 pub mod pre_flight;
 

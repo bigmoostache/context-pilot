@@ -7,7 +7,7 @@
 //!
 //! View results: tail -f .context-pilot/perf.log
 
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use cp_base::panels::time_arith;
 use std::fs::OpenOptions;
 use std::io::Write as _;

@@ -2,10 +2,10 @@ use std::process::{Command, Output, Stdio};
 use std::time::Duration;
 
 use crate::panels::Panel;
-use crate::state::context::{ContextType, ContextTypeMeta};
+use crate::state::context::{Kind, TypeMeta};
 use crate::state::runtime::State;
 use crate::tools::ToolDefinition;
-use crate::tools::pre_flight::PreFlightResult;
+use crate::tools::pre_flight::Verdict;
 use crate::tools::{ToolResult, ToolUse};
 
 /// A function that transforms tool result content into styled terminal lines.
@@ -79,13 +79,13 @@ pub trait Module: Send + Sync {
 
     /// Serialize this module's data from State into a JSON value for persistence.
     /// Returns `Value::Null` if this module has no data to persist.
-    /// Stored in `SharedConfig` (if `is_global`) or `WorkerState` (if !`is_global`).
+    /// Stored in `config::Shared` (if `is_global`) or `WorkerState` (if !`is_global`).
     fn save_module_data(&self, _state: &State) -> serde_json::Value {
         serde_json::Value::Null
     }
 
     /// Deserialize this module's data from a JSON value and apply it to State.
-    /// Data comes from `SharedConfig` (if `is_global`) or `WorkerState` (if !`is_global`).
+    /// Data comes from `config::Shared` (if `is_global`) or `WorkerState` (if !`is_global`).
     fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
     /// Serialize worker-specific data for modules that are global but also need per-worker state.
@@ -104,33 +104,33 @@ pub trait Module: Send + Sync {
 
     /// Pre-flight validation for a tool call. Runs BEFORE execution (and before
     /// queueing). Returns `None` if this module doesn't own the tool.
-    /// Returns `Some(PreFlightResult)` with errors (block execution) and/or
+    /// Returns `Some(Verdict)` with errors (block execution) and/or
     /// warnings (pass-through, tool still runs). Default: no custom checks.
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<Verdict> {
         None
     }
 
     /// Create a panel for the given context type. Returns None if not owned by this module.
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>>;
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>>;
 
     /// Fixed panel types owned by this module (P0-P7)
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
     /// Dynamic panel types this module can create (File, Glob, Grep, Tmux)
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
     /// Default settings for fixed panels: (`context_type`, `display_name`, `cache_deprecated`).
     /// Used by `ensure_default_contexts` to create missing panels generically.
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
     /// Context type metadata for the registry.
     /// Each module declares its owned context types with icon, fixed/cache flags, and sort order.
-    fn context_type_metadata(&self) -> Vec<ContextTypeMeta> {
+    fn context_type_metadata(&self) -> Vec<TypeMeta> {
         vec![]
     }
 
@@ -157,7 +157,7 @@ pub trait Module: Send + Sync {
 
     /// Return detail string for a context element owned by this module (e.g., file path, pattern).
     /// Used in the Overview panel's context elements table.
-    fn context_detail(&self, _ctx: &crate::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &crate::state::context::Entry) -> Option<String> {
         None
     }
 
@@ -183,7 +183,7 @@ pub trait Module: Send + Sync {
     /// Returns Some(Ok(description)) if cleanup succeeded — caller removes the context element.
     fn on_close_context(
         &self,
-        _ctx: &crate::state::context::ContextElement,
+        _ctx: &crate::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -219,7 +219,7 @@ pub trait Module: Send + Sync {
     /// Returns true if the element should be marked `cache_deprecated`.
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &crate::state::context::ContextElement,
+        _ctx: &crate::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

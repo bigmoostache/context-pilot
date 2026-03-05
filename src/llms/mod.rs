@@ -19,7 +19,7 @@ use crate::app::panels::ContextItem;
 use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::ToolResult;
 use crate::state::Message;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
 pub(crate) use cp_base::config::llm_types::{
@@ -196,63 +196,12 @@ pub(crate) struct FakePanelMessage {
 }
 
 /// Convert milliseconds since UNIX epoch to ISO 8601 format.
-#[expect(
-    clippy::arithmetic_side_effects,
-    clippy::integer_division_remainder_used,
-    reason = "hand-rolled date math: all divisions/modulos are by non-zero constants, \
-              subtraction is guarded by loop condition, addition is bounded by calendar range"
-)]
 fn ms_to_iso8601(ms: u64) -> String {
-    use std::time::{Duration, UNIX_EPOCH};
-    let duration = Duration::from_millis(ms);
-    let datetime = UNIX_EPOCH + duration;
+    use chrono::{DateTime, Utc};
 
-    // Manual formatting since we don't have chrono
-    let since_epoch = datetime.duration_since(UNIX_EPOCH).unwrap_or_default();
-    let secs = since_epoch.as_secs();
-    // Calculate components
-    let days_since_epoch = secs / 86400;
-    let time_of_day = secs % 86400;
-    let hours = time_of_day / 3600;
-    let minutes = (time_of_day % 3600) / 60;
-    let seconds = time_of_day % 60;
-
-    // Calculate year/month/day from days since 1970-01-01
-    let mut year = 1970i32;
-    let mut remaining_days = days_since_epoch.to_i32();
-
-    loop {
-        let days_in_year = if is_leap_year(year) { 366 } else { 365 };
-        if remaining_days < days_in_year {
-            break;
-        }
-        remaining_days -= days_in_year;
-        year += 1;
-    }
-
-    let days_in_months: [i32; 12] = if is_leap_year(year) {
-        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    } else {
-        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    };
-
-    let mut month = 1;
-    for days in &days_in_months {
-        if remaining_days < *days {
-            break;
-        }
-        remaining_days -= days;
-        month += 1;
-    }
-    let day = remaining_days + 1;
-
-    format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
-}
-
-/// Gregorian leap year check.
-#[expect(clippy::integer_division_remainder_used, reason = "canonical Gregorian leap year formula requires modulo")]
-const fn is_leap_year(year: i32) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    let secs = cp_base::panels::time_arith::ms_to_secs(ms);
+    DateTime::<Utc>::from_timestamp(secs.to_i64(), 0)
+        .map_or_else(|| "1970-01-01T00:00:00Z".to_string(), |dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
 
 /// Format a time delta in a human-readable way.

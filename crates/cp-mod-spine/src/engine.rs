@@ -7,10 +7,10 @@
 //!
 //! No more AutoContinuation trait — all triggers go through the watcher → notification pipeline.
 
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use cp_base::config::{INJECTIONS, PROMPTS};
 use cp_base::panels::now_ms;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 
 use crate::guard_rail::all_guard_rails;
@@ -83,7 +83,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             .messages
             .iter()
             .rev()
-            .find(|m| m.role == "user" && m.msg_type != cp_base::state::data::message::MessageType::ToolResult);
+            .find(|m| m.role == "user" && m.msg_type != cp_base::state::data::message::MsgKind::ToolResult);
         if let Some(msg) = last_non_error_user {
             let content = msg.content.trim();
             let is_synthetic = content.starts_with("/* Auto-continuation:")
@@ -145,7 +145,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     if SpineState::get(state).config.autonomous_start_ms.is_none() {
         SpineState::get_mut(state).config.autonomous_start_ms = Some(now_ms());
     }
-    state.touch_panel(ContextType::SPINE);
+    state.touch_panel(Kind::SPINE);
 
     SpineDecision::Continue(action)
 }

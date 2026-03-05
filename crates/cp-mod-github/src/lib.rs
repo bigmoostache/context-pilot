@@ -25,9 +25,9 @@ pub const GH_CMD_TIMEOUT_SECS: u64 = 60;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -57,13 +57,13 @@ impl Module for GithubModule {
         &["git"]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::GITHUB_RESULT)]
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::GITHUB_RESULT)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::GITHUB_RESULT => Some(Box::new(GithubResultPanel)),
+            Kind::GITHUB_RESULT => Some(Box::new(GithubResultPanel)),
             _ => None,
         }
     }
@@ -98,8 +98,8 @@ impl Module for GithubModule {
         vec![("gh_execute", visualize_gh_output)]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
-        vec![cp_base::state::context::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
+        vec![cp_base::state::context::TypeMeta {
             context_type: "github_result",
             icon_id: "git",
             is_fixed: false,
@@ -111,8 +111,8 @@ impl Module for GithubModule {
         }]
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
-        (ctx.context_type.as_str() == ContextType::GITHUB_RESULT)
+    fn context_detail(&self, ctx: &cp_base::state::context::Entry) -> Option<String> {
+        (ctx.context_type.as_str() == Kind::GITHUB_RESULT)
             .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_string())
     }
 
@@ -140,15 +140,15 @@ impl Module for GithubModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<Verdict> {
         None
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
@@ -170,7 +170,7 @@ impl Module for GithubModule {
 
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None
@@ -186,7 +186,7 @@ impl Module for GithubModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

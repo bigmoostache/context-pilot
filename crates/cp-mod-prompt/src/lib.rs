@@ -23,9 +23,9 @@ use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -91,22 +91,22 @@ impl Module for PromptModule {
         }
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::LIBRARY)]
+    fn fixed_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::LIBRARY)]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
-        vec![(ContextType::new(ContextType::LIBRARY), "Library", false)]
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
+        vec![(Kind::new(Kind::LIBRARY), "Library", false)]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::SKILL)]
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::SKILL)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::LIBRARY => Some(Box::new(LibraryPanel)),
-            ContextType::SKILL => Some(Box::new(SkillPanel)),
+            Kind::LIBRARY => Some(Box::new(LibraryPanel)),
+            Kind::SKILL => Some(Box::new(SkillPanel)),
             _ => None,
         }
     }
@@ -189,11 +189,11 @@ impl Module for PromptModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         let ps = PromptState::get(state);
         match tool.name.as_str() {
             "agent_delete" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match ps.agents.iter().find(|a| a.id == id) {
                         None => pf.errors.push(format!("Agent '{id}' not found")),
@@ -206,7 +206,7 @@ impl Module for PromptModule {
                 Some(pf)
             }
             "agent_load" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
                     && !id.is_empty()
                     && !ps.agents.iter().any(|a| a.id == id)
@@ -216,7 +216,7 @@ impl Module for PromptModule {
                 Some(pf)
             }
             "skill_delete" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match ps.skills.iter().find(|s| s.id == id) {
                         None => pf.errors.push(format!("Skill '{id}' not found")),
@@ -229,7 +229,7 @@ impl Module for PromptModule {
                 Some(pf)
             }
             "skill_load" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     if !ps.skills.iter().any(|s| s.id == id) {
                         pf.errors.push(format!("Skill '{id}' not found"));
@@ -240,7 +240,7 @@ impl Module for PromptModule {
                 Some(pf)
             }
             "skill_unload" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     if !ps.skills.iter().any(|s| s.id == id) {
                         pf.errors.push(format!("Skill '{id}' not found"));
@@ -251,7 +251,7 @@ impl Module for PromptModule {
                 Some(pf)
             }
             "Edit_prompt" | "Library_open_prompt_editor" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let exists = ps.agents.iter().any(|a| a.id == id)
                         || ps.skills.iter().any(|s| s.id == id)
@@ -263,14 +263,14 @@ impl Module for PromptModule {
                 Some(pf)
             }
             "Library_close_prompt_editor" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if ps.open_prompt_id.is_none() {
                     pf.warnings.push("No prompt editor is currently open".to_string());
                 }
                 Some(pf)
             }
             "command_delete" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match ps.commands.iter().find(|c| c.id == id) {
                         None => pf.errors.push(format!("Command '{id}' not found")),
@@ -307,9 +307,9 @@ impl Module for PromptModule {
         ]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
         vec![
-            cp_base::state::context::ContextTypeMeta {
+            cp_base::state::context::TypeMeta {
                 context_type: "library",
                 icon_id: "library",
                 is_fixed: true,
@@ -319,7 +319,7 @@ impl Module for PromptModule {
                 short_name: "library",
                 needs_async_wait: false,
             },
-            cp_base::state::context::ContextTypeMeta {
+            cp_base::state::context::TypeMeta {
                 context_type: "skill",
                 icon_id: "skill",
                 is_fixed: false,
@@ -334,10 +334,10 @@ impl Module for PromptModule {
 
     fn on_close_context(
         &self,
-        ctx: &cp_base::state::context::ContextElement,
+        ctx: &cp_base::state::context::Entry,
         state: &mut State,
     ) -> Option<Result<String, String>> {
-        if ctx.context_type.as_str() != ContextType::SKILL {
+        if ctx.context_type.as_str() != Kind::SKILL {
             return None;
         }
         let name = ctx.name.clone();
@@ -369,7 +369,7 @@ impl Module for PromptModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &cp_base::state::context::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
         None
     }
 
@@ -395,7 +395,7 @@ impl Module for PromptModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

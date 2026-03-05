@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
 use cp_base::state::watchers::{Watcher, WatcherRegistry, WatcherResult};
@@ -110,66 +110,24 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
 /// Parse an ISO 8601 datetime string into milliseconds since epoch.
 /// Supports: "2026-02-20T08:00:00", "2026-02-20 08:00:00", "2026-02-20T08:00"
 fn parse_datetime_ms(s: &str) -> Result<u64, String> {
-    // Try parsing with chrono-like manual parsing (we don't have chrono in this crate)
-    // Format: YYYY-MM-DDTHH:MM:SS or YYYY-MM-DD HH:MM:SS or YYYY-MM-DDTHH:MM
+    use chrono::NaiveDateTime;
+
     let s = s.trim().replace(' ', "T");
 
-    let parts: Vec<&str> = s.split('T').collect();
-    let [date_str, time_with_tz] = parts.as_slice() else {
-        return Err("Expected format: YYYY-MM-DDTHH:MM:SS or YYYY-MM-DD HH:MM:SS".to_string());
-    };
+    // Pad missing seconds: "2026-02-20T08:00" → "2026-02-20T08:00:00"
+    let normalized = if s.matches(':').count() == 1 { format!("{s}:00") } else { s };
+    // Strip trailing Z if present
+    let normalized = normalized.trim_end_matches('Z');
 
-    let date_parts: Vec<&str> = date_str.split('-').collect();
-    let [year_s, month_s, day_s] = date_parts.as_slice() else {
-        return Err("Expected date format: YYYY-MM-DD".to_string());
-    };
+    let dt = NaiveDateTime::parse_from_str(normalized, "%Y-%m-%dT%H:%M:%S")
+        .map_err(|e| format!("Invalid datetime: {e}. Expected format: YYYY-MM-DDTHH:MM:SS"))?;
 
-    let time_str = time_with_tz.trim_end_matches('Z');
-    let time_parts: Vec<&str> = time_str.split(':').collect();
-    let (hour_s, min_s, sec_s) = match time_parts.as_slice() {
-        [hr, mn] => (*hr, *mn, "0"),
-        [hr, mn, sc, ..] => (*hr, *mn, *sc),
-        _ => return Err("Expected time format: HH:MM or HH:MM:SS".to_string()),
-    };
-
-    let year: i64 = year_s.parse().map_err(|_e| "Invalid year")?;
-    let month: i64 = month_s.parse().map_err(|_e| "Invalid month")?;
-    let day: i64 = day_s.parse().map_err(|_e| "Invalid day")?;
-    let hour: i64 = hour_s.parse().map_err(|_e| "Invalid hour")?;
-    let min: i64 = min_s.parse().map_err(|_e| "Invalid minute")?;
-    let sec: i64 = sec_s.parse().map_err(|_e| "Invalid second")?;
-
-    // Simple days-since-epoch calculation (good enough for scheduling)
-    // Using a basic algorithm for dates after 2000
-    let mut epoch_days: i64 = 0;
-    for y in 1970..year {
-        epoch_days = epoch_days.saturating_add(if is_leap_year(y) { 366 } else { 365 });
-    }
-    let month_days = [31, if is_leap_year(year) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    for day_count in month_days.iter().take(month.saturating_sub(1).to_usize()) {
-        if month > 12 {
-            break;
-        }
-        epoch_days = epoch_days.saturating_add((*day_count).to_i64());
-    }
-    epoch_days = epoch_days.saturating_add(day.saturating_sub(1));
-
-    let total_secs = epoch_days
-        .saturating_mul(86400)
-        .saturating_add(hour.saturating_mul(3600))
-        .saturating_add(min.saturating_mul(60))
-        .saturating_add(sec);
-    if total_secs < 0 {
+    let epoch_secs = dt.and_utc().timestamp();
+    if epoch_secs < 0 {
         return Err("DateTime is before epoch".to_string());
     }
 
-    Ok(total_secs.to_u64().saturating_mul(1000))
-}
-
-/// Check whether a given year is a leap year.
-#[expect(clippy::integer_division_remainder_used, reason = "calendar modulo arithmetic")]
-const fn is_leap_year(y: i64) -> bool {
-    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+    Ok(epoch_secs.to_u64().saturating_mul(1000))
 }
 
 /// Format milliseconds as a human-friendly duration string.

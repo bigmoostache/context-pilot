@@ -11,6 +11,7 @@ readme.workspace = true
 
 [dependencies]
 cp-base.workspace = true
+chrono.workspace = true
 ratatui.workspace = true
 crossterm.workspace = true
 serde.workspace = true

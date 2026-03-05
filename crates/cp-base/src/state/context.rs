@@ -4,22 +4,18 @@ use std::sync::OnceLock;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::cast::SafeCast;
+use crate::cast::Safe;
 use crate::config::accessors::active_theme;
 use crate::config::constants::CHARS_PER_TOKEN;
 use crate::config::normalize_icon;
 
 // =============================================================================
-// ContextType Registry — modules register metadata at startup
+// Kind Registry — modules register metadata at startup
 // =============================================================================
 
 /// Metadata for a context type, provided by the owning module.
 #[derive(Debug, Clone, Copy)]
-#[expect(
-    clippy::module_name_repetitions,
-    reason = "Used via re-export throughout codebase — 'TypeMeta' alone is too generic"
-)]
-pub struct ContextTypeMeta {
+pub struct TypeMeta {
     /// The context type string (e.g., "todo", "`git_result`")
     pub context_type: &'static str,
     /// Key into the theme's context icon `HashMap` (e.g., "todo", "git")
@@ -39,16 +35,16 @@ pub struct ContextTypeMeta {
 }
 
 /// Global registry of context type metadata, populated once at startup.
-static CONTEXT_TYPE_REGISTRY: OnceLock<Vec<ContextTypeMeta>> = OnceLock::new();
+static CONTEXT_TYPE_REGISTRY: OnceLock<Vec<TypeMeta>> = OnceLock::new();
 
 /// Initialize the global context type registry. Called once at startup.
 /// Modules provide their metadata via `Module::context_type_metadata()`.
-pub fn init_context_type_registry(metadata: Vec<ContextTypeMeta>) {
+pub fn init_context_type_registry(metadata: Vec<TypeMeta>) {
     _ = CONTEXT_TYPE_REGISTRY.get_or_init(|| metadata);
 }
 
 /// Look up metadata for a context type string.
-pub fn get_context_type_meta(ct: &str) -> Option<&'static ContextTypeMeta> {
+pub fn get_context_type_meta(ct: &str) -> Option<&'static TypeMeta> {
     let registry = CONTEXT_TYPE_REGISTRY.get()?;
     registry.iter().find(|m| m.context_type == ct)
 }
@@ -63,7 +59,7 @@ pub fn fixed_panel_order() -> Vec<&'static str> {
 }
 
 // =============================================================================
-// ContextType
+// Kind
 // =============================================================================
 
 /// A string-backed context type identifier.
@@ -77,10 +73,9 @@ pub fn fixed_panel_order() -> Vec<&'static str> {
 /// enum serialization.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-#[expect(clippy::module_name_repetitions, reason = "381 callsites via re-export — 'Type' is a reserved word")]
-pub struct ContextType(String);
+pub struct Kind(String);
 
-impl ContextType {
+impl Kind {
     /// Create a new context type from a string ID.
     #[must_use]
     pub fn new(id: &str) -> Self {
@@ -166,7 +161,7 @@ impl ContextType {
     }
 }
 
-impl std::fmt::Display for ContextType {
+impl std::fmt::Display for Kind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -175,15 +170,14 @@ impl std::fmt::Display for ContextType {
 /// A single context panel in the LLM prompt — the core unit of the context window.
 /// Fixed panels (P1–P7) are always present; dynamic panels (P8+) are created by tools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[expect(clippy::module_name_repetitions, reason = "78 callsites via re-export — 'Element' alone is too generic")]
-pub struct ContextElement {
+pub struct Entry {
     /// Display ID (e.g., P1, P2, ... for UI/LLM)
     pub id: String,
     /// UID for dynamic panels (None for fixed P1-P7, Some for P8+)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
     /// What kind of panel this is (e.g., `"todo"`, `"file"`, `"console"`).
-    pub context_type: ContextType,
+    pub context_type: Kind,
     /// Human-readable panel name shown in sidebar and LLM header.
     pub name: String,
     /// Token count for this panel (current page if paginated).
@@ -233,8 +227,8 @@ pub struct ContextElement {
     pub panel_total_cost: f64,
 }
 
-// === ContextElement metadata helpers ===
-impl ContextElement {
+// === Entry metadata helpers ===
+impl Entry {
     /// Get a typed value from the metadata bag.
     #[must_use]
     pub fn get_meta<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
@@ -259,7 +253,7 @@ impl ContextElement {
     /// Fast path: get a metadata `value.to_usize()`.
     #[must_use]
     pub fn get_meta_usize(&self, key: &str) -> Option<usize> {
-        self.metadata.get(key).and_then(serde_json::Value::as_u64).map(SafeCast::to_usize)
+        self.metadata.get(key).and_then(serde_json::Value::as_u64).map(Safe::to_usize)
     }
 }
 
@@ -276,15 +270,10 @@ pub const fn compute_total_pages(token_count: usize) -> usize {
     if token_count <= max { 1 } else { token_count.div_ceil(max) }
 }
 
-/// Create a default `ContextElement` for a fixed or dynamic panel.
+/// Create a default `Entry` for a fixed or dynamic panel.
 #[must_use]
-pub fn make_default_context_element(
-    id: &str,
-    context_type: ContextType,
-    name: &str,
-    cache_deprecated: bool,
-) -> ContextElement {
-    ContextElement {
+pub fn make_default_entry(id: &str, context_type: Kind, name: &str, cache_deprecated: bool) -> Entry {
+    Entry {
         id: id.to_string(),
         uid: None,
         context_type,

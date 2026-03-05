@@ -1,4 +1,4 @@
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use serde::{Deserialize, Serialize};
 
@@ -222,7 +222,7 @@ impl SpineState {
             }
             id
         };
-        state.touch_panel(ContextType::SPINE);
+        state.touch_panel(Kind::SPINE);
         id
     }
 
@@ -238,7 +238,7 @@ impl SpineState {
             }
         };
         if found {
-            state.touch_panel(ContextType::SPINE);
+            state.touch_panel(Kind::SPINE);
         }
         found
     }
@@ -271,7 +271,7 @@ impl SpineState {
             changed
         };
         if changed {
-            state.touch_panel(ContextType::SPINE);
+            state.touch_panel(Kind::SPINE);
         }
     }
 
@@ -291,7 +291,7 @@ impl SpineState {
             changed
         };
         if changed {
-            state.touch_panel(ContextType::SPINE);
+            state.touch_panel(Kind::SPINE);
         }
     }
 
@@ -311,7 +311,7 @@ impl SpineState {
             changed
         };
         if changed {
-            state.touch_panel(ContextType::SPINE);
+            state.touch_panel(Kind::SPINE);
         }
     }
 }

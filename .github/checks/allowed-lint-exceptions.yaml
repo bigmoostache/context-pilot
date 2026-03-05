@@ -15,12 +15,12 @@
 # annotation from the source code.
 
 exceptions:
-  # ── cast.rs: SafeCast macro infrastructure ──────────────────────────
+  # ── cast.rs: Safe macro infrastructure ──────────────────────────
 
   - path: "crates/cp-base/src/cast.rs"
     match: '#![expect('
     reason: >
-      Module-level expect for clippy::allow_attributes. The SafeCast
+      Module-level expect for clippy::allow_attributes. The Safe
       macros expand #[allow(...)] for different types — some lint triggers
       are type-dependent, so #[expect] (which requires the lint to fire)
       would produce unfulfilled-expectation errors on certain expansions.
@@ -32,7 +32,7 @@ exceptions:
   - path: "crates/cp-base/src/cast.rs"
     match: 'trivial_numeric_casts, trivial_casts, clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_precision_loss, reason = "macro-generated identity casts'
     reason: >
-      Unsigned SafeCast macro impl. Raw `as` casts are the whole point of
+      Unsigned Safe macro impl. Raw `as` casts are the whole point of
       this module — it centralizes all numeric casts behind saturating
       wrappers so the rest of the codebase never uses raw `as`.
     strategy: >
@@ -43,16 +43,16 @@ exceptions:
   - path: "crates/cp-base/src/cast.rs"
     match: 'reason = "macro-generated identity casts are unavoidable'
     reason: >
-      Signed SafeCast macro impl. Same rationale as the unsigned variant —
+      Signed Safe macro impl. Same rationale as the unsigned variant —
       macro-generated identity casts are unavoidable with the current
       approach.
     strategy: >
       Same as above — proc-macro or build.rs per-type generation.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'f64 SafeCast impl: saturating casts necessarily use raw'
+    match: 'f64 Safe impl: saturating casts necessarily use raw'
     reason: >
-      Concrete f64 SafeCast impl. Only cast_possible_truncation and
+      Concrete f64 Safe impl. Only cast_possible_truncation and
       cast_sign_loss fire — reduced from 5 lints in the old #[allow].
       Uses #[expect] (compiler-verified) instead of #[allow].
     strategy: >
@@ -60,9 +60,9 @@ exceptions:
       to f64→integer casts. Identity to_f64 triggers nothing.
 
   - path: "crates/cp-base/src/cast.rs"
-    match: 'f32 SafeCast impl: saturating casts necessarily use raw'
+    match: 'f32 Safe impl: saturating casts necessarily use raw'
     reason: >
-      Concrete f32 SafeCast impl. Same as f64 — only truncation and
+      Concrete f32 Safe impl. Same as f64 — only truncation and
       sign_loss fire. Uses #[expect] instead of #[allow].
     strategy: >
       No further reduction — same as f64.
@@ -107,103 +107,9 @@ exceptions:
       behavior for millisecond-to-second conversion and const-divisor
       helpers. No alternative representation avoids it.
 
-  # ── coucou.rs: calendar modulo ──────────────────────────────────────
-
-  - path: "crates/cp-mod-spine/src/coucou.rs"
-    match: '#[expect(clippy::integer_division_remainder_used'
-    reason: >
-      is_leap_year() uses y % 4, y % 100, y % 400 — the canonical
-      Gregorian leap year formula. Modulo IS the algorithm; there is
-      no refactoring that avoids it.
-    strategy: >
-      Replace hand-rolled date math with the chrono crate, which would
-      eliminate the need for is_leap_year() entirely. Low priority —
-      the current impl is correct and minimal.
-
   # ── module_name_repetitions: names that include their module ────────
   # Types used via re-export where the shorter name conflicts with
   # common identifiers (reserved words, std types, or sibling types).
-
-  - path: "crates/cp-base/src/cast.rs"
-    match: 'SafeCast'
-    reason: >
-      "Safe" alone is meaningless. SafeCast is the centralized numeric
-      casting trait — used via re-export at 50+ callsites.
-    strategy: >
-      Only viable if cast module is always used qualified (cast::Safe).
-
-  - path: "crates/cp-base/src/state/autocomplete.rs"
-    match: 'AutocompleteEntry'
-    reason: >
-      "Entry" alone conflicts with HashMap::Entry and other entry types.
-    strategy: >
-      Only viable with crate-level namespace change.
-
-  - path: "crates/cp-base/src/state/autocomplete.rs"
-    match: 'AutocompleteState'
-    reason: >
-      "State" conflicts with the runtime State struct.
-    strategy: >
-      Only viable with crate-level namespace change.
-
-  - path: "crates/cp-base/src/state/context.rs"
-    match: 'ContextTypeMeta'
-    reason: >
-      "TypeMeta" alone is too generic across a codebase with many
-      metadata types.
-    strategy: >
-      Rename if module path is always explicit at callsites.
-
-  - path: "crates/cp-base/src/state/context.rs"
-    match: '381 callsites via re-export'
-    reason: >
-      ContextType — "Type" is a reserved Rust keyword.
-    strategy: >
-      Irreducible — reserved keyword conflict.
-
-  - path: "crates/cp-base/src/state/context.rs"
-    match: '78 callsites via re-export'
-    reason: >
-      ContextElement — "Element" alone is too generic.
-    strategy: >
-      Could rename to PanelElement but churn is enormous.
-
-  - path: "crates/cp-base/src/state/data/message.rs"
-    match: '52 callsites via re-export'
-    reason: >
-      MessageType — "Type" is a reserved keyword.
-    strategy: >
-      Irreducible — reserved keyword conflict.
-
-  - path: "crates/cp-base/src/state/data/message.rs"
-    match: '58 callsites via re-export'
-    reason: >
-      MessageStatus — "Status" alone conflicts with ProcessStatus,
-      SessionStatus, NotificationStatus.
-    strategy: >
-      Could rename to MsgStatus but low value.
-
-  - path: "crates/cp-base/src/state/data/config.rs"
-    match: 'SharedConfig'
-    reason: >
-      "Shared" alone conveys no meaning. Distinguishes from per-worker
-      WorkerState.
-    strategy: >
-      Could rename to GlobalConfig but SharedConfig is established.
-
-  - path: "crates/cp-base/src/state/mod.rs"
-    match: 'ReverieState/ReverieType'
-    reason: >
-      "State" and "Type" both conflict with common identifiers.
-    strategy: >
-      Only resolvable by moving reverie to its own crate.
-
-  - path: "crates/cp-base/src/tools/pre_flight.rs"
-    match: 'PreFlightResult'
-    reason: >
-      "Result" conflicts with std::result::Result.
-    strategy: >
-      Irreducible — std::Result conflict.
 
   # ── ui/helpers.rs: spinner modulo ────────────────────────────────────
 
@@ -304,26 +210,6 @@ exceptions:
       See src/app/run/input.rs entry.
     strategy: >
       Same as input.rs.
-
-  # ── llms/mod.rs: hand-rolled date/time math ────────────────────────
-
-  - path: "src/llms/mod.rs"
-    match: 'hand-rolled date math'
-    reason: >
-      ms_to_iso8601() performs manual epoch-to-date conversion without
-      chrono. All divisions/modulos are by non-zero constants, subtraction
-      is guarded by loop conditions, addition is bounded by calendar range.
-    strategy: >
-      Replace with chrono crate for date formatting, which would eliminate
-      the entire function.
-
-  - path: "src/llms/mod.rs"
-    match: 'canonical Gregorian leap year formula requires modulo'
-    reason: >
-      is_leap_year() uses y % 4, y % 100, y % 400 — the standard
-      Gregorian leap year formula. Modulo IS the algorithm.
-    strategy: >
-      Replace with chrono crate, eliminating the need for is_leap_year().
 
   - path: "src/llms/mod.rs"
     match: 'std::error::Error: provide/type_id/cause are unstable or deprecated'

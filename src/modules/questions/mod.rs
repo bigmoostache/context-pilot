@@ -4,7 +4,7 @@ mod ask_question;
 use crate::app::panels::Panel;
 use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use crate::infra::tools::{ToolResult, ToolUse};
-use crate::state::{ContextType, State};
+use crate::state::{Kind, State};
 
 use super::Module;
 
@@ -79,7 +79,7 @@ impl Module for QuestionsModule {
         }
     }
 
-    fn create_panel(&self, _context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, _context_type: &Kind) -> Option<Box<dyn Panel>> {
         None
     }
 
@@ -103,23 +103,23 @@ impl Module for QuestionsModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<crate::infra::tools::PreFlightResult> {
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<crate::infra::tools::Verdict> {
         None
     }
 
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
 
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
 
-    fn context_type_metadata(&self) -> Vec<crate::state::ContextTypeMeta> {
+    fn context_type_metadata(&self) -> Vec<crate::state::TypeMeta> {
         vec![]
     }
 
@@ -131,7 +131,7 @@ impl Module for QuestionsModule {
         None
     }
 
-    fn context_detail(&self, _ctx: &crate::state::ContextElement) -> Option<String> {
+    fn context_detail(&self, _ctx: &crate::state::Entry) -> Option<String> {
         None
     }
 
@@ -147,11 +147,7 @@ impl Module for QuestionsModule {
         vec![]
     }
 
-    fn on_close_context(
-        &self,
-        _ctx: &crate::state::ContextElement,
-        _state: &mut State,
-    ) -> Option<Result<String, String>> {
+    fn on_close_context(&self, _ctx: &crate::state::Entry, _state: &mut State) -> Option<Result<String, String>> {
         None
     }
 
@@ -165,7 +161,7 @@ impl Module for QuestionsModule {
 
     fn should_invalidate_on_fs_change(
         &self,
-        _ctx: &crate::state::ContextElement,
+        _ctx: &crate::state::Entry,
         _changed_path: &str,
         _is_dir_event: bool,
     ) -> bool {

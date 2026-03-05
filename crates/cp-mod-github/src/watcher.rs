@@ -227,8 +227,8 @@ impl GhPollLoop {
                     // Send update if content changed
                     if let Some((_, pr_info)) = result {
                         let _r = cache_tx.send(CacheUpdate::ModuleSpecific {
-                            context_type: cp_base::state::context::ContextType::new(
-                                cp_base::state::context::ContextType::GITHUB_RESULT,
+                            context_type: cp_base::state::context::Kind::new(
+                                cp_base::state::context::Kind::GITHUB_RESULT,
                             ),
                             data: Box::new(BranchPrUpdate { pr_info }),
                         });

@@ -23,7 +23,7 @@ use ratatui::widgets::Block;
 
 use crate::app::panels;
 use crate::infra::constants::STATUS_BAR_HEIGHT;
-use crate::state::{ContextType, State};
+use crate::state::{Kind, State};
 use crate::ui::perf::PERF;
 
 /// Top-level render entry point: draws the entire TUI frame.
@@ -57,7 +57,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     }
 
     // Render autocomplete popup if active
-    if let Some(ac) = state.get_ext::<cp_base::state::autocomplete::AutocompleteState>()
+    if let Some(ac) = state.get_ext::<cp_base::state::autocomplete::Suggestions>()
         && ac.active
     {
         // Position in main content area (right of sidebar, above status bar)
@@ -152,13 +152,13 @@ fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let context_type = state
         .context
         .get(state.selected_context)
-        .map_or_else(|| ContextType::new(ContextType::CONVERSATION), |c| c.context_type.clone());
+        .map_or_else(|| Kind::new(Kind::CONVERSATION), |c| c.context_type.clone());
 
     let panel = panels::get_panel(&context_type);
 
     // ConversationPanel overrides render() with custom scrollbar + caching.
     // All other panels use render_panel_default (which calls panel.content()).
-    if context_type.as_str() == ContextType::CONVERSATION {
+    if context_type.as_str() == Kind::CONVERSATION {
         panel.render(frame, state, area);
     } else {
         panels::render_panel_default(panel.as_ref(), frame, state, area);

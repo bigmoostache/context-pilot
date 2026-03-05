@@ -4,7 +4,7 @@ use ratatui::prelude::{Line, Span, Style};
 use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel, scroll_key_action};
 use cp_base::state::actions::Action;
-use cp_base::state::context::{ContextType, estimate_tokens};
+use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 
 use crate::types::ScratchpadState;
@@ -46,7 +46,7 @@ impl Panel for ScratchpadPanel {
         let token_count = estimate_tokens(&content);
 
         for ctx in &mut state.context {
-            if ctx.context_type.as_str() == ContextType::SCRATCHPAD {
+            if ctx.context_type.as_str() == Kind::SCRATCHPAD {
                 ctx.token_count = token_count;
                 let _ = cp_base::panels::update_if_changed(ctx, &content);
                 break;
@@ -60,7 +60,7 @@ impl Panel for ScratchpadPanel {
         let (id, last_refresh_ms) = state
             .context
             .iter()
-            .find(|c| c.context_type.as_str() == ContextType::SCRATCHPAD)
+            .find(|c| c.context_type.as_str() == Kind::SCRATCHPAD)
             .map_or(("P7", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Scratchpad", content, last_refresh_ms)]
     }
@@ -73,7 +73,7 @@ impl Panel for ScratchpadPanel {
     }
     fn build_cache_request(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &State,
     ) -> Option<cp_base::panels::CacheRequest> {
         None
@@ -81,7 +81,7 @@ impl Panel for ScratchpadPanel {
     fn apply_cache_update(
         &self,
         _update: cp_base::panels::CacheUpdate,
-        _ctx: &mut cp_base::state::context::ContextElement,
+        _ctx: &mut cp_base::state::context::Entry,
         _state: &mut State,
     ) -> bool {
         false
@@ -89,7 +89,7 @@ impl Panel for ScratchpadPanel {
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
         None
     }
-    fn suicide(&self, _ctx: &cp_base::state::context::ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
         false
     }
     fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}

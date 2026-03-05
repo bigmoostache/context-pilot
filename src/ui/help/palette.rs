@@ -7,7 +7,7 @@ use crate::state::State;
 use crate::ui::theme;
 
 use super::commands::{PaletteCommand, get_available_commands};
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// State for the command palette
 #[derive(Debug, Clone, Default)]

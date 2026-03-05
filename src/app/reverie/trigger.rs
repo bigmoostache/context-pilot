@@ -5,7 +5,7 @@
 //! 2. **Manual**: main AI calls `optimize_context` tool → fires reverie with directive
 
 use crate::state::State;
-use cp_base::state::reverie::{ReverieState, ReverieType};
+use cp_base::state::reverie::{Kind, Session};
 
 /// Check whether the context has breached the cleaning threshold and a reverie
 /// should be auto-triggered.
@@ -36,7 +36,7 @@ pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
 
     // Threshold breached — fire the reverie
     // Start the reverie session with the default cleaner agent
-    let mut rev = ReverieState::new(ReverieType::ContextOptimizer, "cleaner".to_string(), None);
+    let mut rev = Session::new(Kind::ContextOptimizer, "cleaner".to_string(), None);
     rev.queue_active = true;
     let _r = state.reveries.insert("cleaner".to_string(), rev);
 
@@ -62,7 +62,7 @@ pub(crate) fn start_manual_reverie(state: &mut State, agent_id: String, context:
     }
 
     // Start the reverie session
-    let mut rev = ReverieState::new(ReverieType::ContextOptimizer, agent_id.clone(), context);
+    let mut rev = Session::new(Kind::ContextOptimizer, agent_id.clone(), context);
     rev.queue_active = true;
     let _r = state.reveries.insert(agent_id, rev);
 

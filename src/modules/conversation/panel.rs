@@ -10,13 +10,13 @@ use cp_mod_prompt::types::PromptState;
 
 use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel};
-use crate::state::{ContextType, FullCache, InputCache, MessageCache, MessageStatus, MessageType, State, hash_values};
+use crate::state::{FullCache, InputCache, Kind, MessageCache, MsgKind, MsgStatus, State, hash_values};
 use crate::ui::theme;
 use cp_base::panels::scroll_key_action;
 
 use super::list::{self, ListAction};
 use super::render;
-use cp_base::cast::SafeCast as _;
+use cp_base::cast::Safe as _;
 
 /// Panel for displaying the conversation messages and user input.
 pub(super) struct ConversationPanel;
@@ -26,9 +26,9 @@ impl ConversationPanel {
     fn compute_message_hash(msg: &crate::state::Message, viewport_width: u16, dev_mode: bool) -> u64 {
         // Include all fields that affect rendering
         let status_num = match msg.status {
-            MessageStatus::Full => 0u8,
-            MessageStatus::Deleted => 2,
-            MessageStatus::Detached => 3,
+            MsgStatus::Full => 0u8,
+            MsgStatus::Deleted => 2,
+            MsgStatus::Detached => 3,
         };
         let tool_uses_len = msg.tool_uses.len();
         let tool_results_len = msg.tool_results.len();
@@ -63,7 +63,7 @@ impl ConversationPanel {
 
         // Hash conversation history panel count (invalidate when panels added/removed)
         let history_count =
-            state.context.iter().filter(|c| c.context_type.as_str() == ContextType::CONVERSATION_HISTORY).count();
+            state.context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).count();
         std::hash::Hash::hash(&history_count, &mut hasher);
 
         // Hash all message content that affects rendering
@@ -119,7 +119,7 @@ impl ConversationPanel {
         // Prepend frozen `ConversationHistory` panels (oldest first)
         {
             let mut history_panels: Vec<_> =
-                state.context.iter().filter(|c| c.context_type.as_str() == ContextType::CONVERSATION_HISTORY).collect();
+                state.context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).collect();
             history_panels.sort_by_key(|c| c.last_refresh_ms);
 
             for ctx in &history_panels {
@@ -165,7 +165,7 @@ impl ConversationPanel {
             let last_msg_id = state.messages.last().map(|m| m.id.clone());
 
             for msg in &state.messages {
-                if msg.status == MessageStatus::Deleted {
+                if msg.status == MsgStatus::Deleted {
                     continue;
                 }
 
@@ -173,7 +173,7 @@ impl ConversationPanel {
                 let is_streaming_this = state.flags.stream.phase.is_streaming() && is_last && msg.role == "assistant";
 
                 // Skip empty text messages (unless streaming)
-                if msg.msg_type == MessageType::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
+                if msg.msg_type == MsgKind::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
                     continue;
                 }
 
@@ -232,7 +232,7 @@ impl ConversationPanel {
                 let line_count = cached.lines.len();
                 text.extend(cached.lines.iter().cloned());
                 // Update autocomplete with input visual line count
-                if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() {
+                if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
                     ac.input_visual_lines = line_count.to_u16();
                 }
             } else {
@@ -253,7 +253,7 @@ impl ConversationPanel {
                     Some(InputCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
                 text.extend(input_lines);
                 // Update autocomplete with input visual line count
-                if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() {
+                if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
                     ac.input_visual_lines = line_count.to_u16();
                 }
             }
@@ -275,7 +275,7 @@ impl ConversationPanel {
                 Some(InputCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
             text.extend(input_lines);
             // Update autocomplete with input visual line count
-            if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::AutocompleteState>() {
+            if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
                 ac.input_visual_lines = line_count.to_u16();
             }
         }
@@ -443,18 +443,14 @@ impl Panel for ConversationPanel {
         None
     }
 
-    fn build_cache_request(
-        &self,
-        _ctx: &crate::state::ContextElement,
-        _state: &State,
-    ) -> Option<cp_base::panels::CacheRequest> {
+    fn build_cache_request(&self, _ctx: &crate::state::Entry, _state: &State) -> Option<cp_base::panels::CacheRequest> {
         None
     }
 
     fn apply_cache_update(
         &self,
         _update: cp_base::panels::CacheUpdate,
-        _ctx: &mut crate::state::ContextElement,
+        _ctx: &mut crate::state::Entry,
         _state: &mut State,
     ) -> bool {
         false
@@ -464,7 +460,7 @@ impl Panel for ConversationPanel {
         None
     }
 
-    fn suicide(&self, _ctx: &crate::state::ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &crate::state::Entry, _state: &State) -> bool {
         false
     }
 }

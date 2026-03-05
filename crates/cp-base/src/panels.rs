@@ -26,10 +26,10 @@ use sha2::{Digest as _, Sha256};
 
 use crossterm::event::{KeyCode, KeyEvent};
 
-use crate::cast::SafeCast as _;
+use crate::cast::Safe as _;
 use crate::config::constants::{SCROLL_ARROW_AMOUNT, SCROLL_PAGE_AMOUNT};
 use crate::state::actions::Action;
-use crate::state::context::{ContextElement, ContextType};
+use crate::state::context::{Entry, Kind};
 use crate::state::runtime::State;
 
 // =============================================================================
@@ -97,7 +97,7 @@ pub enum CacheUpdate {
     /// Module-specific update requiring downcast (e.g., git status populating `GitState`)
     ModuleSpecific {
         /// Panel type to match against.
-        context_type: ContextType,
+        context_type: Kind,
         /// Type-erased module data (downcast by the module's `apply_cache_update`).
         data: Box<dyn Any + Send>,
     },
@@ -121,7 +121,7 @@ impl fmt::Debug for CacheUpdate {
 /// Each module defines its own request data struct and wraps it in `data`.
 pub struct CacheRequest {
     /// Panel type that originated this request.
-    pub context_type: ContextType,
+    pub context_type: Kind,
     /// Type-erased request payload (downcast by the module's `refresh_cache`).
     pub data: Box<dyn Any + Send>,
 }
@@ -223,7 +223,7 @@ pub mod time_arith {
 
 /// Update `last_refresh_ms` only if content actually changed (hash differs).
 /// Returns true if content changed.
-pub fn update_if_changed(ctx: &mut ContextElement, content: &str) -> bool {
+pub fn update_if_changed(ctx: &mut Entry, content: &str) -> bool {
     let new_hash = hash_content(content);
     if ctx.content_hash.as_deref() == Some(&new_hash) {
         return false;
@@ -353,13 +353,13 @@ pub trait Panel {
 
     /// Build a cache request for the given context element.
     /// Returns None for panels without background caching.
-    fn build_cache_request(&self, _ctx: &ContextElement, _state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, _ctx: &Entry, _state: &State) -> Option<CacheRequest> {
         None
     }
 
     /// Apply a cache update to the context element and state.
     /// Returns true if content changed (caller sets state.dirty).
-    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut ContextElement, _state: &mut State) -> bool {
+    fn apply_cache_update(&self, _update: CacheUpdate, _ctx: &mut Entry, _state: &mut State) -> bool {
         false
     }
 
@@ -382,7 +382,7 @@ pub trait Panel {
     /// - `ConsolePanel`: callback consoles check for newer siblings; others only check when loading
     ///
     /// Return `true` to kill the panel.
-    fn suicide(&self, _ctx: &ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
 

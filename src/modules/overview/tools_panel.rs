@@ -64,18 +64,14 @@ impl Panel for ToolsPanel {
         None
     }
 
-    fn build_cache_request(
-        &self,
-        _ctx: &crate::state::ContextElement,
-        _state: &State,
-    ) -> Option<cp_base::panels::CacheRequest> {
+    fn build_cache_request(&self, _ctx: &crate::state::Entry, _state: &State) -> Option<cp_base::panels::CacheRequest> {
         None
     }
 
     fn apply_cache_update(
         &self,
         _update: cp_base::panels::CacheUpdate,
-        _ctx: &mut crate::state::ContextElement,
+        _ctx: &mut crate::state::Entry,
         _state: &mut State,
     ) -> bool {
         false
@@ -85,7 +81,7 @@ impl Panel for ToolsPanel {
         None
     }
 
-    fn suicide(&self, _ctx: &crate::state::ContextElement, _state: &State) -> bool {
+    fn suicide(&self, _ctx: &crate::state::Entry, _state: &State) -> bool {
         false
     }
 

@@ -11,14 +11,14 @@ mod tools;
 
 use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::FilePanel;
 use cp_base::modules::Module;
-use cp_base::tools::pre_flight::PreFlightResult;
+use cp_base::tools::pre_flight::Verdict;
 
 /// Lazily parsed tool YAML definitions for the files module.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -45,13 +45,13 @@ impl Module for FilesModule {
         true
     }
 
-    fn dynamic_panel_types(&self) -> Vec<ContextType> {
-        vec![ContextType::new(ContextType::FILE)]
+    fn dynamic_panel_types(&self) -> Vec<Kind> {
+        vec![Kind::new(Kind::FILE)]
     }
 
-    fn create_panel(&self, context_type: &ContextType) -> Option<Box<dyn Panel>> {
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            ContextType::FILE => Some(Box::new(FilePanel)),
+            Kind::FILE => Some(Box::new(FilePanel)),
             _ => None,
         }
     }
@@ -84,10 +84,10 @@ impl Module for FilesModule {
         ]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<PreFlightResult> {
+    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "Open" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 let paths: Vec<String> = match tool.input.get("path") {
                     Some(serde_json::Value::String(s)) => vec![s.clone()],
                     Some(serde_json::Value::Array(arr)) => {
@@ -113,7 +113,7 @@ impl Module for FilesModule {
                 Some(pf)
             }
             "Edit" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
                     let p = std::path::Path::new(path_str);
                     if !p.exists() {
@@ -126,8 +126,7 @@ impl Module for FilesModule {
                             .canonicalize()
                             .map_or_else(|_| path_str.to_string(), |cp| cp.to_string_lossy().to_string());
                         let is_open = state.context.iter().any(|c| {
-                            c.context_type.as_str() == ContextType::FILE
-                                && c.get_meta_str("file_path") == Some(&canonical)
+                            c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical)
                         });
                         if !is_open {
                             pf.warnings.push(format!("File '{path_str}' is not open in context. Edit will proceed if old_string has a unique match, but open the file to see current content."));
@@ -146,7 +145,7 @@ impl Module for FilesModule {
                 Some(pf)
             }
             "Write" => {
-                let mut pf = PreFlightResult::new();
+                let mut pf = Verdict::new();
                 if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
                     let p = std::path::Path::new(path_str);
                     if let Some(parent) = p.parent()
@@ -176,8 +175,8 @@ impl Module for FilesModule {
         vec![("Edit", visualize_diff), ("Write", visualize_diff)]
     }
 
-    fn context_type_metadata(&self) -> Vec<cp_base::state::context::ContextTypeMeta> {
-        vec![cp_base::state::context::ContextTypeMeta {
+    fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
+        vec![cp_base::state::context::TypeMeta {
             context_type: "file",
             icon_id: "file",
             is_fixed: false,
@@ -189,9 +188,8 @@ impl Module for FilesModule {
         }]
     }
 
-    fn context_detail(&self, ctx: &cp_base::state::context::ContextElement) -> Option<String> {
-        (ctx.context_type.as_str() == ContextType::FILE)
-            .then(|| ctx.get_meta_str("file_path").unwrap_or("").to_string())
+    fn context_detail(&self, ctx: &cp_base::state::context::Entry) -> Option<String> {
+        (ctx.context_type.as_str() == Kind::FILE).then(|| ctx.get_meta_str("file_path").unwrap_or("").to_string())
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
@@ -202,21 +200,21 @@ impl Module for FilesModule {
         state
             .context
             .iter()
-            .filter(|c| c.context_type.as_str() == ContextType::FILE)
+            .filter(|c| c.context_type.as_str() == Kind::FILE)
             .filter_map(|c| c.get_meta_str("file_path").map(|p| cp_base::panels::WatchSpec::File(p.to_string())))
             .collect()
     }
 
     fn should_invalidate_on_fs_change(
         &self,
-        ctx: &cp_base::state::context::ContextElement,
+        ctx: &cp_base::state::context::Entry,
         changed_path: &str,
         is_dir_event: bool,
     ) -> bool {
         if is_dir_event {
             return false;
         }
-        ctx.context_type.as_str() == ContextType::FILE && ctx.get_meta_str("file_path") == Some(changed_path)
+        ctx.context_type.as_str() == Kind::FILE && ctx.get_meta_str("file_path") == Some(changed_path)
     }
 
     fn dependencies(&self) -> &[&'static str] {
@@ -232,10 +230,10 @@ impl Module for FilesModule {
         serde_json::Value::Null
     }
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
-    fn fixed_panel_types(&self) -> Vec<ContextType> {
+    fn fixed_panel_types(&self) -> Vec<Kind> {
         vec![]
     }
-    fn fixed_panel_defaults(&self) -> Vec<(ContextType, &'static str, bool)> {
+    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
         vec![]
     }
     fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
@@ -253,7 +251,7 @@ impl Module for FilesModule {
     }
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::ContextElement,
+        _ctx: &cp_base::state::context::Entry,
         _state: &mut State,
     ) -> Option<Result<String, String>> {
         None

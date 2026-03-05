@@ -1,7 +1,7 @@
 use crate::storage;
 use crate::types::{PromptItem, PromptState, PromptType};
 use cp_base::config::accessors::library;
-use cp_base::state::context::ContextType;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -44,8 +44,8 @@ pub(crate) fn create(tool: &ToolUse, state: &mut State) -> ToolResult {
     storage::save_prompt_to_dir(&storage::dir_for(PromptType::Agent), &item);
     PromptState::get_mut(state).agents.push(item);
 
-    state.touch_panel(ContextType::SYSTEM);
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::SYSTEM);
+    state.touch_panel(Kind::LIBRARY);
 
     ToolResult::new(tool.id.clone(), format!("Created agent '{name}' with ID '{id}'"), false)
 }
@@ -76,8 +76,8 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
         ps.active_agent_id = Some(library::default_agent_id().to_string());
     }
 
-    state.touch_panel(ContextType::SYSTEM);
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::SYSTEM);
+    state.touch_panel(Kind::LIBRARY);
 
     ToolResult::new(tool.id.clone(), format!("Deleted agent '{}' ({})", agent.name, id), false)
 }
@@ -89,8 +89,8 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     // If id is None or empty, switch to default agent
     let Some(id) = id.filter(|s| !s.is_empty()) else {
         PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_string());
-        state.touch_panel(ContextType::SYSTEM);
-        state.touch_panel(ContextType::LIBRARY);
+        state.touch_panel(Kind::SYSTEM);
+        state.touch_panel(Kind::LIBRARY);
         return ToolResult::new(
             tool.id.clone(),
             format!("Switched to default agent ({})", library::default_agent_id()),
@@ -103,8 +103,8 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     PromptState::get_mut(state).active_agent_id = Some(id.to_string());
-    state.touch_panel(ContextType::SYSTEM);
-    state.touch_panel(ContextType::LIBRARY);
+    state.touch_panel(Kind::SYSTEM);
+    state.touch_panel(Kind::LIBRARY);
 
     let name = PromptState::get(state).agents.iter().find(|a| a.id == id).map_or("unknown", |a| a.name.as_str());
 
