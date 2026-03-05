@@ -271,9 +271,9 @@ pub fn find_size_pattern(line: &str) -> Option<usize> {
 #[must_use]
 pub fn find_children_pattern(line: &str) -> Option<(usize, usize)> {
     if let Some(start) = line.find(" (") {
-        let rest = &line[start + 2..];
+        let rest = line.get(start + 2..).unwrap_or("");
         if let Some(end_paren) = rest.find(')') {
-            let inner = &rest[..end_paren];
+            let inner = rest.get(..end_paren).unwrap_or("");
             if inner.ends_with(" child") || inner.ends_with(" children") {
                 let num_part = inner.split_whitespace().next()?;
                 if num_part.parse::<usize>().is_ok() {

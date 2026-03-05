@@ -203,7 +203,7 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
         full_content.len()
     } else {
         // Find next newline after start_char
-        full_content[start_char..].find('\n').map_or(full_content.len(), |pos| start_char + pos + 1)
+        full_content.get(start_char..).unwrap_or("").find('\n').map_or(full_content.len(), |pos| start_char + pos + 1)
     };
 
     let end_char = start + chars_per_page.to_usize();
@@ -211,10 +211,10 @@ pub fn paginate_content(full_content: &str, current_page: usize, total_pages: us
         full_content.len()
     } else {
         // Find next newline after end_char to snap to line boundary
-        full_content[end_char..].find('\n').map_or(full_content.len(), |pos| end_char + pos + 1)
+        full_content.get(end_char..).unwrap_or("").find('\n').map_or(full_content.len(), |pos| end_char + pos + 1)
     };
 
-    let page_content = &full_content[start..end];
+    let page_content = full_content.get(start..end).unwrap_or("");
     format!("[Page {}/{} — use panel_goto_page to navigate]\n{}", current_page + 1, total_pages, page_content)
 }
 

@@ -80,8 +80,11 @@ pub(crate) fn render_perf_overlay(frame: &mut Frame<'_>, area: Rect) {
             let pct = if total_time > 0.0 { op.total_ms / total_time * 100.0 } else { 0.0 };
             let is_hotspot = pct > 30.0;
 
-            let name =
-                if op.name.len() <= 24 { op.name.to_string() } else { format!("..{}", &op.name[op.name.len() - 22..]) };
+            let name = if op.name.len() <= 24 {
+                op.name.to_string()
+            } else {
+                format!("..{}", &op.name.get(op.name.len() - 22..).unwrap_or(""))
+            };
             let name_str = if is_hotspot { format!("! {name}") } else { format!("  {name}") };
 
             let name_style = if is_hotspot {

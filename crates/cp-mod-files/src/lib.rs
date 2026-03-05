@@ -278,7 +278,7 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<ratatui::text::Line<'s
 /// Truncate a line to fit within the given width.
 fn truncate_line(line: &str, width: usize) -> String {
     if line.len() > width {
-        format!("{}…", &line[..line.floor_char_boundary(width.saturating_sub(1))])
+        format!("{}…", &line.get(..line.floor_char_boundary(width.saturating_sub(1))).unwrap_or(""))
     } else {
         line.to_string()
     }
@@ -311,36 +311,36 @@ fn style_callback_line(
 
         // Find the status word and split around it
         if let Some(pos) = rest.find(" passed") {
-            let name = &rest[..pos];
-            let after = &rest[pos + 7..]; // skip " passed"
+            let name = rest.get(..pos).unwrap_or("");
+            let after = rest.get(pos + 7..).unwrap_or(""); // skip " passed"
             spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
             spans.push(Span::styled(" passed", Style::default().fg(green)));
             if !after.is_empty() {
                 spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
             }
         } else if let Some(pos) = rest.find(" FAILED") {
-            let name = &rest[..pos];
-            let after = &rest[pos + 7..]; // skip " FAILED"
+            let name = rest.get(..pos).unwrap_or("");
+            let after = rest.get(pos + 7..).unwrap_or(""); // skip " FAILED"
             spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
             spans.push(Span::styled(" FAILED", Style::default().fg(red)));
             if !after.is_empty() {
                 spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
             }
         } else if let Some(pos) = rest.find(" TIMED OUT") {
-            let name = &rest[..pos];
-            let after = &rest[pos + 10..]; // skip " TIMED OUT"
+            let name = rest.get(..pos).unwrap_or("");
+            let after = rest.get(pos + 10..).unwrap_or(""); // skip " TIMED OUT"
             spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
             spans.push(Span::styled(" TIMED OUT", Style::default().fg(red)));
             if !after.is_empty() {
                 spans.push(Span::styled(after.to_string(), Style::default().fg(dim)));
             }
         } else if let Some(pos) = rest.find(" dispatched") {
-            let name = &rest[..pos];
+            let name = rest.get(..pos).unwrap_or("");
             spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
             spans.push(Span::styled(" dispatched", Style::default().fg(blue)));
         } else if let Some(pos) = rest.find(" skipped") {
-            let name = &rest[..pos];
-            let after = &rest[pos + 8..]; // skip " skipped"
+            let name = rest.get(..pos).unwrap_or("");
+            let after = rest.get(pos + 8..).unwrap_or(""); // skip " skipped"
             spans.push(Span::styled(name.to_string(), Style::default().fg(dim)));
             spans.push(Span::styled(" skipped", Style::default().fg(dim)));
             if !after.is_empty() {

@@ -103,7 +103,7 @@ impl App {
                         while !params.is_char_boundary(end) {
                             end -= 1;
                         }
-                        format!("{}...", &params[..end])
+                        format!("{}...", params.get(..end).unwrap_or(""))
                     } else {
                         params
                     };

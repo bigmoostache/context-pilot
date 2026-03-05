@@ -16,7 +16,7 @@ fn truncate_str(s: &str, max_bytes: usize) -> &str {
     while end > 0 && !s.is_char_boundary(end) {
         end -= 1;
     }
-    &s[..end]
+    s.get(..end).unwrap_or("")
 }
 
 /// Sentinel value returned when a blocking `console_wait` is registered.

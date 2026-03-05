@@ -43,7 +43,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     // Capture info for notification before moving user_msg
     let user_id_str = user_id.clone();
     let content_preview = if content.len() > 80 {
-        format!("{}...", &content[..content.floor_char_boundary(80)])
+        format!("{}...", &content.get(..content.floor_char_boundary(80)).unwrap_or(""))
     } else {
         content.clone()
     };
@@ -139,7 +139,7 @@ fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
             }
             if i < bytes.len() {
                 // Found closing \x00
-                let idx_str = &input[idx_start..i];
+                let idx_str = input.get(idx_start..i).unwrap_or("");
                 i += 1; // skip closing \x00
 
                 if let Ok(idx) = idx_str.parse::<usize>() {
@@ -149,14 +149,14 @@ fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
                     // If index out of bounds, silently drop the sentinel
                 } else {
                     // Invalid index — keep original bytes
-                    result.push_str(&input[start..i]);
+                    result.push_str(input.get(start..i).unwrap_or(""));
                 }
             } else {
                 // No closing \x00 — keep as-is
-                result.push_str(&input[start..]);
+                result.push_str(input.get(start..).unwrap_or(""));
             }
         } else {
-            let Some(ch) = input[i..].chars().next() else { break };
+            let Some(ch) = input.get(i..).unwrap_or("").chars().next() else { break };
             result.push(ch);
             i += ch.len_utf8();
         }
@@ -180,9 +180,10 @@ fn replace_commands(input: &str, commands: &[PromptItem]) -> String {
                 return line.to_string();
             }
             // Extract the command token after /
-            let token = &trimmed[1..];
-            let (cmd_id, rest) =
-                token.find(|c: char| c.is_whitespace()).map_or((token, ""), |pos| (&token[..pos], &token[pos..]));
+            let token = trimmed.get(1..).unwrap_or("");
+            let (cmd_id, rest) = token
+                .find(|c: char| c.is_whitespace())
+                .map_or((token, ""), |pos| (token.get(..pos).unwrap_or(""), token.get(pos..).unwrap_or("")));
             commands
                 .iter()
                 .find(|c| c.id == cmd_id)

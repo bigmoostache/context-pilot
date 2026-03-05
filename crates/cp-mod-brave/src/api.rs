@@ -190,5 +190,5 @@ fn urlenc(s: &str) -> String {
 }
 
 fn truncate(s: &str, max: usize) -> &str {
-    if s.len() <= max { s } else { &s[..s.floor_char_boundary(max)] }
+    if s.len() <= max { s } else { s.get(..s.floor_char_boundary(max)).unwrap_or("") }
 }

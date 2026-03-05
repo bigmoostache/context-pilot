@@ -56,7 +56,8 @@ pub(crate) fn generate_tree_string(
 fn compute_file_hash(path: &Path) -> Option<String> {
     let content = fs::read(path).ok()?;
     let hash = Sha256::digest(&content);
-    Some(format!("{hash:x}")[..8].to_string()) // First 8 chars
+    let hex = format!("{hash:x}");
+    Some(hex.get(..8).unwrap_or(&hex).to_string())
 }
 
 /// Execute `tree_toggle_folders` tool - open or close folders

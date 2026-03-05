@@ -123,13 +123,13 @@ pub(super) fn render_seeds(state: &State, base_style: Style) -> Vec<Line<'static
                 if is_active { ("\u{2713}", theme::success()) } else { ("", theme::text_muted()) };
 
             let display_name = if agent.name.len() > 20 {
-                format!("{}...", &agent.name[..agent.name.floor_char_boundary(17)])
+                format!("{}...", &agent.name.get(..agent.name.floor_char_boundary(17)).unwrap_or(""))
             } else {
                 agent.name.clone()
             };
 
             let display_desc = if agent.description.len() > 35 {
-                format!("{}...", &agent.description[..agent.description.floor_char_boundary(32)])
+                format!("{}...", &agent.description.get(..agent.description.floor_char_boundary(32)).unwrap_or(""))
             } else {
                 agent.description.clone()
             };
@@ -247,13 +247,13 @@ pub(super) fn render_presets(base_style: Style) -> Vec<Line<'static>> {
                 if p.built_in { ("built-in", theme::accent_dim()) } else { ("custom", theme::success()) };
 
             let display_name = if p.name.len() > 25 {
-                format!("{}...", &p.name[..p.name.floor_char_boundary(22)])
+                format!("{}...", &p.name.get(..p.name.floor_char_boundary(22)).unwrap_or(""))
             } else {
                 p.name.clone()
             };
 
             let display_desc = if p.description.len() > 35 {
-                format!("{}...", &p.description[..p.description.floor_char_boundary(32)])
+                format!("{}...", &p.description.get(..p.description.floor_char_boundary(32)).unwrap_or(""))
             } else {
                 p.description.clone()
             };

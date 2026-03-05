@@ -386,7 +386,7 @@ fn validate_script_env_vars(script: &str, is_global: bool) -> Result<(), String>
 fn has_singular_env_var(script: &str) -> bool {
     let needle = "$CP_CHANGED_FILE";
     let mut start = 0;
-    while let Some(pos) = script[start..].find(needle) {
+    while let Some(pos) = script.get(start..).unwrap_or("").find(needle) {
         let abs_pos = start + pos + needle.len();
         // If the next char is 'S' or 's', this is actually $CP_CHANGED_FILES — skip it
         match script.as_bytes().get(abs_pos) {

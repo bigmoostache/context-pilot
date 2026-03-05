@@ -155,7 +155,7 @@ pub(super) fn render_git_status(state: &State, base_style: Style) -> Vec<Line<'s
                 };
 
                 let display_path = if file.path.len() > 38 {
-                    format!("{}...{}", type_char, &file.path[file.path.len() - 35..])
+                    format!("{}...{}", type_char, &file.path.get(file.path.len() - 35..).unwrap_or(""))
                 } else {
                     format!("{} {}", type_char, file.path)
                 };
@@ -271,8 +271,11 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
         // Ask modules for detail string
         let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
-        let truncated_details =
-            if details.len() > 30 { format!("{}...", &details[..details.floor_char_boundary(27)]) } else { details };
+        let truncated_details = if details.len() > 30 {
+            format!("{}...", &details.get(..details.floor_char_boundary(27)).unwrap_or(""))
+        } else {
+            details
+        };
 
         // Format refresh time as relative
         let refreshed = if ctx.last_refresh_ms < 1_577_836_800_000 {

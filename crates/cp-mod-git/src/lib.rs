@@ -356,7 +356,7 @@ fn visualize_git_output(content: &str, width: usize) -> Vec<ratatui::text::Line<
 
         // Truncate long lines
         let display = if line.len() > width {
-            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+            format!("{}...", &line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
         } else {
             line.to_string()
         };

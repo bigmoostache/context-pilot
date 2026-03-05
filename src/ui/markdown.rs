@@ -306,7 +306,7 @@ pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'st
     // Headers: # ## ### etc.
     if trimmed.starts_with('#') {
         let level = trimmed.chars().take_while(|&c| c == '#').count();
-        let content = trimmed[level..].trim_start();
+        let content = trimmed.get(level..).unwrap_or("").trim_start();
 
         let style = match level {
             1 => Style::default().fg(theme::accent()).bold(),
@@ -330,7 +330,7 @@ pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'st
     }
 
     if trimmed.starts_with("* ") && !trimmed.starts_with("**") {
-        let content = trimmed[2..].to_string();
+        let content = trimmed.get(2..).unwrap_or("").to_string();
         let indent = line.len() - trimmed.len();
         let mut spans = vec![
             Span::styled(" ".repeat(indent), base_style),

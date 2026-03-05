@@ -11,40 +11,11 @@ pub(crate) mod input;
 pub(crate) mod streaming;
 
 // Re-export helpers for external use
-pub(crate) use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern};
+pub(crate) use helpers::{clean_llm_id_prefix, eject_cursor_from_sentinel, find_context_by_id, parse_context_pattern};
 
 use crate::infra::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::state::{ContextElement, ContextType, State, StreamPhase};
 use cp_mod_prompt::PromptState;
-
-/// If cursor is inside a paste sentinel (\x00{idx}\x00), eject it to after the sentinel.
-fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
-    let bytes = input.as_bytes();
-    if cursor == 0 || cursor >= bytes.len() {
-        return cursor;
-    }
-    // Scan backwards from cursor to see if we hit \x00 before any non-digit
-    let mut scan = cursor;
-    while scan > 0 {
-        let b = bytes[scan - 1];
-        if b == 0 {
-            // Found opening \x00 — we're inside a sentinel. Find the closing \x00.
-            let mut end = cursor;
-            while end < bytes.len() && bytes[end] != 0 {
-                end += 1;
-            }
-            if end < bytes.len() && bytes[end] == 0 {
-                return end + 1; // after closing \x00
-            }
-            return cursor;
-        } else if b.is_ascii_digit() {
-            scan -= 1;
-        } else {
-            break; // Not inside a sentinel
-        }
-    }
-    cursor
-}
 
 // Re-export Action/ActionResult from cp-base (shared with module crates)
 pub(crate) use cp_base::state::{Action, ActionResult};
@@ -97,7 +68,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 while word_start < before_space && !state.input.is_char_boundary(word_start) {
                     word_start += 1;
                 }
-                let word = &state.input[word_start..before_space];
+                let word = state.input.get(word_start..before_space).unwrap_or("");
                 if let Some(cmd_name) = word.strip_prefix('/') {
                     let cmd_content =
                         PromptState::get(state).commands.iter().find(|c| c.id == cmd_name).map(|c| c.content.clone());
@@ -110,9 +81,9 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                         // Replace /command<space> with sentinel
                         state.input = format!(
                             "{}{}\n{}",
-                            &state.input[..word_start],
+                            state.input.get(..word_start).unwrap_or(""),
                             sentinel,
-                            &state.input[state.input_cursor..],
+                            state.input.get(state.input_cursor..).unwrap_or(""),
                         );
                         state.input_cursor = word_start + sentinel.len() + 1;
                     }
@@ -149,7 +120,11 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     }
                     if bytes[scan] == 0 {
                         // Remove the entire sentinel from scan..cursor
-                        state.input = format!("{}{}", &state.input[..scan], &state.input[state.input_cursor..]);
+                        state.input = format!(
+                            "{}{}",
+                            state.input.get(..scan).unwrap_or(""),
+                            state.input.get(state.input_cursor..).unwrap_or("")
+                        );
                         state.input_cursor = scan;
                     }
                 } else if state.input_cursor >= 2 && bytes[state.input_cursor - 1].is_ascii_digit() {
@@ -168,17 +143,28 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                         if end < bytes.len() && bytes[end] == 0 {
                             end += 1; // include closing \x00
                         }
-                        state.input = format!("{}{}", &state.input[..scan], &state.input[end..]);
+                        state.input = format!(
+                            "{}{}",
+                            state.input.get(..scan).unwrap_or(""),
+                            state.input.get(end..).unwrap_or("")
+                        );
                         state.input_cursor = scan;
                     } else {
                         // Not a sentinel — normal backspace
-                        let prev = state.input[..state.input_cursor].char_indices().last().map_or(0, |(i, _)| i);
+                        let prev = state
+                            .input
+                            .get(..state.input_cursor)
+                            .unwrap_or("")
+                            .char_indices()
+                            .last()
+                            .map_or(0, |(i, _)| i);
                         let _r = state.input.remove(prev);
                         state.input_cursor = prev;
                     }
                 } else {
                     // Normal backspace — remove one character
-                    let prev = state.input[..state.input_cursor].char_indices().last().map_or(0, |(i, _)| i);
+                    let prev =
+                        state.input.get(..state.input_cursor).unwrap_or("").char_indices().last().map_or(0, |(i, _)| i);
                     let _r = state.input.remove(prev);
                     state.input_cursor = prev;
                 }
@@ -193,7 +179,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::CursorWordLeft => {
             if state.input_cursor > 0 {
-                let before = &state.input[..state.input_cursor];
+                let before = state.input.get(..state.input_cursor).unwrap_or("");
                 let trimmed = before.trim_end();
                 if trimmed.is_empty() {
                     state.input_cursor = 0;
@@ -207,9 +193,9 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::CursorWordRight => {
             if state.input_cursor < state.input.len() {
-                let after = &state.input[state.input_cursor..];
+                let after = state.input.get(state.input_cursor..).unwrap_or("");
                 let skip_word = after.find(|c: char| c.is_whitespace()).unwrap_or(after.len());
-                let remaining = &after[skip_word..];
+                let remaining = after.get(skip_word..).unwrap_or("");
                 let skip_space = remaining.find(|c: char| !c.is_whitespace()).unwrap_or(remaining.len());
                 state.input_cursor += skip_word + skip_space;
                 state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
@@ -218,35 +204,43 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::DeleteWordLeft => {
             if state.input_cursor > 0 {
-                let before = &state.input[..state.input_cursor];
+                let before = state.input.get(..state.input_cursor).unwrap_or("");
                 let trimmed = before.trim_end();
                 let word_start = if trimmed.is_empty() {
                     0
                 } else {
                     trimmed.rfind(|c: char| c.is_whitespace()).map_or(0, |i| i + 1)
                 };
-                state.input = format!("{}{}", &state.input[..word_start], &state.input[state.input_cursor..]);
+                state.input = format!(
+                    "{}{}",
+                    state.input.get(..word_start).unwrap_or(""),
+                    state.input.get(state.input_cursor..).unwrap_or("")
+                );
                 state.input_cursor = word_start;
             }
             ActionResult::Nothing
         }
         Action::RemoveListItem => {
             if state.input_cursor > 0 {
-                let before = &state.input[..state.input_cursor];
+                let before = state.input.get(..state.input_cursor).unwrap_or("");
                 let line_start = before.rfind('\n').map_or(0, |i| i + 1);
-                state.input = format!("{}{}", &state.input[..line_start], &state.input[state.input_cursor..]);
+                state.input = format!(
+                    "{}{}",
+                    state.input.get(..line_start).unwrap_or(""),
+                    state.input.get(state.input_cursor..).unwrap_or("")
+                );
                 state.input_cursor = line_start;
             }
             ActionResult::Nothing
         }
         Action::CursorHome => {
-            let before_cursor = &state.input[..state.input_cursor];
+            let before_cursor = state.input.get(..state.input_cursor).unwrap_or("");
             state.input_cursor = before_cursor.rfind('\n').map_or(0, |i| i + 1);
             state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
             ActionResult::Nothing
         }
         Action::CursorEnd => {
-            let after_cursor = &state.input[state.input_cursor..];
+            let after_cursor = state.input.get(state.input_cursor..).unwrap_or("");
             state.input_cursor += after_cursor.find('\n').unwrap_or(after_cursor.len());
             state.input_cursor = eject_cursor_from_sentinel(&state.input, state.input_cursor);
             ActionResult::Nothing

@@ -116,3 +116,12 @@
 13:12:32.198320148 fmt src/modules/conversation/render.rs
 13:12:49.273114268 fmt src/modules/conversation/render.rs
 13:14:32.310396430 fmt src/modules/conversation/render.rs
+13:23:06.799647791 fmt crates/cp-mod-tree/src/tools.rs
+13:23:24.050181720 fmt crates/cp-mod-tree/src/panel.rs
+13:23:43.380101214 fmt crates/cp-mod-tree/src/panel.rs
+13:25:44.489908757 fmt src/app/actions/helpers.rs
+13:25:58.515239411 fmt src/app/actions/mod.rs
+13:26:51.062226638 fmt crates/cp-mod-firecrawl/src/api.rs
+13:26:55.670010031 fmt crates/cp-mod-brave/src/api.rs
+13:26:58.374893029 fmt crates/cp-mod-firecrawl/src/api.rs
+13:26:58.429953690 fmt crates/cp-mod-brave/src/api.rs

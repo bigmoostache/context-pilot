@@ -149,13 +149,13 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
     let next_user_id = messages
         .iter()
         .filter(|m| m.id.starts_with('U'))
-        .filter_map(|m| m.id[1..].parse::<usize>().ok())
+        .filter_map(|m| m.id.get(1..).unwrap_or("").parse::<usize>().ok())
         .max()
         .map_or(1, |n| n + 1);
     let next_assistant_id = messages
         .iter()
         .filter(|m| m.id.starts_with('A'))
-        .filter_map(|m| m.id[1..].parse::<usize>().ok())
+        .filter_map(|m| m.id.get(1..).unwrap_or("").parse::<usize>().ok())
         .max()
         .map_or(1, |n| n + 1);
 

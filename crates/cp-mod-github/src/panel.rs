@@ -112,8 +112,11 @@ impl Panel for GithubResultPanel {
             && ctx.context_type == ContextType::GITHUB_RESULT
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
-            let short =
-                if cmd.len() > 40 { format!("{}...", &cmd[..cmd.floor_char_boundary(37)]) } else { cmd.to_string() };
+            let short = if cmd.len() > 40 {
+                format!("{}...", &cmd.get(..cmd.floor_char_boundary(37)).unwrap_or(""))
+            } else {
+                cmd.to_string()
+            };
             return short;
         }
         "GitHub Result".to_string()

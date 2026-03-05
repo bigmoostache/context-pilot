@@ -12,9 +12,9 @@ use crate::GH_CMD_TIMEOUT_SECS;
 #[must_use]
 pub fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String) {
     let (headers, body) = if let Some(pos) = stdout.find("\r\n\r\n") {
-        (&stdout[..pos], &stdout[pos + 4..])
+        (stdout.get(..pos).unwrap_or(""), stdout.get(pos + 4..).unwrap_or(""))
     } else if let Some(pos) = stdout.find("\n\n") {
-        (&stdout[..pos], &stdout[pos + 2..])
+        (stdout.get(..pos).unwrap_or(""), stdout.get(pos + 2..).unwrap_or(""))
     } else {
         return (None, None, stdout.to_string());
     };
@@ -30,7 +30,11 @@ pub fn parse_api_response(stdout: &str) -> (Option<String>, Option<u64>, String)
 pub fn extract_header(headers: &str, name: &str) -> Option<String> {
     let prefix = format!("{name}:");
     headers.lines().find_map(|line| {
-        if line.to_lowercase().starts_with(&prefix) { Some(line[prefix.len()..].trim().to_string()) } else { None }
+        if line.to_lowercase().starts_with(&prefix) {
+            Some(line.get(prefix.len()..).unwrap_or("").trim().to_string())
+        } else {
+            None
+        }
     })
 }
 
@@ -120,7 +124,7 @@ fn extract_json_string(json: &str, key: &str) -> Option<String> {
     let pattern = format!("\"{key}\":\"");
     if let Some(start) = json.find(&pattern) {
         let value_start = start + pattern.len();
-        let rest = &json[value_start..];
+        let rest = json.get(value_start..).unwrap_or("");
         let mut end = 0;
         let mut escaped = false;
         for ch in rest.chars() {
@@ -133,7 +137,7 @@ fn extract_json_string(json: &str, key: &str) -> Option<String> {
             }
             end += ch.len_utf8();
         }
-        return Some(rest[..end].to_string());
+        return Some(rest.get(..end).unwrap_or("").to_string());
     }
     None
 }
@@ -143,7 +147,7 @@ fn extract_json_u64(json: &str, key: &str) -> Option<u64> {
     let pattern = format!("\"{key}\":");
     if let Some(start) = json.find(&pattern) {
         let value_start = start + pattern.len();
-        let rest = json[value_start..].trim_start();
+        let rest = json.get(value_start..).unwrap_or("").trim_start();
         let num_str: String = rest.chars().take_while(char::is_ascii_digit).collect();
         return num_str.parse().ok();
     }

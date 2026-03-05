@@ -36,7 +36,11 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         if let Err(e) = validate_tldr(&content) {
-            errors.push(format!("Memory '{}...': {}", &content[..content.floor_char_boundary(30)], e));
+            errors.push(format!(
+                "Memory '{}...': {}",
+                &content.get(..content.floor_char_boundary(30)).unwrap_or(""),
+                e
+            ));
             continue;
         }
 
@@ -59,8 +63,11 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         ms.next_memory_id += 1;
         ms.memories.push(MemoryItem { id: id.clone(), tl_dr: content.clone(), contents, importance, labels });
 
-        let preview =
-            if content.len() > 40 { format!("{}...", &content[..content.floor_char_boundary(37)]) } else { content };
+        let preview = if content.len() > 40 {
+            format!("{}...", &content.get(..content.floor_char_boundary(37)).unwrap_or(""))
+        } else {
+            content
+        };
         created.push(format!("{} [{}]: {}", id, importance.as_str(), preview));
     }
 

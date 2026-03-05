@@ -70,7 +70,7 @@ pub(crate) fn parse_sse_line(line: &str) -> Option<StreamResponse> {
     if !line.starts_with("data: ") {
         return None;
     }
-    let json_str = &line[6..];
+    let json_str = line.get(6..).unwrap_or("");
     if json_str == "[DONE]" {
         return None;
     }

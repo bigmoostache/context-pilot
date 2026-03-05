@@ -51,7 +51,7 @@ pub(crate) fn find_normalized_match<'a>(haystack: &'a str, needle: &str) -> Opti
         let match_end_idx = start_idx + needle_lines.len() - 1;
         let match_end = line_positions[match_end_idx].1;
 
-        return Some(&haystack[match_start..match_end]);
+        return Some(haystack.get(match_start..match_end).unwrap_or(""));
     }
 
     None
@@ -84,7 +84,7 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
 
         if total_score > 0 && best_match.as_ref().is_none_or(|b| total_score > b.1) {
             let preview = if norm_line.len() > 60 {
-                format!("{}...", &norm_line[..norm_line.floor_char_boundary(60)])
+                format!("{}...", &norm_line.get(..norm_line.floor_char_boundary(60)).unwrap_or(""))
             } else {
                 norm_line.to_string()
             };
@@ -153,7 +153,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         let needle_preview = if old_string.len() > 50 {
-            format!("{}...", &old_string[..old_string.floor_char_boundary(50)])
+            format!("{}...", &old_string.get(..old_string.floor_char_boundary(50)).unwrap_or(""))
         } else {
             old_string.to_string()
         };

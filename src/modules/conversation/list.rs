@@ -60,8 +60,8 @@ pub(super) fn detect_list_action(input: &str) -> Option<ListAction> {
 
     // Ordered (numeric or alphabetic): exactly "X. " with nothing after
     if let Some(dot_pos) = trimmed.find(". ") {
-        let marker = &trimmed[..dot_pos];
-        let after = &trimmed[dot_pos + 2..];
+        let marker = trimmed.get(..dot_pos).unwrap_or("");
+        let after = trimmed.get(dot_pos + 2..).unwrap_or("");
         if after.is_empty() {
             // Check if it's a valid marker (numeric or alphabetic)
             let is_numeric = marker.chars().all(|c| c.is_ascii_digit());
@@ -77,14 +77,14 @@ pub(super) fn detect_list_action(input: &str) -> Option<ListAction> {
     // Check for NON-EMPTY list items - continue the list
     // Unordered list: "- text" or "* text"
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-        let prefix = &trimmed[..2];
+        let prefix = trimmed.get(..2).unwrap_or("");
         let indent = current_line.len() - trimmed.len();
         return Some(ListAction::Continue(format!("\n{}{}", " ".repeat(indent), prefix)));
     }
 
     // Ordered list: "1. text", "a. text", "A. text", etc.
     if let Some(dot_pos) = trimmed.find(". ") {
-        let marker = &trimmed[..dot_pos];
+        let marker = trimmed.get(..dot_pos).unwrap_or("");
         let indent = current_line.len() - trimmed.len();
 
         // Numeric: 1, 2, 3, ...

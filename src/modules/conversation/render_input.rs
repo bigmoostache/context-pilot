@@ -40,7 +40,7 @@ fn expand_paste_sentinels(
             }
             if i < bytes.len() {
                 // Found closing \x00
-                let idx_str = &input[idx_start..i];
+                let idx_str = input.get(idx_start..i).unwrap_or("");
                 i += 1; // skip closing \x00
                 let sentinel_len = i - start;
 
@@ -84,14 +84,14 @@ fn expand_paste_sentinels(
                     result.push_str(placeholder);
                 } else {
                     // Invalid index — keep as-is
-                    result.push_str(&input[start..i]);
+                    result.push_str(input.get(start..i).unwrap_or(""));
                 }
             } else {
                 // No closing \x00 — keep as-is
-                result.push_str(&input[start..]);
+                result.push_str(input.get(start..).unwrap_or(""));
             }
         } else {
-            let ch = input[i..].chars().next().unwrap_or('\0');
+            let ch = input.get(i..).unwrap_or("").chars().next().unwrap_or('\0');
             result.push(ch);
             i += ch.len_utf8();
         }
@@ -130,7 +130,7 @@ pub(super) fn render_input(
     let input_with_cursor = if cursor >= input.len() {
         format!("{input}{cursor_char}")
     } else {
-        format!("{}{}{}", &input[..cursor], cursor_char, &input[cursor..])
+        format!("{}{}{}", input.get(..cursor).unwrap_or(""), cursor_char, input.get(cursor..).unwrap_or(""))
     };
 
     if input.is_empty() {
@@ -309,9 +309,9 @@ fn build_text_spans(text: &str, cursor_char: &str, command_ids: &[String], _full
 
     // Check if text starts with / and find the command token
     let (matched_cmd_len, is_command) = if trimmed.starts_with('/') && !command_ids.is_empty() {
-        let after_slash = &trimmed[1..];
+        let after_slash = trimmed.get(1..).unwrap_or("");
         let cmd_end = after_slash.find(|c: char| c.is_whitespace()).unwrap_or(after_slash.len());
-        let cmd_id = &after_slash[..cmd_end];
+        let cmd_id = after_slash.get(..cmd_end).unwrap_or("");
         if command_ids.iter().any(|id| id == cmd_id) {
             // +1 for the slash itself
             (leading_spaces + 1 + cmd_end, true)
@@ -369,7 +369,7 @@ fn build_command_hints(clean_line: &str, command_ids: &[String]) -> Vec<Span<'st
         return vec![];
     }
 
-    let partial = &trimmed[1..]; // after the slash
+    let partial = trimmed.get(1..).unwrap_or(""); // after the slash
     // If there's a space, user is past the command name — no hints
     if partial.contains(' ') {
         return vec![];

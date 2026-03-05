@@ -106,8 +106,9 @@ impl Panel for TreePanel {
             spans.push(Span::styled(" ".to_string(), Style::default().fg(theme::text())));
 
             // Check for description (after " - ")
-            let (main_line, description) =
-                line.find(" - ").map_or((line, None), |desc_idx| (&line[..desc_idx], Some(&line[desc_idx..])));
+            let (main_line, description) = line.find(" - ").map_or((line, None), |desc_idx| {
+                (line.get(..desc_idx).unwrap_or(""), Some(line.get(desc_idx..).unwrap_or("")))
+            });
 
             // Parse the main part
             if let Some(size_start) = find_size_pattern(main_line) {
@@ -115,9 +116,9 @@ impl Panel for TreePanel {
                 spans.push(Span::styled(before_size.to_string(), Style::default().fg(theme::text())));
                 spans.push(Span::styled(size_part.to_string(), Style::default().fg(theme::accent_dim())));
             } else if let Some((start, end)) = find_children_pattern(main_line) {
-                let before = &main_line[..start];
-                let children_part = &main_line[start..end];
-                let after = &main_line[end..];
+                let before = main_line.get(..start).unwrap_or("");
+                let children_part = main_line.get(start..end).unwrap_or("");
+                let after = main_line.get(end..).unwrap_or("");
                 spans.push(Span::styled(before.to_string(), Style::default().fg(theme::text())));
                 spans.push(Span::styled(children_part.to_string(), Style::default().fg(theme::accent())));
                 if !after.is_empty() {

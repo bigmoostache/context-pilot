@@ -87,7 +87,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let count = current_content.matches(old_string).count();
     if count == 0 {
         let preview = if old_string.len() > 50 {
-            format!("{}...", &old_string[..old_string.floor_char_boundary(50)])
+            format!("{}...", &old_string.get(..old_string.floor_char_boundary(50)).unwrap_or(""))
         } else {
             old_string.to_string()
         };

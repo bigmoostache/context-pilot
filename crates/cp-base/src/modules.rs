@@ -35,7 +35,7 @@ pub fn truncate_output(output: &str, max_bytes: usize) -> String {
     if output.len() <= max_bytes {
         output.to_string()
     } else {
-        let truncated = &output[..output.floor_char_boundary(max_bytes)];
+        let truncated = &output.get(..output.floor_char_boundary(max_bytes)).unwrap_or("");
         format!("{truncated}\n\n[Output truncated at 1MB]")
     }
 }

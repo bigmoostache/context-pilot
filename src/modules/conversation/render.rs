@@ -420,7 +420,7 @@ fn read_json_value(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>, f
                     }
                 }
             }
-            full[start..end].to_string()
+            full.get(start..end).unwrap_or("").to_string()
         }
         Some(_) => {
             // Number, bool, null — read until delimiter
@@ -486,7 +486,7 @@ fn render_param_lines(
 /// Truncate a single line, adding ellipsis if it exceeds the max width.
 fn truncate_single_line(val: &str, max_width: usize) -> String {
     if val.len() > max_width {
-        format!("{}…", &val[..val.floor_char_boundary(max_width.saturating_sub(1))])
+        format!("{}…", &val.get(..val.floor_char_boundary(max_width.saturating_sub(1))).unwrap_or(""))
     } else {
         val.to_string()
     }

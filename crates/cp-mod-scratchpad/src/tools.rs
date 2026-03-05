@@ -27,8 +27,11 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Update Scratchpad panel timestamp
     state.touch_panel(ContextType::SCRATCHPAD);
 
-    let preview =
-        if contents.len() > 50 { format!("{}...", &contents[..contents.floor_char_boundary(47)]) } else { contents };
+    let preview = if contents.len() > 50 {
+        format!("{}...", &contents.get(..contents.floor_char_boundary(47)).unwrap_or(""))
+    } else {
+        contents
+    };
 
     ToolResult::new(tool.id.clone(), format!("Created cell {id} '{title}': {preview}"), false)
 }

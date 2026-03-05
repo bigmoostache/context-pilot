@@ -62,7 +62,7 @@ meta_variable_misuse = "deny"
 # Missing Copy on types that could derive it
 missing_copy_implementations = "warn"
 # Missing docs on public items
-missing_docs = "warn"
+missing_docs = "deny"
 # Missing unsafe on extern blocks (2024)
 missing_unsafe_on_extern = "deny"
 # Non-ASCII identifiers
@@ -308,12 +308,12 @@ while_true = "deny"
 needless_pass_by_value = "warn"
 cloned_instead_of_copied = "warn"
 redundant_clone = "warn"
-large_enum_variant = "warn"
+large_enum_variant = "deny"
 # Clarity
 needless_return = "warn"
 manual_let_else = "warn"
 match_wildcard_for_single_variants = "warn"
-implicit_clone = "warn"
+implicit_clone = "deny"
 # Safety / correctness
 cast_possible_truncation = "warn"
 cast_sign_loss = "warn"
@@ -337,19 +337,19 @@ checked_conversions = "warn"
 # Collapse `else { if ... }` into `else if ...`
 collapsible_else_if = "warn"
 # Prefer if/else chains over match for ordered comparisons
-comparison_chain = "warn"
+comparison_chain = "deny"
 # Derive Copy on iterators that can be copied
 copy_iterator = "warn"
 # Use Type::default() instead of Default::default()
-default_trait_access = "warn"
+default_trait_access = "deny"
 # Detect broken intra-doc links
 doc_broken_link = "warn"
 # Detect accidental double-space linebreaks in doc comments
-doc_comment_double_space_linebreaks = "warn"
+doc_comment_double_space_linebreaks = "deny"
 # Detect quoted links in doc comments
-doc_link_with_quotes = "warn"
+doc_link_with_quotes = "deny"
 # Detect unformatted markdown in doc comments
-doc_markdown = "warn"
+doc_markdown = "deny"
 # Detect lifetimes that could be elided
 elidable_lifetime_names = "warn"
 # Detect empty enums that should be ! (never type)
@@ -365,11 +365,11 @@ filter_map_next = "warn"
 # Prefer `filter_map` over `filter().map()` with Option
 flat_map_option = "warn"
 # Warn on `==` comparison of floats (use approx comparison)
-float_cmp = "warn"
+float_cmp = "deny"
 # Flag functions with >3 bool parameters
-fn_params_excessive_bools = "warn"
+fn_params_excessive_bools = "deny"
 # Prefer `.collect()` over `FromIterator::from_iter()`
-from_iter_instead_of_collect = "warn"
+from_iter_instead_of_collect = "deny"
 # Prefer `if x` over `if !x { } else { }`
 if_not_else = "warn"
 # Require reason on `#[ignore]` test attributes
@@ -377,43 +377,43 @@ ignore_without_reason = "warn"
 # Use `_` for ignored unit patterns in match arms
 ignored_unit_patterns = "warn"
 # Prefer generic `S: BuildHasher` over concrete `HashMap`/`HashSet`
-implicit_hasher = "warn"
+implicit_hasher = "deny"
 # Prefer consistent field ordering matching struct definition
 inconsistent_struct_constructor = "warn"
 # Use slice patterns `[first, ..]` instead of `v[0]` on refutable slices
 index_refutable_slice = "warn"
 # Prefer `to_string()` on `&str` over `String::from()` or `.to_owned()`
-inefficient_to_string = "warn"
+inefficient_to_string = "deny"
 # Suggest adding `iter()` method when `IntoIterator` is implemented
-into_iter_without_iter = "warn"
+into_iter_without_iter = "deny"
 # Warn on items (fn, struct, etc.) defined after statements in a block
-items_after_statements = "warn"
+items_after_statements = "deny"
 # Prefer `.flatten()` over `.filter(Result::is_ok).map(Result::unwrap)`
 iter_filter_is_ok = "warn"
 # Prefer `.flatten()` over `.filter(Option::is_some).map(Option::unwrap)`
 iter_filter_is_some = "warn"
 # Iterator-returning methods should return a type named `*Iter*`
-iter_not_returning_iterator = "warn"
+iter_not_returning_iterator = "deny"
 # Suggest adding `into_iter()` method when `iter()` is implemented
-iter_without_into_iter = "warn"
+iter_without_into_iter = "deny"
 # Detect large futures that should be boxed
-large_futures = "warn"
+large_futures = "deny"
 # Detect large stack arrays that should be heap-allocated
-large_stack_arrays = "warn"
+large_stack_arrays = "deny"
 # Detect large types passed by value that should be references
-large_types_passed_by_value = "warn"
+large_types_passed_by_value = "deny"
 # Prefer `assert!` over `if !cond { panic!() }`
-manual_assert = "warn"
+manual_assert = "deny"
 # Prefer `elapsed()` over `Instant::now() - start`
 manual_instant_elapsed = "warn"
 # Prefer `matches!()` over `if let Some/Ok/Err/None`
 manual_is_variant_and = "warn"
 # Prefer `String::new()` over `String::from("")` or `"".to_string()`
-manual_string_new = "warn"
+manual_string_new = "deny"
 # Flag functions with many single-character variable names
-many_single_char_names = "warn"
+many_single_char_names = "deny"
 # Prefer `map_or`/`map_or_else` over `map().unwrap_or()`
-map_unwrap_or = "warn"
+map_unwrap_or = "deny"
 
 # ============================
 # Suspicious → deny
@@ -596,11 +596,11 @@ unnecessary_result_map_or_else = "warn"
 # Match on bool — prefer if/else
 match_bool = "warn"
 # Identical match arms that can be combined
-match_same_arms = "warn"
+match_same_arms = "deny"
 # match result { Err(_) => ... } — use specific error
 match_wild_err_arm = "warn"
 # Public functions returning Result should document errors
-missing_errors_doc = "warn"
+missing_errors_doc = "deny"
 # Custom Debug impls should include all fields
 missing_fields_in_debug = "warn"
 
@@ -608,9 +608,9 @@ missing_fields_in_debug = "warn"
 # Pedantic → warn (C12)
 # ============================
 # Public functions that can panic should document it
-missing_panics_doc = "warn"
+missing_panics_doc = "deny"
 # Functions returning useful values should be #[must_use]
-must_use_candidate = "warn"
+must_use_candidate = "deny"
 # Prefer logical operators (&&/||) over bitwise (&/|) for bools
 needless_bitwise_bool = "warn"
 # Prefer restructuring loop over `continue`
@@ -636,9 +636,9 @@ ptr_cast_constness = "warn"
 # Pedantic → warn (C14)
 # ============================
 # Prefer `0..n` over `0..=n-1`
-range_minus_one = "warn"
+range_minus_one = "deny"
 # Prefer `0..=n` over `0..n+1`
-range_plus_one = "warn"
+range_plus_one = "deny"
 # Use method reference instead of closure: `.map(|x| x.to_string())` → `.map(ToString::to_string)`
 redundant_closure_for_method_calls = "warn"
 # Use ptr::from_ref() / ptr::from_mut() instead of `&x as *const T`
@@ -652,13 +652,13 @@ ref_option = "warn"
 # Detect `Option<&Option<T>>` — usually a mistake
 ref_option_ref = "warn"
 # Methods returning `Self` should be `#[must_use]`
-return_self_not_must_use = "warn"
+return_self_not_must_use = "deny"
 # Detect identical function calls in both branches of an if/else
 same_functions_in_if_condition = "warn"
 # `#[should_panic]` tests should specify `expected` string
 should_panic_without_expect = "warn"
 # Use unstable sort for primitives (faster, no allocation)
-stable_sort_primitive = "warn"
+stable_sort_primitive = "deny"
 
 # ============================
 # Pedantic → warn (C16)
@@ -670,7 +670,7 @@ string_add_assign = "warn"
 # Flag structs with >3 bool fields
 struct_excessive_bools = "warn"
 # Detect field names that redundantly include the struct name
-struct_field_names = "warn"
+struct_field_names = "deny"
 # Use ptr::cast instead of transmute between pointer types
 transmute_ptr_to_ptr = "warn"
 
@@ -684,9 +684,9 @@ uninlined_format_args = "warn"
 # Return T instead of Box<T> when the type is known at compile time
 unnecessary_box_returns = "warn"
 # Use `collect::<String>()` instead of `collect::<Vec<_>>().join("")`
-unnecessary_join = "warn"
+unnecessary_join = "deny"
 # Don't wrap return values in Option/Result when they're always Some/Ok
-unnecessary_wraps = "warn"
+unnecessary_wraps = "deny"
 
 # ============================
 # Pedantic → warn (C18)
@@ -694,7 +694,7 @@ unnecessary_wraps = "warn"
 # Flatten nested `A | B | C` patterns in match arms
 unnested_or_patterns = "warn"
 # Add underscores for readability: `1_000_000` not `1000000`
-unreadable_literal = "warn"
+unreadable_literal = "deny"
 # Warn when Deserialize is derived on a struct with unsafe fields
 unsafe_derive_deserialize = "warn"
 # Detect async functions that don't use .await
@@ -712,7 +712,7 @@ used_underscore_items = "warn"
 # Prefer `.count_ones() != 0` over `x & (x - 1) != 0` for power-of-two checks
 verbose_bit_mask = "warn"
 # Prefer explicit imports over glob `use foo::*`
-wildcard_imports = "warn"
+wildcard_imports = "deny"
 # Use `HashSet` instead of `HashMap<K, ()>`
 zero_sized_map_values = "warn"
 
@@ -746,39 +746,43 @@ derive_partial_eq_without_eq = "warn"
 # `impl From<T>` that can panic — use `TryFrom` instead
 fallible_impl_from = "warn"
 # Futures that are not `Send` — problematic for multi-threaded executors
-future_not_send = "warn"
+future_not_send = "deny"
 # Functions that could be `const fn` but aren't
 missing_const_for_fn = "warn"
 # `&mut T` parameter that doesn't need mutability — use `&T`
 needless_pass_by_ref_mut = "warn"
 # Prefer `map_or` / `map_or_else` over `if let Some(x) = opt { ... } else { ... }`
-option_if_let_else = "warn"
+option_if_let_else = "deny"
 # Lock/guard held across match scrutinee — potential deadlock
-significant_drop_in_scrutinee = "warn"
+significant_drop_in_scrutinee = "deny"
 # Drop guards held longer than needed — tighten scope
-significant_drop_tightening = "warn"
+significant_drop_tightening = "deny"
 # `T: A + B` where `B: A` — `A` bound is redundant
-trait_duplication_in_bounds = "warn"
+trait_duplication_in_bounds = "deny"
 # Same as above but for `where` clauses
-type_repetition_in_bounds = "warn"
+type_repetition_in_bounds = "deny"
 # `Foo { a: a, b: b }` where fields already match — use `Foo { a, b }`
-unnecessary_struct_initialization = "warn"
+unnecessary_struct_initialization = "deny"
 # Use `Self` instead of the type name inside impl blocks
-use_self = "warn"
+use_self = "deny"
+# Flag `Mutex<T>` where `AtomicT` would suffice — avoid lock overhead
+mutex_atomic = "deny"
+# Flag `let mut v = Vec::new(); v.push(x);` — use `vec![x]` or `with_capacity`
+vec_init_then_push = "deny"
 
 # ============================
 # Restriction → warn (carefully selected)
 # ============================
 # Flag bare #[allow(...)] — prefer #[expect(...)] which errors when lint no longer fires
-allow_attributes = "warn"
+allow_attributes = "deny"
 # Require reason on all #[allow/expect] — forces documentation of suppression rationale
-allow_attributes_without_reason = "warn"
+allow_attributes_without_reason = "deny"
 # Flag `cfg(not(test))` — usually a code smell, prefer `cfg(test)` with inverted logic
 cfg_not_test = "warn"
 # Use `Arc::clone(&x)` instead of `x.clone()` — makes ref-count clone explicit
 clone_on_ref_ptr = "warn"
 # Flag `dbg!()` macro — should not ship to production
-dbg_macro = "warn"
+dbg_macro = "deny"
 # Flag empty `Drop` impls — `impl Drop for T {}` is a no-op that prevents optimizations
 empty_drop = "warn"
 # Flag `Foo {}` on unit variants — prefer `Foo` without brackets
@@ -814,7 +818,7 @@ rest_pat_in_fully_bound_structs = "warn"
 # Flag `String + &str` concatenation — prefer `format!()` or `push_str()`
 string_add = "warn"
 # Flag `todo!()` — should not ship to production
-todo = "warn"
+todo = "deny"
 # Require `// SAFETY:` comment on all unsafe blocks
 undocumented_unsafe_blocks = "warn"
 # Flag `unimplemented!()` — should not ship to production
@@ -829,6 +833,12 @@ unreachable = "warn"
 unwrap_used = "warn"
 # Flag `_` in match on non-exhaustive enums — be explicit about variants
 wildcard_enum_match_arm = "warn"
+# Flag `std::mem::forget()` — prevents memory/resource leaks
+mem_forget = "deny"
+# Flag `Rc<Mutex<T>>` — almost always a design error, use `Arc<Mutex<T>>`
+rc_mutex = "deny"
+# Flag `&str[start..end]` slicing — may panic on UTF-8 boundaries
+string_slice = "deny"
 
 # ============================
 # Cargo → warn

@@ -197,7 +197,7 @@ impl LlmClient for AnthropicClient {
             }
             last_lines.push(line.to_string());
 
-            let json_str = &line[6..];
+            let json_str = line.get(6..).unwrap_or("");
             if json_str == "[DONE]" {
                 break;
             }

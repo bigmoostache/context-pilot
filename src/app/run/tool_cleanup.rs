@@ -159,7 +159,7 @@ impl App {
             } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
                 // Callback blocking sentinel: format is "SENTINEL{sentinel_id}{original_content}"
                 // Extract sentinel_id and original content, then merge with callback result
-                let after_sentinel = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
+                let after_sentinel = &tr.content.get(CONSOLE_WAIT_BLOCKING_SENTINEL.len()..).unwrap_or("");
                 // Find matching watcher result by sentinel_id prefix
                 let matched_result = blocking_results
                     .iter()
@@ -167,7 +167,7 @@ impl App {
                 if let Some(result) = matched_result
                     && let Some(sentinel_id) = result.tool_use_id.as_ref()
                 {
-                    let original_content = &after_sentinel[sentinel_id.len()..];
+                    let original_content = &after_sentinel.get(sentinel_id.len()..).unwrap_or("");
                     // Collect ALL blocking results for this sentinel (multiple callbacks)
                     let all_matched: Vec<&str> = blocking_results
                         .iter()
@@ -203,7 +203,7 @@ impl App {
                     tr.content = "Console wait result unavailable (watcher expired or was interrupted)".to_string();
                 } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
                     // Callback sentinel: extract original content after sentinel+id prefix
-                    let after = &tr.content[CONSOLE_WAIT_BLOCKING_SENTINEL.len()..];
+                    let after = &tr.content.get(CONSOLE_WAIT_BLOCKING_SENTINEL.len()..).unwrap_or("");
                     // Try to find where the original content starts (after sentinel_id)
                     tr.content = format!("Callback result unavailable (timeout). Original: {after}");
                 }
@@ -419,7 +419,7 @@ pub(super) fn execute_queue_flush(
         let status = if result.is_error { "ERROR" } else { "ok" };
         let short = if result.content.len() > 100 {
             let end = result.content.floor_char_boundary(97);
-            format!("{}...", &result.content[..end])
+            format!("{}...", result.content.get(..end).unwrap_or(""))
         } else {
             result.content.clone()
         };

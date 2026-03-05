@@ -41,8 +41,12 @@ impl App {
                     // Update the input text: replace @<old_query> with @<new_query>
                     let anchor = ac.anchor_pos;
                     let old_cursor = self.state.input_cursor;
-                    self.state.input =
-                        format!("{}@{}{}", &self.state.input[..anchor], new_query, &self.state.input[old_cursor..]);
+                    self.state.input = format!(
+                        "{}@{}{}",
+                        self.state.input.get(..anchor).unwrap_or(""),
+                        new_query,
+                        self.state.input.get(old_cursor..).unwrap_or("")
+                    );
                     self.state.input_cursor = anchor + 1 + new_query.len(); // +1 for '@'
 
                     // Refresh entries for the new directory
@@ -64,8 +68,12 @@ impl App {
                     ac.deactivate();
                     let cursor = self.state.input_cursor;
                     // Replace @<query> with the full file path (remove the @)
-                    self.state.input =
-                        format!("{}{} {}", &self.state.input[..anchor], full_path, &self.state.input[cursor..]);
+                    self.state.input = format!(
+                        "{}{} {}",
+                        self.state.input.get(..anchor).unwrap_or(""),
+                        full_path,
+                        self.state.input.get(cursor..).unwrap_or("")
+                    );
                     self.state.input_cursor = anchor + full_path.len() + 1; // +1 for space
                 }
             }
@@ -86,8 +94,12 @@ impl App {
                     // Rebuild: everything before @, then @query, then everything after old cursor
                     let rest_start = after_at + query.len() + 1; // +1 for the removed char
                     if rest_start <= old_len {
-                        self.state.input =
-                            format!("{}@{}{}", &self.state.input[..anchor], query, &self.state.input[rest_start..]);
+                        self.state.input = format!(
+                            "{}@{}{}",
+                            self.state.input.get(..anchor).unwrap_or(""),
+                            query,
+                            self.state.input.get(rest_start..).unwrap_or("")
+                        );
                     }
 
                     // Refresh matches

@@ -241,7 +241,7 @@ fn visualize_memory_output(content: &str, width: usize) -> Vec<ratatui::text::Li
         };
 
         let display = if line.len() > width {
-            format!("{}...", &line[..line.floor_char_boundary(width.saturating_sub(3))])
+            format!("{}...", &line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
         } else {
             line.to_string()
         };

@@ -45,15 +45,15 @@ pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
     }
 
     // Find the closing ---
-    let after_first = &trimmed[3..];
+    let after_first = trimmed.get(3..).unwrap_or("");
     let Some(end) = after_first.find("\n---") else {
         // No closing --- found, treat as plain content
         return (String::new(), String::new(), content.to_string());
     };
 
-    let yaml_block = &after_first[..end];
+    let yaml_block = after_first.get(..end).unwrap_or("");
     let body_start = end + 4; // skip \n---
-    let body = after_first[body_start..].trim_start_matches('\n').to_string();
+    let body = after_first.get(body_start..).unwrap_or("").trim_start_matches('\n').to_string();
 
     let fm: Frontmatter = serde_yaml::from_str(yaml_block).unwrap_or_default();
     (fm.name, fm.description, body)

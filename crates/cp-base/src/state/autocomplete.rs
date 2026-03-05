@@ -185,8 +185,8 @@ impl AutocompleteState {
     /// Split query into `dir_prefix` and `name_prefix` at the last '/'.
     fn split_query(&mut self) {
         if let Some(last_slash) = self.query.rfind('/') {
-            self.dir_prefix = self.query[..last_slash].to_string();
-            self.name_prefix = self.query[last_slash + 1..].to_string();
+            self.dir_prefix = self.query.get(..last_slash).unwrap_or("").to_string();
+            self.name_prefix = self.query.get(last_slash + 1..).unwrap_or("").to_string();
         } else {
             self.dir_prefix.clear();
             self.name_prefix = self.query.clone();
