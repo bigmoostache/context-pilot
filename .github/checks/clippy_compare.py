@@ -21,7 +21,7 @@ LINTS_FILE = SCRIPT_DIR / "clippy_lints_list.md"
 CARGO_TOML = ROOT / "Cargo.toml"
 OUTPUT = ROOT / "clippy_compared_list.md"
 
-EMOJI = {"allow": "\U0001f4a4", "warn": "\u26a0\ufe0f", "deny": "\U0001f6ab"}
+EMOJI = {"allow": "\U0001f4a4", "warn": "\u26a0\ufe0f", "deny": "\U0001f6ab", "forbid": "\u2620\ufe0f"}
 CAT_EMOJI = {
     "style": "\U0001f3a8",
     "correctness": "\U0001f534",
@@ -66,7 +66,7 @@ def parse_cargo_clippy(path: Path) -> dict[str, str]:
     section = match.group(1) if match else ""
     return {
         m.group(1): m.group(2)
-        for m in re.finditer(r'^(\w+)\s*=\s*"(allow|warn|deny)"', section, re.MULTILINE)
+        for m in re.finditer(r'^(\w+)\s*=\s*"(allow|warn|deny|forbid)"', section, re.MULTILINE)
     }
 
 
@@ -75,29 +75,34 @@ def main() -> None:
     configured = parse_cargo_clippy(CARGO_TOML)
 
     rows: list[str] = []
+    forbid_count = 0
     for lint in sorted(defaults, key=lambda l: (categories.get(l, "zzz"), l)):
         default = defaults[lint]
         current = configured.get(lint, default)
-        if current in ("warn", "deny"):
+        # Hide lints that are at forbid level in the current project
+        if current == "forbid":
+            forbid_count += 1
             continue
         cat = categories[lint]
         d_emoji = EMOJI.get(default, "\u2753")
         c_emoji = EMOJI.get(current, "\u2753")
         ce = CAT_EMOJI.get(cat, "")
         changed = "\U0001f504" if default != current else ""
-        rows.append(f"| `{lint}` | {ce} {cat} | {d_emoji} {default} | {c_emoji} {current} | {changed} |")
+        # ⚓ = explicitly pinned at this level in Cargo.toml (not just inherited default)
+        pinned = "\u2693" if lint in configured else ""
+        rows.append(f"| `{lint}` | {ce} {cat} | {d_emoji} {default} | {c_emoji} {current} | {changed} {pinned} |")
 
     overridden = sum(1 for l in defaults if configured.get(l, defaults[l]) != defaults[l])
     header = (
-        "# Clippy Lint Configuration vs Defaults\n\n"
-        f"> **{len(rows)}** total clippy lints — **{overridden}** overridden, "
-        f"**{len(rows) - overridden}** at default\n\n"
+        "# Clippy Lint Configuration — Non-Forbid Lints\n\n"
+        f"> **{len(defaults)}** total clippy lints — **{forbid_count}** at forbid, "
+        f"**{len(rows)}** shown below (not yet at forbid level)\n\n"
         "| Lint | Category | Default | Current | |\n"
         "|------|----------|---------|---------|---|\n"
     )
 
     OUTPUT.write_text(header + "\n".join(rows) + "\n")
-    print(f"Wrote {OUTPUT}: {len(rows)} lints, {overridden} overridden.")
+    print(f"Wrote {OUTPUT}: {len(rows)} non-forbid lints shown ({forbid_count} at forbid, hidden).")
 
 
 if __name__ == "__main__":

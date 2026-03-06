@@ -27,626 +27,670 @@ unicode-width = "0.2"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 
 [workspace.lints.rust]
+ambiguous_associated_items = "forbid"
+ambiguous_glob_imports = "forbid"
+arithmetic_overflow = "forbid"
+binary_asm_labels = "forbid"
+bindings_with_variant_name = "forbid"
+conflicting_repr_hints = "forbid"
+dangerous_implicit_autorefs = "forbid"
+dependency_on_unit_never_type_fallback = "forbid"
+deref_nullptr = "forbid"
+elided_lifetimes_in_associated_constant = "forbid"
+enum_intrinsics_non_enums = "forbid"
+explicit_builtin_cfgs_in_flags = "forbid"
+ill_formed_attribute_input = "forbid"
+incomplete_include = "forbid"
+ineffective_unstable_trait_impl = "forbid"
+invalid_atomic_ordering = "forbid"
+invalid_doc_attributes = "forbid"
+invalid_from_utf8_unchecked = "forbid"
+invalid_macro_export_arguments = "forbid"
+invalid_null_arguments = "forbid"
+invalid_reference_casting = "forbid"
+invalid_type_param_default = "forbid"
+legacy_derive_helpers = "forbid"
+let_underscore_lock = "forbid"
+long_running_const_eval = "forbid"
+macro_expanded_macro_exports_accessed_by_absolute_paths = "forbid"
+mutable_transmutes = "forbid"
+named_asm_labels = "forbid"
+never_type_fallback_flowing_into_unsafe = "forbid"
+no_mangle_const_items = "forbid"
+out_of_scope_macro_calls = "forbid"
+overflowing_literals = "forbid"
+patterns_in_fns_without_body = "forbid"
+proc_macro_derive_resolution_fallback = "forbid"
+pub_use_of_private_extern_crate = "forbid"
+repr_transparent_non_zst_fields = "forbid"
+semicolon_in_expressions_from_macros = "forbid"
+soft_unstable = "forbid"
+text_direction_codepoint_in_comment = "forbid"
+text_direction_codepoint_in_literal = "forbid"
+unconditional_panic = "forbid"
+undropped_manually_drops = "forbid"
+unknown_crate_types = "forbid"
+useless_deprecated = "forbid"
 # Visibility hygiene — flag pub items that don't need to be pub
-unreachable_pub = "deny"
+unreachable_pub = "forbid"
 # Missing Debug impls on public types (good for inspectability)
-missing_debug_implementations = "deny"
+missing_debug_implementations = "forbid"
 # Elided lifetimes in impl blocks — forces explicit 'a where it matters
-elided_lifetimes_in_paths = "deny"
+elided_lifetimes_in_paths = "forbid"
 # Prefer crate-relative paths
-absolute_paths_not_starting_with_crate = "deny"
+absolute_paths_not_starting_with_crate = "forbid"
 # Ambiguous negative literals — force parens
-ambiguous_negative_literals = "deny"
+ambiguous_negative_literals = "forbid"
 # Prefer async || over || async {}
-closure_returning_async_block = "deny"
+closure_returning_async_block = "forbid"
 # 2024: deprecated safe on extern fns
-deprecated_safe_2024 = "deny"
+deprecated_safe_2024 = "forbid"
 # Deref into dyn supertrait ambiguity
-deref_into_dyn_supertrait = "deny"
+deref_into_dyn_supertrait = "forbid"
 # 2024: expr fragment specifier change
-edition_2024_expr_fragment_specifier = "deny"
+edition_2024_expr_fragment_specifier = "forbid"
 # Explicit outlives bounds that can be inferred
-explicit_outlives_requirements = "deny"
+explicit_outlives_requirements = "forbid"
 # 2024: if-let temporary rescoping
-if_let_rescope = "deny"
+if_let_rescope = "forbid"
 # impl Trait overcaptures lifetimes
-impl_trait_overcaptures = "deny"
+impl_trait_overcaptures = "forbid"
 # Using 2024 keywords as identifiers
-keyword_idents_2024 = "deny"
+keyword_idents_2024 = "forbid"
 # Silently dropping a guard with let _ = ...
-let_underscore_drop = "deny"
+let_underscore_drop = "forbid"
 # #[macro_use] on extern crate
-macro_use_extern_crate = "deny"
+macro_use_extern_crate = "forbid"
 # Macro meta-variable misuse
-meta_variable_misuse = "deny"
+meta_variable_misuse = "forbid"
 # Missing Copy on types that could derive it
-missing_copy_implementations = "deny"
+missing_copy_implementations = "forbid"
 # Missing docs on public items
-missing_docs = "deny"
+missing_docs = "forbid"
 # Missing unsafe on extern blocks (2024)
-missing_unsafe_on_extern = "deny"
+missing_unsafe_on_extern = "forbid"
 # Non-ASCII identifiers
-non_ascii_idents = "deny"
+non_ascii_idents = "forbid"
 # Redundant imports
-redundant_imports = "deny"
+redundant_imports = "forbid"
 # Redundant lifetime parameters
-redundant_lifetimes = "deny"
+redundant_lifetimes = "forbid"
 # 2024: guarded string syntax
-rust_2024_guarded_string_incompatible_syntax = "deny"
+rust_2024_guarded_string_incompatible_syntax = "forbid"
 # 2024: incompatible patterns
-rust_2024_incompatible_pat = "deny"
+rust_2024_incompatible_pat = "forbid"
 # 2024: prelude collisions
-rust_2024_prelude_collisions = "deny"
+rust_2024_prelude_collisions = "forbid"
 # Single-use lifetime parameters
-single_use_lifetimes = "deny"
+single_use_lifetimes = "forbid"
 # 2024: tail expression drop order
-tail_expr_drop_order = "deny"
+tail_expr_drop_order = "forbid"
 # Trivial casts (e.g. &T as &T)
-trivial_casts = "deny"
+trivial_casts = "forbid"
 # Trivial numeric casts (e.g. u32 as u32)
-trivial_numeric_casts = "deny"
+trivial_numeric_casts = "forbid"
 # Binding a unit value
-unit_bindings = "deny"
+unit_bindings = "forbid"
 # Types that can't be named by external users
-unnameable_types = "deny"
+unnameable_types = "forbid"
 # unsafe attribute without unsafe() wrapper (2024)
-unsafe_attr_outside_unsafe = "deny"
+unsafe_attr_outside_unsafe = "forbid"
 # All unsafe code must be opted-in per module
-unsafe_code = "deny"
+unsafe_code = "forbid"
 # Unsafe operations inside unsafe fn need unsafe blocks
-unsafe_op_in_unsafe_fn = "deny"
+unsafe_op_in_unsafe_fn = "forbid"
 # Unused crate dependencies
-unused_crate_dependencies = "deny"
+unused_crate_dependencies = "forbid"
 # Unused extern crates
 unused_extern_crates = "deny"
 # Unnecessary braces around single import
-unused_import_braces = "deny"
+unused_import_braces = "forbid"
 # Unused lifetime parameters
-unused_lifetimes = "deny"
+unused_lifetimes = "forbid"
 # Unused macro rules
-unused_macro_rules = "deny"
+unused_macro_rules = "forbid"
 # Unnecessary path qualifications
 unused_qualifications = "deny"
 # Unused return values
-unused_results = "deny"
+unused_results = "forbid"
 # Large variant size differences
-variant_size_differences = "deny"
+variant_size_differences = "forbid"
 # --- Warn-by-default promoted to deny ---
 # Two globs re-exporting the same name — always a bug
-ambiguous_glob_reexports = "deny"
+ambiguous_glob_reexports = "forbid"
 # Comparing fat pointers doesn't do what you think
-ambiguous_wide_pointer_comparisons = "deny"
+ambiguous_wide_pointer_comparisons = "forbid"
 # Deprecated syntax, always wrong on edition 2024
-anonymous_parameters = "deny"
+anonymous_parameters = "forbid"
 # Edition migration footgun, always fix
-array_into_iter = "deny"
+array_into_iter = "forbid"
 # Always wrong on 2024, use `dyn Trait`
-bare_trait_objects = "deny"
+bare_trait_objects = "forbid"
 # Same class as array_into_iter, always fix
-boxed_slice_into_iter = "deny"
+boxed_slice_into_iter = "forbid"
 # Ambiguous syntax, always a bug
-break_with_label_and_loop = "deny"
+break_with_label_and_loop = "forbid"
 # Two different signatures for same extern symbol — always a bug
-clashing_extern_declarations = "deny"
+clashing_extern_declarations = "forbid"
 # Soundness-adjacent, always fix
-coherence_leak_check = "deny"
+coherence_leak_check = "forbid"
 # Identifiers that look alike (latin/cyrillic) — always a bug or attack
-confusable_idents = "deny"
+confusable_idents = "forbid"
 # Soundness issue, always fix
-const_evaluatable_unchecked = "deny"
+const_evaluatable_unchecked = "forbid"
 # Duplicate of const_item_mutation, same reasoning
-const_item_interior_mutations = "deny"
+const_item_interior_mutations = "forbid"
 # Mutating a const is always a bug (you get a copy each time)
-const_item_mutation = "deny"
+const_item_mutation = "forbid"
 # Always a bug — pointer to dropped local
-dangling_pointers_from_locals = "deny"
+dangling_pointers_from_locals = "forbid"
 # Always a bug — pointer to dropped temporary
-dangling_pointers_from_temporaries = "deny"
+dangling_pointers_from_temporaries = "forbid"
 # Using deprecated APIs should be fixed immediately
-deprecated = "deny"
+deprecated = "forbid"
 # Always wrong syntax, easy fix
-deprecated_where_clause_location = "deny"
+deprecated_where_clause_location = "forbid"
 # Always confusing, always a mistake
-double_negations = "deny"
+double_negations = "forbid"
 # T: Drop bound is always wrong (not all droppable types impl Drop)
-drop_bounds = "deny"
+drop_bounds = "forbid"
 # drop() on a Copy type does nothing, always a bug
-dropping_copy_types = "deny"
+dropping_copy_types = "forbid"
 # drop(&x) does nothing, always a bug
-dropping_references = "deny"
+dropping_references = "forbid"
 # Always a mistake
-duplicate_macro_attributes = "deny"
+duplicate_macro_attributes = "forbid"
 # dyn Drop is almost never what you want
-dyn_drop = "deny"
+dyn_drop = "forbid"
 # Use ..= not ..., always wrong on modern Rust
-ellipsis_inclusive_range_patterns = "deny"
+ellipsis_inclusive_range_patterns = "forbid"
 # for x in Some(v) is always a bug
-for_loops_over_fallibles = "deny"
+for_loops_over_fallibles = "forbid"
 # forget() on Copy type does nothing, always a bug
-forgetting_copy_types = "deny"
+forgetting_copy_types = "forbid"
 # forget(&x) does nothing, always a bug
-forgetting_references = "deny"
+forgetting_references = "forbid"
 # Casting fn pointer to integer is always suspicious
-function_casts_as_integer = "deny"
+function_casts_as_integer = "forbid"
 # Taking reference to function item instead of fn pointer — always a bug
-function_item_references = "deny"
+function_item_references = "forbid"
 # A named re-export silently hides a glob re-export — always confusing
-hidden_glob_reexports = "deny"
+hidden_glob_reexports = "forbid"
 # FFI type mismatch is always a bug
-improper_ctypes = "deny"
+improper_ctypes = "forbid"
 # Same for definitions
-improper_ctypes_definitions = "deny"
+improper_ctypes_definitions = "forbid"
 # Always a bug — use ptr::from_exposed_addr instead
-integer_to_ptr_transmutes = "deny"
+integer_to_ptr_transmutes = "forbid"
 # Always a bug
-invalid_from_utf8 = "deny"
+invalid_from_utf8 = "forbid"
 # Comparing with NaN is always wrong
-invalid_nan_comparisons = "deny"
+invalid_nan_comparisons = "forbid"
 # Creating invalid values is always UB
-invalid_value = "deny"
+invalid_value = "forbid"
 # if let on irrefutable pattern is always a logic error
-irrefutable_let_patterns = "deny"
+irrefutable_let_patterns = "forbid"
 # Always wrong, will become a hard error
-late_bound_lifetime_arguments = "deny"
+late_bound_lifetime_arguments = "forbid"
 # Always a mistake in attribute syntax
-malformed_diagnostic_attributes = "deny"
+malformed_diagnostic_attributes = "forbid"
 # Always a mistake
-malformed_diagnostic_format_literals = "deny"
+malformed_diagnostic_format_literals = "forbid"
 # .map(f) where f returns () — always meant .for_each()
-map_unit_fn = "deny"
+map_unit_fn = "forbid"
 # Always a mistake in attribute placement
-misplaced_diagnostic_attributes = "deny"
+misplaced_diagnostic_attributes = "forbid"
 # extern without ABI string — always specify "C" explicitly
-missing_abi = "deny"
+missing_abi = "forbid"
 # Mixed unicode scripts in idents — always a bug or attack
-mixed_script_confusables = "deny"
+mixed_script_confusables = "forbid"
 # Confusing format string usage, always fix
-named_arguments_used_positionally = "deny"
+named_arguments_used_positionally = "forbid"
 # no_mangle on generic item does not work, always a bug
-no_mangle_generic_items = "deny"
+no_mangle_generic_items = "forbid"
 # Rust convention, LLMs must follow it
 non_camel_case_types = "deny"
 # Gap in range match — always a bug
-non_contiguous_range_endpoints = "deny"
+non_contiguous_range_endpoints = "forbid"
 # panic!(variable) instead of panic!("{}", variable) — always fix
-non_fmt_panics = "deny"
+non_fmt_panics = "forbid"
 # impl in weird scopes — always wrong
-non_local_definitions = "deny"
+non_local_definitions = "forbid"
 # Foo { x: x } instead of Foo { x } — always fix
-non_shorthand_field_patterns = "deny"
+non_shorthand_field_patterns = "forbid"
 # Rust convention, LLMs must follow it
-non_snake_case = "deny"
+non_snake_case = "forbid"
 # Rust convention, LLMs must follow it
 non_upper_case_globals = "deny"
 # Calling .clone() on &T where T: !Clone does nothing — always a bug
-noop_method_call = "deny"
+noop_method_call = "forbid"
 # Overlapping ranges in match — always a bug
-overlapping_range_endpoints = "deny"
+overlapping_range_endpoints = "forbid"
 # x; as a statement with no effect — always a bug
-path_statements = "deny"
+path_statements = "forbid"
 # Public API with private bounds — always wrong
-private_bounds = "deny"
+private_bounds = "forbid"
 # Public API exposing private types — always wrong
-private_interfaces = "deny"
+private_interfaces = "forbid"
 # Always a bug in const context
-ptr_to_integer_transmute_in_consts = "deny"
+ptr_to_integer_transmute_in_consts = "forbid"
 # Always remove, never intentional
-redundant_semicolons = "deny"
+redundant_semicolons = "forbid"
 # Stale lint config — always fix
-renamed_and_removed_lints = "deny"
+renamed_and_removed_lints = "forbid"
 # Always confusing scoping bug
-self_constructor_from_outer_item = "deny"
+self_constructor_from_outer_item = "forbid"
 # Misusing lib/main as module names — always a mistake
-special_module_name = "deny"
+special_module_name = "forbid"
 # feature(x) where x is stable — always remove
-stable_features = "deny"
+stable_features = "forbid"
 # References to mutable statics are always unsound
-static_mut_refs = "deny"
+static_mut_refs = "forbid"
 # .deref() on &&T — almost always a bug
-suspicious_double_ref_op = "deny"
+suspicious_double_ref_op = "forbid"
 # where i32: Copy — always pointless
-trivial_bounds = "deny"
+trivial_bounds = "forbid"
 # Bounds on type aliases are ignored — always misleading
-type_alias_bounds = "deny"
+type_alias_bounds = "forbid"
 # Will become hard error, always fix
-tyvar_behind_raw_pointer = "deny"
+tyvar_behind_raw_pointer = "forbid"
 # Unusual unicode in idents — always suspicious
-uncommon_codepoints = "deny"
+uncommon_codepoints = "forbid"
 # Infinite recursion — always a bug
-unconditional_recursion = "deny"
+unconditional_recursion = "forbid"
 # Coherence violation — always fix
-uncovered_param_in_projection = "deny"
+uncovered_param_in_projection = "forbid"
 # Static of uninhabited type — always a bug
-uninhabited_static = "deny"
+uninhabited_static = "forbid"
 # Always a scoping mistake in tests
-unnameable_test_items = "deny"
+unnameable_test_items = "forbid"
 # Transmute where a safe cast exists — always fix
-unnecessary_transmutes = "deny"
+unnecessary_transmutes = "forbid"
 # Comparing fn pointers is never reliable — always a bug
-unpredictable_function_pointer_comparisons = "deny"
+unpredictable_function_pointer_comparisons = "forbid"
 # Always a bug
-unreachable_code = "deny"
+unreachable_code = "forbid"
 # Always a bug
-unreachable_patterns = "deny"
+unreachable_patterns = "forbid"
 # Your method will be shadowed by std — always fix
-unstable_name_collisions = "deny"
+unstable_name_collisions = "forbid"
 # Always a bug
-unsupported_calling_conventions = "deny"
+unsupported_calling_conventions = "forbid"
 # Unnecessary Box/Vec allocation — always fix
-unused_allocation = "deny"
+unused_allocation = "forbid"
 # Dead bounds — always remove
-unused_associated_type_bounds = "deny"
+unused_associated_type_bounds = "forbid"
 # Attribute does nothing — always a mistake
 unused_attributes = "deny"
 # Always remove
-unused_braces = "deny"
+unused_braces = "forbid"
 # Comparison that's always true/false — always a bug
-unused_comparisons = "deny"
+unused_comparisons = "forbid"
 # Doc comment on non-item — always misplaced
-unused_doc_comments = "deny"
+unused_doc_comments = "forbid"
 # Feature gate not needed — always remove
-unused_features = "deny"
+unused_features = "forbid"
 # Dead label — always remove
-unused_labels = "deny"
+unused_labels = "forbid"
 # Ignoring Result/#[must_use] — always a bug
-unused_must_use = "deny"
+unused_must_use = "forbid"
 # Unnecessary mut — always fix
-unused_mut = "deny"
+unused_mut = "forbid"
 # Unnecessary parens — always remove
-unused_parens = "deny"
+unused_parens = "forbid"
 # Unnecessary unsafe block — always remove
-unused_unsafe = "deny"
+unused_unsafe = "forbid"
 # Null check on reference-derived pointer — always a bug
-useless_ptr_null_checks = "deny"
+useless_ptr_null_checks = "forbid"
 # Always fix, will become hard error
-varargs_without_pattern = "deny"
+varargs_without_pattern = "forbid"
 # while true instead of loop — always fix
-while_true = "deny"
+while_true = "forbid"
 # --- Remaining warn-by-default promoted to deny ---
 # NEON on softfloat AArch64 — always a bug
-aarch64_softfloat_neon = "deny"
+aarch64_softfloat_neon = "forbid"
 # Partial register use in inline asm — always fix
-asm_sub_register = "deny"
+asm_sub_register = "forbid"
 # async fn in trait without Send bounds — always be explicit
-async_fn_in_trait = "deny"
+async_fn_in_trait = "forbid"
 # AT&T vs Intel asm style — always fix
-bad_asm_style = "deny"
+bad_asm_style = "forbid"
 # Dead code — always remove
-dead_code = "deny"
+dead_code = "forbid"
 # Leaking private deps through public API — always fix
-exported_private_dependencies = "deny"
+exported_private_dependencies = "forbid"
 # Using #[deny(lint_group)] — always spell out individual lints
-forbidden_lint_groups = "deny"
+forbidden_lint_groups = "forbid"
 # Incomplete feature gates — always be explicit
-incomplete_features = "deny"
+incomplete_features = "forbid"
 # #[inline] on #[no_sanitize] — always a bug
-inline_no_sanitize = "deny"
+inline_no_sanitize = "forbid"
 # Using internal rustc features — always wrong in user code
-internal_features = "deny"
+internal_features = "forbid"
 # Large values moved on stack — always fix
-large_assignments = "deny"
+large_assignments = "forbid"
 # Inconsistent lifetime syntax — always fix
-mismatched_lifetime_syntaxes = "deny"
+mismatched_lifetime_syntaxes = "forbid"
 # Opaque type with hidden inferred bounds — always be explicit
-opaque_hidden_inferred_bound = "deny"
+opaque_hidden_inferred_bound = "forbid"
 # Refining impl trait in internal items — always be explicit
-refining_impl_trait_internal = "deny"
+refining_impl_trait_internal = "forbid"
 # Refining impl trait in reachable items — always be explicit
-refining_impl_trait_reachable = "deny"
+refining_impl_trait_reachable = "forbid"
 # repr(C) enum larger than c_int — always be explicit
-repr_c_enums_larger_than_int = "deny"
+repr_c_enums_larger_than_int = "forbid"
 # RTSAN nonblocking async — always fix
-rtsan_nonblocking_async = "deny"
+rtsan_nonblocking_async = "forbid"
 # Unexpected cfg conditions — always fix
-unexpected_cfgs = "deny"
+unexpected_cfgs = "forbid"
 # Lint expectation not fulfilled — always fix
-unfulfilled_lint_expectations = "deny"
+unfulfilled_lint_expectations = "forbid"
 # Ungated async fn track_caller — always fix
-ungated_async_fn_track_caller = "deny"
+ungated_async_fn_track_caller = "forbid"
 # Unknown diagnostic attributes — always a mistake
-unknown_diagnostic_attributes = "deny"
+unknown_diagnostic_attributes = "forbid"
 # Unknown lint names — always fix
-unknown_lints = "deny"
+unknown_lints = "forbid"
 # Unstable syntax before expansion — always fix
-unstable_syntax_pre_expansion = "deny"
+unstable_syntax_pre_expansion = "forbid"
 # Dead assignments — always remove
-unused_assignments = "deny"
+unused_assignments = "forbid"
 # Dead imports — always remove
-unused_imports = "deny"
+unused_imports = "forbid"
 # Dead macros — always remove
-unused_macros = "deny"
+unused_macros = "forbid"
 # Unused variables — always remove
-unused_variables = "deny"
+unused_variables = "forbid"
 # Power alignment issues — always fix
-uses_power_alignment = "deny"
+uses_power_alignment = "forbid"
 # Redundant lifetime captures in impl Trait return types
-impl_trait_redundant_captures = "deny"
+impl_trait_redundant_captures = "forbid"
 # Treat all remaining warnings as errors
-warnings = "deny"
+warnings = "forbid"
 
 [workspace.lints.clippy]
 # Performance
-needless_pass_by_value = "warn"
-cloned_instead_of_copied = "warn"
-redundant_clone = "warn"
-large_enum_variant = "deny"
+needless_pass_by_value = "forbid"
+cloned_instead_of_copied = "forbid"
+redundant_clone = "forbid"
+large_enum_variant = "forbid"
 # Clarity
-needless_return = "warn"
-manual_let_else = "warn"
-match_wildcard_for_single_variants = "warn"
-implicit_clone = "deny"
+needless_return = "forbid"
+manual_let_else = "forbid"
+match_wildcard_for_single_variants = "forbid"
+implicit_clone = "forbid"
 # Safety / correctness
-cast_possible_truncation = "warn"
-cast_sign_loss = "warn"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
 # Style consistency
-enum_glob_use = "warn"
-single_match_else = "warn"
-redundant_else = "warn"
-semicolon_if_nothing_returned = "warn"
+enum_glob_use = "forbid"
+single_match_else = "forbid"
+redundant_else = "forbid"
+semicolon_if_nothing_returned = "forbid"
 
 # ============================
 # Pedantic → warn
 # ============================
 # Detect `as` casts where the value could wrap (e.g. u32 → i32)
-cast_possible_wrap = "warn"
+cast_possible_wrap = "forbid"
 # Detect `as` casts that lose floating-point precision (e.g. f64 → f32)
-cast_precision_loss = "warn"
+cast_precision_loss = "deny"
 # Detect pointer casts to more-aligned types
-cast_ptr_alignment = "warn"
+cast_ptr_alignment = "forbid"
 # Suggest checked conversions (try_from) over raw `as`
-checked_conversions = "warn"
+checked_conversions = "forbid"
 # Collapse `else { if ... }` into `else if ...`
-collapsible_else_if = "warn"
+collapsible_else_if = "forbid"
 # Prefer if/else chains over match for ordered comparisons
-comparison_chain = "deny"
+comparison_chain = "forbid"
 # Derive Copy on iterators that can be copied
-copy_iterator = "warn"
+copy_iterator = "forbid"
 # Use Type::default() instead of Default::default()
-default_trait_access = "deny"
+default_trait_access = "forbid"
 # Detect broken intra-doc links
-doc_broken_link = "warn"
+doc_broken_link = "forbid"
 # Detect accidental double-space linebreaks in doc comments
-doc_comment_double_space_linebreaks = "deny"
+doc_comment_double_space_linebreaks = "forbid"
 # Detect quoted links in doc comments
-doc_link_with_quotes = "deny"
+doc_link_with_quotes = "forbid"
 # Detect unformatted markdown in doc comments
-doc_markdown = "deny"
+doc_markdown = "forbid"
 # Detect lifetimes that could be elided
-elidable_lifetime_names = "warn"
+elidable_lifetime_names = "forbid"
 # Detect empty enums that should be ! (never type)
-empty_enums = "warn"
+empty_enums = "forbid"
 # Prefer *x over x.deref()
-explicit_deref_methods = "warn"
+explicit_deref_methods = "forbid"
 # Prefer `for x in &collection` over `for x in collection.into_iter()`
-explicit_into_iter_loop = "warn"
+explicit_into_iter_loop = "forbid"
 # Prefer `for x in &collection` over `for x in collection.iter()`
-explicit_iter_loop = "warn"
+explicit_iter_loop = "forbid"
 # Prefer `find_map` over `filter_map().next()`
-filter_map_next = "warn"
+filter_map_next = "forbid"
 # Prefer `filter_map` over `filter().map()` with Option
-flat_map_option = "warn"
+flat_map_option = "forbid"
 # Warn on `==` comparison of floats (use approx comparison)
-float_cmp = "deny"
+float_cmp = "forbid"
 # Flag functions with >3 bool parameters
-fn_params_excessive_bools = "deny"
+fn_params_excessive_bools = "forbid"
 # Prefer `.collect()` over `FromIterator::from_iter()`
-from_iter_instead_of_collect = "deny"
+from_iter_instead_of_collect = "forbid"
 # Prefer `if x` over `if !x { } else { }`
-if_not_else = "warn"
+if_not_else = "forbid"
 # Require reason on `#[ignore]` test attributes
-ignore_without_reason = "warn"
+ignore_without_reason = "forbid"
 # Use `_` for ignored unit patterns in match arms
-ignored_unit_patterns = "warn"
+ignored_unit_patterns = "forbid"
 # Prefer generic `S: BuildHasher` over concrete `HashMap`/`HashSet`
-implicit_hasher = "deny"
+implicit_hasher = "forbid"
 # Prefer consistent field ordering matching struct definition
-inconsistent_struct_constructor = "warn"
+inconsistent_struct_constructor = "forbid"
 # Use slice patterns `[first, ..]` instead of `v[0]` on refutable slices
-index_refutable_slice = "warn"
+index_refutable_slice = "forbid"
 # Prefer `to_string()` on `&str` over `String::from()` or `.to_owned()`
-inefficient_to_string = "deny"
+inefficient_to_string = "forbid"
 # Suggest adding `iter()` method when `IntoIterator` is implemented
-into_iter_without_iter = "deny"
+into_iter_without_iter = "forbid"
 # Warn on items (fn, struct, etc.) defined after statements in a block
-items_after_statements = "deny"
+items_after_statements = "forbid"
 # Prefer `.flatten()` over `.filter(Result::is_ok).map(Result::unwrap)`
-iter_filter_is_ok = "warn"
+iter_filter_is_ok = "forbid"
 # Prefer `.flatten()` over `.filter(Option::is_some).map(Option::unwrap)`
-iter_filter_is_some = "warn"
+iter_filter_is_some = "forbid"
 # Iterator-returning methods should return a type named `*Iter*`
-iter_not_returning_iterator = "deny"
+iter_not_returning_iterator = "forbid"
 # Suggest adding `into_iter()` method when `iter()` is implemented
-iter_without_into_iter = "deny"
+iter_without_into_iter = "forbid"
 # Detect large futures that should be boxed
-large_futures = "deny"
+large_futures = "forbid"
 # Detect large stack arrays that should be heap-allocated
-large_stack_arrays = "deny"
+large_stack_arrays = "forbid"
 # Detect large types passed by value that should be references
-large_types_passed_by_value = "deny"
+large_types_passed_by_value = "forbid"
 # Prefer `assert!` over `if !cond { panic!() }`
-manual_assert = "deny"
+manual_assert = "forbid"
 # Prefer `elapsed()` over `Instant::now() - start`
-manual_instant_elapsed = "warn"
+manual_instant_elapsed = "forbid"
 # Prefer `matches!()` over `if let Some/Ok/Err/None`
-manual_is_variant_and = "warn"
+manual_is_variant_and = "forbid"
 # Prefer `String::new()` over `String::from("")` or `"".to_string()`
-manual_string_new = "deny"
+manual_string_new = "forbid"
 # Flag functions with many single-character variable names
-many_single_char_names = "deny"
+many_single_char_names = "forbid"
 # Prefer `map_or`/`map_or_else` over `map().unwrap_or()`
-map_unwrap_or = "deny"
+map_unwrap_or = "forbid"
 
 # ============================
 # Suspicious → deny
 # ============================
 # Always a bug — range missing a char
-almost_complete_range = "deny"
+almost_complete_range = "forbid"
 # Arc<T> where T is not Send+Sync is always wrong
-arc_with_non_send_sync = "deny"
+arc_with_non_send_sync = "forbid"
 # Holding bad type across await is always a bug
-await_holding_invalid_type = "deny"
+await_holding_invalid_type = "forbid"
 # Holding lock across await is always a deadlock risk
-await_holding_lock = "deny"
+await_holding_lock = "forbid"
 # RefCell borrow across await
-await_holding_refcell_ref = "deny"
+await_holding_refcell_ref = "forbid"
 # Enabling all restriction lints is always wrong
-blanket_clippy_restriction_lints = "deny"
+blanket_clippy_restriction_lints = "forbid"
 # Casting enum constructor is always a bug
-cast_enum_constructor = "deny"
+cast_enum_constructor = "forbid"
 # Always undefined/wrong
-cast_nan_to_int = "deny"
+cast_nan_to_int = "forbid"
 # Always use correct from_raw_parts variant
-cast_slice_from_raw_parts = "deny"
+cast_slice_from_raw_parts = "forbid"
 # Always a bug
-confusing_method_to_numeric_cast = "deny"
+confusing_method_to_numeric_cast = "forbid"
 # Checking emptiness of a const is always pointless
-const_is_empty = "deny"
+const_is_empty = "forbid"
 # Cross-pointer transmute is always dangerous
-crosspointer_transmute = "deny"
+crosspointer_transmute = "forbid"
 # Interior mutable const is always a bug
-declare_interior_mutable_const = "deny"
+declare_interior_mutable_const = "forbid"
 # Always fix deprecated clippy cfg attrs
-deprecated_clippy_cfg_attr = "deny"
+deprecated_clippy_cfg_attr = "forbid"
 # Dropping something without Drop is always pointless
-drop_non_drop = "deny"
+drop_non_drop = "forbid"
 # Duplicate module declaration is always a bug
-duplicate_mod = "deny"
+duplicate_mod = "forbid"
 # Duplicate attributes are always a mistake
-duplicated_attributes = "deny"
+duplicated_attributes = "forbid"
 # Empty doc comment is always a mistake
-empty_docs = "deny"
+empty_docs = "forbid"
 # Busy loop without yield is always wrong
-empty_loop = "deny"
+empty_loop = "forbid"
 # Float comparison without abs is always wrong
-float_equality_without_abs = "deny"
+float_equality_without_abs = "forbid"
 # Forgetting something without Drop is always pointless
-forget_non_drop = "deny"
+forget_non_drop = "forbid"
 # //// instead of /// is always a typo
-four_forward_slashes = "deny"
+four_forward_slashes = "forbid"
 # Always a bug
-from_raw_with_void_ptr = "deny"
+from_raw_with_void_ptr = "forbid"
 # Using API above your MSRV is always wrong
-incompatible_msrv = "deny"
+incompatible_msrv = "forbid"
 # Open option that does nothing is always a bug
-ineffective_open_options = "deny"
+ineffective_open_options = "forbid"
 # Always a bug
-iter_out_of_bounds = "deny"
+iter_out_of_bounds = "forbid"
 # Path::join with absolute path discards the base — always a bug
-join_absolute_paths = "deny"
+join_absolute_paths = "forbid"
 # Dropping a future immediately is always wrong
-let_underscore_future = "deny"
+let_underscore_future = "forbid"
 # Always use the right combinator
-lines_filter_map_ok = "deny"
+lines_filter_map_ok = "forbid"
 # Getter returning wrong field is always a bug
-misnamed_getters = "deny"
+misnamed_getters = "forbid"
 # a += a + b instead of a += b — always a bug
-misrefactored_assign_op = "deny"
+misrefactored_assign_op = "forbid"
 # a = b = c is always confusing/wrong in Rust
-multi_assignments = "deny"
+multi_assignments = "forbid"
 # Mutating range bound during iteration is always a bug
-mut_range_bound = "deny"
+mut_range_bound = "forbid"
 # Interior-mutable HashMap key is always a bug
-mutable_key_type = "deny"
+mutable_key_type = "forbid"
 # Replace that does nothing is always a bug
-no_effect_replace = "deny"
+no_effect_replace = "forbid"
 # Clone impl that doesn't delegate properly
-non_canonical_clone_impl = "deny"
+non_canonical_clone_impl = "forbid"
 # PartialOrd that contradicts Ord
-non_canonical_partial_ord_impl = "deny"
+non_canonical_partial_ord_impl = "forbid"
 # Ambiguous octal escape is always confusing
-octal_escapes = "deny"
+octal_escapes = "forbid"
 # .ends_with(".ext") doesn't check extension — always a bug
-path_ends_with_ext = "deny"
+path_ends_with_ext = "forbid"
 # Doesn't grant write on all platforms — always a bug
-permissions_set_readonly_false = "deny"
+permissions_set_readonly_false = "forbid"
 # Always a constraint violation
-pointers_in_nomem_asm_block = "deny"
+pointers_in_nomem_asm_block = "forbid"
 # Almost always a forgotten else
-possible_missing_else = "deny"
+possible_missing_else = "forbid"
 # Print inside Display/Debug impl is always wrong
-print_in_format_impl = "deny"
+print_in_format_impl = "forbid"
 # vec![rc.clone(); n] clones once — always a bug
-rc_clone_in_vec_init = "deny"
+rc_clone_in_vec_init = "forbid"
 # let x = x; is always pointless
-redundant_locals = "deny"
+redundant_locals = "forbid"
 # vec![0..n] creates vec with one Range — always a bug
-single_range_in_vec_init = "deny"
+single_range_in_vec_init = "forbid"
 # size_of_val(&ref) gives pointer size — always a bug
-size_of_ref = "deny"
+size_of_ref = "forbid"
 # Whitespace that hides a compound assignment
-suspicious_assignment_formatting = "deny"
+suspicious_assignment_formatting = "forbid"
 # Space in command arg is always wrong
-suspicious_command_arg_space = "deny"
+suspicious_command_arg_space = "forbid"
 # Malformed doc comment
-suspicious_doc_comments = "deny"
+suspicious_doc_comments = "forbid"
 # Misleading else formatting
-suspicious_else_formatting = "deny"
+suspicious_else_formatting = "forbid"
 # .map() used for side effects — always wrong
-suspicious_map = "deny"
+suspicious_map = "forbid"
 # Open options that conflict
-suspicious_open_options = "deny"
+suspicious_open_options = "forbid"
 # Ambiguous to_owned call
-suspicious_to_owned = "deny"
+suspicious_to_owned = "forbid"
 # Misleading unary op whitespace
-suspicious_unary_op_formatting = "deny"
+suspicious_unary_op_formatting = "forbid"
 # Swapping via raw ptr instead of safe swap
-swap_ptr_to_ref = "deny"
+swap_ptr_to_ref = "forbid"
 # Test attribute in doctest is always wrong
-test_attr_in_doctest = "deny"
+test_attr_in_doctest = "forbid"
 # type_id() on Box<dyn T> gives Box's type_id — always a bug
-type_id_on_box = "deny"
+type_id_on_box = "forbid"
 # Infinite recursion is always a bug (clippy version)
-unconditional_recursion = "deny"
+unconditional_recursion = "forbid"
 # Wrong clippy cfg
-unnecessary_clippy_cfg = "deny"
+unnecessary_clippy_cfg = "forbid"
 # vec![side_effect(); 0] still runs it — always a bug
-zero_repeat_side_effects = "deny"
+zero_repeat_side_effects = "forbid"
 # Not calling wait() on child process — always a bug
-zombie_processes = "deny"
+zombie_processes = "forbid"
 
 # ============================
 # Suspicious → warn (intentional keeps)
 # ============================
 # Suspicious but sometimes intentional
-cast_abs_to_unsigned = "warn"
+cast_abs_to_unsigned = "forbid"
 # Sometimes intentional for FFI
-cast_enum_truncation = "warn"
+cast_enum_truncation = "forbid"
 # Can be intentional in some macro designs
-crate_in_macro_def = "warn"
+crate_in_macro_def = "forbid"
 # Documentation style issue
-doc_nested_refdefs = "warn"
+doc_nested_refdefs = "forbid"
 # Documentation style issue
-doc_suspicious_footnotes = "warn"
+doc_suspicious_footnotes = "forbid"
 # Style, not a bug
-empty_line_after_doc_comments = "warn"
+empty_line_after_doc_comments = "forbid"
 # Style, not a bug
-empty_line_after_outer_attr = "warn"
+empty_line_after_outer_attr = "forbid"
 # Informational
-infallible_try_from = "warn"
+infallible_try_from = "forbid"
 # Can have false positives with complex macros
-macro_metavars_in_unsafe = "warn"
+macro_metavars_in_unsafe = "forbid"
 # Style preference
-manual_unwrap_or_default = "warn"
+manual_unwrap_or_default = "forbid"
 # Good practice but not a bug
-missing_transmute_annotations = "warn"
+missing_transmute_annotations = "forbid"
 # Style
-needless_character_iteration = "warn"
+needless_character_iteration = "forbid"
 # Style
-needless_maybe_sized = "warn"
+needless_maybe_sized = "forbid"
 # Sometimes intentional
-repeat_vec_with_capacity = "warn"
+repeat_vec_with_capacity = "forbid"
 # Worth knowing but not always a bug
-repr_packed_without_abi = "warn"
+repr_packed_without_abi = "forbid"
 # Has false positives with custom numeric types
-suspicious_arithmetic_impl = "warn"
+suspicious_arithmetic_impl = "forbid"
 # Has false positives
-suspicious_op_assign_impl = "warn"
+suspicious_op_assign_impl = "forbid"
 # Style improvement
-unnecessary_get_then_check = "warn"
+unnecessary_get_then_check = "forbid"
 # Style
-unnecessary_option_map_or_else = "warn"
+unnecessary_option_map_or_else = "forbid"
 # Style
-unnecessary_result_map_or_else = "warn"
+unnecessary_result_map_or_else = "forbid"
 
 # ============================
 # Pedantic → warn
@@ -655,473 +699,473 @@ unnecessary_result_map_or_else = "warn"
 # Pedantic → warn (C11)
 # ============================
 # Match on bool — prefer if/else
-match_bool = "warn"
+match_bool = "forbid"
 # Identical match arms that can be combined
-match_same_arms = "deny"
+match_same_arms = "forbid"
 # match result { Err(_) => ... } — use specific error
-match_wild_err_arm = "warn"
+match_wild_err_arm = "forbid"
 # Public functions returning Result should document errors
-missing_errors_doc = "deny"
+missing_errors_doc = "forbid"
 # Custom Debug impls should include all fields
-missing_fields_in_debug = "warn"
+missing_fields_in_debug = "forbid"
 
 # ============================
 # Pedantic → warn (C12)
 # ============================
 # Public functions that can panic should document it
-missing_panics_doc = "deny"
+missing_panics_doc = "forbid"
 # Functions returning useful values should be #[must_use]
-must_use_candidate = "deny"
+must_use_candidate = "forbid"
 # Prefer logical operators (&&/||) over bitwise (&/|) for bools
-needless_bitwise_bool = "warn"
+needless_bitwise_bool = "forbid"
 # Prefer restructuring loop over `continue`
-needless_continue = "warn"
+needless_continue = "forbid"
 # Prefer iterator methods over `for` + side effects
-needless_for_each = "warn"
+needless_for_each = "forbid"
 
 # ============================
 # Pedantic → warn (C13)
 # ============================
 # Remove unnecessary raw string hash symbols (r#"foo"# → r"foo")
-needless_raw_string_hashes = "warn"
+needless_raw_string_hashes = "forbid"
 # #[no_mangle] on Rust ABI functions is suspicious — usually needs extern "C"
-no_mangle_with_rust_abi = "warn"
+no_mangle_with_rust_abi = "forbid"
 # Option<Option<T>> is confusing — flatten or use a custom enum
-option_option = "warn"
+option_option = "forbid"
 # Use ptr::cast::<T>() instead of `as *const T` / `as *mut T`
-ptr_as_ptr = "warn"
+ptr_as_ptr = "forbid"
 # Use ptr.cast_const() / ptr.cast_mut() instead of `as *const T` / `as *mut T`
-ptr_cast_constness = "warn"
+ptr_cast_constness = "forbid"
 
 # ============================
 # Pedantic → warn (C14)
 # ============================
 # Prefer `0..n` over `0..=n-1`
-range_minus_one = "deny"
+range_minus_one = "forbid"
 # Prefer `0..=n` over `0..n+1`
-range_plus_one = "deny"
+range_plus_one = "forbid"
 # Use method reference instead of closure: `.map(|x| x.to_string())` → `.map(ToString::to_string)`
-redundant_closure_for_method_calls = "warn"
+redundant_closure_for_method_calls = "forbid"
 # Use ptr::from_ref() / ptr::from_mut() instead of `&x as *const T`
-ref_as_ptr = "warn"
+ref_as_ptr = "forbid"
 # Use `Option<&T>` instead of `&Option<T>` in function args
-ref_option = "warn"
+ref_option = "forbid"
 
 # ============================
 # Pedantic → warn (C15)
 # ============================
 # Detect `Option<&Option<T>>` — usually a mistake
-ref_option_ref = "warn"
+ref_option_ref = "forbid"
 # Methods returning `Self` should be `#[must_use]`
-return_self_not_must_use = "deny"
+return_self_not_must_use = "forbid"
 # Detect identical function calls in both branches of an if/else
-same_functions_in_if_condition = "warn"
+same_functions_in_if_condition = "forbid"
 # `#[should_panic]` tests should specify `expected` string
-should_panic_without_expect = "warn"
+should_panic_without_expect = "forbid"
 # Use `.first()` instead of `.get(0)` — clearer intent
-get_first = "deny"
+get_first = "forbid"
 # Use unstable sort for primitives (faster, no allocation)
-stable_sort_primitive = "deny"
+stable_sort_primitive = "forbid"
 
 # ============================
 # Pedantic → warn (C16)
 # ============================
 # Use `.lines()` instead of `.split('\n')`
-str_split_at_newline = "warn"
+str_split_at_newline = "forbid"
 # Use `+=` for string concatenation instead of `= ... + &s`
-string_add_assign = "warn"
+string_add_assign = "forbid"
 # Flag structs with >3 bool fields
-struct_excessive_bools = "warn"
+struct_excessive_bools = "forbid"
 # Detect field names that redundantly include the struct name
-struct_field_names = "deny"
+struct_field_names = "forbid"
 # Use ptr::cast instead of transmute between pointer types
-transmute_ptr_to_ptr = "warn"
+transmute_ptr_to_ptr = "forbid"
 
 # ============================
 # Pedantic → warn (C17)
 # ============================
 # Pass small Copy types by value, not by reference
-trivially_copy_pass_by_ref = "warn"
+trivially_copy_pass_by_ref = "forbid"
 # Inline format args: `format!("{x}")` not `format!("{}", x)`
-uninlined_format_args = "warn"
+uninlined_format_args = "forbid"
 # Return T instead of Box<T> when the type is known at compile time
-unnecessary_box_returns = "warn"
+unnecessary_box_returns = "forbid"
 # Use `collect::<String>()` instead of `collect::<Vec<_>>().join("")`
-unnecessary_join = "deny"
+unnecessary_join = "forbid"
 # Don't wrap return values in Option/Result when they're always Some/Ok
-unnecessary_wraps = "deny"
+unnecessary_wraps = "forbid"
 
 # ============================
 # Pedantic → warn (C18)
 # ============================
 # Flatten nested `A | B | C` patterns in match arms
-unnested_or_patterns = "warn"
+unnested_or_patterns = "forbid"
 # Add underscores for readability: `1_000_000` not `1000000`
-unreadable_literal = "deny"
+unreadable_literal = "forbid"
 # Warn when Deserialize is derived on a struct with unsafe fields
-unsafe_derive_deserialize = "warn"
+unsafe_derive_deserialize = "forbid"
 # Detect async functions that don't use .await
-unused_async = "warn"
+unused_async = "forbid"
 # Detect methods that don't use `self`
-unused_self = "warn"
+unused_self = "forbid"
 
 # ============================
 # Pedantic → warn (C19)
 # ============================
 # Flag use of `_`-prefixed bindings after they're declared
-used_underscore_binding = "warn"
+used_underscore_binding = "forbid"
 # Flag items prefixed with `_` that are actually used
-used_underscore_items = "warn"
+used_underscore_items = "forbid"
 # Prefer `.count_ones() != 0` over `x & (x - 1) != 0` for power-of-two checks
-verbose_bit_mask = "warn"
+verbose_bit_mask = "forbid"
 # Prefer explicit imports over glob `use foo::*`
-wildcard_imports = "deny"
+wildcard_imports = "forbid"
 # Use `HashSet` instead of `HashMap<K, ()>`
-zero_sized_map_values = "warn"
+zero_sized_map_values = "forbid"
 
 # ============================
 # Pedantic → warn (C1-C10, prior batches)
 # ============================
 # Use clone_from when possible
-assigning_clones = "warn"
+assigning_clones = "forbid"
 # Use as/into instead of if bool { 1 } else { 0 }
-bool_to_int_with_if = "warn"
+bool_to_int_with_if = "forbid"
 # Use addr_of! instead of &x as *const
-borrow_as_ptr = "warn"
+borrow_as_ptr = "forbid"
 # Always use case-insensitive extension comparison
-case_sensitive_file_extension_comparisons = "warn"
+case_sensitive_file_extension_comparisons = "forbid"
 # Use From instead of as for lossless casts
-cast_lossless = "warn"
+cast_lossless = "forbid"
 
 # ============================
 # Nursery → warn (cherry-picked stable lints)
 # ============================
 # Detect `as_ptr()` followed by `cast_mut()` — use `as_mut_ptr()` instead
-as_ptr_cast_mut = "warn"
+as_ptr_cast_mut = "forbid"
 # Detect identical code at start/end of if/else branches — factor out
-branches_sharing_code = "warn"
+branches_sharing_code = "forbid"
 # Collection populated but never read — dead code
-collection_is_never_read = "warn"
+collection_is_never_read = "forbid"
 # `debug_assert!(x.mutating_call())` — side effect lost in release builds
-debug_assert_with_mut_call = "warn"
+debug_assert_with_mut_call = "forbid"
 # Derive `Eq` when `PartialEq` is derived and all fields are `Eq`
-derive_partial_eq_without_eq = "warn"
+derive_partial_eq_without_eq = "forbid"
 # `impl From<T>` that can panic — use `TryFrom` instead
-fallible_impl_from = "warn"
+fallible_impl_from = "forbid"
 # Futures that are not `Send` — problematic for multi-threaded executors
-future_not_send = "deny"
+future_not_send = "forbid"
 # Functions that could be `const fn` but aren't
-missing_const_for_fn = "warn"
+missing_const_for_fn = "forbid"
 # `&mut T` parameter that doesn't need mutability — use `&T`
-needless_pass_by_ref_mut = "warn"
+needless_pass_by_ref_mut = "forbid"
 # Prefer `map_or` / `map_or_else` over `if let Some(x) = opt { ... } else { ... }`
-option_if_let_else = "deny"
+option_if_let_else = "forbid"
 # Lock/guard held across match scrutinee — potential deadlock
-significant_drop_in_scrutinee = "deny"
+significant_drop_in_scrutinee = "forbid"
 # Drop guards held longer than needed — tighten scope
-significant_drop_tightening = "deny"
+significant_drop_tightening = "forbid"
 # `T: A + B` where `B: A` — `A` bound is redundant
-trait_duplication_in_bounds = "deny"
+trait_duplication_in_bounds = "forbid"
 # Same as above but for `where` clauses
-type_repetition_in_bounds = "deny"
+type_repetition_in_bounds = "forbid"
 # `Foo { a: a, b: b }` where fields already match — use `Foo { a, b }`
-unnecessary_struct_initialization = "deny"
+unnecessary_struct_initialization = "forbid"
 # Use `Self` instead of the type name inside impl blocks
-use_self = "deny"
+use_self = "forbid"
 # Flag `Mutex<T>` where `AtomicT` would suffice — avoid lock overhead
-mutex_atomic = "deny"
+mutex_atomic = "forbid"
 # Flag `let mut v = Vec::new(); v.push(x);` — use `vec![x]` or `with_capacity`
-vec_init_then_push = "deny"
+vec_init_then_push = "forbid"
 
 # ============================
 # Restriction → warn (carefully selected)
 # ============================
 # Flag bare #[allow(...)] — prefer #[expect(...)] which errors when lint no longer fires
-allow_attributes = "deny"
+allow_attributes = "forbid"
 # Require reason on all #[allow/expect] — forces documentation of suppression rationale
-allow_attributes_without_reason = "deny"
+allow_attributes_without_reason = "forbid"
 # Flag `cfg(not(test))` — usually a code smell, prefer `cfg(test)` with inverted logic
-cfg_not_test = "warn"
+cfg_not_test = "forbid"
 # Use `Arc::clone(&x)` instead of `x.clone()` — makes ref-count clone explicit
-clone_on_ref_ptr = "warn"
+clone_on_ref_ptr = "forbid"
 # Flag `dbg!()` macro — should not ship to production
-dbg_macro = "deny"
+dbg_macro = "forbid"
 # Flag empty `Drop` impls — `impl Drop for T {}` is a no-op that prevents optimizations
-empty_drop = "warn"
+empty_drop = "forbid"
 # Flag `Foo {}` on unit variants — prefer `Foo` without brackets
-empty_enum_variants_with_brackets = "warn"
+empty_enum_variants_with_brackets = "forbid"
 # Flag `struct Foo {}` — prefer `struct Foo;` for unit structs
-empty_structs_with_brackets = "warn"
+empty_structs_with_brackets = "forbid"
 # Flag `Error` in error type names — `struct FooError` not `struct Error`
-error_impl_error = "warn"
+error_impl_error = "forbid"
 # Flag `std::process::exit()` — prefer returning from main
-exit = "warn"
+exit = "forbid"
 # Flag `.expect()` — prefer explicit error handling or `unwrap_or`
-expect_used = "warn"
+expect_used = "forbid"
 # Flag `fn as usize` — function-to-integer casts are suspicious
-fn_to_numeric_cast_any = "warn"
+fn_to_numeric_cast_any = "forbid"
 # Flag `map[key]` indexing — prefer `.get()` which returns Option
-get_unwrap = "warn"
+get_unwrap = "forbid"
 # Flag infinite loops without break — `loop {}` without exit path
-infinite_loop = "warn"
+infinite_loop = "forbid"
 # Flag `let _ = must_use_fn()` — don't silently discard important results
-let_underscore_must_use = "warn"
+let_underscore_must_use = "forbid"
 # Flag float literals that lose precision — `0.1` != exact `0.1_f64`
-lossy_float_literal = "warn"
+lossy_float_literal = "forbid"
 # Require messages on all assert! macros — `assert!(x, "reason")` not just `assert!(x)`
-missing_assert_message = "warn"
+missing_assert_message = "forbid"
 # Flag `panic!()` — prefer returning Result or specific error types
-panic = "warn"
+panic = "deny"
 # Flag `eprint!`/`eprintln!` — prefer structured logging
-print_stderr = "warn"
+print_stderr = "forbid"
 # Flag `print!`/`println!` — prefer structured logging
-print_stdout = "warn"
+print_stdout = "forbid"
 # Flag `..` in fully-bound struct patterns — be explicit about all fields
-rest_pat_in_fully_bound_structs = "warn"
+rest_pat_in_fully_bound_structs = "forbid"
 # Flag `String + &str` concatenation — prefer `format!()` or `push_str()`
-string_add = "warn"
+string_add = "forbid"
 # Flag `todo!()` — should not ship to production
-todo = "deny"
+todo = "forbid"
 # Require `// SAFETY:` comment on all unsafe blocks
-undocumented_unsafe_blocks = "warn"
+undocumented_unsafe_blocks = "forbid"
 # Flag `unimplemented!()` — should not ship to production
-unimplemented = "warn"
+unimplemented = "forbid"
 # Flag `// SAFETY:` comments without nearby unsafe — stale safety docs
-unnecessary_safety_comment = "warn"
+unnecessary_safety_comment = "forbid"
 # Flag `# Safety` doc sections without unsafe in the function
-unnecessary_safety_doc = "warn"
+unnecessary_safety_doc = "forbid"
 # Flag `unreachable!()` — prefer compile-time guarantees or specific panics
-unreachable = "warn"
+unreachable = "forbid"
 # Flag `.unwrap()` — prefer explicit error handling
-unwrap_used = "warn"
+unwrap_used = "forbid"
 # Flag `_` in match on non-exhaustive enums — be explicit about variants
-wildcard_enum_match_arm = "warn"
+wildcard_enum_match_arm = "forbid"
 # Flag `std::mem::forget()` — prevents memory/resource leaks
-mem_forget = "deny"
+mem_forget = "forbid"
 # Flag `Rc<Mutex<T>>` — almost always a design error, use `Arc<Mutex<T>>`
-rc_mutex = "deny"
+rc_mutex = "forbid"
 # Flag `&str[start..end]` slicing — may panic on UTF-8 boundaries
-string_slice = "deny"
+string_slice = "forbid"
 
 # ============================
 # Pedantic/Restriction/Nursery — Tier additions
 # ============================
 # Catches `"hello {name}"` without format! — false-positives on .replace() templates
-literal_string_with_formatting_args = "deny"
+literal_string_with_formatting_args = "forbid"
 # PathBuf::push with absolute path silently overwrites — always a bug
-path_buf_push_overwrite = "deny"
+path_buf_push_overwrite = "forbid"
 # Operator precedence bugs in grouped comparisons
-suspicious_operation_groupings = "deny"
+suspicious_operation_groupings = "forbid"
 # `2 ^ 8` is XOR not pow — always a bug
-suspicious_xor_used_as_pow = "deny"
+suspicious_xor_used_as_pow = "forbid"
 # Panicking inside `-> Result` defeats the purpose
-panic_in_result_fn = "deny"
+panic_in_result_fn = "forbid"
 # `.unwrap()` inside `-> Result` — propagate instead
-unwrap_in_result = "deny"
+unwrap_in_result = "forbid"
 # `.ok()` discarded silently — handle the Result
-unused_result_ok = "deny"
+unused_result_ok = "forbid"
 # `impl<B, A> Foo<A, B>` — param order mismatch
-mismatching_type_param_order = "deny"
+mismatching_type_param_order = "forbid"
 # Use std LazyLock instead of lazy_static (edition 2024)
-non_std_lazy_statics = "deny"
+non_std_lazy_statics = "forbid"
 # Tests belong in `#[cfg(test)] mod tests`
-tests_outside_test_module = "deny"
+tests_outside_test_module = "forbid"
 # `.unwrap_or(expensive())` — use `unwrap_or_else`
-or_fun_call = "deny"
+or_fun_call = "forbid"
 # `.collect().iter()` — skip the collect
-needless_collect = "deny"
+needless_collect = "forbid"
 # `set.contains() + set.insert()` — use entry API
-set_contains_or_insert = "deny"
+set_contains_or_insert = "forbid"
 # `.as_ref().cloned()` → `.clone()`
-option_as_ref_cloned = "deny"
+option_as_ref_cloned = "forbid"
 # `"foo".as_bytes()` → `b"foo"`
-string_lit_as_bytes = "deny"
+string_lit_as_bytes = "forbid"
 # Concise doc summary paragraphs
-too_long_first_doc_paragraph = "deny"
+too_long_first_doc_paragraph = "forbid"
 # `push_str(&format!(...))` → `write!`
-format_push_string = "deny"
+format_push_string = "forbid"
 # `.split("x")` → `.split('x')`
-single_char_pattern = "deny"
+single_char_pattern = "forbid"
 # `{:?}` where `{}` works (Display impl available)
-unnecessary_debug_formatting = "deny"
+unnecessary_debug_formatting = "forbid"
 # Trailing `;` in expression position
-unnecessary_semicolon = "deny"
+unnecessary_semicolon = "forbid"
 # `.map_err(|_| ...)` loses error info
-map_err_ignore = "deny"
+map_err_ignore = "forbid"
 # Use `fs::read_to_string` instead of open+read
-verbose_file_reads = "deny"
+verbose_file_reads = "forbid"
 # `PathBuf::new()` + `.push()` → `PathBuf::from()`
-pathbuf_init_then_push = "deny"
+pathbuf_init_then_push = "forbid"
 # Trait impl renames parameters vs trait definition
-renamed_function_params = "deny"
+renamed_function_params = "forbid"
 # `{:?}` in production code — prefer Display
-use_debug = "deny"
+use_debug = "forbid"
 # `let x: Foo = Foo::new()` — redundant annotation
-redundant_type_annotations = "deny"
+redundant_type_annotations = "forbid"
 
 # ============================
 # Taskforce lints — high-value, systematic migration
 # ============================
 # Forces explicit checked arithmetic instead of silent panics
-arithmetic_side_effects = "warn"
+arithmetic_side_effects = "deny"
 # Forces .get() instead of [] indexing — explicit panic handling
-indexing_slicing = "warn"
+indexing_slicing = "forbid"
 # `as` silently truncates; replacing with TryFrom is strictly safer
-# DISABLED: as_conversions = "warn"
+# DISABLED: as_conversions = "forbid"
 # Catches real bugs comparing floats to constants
-float_cmp_const = "warn"
+float_cmp_const = "forbid"
 # Forces explicit intent on integer division
-# DISABLED: integer_division = "warn"
+# DISABLED: integer_division = "forbid"
 # Same rationale as integer_division
-modulo_arithmetic = "warn"
+modulo_arithmetic = "forbid"
 # Eliminates subtle type inference bugs with numeric literals
-# DISABLED: default_numeric_fallback = "warn"
+# DISABLED: default_numeric_fallback = "forbid"
 # Improves match clarity, mechanical fixes
-# DISABLED: pattern_type_mismatch = "warn"
+# DISABLED: pattern_type_mismatch = "forbid"
 # Docs on private items — pays dividends forever
-missing_docs_in_private_items = "warn"
+missing_docs_in_private_items = "forbid"
 # Forces deliberate API design with #[non_exhaustive]
-# DISABLED: exhaustive_enums = "warn"
+# DISABLED: exhaustive_enums = "forbid"
 # Same — forces deliberate struct API design
-# DISABLED: exhaustive_structs = "warn"
+# DISABLED: exhaustive_structs = "forbid"
 # Pure mechanical cleanup, free quality
-# DISABLED: redundant_pub_crate = "warn"
+# DISABLED: redundant_pub_crate = "forbid"
 # Mechanical, zero controversy
-map_with_unused_argument_over_ranges = "warn"
+map_with_unused_argument_over_ranges = "forbid"
 # Real correctness bug class in float loops
-while_float = "warn"
+while_float = "forbid"
 # Free perf for numerics
-imprecise_flops = "warn"
+imprecise_flops = "forbid"
 # Free perf for numerics
-suboptimal_flops = "warn"
+suboptimal_flops = "forbid"
 # Audit and deduplicate deps
 # Transitive deps (typst→hayagriva→thiserror 1, notify→inotify→bitflags 1, proc-macros→syn 1)
 # Cannot fix without upstream migration. Revisit when typst ecosystem upgrades.
 multiple_crate_versions = "allow"
 # Forces explicit todo!() or real impls — no silent default footguns
-missing_trait_methods = "warn"
+missing_trait_methods = "deny"
 # Enforces String::from consistency over .to_string() on &str
-# DISABLED: str_to_string = "warn"
+# DISABLED: str_to_string = "forbid"
 # Prevents accidental drops of MustUse types
-# DISABLED: let_underscore_untyped = "warn"
+# DISABLED: let_underscore_untyped = "forbid"
 # Catches debug-logging mistakes with pointer formatting
-pointer_format = "warn"
+pointer_format = "forbid"
 # Forces exhaustiveness thinking in if-else chains
-# DISABLED: else_if_without_else = "warn"
+# DISABLED: else_if_without_else = "forbid"
 # Unrelated shadows are genuinely confusing
-shadow_unrelated = "warn"
+shadow_unrelated = "forbid"
 # Mechanical, makes docs professional
-# DISABLED: doc_paragraphs_missing_punctuation = "warn"
+# DISABLED: doc_paragraphs_missing_punctuation = "forbid"
 # Named lifetimes improve complex code readability
-single_char_lifetime_names = "warn"
+single_char_lifetime_names = "forbid"
 # Audit re-exports are intentional
-pub_use = "warn"
+pub_use = "forbid"
 # Isolating unsafe ops is a strict quality win
-multiple_unsafe_ops_per_block = "warn"
+multiple_unsafe_ops_per_block = "forbid"
 # Prevents genuine UB with unions
-default_union_representation = "warn"
+default_union_representation = "forbid"
 
 # ============================
 # Nursery — remaining (warn)
 # ============================
-clear_with_drain = "warn"
-coerce_container_to_any = "warn"
-doc_link_code = "warn"
-equatable_if_let = "warn"
-iter_on_empty_collections = "warn"
-iter_on_single_items = "warn"
-iter_with_drain = "warn"
-large_stack_frames = "warn"
-non_send_fields_in_send_ty = "warn"
-nonstandard_macro_braces = "warn"
-read_zero_byte_vec = "warn"
-single_option_map = "warn"
-trailing_empty_array = "warn"
-transmute_undefined_repr = "warn"
-trivial_regex = "warn"
-tuple_array_conversions = "warn"
-uninhabited_references = "warn"
-unused_peekable = "warn"
-unused_rounding = "warn"
-useless_let_if_seq = "warn"
-volatile_composites = "warn"
+clear_with_drain = "forbid"
+coerce_container_to_any = "forbid"
+doc_link_code = "forbid"
+equatable_if_let = "forbid"
+iter_on_empty_collections = "forbid"
+iter_on_single_items = "forbid"
+iter_with_drain = "forbid"
+large_stack_frames = "forbid"
+non_send_fields_in_send_ty = "forbid"
+nonstandard_macro_braces = "forbid"
+read_zero_byte_vec = "forbid"
+single_option_map = "forbid"
+trailing_empty_array = "forbid"
+transmute_undefined_repr = "forbid"
+trivial_regex = "forbid"
+tuple_array_conversions = "forbid"
+uninhabited_references = "forbid"
+unused_peekable = "forbid"
+unused_rounding = "forbid"
+useless_let_if_seq = "forbid"
+volatile_composites = "forbid"
 
 # ============================
 # Pedantic — remaining (warn)
 # ============================
-expl_impl_clone_on_copy = "warn"
-format_collect = "warn"
-inline_always = "warn"
-invalid_upcast_comparisons = "warn"
-ip_constant = "warn"
-large_digit_groups = "warn"
-linkedlist = "warn"
-macro_use_imports = "warn"
-manual_is_power_of_two = "warn"
-manual_midpoint = "warn"
-maybe_infinite_iter = "warn"
-mut_mut = "warn"
-naive_bytecount = "warn"
-no_effect_underscore_binding = "warn"
-pub_underscore_fields = "warn"
-ref_binding_to_reference = "warn"
-self_only_used_in_recursion = "warn"
+expl_impl_clone_on_copy = "forbid"
+format_collect = "forbid"
+inline_always = "forbid"
+invalid_upcast_comparisons = "forbid"
+ip_constant = "forbid"
+large_digit_groups = "forbid"
+linkedlist = "forbid"
+macro_use_imports = "forbid"
+manual_is_power_of_two = "forbid"
+manual_midpoint = "forbid"
+maybe_infinite_iter = "forbid"
+mut_mut = "forbid"
+naive_bytecount = "forbid"
+no_effect_underscore_binding = "forbid"
+pub_underscore_fields = "forbid"
+ref_binding_to_reference = "forbid"
+self_only_used_in_recursion = "forbid"
 # =====================
-similar_names = "warn"
-# DISABLED: too_many_lines = "warn"
-unchecked_time_subtraction = "warn"
-unicode_not_nfc = "warn"
-unnecessary_literal_bound = "warn"
+similar_names = "forbid"
+# DISABLED: too_many_lines = "forbid"
+unchecked_time_subtraction = "forbid"
+unicode_not_nfc = "forbid"
+unnecessary_literal_bound = "forbid"
 
 # ============================
 # Restriction — remaining (warn)
 # ============================
-as_pointer_underscore = "warn"
-as_underscore = "warn"
-assertions_on_result_states = "warn"
-# DISABLED: cognitive_complexity = "warn"
-create_dir = "warn"
-decimal_literal_representation = "warn"
-deref_by_slicing = "warn"
-doc_include_without_cfg = "warn"
-field_scoped_visibility_modifiers = "warn"
-filetype_is_file = "warn"
-if_then_some_else_none = "warn"
-impl_trait_in_params = "warn"
-integer_division_remainder_used = "warn"
-iter_over_hash_type = "warn"
-large_include_file = "warn"
-missing_asserts_for_indexing = "warn"
-mixed_read_write_in_expression = "warn"
-module_name_repetitions = "deny"
+as_pointer_underscore = "forbid"
+as_underscore = "forbid"
+assertions_on_result_states = "forbid"
+# DISABLED: cognitive_complexity = "forbid"
+create_dir = "forbid"
+decimal_literal_representation = "forbid"
+deref_by_slicing = "forbid"
+doc_include_without_cfg = "forbid"
+field_scoped_visibility_modifiers = "forbid"
+filetype_is_file = "forbid"
+if_then_some_else_none = "forbid"
+impl_trait_in_params = "forbid"
+integer_division_remainder_used = "deny"
+iter_over_hash_type = "forbid"
+large_include_file = "forbid"
+missing_asserts_for_indexing = "forbid"
+mixed_read_write_in_expression = "forbid"
+module_name_repetitions = "forbid"
 # Multiple impl blocks for same type — warn only (App is intentionally split across 7 files)
-multiple_inherent_impl = "warn"
-mutex_integer = "warn"
-needless_raw_strings = "warn"
-non_zero_suggestions = "warn"
-partial_pub_fields = "warn"
-precedence_bits = "warn"
-rc_buffer = "warn"
-redundant_test_prefix = "warn"
-return_and_then = "warn"
-same_name_method = "warn"
-string_lit_chars_any = "warn"
-try_err = "warn"
-unnecessary_self_imports = "warn"
-unneeded_field_pattern = "warn"
-unused_trait_names = "warn"
+multiple_inherent_impl = "deny"
+mutex_integer = "forbid"
+needless_raw_strings = "forbid"
+non_zero_suggestions = "forbid"
+partial_pub_fields = "forbid"
+precedence_bits = "forbid"
+rc_buffer = "forbid"
+redundant_test_prefix = "forbid"
+return_and_then = "forbid"
+same_name_method = "forbid"
+string_lit_chars_any = "forbid"
+try_err = "forbid"
+unnecessary_self_imports = "forbid"
+unneeded_field_pattern = "forbid"
+unused_trait_names = "forbid"
 
 # ============================
 # Cargo → warn
 # ============================
 # Ensures proper Cargo.toml metadata (description, license, etc.)
-cargo_common_metadata = "warn"
+cargo_common_metadata = "forbid"
 # Feature names shouldn't be negative (no_*)
-negative_feature_names = "warn"
+negative_feature_names = "forbid"
 # Feature named same as dep is redundant
-redundant_feature_names = "warn"
+redundant_feature_names = "forbid"
 # Always pin dependency versions
-wildcard_dependencies = "warn"
+wildcard_dependencies = "forbid"
 
 [package]
 name = "tui"
