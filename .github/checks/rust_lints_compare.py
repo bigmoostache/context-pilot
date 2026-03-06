@@ -24,7 +24,7 @@ OUTPUT = ROOT / "rust_lints_compared_list.md"
 EMOJI = {"allow": "\U0001f4a4", "warn": "\u26a0\ufe0f", "deny": "\U0001f6ab", "forbid": "\u2620\ufe0f"}
 
 # Toggle: hide lines where current == default (warn) and irrelevant lines
-HIDE_UNMODIFIED_AND_IRRELEVANT = True
+HIDE_UNMODIFIED_AND_IRRELEVANT = False
 
 
 def normalize(name: str) -> str:

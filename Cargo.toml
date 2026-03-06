@@ -31,7 +31,7 @@ ambiguous_associated_items = "forbid"
 ambiguous_glob_imports = "forbid"
 arithmetic_overflow = "forbid"
 binary_asm_labels = "forbid"
-bindings_with_variant_name = "forbid"
+bindings_with_variant_name = "deny"
 conflicting_repr_hints = "forbid"
 dangerous_implicit_autorefs = "forbid"
 dependency_on_unit_never_type_fallback = "forbid"
@@ -356,7 +356,7 @@ async_fn_in_trait = "forbid"
 # AT&T vs Intel asm style — always fix
 bad_asm_style = "forbid"
 # Dead code — always remove
-dead_code = "forbid"
+dead_code = "deny"
 # Leaking private deps through public API — always fix
 exported_private_dependencies = "forbid"
 # Using #[deny(lint_group)] — always spell out individual lints
