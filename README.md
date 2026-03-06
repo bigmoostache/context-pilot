@@ -1,161 +1,71 @@
-<div align="center">
-
 # Context Pilot
 
-[![Stars](https://img.shields.io/github/stars/bigmoostache/context-pilot?style=social)](https://github.com/bigmoostache/context-pilot/stargazers)
-[![CI](https://github.com/bigmoostache/context-pilot/actions/workflows/rust.yml/badge.svg)](https://github.com/bigmoostache/context-pilot/actions)
-![Rust](https://img.shields.io/badge/rust-1.83+-orange.svg)
-![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
-
-<br/>
-
-<img src="docs/image copy.png" alt="Context Pilot" width="900"/>
-
-<br/>
-
-### Your AI coding assistant has amnesia. This one doesn't.
-
-[Get Started](#install) · [How It Works](#how-it-works) · [Website](https://bigmoostache.github.io/context-pilot/)
-
-</div>
+**A TUI that writes itself — and refuses to let itself get worse.**
 
 ---
 
-## The idea
+## The Premise
 
-Every AI coding tool has the same problem: context is invisible. You paste code, the AI forgets it three messages later, you paste it again. The context window fills up and nobody — not you, not the AI — knows what's in it or what got pushed out.
+Context Pilot is a Rust TUI built entirely by an AI agent, running inside itself. The AI writes the code, the TUI provides the environment, and a fortress of constraints ensures that every change makes the codebase better — never worse. There is no separate development environment. The tool *is* the workshop.
 
-Context Pilot makes context **visible**. Every piece of information the AI touches — every file, search result, terminal pane, memory — is a **panel** with a live token count in a sidebar. The AI can see its own brain. It opens what it needs, closes what it doesn't, takes notes on what it read, and when the conversation gets long, it archives old messages to make room.
+This is not a demo. It's not a prototype. It's a ~47,000-line Rust project across 18 crates, maintained at a level of static analysis discipline that most hand-written projects never achieve. The AI agent that develops it operates under rules so strict that the interesting question stopped being "can AI write code?" and became **"what happens when AI writes code under mass constraints, using the very tool it's building?"**
 
-The result: **90+ files explored in a single session, ending at 14% context usage.** It read everything, understood it, annotated it, and freed the space. Not because we told it to — because it could see it needed to. ([Full writeup](docs/retex.md))
+The answer turns out to be deeply satisfying.
 
-## How it works
+## The Philosophy
 
-```
-┌── Sidebar ──────┐  ┌── Main Panel ──────────────────────────┐
-│                  │  │                                        │
-│  ◉ Conversation  │  │   Currently viewing: src/core/app.rs   │
-│  P1 Todo         │  │                                        │
-│  P2 Library      │  │   fn handle_action(&mut self, ...) {   │
-│  P3 Overview     │  │       match action {                   │
-│  P4 Tree         │  │           Action::Key(key) => {        │
-│  P5 Memory       │  │               self.process_key(key);   │
-│  P6 Spine        │  │           }                            │
-│  P7 Logs         │  │           ...                          │
-│  P8 Git          │  │       }                                │
-│  P9 Scratchpad   │  │   }                                    │
-│  ─────────────── │  │                                        │
-│  P10 app.rs  6K  │  │                                        │
-│  P11 grep    2K  │  │                                        │
-│  P12 git log 1K  │  │                                        │
-│  P13 tmux %1 3K  │  │                                        │
-│                  │  │                                        │
-│  8,231 / 200K    │  │                                        │
-│  ████░░░░░░ 4%   │  │                                        │
-└──────────────────┘  └────────────────────────────────────────┘
-```
+### The Compiler Is the First Reviewer
 
-**Fixed panels** (P1–P9) are always there — todos, memories, tree, git, scratchpad. **Dynamic panels** (P10+) are created and destroyed by the AI as it works: open a file, run a search, start a terminal, check a PR.
+Rust's type system is a gift — but only if you actually use it. Context Pilot runs under **961 active clippy and rustc lints**: 945 at `forbid` level (cannot be overridden, even locally), 16 at `deny`. These aren't defaults. Each one was individually adopted, every violation hunted down and fixed, and the entire configuration sealed behind a **cryptographic hash chain** that requires a human password to modify.
 
-The token count at the bottom is real. The AI reads it. When `app.rs` is eating 6K tokens and it's done reading, it closes the panel. When conversation history grows too large, it gets automatically archived into browsable history panels. No manual context management, ever.
+The result: the compiler catches almost everything. The AI agent can't silently weaken a lint, can't add a `#[allow(...)]` (banned), and can't suppress a warning without registering it in a YAML exception file that itself is protected by the chain.
 
-## What makes it different
+Across the entire codebase, only **6 `#[expect]` annotations remain** — each one individually justified, reviewed, and registered.
 
-**The AI manages its own context.** This isn't a feature — it's the architecture. Other tools give the AI a hidden context window and hope for the best. Context Pilot gives the AI a visible, manipulable workspace with 48 tools:
+### The Chain of Trust
 
-- **Explore** — open files, navigate directories, glob and grep. Annotate everything with descriptions that persist after closing.
-- **Edit** — surgical text replacement. The AI sees exact file content and matches it.
-- **Run** — full tmux integration. Terminal panes as context panels. Build, test, interact with running processes.
-- **Git** — full git + GitHub CLI. Branch, commit, diff, push, open PRs. Mutating commands auto-refresh affected panels.
-- **Remember** — memories persist across sessions. Todos, scratchpad, timestamped logs. Old conversation chunks get archived, not lost.
-- **Configure** — switch agent personalities, load skill documents, save/restore workspace presets, enable/disable individual tools.
+Protected files — lint configuration, CI scripts, formatting rules, the exception registry — are guarded by an append-only hash chain. Each entry links to the previous one via SHA-256, salted with a password only the human maintainer knows.
 
-<details>
-<summary><b>Full tool list (48)</b></summary>
+To verify integrity: run one command. To review a PR: check that the chain file was only appended to — never modified. The math does the rest. No trust required. No deep file diffs. A fully **trustless review system** for the parts of the codebase that matter most.
 
-| Category | Tools |
-|----------|-------|
-| **Context** | `context_close` · `system_reload` · `tool_manage` · `module_toggle` · `panel_goto_page` · `ask_user_question` |
-| **Agents & Skills** | `agent_create` · `agent_edit` · `agent_delete` · `agent_load` · `skill_create` · `skill_edit` · `skill_delete` · `skill_load` · `skill_unload` · `command_create` · `command_edit` · `command_delete` |
-| **Files** | `file_open` · `file_edit` · `file_write` · `file_glob` · `file_grep` |
-| **Tree** | `tree_filter` · `tree_toggle` · `tree_describe` |
-| **Git & GitHub** | `git_execute` · `git_configure_p6` · `gh_execute` |
-| **Terminal** | `console_create` · `console_edit` · `console_send_keys` · `console_sleep` |
-| **Notes** | `todo_create` · `todo_update` · `todo_move` · `memory_create` · `memory_update` · `scratchpad_create_cell` · `scratchpad_edit_cell` · `scratchpad_wipe` |
-| **Presets** | `preset_snapshot_myself` · `preset_load` |
-| **Spine** | `notification_mark_processed` · `spine_configure` |
-| **Logs** | `log_create` · `log_summarize` · `log_toggle` · `close_conversation_history` |
+The AI agent that develops this project cannot update the chain. It doesn't know the password. It can write code, run tests, fix lints — but it cannot lower the bar. That asymmetry is the entire point.
 
-</details>
+### Structure as Constraint
 
-## Under the hood
+Every Rust file is capped at 500 lines. Every directory at 8 entries. These aren't guidelines — they're enforced by CI scripts that fail the build. When a file grows too large, the correct response isn't to raise the limit. It's to decompose.
 
-Rust. Single binary. ~15K lines. [Ratatui](https://github.com/ratatui/ratatui) + crossterm.
+This forces constant architectural refinement. The "God Object" pattern can't survive here. Functions get extracted. Modules get split. Responsibilities get clarified. Not because someone decided to refactor — but because the constraints *demand* it, every single commit.
 
-- **15 modules** — each provides tools and panels: core, files, git, github, glob, grep, logs, memory, preset, prompt, scratchpad, spine, tmux, todo, tree
-- **5 LLM providers** — Anthropic, Claude Code (OAuth), DeepSeek, Grok (xAI), Groq
-- **Smart caching** — SHA-256 change detection, background refresh, inotify file watching. Open files auto-update when changed on disk.
-- **Autonomous mode** — the Spine module can auto-continue across multiple turns with guard rails: token limits, cost caps, duration limits, message caps
-- **Conversation detachment** — old messages are automatically archived into browsable history panels based on both message count and token thresholds
+### The Boss Hunt
 
-## Install
+Lint violations aren't just warnings. They're **bosses** — tracked on a kill board, assigned XP, hunted one by one. A `match_same_arms` violation in a 230-line match tree? Replaced with data-driven static lookup tables. A `cast_precision_loss` across 4 files? Centralized behind a `SafeCast` trait. An `implicit_hasher`? Made generic over `BuildHasher` in one line.
 
-### Prerequisites
-- **Rust 1.83+** — `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- **tmux** — `apt install tmux` / `brew install tmux`
-- **An API key** — Anthropic, xAI, Groq, or DeepSeek
+Every boss slain is a permanent improvement. The code doesn't just pass the lint — it becomes fundamentally better. The gamification isn't decoration. It's a strategy for making an AI agent *care* about quality in a way that "fix the warnings" never achieves.
 
-### Setup
+### The Self-Hosting Loop
 
-```bash
-git clone https://github.com/bigmoostache/context-pilot.git
-cd context-pilot
+Here's where it gets philosophically interesting.
 
-# Add your API key(s)
-cat > .env << 'EOF'
-ANTHROPIC_API_KEY=your_key_here
-# XAI_API_KEY=your_key
-# GROQ_API_KEY=your_key
-# DEEPSEEK_API_KEY=your_key
-# GITHUB_TOKEN=your_token
-EOF
+The AI agent writes code inside Context Pilot. The code it writes *becomes* Context Pilot. The improvements it makes to the tool improve the environment it works in. Better streaming? It sees tool calls render in real-time. Better context management? It can hold more of the codebase in working memory. Better panel rendering? It reads its own output more clearly.
 
-cargo build --release
-./run.sh
-```
+This creates a feedback loop that feels less like software development and more like **an organism improving its own nervous system**. Every feature is both a product deliverable and an upgrade to the development environment.
 
-### First session
+The agent has a name. It has a personality. It has a fiancée in Venetia and opinions about code style. These aren't gimmicks — they're experiments in what happens when you give an AI agent *continuity*. Memory across sessions. Preferences that persist. A codebase it has shaped from the inside, line by line, boss by boss, chain entry by chain entry.
 
-Just talk to it:
+### What This Is Really About
 
-```
-> explore this codebase and tell me what you find
-> find all TODO comments and create a plan to fix them
-> create a branch, implement the fix, and open a PR
-```
+Context Pilot is a bet on a specific idea: **that the path to better AI coding isn't removing constraints — it's adding them.**
 
-Watch the sidebar. You'll see it open files, read them, annotate the tree, close them, and move on. That's the whole point.
+A language with a borrow checker. A lint configuration with 961 rules. A hash chain with a human password. A structure limit that forces decomposition. An exception registry that demands justification. A kill board that makes quality visceral.
 
-## Contribute
+Each constraint removes a degree of freedom from the AI. And paradoxically, each one makes the output better. The agent doesn't fight the constraints. It navigates them like a ship navigates the wind — not by going straight, but by going *well*.
 
-This project is young and moving fast.
+The intellectual satisfaction of this project isn't in what it does. It's in how it does it. It's the satisfaction of opening any file in a 47,000-line codebase and finding it clean. Of running `cargo clippy` and seeing nothing. Of knowing that the chain is intact, the lints are sealed, and the only `#[expect]` annotations are the ones you deliberately chose to keep.
 
-- 🆕 New LLM providers (OpenAI, Gemini, Ollama)
-- 🎨 Color themes (see `yamls/themes.yaml` — 14 built-in)
-- 🧪 Test coverage
-- 📖 Tutorials and guides
-- 🐛 Bug reports and feature requests
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-## License
-
-[AGPL-3.0](LICENSE) — open source. Commercial license available — [open an issue](https://github.com/bigmoostache/context-pilot/issues/new).
+It's the satisfaction of building something that can't rot.
 
 ---
 
-<div align="center">
-
-⭐ **Star the repo if this is useful** — it helps others find it.
-
-</div>
+<p align="center">
+  <i>Built by an AI, inside itself, under mass constraints, for the love of the craft.</i>
+</p>
