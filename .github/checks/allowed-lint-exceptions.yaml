@@ -72,7 +72,7 @@ exceptions:
 
 
 
-  # ── app/run/*: multiple_inherent_impl for App ─────────────────────────
+  # ── app/run/*: multiple_inherent_impl for App ────────────────────────
 
   - path: "src/app/run/lifecycle.rs"
     match: 'App methods split across run/ submodules for readability'

@@ -1,0 +1,50 @@
+# Protected files manifest — the captain's seal.
+#
+# Every file listed here is included in the cryptographic hash chain.
+# Changing ANY of these files (or this manifest itself) requires the
+# password to update the chain.
+#
+# Format:
+#   - path: relative/to/project/root
+#     sections:                        # optional: protect only specific sections
+#       - start: "[section.header]"    # line that starts the section (literal match)
+#         end_before: "["              # first line that ends it (prefix match)
+#     whole_file: true                 # or protect the entire file (default if no sections)
+
+# --- This manifest (self-protecting) ---
+- path: .github/checks/protected-files.yaml
+  whole_file: true
+
+# --- Cargo lint configuration ---
+- path: Cargo.toml
+  sections:
+    - start: "[workspace.lints.clippy]"
+      end_before: "["
+    - start: "[workspace.lints.rust]"
+      end_before: "["
+
+# --- Clippy & format config ---
+- path: clippy.toml
+  whole_file: true
+- path: rustfmt.toml
+  whole_file: true
+
+# --- CI check scripts ---
+- path: .github/checks/check-file-lengths.sh
+  whole_file: true
+- path: .github/checks/check-folder-sizes.sh
+  whole_file: true
+- path: .github/checks/check-lint-config.sh
+  whole_file: true
+- path: .github/checks/check-lint-exceptions.sh
+  whole_file: true
+
+# --- Lint exception registry ---
+- path: .github/checks/allowed-lint-exceptions.yaml
+  whole_file: true
+
+# --- Build & deploy scripts ---
+- path: deploy_local.sh
+  whole_file: true
+- path: run.sh
+  whole_file: true
