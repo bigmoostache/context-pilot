@@ -75,7 +75,7 @@ deactivation, and monitors its health.
 
 | Aspect           | Decision                                              |
 |------------------|-------------------------------------------------------|
-| Binary location  | `~/.context-pilot/bin/tuwunel` (auto-downloaded)      |
+| Binary location  | Bundled in CP release artifacts (extracted to `~/.context-pilot/bin/tuwunel`) |
 | Data directory   | `.context-pilot/matrix/data/`                         |
 | Config           | `.context-pilot/matrix/homeserver.toml` (auto-generated) |
 | Listening        | `127.0.0.1:6167` (localhost only, no federation by default) |
@@ -87,7 +87,7 @@ deactivation, and monitors its health.
 
 On first activation of the Matrix module:
 
-1. **Download Tuwunel** binary if not present (platform-appropriate)
+1. **Extract Tuwunel** binary from bundled CP assets to `~/.context-pilot/bin/tuwunel` if not already present
 2. **Generate config** (`homeserver.toml`) with secure defaults:
    - Server name: `localhost` (or user-configured)
    - Registration: disabled (CP creates the bot account directly)
@@ -98,7 +98,7 @@ On first activation of the Matrix module:
 
 ### 3.3 Startup Sequence (Every Module Activation)
 
-1. Check if Tuwunel binary exists → download if missing
+1. Check if Tuwunel binary exists at `~/.context-pilot/bin/tuwunel` → extract from bundled assets if missing
 2. Start Tuwunel process
 3. Wait for `/_matrix/client/versions` to respond (with timeout)
 4. Authenticate with stored access token
@@ -589,6 +589,10 @@ Decisions made during design refinement:
 | 7 | **Bridge management** | Docker-compose template | CP ships a `docker-compose.yaml` template in `.context-pilot/matrix/`. Postgres + bridges all containerized. User customizes and runs `docker compose up`. CP never manages bridge processes directly. |
 | 8 | **PostgreSQL** | Inside Docker (with bridges) | All mautrix Go bridges require PostgreSQL 16+. Postgres runs as a container alongside bridges in the same docker-compose. CP only talks to the homeserver (SQLite). |
 | 9 | **Email bridge** | Excluded | Postmoogle requires DNS records (DKIM/SPF/DMARC), SMTP port 25, and a real domain — fundamentally incompatible with local-first. Out of scope. |
+| 10 | **Media handling** | Download + local path | Files/images auto-downloaded to `.context-pilot/matrix/media/`. AI sees a local file path in the room panel and uses existing tools (Open, console_easy_bash, etc.) to inspect content. No multimodal LLM features — the AI works with what it has. |
+| 11 | **Message history** | Paginated on demand | Room panel opens with last ~20 messages. AI calls `message_read` with pagination params to load more. AI controls its own context budget. |
+| 12 | **AI accounts** | Single shared bot | One `@context-pilot:localhost` account shared across all workers. Simple sync, simple auth. If multiple workers reply, they all appear as the same bot. |
+| 13 | **Tuwunel distribution** | Bundled with CP binary | Tuwunel ships inside Context Pilot's release artifacts. Single download, zero setup. Versions are tied together — CP release N ships with Tuwunel version M. |
 
 ## 11. Open Questions
 
@@ -596,11 +600,7 @@ Items that still need resolution:
 
 | # | Question | Options | Notes |
 |---|----------|---------|-------|
-| 1 | **Media handling**: Should the AI see images/files? | (a) Text-only (b) Download + describe (c) Pass URLs | Multimodal adds complexity |
-| 2 | **Message history persistence**: How much history to keep in context? | (a) Last N messages (b) Time window (c) Configurable | Affects token budget |
-| 3 | **Multiple AI accounts**: One bot per worker, or shared? | (a) Shared `@context-pilot` (b) Per-worker accounts | Relates to multi-worker setups |
-| 4 | **Binary distribution**: How to ship Tuwunel? | (a) Auto-download from GitHub releases (b) System package (c) Compile from source | Auto-download simplest |
-| 5 | **E2EE**: End-to-end encryption for bridge channels? | (a) Disabled (local-only, unnecessary) (b) Enabled for federation | matrix-sdk supports it, but adds complexity |
+| 1 | **E2EE**: End-to-end encryption for bridge channels? | (a) Disabled (local-only, unnecessary) (b) Enabled for federation | matrix-sdk supports it, but adds complexity. Likely unnecessary for localhost-only. |
 
 ---
 
