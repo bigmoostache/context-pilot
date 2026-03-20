@@ -214,6 +214,7 @@ pub enum BridgeHint {
 | `message_read`         | Open a room panel (shows recent messages)          | Message  |
 | `message_react`        | Add a reaction emoji to a message                  | Message  |
 | `message_reply`        | Reply to a specific message in a room              | Message  |
+| `message_acknowledge`  | Mark messages in a room as read/processed          | Message  |
 | `message_list_rooms`   | List all rooms with unread counts                  | Room     |
 | `message_create_room`  | Create a new room                                  | Room     |
 | `message_invite`       | Invite a user to a room                            | Room     |
@@ -304,6 +305,22 @@ parameters:
     type: string
     required: true
     description: "Reaction emoji (e.g. '👍', '✅', '🏴‍☠️')"
+```
+
+#### `message_acknowledge`
+
+```yaml
+name: message_acknowledge
+description: >
+  Marks messages in a room as read/processed. This clears the unread
+  count for the room and removes it from the "Unprocessed messages"
+  Spine notification. Opening a room panel does NOT automatically mark
+  messages as read — you must explicitly acknowledge them.
+parameters:
+  room:
+    type: string
+    required: true
+    description: "Room name or room ID to acknowledge"
 ```
 
 #### `message_list_rooms`
@@ -494,22 +511,33 @@ Module deactivation → cancel sync task
 
 ### 7.2 Notification Integration
 
-When a message arrives in a room the AI is watching (has an open panel for),
-it can optionally trigger a **Spine notification** — the same mechanism used by
-console watchers and coucou timers. This lets the AI auto-respond to messages:
+The module uses a **single coalesced Spine notification** for all unread
+messages across all rooms. This notification appears as:
+
+    "Unprocessed messages: 5 in #general, 2 in @bob, 1 in #alerts"
+
+The notification **updates in place** — new messages increment the count
+rather than creating new notifications. The notification is cleared only
+when the AI explicitly calls `message_acknowledge` for each room.
 
 ```
-New message in watched room
+New message arrives in any room
     │
-    ├── Is the room panel open? ──→ Yes ──→ Update panel content
-    │                                        Create Spine notification:
-    │                                        "New message in #general from alice"
+    ├── Update unread count in MatrixState
+    ├── Update MatrixOverviewPanel (room list)
     │
-    └── No ──→ Increment unread count in overview panel
+    ├── Is a room panel open for this room?
+    │   └── Yes → Push new message to panel content
+    │
+    └── Are there ANY unread messages across all rooms?
+        └── Yes → Update (or create) single Spine notification:
+                  "Unprocessed messages: N total across M rooms"
 ```
 
-The spine notification triggers auto-continuation if configured, allowing the AI
-to read the message and respond autonomously.
+The AI reads the notification, decides which rooms to check (via
+`message_list_rooms` or `message_read`), processes them, and calls
+`message_acknowledge` to clear each room. This clears the notification
+when all rooms reach zero unread.
 
 ---
 
@@ -546,26 +574,37 @@ No new heavy dependencies beyond `matrix-sdk` (which pulls in `ruma`).
 
 ---
 
-## 10. Open Questions
+## 10. Resolved Design Decisions
 
-Items that need resolution before or during implementation:
+Decisions made during design refinement:
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| 1 | **Room-to-panel mapping** | One panel per room | Each `message_read` opens a dedicated panel, like file panels. Multiple rooms = multiple context panels. Full visibility for the AI. |
+| 2 | **Rate limiting** | None (user-managed) | No built-in rate limiting. User manages via spine guard rails and prompt instructions. Maximum flexibility. |
+| 3 | **Notification model** | Single coalesced Spine notification | One global "Unprocessed messages" notification shared across all rooms. Shows total unread count. Updates in place — no notification spam. |
+| 4 | **Mark-as-read semantics** | Explicit `message_acknowledge` tool | Opening a room panel does NOT mark messages as read. The AI must actively call `message_acknowledge` to mark messages as processed. This prevents "seeing but not acting" from clearing unreads. |
+| 5 | **Federation** | Local-only (localhost) | No federation support. Server listens on `127.0.0.1` only. Bridges still work (they connect outbound to external services). Simplest and most secure. |
+| 6 | **Auto-response policy** | Via Spine notification | AI receives a single Spine notification when unread messages exist. Whether it auto-responds depends on spine config (auto-continuation). The AI decides what to do — read, respond, ignore — it's not forced. |
+| 7 | **Bridge management** | Docker-compose template | CP ships a `docker-compose.yaml` template in `.context-pilot/matrix/`. Postgres + bridges all containerized. User customizes and runs `docker compose up`. CP never manages bridge processes directly. |
+| 8 | **PostgreSQL** | Inside Docker (with bridges) | All mautrix Go bridges require PostgreSQL 16+. Postgres runs as a container alongside bridges in the same docker-compose. CP only talks to the homeserver (SQLite). |
+| 9 | **Email bridge** | Excluded | Postmoogle requires DNS records (DKIM/SPF/DMARC), SMTP port 25, and a real domain — fundamentally incompatible with local-first. Out of scope. |
+
+## 11. Open Questions
+
+Items that still need resolution:
 
 | # | Question | Options | Notes |
 |---|----------|---------|-------|
-| 1 | **Bridge management**: Should CP manage bridge processes? | (a) CP starts/stops bridges (b) External docker-compose (c) Hybrid | Deferred from initial design session |
-| 2 | **Federation**: Should we support federation out of the box? | (a) Local-only (b) Opt-in federation | Local-only safer as default |
-| 3 | **Auto-response policy**: When should the AI auto-respond to messages? | (a) Always when room is open (b) Only when mentioned (c) Configurable per-room | Relates to spine notification behavior |
-| 4 | **Media handling**: Should the AI see images/files? | (a) Text-only (b) Download + describe (c) Pass URLs | Multimodal adds complexity |
-| 5 | **Message history persistence**: How much history to keep in context? | (a) Last N messages (b) Time window (c) Configurable | Affects token budget |
-| 6 | **Multiple AI accounts**: One bot per worker, or shared? | (a) Shared `@context-pilot` (b) Per-worker accounts | Relates to multi-worker setups |
-| 7 | **Binary distribution**: How to ship Tuwunel? | (a) Auto-download from GitHub releases (b) System package (c) Compile from source | Auto-download simplest |
-| 8 | **E2EE**: End-to-end encryption for bridge channels? | (a) Disabled (local-only, unnecessary) (b) Enabled for federation | matrix-sdk supports it, but adds complexity |
-| 9 | **Room-to-panel mapping**: One panel per room, or a single combined panel? | (a) One panel per open room (b) Single panel with room tabs (c) Both modes | Multiple panels = more context tokens |
-| 10 | **Rate limiting**: How to prevent AI message floods? | (a) Per-room cooldown (b) Global rate limit (c) Both | Important for bridge compliance |
+| 1 | **Media handling**: Should the AI see images/files? | (a) Text-only (b) Download + describe (c) Pass URLs | Multimodal adds complexity |
+| 2 | **Message history persistence**: How much history to keep in context? | (a) Last N messages (b) Time window (c) Configurable | Affects token budget |
+| 3 | **Multiple AI accounts**: One bot per worker, or shared? | (a) Shared `@context-pilot` (b) Per-worker accounts | Relates to multi-worker setups |
+| 4 | **Binary distribution**: How to ship Tuwunel? | (a) Auto-download from GitHub releases (b) System package (c) Compile from source | Auto-download simplest |
+| 5 | **E2EE**: End-to-end encryption for bridge channels? | (a) Disabled (local-only, unnecessary) (b) Enabled for federation | matrix-sdk supports it, but adds complexity |
 
 ---
 
-## 11. Implementation Phases
+## 12. Implementation Phases
 
 ### Phase 1: Foundation (MVP)
 - [ ] Crate scaffold (`cp-mod-matrix`)
@@ -605,7 +644,7 @@ Items that need resolution before or during implementation:
 
 ---
 
-## 12. Example Interaction
+## 13. Example Interaction
 
 ```
 User: Check if anyone messaged me
@@ -651,3 +690,153 @@ AI: [calls message_read room="#alerts" limit=20]
 
 All of these are abstracted by `matrix-sdk` — we never construct raw HTTP
 requests.
+
+---
+
+## Appendix B: Bridge Architecture Reference
+
+### How Matrix Bridges Work
+
+Bridges use the **Matrix Application Service API** — a privileged extension of
+the Client-Server API. Unlike regular clients that poll `/sync`, bridges:
+
+1. **Register** with the homeserver via a `registration.yaml` file
+2. **Receive events** pushed by the homeserver via HTTP PUT `/transactions`
+3. **Control puppet users** in a reserved namespace (e.g. `@discord_.*:localhost`)
+4. Have **no rate limits** (unlike regular clients)
+
+```
+External Platform                  Matrix Homeserver (Tuwunel)
+  Discord ←──websocket──→ mautrix-discord ←──HTTP push──→ Tuwunel
+                              (port 29318)                 (port 6167)
+                              │                               │
+                              └── registration.yaml ──────────┘
+                                  (as_token, hs_token,
+                                   user namespace, etc.)
+```
+
+Each bridge registers puppet user namespaces. For example, mautrix-discord
+registers `@discord_.*:localhost` — every Discord user appears as a Matrix
+puppet user in that namespace. Messages are bidirectional.
+
+### The Registration File
+
+Every bridge generates a `registration.yaml` like:
+
+```yaml
+id: "discord"
+url: "http://localhost:29318"           # Bridge's HTTP server
+as_token: "<random>"                    # Bridge → Homeserver auth
+hs_token: "<random>"                    # Homeserver → Bridge auth
+sender_localpart: "discordbot"          # @discordbot:localhost
+namespaces:
+  users:
+    - exclusive: true
+      regex: "@discord_.*:localhost"     # Puppet user namespace
+  aliases:
+    - exclusive: true
+      regex: "#discord_.*:localhost"     # Room alias namespace
+```
+
+This file must be listed in the homeserver's config (`homeserver.toml` for
+Tuwunel) under `app_service_config_files`. After adding it, the homeserver
+needs a restart.
+
+### Supported Bridges (mautrix Family)
+
+All modern mautrix bridges are written in **Go** using the `bridgev2`
+framework (unified architecture since 2025). All require **PostgreSQL 16+**.
+
+| Bridge | Platform | Auth Method | Notes |
+|--------|----------|-------------|-------|
+| mautrix-whatsapp | WhatsApp | QR code scan from phone | Multi-device API, no phone tethering after pair |
+| mautrix-discord | Discord | QR code or token | Full server/channel bridging |
+| mautrix-telegram | Telegram | API key (api_id + api_hash) | Relay + puppet modes |
+| mautrix-signal | Signal | QR code device linking | Requires Rust/Cargo for libsignal FFI compilation |
+| mautrix-meta | Instagram + Messenger | Facebook login | Unified bridge, replaces separate instagram/facebook bridges |
+| mautrix-slack | Slack | OAuth or user token | Workspace-level bridging |
+| mautrix-twitter | Twitter/X | Account login | DMs only |
+| mautrix-googlechat | Google Chat | Google auth | Workspace accounts only |
+| mautrix-gmessages | Google Messages | QR code from phone | Requires Android phone |
+| mautrix-bluesky | Bluesky | Account credentials | Relatively new |
+| mautrix-irc | IRC | None (server connection) | New, replaces Heisenbridge |
+| mautrix-zulip | Zulip | API key | Topics map to threads |
+| mautrix-linkedin | LinkedIn | Account login | Python-based (exception), based on mautrix-python |
+| mautrix-imessage | iMessage | Apple ID | **Requires macOS or iPhone hardware** |
+
+**Excluded from scope:**
+- **Postmoogle (Email)** — requires DNS records, SMTP port 25, real domain
+- **mautrix-gvoice** — requires Electron runtime (~200MB)
+- **mautrix-imessage** — requires Apple hardware
+
+### Docker-Compose Architecture
+
+CP ships a template `docker-compose.yaml` in `.context-pilot/matrix/`.
+The user enables the bridges they want and runs `docker compose up`.
+
+```yaml
+# .context-pilot/matrix/docker-compose.yaml (template)
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: matrix
+      POSTGRES_PASSWORD: <auto-generated>
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  # Uncomment bridges as needed:
+
+  # whatsapp:
+  #   image: dock.mau.dev/mautrix/whatsapp:latest
+  #   volumes:
+  #     - ./bridges/whatsapp:/data
+  #   depends_on: [postgres]
+
+  # discord:
+  #   image: dock.mau.dev/mautrix/discord:latest
+  #   volumes:
+  #     - ./bridges/discord:/data
+  #   depends_on: [postgres]
+
+  # telegram:
+  #   image: dock.mau.dev/mautrix/telegram:latest
+  #   volumes:
+  #     - ./bridges/telegram:/data
+  #   depends_on: [postgres]
+
+  # signal:
+  #   image: dock.mau.dev/mautrix/signal:latest
+  #   volumes:
+  #     - ./bridges/signal:/data
+  #   depends_on: [postgres]
+```
+
+Each bridge's `config.yaml` is auto-generated by CP on first setup with:
+- Homeserver URL: `http://host.docker.internal:6167` (or host network)
+- Database URI: `postgres://matrix:<password>@postgres:5432/<bridge_name>`
+- Bridge-specific defaults (sane permissions, bot username, etc.)
+
+The registration files are generated by each bridge (`./mautrix-$bridge -g`)
+and must be added to Tuwunel's config.
+
+### Bridge Setup Flow (User Perspective)
+
+```
+1. User enables Matrix module in CP
+   └── Tuwunel starts, bot account created, sync running
+
+2. User wants WhatsApp bridge:
+   └── Uncomments whatsapp service in docker-compose.yaml
+   └── Runs: docker compose up -d whatsapp postgres
+   └── Bridge generates config.yaml + registration.yaml
+   └── User adds registration.yaml to Tuwunel config, restarts
+   └── In any Matrix room, sends: !wa login
+   └── Bridge shows QR code, user scans with phone
+   └── WhatsApp contacts appear as Matrix rooms ✓
+
+3. CP sees WhatsApp rooms as regular Matrix rooms
+   └── AI tools work identically — send, read, react, etc.
+```
