@@ -30,10 +30,10 @@ fn stub(tool: &ToolUse, msg: &str) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content: msg.to_string(), is_error: true, tool_name: tool.name.clone() }
 }
 
-/// `Chat_open` — ensures the server is running, then opens a room panel.
+/// `Chat_open` — resolves the room reference and prepares a room panel.
 ///
-/// During §2, this verifies the server lifecycle. Full room opening
-/// comes in §5–§6 when the sync loop is implemented.
+/// During §3, this verifies client connectivity and room resolution.
+/// Full room panel opening comes in §5–§6 when panels are implemented.
 fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cs = ChatState::get(state);
 
@@ -49,13 +49,21 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     }
 
-    // Server running — room opening will be implemented in §5-§6
     let room = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
 
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("Server running. Room panel for '{room}' not yet implemented (§5-§6)."),
-        is_error: false,
-        tool_name: tool.name.clone(),
+    // Resolve alias/ID — exercises the full client → alias resolution path
+    match crate::client::resolve_room(room) {
+        Ok(room_id) => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Resolved '{room}' → {room_id}. Room panel not yet implemented (§5-§6)."),
+            is_error: false,
+            tool_name: tool.name.clone(),
+        },
+        Err(e) => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Room resolution failed: {e}"),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        },
     }
 }

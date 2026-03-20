@@ -161,6 +161,16 @@ impl Panel for ChatDashboardPanel {
     fn render(&self, _frame: &mut Frame<'_>, _state: &mut State, _area: Rect) {}
 
     fn refresh(&self, state: &mut State) {
+        // Drain sync events from the async loop into ChatState + fire Spine notifications
+        let _changed = crate::sync::drain_sync_events(state);
+
+        // Sync room list from the Matrix SDK into ChatState
+        let rooms = crate::client::fetch_room_list();
+        if !rooms.is_empty() {
+            let cs = ChatState::get_mut(state);
+            cs.rooms = rooms;
+        }
+
         let content = Self::build_context(state);
         let token_count = estimate_tokens(&content);
 

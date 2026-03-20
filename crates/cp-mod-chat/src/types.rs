@@ -177,6 +177,46 @@ pub struct RoomFilter {
     pub query: Option<String>,
 }
 
+/// Event pushed from the async sync loop to the main thread.
+///
+/// The sync loop has no access to [`State`], so it sends these through
+/// a [`std::sync::mpsc`] channel. The dashboard panel drains them on
+/// each `refresh()` tick and applies them to [`ChatState`].
+#[derive(Debug, Clone)]
+pub enum ChatEvent {
+    /// New message arrived in a room.
+    Message {
+        /// Matrix room ID.
+        room_id: String,
+        /// Sender Matrix user ID.
+        sender: String,
+        /// Sender display name.
+        sender_display_name: String,
+        /// Message body (plain text).
+        body: String,
+        /// Full Matrix event ID.
+        event_id: String,
+        /// Unix timestamp in milliseconds.
+        timestamp_ms: u64,
+    },
+    /// Room invite received — auto-accepted by the handler.
+    Invite {
+        /// Matrix room ID of the invitation.
+        room_id: String,
+    },
+    /// Room metadata changed (name, topic, member count).
+    RoomMeta {
+        /// Matrix room ID.
+        room_id: String,
+        /// Updated display name.
+        display_name: String,
+        /// Updated topic.
+        topic: Option<String>,
+        /// Updated member count.
+        member_count: u64,
+    },
+}
+
 /// Tuwunel homeserver health status.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ServerStatus {

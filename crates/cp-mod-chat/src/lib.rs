@@ -7,16 +7,23 @@
 
 /// First-run bootstrap: directory layout, config generation, credential scaffolding.
 mod bootstrap;
+/// Matrix SDK client wrapper: connection, authentication, sync loop.
+mod client;
 /// Panel rendering: room panels and dashboard.
 mod panels;
 /// Tuwunel homeserver process lifecycle: start, stop, health check.
 mod server;
+/// Async-to-sync event bridge: channel, drain, Spine notification coalescing.
+mod sync;
 /// Tool execution handlers for all `Chat_*` tools.
 mod tools;
 /// Chat state types: `ChatState`, `RoomInfo`, `MessageInfo`, `BridgeSource`, etc.
 pub mod types;
 
 use types::ChatState;
+
+// Suppress unused-crate-dependencies for transitive deps pulled in by matrix-sdk.
+use url as _;
 
 use std::fmt::Write as _;
 
@@ -74,11 +81,26 @@ impl Module for ChatModule {
         if let Err(e) = bootstrap::bootstrap(root) {
             let cs = ChatState::get_mut(state);
             cs.server_status = types::ServerStatus::Error(format!("Bootstrap failed: {e}"));
+            return;
         }
+
+        // Start the homeserver, then connect the Matrix client
+        if let Err(e) = server::start_server(state) {
+            log::warn!("Chat server failed to start: {e}");
+            return;
+        }
+
+        if let Err(e) = client::connect() {
+            log::warn!("Matrix client connection failed: {e}");
+            return;
+        }
+
+        client::start_sync();
     }
 
     fn reset_state(&self, state: &mut State) {
-        // Stop server before resetting state
+        // Tear down in reverse order: client → server → state
+        client::disconnect();
         server::stop_server(state);
         state.set_ext(ChatState::default());
     }
