@@ -1,0 +1,24 @@
+[package]
+name = "cp-mod-chat"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Chat module — Matrix-based universal messaging layer for Context Pilot"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+cp-base.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+log = "0.4"
+# matrix-sdk = { version = "0.9", features = ["sqlite", "bundled-sqlite", "markdown", "native-tls"] }
+# Uncomment when implementing §2-§3. Keeping build times fast for scaffold phase.
+
+[lints]
+workspace = true

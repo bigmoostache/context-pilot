@@ -474,6 +474,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-mod-chat"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "crossterm",
+ "log",
+ "ratatui",
+ "reqwest",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cp-mod-console"
 version = "0.1.0"
 dependencies = [
@@ -4029,6 +4042,7 @@ dependencies = [
  "cp-base",
  "cp-mod-brave",
  "cp-mod-callback",
+ "cp-mod-chat",
  "cp-mod-console",
  "cp-mod-files",
  "cp-mod-firecrawl",

@@ -22,6 +22,7 @@ static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 pub(crate) use cp_mod_brave::BraveModule;
 pub(crate) use cp_mod_callback::CallbackModule;
+pub(crate) use cp_mod_chat::ChatModule;
 pub(crate) use cp_mod_console::ConsoleModule;
 pub(crate) use cp_mod_files::FilesModule;
 pub(crate) use cp_mod_firecrawl::FirecrawlModule;
@@ -127,6 +128,7 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(BraveModule),
         Box::new(FirecrawlModule),
         Box::new(QueueModule),
+        Box::new(ChatModule),
     ]
 }
 

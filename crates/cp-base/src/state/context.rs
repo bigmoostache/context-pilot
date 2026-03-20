@@ -139,6 +139,8 @@ impl Kind {
     pub const TOOLS: &str = "tools";
     /// Queue status panel.
     pub const QUEUE: &str = "queue";
+    /// Chat dashboard panel (always-on room list, server status).
+    pub const CHAT_DASHBOARD: &str = "chat-dashboard";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
     #[must_use]

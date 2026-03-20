@@ -1,0 +1,57 @@
+# Chat tools — Matrix-based universal messaging layer
+# 8 tools: Chat_open, Chat_send, Chat_react, Chat_configure,
+#           Chat_search, Chat_mark_as_read, Chat_create_room, Chat_invite
+
+Chat_open:
+  description: >
+    Opens a Matrix room as a context panel showing recent messages.
+    The panel auto-refreshes as new messages arrive via the sync loop.
+    If the room is already open, returns success without creating a
+    duplicate. Close the panel with Close_panel to stop watching.
+    Room is resolved by alias (e.g. '#general') via Matrix API.
+    Default: shows last 30 messages. Use Chat_configure to filter.
+
+Chat_send:
+  description: >
+    Sends a message to a Matrix room. Supports plain text and markdown
+    (sent as both plain text body + HTML formatted_body per Matrix spec).
+    Default mode is notice (bot-style, no notification to bridged users).
+    Optional params for reply, edit, or delete operations on own messages.
+    Only one of edit/delete can be used per call. Event refs (E1, E2...)
+    from open room panels can be used for reply_to/edit/delete.
+
+Chat_react:
+  description: >
+    Adds an emoji reaction to a message in a room.
+
+Chat_configure:
+  description: >
+    Configures the view on an open room panel. Sets or clears filters
+    for message display. All params are optional — omitted params keep
+    current values. Call with no filter params to reset to default view
+    (latest 30 messages, no filters). The room panel must already be
+    open (via Chat_open).
+
+Chat_search:
+  description: >
+    Activates a cross-room search section in the Chat dashboard panel.
+    Only one search active at a time — calling again replaces the
+    previous search. Results appear in a split view below the room list.
+    Max 20 results. Call with empty query to clear the search section.
+    Results contribute to dashboard context_content().
+
+Chat_mark_as_read:
+  description: >
+    Marks ALL messages in a room as read/processed. Resets the room's
+    unread count to zero, removes it from the 'Unprocessed messages'
+    Spine notification, and sends a Matrix read receipt (visible to
+    bridged users as 'read' status). Opening a room panel does NOT
+    mark messages as read — this explicit call is required.
+
+Chat_create_room:
+  description: >
+    Creates a new Matrix room on the local homeserver.
+
+Chat_invite:
+  description: >
+    Invites a user to a Matrix room.
