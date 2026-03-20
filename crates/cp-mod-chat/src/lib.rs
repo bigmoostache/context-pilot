@@ -271,13 +271,18 @@ impl Module for ChatModule {
             types::ServerStatus::Running => "running",
             types::ServerStatus::Error(_) => "error",
         };
-        let total_unread: u64 = cs.rooms.iter().map(|r| r.unread_count).sum();
         let mut section = format!("Chat: {status_label}");
         if !cs.rooms.is_empty() {
             {
                 let _r = write!(section, ", {} rooms", cs.rooms.len());
             }
+            // Show bridge breakdown if any bridged rooms exist
+            let bridged: usize = cs.rooms.iter().filter(|r| r.bridge_source.is_some()).count();
+            if bridged > 0 {
+                let _r = write!(section, " ({bridged} bridged)");
+            }
         }
+        let total_unread: u64 = cs.rooms.iter().map(|r| r.unread_count).sum();
         if total_unread > 0 {
             {
                 let _r = write!(section, ", {total_unread} unread");

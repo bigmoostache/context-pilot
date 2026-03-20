@@ -15,7 +15,7 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{Entry, Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 
-use crate::types::ChatState;
+use crate::types::{ChatState, RoomInfo, ServerStatus};
 
 /// Fixed panel showing the chat module overview.
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl ChatDashboardPanel {
     /// Build YAML context string for the LLM.
     fn build_context(state: &State) -> String {
         let cs = ChatState::get(state);
-        let mut out = String::new();
+        let mut out = String::with_capacity(1024);
         Self::write_server_status(&mut out, cs);
         Self::write_room_list(&mut out, cs);
         Self::write_search_results(&mut out, cs);
@@ -35,37 +35,64 @@ impl ChatDashboardPanel {
     /// Append the server status YAML block.
     fn write_server_status(out: &mut String, cs: &ChatState) {
         let status = match &cs.server_status {
-            crate::types::ServerStatus::Stopped => "stopped",
-            crate::types::ServerStatus::Starting => "starting",
-            crate::types::ServerStatus::Running => "running",
-            crate::types::ServerStatus::Error(e) => e.as_str(),
+            ServerStatus::Stopped => "stopped",
+            ServerStatus::Starting => "starting",
+            ServerStatus::Running => "running",
+            ServerStatus::Error(e) => e.as_str(),
         };
         {
             let _r = writeln!(out, "server:\n  status: {status}\n  address: \"localhost:6167\"");
         }
+        if let Some(ref uid) = cs.bot_user_id {
+            let _r = writeln!(out, "  bot: \"{uid}\"");
+        }
     }
 
-    /// Append the room list YAML block.
+    /// Append the room list YAML block, sorted by last activity.
     fn write_room_list(out: &mut String, cs: &ChatState) {
         if cs.rooms.is_empty() {
             return;
         }
+        let mut sorted: Vec<&RoomInfo> = cs.rooms.iter().collect();
+        sorted.sort_by(|a, b| {
+            let ts_a = a.last_message.as_ref().map_or(0, |m| m.timestamp);
+            let ts_b = b.last_message.as_ref().map_or(0, |m| m.timestamp);
+            ts_b.cmp(&ts_a)
+        });
+
         out.push_str("rooms:\n");
-        for room in &cs.rooms {
+        for room in &sorted {
             Self::write_room_entry(out, room);
         }
     }
 
     /// Append a single room entry to the YAML output.
-    fn write_room_entry(out: &mut String, room: &crate::types::RoomInfo) {
+    fn write_room_entry(out: &mut String, room: &RoomInfo) {
         {
             let _r = writeln!(out, "  - name: \"{}\"", room.display_name);
+        }
+        {
+            let _r = writeln!(out, "    id: \"{}\"", room.room_id);
+        }
+        if room.is_direct {
+            let _r = writeln!(out, "    type: dm");
         }
         if let Some(ref bridge) = room.bridge_source {
             let _r = writeln!(out, "    bridge: {}", bridge.label());
         }
         {
+            let _r = writeln!(out, "    members: {}", room.member_count);
+        }
+        if room.unread_count > 0 {
             let _r = writeln!(out, "    unread: {}", room.unread_count);
+        }
+        if room.encrypted {
+            let _r = writeln!(out, "    encrypted: true");
+        }
+        if let Some(ref topic) = room.topic
+            && !topic.is_empty()
+        {
+            let _r = writeln!(out, "    topic: \"{}\"", truncate_body(topic, 100));
         }
         if let Some(ref msg) = room.last_message {
             let _r =
@@ -82,18 +109,108 @@ impl ChatDashboardPanel {
             let _r = writeln!(out, "search:\n  query: \"{query}\"");
         }
         if cs.search_results.is_empty() {
+            out.push_str("  results: []\n");
             return;
         }
         out.push_str("  results:\n");
         for sr in &cs.search_results {
             let _r = writeln!(
                 out,
-                "    - room: \"{}\"\n      sender: {}\n      body: \"{}\"",
+                "    - room: \"{}\"\n      sender: \"{}\"\n      body: \"{}\"",
                 sr.room_name,
                 sr.sender,
                 truncate_body(&sr.body, 120),
             );
         }
+    }
+
+    /// Build the TUI render lines for the room list.
+    fn render_room_lines(cs: &ChatState) -> Vec<Line<'static>> {
+        let mut lines = Vec::new();
+
+        if cs.rooms.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "  No rooms yet — use Chat_create_room or bridge a platform",
+                Style::default().fg(Color::DarkGray),
+            )));
+            return lines;
+        }
+
+        // Sort by last activity (newest first)
+        let mut sorted: Vec<&RoomInfo> = cs.rooms.iter().collect();
+        sorted.sort_by(|a, b| {
+            let ts_a = a.last_message.as_ref().map_or(0, |m| m.timestamp);
+            let ts_b = b.last_message.as_ref().map_or(0, |m| m.timestamp);
+            ts_b.cmp(&ts_a)
+        });
+
+        lines.push(Line::from(Span::styled("  Rooms", Style::default().fg(Color::White))));
+        lines.push(Line::from(""));
+
+        for room in &sorted {
+            let mut spans = Vec::new();
+
+            // Unread indicator
+            if room.unread_count > 0 {
+                spans.push(Span::styled(format!("  ● {}", room.display_name), Style::default().fg(Color::Yellow)));
+                spans.push(Span::styled(format!(" ({})", room.unread_count), Style::default().fg(Color::Yellow)));
+            } else {
+                spans.push(Span::styled(format!("  ○ {}", room.display_name), Style::default().fg(Color::Gray)));
+            }
+
+            // Bridge badge
+            if let Some(ref bridge) = room.bridge_source {
+                spans.push(Span::styled(format!(" [{}]", bridge.label()), Style::default().fg(Color::Cyan)));
+            }
+
+            // DM indicator
+            if room.is_direct {
+                spans.push(Span::styled(" DM", Style::default().fg(Color::DarkGray)));
+            }
+
+            // Encryption badge
+            if room.encrypted {
+                spans.push(Span::styled(" 🔒", Style::default()));
+            }
+
+            lines.push(Line::from(spans));
+
+            // Last message preview (indented)
+            if let Some(ref msg) = room.last_message {
+                let preview = format!("    {} — {}", msg.sender_display_name, truncate_body(&msg.body, 60),);
+                lines.push(Line::from(Span::styled(preview, Style::default().fg(Color::DarkGray))));
+            }
+        }
+
+        lines
+    }
+
+    /// Build search result render lines.
+    fn render_search_lines(cs: &ChatState) -> Vec<Line<'static>> {
+        let mut lines = Vec::new();
+        let Some(ref query) = cs.search_query else {
+            return lines;
+        };
+
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("  Search: ", Style::default().fg(Color::White)),
+            Span::styled(format!("\"{query}\""), Style::default().fg(Color::Yellow)),
+        ]));
+
+        if cs.search_results.is_empty() {
+            lines.push(Line::from(Span::styled("  No results", Style::default().fg(Color::DarkGray))));
+        } else {
+            for sr in &cs.search_results {
+                lines.push(Line::from(vec![
+                    Span::styled(format!("  [{}] ", sr.room_name), Style::default().fg(Color::Cyan)),
+                    Span::styled(sr.sender.clone(), Style::default().fg(Color::White)),
+                    Span::styled(format!(": {}", truncate_body(&sr.body, 60)), Style::default().fg(Color::Gray)),
+                ]));
+            }
+        }
+
+        lines
     }
 }
 
@@ -105,27 +222,38 @@ impl Panel for ChatDashboardPanel {
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         let cs = ChatState::get(state);
 
-        let status_label = match &cs.server_status {
-            crate::types::ServerStatus::Stopped => Span::styled("● Stopped", Style::default().fg(Color::Red)),
-            crate::types::ServerStatus::Starting => Span::styled("● Starting", Style::default().fg(Color::Yellow)),
-            crate::types::ServerStatus::Running => Span::styled("● Running", Style::default().fg(Color::Green)),
-            crate::types::ServerStatus::Error(e) => {
-                Span::styled(format!("● Error: {e}"), Style::default().fg(Color::Red))
+        let status_line = match &cs.server_status {
+            ServerStatus::Stopped => {
+                Line::from(vec![Span::raw("  Server: "), Span::styled("● Stopped", Style::default().fg(Color::Red))])
             }
+            ServerStatus::Starting => Line::from(vec![
+                Span::raw("  Server: "),
+                Span::styled("● Starting…", Style::default().fg(Color::Yellow)),
+            ]),
+            ServerStatus::Running => {
+                let mut spans = vec![
+                    Span::raw("  Server: "),
+                    Span::styled("● Running", Style::default().fg(Color::Green)),
+                    Span::styled(" (localhost:6167)", Style::default().fg(Color::DarkGray)),
+                ];
+                if let Some(ref uid) = cs.bot_user_id {
+                    spans.push(Span::styled(format!("  as {uid}"), Style::default().fg(Color::DarkGray)));
+                }
+                Line::from(spans)
+            }
+            ServerStatus::Error(e) => Line::from(vec![
+                Span::raw("  Server: "),
+                Span::styled(format!("● Error: {e}"), Style::default().fg(Color::Red)),
+            ]),
         };
 
-        let mut lines = vec![Line::from(vec![Span::raw("  Server: "), status_label]), Line::from("")];
+        let mut lines = vec![status_line, Line::from("")];
 
-        if cs.rooms.is_empty() {
-            lines.push(Line::from(Span::styled("  No rooms yet", Style::default().fg(Color::DarkGray))));
-        } else {
-            for room in &cs.rooms {
-                let unread =
-                    if room.unread_count > 0 { format!("  {} unread", room.unread_count) } else { String::new() };
-                let bridge = room.bridge_source.as_ref().map_or(String::new(), |b| format!(" ({})", b.label()));
-                lines.push(Line::from(format!("  {}{}{unread}", room.display_name, bridge)));
-            }
-        }
+        // Room list (sorted by activity)
+        lines.extend(Self::render_room_lines(cs));
+
+        // Search results (if active)
+        lines.extend(Self::render_search_lines(cs));
 
         lines
     }
@@ -164,7 +292,7 @@ impl Panel for ChatDashboardPanel {
         // Drain sync events from the async loop into ChatState + fire Spine notifications
         let _changed = crate::sync::drain_sync_events(state);
 
-        // Sync room list from the Matrix SDK into ChatState
+        // Refresh room list from the Matrix SDK
         let rooms = crate::client::fetch_room_list();
         if !rooms.is_empty() {
             let cs = ChatState::get_mut(state);
