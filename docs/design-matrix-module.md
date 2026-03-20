@@ -42,8 +42,8 @@ from a terminal-only assistant into a **multi-channel agent**.
 │  └──────┬───────┘  └──────┬───────┘  └────────────┬─────────────┘  │
 │         │                 │                        │                │
 │  ┌──────┴─────────────────┴────────────────────────┴─────────────┐ │
-│  │                    cp-mod-matrix                               │ │
-│  │  MatrixModule (tools + panels + sync loop + state)            │ │
+│  │                    cp-mod-chat                                │ │
+│  │  ChatModule (tools + panels + sync loop + state)              │ │
 │  │  Uses: matrix-sdk (Rust crate)                                │ │
 │  └──────────────────────────┬────────────────────────────────────┘ │
 └─────────────────────────────┼──────────────────────────────────────┘
@@ -103,7 +103,7 @@ On first activation of the Matrix module:
 3. Wait for `/_matrix/client/versions` to respond (with timeout)
 4. Authenticate with stored access token
 5. Start background sync loop (`matrix-sdk` sliding sync)
-6. Populate room list in MatrixState
+6. Populate room list in ChatState
 7. Module ready — tools and panels available
 
 ### 3.4 Shutdown Sequence
@@ -115,22 +115,22 @@ On first activation of the Matrix module:
 
 ---
 
-## 4. Module Design: `cp-mod-matrix`
+## 4. Module Design: `cp-mod-chat`
 
 ### 4.1 Crate Structure
 
 ```
-crates/cp-mod-matrix/
+crates/cp-mod-chat/
 ├── src/
 │   ├── lib.rs            # Module trait impl, tool registration
-│   ├── types.rs          # MatrixState, RoomInfo, MessageInfo
+│   ├── types.rs          # ChatState, RoomInfo, MessageInfo
 │   ├── client.rs         # matrix-sdk wrapper, sync loop, auth
 │   ├── server.rs         # Tuwunel process lifecycle management
 │   ├── bootstrap.rs      # First-run setup, download, config generation
 │   ├── panels/
 │   │   ├── mod.rs
-│   │   ├── room.rs       # MessageRoomPanel — shows messages in one room
-│   │   └── overview.rs   # MatrixOverviewPanel — room list, status
+│   │   ├── room.rs       # ChatRoomPanel — shows messages in one room
+│   │   └── dashboard.rs  # ChatDashboardPanel — room list, status, search
 │   └── tools/
 │       ├── mod.rs         # Tool dispatch
 │       ├── rooms.rs       # Room management tools
@@ -142,8 +142,8 @@ crates/cp-mod-matrix/
 ### 4.2 State
 
 ```rust
-pub struct MatrixState {
-    /// matrix-sdk Client handle (authenticated)
+pub struct ChatState {
+    /// matrix-sdk Client handle (authenticated, shared across workers)
     pub client: Option<matrix_sdk::Client>,
 
     /// Tuwunel child process handle
@@ -152,14 +152,23 @@ pub struct MatrixState {
     /// Cached room list (refreshed by sync loop)
     pub rooms: Vec<RoomInfo>,
 
-    /// Currently open room panels (room_id → panel_id)
+    /// Currently open room panels per worker (room_id → panel_id)
     pub open_rooms: HashMap<String, String>,
 
-    /// Background sync task handle
+    /// Event ref mapping per open room (short ref "E1" → full event ID)
+    pub event_refs: HashMap<String, HashMap<String, String>>,
+
+    /// Background sync task handle (shared, one sync loop)
     pub sync_handle: Option<JoinHandle<()>>,
 
     /// Server health status
     pub server_status: ServerStatus,
+
+    /// Active dashboard search query (None = no search)
+    pub search_query: Option<String>,
+
+    /// Dashboard search results (populated by Chat_search)
+    pub search_results: Vec<SearchResult>,
 }
 
 pub struct RoomInfo {
@@ -169,8 +178,11 @@ pub struct RoomInfo {
     pub unread_count: u64,
     pub last_message: Option<MessageInfo>,
     pub is_direct: bool,
-    /// Where messages originate (for display hints, NOT for AI tool logic)
-    pub bridge_hint: Option<BridgeHint>,
+    pub member_count: u64,
+    pub creation_date: Option<String>,
+    pub encrypted: bool,
+    /// Detected from appservice puppet user namespace
+    pub bridge_source: Option<BridgeSource>,
 }
 
 pub struct MessageInfo {
@@ -182,6 +194,24 @@ pub struct MessageInfo {
     pub msg_type: MessageType,
     pub reply_to: Option<String>,
     pub reactions: Vec<ReactionInfo>,
+    /// Local path for downloaded media (if applicable)
+    pub media_path: Option<String>,
+    pub media_size: Option<u64>,
+}
+
+pub struct SearchResult {
+    pub room_id: String,
+    pub room_name: String,
+    pub event_id: String,
+    pub sender: String,
+    pub body: String,
+    pub timestamp: u64,
+}
+
+pub struct RoomFilter {
+    pub n_messages: Option<u64>,
+    pub max_age: Option<String>,
+    pub query: Option<String>,
 }
 
 pub enum ServerStatus {
@@ -191,13 +221,20 @@ pub enum ServerStatus {
     Error(String),
 }
 
-pub enum BridgeHint {
+pub enum BridgeSource {
     Discord,
     WhatsApp,
     Telegram,
     Signal,
     Slack,
     Irc,
+    Meta,
+    Twitter,
+    Bluesky,
+    GoogleChat,
+    GoogleMessages,
+    Zulip,
+    LinkedIn,
     Native,
 }
 ```
@@ -210,251 +247,285 @@ pub enum BridgeHint {
 
 | Tool                   | Description                                        | Category |
 |------------------------|----------------------------------------------------|----------|
-| `message_send`         | Send a message to a room                           | Message  |
-| `message_read`         | Open a room panel (shows recent messages)          | Message  |
-| `message_react`        | Add a reaction emoji to a message                  | Message  |
-| `message_reply`        | Reply to a specific message in a room              | Message  |
-| `message_acknowledge`  | Mark messages in a room as read/processed          | Message  |
-| `message_list_rooms`   | List all rooms with unread counts                  | Room     |
-| `message_create_room`  | Create a new room                                  | Room     |
-| `message_invite`       | Invite a user to a room                            | Room     |
-| `message_search`       | Full-text search across room messages              | Search   |
-| `matrix_status`        | Show server health, sync status, connected bridges | Status   |
+| `Chat_open`            | Open a room as a context panel (shows messages)    | View     |
+| `Chat_send`            | Send, reply, edit, or delete a message             | Message  |
+| `Chat_react`           | Add a reaction emoji to a message                  | Message  |
+| `Chat_configure`       | Set/clear filters on an open room panel            | View     |
+| `Chat_search`          | Cross-room search in the dashboard panel           | Search   |
+| `Chat_mark_as_read`    | Acknowledge all messages in a room                 | Status   |
+| `Chat_create_room`     | Create a new Matrix room                           | Room     |
+| `Chat_invite`          | Invite a user to a room                            | Room     |
 
-### 5.2 Tool Definitions (Draft)
+### 5.2 Tool Definitions
 
-#### `message_send`
+#### `Chat_open`
 
 ```yaml
-name: message_send
+name: Chat_open
 description: >
-  Sends a message to a Matrix room. The room can be specified by name
-  (e.g. '#general') or room ID. Supports plain text and markdown.
+  Opens a Matrix room as a context panel showing recent messages.
+  The panel auto-refreshes as new messages arrive via the sync loop.
+  If the room is already open, returns success without creating a
+  duplicate. Close the panel with Close_panel to stop watching.
+  Room is resolved by alias (e.g. '#general') via Matrix API.
+  Default: shows last 30 messages. Use Chat_configure to filter.
 parameters:
   room:
     type: string
     required: true
-    description: "Room name (e.g. '#general') or room ID"
-  message:
+    description: "Room alias (e.g. '#general') or room ID"
+```
+
+#### `Chat_send`
+
+```yaml
+name: Chat_send
+description: >
+  Sends a message to a Matrix room. Supports plain text and markdown
+  (sent as both plain text body + HTML formatted_body per Matrix spec).
+  Default mode is notice (bot-style, no notification to bridged users).
+  Optional params for reply, edit, or delete operations on own messages.
+  Only one of edit/delete can be used per call. Event refs (E1, E2...)
+  from open room panels can be used for reply_to/edit/delete.
+parameters:
+  room:
     type: string
     required: true
-    description: "Message content (supports markdown)"
+    description: "Room alias (e.g. '#general') or room ID"
+  message:
+    type: string
+    required: false
+    description: "Message content (markdown). Required unless deleting."
+  reply_to:
+    type: string
+    required: false
+    description: "Event ref (e.g. 'E3') to reply to (creates threaded reply)"
+  edit:
+    type: string
+    required: false
+    description: "Event ref (e.g. 'E5') of own message to edit. message param is the new content."
+  delete:
+    type: string
+    required: false
+    description: "Event ref (e.g. 'E3') of own message to delete. No message param needed."
   notice:
     type: boolean
     required: false
-    description: "Send as notice (bot-style, no notification) instead of regular message"
+    description: "Send as notice (default true). Set false for regular message (triggers notifications)."
 ```
 
-#### `message_read`
+#### `Chat_react`
 
 ```yaml
-name: message_read
-description: >
-  Opens a room as a context panel showing recent messages. The panel
-  auto-refreshes as new messages arrive. Close the panel to stop
-  watching the room.
-parameters:
-  room:
-    type: string
-    required: true
-    description: "Room name or room ID to open"
-  limit:
-    type: integer
-    required: false
-    description: "Number of recent messages to show (default 50, max 200)"
-```
-
-#### `message_reply`
-
-```yaml
-name: message_reply
-description: >
-  Replies to a specific message in a room (creates a threaded reply).
-  Use message_read first to see messages and their event IDs.
-parameters:
-  room:
-    type: string
-    required: true
-    description: "Room name or room ID"
-  event_id:
-    type: string
-    required: true
-    description: "Event ID of the message to reply to"
-  message:
-    type: string
-    required: true
-    description: "Reply content (supports markdown)"
-```
-
-#### `message_react`
-
-```yaml
-name: message_react
+name: Chat_react
 description: >
   Adds an emoji reaction to a message in a room.
 parameters:
   room:
     type: string
     required: true
-    description: "Room name or room ID"
+    description: "Room alias or room ID"
   event_id:
     type: string
     required: true
-    description: "Event ID of the message to react to"
+    description: "Event ref (e.g. 'E3') of the message to react to"
   emoji:
     type: string
     required: true
     description: "Reaction emoji (e.g. '👍', '✅', '🏴‍☠️')"
 ```
 
-#### `message_acknowledge`
+#### `Chat_configure`
 
 ```yaml
-name: message_acknowledge
+name: Chat_configure
 description: >
-  Marks messages in a room as read/processed. This clears the unread
-  count for the room and removes it from the "Unprocessed messages"
-  Spine notification. Opening a room panel does NOT automatically mark
-  messages as read — you must explicitly acknowledge them.
+  Configures the view on an open room panel. Sets or clears filters
+  for message display. All params are optional — omitted params keep
+  current values. Call with no filter params to reset to default view
+  (latest 30 messages, no filters). The room panel must already be
+  open (via Chat_open).
 parameters:
   room:
     type: string
     required: true
-    description: "Room name or room ID to acknowledge"
+    description: "Room alias or room ID (must be an open panel)"
+  n_messages:
+    type: integer
+    required: false
+    description: "Max messages to show (default 30)"
+  max_age:
+    type: string
+    required: false
+    description: "Only show messages newer than this (e.g. '24h', '7d')"
+  query:
+    type: string
+    required: false
+    description: "Filter messages containing this text"
 ```
 
-#### `message_list_rooms`
+#### `Chat_search`
 
 ```yaml
-name: message_list_rooms
+name: Chat_search
 description: >
-  Lists all Matrix rooms the bot has joined, with unread counts and
-  last message preview. Returns a table overview.
-parameters: {}
+  Activates a cross-room search section in the Chat dashboard panel.
+  Only one search active at a time — calling again replaces the
+  previous search. Results appear in a split view below the room list.
+  Max 20 results. Call with empty query to clear the search section.
+  Results contribute to dashboard context_content().
+parameters:
+  query:
+    type: string
+    required: true
+    description: "Search query (empty string clears active search)"
+  room:
+    type: string
+    required: false
+    description: "Limit search to a specific room"
 ```
 
-#### `message_create_room`
+#### `Chat_mark_as_read`
 
 ```yaml
-name: message_create_room
+name: Chat_mark_as_read
 description: >
-  Creates a new Matrix room.
+  Marks ALL messages in a room as read/processed. Resets the room's
+  unread count to zero, removes it from the 'Unprocessed messages'
+  Spine notification, and sends a Matrix read receipt (visible to
+  bridged users as 'read' status). Opening a room panel does NOT
+  mark messages as read — this explicit call is required.
+parameters:
+  room:
+    type: string
+    required: true
+    description: "Room alias or room ID to acknowledge"
+```
+
+#### `Chat_create_room`
+
+```yaml
+name: Chat_create_room
+description: >
+  Creates a new Matrix room on the local homeserver.
 parameters:
   name:
     type: string
     required: true
-    description: "Room name (e.g. 'project-updates')"
+    description: "Room name (e.g. 'deploy-alerts')"
   topic:
     type: string
     required: false
     description: "Room topic/description"
-  direct:
-    type: boolean
-    required: false
-    description: "Create as a direct message room (default false)"
   invite:
     type: array
     required: false
     description: "User IDs to invite (e.g. ['@alice:localhost'])"
 ```
 
-#### `message_invite`
+#### `Chat_invite`
 
 ```yaml
-name: message_invite
+name: Chat_invite
 description: >
   Invites a user to a Matrix room.
 parameters:
   room:
     type: string
     required: true
-    description: "Room name or room ID"
+    description: "Room alias or room ID"
   user_id:
     type: string
     required: true
-    description: "Matrix user ID to invite (e.g. '@alice:localhost')"
-```
-
-#### `message_search`
-
-```yaml
-name: message_search
-description: >
-  Searches messages across rooms using full-text search. Returns
-  matching messages with room context.
-parameters:
-  query:
-    type: string
-    required: true
-    description: "Search query"
-  room:
-    type: string
-    required: false
-    description: "Limit search to a specific room"
-  limit:
-    type: integer
-    required: false
-    description: "Max results (default 20)"
-```
-
-#### `matrix_status`
-
-```yaml
-name: matrix_status
-description: >
-  Shows the Matrix server status: homeserver health, sync state,
-  connected bridges, room count, and any errors.
-parameters: {}
+    description: "Matrix user ID (e.g. '@alice:localhost')"
 ```
 
 ---
 
 ## 6. Panels
 
-### 6.1 MessageRoomPanel
+### 6.1 ChatRoomPanel
 
-Displays messages in a single Matrix room. Created by `message_read` tool.
+Displays messages in a single Matrix room. Created by `Chat_open`.
+Context type: `chat:<room_id>` (unique per room).
+Panel title: `#general (Discord)` — room name + platform hint.
 
 **Rendering:**
 ```
-─── #general ─── 3 unread ─── via Discord ──────────────
+─── #general (Discord) ─── 3 unread ──────────────────
   10:23  alice    Hey, can you review the PR?
   10:24  bob      Sure, looking at it now
-  10:25  alice    The tests in module_x are failing
+  10:25  alice    └─ reply to bob: Thanks
   10:31  ★ CP     I'll investigate the test failures.
-                  Looking at module_x now...
-  10:45  alice    👍
-─────────────────────────────────────────────────────────
+  10:45  alice    👍 (to CP's message)
+  10:50  bob      📎 image: screenshot.png (245 KB)
+───────────────────────────────────────────────────────
+```
+
+**Context output** (YAML — what the LLM sees):
+```yaml
+room: "#general"
+bridge: discord
+topic: "Development discussion"
+members: 5
+unread: 3
+encrypted: false
+filter: null  # or {n_messages: 50, max_age: "24h", query: "deploy"}
+participants:
+  - name: alice
+    platform: discord
+    user_id: "@discord_alice:localhost"
+  - name: bob
+    platform: discord
+    user_id: "@discord_bob:localhost"
+  - name: Context Pilot
+    platform: native
+    user_id: "@context-pilot:localhost"
+messages:
+  - id: E1
+    sender: alice
+    time: "2026-03-20T10:23:00Z"
+    body: "Hey, can you review the PR?"
+  - id: E2
+    sender: bob
+    time: "2026-03-20T10:24:00Z"
+    body: "Sure, looking at it now"
+  - id: E3
+    sender: alice
+    time: "2026-03-20T10:25:00Z"
+    reply_to: E2
+    body: "Thanks"
+  - id: E4
+    sender: Context Pilot
+    time: "2026-03-20T10:31:00Z"
+    body: "I'll investigate the test failures."
+    reactions: [👍 alice]
+  - id: E5
+    sender: bob
+    time: "2026-03-20T10:50:00Z"
+    body: "📎 image: .context-pilot/matrix/media/screenshot.png (245 KB)"
 ```
 
 **Behavior:**
 - Auto-refreshes via the background sync loop (push, not poll)
-- Shows sender display name (bridged names preserved)
-- AI's own messages marked with `★ CP` prefix
-- Reactions shown inline
-- Scrollable with standard panel key bindings
-- `context_content()` returns recent messages as formatted text for the LLM
+- Event refs (E1, E2...) are short sequential IDs mapped to full Matrix event IDs internally
+- Event refs reset when panel is closed and re-opened
+- Bot's own messages included in context (sender: "Context Pilot")
+- Media files downloaded to `.context-pilot/matrix/media/` with inline path + size
+- Reactions shown inline after the message body
+- Replies shown with `reply_to: E<n>` reference
+- Default: last 30 messages (sliding window). Configurable via Chat_configure
+- Duplicate Chat_open on same room is a no-op (returns success)
 
-**Context output** (what the LLM sees):
-```
-Room: #general (via Discord bridge)
-Recent messages (newest last):
+### 6.2 ChatDashboardPanel
 
-[10:23] alice: Hey, can you review the PR?
-[10:24] bob: Sure, looking at it now
-[10:25] alice: The tests in module_x are failing
-[10:31] Context Pilot: I'll investigate the test failures. Looking at module_x now...
-[10:45] alice: 👍 (reaction to message by Context Pilot)
-```
-
-### 6.2 MatrixOverviewPanel
-
-Fixed panel showing the room list and server status. Always visible when the
-module is active (like the Todo or Memory panels).
+Fixed panel (always present when module is active). Shows room list,
+server status, bridge info, and optional search results.
+Context type: `chat-dashboard`.
 
 **Rendering:**
 ```
-─── Matrix ─── ● Running ─── 5 rooms ─── 2 bridges ────
+─── Chat ─── ● Running ─── 5 rooms ─── 2 bridges ─────
   Server: tuwunel 0.5.2 on localhost:6167
 
   Rooms:
@@ -465,21 +536,79 @@ module is active (like the Todo or Memory panels).
   │ #dev-log        │  0 unread │ CP: Committed a3f2...  │
 
   Bridges: discord ● │ whatsapp ● │ telegram ○
+
+  Search: "deploy error" (3 results)
+  │ #general  │ alice │ 10:25 │ deploy error on staging  │
+  │ #alerts   │ bot   │ 09:00 │ deploy error: timeout    │
+  │ #dev-log  │ CP    │ 10:40 │ fixed deploy error in... │
 ────────────────────────────────────────────────────────
 ```
 
-**Context output** (what the LLM sees):
+**Context output** (YAML):
+```yaml
+server:
+  status: running
+  version: "tuwunel 0.5.2"
+  address: "localhost:6167"
+bridges:
+  - name: discord
+    status: connected
+  - name: whatsapp
+    status: connected
+  - name: telegram
+    status: disconnected
+rooms:
+  - name: "#general"
+    bridge: discord
+    unread: 3
+    last_message: "alice: The tests in module_x are failing"
+    last_activity: "2026-03-20T10:25:00Z"
+  - name: "#alerts"
+    bridge: null
+    unread: 0
+    last_message: "bot: Deploy success"
+    last_activity: "2026-03-20T09:00:00Z"
+  - name: "@alice"
+    bridge: null
+    unread: 1
+    last_message: "alice: Thanks!"
+    last_activity: "2026-03-20T10:45:00Z"
+  - name: "@bob"
+    bridge: whatsapp
+    unread: 0
+    last_message: "bob: ok"
+    last_activity: "2026-03-19T18:30:00Z"
+  - name: "#dev-log"
+    bridge: null
+    unread: 0
+    last_message: "Context Pilot: Committed a3f2..."
+    last_activity: "2026-03-20T10:40:00Z"
+search:
+  query: "deploy error"
+  results:
+    - room: "#general"
+      sender: alice
+      time: "2026-03-20T10:25:00Z"
+      body: "deploy error on staging server"
+    - room: "#alerts"
+      sender: bot
+      time: "2026-03-20T09:00:00Z"
+      body: "deploy error: timeout after 30s"
+    - room: "#dev-log"
+      sender: Context Pilot
+      time: "2026-03-20T10:40:00Z"
+      body: "fixed deploy error in CI pipeline"
 ```
-Matrix Server: Running (tuwunel 0.5.2, localhost:6167)
-Bridges: discord (connected), whatsapp (connected), telegram (disconnected)
 
-Rooms (5):
-- #general: 3 unread, last: alice: "The tests in module_x are failing" (10:25)
-- #alerts: 0 unread, last: bot: "Deploy success" (09:00)
-- @alice (DM): 1 unread, last: alice: "Thanks!" (10:45)
-- @bob (WhatsApp): 0 unread, last: bob: "ok" (yesterday)
-- #dev-log: 0 unread, last: CP: "Committed a3f2..." (10:40)
-```
+**Behavior:**
+- Always-on fixed panel when chat module is active
+- Room list sorted by last activity (most recent first)
+- No room count limit — all joined rooms shown
+- Bridge status detected via appservice registration health checks
+- Search section appears in split view (rooms always visible above)
+- Max 20 search results
+- Chat_search with empty query clears the search section
+- Status info (server + bridges) integrated — no separate status tool
 
 ---
 
@@ -487,19 +616,23 @@ Rooms (5):
 
 ### 7.1 Background Sync Loop
 
-The module runs a persistent background task using `matrix-sdk`'s sync mechanism:
+The module runs a persistent background task using `matrix-sdk`'s
+**Sliding Sync** (MSC3575) mechanism — only fetching rooms and events
+the client cares about, with faster initial sync and lower bandwidth
+than traditional `/sync`:
 
 ```
 Module activation
     │
     ▼
-Start sync loop ──→ matrix_sdk::Client::sync()
+Start sync loop ──→ matrix_sdk::Client::sliding_sync()
     │                     │
-    │                     ├── on room message → update MatrixState.rooms
+    │                     ├── on room message → update ChatState.rooms
     │                     │                   → notify open panels
-    │                     │                   → check notification rules
+    │                     │                   → update Spine notification
+    │                     │                   → set typing indicator (if Chat_send streaming)
     │                     │
-    │                     ├── on invite → auto-accept (configurable)
+    │                     ├── on invite → auto-accept (all invites)
     │                     │
     │                     ├── on room state → update room list
     │                     │
@@ -509,35 +642,60 @@ Start sync loop ──→ matrix_sdk::Client::sync()
 Module deactivation → cancel sync task
 ```
 
+The sync loop is **shared across workers**: one `matrix-sdk::Client` instance,
+one sync task. Per-worker room panels are views into the shared state.
+
 ### 7.2 Notification Integration
 
 The module uses a **single coalesced Spine notification** for all unread
-messages across all rooms. This notification appears as:
+messages across all rooms. The notification **updates in place immediately**
+on every new message — replacing the existing notification, never creating
+duplicates.
 
-    "Unprocessed messages: 5 in #general, 2 in @bob, 1 in #alerts"
-
-The notification **updates in place** — new messages increment the count
-rather than creating new notifications. The notification is cleared only
-when the AI explicitly calls `message_acknowledge` for each room.
+Format: `"Unprocessed messages: 5 in #general, 2 in @bob, 1 in #alerts"`
 
 ```
 New message arrives in any room
     │
-    ├── Update unread count in MatrixState
-    ├── Update MatrixOverviewPanel (room list)
+    ├── Update unread count in ChatState
+    ├── Update ChatDashboardPanel (room list)
     │
     ├── Is a room panel open for this room?
     │   └── Yes → Push new message to panel content
     │
     └── Are there ANY unread messages across all rooms?
-        └── Yes → Update (or create) single Spine notification:
+        └── Yes → Replace (or create) single Spine notification:
                   "Unprocessed messages: N total across M rooms"
 ```
 
 The AI reads the notification, decides which rooms to check (via
-`message_list_rooms` or `message_read`), processes them, and calls
-`message_acknowledge` to clear each room. This clears the notification
-when all rooms reach zero unread.
+the dashboard or `Chat_open`), processes them, and calls
+`Chat_mark_as_read` to clear each room. When all rooms reach zero
+unread, the notification is removed.
+
+`Chat_mark_as_read` acknowledges the entire room (all messages),
+resets internal unread count, AND sends a Matrix read receipt
+(bridged users see "read" status on their platform).
+
+### 7.3 Typing Indicators
+
+The bot sends Matrix typing indicators using the existing
+`StreamingTool` infrastructure:
+
+```
+LLM streams Chat_send tool call
+    │
+    ├── StreamEvent::ToolProgress with tool_name="Chat_send"
+    │   └── Room param parsed from partial JSON?
+    │       └── Yes → Send typing indicator to that room
+    │                 (POST /rooms/{id}/typing/@context-pilot:localhost)
+    │
+    └── StreamEvent::ToolUse (tool call complete)
+        └── Clear typing indicator for that room
+```
+
+Bridged users see "Context Pilot is typing..." on their platform
+(Discord, WhatsApp, etc.) while the AI composes its response.
 
 ---
 
@@ -580,19 +738,56 @@ Decisions made during design refinement:
 
 | # | Decision | Choice | Rationale |
 |---|----------|--------|-----------|
-| 1 | **Room-to-panel mapping** | One panel per room | Each `message_read` opens a dedicated panel, like file panels. Multiple rooms = multiple context panels. Full visibility for the AI. |
+| 1 | **Room-to-panel mapping** | One panel per room | Each `Chat_open` opens a dedicated panel, like file panels. Multiple rooms = multiple context panels. Full visibility for the AI. |
 | 2 | **Rate limiting** | None (user-managed) | No built-in rate limiting. User manages via spine guard rails and prompt instructions. Maximum flexibility. |
 | 3 | **Notification model** | Single coalesced Spine notification | One global "Unprocessed messages" notification shared across all rooms. Shows total unread count. Updates in place — no notification spam. |
-| 4 | **Mark-as-read semantics** | Explicit `message_acknowledge` tool | Opening a room panel does NOT mark messages as read. The AI must actively call `message_acknowledge` to mark messages as processed. This prevents "seeing but not acting" from clearing unreads. |
+| 4 | **Mark-as-read semantics** | Explicit `Chat_mark_as_read` tool | Opening a room panel does NOT mark messages as read. The AI must actively call `Chat_mark_as_read` to mark messages as processed. This prevents "seeing but not acting" from clearing unreads. |
 | 5 | **Federation** | Local-only (localhost) | No federation support. Server listens on `127.0.0.1` only. Bridges still work (they connect outbound to external services). Simplest and most secure. |
 | 6 | **Auto-response policy** | Via Spine notification | AI receives a single Spine notification when unread messages exist. Whether it auto-responds depends on spine config (auto-continuation). The AI decides what to do — read, respond, ignore — it's not forced. |
 | 7 | **Bridge management** | Docker-compose template | CP ships a `docker-compose.yaml` template in `.context-pilot/matrix/`. Postgres + bridges all containerized. User customizes and runs `docker compose up`. CP never manages bridge processes directly. |
 | 8 | **PostgreSQL** | Inside Docker (with bridges) | All mautrix Go bridges require PostgreSQL 16+. Postgres runs as a container alongside bridges in the same docker-compose. CP only talks to the homeserver (SQLite). |
 | 9 | **Email bridge** | Excluded | Postmoogle requires DNS records (DKIM/SPF/DMARC), SMTP port 25, and a real domain — fundamentally incompatible with local-first. Out of scope. |
 | 10 | **Media handling** | Download + local path | Files/images auto-downloaded to `.context-pilot/matrix/media/`. AI sees a local file path in the room panel and uses existing tools (Open, console_easy_bash, etc.) to inspect content. No multimodal LLM features — the AI works with what it has. |
-| 11 | **Message history** | Paginated on demand | Room panel opens with last ~20 messages. AI calls `message_read` with pagination params to load more. AI controls its own context budget. |
+| 11 | **Message history** | Paginated on demand | Room panel opens with last ~30 messages. AI calls `Chat_configure` with filter params to load more or narrow results. AI controls its own context budget. |
 | 12 | **AI accounts** | Single shared bot | One `@context-pilot:localhost` account shared across all workers. Simple sync, simple auth. If multiple workers reply, they all appear as the same bot. |
 | 13 | **Tuwunel distribution** | Bundled with CP binary | Tuwunel ships inside Context Pilot's release artifacts. Single download, zero setup. Versions are tied together — CP release N ships with Tuwunel version M. |
+| 14 | **Room resolution** | Alias resolution via Matrix API | Room aliases (e.g. `#general`) resolved to room IDs via the Matrix directory API. Room IDs also accepted directly. |
+| 15 | **Sync technology** | Sliding Sync (MSC3575) | Newer, faster initial sync. Only fetches rooms/events the client needs. Tuwunel supports it natively. |
+| 16 | **Media naming** | Flat global directory | Files stored in `.context-pilot/matrix/media/` with room ID prefix for disambiguation. mxc:// URIs mapped to local paths. |
+| 17 | **Acknowledge scope** | Whole room at once | `Chat_mark_as_read` marks ALL messages in the room as read. Resets unread to 0 and sends Matrix read receipt. |
+| 18 | **Room invites** | Auto-accept all | Bot auto-accepts ALL room invites immediately. Required for bridge usability (WhatsApp contacts auto-create DM rooms). |
+| 19 | **Panel close behavior** | Stay joined, stop displaying | Closing a room panel does NOT leave the Matrix room. Unreads still accumulate. Re-opening is instant. Event refs reset. |
+| 20 | **Bot display name** | Configurable | Default "Context Pilot". Configurable display name and avatar via module config. |
+| 21 | **Sender identity** | Display name + platform hint + full metadata | YAML context includes participant section with display name, platform source, and Matrix user ID. |
+| 22 | **Reactions in context** | Inline after message | Reactions shown as part of the message entry: `reactions: [👍 alice, ✅ bob]`. |
+| 23 | **Module offline** | Module refuses to activate | If Tuwunel fails to start, module activation fails. Tools unavailable. Dashboard shows "Server offline". |
+| 24 | **Timestamps** | ISO 8601 | `2026-03-20T10:23:00Z` format in YAML context. Unambiguous and machine-parseable. |
+| 25 | **Message format** | YAML | `context_content()` outputs structured YAML with metadata header + messages list. Rich, AI-friendly. |
+| 26 | **Markdown sending** | Both plain + HTML (Matrix spec) | body field is plain text (fallback), formatted_body is HTML. Maximum bridge compatibility. |
+| 27 | **Edit/delete** | Both, own messages only, params on Chat_send | `Chat_send(edit='E5', message='new')` or `Chat_send(delete='E3')`. Only bot's own messages. |
+| 28 | **Notice default** | Notices by default | `Chat_send` defaults to m.notice (bot-style, no notification). Set `notice=false` for regular message. |
+| 29 | **Tool naming** | `Chat_` prefix | 8 tools: Chat_open, Chat_send, Chat_react, Chat_configure, Chat_search, Chat_mark_as_read, Chat_create_room, Chat_invite. |
+| 30 | **Module/crate name** | `chat` / `cp-mod-chat` | Generic name. Tools are `Chat_*`. Context types: `chat:<room_id>`, `chat-dashboard`. |
+| 31 | **Event ID format** | Short sequential refs (E1, E2...) | Panel maps short refs to full Matrix event IDs internally. Saves tokens. Refs reset on panel close. |
+| 32 | **Thread display** | Inline with reply markers | `reply_to: E2` in YAML. Panel renders `└─ reply to bob: ...` in TUI. |
+| 33 | **Typing indicators** | StreamingTool hook | Typing indicator sent when Chat_send tool's room param is parsed from streaming. Cleared on ToolUse completion. |
+| 34 | **Room panel context** | Only open panels | Only open room panels contribute to LLM context. Dashboard is always-on. Standard panel system rules apply. |
+| 35 | **Notification timing** | Immediate, in-place replacement | Every new message instantly updates the singleton notification. Never creates duplicates. |
+| 36 | **Chat_configure** | All-in-one optional params | `Chat_configure(room, n_messages?, max_age?, query?)`. No-params resets to default view. |
+| 37 | **Search results** | Split view in dashboard | Room list always visible above, search results below. Max 20 results. In dashboard context_content(). |
+| 38 | **Search clear** | Empty Chat_search | `Chat_search(query='')` clears the search section, returning dashboard to room-list-only view. |
+| 39 | **Bot messages** | Included in context | Bot's own messages appear in room panel YAML (sender: "Context Pilot"). AI sees full conversation. |
+| 40 | **Room leave** | No leave tool | Bot stays in all rooms. User can manually leave via another Matrix client if needed. |
+| 41 | **DM handling** | No special handling | DMs are rooms with `is_direct=true`. No special tools or display logic. Same as group rooms. |
+| 42 | **Startup panels** | Dashboard only, no auto-open | Module starts with just the dashboard. AI opens rooms on demand via Chat_open. |
+| 43 | **Multi-worker sync** | Shared sync, per-worker panels | One matrix-sdk Client, one sync loop, shared across workers. Each worker opens its own room panels. |
+| 44 | **Dashboard search limit** | Max 20 results | Cross-room Chat_search returns max 20 results to keep dashboard context manageable. |
+| 45 | **Bridge detection** | Appservice registration query | Bridge status detected by querying Tuwunel's registered appservices and checking puppet user activity. |
+| 46 | **Duplicate Chat_open** | No-op, return success | Opening an already-open room returns success without creating a duplicate panel. |
+| 47 | **Default message count** | 30 messages, sliding window | Room panel opens with last 30 messages. Oldest fall off as new ones arrive. Configurable via Chat_configure. |
+| 48 | **Read receipts** | Dual: internal tracking + Matrix receipts | Internal unread counter for Spine notification. Matrix read receipt sent on Chat_mark_as_read for bridge visibility. |
+| 49 | **Phase 1 scope** | Ship everything | All 8 tools, typing indicators, media download, edit/delete, dashboard search — full implementation in one phase. |
+| 50 | **Config storage** | TBD | Deferred — will be decided during implementation. |
 
 ## 11. Open Questions
 
@@ -606,41 +801,49 @@ Items that still need resolution:
 
 ## 12. Implementation Phases
 
-### Phase 1: Foundation (MVP)
-- [ ] Crate scaffold (`cp-mod-matrix`)
+### Single Phase: Full Implementation
+
+All features ship together. No phased rollout.
+
+**Foundation:**
+- [ ] Crate scaffold (`cp-mod-chat`)
 - [ ] Tuwunel process management (start/stop/health check)
-- [ ] First-run bootstrap (download binary, generate config, create bot account)
+- [ ] First-run bootstrap (extract bundled binary, generate config, create bot account)
 - [ ] `matrix-sdk` client connection + authentication
-- [ ] Background sync loop (receive messages)
-- [ ] `message_list_rooms` tool + MatrixOverviewPanel
-- [ ] `message_read` tool + MessageRoomPanel
-- [ ] `message_send` tool
+- [ ] Sliding Sync loop (MSC3575) with shared-across-workers architecture
 
-### Phase 2: Interaction
-- [ ] `message_reply` tool (threaded replies)
-- [ ] `message_react` tool
-- [ ] `message_create_room` tool
-- [ ] `message_invite` tool
-- [ ] Spine notification integration (new message → auto-continuation)
+**Dashboard:**
+- [ ] ChatDashboardPanel (always-on fixed panel)
+- [ ] Room list with unread counts, last message preview, bridge source
+- [ ] Server status + bridge health (appservice registration query)
+- [ ] YAML context_content() with full metadata
 
-### Phase 3: Search & Intelligence
-- [ ] `message_search` tool (full-text search)
-- [ ] `matrix_status` tool (detailed health/bridge info)
-- [ ] Smart context: only include relevant room messages in LLM context
-- [ ] Per-room notification policies (always / mention-only / silent)
+**Room Panels:**
+- [ ] ChatRoomPanel with YAML context output
+- [ ] Short event refs (E1, E2...) with internal mapping
+- [ ] Participant metadata (display name, platform, user ID)
+- [ ] Media download to `.context-pilot/matrix/media/` with inline path + size
+- [ ] Inline reply markers (`reply_to: E<n>`)
+- [ ] Inline reactions (`reactions: [👍 alice]`)
+- [ ] 30-message sliding window default
 
-### Phase 4: Bridges
-- [ ] Bridge status detection (which bridges are connected)
-- [ ] Bridge display hints in panels (show "via Discord" etc.)
-- [ ] Optional: bridge lifecycle management tools
-- [ ] Documentation: how to set up each bridge
+**Tools:**
+- [ ] `Chat_open` — open room panel, alias resolution via API, no-op on duplicate
+- [ ] `Chat_send` — send/reply/edit/delete, markdown → HTML, notices by default
+- [ ] `Chat_react` — emoji reaction via event ref
+- [ ] `Chat_configure` — room panel filtering (n_messages, max_age, query), no-params reset
+- [ ] `Chat_search` — cross-room search in dashboard, split view, max 20, empty clears
+- [ ] `Chat_mark_as_read` — whole-room ack + Matrix read receipt
+- [ ] `Chat_create_room` — create room with optional topic/invites
+- [ ] `Chat_invite` — invite user to room
 
-### Phase 5: Advanced
-- [ ] Federation support (opt-in)
-- [ ] Media handling (images, files)
-- [ ] E2EE support
-- [ ] Per-worker Matrix accounts
-- [ ] Room-level AI behavior configuration
+**Integration:**
+- [ ] Spine notification (single coalesced, immediate in-place replacement)
+- [ ] Typing indicators via StreamingTool hook
+- [ ] Auto-accept all room invites
+- [ ] Room alias resolution via Matrix API
+- [ ] Bridge detection via appservice registration query
+- [ ] Bot display name configurable
 
 ---
 
@@ -649,27 +852,37 @@ Items that still need resolution:
 ```
 User: Check if anyone messaged me
 
-AI: [calls message_list_rooms]
-    → Shows 3 rooms with unread messages
-
-AI: You have unread messages in 3 rooms:
+AI: [reads Chat dashboard panel — sees unread counts]
+    You have unread messages in 3 rooms:
     - #general (Discord): 5 unread — alice asking about PR review
     - @bob (WhatsApp): 2 unread — asking about dinner plans
     - #alerts: 1 unread — deploy notification
 
-User: Reply to alice that I'll review the PR after lunch
+User: Open general and reply to alice
 
-AI: [calls message_send room="#general" message="I'll review the PR after lunch! 🍕"]
-    → Message sent to #general
+AI: [calls Chat_open(room='#general')]
+    → Opens ChatRoomPanel showing last 30 messages in YAML
+    → Sees E1-E30 event refs, alice's PR review request is E28
 
-    Alice will see this in Discord as a message from the bot (or from
-    you, if double-puppeting is configured).
+    [calls Chat_send(room='#general', message="I'll review the PR after lunch! 🍕", reply_to='E28')]
+    → Threaded reply sent. Alice sees it on Discord.
 
-User: Open the alerts room
+    [calls Chat_mark_as_read(room='#general')]
+    → Unread count → 0, Spine notification updated, Discord shows "read"
 
-AI: [calls message_read room="#alerts" limit=20]
-    → Opens MessageRoomPanel showing last 20 messages in #alerts
-    → Panel auto-refreshes as new alerts arrive
+User: Search for any deploy errors across all rooms
+
+AI: [calls Chat_search(query='deploy error')]
+    → Dashboard split view: rooms above, 3 search results below
+    → AI sees matching messages from #general, #alerts, #dev-log in YAML context
+
+User: Clear that search and close general
+
+AI: [calls Chat_search(query='')]
+    → Search section removed from dashboard
+
+    [calls Close_panel on #general's panel]
+    → Room panel closed, event refs reset. Bot still joined — unreads accumulate.
 ```
 
 ---
