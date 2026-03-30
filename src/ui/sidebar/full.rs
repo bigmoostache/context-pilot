@@ -33,6 +33,7 @@ pub(super) fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String>
         "queue" => cp_mod_queue::types::QueueState::get(state).queued_calls.len(),
         "overview" => state.context.len().saturating_add(2), // +2 for system prompt + tool definitions
         "tools" => state.tools.iter().filter(|t| t.enabled).count(),
+        "chat-dashboard" => cp_mod_chat::types::ChatState::get(state).rooms.len(),
         _ => return None,
     };
     Some(count.to_string())

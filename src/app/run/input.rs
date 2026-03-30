@@ -35,6 +35,7 @@ impl App {
             last_render_ms: 0,
             last_spinner_ms: 0,
             last_gh_sync_ms: 0,
+            last_chat_drain_ms: 0,
             api_check_rx: None,
             resume_stream,
             command_palette: CommandPalette::new(),

@@ -213,9 +213,6 @@ pub(super) fn finalize_stream(app: &mut App) {
             // Reset consecutive error backoff — successful completion proves API is healthy
             spine_cfg.consecutive_continuation_errors = 0;
             spine_cfg.last_continuation_error_ms = None;
-            // Reopen the throttle gate — a successful LLM tick means the system processed
-            // the notifications. New notifications can now trigger auto-continuation again.
-            spine_cfg.can_awake_using_notification = true;
         }
 
         // Unblock any guard-rail-blocked notifications — they get another chance now

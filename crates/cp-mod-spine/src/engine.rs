@@ -16,6 +16,16 @@ use cp_base::state::runtime::State;
 use crate::guard_rail::all_guard_rails;
 use crate::types::{ContinuationAction, Notification, NotificationType, SpineState};
 
+/// Temporary debug logger — writes to `spine_debug.log` for tracing auto-continuation.
+fn spine_debug(msg: &str) {
+    use std::io::Write as _;
+    let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(".context-pilot/spine_debug.log") else {
+        return;
+    };
+    let ts = now_ms();
+    drop(writeln!(f, "[{ts}] {msg}"));
+}
+
 /// Result of a spine check — tells the caller what to do.
 #[derive(Debug)]
 pub enum SpineDecision {
@@ -40,11 +50,6 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     // Check context threshold and emit notification if crossed
     check_context_threshold(state);
 
-    // Check if user explicitly stopped (Esc) — don't auto-continue
-    if SpineState::get(state).config.user_stopped {
-        return SpineDecision::Idle;
-    }
-
     // Backoff after consecutive failed continuations (errors with all retries exhausted).
     // Delay: 2^errors seconds, capped at 60s. Prevents runaway loops on persistent API failures.
     {
@@ -55,6 +60,7 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
             let backoff_secs = (1u64 << cfg.consecutive_continuation_errors.min(6)).min(60);
             let elapsed_ms = now_ms().saturating_sub(last_err_ms);
             if elapsed_ms < backoff_secs.saturating_mul(1000) {
+                spine_debug(&format!("IDLE — error backoff ({backoff_secs}s, elapsed {elapsed_ms}ms)"));
                 return SpineDecision::Idle;
             }
         }
@@ -65,12 +71,43 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
         return SpineDecision::Idle;
     }
 
-    // === Guardrail 1: Throttle gate ===
-    // If the gate is closed, a previous notification-driven continuation hasn't
-    // completed yet (or was blocked). Don't fire again until a successful LLM tick
-    // or human message reopens the gate.
-    if !SpineState::get(state).config.can_awake_using_notification {
-        return SpineDecision::Idle;
+    // If any unprocessed notification comes from an external human channel
+    // (chat/bridge), treat it like a fresh user message: reset all counters
+    // so guard rails don't block what is effectively human-initiated input.
+    {
+        let has_external =
+            SpineState::get(state).notifications.iter().any(|n| n.is_unprocessed() && n.source == "chat");
+        if has_external {
+            let cfg = &mut SpineState::get_mut(state).config;
+            cfg.auto_continuation_count = 0;
+            cfg.autonomous_start_ms = None;
+            cfg.consecutive_continuation_errors = 0;
+            cfg.last_continuation_error_ms = None;
+        }
+    }
+
+    spine_debug(&format!(
+        "HAS UNPROCESSED — user_stopped={}, phase={:?}",
+        SpineState::get(state).config.user_stopped,
+        state.flags.stream.phase
+    ));
+
+    // Check if user explicitly stopped (Esc) — only block todo-driven continuations,
+    // not new triggers like chat messages or coucou timers. A fresh notification
+    // (Custom/UserMessage) always gets through — the user intended to wake us.
+    if SpineState::get(state).config.user_stopped {
+        let all_todo = SpineState::get(state)
+            .notifications
+            .iter()
+            .filter(|n| n.is_unprocessed())
+            .all(|n| n.source == "todo_continuation");
+        if all_todo {
+            spine_debug("IDLE — user_stopped and all notifications are todo_continuation");
+            return SpineDecision::Idle;
+        }
+        // Non-todo notification present — clear user_stopped and proceed
+        spine_debug("CLEARING user_stopped — non-todo notification present");
+        SpineState::get_mut(state).config.user_stopped = false;
     }
 
     // === Guardrail 2: No two synthetic messages in a row ===
@@ -125,15 +162,10 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
                     format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
                 ));
             }
-            // Mark all unprocessed notifications as processed — they were evaluated
+            // Mark all unprocessed notifications as blocked — they were evaluated
             // and the decision was "blocked." Persistent watchers will recreate new
             // notifications on the next poll, and we'll re-evaluate then.
-            // Without this, notifications accumulate infinitely while blocked.
             SpineState::mark_all_unprocessed_as_blocked(state);
-
-            // Close the throttle gate — prevents rapid-fire re-evaluation.
-            // Reopened by a successful LLM tick or human message.
-            SpineState::get_mut(state).config.can_awake_using_notification = false;
 
             return SpineDecision::Blocked(reason);
         }

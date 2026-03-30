@@ -7,6 +7,87 @@ use matrix_sdk::ruma::RoomId;
 
 use super::{ASYNC_RT, get_client};
 
+/// Fetch recent messages from a room for backfilling an open panel.
+///
+/// Returns up to `limit` messages (newest last) using the Matrix
+/// `/messages` API with backward pagination.
+///
+/// # Errors
+///
+/// Returns a description if the request fails.
+pub(crate) fn fetch_recent_messages(room_id: &str, limit: u32) -> Result<Vec<crate::types::MessageInfo>, String> {
+    use matrix_sdk::ruma::events::AnySyncMessageLikeEvent as MLE;
+    use matrix_sdk::ruma::events::AnySyncTimelineEvent as TLE;
+    use matrix_sdk::ruma::events::room::message::{MessageType as RumaMessageType, SyncRoomMessageEvent};
+
+    let client = get_client().ok_or("Not connected to Matrix server")?;
+    let parsed_id = <&RoomId>::try_from(room_id).map_err(|e| format!("Invalid room ID: {e}"))?;
+
+    ASYNC_RT.block_on(Box::pin(async {
+        let room = client.get_room(parsed_id).ok_or_else(|| format!("Room {room_id} not found"))?;
+
+        let mut opts = matrix_sdk::room::MessagesOptions::backward();
+        opts.limit = limit.into();
+
+        let response = Box::pin(room.messages(opts)).await.map_err(|e| format!("Cannot fetch messages: {e}"))?;
+
+        let mut messages = Vec::new();
+        for timeline_event in &response.chunk {
+            let Ok(event) = timeline_event.raw().deserialize() else {
+                continue;
+            };
+            let TLE::MessageLike(MLE::RoomMessage(msg)) = &event else {
+                continue;
+            };
+            let SyncRoomMessageEvent::Original(o) = msg else {
+                continue;
+            };
+
+            let (body, msg_type) = match &o.content.msgtype {
+                RumaMessageType::Text(t) => (t.body.clone(), crate::types::MessageType::Text),
+                RumaMessageType::Notice(n) => (n.body.clone(), crate::types::MessageType::Notice),
+                RumaMessageType::Emote(e) => (e.body.clone(), crate::types::MessageType::Emote),
+                RumaMessageType::Image(_) => ("[image]".to_string(), crate::types::MessageType::Image),
+                RumaMessageType::File(_) => ("[file]".to_string(), crate::types::MessageType::File),
+                RumaMessageType::Video(_) => ("[video]".to_string(), crate::types::MessageType::Video),
+                RumaMessageType::Audio(_) => ("[audio]".to_string(), crate::types::MessageType::Audio),
+                RumaMessageType::Location(_)
+                | RumaMessageType::ServerNotice(_)
+                | RumaMessageType::VerificationRequest(_)
+                | _ => continue,
+            };
+
+            let sender = o.sender.to_string();
+            let display_name = room.get_member_no_sync(&o.sender).await.ok().flatten().map_or_else(
+                || sender.clone(),
+                |m| m.display_name().unwrap_or_else(|| m.user_id().as_str()).to_string(),
+            );
+
+            // Sync events don't carry event_id/origin_server_ts directly —
+            // extract from the raw JSON via the timeline_event helper.
+            let event_id = timeline_event.event_id().map_or_else(|| String::from("?"), |id| id.to_string());
+            let timestamp: u64 = o.origin_server_ts.0.into();
+
+            messages.push(crate::types::MessageInfo {
+                event_id,
+                sender,
+                sender_display_name: display_name,
+                body,
+                timestamp,
+                msg_type,
+                reply_to: None,
+                reactions: Vec::new(),
+                media_path: None,
+                media_size: None,
+            });
+        }
+
+        // API returns newest-first (backward), reverse to chronological order
+        messages.reverse();
+        Ok(messages)
+    }))
+}
+
 /// Search for messages across rooms using the Matrix server-side search API.
 ///
 /// Returns up to 20 results. When `room_id` is `Some`, scopes the search

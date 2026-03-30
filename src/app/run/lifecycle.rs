@@ -168,6 +168,13 @@ impl App {
                 self.last_gh_sync_ms = current_ms;
                 super::watchers::sync_gh_watches(self);
             }
+            // Drain Matrix sync events periodically (every 2s) so chat notifications
+            // fire even while idle — without this, drain_sync_events() only runs
+            // inside prepare_stream_context() which never happens when idle.
+            if current_ms.saturating_sub(self.last_chat_drain_ms) >= 2_000 {
+                self.last_chat_drain_ms = current_ms;
+                crate::app::panels::refresh_all_panels(&mut self.state);
+            }
             super::watchers::check_timer_based_deprecation(self);
             super::tool_pipeline::handle_tool_execution(self, ch.tx);
             super::streaming::finalize_stream(self);

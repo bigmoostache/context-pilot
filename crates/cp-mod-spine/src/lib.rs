@@ -286,8 +286,6 @@ impl Module for SpineModule {
         // Reset error backoff — human can immediately trigger a new stream
         ss.config.consecutive_continuation_errors = 0;
         ss.config.last_continuation_error_ms = None;
-        // Reopen the throttle gate — human message always unblocks
-        ss.config.can_awake_using_notification = true;
     }
 
     fn on_stream_stop(&self, state: &mut State) {

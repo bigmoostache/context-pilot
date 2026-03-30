@@ -19,6 +19,7 @@ use crate::server;
 use crate::types::{BridgeSource, ChatEvent, RoomInfo};
 
 /// Tuwunel binary download and extraction from GitHub releases.
+pub(crate) mod account;
 pub(crate) mod download;
 /// Room management: search, read receipts, creation, invites.
 pub(crate) mod rooms;
@@ -98,7 +99,7 @@ async fn connect_async() -> Result<(), String> {
     let user_id = creds.get("user_id").and_then(serde_json::Value::as_str).unwrap_or("@context-pilot:localhost");
 
     // Build the client pointing at the local homeserver
-    let server_url = format!("http://{}", server::SERVER_ADDR);
+    let server_url = format!("http://{}", server::server_addr());
     let store_path = data.join("sdk-store");
     std::fs::create_dir_all(&store_path).map_err(|e| format!("Cannot create SDK store dir: {e}"))?;
 
@@ -298,7 +299,7 @@ fn register_event_handlers(client: &Client) {
             sender_display_name: display_name,
             body,
             event_id: original.event_id.to_string(),
-            timestamp_ms: original.origin_server_ts.as_secs().into(),
+            timestamp_ms: original.origin_server_ts.0.into(),
         });
     });
 

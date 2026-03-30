@@ -96,10 +96,14 @@ impl Module for ChatModule {
         }
 
         client::start_sync();
+
+        // Recover any running bridge processes from a previous session
+        recover_bridges(state);
     }
 
     fn reset_state(&self, state: &mut State) {
-        // Tear down in reverse order: client → server → state
+        // Tear down in reverse order: bridges → client → server → state
+        shutdown_bridges(state);
         client::disconnect();
         server::stop_server(state);
         state.set_ext(ChatState::default());
@@ -403,6 +407,41 @@ fn clear_typing_indicator(state: &mut State) {
     if let Some(room_id) = cs.typing_room.take() {
         client::send::set_typing(&room_id, false);
     }
+}
+
+/// Recover running bridge processes from a previous session.
+///
+/// Scans all known bridges for PID files left by a prior invocation.
+/// If the process is still alive and healthy, updates `bridge_status`
+/// to `Running` so the dashboard reflects reality.
+fn recover_bridges(state: &mut State) {
+    let root = std::path::Path::new(".");
+    let cs = ChatState::get_mut(state);
+    for spec in bridges::BRIDGES {
+        if bridges::lifecycle::binary_path(spec.name).is_some_and(|p| p.exists()) {
+            match bridges::lifecycle::start(root, spec.name) {
+                Ok(pid) => {
+                    let _inserted =
+                        cs.bridge_status.insert(spec.name.to_string(), types::BridgeStatus::Running { pid });
+                }
+                Err(e) => {
+                    log::debug!("Bridge {} not recovered: {e}", spec.name);
+                }
+            }
+        }
+    }
+}
+
+/// Stop all running bridge processes during module deactivation.
+fn shutdown_bridges(state: &mut State) {
+    let root = std::path::Path::new(".");
+    let cs = ChatState::get_mut(state);
+    for spec in bridges::BRIDGES {
+        if cs.bridge_status.contains_key(spec.name) {
+            bridges::lifecycle::stop(root, spec.name);
+        }
+    }
+    cs.bridge_status.clear();
 }
 
 /// Extract the `"room"` value from a partial JSON string.

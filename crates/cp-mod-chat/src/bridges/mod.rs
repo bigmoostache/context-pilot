@@ -1,37 +1,37 @@
-//! Bridge configuration and registration file management.
+//! Bridge configuration: specs, config templates, and registration management.
 //!
-//! Generates per-bridge `config.yaml` templates and detects
-//! `registration.yaml` files to register with the homeserver.
-//! All bridges use the mautrix Go framework (`bridgev2`) and
-//! require PostgreSQL 16+ (provided via docker-compose).
+//! Each mautrix bridge is a standalone Go binary. This module holds the
+//! bridge specification table, generates config files, and manages
+//! appservice registration in the homeserver config. Process lifecycle
+//! (download, spawn, stop) lives in the [`lifecycle`] submodule.
+
+/// Bridge process lifecycle: download, spawn, stop, health check.
+pub(crate) mod lifecycle;
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use crate::server;
 
-/// Default PostgreSQL connection string template for bridge databases.
-///
-/// The `{bridge}` placeholder is replaced with the bridge name
-/// (e.g. `discord`, `whatsapp`) to create per-bridge databases.
-const POSTGRES_URI_TEMPLATE: &str = "postgres://matrix:changeme@localhost:5432/{bridge}?sslmode=disable";
-
-/// Bridge descriptor: metadata needed to generate config templates.
-struct BridgeSpec {
+/// Bridge descriptor: everything needed to configure and run a bridge.
+pub(crate) struct BridgeSpec {
     /// Short name used for directories and database names (e.g. `discord`).
-    name: &'static str,
+    pub name: &'static str,
     /// Default appservice bot username (e.g. `discordbot`).
-    bot_username: &'static str,
+    pub bot_username: &'static str,
     /// Default appservice port the bridge listens on.
-    appservice_port: u16,
+    pub appservice_port: u16,
     /// Puppet user namespace regex (e.g. `@discord_.*`).
-    user_namespace: &'static str,
+    pub user_namespace: &'static str,
     /// Puppet room alias namespace regex (e.g. `#discord_.*`).
-    alias_namespace: &'static str,
+    pub alias_namespace: &'static str,
 }
 
-/// All supported mautrix bridges with their default configuration.
-const BRIDGES: &[BridgeSpec] = &[
+/// All supported mautrix bridges with their configuration defaults.
+///
+/// Each bridge binary is downloaded from GitHub:
+/// `https://github.com/mautrix/{name}/releases/latest/download/mautrix-{name}-{arch}`
+pub(crate) const BRIDGES: &[BridgeSpec] = &[
     BridgeSpec {
         name: "whatsapp",
         bot_username: "whatsappbot",
@@ -102,30 +102,27 @@ const BRIDGES: &[BridgeSpec] = &[
         user_namespace: "@bluesky_.*",
         alias_namespace: "#bluesky_.*",
     },
-    BridgeSpec {
-        name: "irc",
-        bot_username: "ircbot",
-        appservice_port: 29328,
-        user_namespace: "@irc_.*",
-        alias_namespace: "#irc_.*",
-    },
 ];
 
-/// Generate a `config.yaml` template for every known bridge.
+// -- Config generation -------------------------------------------------------
+
+/// Bridge data directory: `.context-pilot/matrix/bridges/{name}/`
+#[must_use]
+pub(crate) fn bridge_data_dir(project_root: &Path, name: &str) -> PathBuf {
+    server::data_dir(project_root).join("bridges").join(name)
+}
+
+/// Generate config templates for all known bridges.
 ///
 /// Each config is written to `.context-pilot/matrix/bridges/{name}/config.yaml`.
 /// Existing files are **not** overwritten (safe to call repeatedly).
-/// The generated configs use the local homeserver address and the
-/// PostgreSQL URI from the docker-compose template.
 ///
 /// # Errors
 ///
 /// Returns a description of the first I/O failure encountered.
 pub(crate) fn generate_bridge_configs(project_root: &Path) -> Result<(), String> {
-    let bridges_dir = server::data_dir(project_root).join("bridges");
-
     for spec in BRIDGES {
-        let dir = bridges_dir.join(spec.name);
+        let dir = bridge_data_dir(project_root, spec.name);
         std::fs::create_dir_all(&dir).map_err(|e| format!("Cannot create {}: {e}", dir.display()))?;
 
         let cfg_path = dir.join("config.yaml");
@@ -133,10 +130,9 @@ pub(crate) fn generate_bridge_configs(project_root: &Path) -> Result<(), String>
             continue;
         }
 
-        let content = render_bridge_config(spec);
+        let content = render_bridge_config(spec, project_root);
         std::fs::write(&cfg_path, content).map_err(|e| format!("Cannot write {}: {e}", cfg_path.display()))?;
 
-        // Also write a sample registration.yaml alongside the config
         let reg_path = dir.join("registration.yaml.sample");
         if !reg_path.exists()
             && let Some(reg) = render_registration_template(spec.name)
@@ -148,120 +144,11 @@ pub(crate) fn generate_bridge_configs(project_root: &Path) -> Result<(), String>
     Ok(())
 }
 
-/// Scan for `registration.yaml` files across all bridge directories
-/// and return their paths.
-///
-/// Looks in `.context-pilot/matrix/bridges/{name}/registration.yaml`
-/// for every known bridge. Only returns paths that actually exist.
-#[must_use]
-pub(crate) fn find_registration_files(project_root: &Path) -> Vec<PathBuf> {
-    let bridges_dir = server::data_dir(project_root).join("bridges");
-    let mut found = Vec::new();
-
-    for spec in BRIDGES {
-        let reg = bridges_dir.join(spec.name).join("registration.yaml");
-        if reg.exists() {
-            found.push(reg);
-        }
-    }
-
-    found
-}
-
-/// Update the homeserver config to include all detected registration files.
-///
-/// Reads `homeserver.toml`, checks for an `app_service_config_files` key,
-/// and appends any registration paths not already listed. Writes the
-/// updated config back to disk.
-///
-/// # Errors
-///
-/// Returns a description if the config cannot be read or written.
-pub(crate) fn update_appservice_registrations(project_root: &Path) -> Result<bool, String> {
-    let registrations = find_registration_files(project_root);
-    if registrations.is_empty() {
-        return Ok(false);
-    }
-
-    let cfg_path = server::config_path(project_root);
-    let content = std::fs::read_to_string(&cfg_path).map_err(|e| format!("Cannot read {}: {e}", cfg_path.display()))?;
-
-    // Collect registration paths as strings relative to the config dir
-    let cfg_dir = cfg_path.parent().unwrap_or_else(|| Path::new("."));
-    let reg_strs: Vec<String> = registrations
-        .iter()
-        .filter_map(|p| p.strip_prefix(cfg_dir).ok())
-        .map(|p| p.to_string_lossy().to_string())
-        .collect();
-
-    // Check if any registrations are missing from the config
-    let has_new = reg_strs.iter().any(|r| !content.contains(r.as_str()));
-
-    if !has_new {
-        return Ok(false);
-    }
-
-    // Build the appservice list line
-    let mut list = String::from("app_service_config_files = [");
-    for (i, reg) in reg_strs.iter().enumerate() {
-        if i > 0 {
-            list.push_str(", ");
-        }
-        {
-            let _r = write!(list, "\"{reg}\"");
-        }
-    }
-    list.push(']');
-
-    // Replace existing line or append under [global]
-    let updated = if content.contains("app_service_config_files") {
-        // Replace the existing line
-        let mut result = String::with_capacity(content.len());
-        for line in content.lines() {
-            if line.trim_start().starts_with("app_service_config_files") {
-                result.push_str(&list);
-            } else {
-                result.push_str(line);
-            }
-            result.push('\n');
-        }
-        result
-    } else {
-        // Append after the [global] section
-        let mut result = String::with_capacity(content.len().saturating_add(list.len()).saturating_add(2));
-        let mut inserted = false;
-        for line in content.lines() {
-            result.push_str(line);
-            result.push('\n');
-            if !inserted && line.trim() == "[global]" {
-                result.push_str(&list);
-                result.push('\n');
-                inserted = true;
-            }
-        }
-        // Fallback: append at end if [global] not found
-        if !inserted {
-            result.push_str(&list);
-            result.push('\n');
-        }
-        result
-    };
-
-    std::fs::write(&cfg_path, updated).map_err(|e| format!("Cannot write {}: {e}", cfg_path.display()))?;
-
-    Ok(true)
-}
-
-/// Render a bridge `config.yaml` from a spec.
-///
-/// The generated YAML contains the homeserver address, database URI,
-/// appservice configuration, and bridge-specific bot settings. Users
-/// must fill in authentication credentials for their platform.
-fn render_bridge_config(spec: &BridgeSpec) -> String {
-    let db_uri = POSTGRES_URI_TEMPLATE.replace("{bridge}", spec.name);
-    let hs_addr = format!("http://{}", server::SERVER_ADDR);
-    // Bridges in Docker need host.docker.internal to reach the host
-    let hs_addr_docker = format!("http://host.docker.internal:{}", 6167);
+/// Render a bridge `config.yaml` using `SQLite` and localhost addresses.
+fn render_bridge_config(spec: &BridgeSpec, project_root: &Path) -> String {
+    let hs_addr = format!("http://{}", server::server_addr());
+    let db_path = bridge_data_dir(project_root, spec.name).join(format!("{}.db", spec.name));
+    let db_uri = format!("file:{}?_txlock=immediate", db_path.to_string_lossy());
 
     let mut cfg = String::with_capacity(1024);
 
@@ -281,16 +168,7 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
         let _r = writeln!(cfg, "homeserver:");
     }
     {
-        let _r = writeln!(cfg, "  # Use this if the bridge runs on the host:");
-    }
-    {
-        let _r = writeln!(cfg, "  # address: {hs_addr}");
-    }
-    {
-        let _r = writeln!(cfg, "  # Use this if the bridge runs in Docker:");
-    }
-    {
-        let _r = writeln!(cfg, "  address: {hs_addr_docker}");
+        let _r = writeln!(cfg, "  address: {hs_addr}");
     }
     {
         let _r = writeln!(cfg, "  domain: localhost");
@@ -314,7 +192,7 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
         let _r = writeln!(cfg, "  database:");
     }
     {
-        let _r = writeln!(cfg, "    type: postgres");
+        let _r = writeln!(cfg, "    type: sqlite3-fk-wal");
     }
     {
         let _r = writeln!(cfg, "    uri: {db_uri}");
@@ -347,26 +225,98 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
     cfg
 }
 
-/// Capitalize the first letter of a string.
-fn capitalize(s: &str) -> String {
-    let mut chars = s.chars();
-    chars.next().map_or_else(String::new, |c| {
-        let mut result = String::with_capacity(s.len());
-        for upper in c.to_uppercase() {
-            result.push(upper);
+// -- Registration file management --------------------------------------------
+
+/// Scan for `registration.yaml` files across all bridge directories.
+#[must_use]
+pub(crate) fn find_registration_files(project_root: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    for spec in BRIDGES {
+        let reg = bridge_data_dir(project_root, spec.name).join("registration.yaml");
+        if reg.exists() {
+            found.push(reg);
         }
-        result.extend(chars);
-        result
-    })
+    }
+    found
 }
 
-/// Render a sample `registration.yaml` for a bridge spec.
+/// Update the homeserver config to include all detected registration files.
 ///
-/// Bridges normally generate their own registration files, but this
-/// template serves as documentation and a fallback if the user needs
-/// to create one manually. The `as_token` and `hs_token` are
-/// placeholder values that must be replaced with the bridge's actual
-/// generated tokens.
+/// Reads `homeserver.toml`, appends any registration paths not already
+/// listed to `app_service_config_files`, and writes back.
+///
+/// # Errors
+///
+/// Returns a description if the config cannot be read or written.
+pub(crate) fn update_appservice_registrations(project_root: &Path) -> Result<bool, String> {
+    let registrations = find_registration_files(project_root);
+    if registrations.is_empty() {
+        return Ok(false);
+    }
+
+    let cfg_path = server::config_path(project_root);
+    let content = std::fs::read_to_string(&cfg_path).map_err(|e| format!("Cannot read {}: {e}", cfg_path.display()))?;
+
+    let cfg_dir = cfg_path.parent().unwrap_or_else(|| Path::new("."));
+    let reg_strs: Vec<String> = registrations
+        .iter()
+        .filter_map(|p| p.strip_prefix(cfg_dir).ok())
+        .map(|p| p.to_string_lossy().to_string())
+        .collect();
+
+    let has_new = reg_strs.iter().any(|r| !content.contains(r.as_str()));
+    if !has_new {
+        return Ok(false);
+    }
+
+    let mut list = String::from("app_service_config_files = [");
+    for (i, reg) in reg_strs.iter().enumerate() {
+        if i > 0 {
+            list.push_str(", ");
+        }
+        {
+            let _r = write!(list, "\"{reg}\"");
+        }
+    }
+    list.push(']');
+
+    let updated = if content.contains("app_service_config_files") {
+        let mut result = String::with_capacity(content.len());
+        for line in content.lines() {
+            if line.trim_start().starts_with("app_service_config_files") {
+                result.push_str(&list);
+            } else {
+                result.push_str(line);
+            }
+            result.push('\n');
+        }
+        result
+    } else {
+        let mut result = String::with_capacity(content.len().saturating_add(list.len()).saturating_add(2));
+        let mut inserted = false;
+        for line in content.lines() {
+            result.push_str(line);
+            result.push('\n');
+            if !inserted && line.trim() == "[global]" {
+                result.push_str(&list);
+                result.push('\n');
+                inserted = true;
+            }
+        }
+        if !inserted {
+            result.push_str(&list);
+            result.push('\n');
+        }
+        result
+    };
+
+    std::fs::write(&cfg_path, updated).map_err(|e| format!("Cannot write {}: {e}", cfg_path.display()))?;
+    Ok(true)
+}
+
+// -- Helpers -----------------------------------------------------------------
+
+/// Render a sample `registration.yaml` for documentation purposes.
 #[must_use]
 pub(crate) fn render_registration_template(bridge_name: &str) -> Option<String> {
     let spec = BRIDGES.iter().find(|b| b.name == bridge_name)?;
@@ -416,4 +366,17 @@ pub(crate) fn render_registration_template(bridge_name: &str) -> Option<String> 
     }
 
     Some(out)
+}
+
+/// Capitalize the first letter of a string.
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    chars.next().map_or_else(String::new, |c| {
+        let mut result = String::with_capacity(s.len());
+        for upper in c.to_uppercase() {
+            result.push(upper);
+        }
+        result.extend(chars);
+        result
+    })
 }

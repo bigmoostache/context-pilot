@@ -105,6 +105,14 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Fetch participant list from the Matrix SDK
     open.participants = client::fetch_participants(&room_id);
 
+    // Backfill recent messages so the panel isn't empty on open
+    if let Ok(backfill) = client::rooms::fetch_recent_messages(&room_id, 30) {
+        for msg in backfill {
+            let _ref = open.assign_ref(&msg.event_id);
+            open.push_message(msg);
+        }
+    }
+
     let cs = ChatState::get_mut(state);
     let _prev = cs.open_rooms.insert(room_id, open);
 

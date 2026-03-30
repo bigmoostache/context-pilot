@@ -39,6 +39,10 @@ pub struct ChatState {
     /// Cleared when the tool call completes or the stream stops.
     #[serde(skip)]
     pub typing_room: Option<String>,
+
+    /// Per-bridge runtime status (populated when bridges are started).
+    #[serde(skip)]
+    pub bridge_status: HashMap<String, BridgeStatus>,
 }
 
 impl Default for ChatState {
@@ -52,6 +56,7 @@ impl Default for ChatState {
             search_query: None,
             search_results: Vec::new(),
             typing_room: None,
+            bridge_status: HashMap::new(),
         }
     }
 }
@@ -316,6 +321,22 @@ pub enum ServerStatus {
     /// Server is running and healthy.
     Running,
     /// Server encountered an error.
+    Error(String),
+}
+
+/// Runtime status of a bridge process.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum BridgeStatus {
+    /// Bridge is not running.
+    Stopped,
+    /// Bridge process spawned, waiting for health check.
+    Starting,
+    /// Bridge is running and healthy.
+    Running {
+        /// Process ID of the bridge.
+        pid: u32,
+    },
+    /// Bridge encountered an error.
     Error(String),
 }
 

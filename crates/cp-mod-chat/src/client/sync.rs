@@ -44,11 +44,15 @@ pub(crate) fn drain_sync_events(state: &mut cp_base::state::runtime::State) -> b
     }
 
     let cs = ChatState::get_mut(state);
+    let bot_user = cs.bot_user_id.clone();
     let mut new_messages = 0u64;
 
     for event in &events {
         match event {
             ChatEvent::Message { room_id, body, sender_display_name, event_id, sender, timestamp_ms } => {
+                // Don't count our own messages as unread — no self-notifications
+                let is_own = bot_user.as_ref().is_some_and(|bot| bot == sender);
+
                 let msg = MessageInfo {
                     event_id: event_id.clone(),
                     sender: sender.clone(),
@@ -65,8 +69,10 @@ pub(crate) fn drain_sync_events(state: &mut cp_base::state::runtime::State) -> b
                 // Update room list last_message + unread counter
                 if let Some(room) = cs.rooms.iter_mut().find(|r| r.room_id == *room_id) {
                     room.last_message = Some(msg.clone());
-                    room.unread_count = room.unread_count.saturating_add(1);
-                    new_messages = new_messages.saturating_add(1);
+                    if !is_own {
+                        room.unread_count = room.unread_count.saturating_add(1);
+                        new_messages = new_messages.saturating_add(1);
+                    }
                 }
 
                 // Push into open room panel (sliding window with event ref)
@@ -100,17 +106,43 @@ pub(crate) fn drain_sync_events(state: &mut cp_base::state::runtime::State) -> b
 ///
 /// Updates the existing chat notification in-place if one is still
 /// unprocessed. Otherwise creates a new one. Never duplicates.
+/// Content includes room names, senders, and message previews.
 fn fire_chat_notification(state: &mut cp_base::state::runtime::State) {
     use cp_mod_spine::types::{NotificationType, SpineState};
 
-    let total_unread: u64 = ChatState::get(state).rooms.iter().map(|r| r.unread_count).sum();
+    let cs = ChatState::get(state);
+    let total_unread: u64 = cs.rooms.iter().map(|r| r.unread_count).sum();
 
     if total_unread == 0 {
         return;
     }
 
-    let content =
-        if total_unread == 1 { "1 unread message".to_string() } else { format!("{total_unread} unread messages") };
+    // Build per-room summaries: "Room (sender): message preview..."
+    let mut parts: Vec<String> = Vec::new();
+    for room in &cs.rooms {
+        if room.unread_count == 0 {
+            continue;
+        }
+        let room_name = if room.display_name.is_empty() { &room.room_id } else { &room.display_name };
+        if let Some(msg) = &room.last_message {
+            let sender = if msg.sender_display_name.is_empty() { &msg.sender } else { &msg.sender_display_name };
+            let preview: String = msg.body.chars().take(80).collect();
+            let ellipsis = if msg.body.len() > 80 { "…" } else { "" };
+            if room.unread_count == 1 {
+                parts.push(format!("[{room_name}] {sender}: {preview}{ellipsis}"));
+            } else {
+                parts.push(format!("[{room_name}] {} new — {sender}: {preview}{ellipsis}", room.unread_count));
+            }
+        } else {
+            parts.push(format!("[{room_name}] {} unread", room.unread_count));
+        }
+    }
+
+    let content = if parts.len() == 1 {
+        parts.into_iter().next().unwrap_or_default()
+    } else {
+        format!("{total_unread} unread across {} rooms:\n{}", parts.len(), parts.join("\n"))
+    };
 
     // Try to update an existing unprocessed chat notification in-place
     let ss = SpineState::get_mut(state);
@@ -124,4 +156,15 @@ fn fire_chat_notification(state: &mut cp_base::state::runtime::State) {
     } else {
         let _id = SpineState::create_notification(state, NotificationType::Custom, "chat".to_string(), content);
     }
+
+    // A chat message from Telegram/bridge IS a human message arriving
+    // via a different channel — clear blockers so the Spine can wake up.
+    let spine_cfg = &mut SpineState::get_mut(state).config;
+    spine_cfg.user_stopped = false;
+    spine_cfg.consecutive_continuation_errors = 0;
+    spine_cfg.last_continuation_error_ms = None;
+    // Reset auto-continuation counters — external messages are human input,
+    // so the MaxAutoRetries guard rail should start fresh.
+    spine_cfg.auto_continuation_count = 0;
+    spine_cfg.autonomous_start_ms = None;
 }

@@ -1,0 +1,209 @@
+//! Bridge binary download and process lifecycle management.
+//!
+//! Handles downloading mautrix bridge binaries from GitHub, spawning
+//! them as child processes, PID file tracking, and health checks.
+//! Follows the same pattern as Tuwunel's own server lifecycle.
+
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+use super::{BRIDGES, bridge_data_dir};
+
+/// Grace period before force-killing a bridge after SIGTERM.
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
+
+/// Time to wait for a bridge to become healthy after start.
+const HEALTH_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Interval between health check retries during bridge startup.
+const HEALTH_INTERVAL: Duration = Duration::from_millis(500);
+
+// -- Binary management -------------------------------------------------------
+
+/// Path to a bridge binary: `~/.context-pilot/bin/mautrix-{name}`
+#[must_use]
+pub(crate) fn binary_path(name: &str) -> Option<PathBuf> {
+    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(format!(".context-pilot/bin/mautrix-{name}")))
+}
+
+/// Download a bridge binary from GitHub if not already present.
+///
+/// Uses the `/releases/latest/download/` URL which follows redirects
+/// to the most recent release. The binary is a static Go executable
+/// (~30–50 MB depending on the bridge).
+///
+/// # Errors
+///
+/// Returns a description if the download fails or the architecture
+/// is unsupported.
+pub(crate) fn ensure_binary(name: &str) -> Result<PathBuf, String> {
+    let bin = binary_path(name).ok_or("Cannot determine home directory")?;
+    if bin.exists() {
+        return Ok(bin);
+    }
+
+    let bin_dir = bin.parent().ok_or("Invalid binary path")?;
+    std::fs::create_dir_all(bin_dir).map_err(|e| format!("Cannot create {}: {e}", bin_dir.display()))?;
+
+    let arch = match std::env::consts::ARCH {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        other => return Err(format!("Unsupported architecture for mautrix bridges: {other}")),
+    };
+
+    let url = format!("https://github.com/mautrix/{name}/releases/latest/download/mautrix-{name}-{arch}");
+    log::info!("Downloading mautrix-{name} from {url}...");
+
+    let resp = reqwest::blocking::get(&url).map_err(|e| format!("Download failed: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Download returned HTTP {}", resp.status()));
+    }
+
+    let bytes = resp.bytes().map_err(|e| format!("Failed to read response: {e}"))?;
+    std::fs::write(&bin, &bytes).map_err(|e| format!("Cannot write {}: {e}", bin.display()))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let perms = std::fs::Permissions::from_mode(0o755);
+        std::fs::set_permissions(&bin, perms).map_err(|e| format!("Cannot chmod: {e}"))?;
+    }
+
+    log::info!("mautrix-{name} installed at {} ({} bytes)", bin.display(), bytes.len());
+    Ok(bin)
+}
+
+// -- Process lifecycle -------------------------------------------------------
+
+/// PID file path: `.context-pilot/matrix/bridges/{name}/bridge.pid`
+fn pid_path(project_root: &Path, name: &str) -> PathBuf {
+    bridge_data_dir(project_root, name).join("bridge.pid")
+}
+
+/// Read a bridge's PID from its PID file.
+fn read_pid(project_root: &Path, name: &str) -> Option<u32> {
+    let path = pid_path(project_root, name);
+    std::fs::read_to_string(path).ok()?.trim().parse().ok()
+}
+
+/// Check if a process is alive (kill -0).
+fn is_alive(pid: u32) -> bool {
+    Command::new("kill")
+        .arg("-0")
+        .arg(pid.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+/// Start a bridge process.
+///
+/// Downloads the binary if needed, then spawns it with the config file
+/// in the bridge's data directory. Writes a PID file for orphan recovery.
+///
+/// # Errors
+///
+/// Returns a description if the binary can't be obtained, the config
+/// is missing, or the process fails to spawn.
+pub(crate) fn start(project_root: &Path, name: &str) -> Result<u32, String> {
+    let spec = BRIDGES.iter().find(|b| b.name == name).ok_or_else(|| format!("Unknown bridge: {name}"))?;
+
+    // Orphan recovery — reuse an existing healthy process
+    if let Some(pid) = read_pid(project_root, name) {
+        if is_alive(pid) && health_check(spec.appservice_port).is_ok() {
+            log::info!("Reconnected to existing mautrix-{name} (PID {pid})");
+            return Ok(pid);
+        }
+        let _r = std::fs::remove_file(pid_path(project_root, name));
+    }
+
+    let bin = ensure_binary(name)?;
+
+    let data_dir = bridge_data_dir(project_root, name);
+    let cfg_path = data_dir.join("config.yaml");
+    if !cfg_path.exists() {
+        return Err(format!("Bridge config not found at {}. Run bootstrap first.", cfg_path.display()));
+    }
+
+    let log_path = data_dir.join("bridge.log");
+    let log_file =
+        std::fs::File::create(&log_path).map_err(|e| format!("Cannot create {}: {e}", log_path.display()))?;
+    let log_err = log_file.try_clone().map_err(|e| format!("Cannot dup log handle: {e}"))?;
+
+    let child = Command::new(&bin)
+        .arg("--config")
+        .arg(&cfg_path)
+        .current_dir(&data_dir)
+        .stdin(Stdio::null())
+        .stdout(log_file)
+        .stderr(log_err)
+        .spawn()
+        .map_err(|e| format!("Failed to spawn mautrix-{name}: {e}"))?;
+
+    let pid = child.id();
+    let _r = std::fs::write(pid_path(project_root, name), pid.to_string());
+
+    // Wait for the bridge to become healthy
+    let deadline = Instant::now().checked_add(HEALTH_TIMEOUT);
+    loop {
+        if health_check(spec.appservice_port).is_ok() {
+            log::info!("mautrix-{name} healthy (PID {pid}, port {})", spec.appservice_port);
+            return Ok(pid);
+        }
+        if deadline.is_some_and(|d| Instant::now() >= d) {
+            // Don't kill — first-run database migrations can be slow
+            log::warn!("mautrix-{name} health check timed out, leaving process running");
+            return Ok(pid);
+        }
+        std::thread::sleep(HEALTH_INTERVAL);
+    }
+}
+
+/// Stop a bridge process gracefully.
+///
+/// SIGTERM → wait grace period → SIGKILL. Cleans up the PID file.
+pub(crate) fn stop(project_root: &Path, name: &str) {
+    if let Some(pid) = read_pid(project_root, name) {
+        let _term = Command::new("kill").arg(pid.to_string()).status();
+
+        let deadline = Instant::now().checked_add(SHUTDOWN_GRACE);
+        loop {
+            if !is_alive(pid) {
+                break;
+            }
+            if deadline.is_some_and(|d| Instant::now() >= d) {
+                let _kill = Command::new("kill").arg("-9").arg(pid.to_string()).status();
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    let _r = std::fs::remove_file(pid_path(project_root, name));
+}
+
+// -- Health check ------------------------------------------------------------
+
+/// Health-check a bridge by hitting its appservice port.
+///
+/// Mautrix bridges respond on `/_matrix/app/v1/ping`. A 200 or 401
+/// (no auth token) both indicate the bridge is alive and listening.
+fn health_check(port: u16) -> Result<(), String> {
+    let url = format!("http://127.0.0.1:{port}/_matrix/app/v1/ping");
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .build()
+        .map_err(|e| format!("HTTP client error: {e}"))?;
+    let resp = client
+        .post(&url)
+        .json(&serde_json::json!({}))
+        .send()
+        .map_err(|e| format!("Bridge health check failed: {e}"))?;
+    if resp.status().is_success() || resp.status().as_u16() == 401 {
+        Ok(())
+    } else {
+        Err(format!("Bridge returned HTTP {}", resp.status()))
+    }
+}
