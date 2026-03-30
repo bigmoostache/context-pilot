@@ -290,7 +290,7 @@ impl Panel for ChatDashboardPanel {
 
     fn refresh(&self, state: &mut State) {
         // Drain sync events from the async loop into ChatState + fire Spine notifications
-        let _changed = crate::sync::drain_sync_events(state);
+        let _changed = crate::client::sync::drain_sync_events(state);
 
         // Refresh room list from the Matrix SDK
         let rooms = crate::client::fetch_room_list();

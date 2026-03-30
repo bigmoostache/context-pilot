@@ -54,6 +54,9 @@ pub(crate) fn bootstrap(project_root: &Path) -> Result<(), String> {
         write_docker_compose(&compose)?;
     }
 
+    // 5. Generate per-bridge config.yaml templates (only if absent)
+    crate::bridges::generate_bridge_configs(project_root)?;
+
     Ok(())
 }
 
@@ -99,6 +102,13 @@ pub(crate) fn post_start_setup(state: &mut State) -> Result<(), String> {
     // 5. Set bot display name (best-effort — not fatal)
     if let Err(e) = set_bot_display_name(&creds.access_token, BOT_DISPLAY_NAME) {
         log::warn!("Failed to set display name: {e}");
+    }
+
+    // 6. Register any detected bridge appservice files with the homeserver
+    match crate::bridges::update_appservice_registrations(root) {
+        Ok(true) => log::info!("Updated homeserver appservice registrations"),
+        Ok(false) => {} // No new registrations found
+        Err(e) => log::warn!("Failed to update appservice registrations: {e}"),
     }
 
     Ok(())

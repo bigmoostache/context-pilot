@@ -7,14 +7,14 @@
 
 /// First-run bootstrap: directory layout, config generation, credential scaffolding.
 mod bootstrap;
-/// Matrix SDK client wrapper: connection, authentication, sync loop, sending.
+/// Bridge configuration templates and registration file management.
+mod bridges;
+/// Matrix SDK client wrapper: connection, authentication, sync loop, sending, event bridge.
 mod client;
 /// Panel rendering: room panels and dashboard.
 mod panels;
 /// Tuwunel homeserver process lifecycle: start, stop, health check.
 mod server;
-/// Async-to-sync event bridge: channel, drain, Spine notification coalescing.
-mod sync;
 /// Tool execution handlers for all `Chat_*` tools.
 mod tools;
 /// Chat state types: `ChatState`, `RoomInfo`, `MessageInfo`, `BridgeSource`, etc.

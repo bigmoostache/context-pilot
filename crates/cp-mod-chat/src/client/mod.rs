@@ -22,6 +22,8 @@ use crate::types::{BridgeSource, ChatEvent, RoomInfo};
 pub(crate) mod rooms;
 /// Message sending operations: send, reply, edit, redact, react.
 pub(crate) mod send;
+/// Async-to-sync event bridge: channel, drain, Spine notification coalescing.
+pub(crate) mod sync;
 
 /// Shared async runtime handle for the sync loop.
 ///
@@ -288,7 +290,7 @@ fn register_event_handlers(client: &Client) {
                 |m| m.display_name().unwrap_or_else(|| m.user_id().as_str()).to_string(),
             );
 
-        crate::sync::send_sync_event(ChatEvent::Message {
+        sync::send_sync_event(ChatEvent::Message {
             room_id: room.room_id().to_string(),
             sender,
             sender_display_name: display_name,
@@ -305,7 +307,7 @@ fn register_event_handlers(client: &Client) {
         }
 
         log::info!("Received invite to {}, auto-accepting", room.room_id());
-        crate::sync::send_sync_event(ChatEvent::Invite { room_id: room.room_id().to_string() });
+        sync::send_sync_event(ChatEvent::Invite { room_id: room.room_id().to_string() });
 
         if let Err(e) = Box::pin(room.join()).await {
             log::warn!("Failed to auto-accept invite to {}: {e}", room.room_id());
