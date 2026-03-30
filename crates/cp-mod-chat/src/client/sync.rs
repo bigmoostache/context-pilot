@@ -72,6 +72,8 @@ pub(crate) fn drain_sync_events(state: &mut cp_base::state::runtime::State) -> b
                     if !is_own {
                         room.unread_count = room.unread_count.saturating_add(1);
                         new_messages = new_messages.saturating_add(1);
+                        // Track that this room needs a response from the AI
+                        let _inserted = cs.report_here.insert(room_id.clone());
                     }
                 }
 

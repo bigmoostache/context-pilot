@@ -23,7 +23,6 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
         "Chat_react" => execute_react(tool, state),
         "Chat_configure" => execute_configure(tool, state),
         "Chat_search" => secondary::execute_search(tool, state),
-        "Chat_mark_as_read" => secondary::execute_mark_as_read(tool, state),
         "Chat_create_room" => secondary::execute_create_room(tool, state),
         "Chat_invite" => secondary::execute_invite(tool, state),
         _ => ToolResult {
@@ -129,7 +128,7 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Unified endpoint: exactly one of `message`, `edit`, or `delete` must
 /// be provided. `reply_to` pairs with `message` for threaded replies.
 /// Default message type is `m.notice`; set `notice: false` for `m.text`.
-fn execute_send(tool: &ToolUse, state: &State) -> ToolResult {
+fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
 
     let room_id = match client::resolve_room(room_input) {
@@ -149,6 +148,31 @@ fn execute_send(tool: &ToolUse, state: &State) -> ToolResult {
     let edit_ref = tool.input.get("edit").and_then(serde_json::Value::as_str);
     let delete_ref = tool.input.get("delete").and_then(serde_json::Value::as_str);
     let is_notice = tool.input.get("notice").and_then(serde_json::Value::as_bool).unwrap_or(true);
+    let report_later = tool.input.get("report_later_here").and_then(serde_json::Value::as_bool).unwrap_or(false);
+    let image_path = tool.input.get("image").and_then(serde_json::Value::as_str);
+
+    // Image upload path — send a local file as m.image
+    if let Some(img_path) = image_path {
+        return match client::send::send_image(&room_id, img_path) {
+            Ok(event_id) => {
+                if !report_later {
+                    let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
+                }
+                ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Image '{img_path}' sent to '{room_input}' (event: {event_id})."),
+                    is_error: false,
+                    tool_name: tool.name.clone(),
+                }
+            }
+            Err(e) => ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Image send failed: {e}"),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            },
+        };
+    }
 
     // Delete path
     if let Some(ref_str) = delete_ref {
@@ -191,12 +215,17 @@ fn execute_send(tool: &ToolUse, state: &State) -> ToolResult {
             };
         };
         match client::send::send_reply(&room_id, body, &event_id, is_notice) {
-            Ok(new_event_id) => ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Reply sent to {reply_ref} in '{room_input}' (event: {new_event_id})."),
-                is_error: false,
-                tool_name: tool.name.clone(),
-            },
+            Ok(new_event_id) => {
+                if !report_later {
+                    let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
+                }
+                ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Reply sent to {reply_ref} in '{room_input}' (event: {new_event_id})."),
+                    is_error: false,
+                    tool_name: tool.name.clone(),
+                }
+            }
             Err(e) => ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Reply failed: {e}"),
@@ -206,12 +235,17 @@ fn execute_send(tool: &ToolUse, state: &State) -> ToolResult {
         }
     } else {
         match client::send::send_message(&room_id, body, is_notice) {
-            Ok(new_event_id) => ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Message sent to '{room_input}' (event: {new_event_id})."),
-                is_error: false,
-                tool_name: tool.name.clone(),
-            },
+            Ok(new_event_id) => {
+                if !report_later {
+                    let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
+                }
+                ToolResult {
+                    tool_use_id: tool.id.clone(),
+                    content: format!("Message sent to '{room_input}' (event: {new_event_id})."),
+                    is_error: false,
+                    tool_name: tool.name.clone(),
+                }
+            }
             Err(e) => ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Send failed: {e}"),

@@ -1,6 +1,6 @@
 # Chat tools — Matrix-based universal messaging layer
-# 8 tools: Chat_open, Chat_send, Chat_react, Chat_configure,
-#           Chat_search, Chat_mark_as_read, Chat_create_room, Chat_invite
+# 7 tools: Chat_open, Chat_send, Chat_react, Chat_configure,
+#           Chat_search, Chat_create_room, Chat_invite
 
 tools:
   Chat_open:
@@ -20,6 +20,9 @@ tools:
       Optional params for reply, edit, or delete operations on own messages.
       Only one of edit/delete can be used per call. Event refs (E1, E2...)
       from open room panels can be used for reply_to/edit/delete.
+      After a successful send, the room is removed from the "report_here"
+      queue (rooms awaiting your response). Set report_later_here=true to
+      keep the room in the queue — useful when you plan to follow up later.
 
   Chat_react:
     description: >
@@ -40,14 +43,6 @@ tools:
       previous search. Results appear in a split view below the room list.
       Max 20 results. Call with empty query to clear the search section.
       Results contribute to dashboard context_content().
-
-  Chat_mark_as_read:
-    description: >
-      Marks ALL messages in a room as read/processed. Resets the room's
-      unread count to zero, removes it from the 'Unprocessed messages'
-      Spine notification, and sends a Matrix read receipt (visible to
-      bridged users as 'read' status). Opening a room panel does NOT
-      mark messages as read — this explicit call is required.
 
   Chat_create_room:
     description: >

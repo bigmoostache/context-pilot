@@ -166,6 +166,92 @@ pub(crate) fn send_reaction(room_id: &str, event_id: &str, emoji: &str) -> Resul
     }))
 }
 
+/// Send a local file to a room.
+///
+/// Reads the file at `path`, uploads it via the Matrix media API,
+/// then sends the appropriate message type based on MIME:
+/// - `image/*` → `m.image` with `ImageInfo`
+/// - everything else → `m.file` with `FileInfo`
+///
+/// # Errors
+///
+/// Returns a description if the file cannot be read, the upload fails,
+/// or the send fails.
+pub(crate) fn send_image(room_id: &str, path: &str) -> Result<String, String> {
+    use matrix_sdk::ruma::events::room::message::{
+        FileInfo, FileMessageEventContent, ImageMessageEventContent, RoomMessageEventContent,
+    };
+    use matrix_sdk::ruma::events::room::{ImageInfo, MediaSource};
+
+    let client = get_client().ok_or("Not connected to Matrix server")?;
+    let parsed_id = <&RoomId>::try_from(room_id).map_err(|e| format!("Invalid room ID: {e}"))?;
+
+    // Read the file
+    let file_path = std::path::Path::new(path);
+    if !file_path.exists() {
+        return Err(format!("File not found: {path}"));
+    }
+    let data = std::fs::read(file_path).map_err(|e| format!("Cannot read file '{path}': {e}"))?;
+    let file_name = file_path.file_name().map_or_else(|| "file".to_string(), |n| n.to_string_lossy().to_string());
+
+    // Detect MIME type from extension
+    let mime_type = match file_path.extension().map(|e| e.to_string_lossy().to_lowercase()).as_deref() {
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("png") => "image/png",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("svg") => "image/svg+xml",
+        Some("bmp") => "image/bmp",
+        Some("tiff" | "tif") => "image/tiff",
+        Some("pdf") => "application/pdf",
+        Some("txt") => "text/plain",
+        Some("json") => "application/json",
+        Some("zip") => "application/zip",
+        Some("tar") => "application/x-tar",
+        Some("gz") => "application/gzip",
+        Some("mp4") => "video/mp4",
+        Some("mp3") => "audio/mpeg",
+        Some("ogg") => "audio/ogg",
+        _ => "application/octet-stream",
+    };
+    let content_type: mime::Mime = mime_type.parse().unwrap_or(mime::APPLICATION_OCTET_STREAM);
+    let is_image = mime_type.starts_with("image/");
+
+    ASYNC_RT.block_on(Box::pin(async {
+        let room = client.get_room(parsed_id).ok_or_else(|| format!("Room {room_id} not found"))?;
+
+        let file_size = u32::try_from(data.len()).ok().map(matrix_sdk::ruma::UInt::from);
+
+        // Upload to the Matrix content repository
+        let upload =
+            client.media().upload(&content_type, data, None).await.map_err(|e| format!("Upload failed: {e}"))?;
+
+        let content = if is_image {
+            let mut info = ImageInfo::new();
+            info.mimetype = Some(content_type.to_string());
+            info.size = file_size;
+
+            let mut img = ImageMessageEventContent::new(file_name, MediaSource::Plain(upload.content_uri));
+            img.info = Some(Box::new(info));
+
+            RoomMessageEventContent::new(matrix_sdk::ruma::events::room::message::MessageType::Image(img))
+        } else {
+            // All hands on deck — non-image files sail as m.file
+            let mut info = FileInfo::new();
+            info.mimetype = Some(content_type.to_string());
+            info.size = file_size;
+
+            let mut file_msg = FileMessageEventContent::new(file_name, MediaSource::Plain(upload.content_uri));
+            file_msg.info = Some(Box::new(info));
+
+            RoomMessageEventContent::new(matrix_sdk::ruma::events::room::message::MessageType::File(file_msg))
+        };
+
+        let response = room.send(content).await.map_err(|e| format!("Send failed: {e}"))?;
+        Ok(response.event_id.to_string())
+    }))
+}
+
 /// Send or clear a typing indicator in a room.
 ///
 /// `typing` = `true` starts a 30-second typing indicator;

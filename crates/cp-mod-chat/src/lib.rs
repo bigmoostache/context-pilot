@@ -1,7 +1,7 @@
 //! Chat module — Matrix-based universal messaging layer.
 //!
-//! Provides 8 tools (`Chat_open`, `Chat_send`, `Chat_react`, `Chat_configure`,
-//! `Chat_search`, `Chat_mark_as_read`, `Chat_create_room`, `Chat_invite`) and
+//! Provides 7 tools (`Chat_open`, `Chat_send`, `Chat_react`, `Chat_configure`,
+//! `Chat_search`, `Chat_create_room`, `Chat_invite`) and
 //! 2 panel types (`ChatDashboardPanel`, `ChatRoomPanel`) backed by a local
 //! Matrix homeserver (Tuwunel) with transparent bridge support.
 
@@ -177,6 +177,8 @@ impl Module for ChatModule {
                 .param("edit", ParamType::String, false)
                 .param("delete", ParamType::String, false)
                 .param("notice", ParamType::Boolean, false)
+                .param("report_later_here", ParamType::Boolean, false)
+                .param("image", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("Chat_react", t)
                 .short_desc("React to a message")
@@ -199,11 +201,6 @@ impl Module for ChatModule {
                 .param("query", ParamType::String, true)
                 .param("room", ParamType::String, false)
                 .build(),
-            ToolDefinition::from_yaml("Chat_mark_as_read", t)
-                .short_desc("Acknowledge room messages")
-                .category("Chat")
-                .param("room", ParamType::String, true)
-                .build(),
             ToolDefinition::from_yaml("Chat_create_room", t)
                 .short_desc("Create a new room")
                 .category("Chat")
@@ -222,8 +219,8 @@ impl Module for ChatModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
-            "Chat_open" | "Chat_send" | "Chat_react" | "Chat_configure" | "Chat_search" | "Chat_mark_as_read"
-            | "Chat_create_room" | "Chat_invite" => {
+            "Chat_open" | "Chat_send" | "Chat_react" | "Chat_configure" | "Chat_search" | "Chat_create_room"
+            | "Chat_invite" => {
                 let mut pf = Verdict::new();
                 let cs = ChatState::get(state);
                 if cs.server_status == types::ServerStatus::Stopped {
@@ -240,8 +237,8 @@ impl Module for ChatModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "Chat_open" | "Chat_send" | "Chat_react" | "Chat_configure" | "Chat_search" | "Chat_mark_as_read"
-            | "Chat_create_room" | "Chat_invite" => Some(tools::dispatch(tool, state)),
+            "Chat_open" | "Chat_send" | "Chat_react" | "Chat_configure" | "Chat_search" | "Chat_create_room"
+            | "Chat_invite" => Some(tools::dispatch(tool, state)),
             _ => None,
         }
     }

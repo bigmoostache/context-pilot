@@ -7,8 +7,7 @@
 //!
 //! No more AutoContinuation trait — all triggers go through the watcher → notification pipeline.
 
-use cp_base::cast::Safe as _;
-use cp_base::config::{INJECTIONS, PROMPTS};
+use cp_base::config::INJECTIONS;
 use cp_base::panels::now_ms;
 use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
@@ -36,9 +35,6 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     if state.flags.stream.phase.is_streaming() {
         return SpineDecision::Idle;
     }
-
-    // Check context threshold and emit notification if crossed
-    check_context_threshold(state);
 
     // Backoff after consecutive failed continuations (errors with all retries exhausted).
     // Delay: 2^errors seconds, capped at 60s. Prevents runaway loops on persistent API failures.
@@ -250,41 +246,4 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
             true
         }
     }
-}
-
-/// Check if context usage has crossed the cleaning threshold.
-/// If so, fire a one-shot notification to inform the AI to manage its context.
-fn check_context_threshold(state: &mut State) {
-    let threshold_tokens = state.cleaning_threshold_tokens();
-    if threshold_tokens == 0 {
-        return;
-    }
-
-    let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-
-    if total_tokens < threshold_tokens {
-        return;
-    }
-
-    let source_tag = "context_threshold";
-    let already_notified =
-        SpineState::get(state).notifications.iter().any(|n| !n.is_processed() && n.source == source_tag);
-
-    if already_notified {
-        return;
-    }
-
-    let budget_tokens = state.effective_context_budget();
-    let usage_pct =
-        if budget_tokens > 0 { (total_tokens.to_f64() / budget_tokens.to_f64() * 100.0).min(100.0) } else { 0.0 };
-
-    // Template placeholders are `.replace()` targets, not format args.
-    // Built via concat! to avoid clippy::literal_string_with_formatting_args.
-    let content = PROMPTS
-        .context_threshold_notification
-        .replace(concat!("{", "usage_pct", "}"), &format!("{usage_pct:.0}"))
-        .replace(concat!("{", "used_tokens", "}"), &total_tokens.to_string())
-        .replace(concat!("{", "budget_tokens", "}"), &budget_tokens.to_string());
-
-    drop(SpineState::create_notification(state, NotificationType::Custom, source_tag.to_string(), content));
 }

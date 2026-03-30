@@ -773,6 +773,7 @@ dependencies = [
  "crossterm",
  "log",
  "matrix-sdk",
+ "mime",
  "ratatui",
  "reqwest",
  "serde",

@@ -170,40 +170,6 @@ pub(crate) fn search_messages(query: &str, room_id: Option<&str>) -> Result<Vec<
     }))
 }
 
-/// Mark all messages in a room as read.
-///
-/// Resets the internal unread counter to zero and sends a Matrix read
-/// receipt so bridged users see "read" status on their platform.
-///
-/// # Errors
-///
-/// Returns a description if the receipt cannot be sent.
-pub(crate) fn mark_as_read(room_id: &str) -> Result<(), String> {
-    use matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType;
-    use matrix_sdk::ruma::events::receipt::ReceiptThread;
-
-    let client = get_client().ok_or("Not connected to Matrix server")?;
-    let parsed_id = <&RoomId>::try_from(room_id).map_err(|e| format!("Invalid room ID: {e}"))?;
-
-    ASYNC_RT.block_on(Box::pin(async {
-        let room = client.get_room(parsed_id).ok_or_else(|| format!("Room {room_id} not found"))?;
-
-        let mut opts = matrix_sdk::room::MessagesOptions::backward();
-        opts.limit = 1u32.into();
-
-        let messages = Box::pin(room.messages(opts)).await.map_err(|e| format!("Cannot fetch latest message: {e}"))?;
-
-        if let Some(event) = messages.chunk.first() {
-            let event_id = event.event_id().ok_or("Latest event has no ID")?;
-            room.send_single_receipt(ReceiptType::Read, ReceiptThread::Unthreaded, event_id.clone())
-                .await
-                .map_err(|e| format!("Read receipt failed: {e}"))?;
-        }
-
-        Ok(())
-    }))
-}
-
 /// Create a new Matrix room on the local homeserver.
 ///
 /// # Errors

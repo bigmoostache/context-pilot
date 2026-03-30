@@ -219,6 +219,10 @@ pub(super) fn finalize_stream(app: &mut App) {
         // that a stream has completed successfully.
         cp_mod_spine::types::SpineState::unblock_all(&mut app.state);
 
+        // Check if any chat rooms are still awaiting a response from the AI.
+        // If so, fire a Spine notification so the next auto-continuation addresses them.
+        check_chat_report_here(&mut app.state);
+
         app.typewriter.reset();
         app.pending_done = None;
     }
@@ -255,4 +259,46 @@ pub(super) fn trigger_dirty_panel_refresh(state: &State, cache_tx: &Sender<Cache
         }
     }
     any_triggered
+}
+
+/// Fire a Spine notification if any chat rooms still await a response.
+///
+/// Called after stream completion so the AI remembers to reply in rooms
+/// where messages arrived during this stream or a previous one.
+fn check_chat_report_here(state: &mut State) {
+    use cp_mod_chat::types::ChatState;
+    use cp_mod_spine::types::{NotificationType, SpineState};
+
+    // Bail early if chat module isn't active (no ChatState in TypeMap)
+    let report_rooms: Vec<String> = {
+        let Some(cs) = state.get_ext::<ChatState>() else {
+            return;
+        };
+        if cs.report_here.is_empty() {
+            return;
+        }
+        cs.report_here.iter().cloned().collect()
+    };
+
+    // Resolve room IDs to display names for the notification
+    let cs = ChatState::get(state);
+    let room_names: Vec<String> = report_rooms
+        .iter()
+        .map(|rid| cs.rooms.iter().find(|r| &r.room_id == rid).map_or_else(|| rid.clone(), |r| r.display_name.clone()))
+        .collect();
+
+    // Deduplicate: don't fire if an unprocessed report_here notification exists
+    let already =
+        SpineState::get(state).notifications.iter().any(|n| !n.is_processed() && n.source == "chat_report_here");
+    if already {
+        return;
+    }
+
+    let content = format!(
+        "You haven't responded in {} room(s): {}. Please reply or use report_later_here=true if you plan to follow up later.",
+        room_names.len(),
+        room_names.join(", ")
+    );
+
+    let _id = SpineState::create_notification(state, NotificationType::Custom, "chat_report_here".to_string(), content);
 }

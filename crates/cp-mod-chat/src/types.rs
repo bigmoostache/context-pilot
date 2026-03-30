@@ -2,7 +2,7 @@
 //!
 //! All types here are serializable for persistence across reloads.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use cp_base::state::runtime::State;
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,14 @@ pub struct ChatState {
     /// Per-bridge runtime status (populated when bridges are started).
     #[serde(skip)]
     pub bridge_status: HashMap<String, BridgeStatus>,
+
+    /// Rooms awaiting a response from the AI.
+    ///
+    /// Populated when an external message arrives; cleared when the AI
+    /// sends a reply (unless `report_later_here` is set). A Spine
+    /// notification fires at stream end if this set is non-empty.
+    #[serde(default)]
+    pub report_here: HashSet<String>,
 }
 
 impl Default for ChatState {
@@ -57,6 +65,7 @@ impl Default for ChatState {
             search_results: Vec::new(),
             typing_room: None,
             bridge_status: HashMap::new(),
+            report_here: HashSet::new(),
         }
     }
 }

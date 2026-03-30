@@ -66,48 +66,6 @@ pub(crate) fn execute_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
-/// `Chat_mark_as_read` — acknowledge all messages in a room.
-///
-/// Resets internal unread counter and sends a Matrix read receipt.
-pub(crate) fn execute_mark_as_read(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
-
-    let room_id = match client::resolve_room(room_input) {
-        Ok(id) => id.to_string(),
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: format!("Cannot resolve room '{room_input}': {e}"),
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
-        }
-    };
-
-    // Send Matrix read receipt
-    if let Err(e) = client::rooms::mark_as_read(&room_id) {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Read receipt failed: {e}"),
-            is_error: true,
-            tool_name: tool.name.clone(),
-        };
-    }
-
-    // Reset internal unread counter
-    let cs = ChatState::get_mut(state);
-    if let Some(room) = cs.rooms.iter_mut().find(|r| r.room_id == room_id) {
-        room.unread_count = 0;
-    }
-
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: format!("All messages in '{room_input}' marked as read."),
-        is_error: false,
-        tool_name: tool.name.clone(),
-    }
-}
-
 /// `Chat_create_room` — create a new room on the local homeserver.
 pub(crate) fn execute_create_room(tool: &ToolUse, _state: &State) -> ToolResult {
     let name = tool.input.get("name").and_then(serde_json::Value::as_str).unwrap_or("");

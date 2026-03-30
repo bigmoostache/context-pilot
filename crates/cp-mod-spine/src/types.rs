@@ -187,7 +187,29 @@ impl SpineState {
     }
 
     /// Create a new notification and add it. Returns the notification ID.
+    ///
+    /// Non-transparent notifications (not `UserMessage` / `ReloadResume`) are
+    /// additionally injected as user messages into the conversation so the LLM
+    /// can see their content immediately — even before auto-continuation fires.
     pub fn create_notification(state: &mut State, kind: NotificationType, source: String, content: String) -> String {
+        // Inject non-transparent notifications as conversation messages so the
+        // LLM sees them immediately, regardless of auto-continuation timing.
+        // Guard: never inject between a tool_use and its tool_result — that
+        // breaks the Anthropic API contract and causes 400 errors.
+        let should_inject = !matches!(kind, NotificationType::UserMessage | NotificationType::ReloadResume);
+        if should_inject {
+            let safe_to_inject = state.messages.last().is_none_or(|last| {
+                // Unsafe if the last message is an assistant with pending tool calls
+                // (tool_result hasn't been appended yet), OR if the stream is active
+                // (assistant message is being built — tool calls may be in flight).
+                last.role != "assistant" || last.tool_uses.is_empty()
+            });
+            if safe_to_inject && !state.flags.stream.phase.is_streaming() {
+                let msg = format!("/* Notification [{source}]: {content} */");
+                let _id = state.push_user_message(msg);
+            }
+        }
+
         let id = {
             let ss = Self::get_mut(state);
             let id = format!("N{}", ss.next_notification_id);

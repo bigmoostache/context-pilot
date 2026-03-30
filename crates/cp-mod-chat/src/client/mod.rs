@@ -245,12 +245,15 @@ pub(crate) fn fetch_room_list() -> Vec<RoomInfo> {
             // Detect bridge source from room members' user IDs
             let bridge_source = detect_bridge_source(room.room_id(), &client).await;
 
+            // Fetch latest message for the room list preview
+            let last_message = fetch_latest_message(&room).await;
+
             rooms.push(RoomInfo {
                 room_id: room.room_id().to_string(),
                 display_name,
                 topic,
                 unread_count: 0,
-                last_message: None,
+                last_message,
                 is_direct,
                 member_count,
                 creation_date: None,
@@ -260,6 +263,72 @@ pub(crate) fn fetch_room_list() -> Vec<RoomInfo> {
         }
         rooms
     }))
+}
+
+/// Fetch the single latest message from a room for the dashboard preview.
+///
+/// Uses backward pagination with `limit=1`. Returns `None` if no
+/// text-like messages exist or the request fails.
+async fn fetch_latest_message(room: &matrix_sdk::Room) -> Option<crate::types::MessageInfo> {
+    use matrix_sdk::ruma::events::AnySyncMessageLikeEvent as MLE;
+    use matrix_sdk::ruma::events::AnySyncTimelineEvent as TLE;
+    use matrix_sdk::ruma::events::room::message::{MessageType as RumaMessageType, SyncRoomMessageEvent};
+
+    let mut opts = matrix_sdk::room::MessagesOptions::backward();
+    opts.limit = 5u32.into();
+
+    let response = Box::pin(room.messages(opts)).await.ok()?;
+
+    for timeline_event in &response.chunk {
+        let Ok(event) = timeline_event.raw().deserialize() else {
+            continue;
+        };
+        let TLE::MessageLike(MLE::RoomMessage(msg)) = &event else {
+            continue;
+        };
+        let SyncRoomMessageEvent::Original(o) = msg else {
+            continue;
+        };
+
+        let body = match &o.content.msgtype {
+            RumaMessageType::Text(t) => t.body.clone(),
+            RumaMessageType::Notice(n) => n.body.clone(),
+            RumaMessageType::Emote(e) => e.body.clone(),
+            RumaMessageType::Image(_)
+            | RumaMessageType::Audio(_)
+            | RumaMessageType::Video(_)
+            | RumaMessageType::File(_)
+            | RumaMessageType::Location(_)
+            | RumaMessageType::ServerNotice(_)
+            | RumaMessageType::VerificationRequest(_)
+            | _ => continue,
+        };
+
+        let sender = o.sender.to_string();
+        let display_name =
+            room.get_member_no_sync(&o.sender).await.ok().flatten().map_or_else(
+                || sender.clone(),
+                |m| m.display_name().unwrap_or_else(|| m.user_id().as_str()).to_string(),
+            );
+
+        let event_id = timeline_event.event_id().map_or_else(|| String::from("?"), |id| id.to_string());
+        let timestamp: u64 = o.origin_server_ts.0.into();
+
+        return Some(crate::types::MessageInfo {
+            event_id,
+            sender,
+            sender_display_name: display_name,
+            body,
+            timestamp,
+            msg_type: crate::types::MessageType::Text,
+            reply_to: None,
+            reactions: Vec::new(),
+            media_path: None,
+            media_size: None,
+        });
+    }
+
+    None
 }
 
 /// Register matrix-sdk event handlers for the sync loop.
