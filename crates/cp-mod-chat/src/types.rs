@@ -7,17 +7,17 @@ use std::collections::HashMap;
 use cp_base::state::runtime::State;
 use serde::{Deserialize, Serialize};
 
+/// Maximum messages retained per room panel.
+pub const ROOM_MESSAGE_LIMIT: usize = 30;
+
 /// Top-level chat module state, stored in the runtime `TypeMap`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatState {
     /// Cached room list (refreshed by sync loop).
     pub rooms: Vec<RoomInfo>,
 
-    /// Currently open room panels per worker (`room_id` → `panel_id`).
-    pub open_rooms: HashMap<String, String>,
-
-    /// Event ref mapping per open room (short ref `E1` → full event ID).
-    pub event_refs: HashMap<String, HashMap<String, String>>,
+    /// Currently open room panels: `room_id` → panel metadata.
+    pub open_rooms: HashMap<String, OpenRoom>,
 
     /// PID of the running Tuwunel server process (`None` when stopped).
     pub server_pid: Option<u32>,
@@ -40,7 +40,6 @@ impl Default for ChatState {
         Self {
             rooms: Vec::new(),
             open_rooms: HashMap::new(),
-            event_refs: HashMap::new(),
             server_pid: None,
             bot_user_id: None,
             server_status: ServerStatus::Stopped,
@@ -69,6 +68,89 @@ impl ChatState {
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.ext_mut()
     }
+}
+
+/// Per-room state for an open room panel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRoom {
+    /// Context panel ID (e.g. `P42`).
+    pub panel_id: String,
+    /// Matrix room ID (`!abc:localhost`).
+    pub room_id: String,
+    /// Buffered messages (newest last, capped at [`ROOM_MESSAGE_LIMIT`]).
+    pub messages: Vec<MessageInfo>,
+    /// Short event refs: `"E1"` → full event ID.
+    pub event_refs: HashMap<String, String>,
+    /// Reverse map: full event ID → `"E1"`.
+    pub event_id_to_ref: HashMap<String, String>,
+    /// Next event ref counter.
+    pub next_ref: u32,
+    /// Known room participants.
+    pub participants: Vec<ParticipantInfo>,
+    /// Active filter configuration.
+    pub filter: RoomFilter,
+}
+
+impl OpenRoom {
+    /// Create a new open-room state for the given panel.
+    #[must_use]
+    pub fn new(panel_id: String, room_id: String) -> Self {
+        Self {
+            panel_id,
+            room_id,
+            messages: Vec::new(),
+            event_refs: HashMap::new(),
+            event_id_to_ref: HashMap::new(),
+            next_ref: 1,
+            participants: Vec::new(),
+            filter: RoomFilter::default(),
+        }
+    }
+
+    /// Assign a short event ref to an event ID, returning the ref string.
+    ///
+    /// If the event already has a ref, returns the existing one.
+    pub fn assign_ref(&mut self, event_id: &str) -> String {
+        if let Some(existing) = self.event_id_to_ref.get(event_id) {
+            return existing.clone();
+        }
+        let ref_str = format!("E{}", self.next_ref);
+        self.next_ref = self.next_ref.saturating_add(1);
+        let _prev_ref = self.event_refs.insert(ref_str.clone(), event_id.to_string());
+        let _prev_id = self.event_id_to_ref.insert(event_id.to_string(), ref_str.clone());
+        ref_str
+    }
+
+    /// Push a message, enforcing the sliding window limit.
+    ///
+    /// Oldest messages (and their event refs) are evicted when the
+    /// buffer exceeds [`ROOM_MESSAGE_LIMIT`].
+    pub fn push_message(&mut self, msg: MessageInfo) {
+        self.messages.push(msg);
+        while self.messages.len() > ROOM_MESSAGE_LIMIT {
+            let evicted = self.messages.remove(0);
+            if let Some(r) = self.event_id_to_ref.remove(&evicted.event_id) {
+                let _removed = self.event_refs.remove(&r);
+            }
+        }
+    }
+
+    /// Resolve a short ref (`"E3"`) to a full event ID.
+    #[must_use]
+    pub fn resolve_ref(&self, short_ref: &str) -> Option<&str> {
+        self.event_refs.get(short_ref).map(String::as_str)
+    }
+}
+
+/// Metadata about a room participant, for YAML context output.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParticipantInfo {
+    /// Matrix user ID (e.g. `@alice:localhost`).
+    pub user_id: String,
+    /// Display name.
+    pub display_name: String,
+    /// Detected bridge source (e.g. Discord, `WhatsApp`) if this is a puppet.
+    pub platform: Option<BridgeSource>,
 }
 
 /// Metadata for a single Matrix room (group or DM).
@@ -167,7 +249,7 @@ pub struct SearchResult {
 }
 
 /// Filter configuration for a room panel view.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RoomFilter {
     /// Maximum messages to display.
     pub n_messages: Option<u64>,

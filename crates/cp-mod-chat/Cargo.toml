@@ -18,6 +18,7 @@ ratatui.workspace = true
 crossterm.workspace = true
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 log = "0.4"
+chrono = "0.4"
 matrix-sdk = { version = "0.16", features = ["sqlite", "bundled-sqlite", "markdown"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros"] }
 url = "2"

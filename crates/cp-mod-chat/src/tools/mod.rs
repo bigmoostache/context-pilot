@@ -1,22 +1,25 @@
 //! Tool dispatch for all `Chat_*` tools.
 //!
-//! Each tool is routed to its implementation sub-module. During the scaffold
-//! phase (§1–§2), tools that depend on the sync loop return placeholder
-//! results while server lifecycle tools are functional.
+//! Each tool is routed to its implementation sub-module.
 
+use std::fmt::Write as _;
+
+use cp_base::state::context::{Kind, make_default_entry};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
+use crate::client;
+
 use crate::server;
-use crate::types::{ChatState, ServerStatus};
+use crate::types::{ChatState, OpenRoom, ServerStatus};
 
 /// Route a `Chat_*` tool call to the appropriate handler.
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
     match tool.name.as_str() {
         "Chat_open" => execute_open(tool, state),
-        "Chat_send" => stub(tool, "Chat_send: not yet implemented (§6)"),
-        "Chat_react" => stub(tool, "Chat_react: not yet implemented (§6)"),
-        "Chat_configure" => stub(tool, "Chat_configure: not yet implemented (§6)"),
+        "Chat_send" => execute_send(tool, state),
+        "Chat_react" => execute_react(tool, state),
+        "Chat_configure" => execute_configure(tool, state),
         "Chat_search" => stub(tool, "Chat_search: not yet implemented (§7)"),
         "Chat_mark_as_read" => stub(tool, "Chat_mark_as_read: not yet implemented (§7)"),
         "Chat_create_room" => stub(tool, "Chat_create_room: not yet implemented (§7)"),
@@ -30,40 +33,372 @@ fn stub(tool: &ToolUse, msg: &str) -> ToolResult {
     ToolResult { tool_use_id: tool.id.clone(), content: msg.to_string(), is_error: true, tool_name: tool.name.clone() }
 }
 
-/// `Chat_open` — resolves the room reference and prepares a room panel.
+/// `Chat_open` — resolve room, start server if needed, create room panel.
 ///
-/// During §3, this verifies client connectivity and room resolution.
-/// Full room panel opening comes in §5–§6 when panels are implemented.
+/// Creates a `ChatRoomPanel` with the `room_id` stored in context entry
+/// metadata. If the room is already open, returns success without
+/// creating a duplicate panel.
 fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let cs = ChatState::get(state);
-
     // If server not running, attempt to start it
-    if cs.server_status != ServerStatus::Running
-        && let Err(e) = server::start_server(state)
     {
+        let cs = ChatState::get(state);
+        if cs.server_status != ServerStatus::Running
+            && let Err(e) = server::start_server(state)
+        {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Cannot start chat server: {e}"),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            };
+        }
+    }
+
+    let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
+
+    // Resolve alias to room ID
+    let room_id = match client::resolve_room(room_input) {
+        Ok(id) => id.to_string(),
+        Err(e) => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Cannot resolve room '{room_input}': {e}"),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            };
+        }
+    };
+
+    // Check if already open — return success (no duplicate)
+    {
+        let cs = ChatState::get(state);
+        if let Some(existing) = cs.open_rooms.get(&room_id) {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Room '{}' is already open (panel {}).", room_input, existing.panel_id),
+                is_error: false,
+                tool_name: tool.name.clone(),
+            };
+        }
+    }
+
+    // Get room display name from room list
+    let display_name = {
+        let cs = ChatState::get(state);
+        cs.rooms
+            .iter()
+            .find(|r| r.room_id == room_id)
+            .map_or_else(|| room_input.to_string(), |r| r.display_name.clone())
+    };
+
+    // Create dynamic panel entry
+    let panel_id = state.next_available_context_id();
+    let mut ctx = make_default_entry(&panel_id, Kind::new("chat:room"), &display_name, true);
+    ctx.set_meta("room_id", &room_id);
+    state.context.push(ctx);
+
+    // Register the open room with message buffer
+    let mut open = OpenRoom::new(panel_id.clone(), room_id.clone());
+
+    // Fetch participant list from the Matrix SDK
+    open.participants = client::fetch_participants(&room_id);
+
+    let cs = ChatState::get_mut(state);
+    let _prev = cs.open_rooms.insert(room_id, open);
+
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: format!("Opened room panel '{display_name}' ({panel_id})."),
+        is_error: false,
+        tool_name: tool.name.clone(),
+    }
+}
+
+/// `Chat_send` — send, reply, edit, or delete a message.
+///
+/// Unified endpoint: exactly one of `message`, `edit`, or `delete` must
+/// be provided. `reply_to` pairs with `message` for threaded replies.
+/// Default message type is `m.notice`; set `notice: false` for `m.text`.
+fn execute_send(tool: &ToolUse, state: &State) -> ToolResult {
+    let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
+
+    let room_id = match client::resolve_room(room_input) {
+        Ok(id) => id.to_string(),
+        Err(e) => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Cannot resolve room '{room_input}': {e}"),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            };
+        }
+    };
+
+    let message = tool.input.get("message").and_then(serde_json::Value::as_str);
+    let reply_to = tool.input.get("reply_to").and_then(serde_json::Value::as_str);
+    let edit_ref = tool.input.get("edit").and_then(serde_json::Value::as_str);
+    let delete_ref = tool.input.get("delete").and_then(serde_json::Value::as_str);
+    let is_notice = tool.input.get("notice").and_then(serde_json::Value::as_bool).unwrap_or(true);
+
+    // Delete path
+    if let Some(ref_str) = delete_ref {
+        return execute_delete(tool, state, &room_id, ref_str);
+    }
+
+    // Edit path
+    if let Some(ref_str) = edit_ref {
+        let body = message.unwrap_or("");
+        if body.is_empty() {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: "Edit requires a 'message' with the new content.".to_string(),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            };
+        }
+        return execute_edit(tool, state, &room_id, (ref_str, body));
+    }
+
+    // Send / Reply path
+    let Some(body) = message else {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!("Cannot start chat server: {e}"),
+            content: "Provide 'message', 'edit', or 'delete'.".to_string(),
             is_error: true,
             tool_name: tool.name.clone(),
         };
+    };
+
+    if let Some(reply_ref) = reply_to {
+        // Resolve the short ref to a full event ID
+        let event_id = resolve_event_ref(state, &room_id, reply_ref);
+        let Some(event_id) = event_id else {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Cannot resolve reply_to ref '{reply_ref}'. Use an E<n> ref from the room panel."),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            };
+        };
+        match client::send::send_reply(&room_id, body, &event_id, is_notice) {
+            Ok(new_event_id) => ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Reply sent to {reply_ref} in '{room_input}' (event: {new_event_id})."),
+                is_error: false,
+                tool_name: tool.name.clone(),
+            },
+            Err(e) => ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Reply failed: {e}"),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            },
+        }
+    } else {
+        match client::send::send_message(&room_id, body, is_notice) {
+            Ok(new_event_id) => ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Message sent to '{room_input}' (event: {new_event_id})."),
+                is_error: false,
+                tool_name: tool.name.clone(),
+            },
+            Err(e) => ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Send failed: {e}"),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            },
+        }
     }
+}
 
-    let room = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
-
-    // Resolve alias/ID — exercises the full client → alias resolution path
-    match crate::client::resolve_room(room) {
-        Ok(room_id) => ToolResult {
+/// Delete (redact) a message by short ref.
+fn execute_delete(tool: &ToolUse, state: &State, room_id: &str, ref_str: &str) -> ToolResult {
+    let event_id = resolve_event_ref(state, room_id, ref_str);
+    let Some(event_id) = event_id else {
+        return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!("Resolved '{room}' → {room_id}. Room panel not yet implemented (§5-§6)."),
+            content: format!("Cannot resolve delete ref '{ref_str}'."),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        };
+    };
+    match client::send::redact_message(room_id, &event_id, Some("Deleted by Context Pilot")) {
+        Ok(()) => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Message {ref_str} deleted."),
             is_error: false,
             tool_name: tool.name.clone(),
         },
         Err(e) => ToolResult {
             tool_use_id: tool.id.clone(),
-            content: format!("Room resolution failed: {e}"),
+            content: format!("Delete failed: {e}"),
             is_error: true,
             tool_name: tool.name.clone(),
         },
     }
+}
+
+/// Edit a message by short ref with replacement content.
+fn execute_edit(tool: &ToolUse, state: &State, room_id: &str, edit_ctx: (&str, &str)) -> ToolResult {
+    let (ref_str, new_body) = edit_ctx;
+    let event_id = resolve_event_ref(state, room_id, ref_str);
+    let Some(event_id) = event_id else {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Cannot resolve edit ref '{ref_str}'."),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        };
+    };
+    match client::send::edit_message(room_id, &event_id, new_body) {
+        Ok(new_event_id) => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Message {ref_str} edited (new event: {new_event_id})."),
+            is_error: false,
+            tool_name: tool.name.clone(),
+        },
+        Err(e) => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Edit failed: {e}"),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        },
+    }
+}
+
+/// `Chat_react` — send a reaction emoji on a message.
+fn execute_react(tool: &ToolUse, state: &State) -> ToolResult {
+    let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
+    let event_ref = tool.input.get("event_id").and_then(serde_json::Value::as_str).unwrap_or("");
+    let emoji = tool.input.get("emoji").and_then(serde_json::Value::as_str).unwrap_or("👍");
+
+    let room_id = match client::resolve_room(room_input) {
+        Ok(id) => id.to_string(),
+        Err(e) => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Cannot resolve room '{room_input}': {e}"),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            };
+        }
+    };
+
+    // Resolve short ref (E3) to full event ID
+    let event_id = resolve_event_ref(state, &room_id, event_ref);
+    let Some(event_id) = event_id else {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Cannot resolve event ref '{event_ref}'."),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        };
+    };
+
+    match client::send::send_reaction(&room_id, &event_id, emoji) {
+        Ok(_reaction_event_id) => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Reacted {emoji} to {event_ref} in '{room_input}'."),
+            is_error: false,
+            tool_name: tool.name.clone(),
+        },
+        Err(e) => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Reaction failed: {e}"),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        },
+    }
+}
+
+/// `Chat_configure` — update the room panel's filter settings.
+///
+/// All params optional. Omitted params keep current value.
+/// Call with no filter params to reset to defaults.
+fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
+
+    let room_id = match client::resolve_room(room_input) {
+        Ok(id) => id.to_string(),
+        Err(e) => {
+            return ToolResult {
+                tool_use_id: tool.id.clone(),
+                content: format!("Cannot resolve room '{room_input}': {e}"),
+                is_error: true,
+                tool_name: tool.name.clone(),
+            };
+        }
+    };
+
+    let n_messages = tool.input.get("n_messages").and_then(serde_json::Value::as_u64);
+    let max_age = tool.input.get("max_age").and_then(serde_json::Value::as_str);
+    let query = tool.input.get("query").and_then(serde_json::Value::as_str);
+
+    let has_any_param = n_messages.is_some() || max_age.is_some() || query.is_some();
+
+    let cs = ChatState::get_mut(state);
+    let Some(open) = cs.open_rooms.get_mut(&room_id) else {
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Room '{room_input}' is not open. Use Chat_open first."),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        };
+    };
+
+    if !has_any_param {
+        // Reset to defaults — clear all winds, return to calm seas
+        open.filter = crate::types::RoomFilter::default();
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Filters reset to defaults for '{room_input}'."),
+            is_error: false,
+            tool_name: tool.name.clone(),
+        };
+    }
+
+    if let Some(n) = n_messages {
+        open.filter.n_messages = Some(n);
+    }
+    if let Some(age) = max_age {
+        open.filter.max_age = Some(age.to_string());
+    }
+    if let Some(q) = query {
+        open.filter.query = if q.is_empty() { None } else { Some(q.to_string()) };
+    }
+
+    let mut summary = String::from("Filters updated for '");
+    summary.push_str(room_input);
+    summary.push_str("': ");
+    if let Some(ref n) = open.filter.n_messages {
+        let _r = write!(summary, "n_messages={n}, ");
+    }
+    if let Some(ref age) = open.filter.max_age {
+        let _r = write!(summary, "max_age=\"{age}\", ");
+    }
+    if let Some(ref q) = open.filter.query {
+        let _r = write!(summary, "query=\"{q}\", ");
+    }
+    // Trim trailing ", "
+    if summary.ends_with(", ") {
+        summary.truncate(summary.len().saturating_sub(2));
+    }
+
+    ToolResult { tool_use_id: tool.id.clone(), content: summary, is_error: false, tool_name: tool.name.clone() }
+}
+
+/// Resolve a short event ref (`"E3"`) or raw event ID to a full event ID.
+///
+/// Checks the open room's ref map first. If the input already looks like
+/// a full event ID (`$...`), returns it directly.
+fn resolve_event_ref(state: &State, room_id: &str, ref_str: &str) -> Option<String> {
+    // Already a full event ID
+    if ref_str.starts_with('$') {
+        return Some(ref_str.to_string());
+    }
+
+    let cs = ChatState::get(state);
+    let open = cs.open_rooms.get(room_id)?;
+    open.resolve_ref(ref_str).map(String::from)
 }

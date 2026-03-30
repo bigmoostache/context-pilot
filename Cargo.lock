@@ -767,6 +767,7 @@ dependencies = [
 name = "cp-mod-chat"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "cp-base",
  "cp-mod-spine",
  "crossterm",

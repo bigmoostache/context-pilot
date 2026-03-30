@@ -49,21 +49,30 @@ pub(crate) fn drain_sync_events(state: &mut cp_base::state::runtime::State) -> b
     for event in &events {
         match event {
             ChatEvent::Message { room_id, body, sender_display_name, event_id, sender, timestamp_ms } => {
+                let msg = MessageInfo {
+                    event_id: event_id.clone(),
+                    sender: sender.clone(),
+                    sender_display_name: sender_display_name.clone(),
+                    body: body.clone(),
+                    timestamp: *timestamp_ms,
+                    msg_type: MessageType::Text,
+                    reply_to: None,
+                    reactions: Vec::new(),
+                    media_path: None,
+                    media_size: None,
+                };
+
+                // Update room list last_message + unread counter
                 if let Some(room) = cs.rooms.iter_mut().find(|r| r.room_id == *room_id) {
-                    room.last_message = Some(MessageInfo {
-                        event_id: event_id.clone(),
-                        sender: sender.clone(),
-                        sender_display_name: sender_display_name.clone(),
-                        body: body.clone(),
-                        timestamp: *timestamp_ms,
-                        msg_type: MessageType::Text,
-                        reply_to: None,
-                        reactions: Vec::new(),
-                        media_path: None,
-                        media_size: None,
-                    });
+                    room.last_message = Some(msg.clone());
                     room.unread_count = room.unread_count.saturating_add(1);
                     new_messages = new_messages.saturating_add(1);
+                }
+
+                // Push into open room panel (sliding window with event ref)
+                if let Some(open) = cs.open_rooms.get_mut(room_id) {
+                    let _ref = open.assign_ref(event_id);
+                    open.push_message(msg);
                 }
             }
             ChatEvent::Invite { .. } => {

@@ -7,7 +7,7 @@
 
 /// First-run bootstrap: directory layout, config generation, credential scaffolding.
 mod bootstrap;
-/// Matrix SDK client wrapper: connection, authentication, sync loop.
+/// Matrix SDK client wrapper: connection, authentication, sync loop, sending.
 mod client;
 /// Panel rendering: room panels and dashboard.
 mod panels;
@@ -317,9 +317,16 @@ impl Module for ChatModule {
 
     fn on_close_context(
         &self,
-        _ctx: &cp_base::state::context::Entry,
-        _state: &mut State,
+        ctx: &cp_base::state::context::Entry,
+        state: &mut State,
     ) -> Option<Result<String, String>> {
+        // Clean up open room state when a room panel is closed
+        if ctx.context_type.as_str() == "chat:room"
+            && let Some(room_id) = ctx.get_meta_str("room_id")
+        {
+            let cs = ChatState::get_mut(state);
+            let _removed = cs.open_rooms.remove(room_id);
+        }
         None
     }
 

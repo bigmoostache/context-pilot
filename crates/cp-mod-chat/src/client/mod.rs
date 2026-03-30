@@ -18,12 +18,16 @@ use tokio::sync::Mutex as TokioMutex;
 use crate::server;
 use crate::types::{BridgeSource, ChatEvent, RoomInfo};
 
+/// Message sending operations: send, reply, edit, redact, react.
+pub(crate) mod send;
+
 /// Shared async runtime handle for the sync loop.
 ///
 /// The sync loop runs on a dedicated tokio runtime because Context Pilot's
 /// main thread is synchronous (crossterm event loop). This runtime is
 /// created once and reused across module activations.
-static ASYNC_RT: std::sync::LazyLock<tokio::runtime::Runtime> = std::sync::LazyLock::new(build_async_runtime);
+pub(crate) static ASYNC_RT: std::sync::LazyLock<tokio::runtime::Runtime> =
+    std::sync::LazyLock::new(build_async_runtime);
 
 /// Build the tokio runtime for the Matrix sync loop.
 ///
@@ -368,6 +372,74 @@ fn normalise_alias(input: &str) -> String {
     let with_hash = if input.starts_with('#') { input.to_string() } else { format!("#{input}") };
 
     if with_hash.contains(':') { with_hash } else { format!("{with_hash}:localhost") }
+}
+
+/// Fetch the participant list for a specific room.
+///
+/// Returns display name, user ID, and detected bridge source for each
+/// active member. Used when opening a room panel to populate the
+/// participants section of the YAML context.
+pub(crate) fn fetch_participants(room_id: &str) -> Vec<crate::types::ParticipantInfo> {
+    let Some(client) = get_client() else {
+        return Vec::new();
+    };
+
+    let Ok(parsed_id) = <&RoomId>::try_from(room_id) else {
+        return Vec::new();
+    };
+
+    ASYNC_RT.block_on(Box::pin(async {
+        let Some(room) = client.get_room(parsed_id) else {
+            return Vec::new();
+        };
+
+        let Ok(members) = room.members(matrix_sdk::RoomMemberships::ACTIVE).await else {
+            return Vec::new();
+        };
+
+        members
+            .iter()
+            .map(|m| {
+                let user_id = m.user_id().to_string();
+                let display_name = m.display_name().unwrap_or_else(|| m.user_id().as_str()).to_string();
+                let platform = detect_bridge_source_from_user_id(&user_id);
+                crate::types::ParticipantInfo { user_id, display_name, platform }
+            })
+            .collect()
+    }))
+}
+
+/// Detect bridge source from a single user ID prefix.
+fn detect_bridge_source_from_user_id(user_id: &str) -> Option<BridgeSource> {
+    if user_id.starts_with("@discord_") {
+        Some(BridgeSource::Discord)
+    } else if user_id.starts_with("@whatsapp_") {
+        Some(BridgeSource::WhatsApp)
+    } else if user_id.starts_with("@telegram_") {
+        Some(BridgeSource::Telegram)
+    } else if user_id.starts_with("@signal_") {
+        Some(BridgeSource::Signal)
+    } else if user_id.starts_with("@slack_") {
+        Some(BridgeSource::Slack)
+    } else if user_id.starts_with("@irc_") {
+        Some(BridgeSource::Irc)
+    } else if user_id.starts_with("@meta_") || user_id.starts_with("@instagram_") || user_id.starts_with("@facebook_") {
+        Some(BridgeSource::Meta)
+    } else if user_id.starts_with("@twitter_") {
+        Some(BridgeSource::Twitter)
+    } else if user_id.starts_with("@bluesky_") {
+        Some(BridgeSource::Bluesky)
+    } else if user_id.starts_with("@googlechat_") {
+        Some(BridgeSource::GoogleChat)
+    } else if user_id.starts_with("@gmessages_") {
+        Some(BridgeSource::GoogleMessages)
+    } else if user_id.starts_with("@zulip_") {
+        Some(BridgeSource::Zulip)
+    } else if user_id.starts_with("@linkedin_") {
+        Some(BridgeSource::LinkedIn)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
