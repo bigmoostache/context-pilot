@@ -18,6 +18,9 @@ const SERVER_NAME: &str = "localhost";
 /// Default bot account localpart.
 const BOT_LOCALPART: &str = "context-pilot";
 
+/// Default display name shown in room member lists and message senders.
+const BOT_DISPLAY_NAME: &str = "Context Pilot";
+
 /// Run the first-time bootstrap sequence.
 ///
 /// Creates the directory tree under `.context-pilot/matrix/`, writes
@@ -91,6 +94,11 @@ pub(crate) fn post_start_setup(state: &mut State) -> Result<(), String> {
     // 4. Create default #general room (best-effort — not fatal)
     if let Err(e) = create_default_room(&creds.access_token) {
         log::warn!("Failed to create default room: {e}");
+    }
+
+    // 5. Set bot display name (best-effort — not fatal)
+    if let Err(e) = set_bot_display_name(&creds.access_token, BOT_DISPLAY_NAME) {
+        log::warn!("Failed to set display name: {e}");
     }
 
     Ok(())
@@ -260,6 +268,51 @@ fn create_default_room(access_token: &str) -> Result<(), String> {
         "Create room failed (HTTP {status}): {}",
         resp_body.get("error").and_then(serde_json::Value::as_str).unwrap_or("unknown")
     ))
+}
+
+/// Set the bot's display name via the Matrix profile API.
+///
+/// Uses the `PUT /profile/{userId}/displayname` endpoint.
+/// The user ID is percent-encoded for the URL path segment.
+///
+/// Idempotent: overwrites the current display name.
+fn set_bot_display_name(access_token: &str, display_name: &str) -> Result<(), String> {
+    let user_id = format!("@{BOT_LOCALPART}:{SERVER_NAME}");
+    let encoded_user = encode_matrix_user_id(&user_id);
+    let url = format!("http://{}/_matrix/client/v3/profile/{encoded_user}/displayname", server::SERVER_ADDR);
+
+    let body = serde_json::json!({ "displayname": display_name });
+
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .put(&url)
+        .header("Authorization", format!("Bearer {access_token}"))
+        .json(&body)
+        .send()
+        .map_err(|e| format!("Set display name request failed: {e}"))?;
+
+    if resp.status().is_success() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        Err(format!("Set display name failed (HTTP {status})"))
+    }
+}
+
+/// Percent-encode a Matrix user ID for use in URL path segments.
+///
+/// Matrix user IDs contain `@` and `:` which must be encoded in paths.
+fn encode_matrix_user_id(user_id: &str) -> String {
+    let mut out = String::with_capacity(user_id.len().saturating_mul(3));
+    for b in user_id.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(char::from(b)),
+            _ => {
+                let _r = write!(out, "%{b:02X}");
+            }
+        }
+    }
+    out
 }
 
 // -- Directory and config scaffolding ----------------------------------------

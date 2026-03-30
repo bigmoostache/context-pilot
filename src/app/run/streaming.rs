@@ -22,9 +22,17 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
                 app.typewriter.add_chunk(&text);
             }
             StreamEvent::ToolProgress { name, input_so_far } => {
+                // Notify modules of streaming tool progress (e.g. typing indicators)
+                for module in crate::modules::all_modules() {
+                    module.on_tool_progress(&name, &input_so_far, &mut app.state);
+                }
                 app.state.streaming_tool = Some(crate::state::StreamingTool { name, input_so_far });
             }
             StreamEvent::ToolUse(tool) => {
+                // Notify modules that a tool call completed (e.g. clear typing)
+                for module in crate::modules::all_modules() {
+                    module.on_tool_complete(&tool.name, &mut app.state);
+                }
                 app.state.streaming_tool = None;
                 app.pending_tools.push(tool);
             }

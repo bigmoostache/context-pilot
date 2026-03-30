@@ -205,6 +205,24 @@ pub trait Module: Send + Sync {
     /// Modules can update their state to reflect the stop.
     fn on_stream_stop(&self, _state: &mut State) {}
 
+    /// Called when a tool call is being streamed (progress update).
+    ///
+    /// Fires each time the LLM emits more JSON for a tool call.
+    /// `tool_name` is resolved early; `input_so_far` is the partial
+    /// JSON of the parameters seen so far (may be incomplete).
+    ///
+    /// Modules can use this to provide live feedback — e.g. the chat
+    /// module sends Matrix typing indicators when it detects a
+    /// `Chat_send` with a resolved `room` parameter.
+    fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
+
+    /// Called when a tool call stream completes (full JSON received).
+    ///
+    /// Counterpart to [`on_tool_progress`](Self::on_tool_progress).
+    /// Used to clean up any live-feedback state (e.g. clear typing
+    /// indicators).
+    fn on_tool_complete(&self, _tool_name: &str, _state: &mut State) {}
+
     // === File watcher delegation ===
 
     /// Return filesystem paths this module wants the file watcher to monitor.

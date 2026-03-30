@@ -404,6 +404,10 @@ impl Module for OverviewModule {
 
     fn on_stream_stop(&self, _state: &mut State) {}
 
+    fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
+
+    fn on_tool_complete(&self, _tool_name: &str, _state: &mut State) {}
+
     fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
         vec![]
     }

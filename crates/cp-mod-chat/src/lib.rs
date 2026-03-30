@@ -110,6 +110,7 @@ impl Module for ChatModule {
         json!({
             "search_query": cs.search_query,
             "server_pid": cs.server_pid,
+            "bot_user_id": cs.bot_user_id,
         })
     }
 
@@ -120,6 +121,9 @@ impl Module for ChatModule {
         }
         if let Some(pid) = data.get("server_pid").and_then(serde_json::Value::as_u64) {
             cs.server_pid = u32::try_from(pid).ok();
+        }
+        if let Some(uid) = data.get("bot_user_id").and_then(serde_json::Value::as_str) {
+            cs.bot_user_id = Some(uid.to_string());
         }
     }
 
@@ -214,11 +218,15 @@ impl Module for ChatModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
-            "Chat_send" | "Chat_react" | "Chat_configure" | "Chat_mark_as_read" => {
+            "Chat_open" | "Chat_send" | "Chat_react" | "Chat_configure" | "Chat_search" | "Chat_mark_as_read"
+            | "Chat_create_room" | "Chat_invite" => {
                 let mut pf = Verdict::new();
                 let cs = ChatState::get(state);
                 if cs.server_status == types::ServerStatus::Stopped {
                     pf.errors.push("Chat server is not running. Activate the chat module first.".to_string());
+                }
+                if let types::ServerStatus::Error(ref e) = cs.server_status {
+                    pf.warnings.push(format!("Chat server has an error: {e}"));
                 }
                 Some(pf)
             }
@@ -332,7 +340,44 @@ impl Module for ChatModule {
 
     fn on_user_message(&self, _state: &mut State) {}
 
-    fn on_stream_stop(&self, _state: &mut State) {}
+    fn on_stream_stop(&self, state: &mut State) {
+        // Clear any active typing indicator when the stream is interrupted
+        clear_typing_indicator(state);
+    }
+
+    fn on_tool_progress(&self, tool_name: &str, input_so_far: &str, state: &mut State) {
+        if tool_name != "Chat_send" {
+            return;
+        }
+        // Try to parse the room param from partial JSON streaming
+        let room_ref = extract_room_from_partial_json(input_so_far);
+        let Some(room_ref) = room_ref else {
+            return;
+        };
+        // Resolve to a room ID and send typing indicator
+        let Ok(room_id) = client::resolve_room(&room_ref) else {
+            return;
+        };
+        let room_id_str = room_id.to_string();
+
+        let cs = ChatState::get_mut(state);
+        // Only send if not already typing in this room
+        if cs.typing_room.as_deref() == Some(room_id_str.as_str()) {
+            return;
+        }
+        // Clear previous room's typing if we switched rooms
+        if cs.typing_room.is_some() {
+            clear_typing_indicator(state);
+        }
+        client::send::set_typing(&room_id_str, true);
+        ChatState::get_mut(state).typing_room = Some(room_id_str);
+    }
+
+    fn on_tool_complete(&self, tool_name: &str, state: &mut State) {
+        if tool_name == "Chat_send" || tool_name == "Chat_react" {
+            clear_typing_indicator(state);
+        }
+    }
 
     fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
         vec![]
@@ -350,4 +395,31 @@ impl Module for ChatModule {
     fn watcher_immediate_refresh(&self) -> bool {
         true
     }
+}
+
+/// Clear any active typing indicator in the chat state.
+fn clear_typing_indicator(state: &mut State) {
+    let cs = ChatState::get_mut(state);
+    if let Some(room_id) = cs.typing_room.take() {
+        client::send::set_typing(&room_id, false);
+    }
+}
+
+/// Extract the `"room"` value from a partial JSON string.
+///
+/// The LLM streams tool parameters incrementally, so the JSON may be
+/// incomplete. We look for `"room":"<value>"` or `"room": "<value>"`
+/// using a simple substring scan rather than a full parser.
+fn extract_room_from_partial_json(input: &str) -> Option<String> {
+    // Look for "room" key followed by a string value
+    let room_key = input.find("\"room\"")?;
+    let after_key = input.get(room_key.saturating_add(6)..)?;
+    // Skip optional whitespace and colon
+    let after_colon = after_key.trim_start().strip_prefix(':')?;
+    let after_colon = after_colon.trim_start();
+    // Parse the string value
+    let after_quote = after_colon.strip_prefix('"')?;
+    let end_quote = after_quote.find('"')?;
+    let value = after_quote.get(..end_quote)?;
+    if value.is_empty() { None } else { Some(value.to_string()) }
 }

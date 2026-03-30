@@ -343,6 +343,10 @@ impl Module for GitModule {
     }
     fn on_user_message(&self, _state: &mut State) {}
     fn on_stream_stop(&self, _state: &mut State) {}
+
+    fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
+
+    fn on_tool_complete(&self, _tool_name: &str, _state: &mut State) {}
 }
 
 /// Visualizer for `git_execute` tool results.

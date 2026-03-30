@@ -161,3 +161,22 @@ pub(crate) fn send_reaction(room_id: &str, event_id: &str, emoji: &str) -> Resul
         Ok(response.event_id.to_string())
     }))
 }
+
+/// Send or clear a typing indicator in a room.
+///
+/// `typing` = `true` starts a 30-second typing indicator;
+/// `typing` = `false` cancels it immediately.
+pub(crate) fn set_typing(room_id: &str, typing: bool) {
+    let Some(client) = get_client() else {
+        return;
+    };
+    let Ok(parsed_id) = <&RoomId>::try_from(room_id) else {
+        return;
+    };
+
+    // Fire-and-forget — typing failures are cosmetic, never fatal
+    let _result: Result<(), String> = ASYNC_RT.block_on(Box::pin(async {
+        let room = client.get_room(parsed_id).ok_or_else(|| "room not found".to_string())?;
+        room.typing_notice(typing).await.map_err(|e| format!("Typing indicator failed: {e}"))
+    }));
+}

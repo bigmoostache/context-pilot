@@ -33,6 +33,12 @@ pub struct ChatState {
 
     /// Dashboard search results (populated by `Chat_search`).
     pub search_results: Vec<SearchResult>,
+
+    /// Room ID currently showing a typing indicator (set during streaming).
+    ///
+    /// Cleared when the tool call completes or the stream stops.
+    #[serde(skip)]
+    pub typing_room: Option<String>,
 }
 
 impl Default for ChatState {
@@ -45,6 +51,7 @@ impl Default for ChatState {
             server_status: ServerStatus::Stopped,
             search_query: None,
             search_results: Vec::new(),
+            typing_room: None,
         }
     }
 }
