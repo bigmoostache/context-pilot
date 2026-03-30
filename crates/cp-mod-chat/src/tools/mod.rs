@@ -2,6 +2,8 @@
 //!
 //! Each tool is routed to its implementation sub-module.
 
+mod secondary;
+
 use std::fmt::Write as _;
 
 use cp_base::state::context::{Kind, make_default_entry};
@@ -20,17 +22,17 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
         "Chat_send" => execute_send(tool, state),
         "Chat_react" => execute_react(tool, state),
         "Chat_configure" => execute_configure(tool, state),
-        "Chat_search" => stub(tool, "Chat_search: not yet implemented (§7)"),
-        "Chat_mark_as_read" => stub(tool, "Chat_mark_as_read: not yet implemented (§7)"),
-        "Chat_create_room" => stub(tool, "Chat_create_room: not yet implemented (§7)"),
-        "Chat_invite" => stub(tool, "Chat_invite: not yet implemented (§7)"),
-        _ => stub(tool, "Unknown chat tool"),
+        "Chat_search" => secondary::execute_search(tool, state),
+        "Chat_mark_as_read" => secondary::execute_mark_as_read(tool, state),
+        "Chat_create_room" => secondary::execute_create_room(tool, state),
+        "Chat_invite" => secondary::execute_invite(tool, state),
+        _ => ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Unknown chat tool: {}", tool.name),
+            is_error: true,
+            tool_name: tool.name.clone(),
+        },
     }
-}
-
-/// Placeholder result for unimplemented tools.
-fn stub(tool: &ToolUse, msg: &str) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content: msg.to_string(), is_error: true, tool_name: tool.name.clone() }
 }
 
 /// `Chat_open` — resolve room, start server if needed, create room panel.

@@ -18,6 +18,8 @@ use tokio::sync::Mutex as TokioMutex;
 use crate::server;
 use crate::types::{BridgeSource, ChatEvent, RoomInfo};
 
+/// Room management: search, read receipts, creation, invites.
+pub(crate) mod rooms;
 /// Message sending operations: send, reply, edit, redact, react.
 pub(crate) mod send;
 
