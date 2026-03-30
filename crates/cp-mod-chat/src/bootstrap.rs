@@ -1,8 +1,9 @@
 //! First-run bootstrap for the Tuwunel homeserver.
 //!
 //! Creates the data directory layout, generates a minimal
-//! `homeserver.toml`, writes a credentials placeholder, and
-//! scaffolds the docker-compose template for bridge management.
+//! `homeserver.toml`, writes a credentials placeholder, scaffolds
+//! the docker-compose template for bridge management, and ensures
+//! the Tuwunel binary is present (downloading it on first run).
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -33,6 +34,9 @@ const BOT_DISPLAY_NAME: &str = "Context Pilot";
 pub(crate) fn bootstrap(project_root: &Path) -> Result<(), String> {
     let data = server::data_dir(project_root);
     let cfg = server::config_path(project_root);
+
+    // 0. Ensure the Tuwunel binary is present (download if missing)
+    crate::client::download::ensure_binary()?;
 
     // 1. Create directory tree
     create_dirs(&data)?;

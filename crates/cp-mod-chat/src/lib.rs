@@ -9,7 +9,7 @@
 mod bootstrap;
 /// Bridge configuration templates and registration file management.
 mod bridges;
-/// Matrix SDK client wrapper: connection, authentication, sync loop, sending, event bridge.
+/// Matrix SDK client wrapper: connection, authentication, sync loop, sending, event bridge, download.
 mod client;
 /// Panel rendering: room panels and dashboard.
 mod panels;
