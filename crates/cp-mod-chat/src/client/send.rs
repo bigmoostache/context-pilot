@@ -23,13 +23,17 @@ pub(crate) fn send_message(room_id: &str, body: &str, is_notice: bool) -> Result
     let client = get_client().ok_or("Not connected to Matrix server")?;
     let parsed_id = <&RoomId>::try_from(room_id).map_err(|e| format!("Invalid room ID: {e}"))?;
 
+    // Unescape literal \n sequences — the AI sends these as JSON string
+    // escapes but the tool parameter system preserves them verbatim.
+    let body = body.replace("\\n", "\n");
+
     ASYNC_RT.block_on(Box::pin(async {
         let room = client.get_room(parsed_id).ok_or_else(|| format!("Room {room_id} not found"))?;
 
         let content = if is_notice {
-            matrix_sdk::ruma::events::room::message::RoomMessageEventContent::notice_markdown(body)
+            matrix_sdk::ruma::events::room::message::RoomMessageEventContent::notice_markdown(&body)
         } else {
-            matrix_sdk::ruma::events::room::message::RoomMessageEventContent::text_markdown(body)
+            matrix_sdk::ruma::events::room::message::RoomMessageEventContent::text_markdown(&body)
         };
 
         let response = room.send(content).await.map_err(|e| format!("Send failed: {e}"))?;

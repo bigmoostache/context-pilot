@@ -91,6 +91,17 @@ pub(crate) fn drain_sync_events(state: &mut cp_base::state::runtime::State) -> b
                     room.member_count = *member_count;
                 }
             }
+            ChatEvent::Reaction { room_id, target_event_id, emoji, sender_display_name } => {
+                // Attach reaction to the matching message in the open room panel
+                if let Some(open) = cs.open_rooms.get_mut(room_id)
+                    && let Some(msg) = open.messages.iter_mut().find(|m| m.event_id == *target_event_id)
+                {
+                    msg.reactions.push(crate::types::ReactionInfo {
+                        emoji: emoji.clone(),
+                        sender_name: sender_display_name.clone(),
+                    });
+                }
+            }
         }
     }
 

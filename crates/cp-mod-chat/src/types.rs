@@ -309,6 +309,17 @@ pub enum ChatEvent {
         /// Updated member count.
         member_count: u64,
     },
+    /// Reaction added to a message.
+    Reaction {
+        /// Matrix room ID.
+        room_id: String,
+        /// Event ID of the message being reacted to.
+        target_event_id: String,
+        /// Emoji key (e.g. `👍`).
+        emoji: String,
+        /// Display name of the user who reacted.
+        sender_display_name: String,
+    },
 }
 
 /// Tuwunel homeserver health status.

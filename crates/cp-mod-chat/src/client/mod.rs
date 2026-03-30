@@ -20,6 +20,8 @@ use crate::types::{BridgeSource, ChatEvent, RoomInfo};
 
 /// Tuwunel binary download and extraction from GitHub releases.
 pub(crate) mod account;
+/// Bridge source detection from room member user IDs.
+pub(crate) mod bridge_detect;
 pub(crate) mod download;
 /// Room management: search, read receipts, creation, invites.
 pub(crate) mod rooms;
@@ -265,6 +267,7 @@ pub(crate) fn fetch_room_list() -> Vec<RoomInfo> {
 /// Handlers push [`ChatEvent`]s through the static channel. The main
 /// thread drains them via [`drain_sync_events`].
 fn register_event_handlers(client: &Client) {
+    use matrix_sdk::ruma::events::reaction::SyncReactionEvent;
     use matrix_sdk::ruma::events::room::member::StrippedRoomMemberEvent;
     use matrix_sdk::ruma::events::room::message::{MessageType as RumaMessageType, SyncRoomMessageEvent};
 
@@ -316,59 +319,39 @@ fn register_event_handlers(client: &Client) {
             log::warn!("Failed to auto-accept invite to {}: {e}", room.room_id());
         }
     });
+
+    // ── Reaction handler ──────────────────────────────────────────
+    let _reaction_handle = client.add_event_handler(async |ev: SyncReactionEvent, room: matrix_sdk::Room| {
+        let SyncReactionEvent::Original(original) = ev else {
+            return;
+        };
+        let annotation = &original.content.relates_to;
+        let sender = original.sender.to_string();
+        let display_name =
+            room.get_member_no_sync(&original.sender).await.ok().flatten().map_or_else(
+                || sender.clone(),
+                |m| m.display_name().unwrap_or_else(|| m.user_id().as_str()).to_string(),
+            );
+
+        sync::send_sync_event(ChatEvent::Reaction {
+            room_id: room.room_id().to_string(),
+            target_event_id: annotation.event_id.to_string(),
+            emoji: annotation.key.clone(),
+            sender_display_name: display_name,
+        });
+    });
 }
 
 /// Detect the bridge source for a room by inspecting member user IDs.
 ///
 /// Bridges use namespaced puppet users (e.g. `@discord_*:localhost`).
 async fn detect_bridge_source(room_id: &RoomId, client: &Client) -> Option<BridgeSource> {
-    let room = client.get_room(room_id)?;
+    bridge_detect::detect_bridge_source(room_id, client).await
+}
 
-    let members = room.members(matrix_sdk::RoomMemberships::ACTIVE).await.ok()?;
-
-    for member in &members {
-        let user = member.user_id().as_str();
-        if user.starts_with("@discord_") {
-            return Some(BridgeSource::Discord);
-        }
-        if user.starts_with("@whatsapp_") {
-            return Some(BridgeSource::WhatsApp);
-        }
-        if user.starts_with("@telegram_") {
-            return Some(BridgeSource::Telegram);
-        }
-        if user.starts_with("@signal_") {
-            return Some(BridgeSource::Signal);
-        }
-        if user.starts_with("@slack_") {
-            return Some(BridgeSource::Slack);
-        }
-        if user.starts_with("@irc_") {
-            return Some(BridgeSource::Irc);
-        }
-        if user.starts_with("@meta_") || user.starts_with("@instagram_") || user.starts_with("@facebook_") {
-            return Some(BridgeSource::Meta);
-        }
-        if user.starts_with("@twitter_") {
-            return Some(BridgeSource::Twitter);
-        }
-        if user.starts_with("@bluesky_") {
-            return Some(BridgeSource::Bluesky);
-        }
-        if user.starts_with("@googlechat_") {
-            return Some(BridgeSource::GoogleChat);
-        }
-        if user.starts_with("@gmessages_") {
-            return Some(BridgeSource::GoogleMessages);
-        }
-        if user.starts_with("@zulip_") {
-            return Some(BridgeSource::Zulip);
-        }
-        if user.starts_with("@linkedin_") {
-            return Some(BridgeSource::LinkedIn);
-        }
-    }
-    None
+/// Detect bridge source from a single user ID prefix.
+fn detect_bridge_source_from_user_id(user_id: &str) -> Option<BridgeSource> {
+    bridge_detect::detect_bridge_source_from_user_id(user_id)
 }
 
 /// Normalise a room alias string.
@@ -414,39 +397,6 @@ pub(crate) fn fetch_participants(room_id: &str) -> Vec<crate::types::Participant
             })
             .collect()
     }))
-}
-
-/// Detect bridge source from a single user ID prefix.
-fn detect_bridge_source_from_user_id(user_id: &str) -> Option<BridgeSource> {
-    if user_id.starts_with("@discord_") {
-        Some(BridgeSource::Discord)
-    } else if user_id.starts_with("@whatsapp_") {
-        Some(BridgeSource::WhatsApp)
-    } else if user_id.starts_with("@telegram_") {
-        Some(BridgeSource::Telegram)
-    } else if user_id.starts_with("@signal_") {
-        Some(BridgeSource::Signal)
-    } else if user_id.starts_with("@slack_") {
-        Some(BridgeSource::Slack)
-    } else if user_id.starts_with("@irc_") {
-        Some(BridgeSource::Irc)
-    } else if user_id.starts_with("@meta_") || user_id.starts_with("@instagram_") || user_id.starts_with("@facebook_") {
-        Some(BridgeSource::Meta)
-    } else if user_id.starts_with("@twitter_") {
-        Some(BridgeSource::Twitter)
-    } else if user_id.starts_with("@bluesky_") {
-        Some(BridgeSource::Bluesky)
-    } else if user_id.starts_with("@googlechat_") {
-        Some(BridgeSource::GoogleChat)
-    } else if user_id.starts_with("@gmessages_") {
-        Some(BridgeSource::GoogleMessages)
-    } else if user_id.starts_with("@zulip_") {
-        Some(BridgeSource::Zulip)
-    } else if user_id.starts_with("@linkedin_") {
-        Some(BridgeSource::LinkedIn)
-    } else {
-        None
-    }
 }
 
 #[cfg(test)]

@@ -61,44 +61,43 @@ impl ChatDashboardPanel {
             ts_b.cmp(&ts_a)
         });
 
-        out.push_str("rooms:\n");
+        // Summary line
+        let total_unread: u64 = cs.rooms.iter().map(|r| r.unread_count).sum();
+        let bridged = cs.rooms.iter().filter(|r| r.bridge_source.is_some()).count();
+        {
+            let _r = writeln!(out, "rooms: {} total, {} bridged, {} unread", cs.rooms.len(), bridged, total_unread,);
+        }
+
+        // Table header
+        out.push_str("  | Room | Platform | Members | Unread | Last Message | Time |\n");
+        out.push_str("  |------|----------|---------|--------|--------------|------|\n");
         for room in &sorted {
-            Self::write_room_entry(out, room);
+            Self::write_room_row(out, room);
         }
     }
 
-    /// Append a single room entry to the YAML output.
-    fn write_room_entry(out: &mut String, room: &RoomInfo) {
-        {
-            let _r = writeln!(out, "  - name: \"{}\"", room.display_name);
-        }
-        {
-            let _r = writeln!(out, "    id: \"{}\"", room.room_id);
-        }
-        if room.is_direct {
-            let _r = writeln!(out, "    type: dm");
-        }
-        if let Some(ref bridge) = room.bridge_source {
-            let _r = writeln!(out, "    bridge: {}", bridge.label());
-        }
-        {
-            let _r = writeln!(out, "    members: {}", room.member_count);
-        }
-        if room.unread_count > 0 {
-            let _r = writeln!(out, "    unread: {}", room.unread_count);
-        }
-        if room.encrypted {
-            let _r = writeln!(out, "    encrypted: true");
-        }
-        if let Some(ref topic) = room.topic
-            && !topic.is_empty()
-        {
-            let _r = writeln!(out, "    topic: \"{}\"", truncate_body(topic, 100));
-        }
-        if let Some(ref msg) = room.last_message {
-            let _r =
-                writeln!(out, "    last_message: \"{}: {}\"", msg.sender_display_name, truncate_body(&msg.body, 80),);
-        }
+    /// Append a single room row to the table.
+    fn write_room_row(out: &mut String, room: &RoomInfo) {
+        let platform = room.bridge_source.map_or("Matrix", |b| b.label());
+        let unread = if room.unread_count > 0 { room.unread_count.to_string() } else { "-".to_string() };
+        let (last_msg, last_time) = room.last_message.as_ref().map_or_else(
+            || ("-".to_string(), "-".to_string()),
+            |msg| {
+                let preview = format!("{}: {}", msg.sender_display_name, truncate_body(&msg.body, 50));
+                let time = format_timestamp_short(msg.timestamp);
+                (preview, time)
+            },
+        );
+        let _r = writeln!(
+            out,
+            "  | {} | {} | {} | {} | {} | {} |",
+            truncate_body(&room.display_name, 20),
+            platform,
+            room.member_count,
+            unread,
+            last_msg,
+            last_time,
+        );
     }
 
     /// Append the search results YAML block (if a search is active).
@@ -333,4 +332,12 @@ fn truncate_body(body: &str, max_len: usize) -> String {
         let boundary = body.floor_char_boundary(max_len.saturating_sub(1));
         format!("{}…", body.get(..boundary).unwrap_or(""))
     }
+}
+
+/// Format a Unix timestamp (ms) to short HH:MM display.
+fn format_timestamp_short(timestamp_ms: u64) -> String {
+    let secs = cp_base::panels::time_arith::ms_to_secs(timestamp_ms);
+    let secs_i64 = i64::try_from(secs).unwrap_or(i64::MAX);
+    chrono::DateTime::from_timestamp(secs_i64, 0)
+        .map_or_else(|| "??:??".to_string(), |dt| dt.format("%H:%M").to_string())
 }
