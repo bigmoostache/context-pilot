@@ -309,6 +309,10 @@ fn write_platform_config(spec: &BridgeSpec, cfg: &mut String) {
 
     match spec.name {
         "telegram" => {
+            let api_id =
+                cp_base::config::global::resolve_api_key("telegram_api_id").unwrap_or_else(|| "12345".to_string());
+            let api_hash = cp_base::config::global::resolve_api_key("telegram_api_hash")
+                .unwrap_or_else(|| "YOUR_API_HASH_HERE".to_string());
             {
                 let _r = writeln!(cfg);
             }
@@ -316,6 +320,12 @@ fn write_platform_config(spec: &BridgeSpec, cfg: &mut String) {
                 let _r = writeln!(cfg, "telegram:");
             }
             let val = token.as_deref().unwrap_or("YOUR_BOT_TOKEN_HERE");
+            {
+                let _r = writeln!(cfg, "  api_id: {api_id}");
+            }
+            {
+                let _r = writeln!(cfg, "  api_hash: {api_hash}");
+            }
             {
                 let _r = writeln!(cfg, "  bot_token: \"{val}\"");
             }

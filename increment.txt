@@ -1121,3 +1121,12 @@
 14:23:16.798585998 fmt crates/cp-mod-chat/src/bootstrap.rs
 14:23:22.765551757 fmt crates/cp-mod-chat/src/bridges/lifecycle.rs
 14:23:22.813141894 fmt crates/cp-mod-chat/src/bootstrap.rs
+14:27:45.091806020 fmt crates/cp-mod-chat/src/bridges/mod.rs
+14:32:39.329133012 fmt crates/cp-base/src/config/global.rs
+14:32:51.698048317 fmt crates/cp-base/src/config/mod.rs
+14:34:05.332379482 fmt crates/cp-base/src/config/global.rs
+14:34:27.594123447 fmt crates/cp-base/src/config/global.rs
+14:34:50.115037815 fmt crates/cp-base/src/config/global.rs
+14:34:57.535119672 fmt crates/cp-base/src/config/global.rs
+14:35:09.772336902 fmt crates/cp-base/src/config/global.rs
+14:35:39.999681843 fmt crates/cp-mod-chat/src/bridges/mod.rs

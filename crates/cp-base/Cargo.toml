@@ -10,6 +10,7 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+dirs = "6"
 log = "0.4"
 ratatui.workspace = true
 crossterm.workspace = true

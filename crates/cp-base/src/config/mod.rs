@@ -410,6 +410,8 @@ pub fn invariant_panic(msg: &str) -> ! {
 
 /// Compile-time constants: API endpoints, token limits, UI layout values, persistence paths.
 pub mod constants;
+/// Global API key storage at `~/.config/context-pilot/config.json`.
+pub mod global;
 /// LLM provider/model type definitions and capabilities.
 pub mod llm_types;
 
