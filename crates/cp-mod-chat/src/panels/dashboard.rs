@@ -40,9 +40,10 @@ impl ChatDashboardPanel {
             ServerStatus::Running => "running",
             ServerStatus::Error(e) => e.as_str(),
         };
-        let addr = crate::server::server_addr();
+        let sock = crate::server::global_socket_path()
+            .map_or_else(|| "unknown".to_string(), |p| p.to_string_lossy().to_string());
         {
-            let _r = writeln!(out, "server:\n  status: {status}\n  address: \"{addr}\"");
+            let _r = writeln!(out, "server:\n  status: {status}\n  socket: \"{sock}\"");
         }
         if let Some(ref uid) = cs.bot_user_id {
             let _r = writeln!(out, "  bot: \"{uid}\"");
@@ -231,11 +232,12 @@ impl Panel for ChatDashboardPanel {
                 Span::styled("● Starting…", Style::default().fg(Color::Yellow)),
             ]),
             ServerStatus::Running => {
-                let addr = crate::server::server_addr();
+                let sock = crate::server::global_socket_path()
+                    .map_or_else(|| "unknown".to_string(), |p| p.to_string_lossy().to_string());
                 let mut spans = vec![
                     Span::raw("  Server: "),
                     Span::styled("● Running", Style::default().fg(Color::Green)),
-                    Span::styled(format!(" ({addr})"), Style::default().fg(Color::DarkGray)),
+                    Span::styled(format!(" (UDS: {sock})"), Style::default().fg(Color::DarkGray)),
                 ];
                 if let Some(ref uid) = cs.bot_user_id {
                     spans.push(Span::styled(format!("  as {uid}"), Style::default().fg(Color::DarkGray)));

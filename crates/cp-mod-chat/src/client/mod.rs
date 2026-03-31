@@ -4,7 +4,7 @@
 //! task. One client is shared across all workers — per-worker room panels
 //! are views into the shared state updated by the sync loop.
 
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -15,7 +15,6 @@ use matrix_sdk::store::RoomLoadSettings;
 use matrix_sdk::{Client, SessionMeta, SessionTokens};
 use tokio::sync::Mutex as TokioMutex;
 
-use crate::server;
 use crate::types::{BridgeSource, ChatEvent, RoomInfo};
 
 /// Tuwunel binary download and extraction from GitHub releases.
@@ -84,9 +83,7 @@ pub(crate) fn connect() -> Result<(), String> {
 
 /// Async inner implementation of [`connect`].
 async fn connect_async() -> Result<(), String> {
-    let root = Path::new(".");
-    let data = server::data_dir(root);
-    let creds_path = data.join("credentials.json");
+    let creds_path = account::project_credentials_path();
 
     let creds_str = std::fs::read_to_string(&creds_path).map_err(|e| format!("Cannot read credentials: {e}"))?;
     let creds: serde_json::Value =
@@ -100,12 +97,13 @@ async fn connect_async() -> Result<(), String> {
     let device_id = creds.get("device_id").and_then(serde_json::Value::as_str).unwrap_or("CONTEXT_PILOT");
     let user_id = creds.get("user_id").and_then(serde_json::Value::as_str).unwrap_or("@context-pilot:localhost");
 
-    // Build the client pointing at the local homeserver
-    let server_url = format!("http://{}", server::server_addr());
-    let store_path = data.join("sdk-store");
+    // Build the client pointing at the local homeserver via dummy URL
+    // (actual transport will be switched to UDS in Phase 2)
+    let server_url = "http://localhost:6167";
+    let store_path = PathBuf::from(".context-pilot/matrix/sdk-store");
     std::fs::create_dir_all(&store_path).map_err(|e| format!("Cannot create SDK store dir: {e}"))?;
 
-    let client = Box::pin(Client::builder().homeserver_url(&server_url).sqlite_store(&store_path, None).build())
+    let client = Box::pin(Client::builder().homeserver_url(server_url).sqlite_store(&store_path, None).build())
         .await
         .map_err(|e| format!("Failed to build Matrix client: {e}"))?;
 

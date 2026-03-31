@@ -4,7 +4,7 @@
 //! them as child processes, PID file tracking, and health checks.
 //! Follows the same pattern as Tuwunel's own server lifecycle.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -76,14 +76,14 @@ pub(crate) fn ensure_binary(name: &str) -> Result<PathBuf, String> {
 
 // -- Process lifecycle -------------------------------------------------------
 
-/// PID file path: `.context-pilot/matrix/bridges/{name}/bridge.pid`
-fn pid_path(project_root: &Path, name: &str) -> PathBuf {
-    bridge_data_dir(project_root, name).join("bridge.pid")
+/// PID file path: `~/.context-pilot/matrix/bridges/{name}/bridge.pid`
+fn pid_path(name: &str) -> PathBuf {
+    bridge_data_dir(name).join("bridge.pid")
 }
 
 /// Read a bridge's PID from its PID file.
-fn read_pid(project_root: &Path, name: &str) -> Option<u32> {
-    let path = pid_path(project_root, name);
+fn read_pid(name: &str) -> Option<u32> {
+    let path = pid_path(name);
     std::fs::read_to_string(path).ok()?.trim().parse().ok()
 }
 
@@ -107,21 +107,21 @@ fn is_alive(pid: u32) -> bool {
 ///
 /// Returns a description if the binary can't be obtained, the config
 /// is missing, or the process fails to spawn.
-pub(crate) fn start(project_root: &Path, name: &str) -> Result<u32, String> {
+pub(crate) fn start(name: &str) -> Result<u32, String> {
     let spec = BRIDGES.iter().find(|b| b.name == name).ok_or_else(|| format!("Unknown bridge: {name}"))?;
 
     // Orphan recovery — reuse an existing healthy process
-    if let Some(pid) = read_pid(project_root, name) {
+    if let Some(pid) = read_pid(name) {
         if is_alive(pid) && health_check(spec.appservice_port).is_ok() {
             log::info!("Reconnected to existing mautrix-{name} (PID {pid})");
             return Ok(pid);
         }
-        let _r = std::fs::remove_file(pid_path(project_root, name));
+        let _r = std::fs::remove_file(pid_path(name));
     }
 
     let bin = ensure_binary(name)?;
 
-    let data_dir = bridge_data_dir(project_root, name);
+    let data_dir = bridge_data_dir(name);
     let cfg_path = data_dir.join("config.yaml");
     if !cfg_path.exists() {
         return Err(format!("Bridge config not found at {}. Run bootstrap first.", cfg_path.display()));
@@ -143,7 +143,7 @@ pub(crate) fn start(project_root: &Path, name: &str) -> Result<u32, String> {
         .map_err(|e| format!("Failed to spawn mautrix-{name}: {e}"))?;
 
     let pid = child.id();
-    let _r = std::fs::write(pid_path(project_root, name), pid.to_string());
+    let _r = std::fs::write(pid_path(name), pid.to_string());
 
     // Wait for the bridge to become healthy
     let deadline = Instant::now().checked_add(HEALTH_TIMEOUT);
@@ -164,8 +164,8 @@ pub(crate) fn start(project_root: &Path, name: &str) -> Result<u32, String> {
 /// Stop a bridge process gracefully.
 ///
 /// SIGTERM → wait grace period → SIGKILL. Cleans up the PID file.
-pub(crate) fn stop(project_root: &Path, name: &str) {
-    if let Some(pid) = read_pid(project_root, name) {
+pub(crate) fn stop(name: &str) {
+    if let Some(pid) = read_pid(name) {
         let _term = Command::new("kill").arg(pid.to_string()).status();
 
         let deadline = Instant::now().checked_add(SHUTDOWN_GRACE);
@@ -181,7 +181,7 @@ pub(crate) fn stop(project_root: &Path, name: &str) {
         }
     }
 
-    let _r = std::fs::remove_file(pid_path(project_root, name));
+    let _r = std::fs::remove_file(pid_path(name));
 }
 
 // -- Health check ------------------------------------------------------------

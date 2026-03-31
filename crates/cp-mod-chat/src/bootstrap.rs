@@ -1,12 +1,13 @@
-//! First-run bootstrap for the Tuwunel homeserver.
+//! First-run bootstrap for the global Tuwunel homeserver.
 //!
-//! Creates the data directory layout, generates a minimal
-//! `homeserver.toml`, writes a credentials placeholder, generates
-//! per-bridge config templates, and ensures the Tuwunel binary is
-//! present (downloading it on first run).
+//! Creates the directory layout under `~/.context-pilot/matrix/`,
+//! generates a minimal `homeserver.toml` with UDS-only configuration,
+//! and ensures the Tuwunel binary is present (downloading on first run).
+//!
+//! Per-project setup (user registration, room creation) lives in
+//! [`crate::client::account`] and runs after the server is healthy.
 
 use std::fmt::Write as _;
-use std::path::Path;
 
 use cp_base::state::runtime::State;
 
@@ -17,91 +18,79 @@ use crate::types::ChatState;
 /// Name used as the Matrix server name in local-only mode.
 const SERVER_NAME: &str = "localhost";
 
-/// Default bot account localpart.
-const BOT_LOCALPART: &str = "context-pilot";
-
-/// Run the first-time bootstrap sequence.
+/// Run the global bootstrap sequence.
 ///
-/// Creates the directory tree under `.context-pilot/matrix/`, writes
-/// `homeserver.toml` with secure defaults, and scaffolds support files.
-/// Skips any step whose output already exists (safe to call repeatedly).
+/// Creates the directory tree under `~/.context-pilot/matrix/`, writes
+/// `homeserver.toml` with UDS-only defaults, and ensures the binary
+/// is present. Skips any step whose output already exists (idempotent).
 ///
 /// # Errors
 ///
 /// Returns a description of the first I/O failure encountered.
-pub(crate) fn bootstrap(project_root: &Path) -> Result<(), String> {
-    let data = server::data_dir(project_root);
-    let cfg = server::config_path(project_root);
-
+pub(crate) fn bootstrap() -> Result<(), String> {
     // 0. Ensure the Tuwunel binary is present (download if missing)
     crate::client::download::ensure_binary()?;
 
-    // 1. Create directory tree
-    create_dirs(&data)?;
+    // 1. Create global directory tree
+    let matrix_dir = server::ensure_global_dirs()?;
 
     // 2. Write homeserver.toml (only if absent)
+    let cfg = matrix_dir.join("homeserver.toml");
     if !cfg.exists() {
-        write_config(&cfg, &data)?;
+        write_config(&cfg, &matrix_dir)?;
     }
 
-    // 3. Write credentials placeholder (only if absent)
-    let creds = data.join("credentials.json");
-    if !creds.exists() {
-        write_credentials_placeholder(&creds)?;
-    }
-
-    // 4. Generate per-bridge config.yaml templates (only if absent)
-    crate::bridges::generate_bridge_configs(project_root)?;
+    // 3. Scaffold bridge config templates (idempotent — skips existing)
+    crate::bridges::generate_bridge_configs()?;
 
     Ok(())
 }
 
-/// Post-start setup: register the bot account, store credentials,
-/// and create the default `#general` room.
+/// Post-start setup: register this project's bot account, store
+/// credentials, and create its default room.
 ///
-/// Runs once after the server becomes healthy. Skips steps that are
-/// already complete (idempotent). Reads `credentials.json` — if the
-/// access token is already populated, nothing happens.
+/// Runs once per project after the server becomes healthy. Reads
+/// per-project `credentials.json` — if the access token is already
+/// populated, skips registration. Idempotent.
 ///
 /// # Errors
 ///
 /// Returns a description of the first failure encountered.
-pub(crate) fn post_start_setup(state: &mut State) -> Result<(), String> {
-    let root = Path::new(".");
-    let data = server::data_dir(root);
-    let creds_path = data.join("credentials.json");
+pub(crate) fn project_post_start(state: &mut State) -> Result<(), String> {
+    let creds_path = account::project_credentials_path();
 
     // Load existing credentials to check if registration already done
-    let existing = account::load_credentials(&creds_path)?;
-    if !existing.access_token.is_empty() {
-        // Already registered — just propagate to ChatState
+    if let Ok(existing) = account::load_credentials(&creds_path)
+        && !existing.access_token.is_empty()
+    {
         let cs = ChatState::get_mut(state);
         cs.bot_user_id = Some(existing.user_id);
         return Ok(());
     }
 
-    // 1. Register the bot account on the homeserver
+    // 1. Register this project's bot account on the homeserver
     let creds = account::register_bot_account()?;
 
-    // 2. Persist the credentials
+    // 2. Persist the credentials (per-project)
     account::save_credentials(&creds_path, &creds)?;
 
     // 3. Store user ID in ChatState for immediate use
     let cs = ChatState::get_mut(state);
     cs.bot_user_id = Some(creds.user_id.clone());
 
-    // 4. Create default #general room (best-effort — not fatal)
+    // 4. Create this project's default room (best-effort)
     if let Err(e) = account::create_default_room(&creds.access_token) {
         log::warn!("Failed to create default room: {e}");
     }
 
-    // 5. Set bot display name (best-effort — not fatal)
-    if let Err(e) = account::set_bot_display_name(&creds.access_token, account::BOT_DISPLAY_NAME) {
+    // 5. Set bot display name (best-effort)
+    let display_name = account::project_display_name();
+    if let Err(e) = account::set_bot_display_name(&creds.access_token, &display_name) {
         log::warn!("Failed to set display name: {e}");
     }
 
-    // 6. Register any detected bridge appservice files with the homeserver
-    match crate::bridges::update_appservice_registrations(root) {
+    // 6. Register any detected bridge appservice files (global, idempotent)
+    match crate::bridges::update_appservice_registrations() {
         Ok(true) => log::info!("Updated homeserver appservice registrations"),
         Ok(false) => {} // No new registrations found
         Err(e) => log::warn!("Failed to update appservice registrations: {e}"),
@@ -110,28 +99,19 @@ pub(crate) fn post_start_setup(state: &mut State) -> Result<(), String> {
     Ok(())
 }
 
-// -- Directory and config scaffolding ----------------------------------------
+// -- Config scaffolding ------------------------------------------------------
 
-/// Create the matrix data directory tree.
-fn create_dirs(data: &Path) -> Result<(), String> {
-    for sub in &["data", "media", "bridges"] {
-        let p = data.join(sub);
-        std::fs::create_dir_all(&p).map_err(|e| format!("Cannot create {}: {e}", p.display()))?;
-    }
-    Ok(())
-}
-
-/// Write a minimal `homeserver.toml` with localhost-only defaults.
+/// Write a minimal `homeserver.toml` with UDS-only defaults.
 ///
-/// Uses `RocksDB` (Tuwunel's default and only backend) with data stored
-/// in the project-local `.context-pilot/matrix/data/` directory.
-/// Registration is enabled with a token so the bot account can be
-/// created programmatically during [`post_start_setup`].
-fn write_config(path: &Path, data_dir: &Path) -> Result<(), String> {
-    let db_path = data_dir.join("db");
+/// Uses `RocksDB` (Tuwunel's default backend) with data stored in the
+/// global `~/.context-pilot/matrix/data/` directory. Listens only on a
+/// Unix domain socket — no TCP port is opened.
+fn write_config(path: &std::path::Path, matrix_dir: &std::path::Path) -> Result<(), String> {
+    let db_path = matrix_dir.join("data").join("db");
     let db_str = db_path.to_string_lossy();
     let reg_token = account::generate_registration_token();
-    let port = server::derive_port();
+    let sock_path = server::global_socket_path().ok_or("Cannot determine socket path")?;
+    let sock_str = sock_path.to_string_lossy();
 
     let mut cfg = String::with_capacity(512);
 
@@ -151,13 +131,13 @@ fn write_config(path: &Path, data_dir: &Path) -> Result<(), String> {
         let _r = writeln!(cfg, "server_name = \"{SERVER_NAME}\"");
     }
     {
-        let _r = writeln!(cfg, "port = [{port}]");
-    }
-    {
-        let _r = writeln!(cfg, "address = \"127.0.0.1\"");
-    }
-    {
         let _r = writeln!(cfg, "database_path = \"{db_str}\"");
+    }
+    {
+        let _r = writeln!(cfg, "unix_socket_path = \"{sock_str}\"");
+    }
+    {
+        let _r = writeln!(cfg, "unix_socket_perms = 660");
     }
     {
         let _r = writeln!(cfg, "allow_registration = true");
@@ -173,15 +153,4 @@ fn write_config(path: &Path, data_dir: &Path) -> Result<(), String> {
     }
 
     std::fs::write(path, cfg).map_err(|e| format!("Cannot write {}: {e}", path.display()))
-}
-
-/// Write a JSON placeholder for bot credentials.
-///
-/// The actual access token is populated after the bot account is
-/// registered with the running homeserver (§2 task X439).
-fn write_credentials_placeholder(path: &Path) -> Result<(), String> {
-    let json = format!(
-        "{{\n  \"user_id\": \"@{BOT_LOCALPART}:{SERVER_NAME}\",\n  \"access_token\": \"\",\n  \"device_id\": \"\"\n}}\n"
-    );
-    std::fs::write(path, json).map_err(|e| format!("Cannot write {}: {e}", path.display()))
 }

@@ -1,14 +1,19 @@
-//! Tuwunel homeserver process lifecycle management.
+//! Global Tuwunel homeserver process lifecycle.
 //!
-//! Handles starting, stopping, and health-checking the local Matrix
-//! homeserver that runs alongside Context Pilot. Each project gets
-//! a unique port derived from the project path (range 6167–6667),
-//! so multiple Context Pilot instances can coexist on one machine.
+//! The Matrix homeserver is a **shared, machine-wide resource** that
+//! lives under `~/.context-pilot/matrix/`. Every Context Pilot instance
+//! on the machine connects to the same server as a separate Matrix user.
 //!
-//! The server process is tracked via a PID file, not a `Child` handle,
-//! so it survives TUI reloads and can be reconnected to on restart.
+//! Communication happens exclusively over a **Unix domain socket** —
+//! no TCP ports are opened, nothing touches the network.
+//!
+//! The first cpilot to need chat starts the server; subsequent instances
+//! discover it via the PID file and reuse it. No instance ever stops
+//! the server on shutdown — it runs until reboot or manual kill.
 
-use std::path::{Path, PathBuf};
+use std::io::{Read as _, Write as _};
+use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -16,14 +21,7 @@ use cp_base::state::runtime::State;
 
 use crate::types::{ChatState, ServerStatus};
 
-/// Bind address — always localhost, never exposed.
-const BIND_HOST: &str = "127.0.0.1";
-
-/// Start of the port range for derived ports (inclusive).
-const PORT_RANGE_START: u16 = 6167;
-
-/// Size of the port range (6167–6667 = 501 ports).
-const PORT_RANGE_SIZE: u16 = 501;
+// -- Timeouts ----------------------------------------------------------------
 
 /// Maximum time to wait for the server to become healthy after start.
 const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(15);
@@ -31,121 +29,83 @@ const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(15);
 /// Interval between health check retries during startup.
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_millis(500);
 
-/// Grace period before force-killing after requesting termination.
+/// Grace period before force-killing after SIGTERM.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
-/// Path to the Tuwunel binary relative to the user's home directory.
-const BIN_REL_PATH: &str = ".context-pilot/bin/tuwunel";
+// -- Global paths ------------------------------------------------------------
 
-/// Returns the absolute path to the Tuwunel binary.
+/// Root of all global Matrix data: `~/.context-pilot/matrix/`.
+#[must_use]
+pub(crate) fn global_matrix_dir() -> Option<PathBuf> {
+    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".context-pilot/matrix"))
+}
+
+/// Homeserver config: `~/.context-pilot/matrix/homeserver.toml`.
+#[must_use]
+pub(crate) fn global_config_path() -> Option<PathBuf> {
+    global_matrix_dir().map(|d| d.join("homeserver.toml"))
+}
+
+/// PID file: `~/.context-pilot/matrix/tuwunel.pid`.
+#[must_use]
+pub(crate) fn global_pid_path() -> Option<PathBuf> {
+    global_matrix_dir().map(|d| d.join("tuwunel.pid"))
+}
+
+/// Unix domain socket: `~/.context-pilot/matrix/tuwunel.sock`.
+#[must_use]
+pub(crate) fn global_socket_path() -> Option<PathBuf> {
+    global_matrix_dir().map(|d| d.join("tuwunel.sock"))
+}
+
+/// Server log file: `~/.context-pilot/matrix/server.log`.
+#[must_use]
+pub(crate) fn global_log_path() -> Option<PathBuf> {
+    global_matrix_dir().map(|d| d.join("server.log"))
+}
+
+/// Path to the Tuwunel binary: `~/.context-pilot/bin/tuwunel`.
 #[must_use]
 pub(crate) fn binary_path() -> Option<PathBuf> {
-    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(BIN_REL_PATH))
-}
-
-/// Returns the matrix data directory inside the project's `.context-pilot/`.
-#[must_use]
-pub(crate) fn data_dir(project_root: &Path) -> PathBuf {
-    project_root.join(".context-pilot/matrix")
-}
-
-/// Returns the path to the homeserver config file.
-#[must_use]
-pub(crate) fn config_path(project_root: &Path) -> PathBuf {
-    data_dir(project_root).join("homeserver.toml")
-}
-
-/// Returns the path to the PID file.
-#[must_use]
-pub(crate) fn pid_path(project_root: &Path) -> PathBuf {
-    data_dir(project_root).join("tuwunel.pid")
-}
-
-// -- Dynamic port derivation -------------------------------------------------
-
-/// Derive a deterministic port from the project's absolute path.
-///
-/// Hashes the canonical working directory and maps it into the range
-/// `6167..=6667`. Two different project directories will (almost
-/// certainly) get different ports, allowing concurrent instances.
-#[must_use]
-pub(crate) fn derive_port() -> u16 {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::Hash as _;
-
-    let mut hasher = DefaultHasher::new();
-    let cwd = std::env::current_dir().unwrap_or_default();
-    "tuwunel_port_salt".hash(&mut hasher);
-    cwd.hash(&mut hasher);
-    let h = std::hash::Hasher::finish(&hasher);
-    // PORT_RANGE_SIZE is 501, so remainder always fits in u16
-    let range = u64::from(PORT_RANGE_SIZE);
-    let offset = h.checked_rem(range).unwrap_or(0);
-    let offset_u16 = u16::try_from(offset).unwrap_or(0);
-    PORT_RANGE_START.wrapping_add(offset_u16)
-}
-
-/// Read the port number from `homeserver.toml`.
-///
-/// Parses the `port = [N]` line. Falls back to [`derive_port`] if the
-/// config cannot be read or the port line is absent.
-#[must_use]
-pub(crate) fn read_port(project_root: &Path) -> u16 {
-    let cfg = config_path(project_root);
-    let Ok(content) = std::fs::read_to_string(cfg) else {
-        return derive_port();
-    };
-    // Parse the `port = [6167]` line — simple and robust
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("port")
-            && let Some(bracket_start) = trimmed.find('[')
-            && let Some(bracket_end) = trimmed.find(']')
-            && bracket_end > bracket_start
-        {
-            let inner = trimmed.get(bracket_start.saturating_add(1)..bracket_end).unwrap_or("");
-            if let Ok(p) = inner.trim().parse::<u16>() {
-                return p;
-            }
-        }
-    }
-    derive_port()
-}
-
-/// Returns the full `host:port` address string for the homeserver.
-///
-/// Reads the port from the config file (or derives it if the config
-/// doesn't exist yet). This replaces the old `SERVER_ADDR` constant.
-#[must_use]
-pub(crate) fn server_addr() -> String {
-    let port = read_port(Path::new("."));
-    format!("{BIND_HOST}:{port}")
+    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".context-pilot/bin/tuwunel"))
 }
 
 // -- PID file management -----------------------------------------------------
 
-/// Write the server PID to the PID file.
-fn write_pid(project_root: &Path, pid: u32) -> Result<(), String> {
-    let path = pid_path(project_root);
+/// Write the server PID to the global PID file.
+fn write_pid(pid: u32) -> Result<(), String> {
+    let path = global_pid_path().ok_or("Cannot determine home directory")?;
     std::fs::write(&path, pid.to_string()).map_err(|e| format!("Cannot write PID file {}: {e}", path.display()))
 }
 
-/// Read the PID from the PID file (if it exists).
-fn read_pid(project_root: &Path) -> Option<u32> {
-    let path = pid_path(project_root);
+/// Read the PID from the global PID file (if it exists).
+fn read_pid() -> Option<u32> {
+    let path = global_pid_path()?;
     std::fs::read_to_string(path).ok()?.trim().parse().ok()
 }
 
-/// Remove the PID file.
-fn remove_pid(project_root: &Path) {
-    let path = pid_path(project_root);
-    let _r = std::fs::remove_file(path);
+/// Remove the global PID file.
+fn remove_pid() {
+    if let Some(path) = global_pid_path() {
+        let _r = std::fs::remove_file(path);
+    }
 }
 
-/// Check if a process with the given PID is alive.
+/// Check if a process with the given PID is alive (not a zombie).
 ///
-/// Uses `kill -0` which checks existence without sending a signal.
+/// Reads `/proc/<pid>/status` on Linux to exclude zombies, falling
+/// back to `kill -0` on other platforms.
 fn is_pid_alive(pid: u32) -> bool {
+    let proc_status = format!("/proc/{pid}/status");
+    if let Ok(content) = std::fs::read_to_string(&proc_status) {
+        for line in content.lines() {
+            if let Some(state) = line.strip_prefix("State:") {
+                let trimmed = state.trim();
+                return !trimmed.starts_with('Z') && !trimmed.starts_with('X');
+            }
+        }
+    }
+    // Fallback: kill -0
     Command::new("kill")
         .arg("-0")
         .arg(pid.to_string())
@@ -155,50 +115,124 @@ fn is_pid_alive(pid: u32) -> bool {
         .is_ok_and(|s| s.success())
 }
 
+// -- UDS HTTP helpers --------------------------------------------------------
+
+/// Send a raw HTTP/1.1 GET request over a Unix domain socket.
+///
+/// Returns the response body on success (HTTP 2xx), or an error
+/// description otherwise. This avoids pulling in `reqwest` for
+/// simple health checks over UDS.
+fn uds_get(path: &str) -> Result<String, String> {
+    let sock = global_socket_path().ok_or("Cannot determine socket path")?;
+    let mut stream = UnixStream::connect(&sock).map_err(|e| format!("UDS connect failed: {e}"))?;
+    let _r = stream.set_read_timeout(Some(Duration::from_secs(5)));
+
+    let request = format!("GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+    stream.write_all(request.as_bytes()).map_err(|e| format!("UDS write failed: {e}"))?;
+
+    let mut response = String::with_capacity(1024);
+    let _n = stream.read_to_string(&mut response).map_err(|e| format!("UDS read failed: {e}"))?;
+
+    // Parse status line
+    let status_line = response.lines().next().unwrap_or("");
+    let status_code = status_line.split_whitespace().nth(1).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
+
+    if (200..300).contains(&status_code) {
+        // Extract body after \r\n\r\n
+        let body = response.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+        Ok(body)
+    } else {
+        Err(format!("HTTP {status_code}: {status_line}"))
+    }
+}
+
+/// Send a raw HTTP/1.1 POST request with JSON body over UDS.
+///
+/// Used for account registration and other direct API calls that
+/// bypass the matrix-sdk.
+pub(crate) fn uds_post(path: &str, json_body: &str) -> Result<(u16, String), String> {
+    let sock = global_socket_path().ok_or("Cannot determine socket path")?;
+    let mut stream = UnixStream::connect(&sock).map_err(|e| format!("UDS connect failed: {e}"))?;
+    let _r = stream.set_read_timeout(Some(Duration::from_secs(10)));
+
+    let content_len = json_body.len();
+    let request = format!(
+        "POST {path} HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {content_len}\r\nConnection: close\r\n\r\n{json_body}"
+    );
+    stream.write_all(request.as_bytes()).map_err(|e| format!("UDS write failed: {e}"))?;
+
+    let mut response = Vec::with_capacity(4096);
+    let _n = stream.read_to_end(&mut response).map_err(|e| format!("UDS read failed: {e}"))?;
+    let response_str = String::from_utf8_lossy(&response);
+
+    let status_line = response_str.lines().next().unwrap_or("");
+    let status_code = status_line.split_whitespace().nth(1).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
+
+    let body = response_str.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+    Ok((status_code, body))
+}
+
+/// Send a raw HTTP/1.1 PUT request with JSON body over UDS.
+///
+/// Used for profile updates and other PUT-based Matrix API calls.
+pub(crate) fn uds_put(path: &str, json_body: &str, access_token: &str) -> Result<(u16, String), String> {
+    let sock = global_socket_path().ok_or("Cannot determine socket path")?;
+    let mut stream = UnixStream::connect(&sock).map_err(|e| format!("UDS connect failed: {e}"))?;
+    let _r = stream.set_read_timeout(Some(Duration::from_secs(10)));
+
+    let content_len = json_body.len();
+    let request = format!(
+        "PUT {path} HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {content_len}\r\nAuthorization: Bearer {access_token}\r\nConnection: close\r\n\r\n{json_body}"
+    );
+    stream.write_all(request.as_bytes()).map_err(|e| format!("UDS write failed: {e}"))?;
+
+    let mut response = Vec::with_capacity(4096);
+    let _n = stream.read_to_end(&mut response).map_err(|e| format!("UDS read failed: {e}"))?;
+    let response_str = String::from_utf8_lossy(&response);
+
+    let status_line = response_str.lines().next().unwrap_or("");
+    let status_code = status_line.split_whitespace().nth(1).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
+
+    let body = response_str.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+    Ok((status_code, body))
+}
+
 // -- Server lifecycle --------------------------------------------------------
 
-/// Start the Tuwunel homeserver, reusing an existing process if found.
+/// Start the global Tuwunel homeserver, reusing an existing process.
 ///
-/// **Orphan recovery**: checks the PID file first. If a process is
-/// alive AND the health endpoint responds, the existing server is
-/// reused — no new process is spawned. This makes TUI reloads seamless.
+/// **Orphan recovery**: checks the global PID file first. If a process
+/// is alive AND the health endpoint responds over UDS, the existing
+/// server is reused — no new process spawned.
 ///
-/// **Fresh start**: validates prerequisites, spawns the binary, writes
-/// the PID file, and polls the health endpoint until ready (up to 15 s).
+/// **Fresh start**: validates prerequisites, creates global dirs, runs
+/// bootstrap if needed, spawns the binary, writes the PID file, and
+/// polls the health endpoint until ready (up to 15 s).
 ///
 /// # Errors
 ///
 /// Returns a descriptive error if the binary is missing, config is
 /// absent, the process fails to spawn, or health check times out.
 pub(crate) fn start_server(state: &mut State) -> Result<(), String> {
-    let root = Path::new(".");
-
-    // ── Phase 0: try to reconnect to an existing server ────────────
-    if let Some(pid) = read_pid(root) {
+    // Phase 0: try to reconnect to an existing server
+    if let Some(pid) = read_pid() {
         if is_pid_alive(pid) && health_check().is_ok() {
-            // Server is alive and healthy — reuse it
             let cs = ChatState::get_mut(state);
             cs.server_pid = Some(pid);
             cs.server_status = ServerStatus::Running;
             log::info!("Reconnected to existing Tuwunel server (PID {pid})");
-            // Still run post-start setup (idempotent)
-            if let Err(e) = crate::bootstrap::post_start_setup(state) {
-                log::warn!("Post-start setup incomplete: {e}");
-            }
             return Ok(());
         }
-        // PID file is stale — clean it up
-        remove_pid(root);
+        // PID file is stale
+        remove_pid();
     }
 
-    // ── Phase 1: validate prerequisites and spawn ──────────────────
+    // Phase 1: validate prerequisites and spawn
     {
         let cs = ChatState::get_mut(state);
-
         if cs.server_status == ServerStatus::Running {
             return Ok(());
         }
-
         cs.server_status = ServerStatus::Starting;
     }
 
@@ -208,14 +242,13 @@ pub(crate) fn start_server(state: &mut State) -> Result<(), String> {
         return Err(format!("Tuwunel binary not found at {}. Install it first.", bin.display()));
     }
 
-    let data = data_dir(root);
-    let cfg = config_path(root);
+    let cfg = global_config_path().ok_or("Cannot determine global config path")?;
     if !cfg.exists() {
         ChatState::get_mut(state).server_status = ServerStatus::Stopped;
         return Err(format!("Config not found at {}. Run bootstrap first.", cfg.display()));
     }
 
-    let log_path = data.join("server.log");
+    let log_path = global_log_path().ok_or("Cannot determine global log path")?;
     let log_file = std::fs::File::create(&log_path).map_err(|e| {
         ChatState::get_mut(state).server_status = ServerStatus::Error(e.to_string());
         format!("Cannot create server log at {}: {e}", log_path.display())
@@ -240,15 +273,12 @@ pub(crate) fn start_server(state: &mut State) -> Result<(), String> {
     let pid = child.id();
     ChatState::get_mut(state).server_pid = Some(pid);
 
-    // Write PID file so we can find this process after a reload
-    if let Err(e) = write_pid(root, pid) {
+    if let Err(e) = write_pid(pid) {
         log::warn!("Failed to write PID file: {e}");
     }
 
-    // ── Phase 2: wait for health and run post-start setup ──────────
-    let health = wait_for_health();
-
-    match health {
+    // Phase 2: wait for health over UDS
+    match wait_for_health() {
         Ok(()) => {
             ChatState::get_mut(state).server_status = ServerStatus::Running;
         }
@@ -258,37 +288,26 @@ pub(crate) fn start_server(state: &mut State) -> Result<(), String> {
         }
     }
 
-    if let Err(e) = crate::bootstrap::post_start_setup(state) {
-        log::warn!("Post-start setup incomplete: {e}");
-    }
-
     Ok(())
 }
 
-/// Stop the Tuwunel homeserver gracefully.
+/// Stop the global Tuwunel homeserver.
 ///
-/// Uses the PID from `ChatState` (or the PID file as fallback).
 /// Sends SIGTERM, waits up to 5 seconds, then force-kills.
-/// Cleans up the PID file afterwards.
+/// Cleans up the PID file. **Use sparingly** — other cpilots may
+/// be connected.
 pub(crate) fn stop_server(state: &mut State) {
-    let root = Path::new(".");
-    let cs = ChatState::get_mut(state);
-
-    // Determine which PID to kill: state first, PID file as fallback
-    let pid = cs.server_pid.or_else(|| read_pid(root));
+    let pid = ChatState::get(state).server_pid.or_else(read_pid);
 
     if let Some(pid) = pid {
-        // Request graceful shutdown
         let _term = Command::new("kill").arg(pid.to_string()).status();
 
-        // Wait for exit within the grace period
         let deadline = Instant::now().checked_add(SHUTDOWN_GRACE);
         loop {
             if !is_pid_alive(pid) {
                 break;
             }
             if deadline.is_some_and(|d| Instant::now() >= d) {
-                // Grace period expired — force kill
                 let _kill = Command::new("kill").arg("-9").arg(pid.to_string()).status();
                 break;
             }
@@ -296,20 +315,20 @@ pub(crate) fn stop_server(state: &mut State) {
         }
     }
 
-    remove_pid(root);
+    remove_pid();
+    let cs = ChatState::get_mut(state);
     cs.server_pid = None;
     cs.server_status = ServerStatus::Stopped;
 }
 
-/// Check if the homeserver is healthy by hitting the versions endpoint.
+/// Check if the homeserver is healthy via the versions endpoint over UDS.
 ///
 /// # Errors
 ///
-/// Returns an error if the HTTP request fails or returns a non-`2xx` status.
+/// Returns an error if the UDS connection fails or the response is not 2xx.
 pub(crate) fn health_check() -> Result<(), String> {
-    let url = format!("http://{}/_matrix/client/versions", server_addr());
-    let resp = reqwest::blocking::get(&url).map_err(|e| format!("Health check failed: {e}"))?;
-    if resp.status().is_success() { Ok(()) } else { Err(format!("Health check returned HTTP {}", resp.status())) }
+    let _body = uds_get("/_matrix/client/versions")?;
+    Ok(())
 }
 
 /// Poll the health endpoint until it responds or the timeout expires.
@@ -324,4 +343,29 @@ fn wait_for_health() -> Result<(), String> {
         }
         std::thread::sleep(HEALTH_CHECK_INTERVAL);
     }
+}
+
+// -- Global directory setup --------------------------------------------------
+
+/// Create the global matrix directory tree with restrictive permissions.
+///
+/// Creates `~/.context-pilot/matrix/` and its subdirectories with
+/// mode 700 (owner-only access).
+pub(crate) fn ensure_global_dirs() -> Result<PathBuf, String> {
+    let matrix_dir = global_matrix_dir().ok_or("Cannot determine home directory")?;
+
+    for sub in &["", "data", "media", "bridges"] {
+        let p = matrix_dir.join(sub);
+        std::fs::create_dir_all(&p).map_err(|e| format!("Cannot create {}: {e}", p.display()))?;
+    }
+
+    // Restrict top-level dir to owner only
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let perms = std::fs::Permissions::from_mode(0o700);
+        let _r = std::fs::set_permissions(&matrix_dir, perms);
+    }
+
+    Ok(matrix_dir)
 }

@@ -77,8 +77,7 @@ impl Module for ChatModule {
         state.set_ext(ChatState::default());
 
         // Run first-time bootstrap (idempotent — skips if files exist)
-        let root = std::path::Path::new(".");
-        if let Err(e) = bootstrap::bootstrap(root) {
+        if let Err(e) = bootstrap::bootstrap() {
             let cs = ChatState::get_mut(state);
             cs.server_status = types::ServerStatus::Error(format!("Bootstrap failed: {e}"));
             return;
@@ -88,6 +87,12 @@ impl Module for ChatModule {
         if let Err(e) = server::start_server(state) {
             log::warn!("Chat server failed to start: {e}");
             return;
+        }
+
+        // Register this project's bot user, create its room, set display name
+        if let Err(e) = bootstrap::project_post_start(state) {
+            log::warn!("Project post-start setup failed: {e}");
+            // Non-fatal — client can still connect with existing credentials
         }
 
         if let Err(e) = client::connect() {
@@ -412,11 +417,10 @@ fn clear_typing_indicator(state: &mut State) {
 /// If the process is still alive and healthy, updates `bridge_status`
 /// to `Running` so the dashboard reflects reality.
 fn recover_bridges(state: &mut State) {
-    let root = std::path::Path::new(".");
     let cs = ChatState::get_mut(state);
     for spec in bridges::BRIDGES {
         if bridges::lifecycle::binary_path(spec.name).is_some_and(|p| p.exists()) {
-            match bridges::lifecycle::start(root, spec.name) {
+            match bridges::lifecycle::start(spec.name) {
                 Ok(pid) => {
                     let _inserted =
                         cs.bridge_status.insert(spec.name.to_string(), types::BridgeStatus::Running { pid });
@@ -431,11 +435,10 @@ fn recover_bridges(state: &mut State) {
 
 /// Stop all running bridge processes during module deactivation.
 fn shutdown_bridges(state: &mut State) {
-    let root = std::path::Path::new(".");
     let cs = ChatState::get_mut(state);
     for spec in bridges::BRIDGES {
         if cs.bridge_status.contains_key(spec.name) {
-            bridges::lifecycle::stop(root, spec.name);
+            bridges::lifecycle::stop(spec.name);
         }
     }
     cs.bridge_status.clear();

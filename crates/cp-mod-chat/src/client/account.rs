@@ -4,26 +4,68 @@
 //! Tuwunel: initiate registration (get session ID), then complete
 //! with a `registration_token`. Falls back to login if the account
 //! already exists.
+//!
+//! All HTTP calls go through the global Unix domain socket via
+//! [`crate::server::uds_post`] — no TCP, no `reqwest`.
 
-use std::path::Path;
-
-use crate::server;
+use std::path::{Path, PathBuf};
 
 /// Name used as the Matrix server name in local-only mode.
 const SERVER_NAME: &str = "localhost";
 
-/// Default bot account localpart.
-const BOT_LOCALPART: &str = "context-pilot";
+/// Default bot account localpart (per-project hash appended).
+const BOT_LOCALPART_PREFIX: &str = "cpilot-";
 
 /// Default display name shown in room member lists and message senders.
 pub(crate) const BOT_DISPLAY_NAME: &str = "Context Pilot";
+
+// -- Per-project paths -------------------------------------------------------
+
+/// Per-project credentials file: `.context-pilot/matrix/credentials.json`.
+#[must_use]
+pub(crate) fn project_credentials_path() -> PathBuf {
+    PathBuf::from(".context-pilot/matrix/credentials.json")
+}
+
+/// Generate a unique Matrix localpart for this project.
+///
+/// Hashes the current working directory → `cpilot-<8hex>`.
+#[must_use]
+pub(crate) fn generate_user_localpart() -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash as _;
+
+    let mut hasher = DefaultHasher::new();
+    let cwd = std::env::current_dir().unwrap_or_default();
+    cwd.hash(&mut hasher);
+    format!("{BOT_LOCALPART_PREFIX}{:08x}", std::hash::Hasher::finish(&hasher))
+}
+
+/// Display name that includes the project directory name.
+///
+/// E.g. `"Context Pilot (my-project)"` — helps distinguish bots
+/// when multiple cpilots share bridged rooms.
+#[must_use]
+pub(crate) fn project_display_name() -> String {
+    let dir_name = std::env::current_dir()
+        .ok()
+        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+        .unwrap_or_else(|| "unknown".to_string());
+    format!("{BOT_DISPLAY_NAME} ({dir_name})")
+}
+
+/// Default room alias for this project: `cpilot-<hash>`.
+#[must_use]
+fn project_room_alias() -> String {
+    generate_user_localpart()
+}
 
 // -- Credential types and I/O -----------------------------------------------
 
 /// Credentials stored in `credentials.json`.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct Credentials {
-    /// Full Matrix user ID (e.g. `@context-pilot:localhost`).
+    /// Full Matrix user ID (e.g. `@cpilot-1a2b3c4d:localhost`).
     pub user_id: String,
     /// Access token for API calls.
     pub access_token: String,
@@ -39,62 +81,66 @@ pub(crate) fn load_credentials(path: &Path) -> Result<Credentials, String> {
 
 /// Save credentials to disk.
 pub(crate) fn save_credentials(path: &Path, creds: &Credentials) -> Result<(), String> {
+    // Ensure parent directory exists
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("Cannot create {}: {e}", parent.display()))?;
+    }
     let json = serde_json::to_string_pretty(creds).map_err(|e| format!("Cannot serialize credentials: {e}"))?;
     std::fs::write(path, json).map_err(|e| format!("Cannot write {}: {e}", path.display()))
 }
 
 // -- Account registration ---------------------------------------------------
 
-/// Register the bot account via the Matrix UIAA registration flow.
+/// Register this project's bot account via the Matrix UIAA flow.
 ///
 /// Tuwunel requires a two-step User-Interactive Authentication:
 ///   1. POST with username/password (no auth) → 401 with `session` ID
 ///   2. POST again with the `session` + `m.login.registration_token`
 ///
 /// Falls back to login if the account already exists (`M_USER_IN_USE`).
+/// All HTTP goes over the global Unix domain socket.
 pub(crate) fn register_bot_account() -> Result<Credentials, String> {
-    let url = format!("http://{}/_matrix/client/v3/register", server::server_addr());
+    let localpart = generate_user_localpart();
     let password = generate_password();
     let reg_token = generate_registration_token();
-    let client = reqwest::blocking::Client::new();
 
-    // Step 1: Initiate registration to obtain a UIAA session ID
     let step1_body = serde_json::json!({
-        "username": BOT_LOCALPART,
+        "username": localpart,
         "password": password,
         "device_id": "CONTEXT_PILOT",
         "initial_device_display_name": "Context Pilot",
         "inhibit_login": false,
-    });
+    })
+    .to_string();
 
-    let init_resp =
-        client.post(&url).json(&step1_body).send().map_err(|e| format!("Registration init request failed: {e}"))?;
+    let (status, body) = crate::server::uds_post("/_matrix/client/v3/register", &step1_body)?;
 
-    let init_status = init_resp.status();
-    let init_resp_body: serde_json::Value =
-        init_resp.json().map_err(|e| format!("Cannot parse registration init response: {e}"))?;
-
-    // If 200, registration succeeded without UIAA (unlikely but handle it)
-    if init_status.is_success() {
-        return Ok(credentials_from_response(&init_resp_body));
+    // 200 — registration succeeded without UIAA (unlikely but handle it)
+    if (200..300).contains(&status) {
+        let resp: serde_json::Value =
+            serde_json::from_str(&body).map_err(|e| format!("Cannot parse registration response: {e}"))?;
+        return Ok(credentials_from_response(&resp, &localpart));
     }
 
-    // If `M_USER_IN_USE`, fall back to login
-    if init_resp_body.get("errcode").and_then(serde_json::Value::as_str).is_some_and(|c| c == "M_USER_IN_USE") {
+    let resp: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| format!("Cannot parse registration response: {e}"))?;
+
+    // M_USER_IN_USE — fall back to login
+    if resp.get("errcode").and_then(serde_json::Value::as_str).is_some_and(|c| c == "M_USER_IN_USE") {
         return login_bot_account();
     }
 
     // Extract session from the 401 UIAA response
-    let session = init_resp_body.get("session").and_then(serde_json::Value::as_str).ok_or_else(|| {
+    let session = resp.get("session").and_then(serde_json::Value::as_str).ok_or_else(|| {
         format!(
-            "Registration did not return a UIAA session (HTTP {init_status}): {}",
-            init_resp_body.get("error").and_then(serde_json::Value::as_str).unwrap_or("unknown")
+            "Registration did not return a UIAA session (HTTP {status}): {}",
+            resp.get("error").and_then(serde_json::Value::as_str).unwrap_or("unknown")
         )
     })?;
 
-    // Step 2: Complete registration with the session + registration token
+    // Step 2: complete with registration token
     let step2_body = serde_json::json!({
-        "username": BOT_LOCALPART,
+        "username": localpart,
         "password": password,
         "auth": {
             "type": "m.login.registration_token",
@@ -104,64 +150,68 @@ pub(crate) fn register_bot_account() -> Result<Credentials, String> {
         "device_id": "CONTEXT_PILOT",
         "initial_device_display_name": "Context Pilot",
         "inhibit_login": false,
-    });
+    })
+    .to_string();
 
-    let resp =
-        client.post(&url).json(&step2_body).send().map_err(|e| format!("Registration auth request failed: {e}"))?;
+    let (status2, body2) = crate::server::uds_post("/_matrix/client/v3/register", &step2_body)?;
 
-    let status = resp.status();
-    let resp_body: serde_json::Value = resp.json().map_err(|e| format!("Cannot parse registration response: {e}"))?;
-
-    if status.is_success() {
-        return Ok(credentials_from_response(&resp_body));
+    if (200..300).contains(&status2) {
+        let resp2: serde_json::Value =
+            serde_json::from_str(&body2).map_err(|e| format!("Cannot parse registration response: {e}"))?;
+        return Ok(credentials_from_response(&resp2, &localpart));
     }
 
+    let resp2: serde_json::Value =
+        serde_json::from_str(&body2).map_err(|e| format!("Cannot parse registration response: {e}"))?;
+
     // Account may have been created between step 1 and step 2
-    if resp_body.get("errcode").and_then(serde_json::Value::as_str).is_some_and(|c| c == "M_USER_IN_USE") {
+    if resp2.get("errcode").and_then(serde_json::Value::as_str).is_some_and(|c| c == "M_USER_IN_USE") {
         return login_bot_account();
     }
 
     Err(format!(
-        "Registration failed (HTTP {status}): {}",
-        resp_body.get("error").and_then(serde_json::Value::as_str).unwrap_or("unknown")
+        "Registration failed (HTTP {status2}): {}",
+        resp2.get("error").and_then(serde_json::Value::as_str).unwrap_or("unknown")
     ))
 }
 
 /// Log in to an existing bot account (fallback when already registered).
 fn login_bot_account() -> Result<Credentials, String> {
-    let url = format!("http://{}/_matrix/client/v3/login", server::server_addr());
+    let localpart = generate_user_localpart();
 
     let body = serde_json::json!({
         "type": "m.login.password",
-        "identifier": { "type": "m.id.user", "user": BOT_LOCALPART },
+        "identifier": { "type": "m.id.user", "user": localpart },
         "password": generate_password(),
         "device_id": "CONTEXT_PILOT",
         "initial_device_display_name": "Context Pilot",
-    });
+    })
+    .to_string();
 
-    let client = reqwest::blocking::Client::new();
-    let resp = client.post(&url).json(&body).send().map_err(|e| format!("Login request failed: {e}"))?;
+    let (status, resp_body) = crate::server::uds_post("/_matrix/client/v3/login", &body)?;
 
-    let status = resp.status();
-    let resp_body: serde_json::Value = resp.json().map_err(|e| format!("Cannot parse login response: {e}"))?;
-
-    if status.is_success() {
-        return Ok(credentials_from_response(&resp_body));
+    if (200..300).contains(&status) {
+        let resp: serde_json::Value =
+            serde_json::from_str(&resp_body).map_err(|e| format!("Cannot parse login response: {e}"))?;
+        return Ok(credentials_from_response(&resp, &localpart));
     }
+
+    let resp: serde_json::Value =
+        serde_json::from_str(&resp_body).map_err(|e| format!("Cannot parse login response: {e}"))?;
 
     Err(format!(
         "Login failed (HTTP {status}): {}",
-        resp_body.get("error").and_then(serde_json::Value::as_str).unwrap_or("unknown")
+        resp.get("error").and_then(serde_json::Value::as_str).unwrap_or("unknown")
     ))
 }
 
 /// Extract `Credentials` from a registration or login JSON response.
-fn credentials_from_response(resp: &serde_json::Value) -> Credentials {
+fn credentials_from_response(resp: &serde_json::Value, localpart: &str) -> Credentials {
     Credentials {
         user_id: resp
             .get("user_id")
             .and_then(serde_json::Value::as_str)
-            .map_or_else(|| format!("@{BOT_LOCALPART}:{SERVER_NAME}"), String::from),
+            .map_or_else(|| format!("@{localpart}:{SERVER_NAME}"), String::from),
         access_token: resp.get("access_token").and_then(serde_json::Value::as_str).unwrap_or_default().to_string(),
         device_id: resp.get("device_id").and_then(serde_json::Value::as_str).unwrap_or("CONTEXT_PILOT").to_string(),
     }
@@ -200,73 +250,74 @@ pub(crate) fn generate_registration_token() -> String {
 
 // -- Room and profile management ---------------------------------------------
 
-/// Create the default `#general:localhost` room.
+/// Create this project's default room.
 ///
-/// Idempotent: returns `Ok(())` if the room alias is already taken.
+/// Alias: `#cpilot-<hash>:localhost`. Each project gets its own
+/// private room. Idempotent: returns `Ok(())` if already exists.
 pub(crate) fn create_default_room(access_token: &str) -> Result<(), String> {
-    let url = format!("http://{}/_matrix/client/v3/createRoom", server::server_addr());
+    use std::io::{Read as _, Write as _};
+
+    let alias = project_room_alias();
 
     let body = serde_json::json!({
-        "room_alias_name": "general",
+        "room_alias_name": alias,
         "name": "General",
         "topic": "Default room for Context Pilot chat",
         "visibility": "private",
         "preset": "private_chat",
-    });
+    })
+    .to_string();
 
-    let client = reqwest::blocking::Client::new();
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {access_token}"))
-        .json(&body)
-        .send()
-        .map_err(|e| format!("Create room request failed: {e}"))?;
+    let path = "/_matrix/client/v3/createRoom";
+    // Need auth header — use uds_put with POST semantics via raw call
+    let sock = crate::server::global_socket_path().ok_or("Cannot determine socket path")?;
+    let mut stream = std::os::unix::net::UnixStream::connect(&sock).map_err(|e| format!("UDS connect failed: {e}"))?;
+    let _r = stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
 
-    let status = resp.status();
-    if status.is_success() {
+    let content_len = body.len();
+    let request = format!(
+        "POST {path} HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {content_len}\r\nAuthorization: Bearer {access_token}\r\nConnection: close\r\n\r\n{body}"
+    );
+    stream.write_all(request.as_bytes()).map_err(|e| format!("UDS write failed: {e}"))?;
+
+    let mut response = Vec::with_capacity(4096);
+    let _n = stream.read_to_end(&mut response).map_err(|e| format!("UDS read failed: {e}"))?;
+    let response_str = String::from_utf8_lossy(&response);
+
+    let status_line = response_str.lines().next().unwrap_or("");
+    let status_code = status_line.split_whitespace().nth(1).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
+
+    if (200..300).contains(&status_code) {
         return Ok(());
     }
 
-    let resp_body: serde_json::Value = resp.json().map_err(|e| format!("Cannot parse room creation response: {e}"))?;
+    let resp_body = response_str.split("\r\n\r\n").nth(1).unwrap_or("");
+    let resp: serde_json::Value = serde_json::from_str(resp_body).unwrap_or_default();
+    let errcode = resp.get("errcode").and_then(serde_json::Value::as_str).unwrap_or("");
 
-    let errcode = resp_body.get("errcode").and_then(serde_json::Value::as_str).unwrap_or("");
-
-    // Room alias already taken — not an error (idempotent)
     if errcode == "M_ROOM_IN_USE" {
         return Ok(());
     }
 
     Err(format!(
-        "Create room failed (HTTP {status}): {}",
-        resp_body.get("error").and_then(serde_json::Value::as_str).unwrap_or("unknown")
+        "Create room failed (HTTP {status_code}): {}",
+        resp.get("error").and_then(serde_json::Value::as_str).unwrap_or("unknown")
     ))
 }
 
 /// Set the bot's display name via the Matrix profile API.
 ///
-/// Uses the `PUT /profile/{userId}/displayname` endpoint.
-/// The user ID is percent-encoded for the URL path segment.
+/// Uses `PUT /profile/{userId}/displayname` over UDS.
 pub(crate) fn set_bot_display_name(access_token: &str, display_name: &str) -> Result<(), String> {
-    let user_id = format!("@{BOT_LOCALPART}:{SERVER_NAME}");
+    let localpart = generate_user_localpart();
+    let user_id = format!("@{localpart}:{SERVER_NAME}");
     let encoded_user = encode_matrix_user_id(&user_id);
-    let url = format!("http://{}/_matrix/client/v3/profile/{encoded_user}/displayname", server::server_addr());
+    let path = format!("/_matrix/client/v3/profile/{encoded_user}/displayname");
 
-    let body = serde_json::json!({ "displayname": display_name });
+    let body = serde_json::json!({ "displayname": display_name }).to_string();
+    let (status, _resp) = crate::server::uds_put(&path, &body, access_token)?;
 
-    let client = reqwest::blocking::Client::new();
-    let resp = client
-        .put(&url)
-        .header("Authorization", format!("Bearer {access_token}"))
-        .json(&body)
-        .send()
-        .map_err(|e| format!("Set display name request failed: {e}"))?;
-
-    if resp.status().is_success() {
-        Ok(())
-    } else {
-        let status = resp.status();
-        Err(format!("Set display name failed (HTTP {status})"))
-    }
+    if (200..300).contains(&status) { Ok(()) } else { Err(format!("Set display name failed (HTTP {status})")) }
 }
 
 /// Percent-encode a Matrix user ID for use in URL path segments.

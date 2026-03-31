@@ -9,7 +9,7 @@
 pub(crate) mod lifecycle;
 
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::server;
 
@@ -106,23 +106,23 @@ pub(crate) const BRIDGES: &[BridgeSpec] = &[
 
 // -- Config generation -------------------------------------------------------
 
-/// Bridge data directory: `.context-pilot/matrix/bridges/{name}/`
+/// Bridge data directory: `~/.context-pilot/matrix/bridges/{name}/`
 #[must_use]
-pub(crate) fn bridge_data_dir(project_root: &Path, name: &str) -> PathBuf {
-    server::data_dir(project_root).join("bridges").join(name)
+pub(crate) fn bridge_data_dir(name: &str) -> PathBuf {
+    server::global_matrix_dir().unwrap_or_else(|| PathBuf::from(".context-pilot/matrix")).join("bridges").join(name)
 }
 
 /// Generate config templates for all known bridges.
 ///
-/// Each config is written to `.context-pilot/matrix/bridges/{name}/config.yaml`.
+/// Each config is written to `~/.context-pilot/matrix/bridges/{name}/config.yaml`.
 /// Existing files are **not** overwritten (safe to call repeatedly).
 ///
 /// # Errors
 ///
 /// Returns a description of the first I/O failure encountered.
-pub(crate) fn generate_bridge_configs(project_root: &Path) -> Result<(), String> {
+pub(crate) fn generate_bridge_configs() -> Result<(), String> {
     for spec in BRIDGES {
-        let dir = bridge_data_dir(project_root, spec.name);
+        let dir = bridge_data_dir(spec.name);
         std::fs::create_dir_all(&dir).map_err(|e| format!("Cannot create {}: {e}", dir.display()))?;
 
         let cfg_path = dir.join("config.yaml");
@@ -130,7 +130,7 @@ pub(crate) fn generate_bridge_configs(project_root: &Path) -> Result<(), String>
             continue;
         }
 
-        let content = render_bridge_config(spec, project_root);
+        let content = render_bridge_config(spec);
         std::fs::write(&cfg_path, content).map_err(|e| format!("Cannot write {}: {e}", cfg_path.display()))?;
 
         let reg_path = dir.join("registration.yaml.sample");
@@ -144,10 +144,11 @@ pub(crate) fn generate_bridge_configs(project_root: &Path) -> Result<(), String>
     Ok(())
 }
 
-/// Render a bridge `config.yaml` using `SQLite` and localhost addresses.
-fn render_bridge_config(spec: &BridgeSpec, project_root: &Path) -> String {
-    let hs_addr = format!("http://{}", server::server_addr());
-    let db_path = bridge_data_dir(project_root, spec.name).join(format!("{}.db", spec.name));
+/// Render a bridge `config.yaml` using `SQLite` and UDS connection.
+fn render_bridge_config(spec: &BridgeSpec) -> String {
+    let sock_path = server::global_socket_path()
+        .map_or_else(|| "http://localhost:6167".to_string(), |p| format!("unix:{}", p.to_string_lossy()));
+    let db_path = bridge_data_dir(spec.name).join(format!("{}.db", spec.name));
     let db_uri = format!("file:{}?_txlock=immediate", db_path.to_string_lossy());
 
     let mut cfg = String::with_capacity(1024);
@@ -168,7 +169,7 @@ fn render_bridge_config(spec: &BridgeSpec, project_root: &Path) -> String {
         let _r = writeln!(cfg, "homeserver:");
     }
     {
-        let _r = writeln!(cfg, "  address: {hs_addr}");
+        let _r = writeln!(cfg, "  address: {sock_path}");
     }
     {
         let _r = writeln!(cfg, "  domain: localhost");
@@ -227,12 +228,12 @@ fn render_bridge_config(spec: &BridgeSpec, project_root: &Path) -> String {
 
 // -- Registration file management --------------------------------------------
 
-/// Scan for `registration.yaml` files across all bridge directories.
+/// Scan for `registration.yaml` files across all global bridge directories.
 #[must_use]
-pub(crate) fn find_registration_files(project_root: &Path) -> Vec<PathBuf> {
+pub(crate) fn find_registration_files() -> Vec<PathBuf> {
     let mut found = Vec::new();
     for spec in BRIDGES {
-        let reg = bridge_data_dir(project_root, spec.name).join("registration.yaml");
+        let reg = bridge_data_dir(spec.name).join("registration.yaml");
         if reg.exists() {
             found.push(reg);
         }
@@ -242,22 +243,22 @@ pub(crate) fn find_registration_files(project_root: &Path) -> Vec<PathBuf> {
 
 /// Update the homeserver config to include all detected registration files.
 ///
-/// Reads `homeserver.toml`, appends any registration paths not already
-/// listed to `app_service_config_files`, and writes back.
+/// Reads the global `homeserver.toml`, appends any registration paths
+/// not already listed to `app_service_config_files`, and writes back.
 ///
 /// # Errors
 ///
 /// Returns a description if the config cannot be read or written.
-pub(crate) fn update_appservice_registrations(project_root: &Path) -> Result<bool, String> {
-    let registrations = find_registration_files(project_root);
+pub(crate) fn update_appservice_registrations() -> Result<bool, String> {
+    let registrations = find_registration_files();
     if registrations.is_empty() {
         return Ok(false);
     }
 
-    let cfg_path = server::config_path(project_root);
+    let cfg_path = server::global_config_path().ok_or("Cannot determine global config path")?;
     let content = std::fs::read_to_string(&cfg_path).map_err(|e| format!("Cannot read {}: {e}", cfg_path.display()))?;
 
-    let cfg_dir = cfg_path.parent().unwrap_or_else(|| Path::new("."));
+    let cfg_dir = cfg_path.parent().unwrap_or_else(|| std::path::Path::new("."));
     let reg_strs: Vec<String> = registrations
         .iter()
         .filter_map(|p| p.strip_prefix(cfg_dir).ok())
