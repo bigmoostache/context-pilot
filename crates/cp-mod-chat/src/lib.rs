@@ -433,14 +433,13 @@ fn recover_bridges(state: &mut State) {
     }
 }
 
-/// Stop all running bridge processes during module deactivation.
+/// Disconnect from bridge processes during module deactivation.
+///
+/// Does **not** stop the bridge processes — they are global resources
+/// shared across all Context Pilot instances. Only clears this
+/// instance's tracking state.
 fn shutdown_bridges(state: &mut State) {
     let cs = ChatState::get_mut(state);
-    for spec in bridges::BRIDGES {
-        if cs.bridge_status.contains_key(spec.name) {
-            bridges::lifecycle::stop(spec.name);
-        }
-    }
     cs.bridge_status.clear();
 }
 

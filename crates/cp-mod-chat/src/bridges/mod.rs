@@ -29,15 +29,18 @@ pub(crate) struct BridgeSpec {
 
 /// All supported mautrix bridges with their configuration defaults.
 ///
+/// Only platforms with proper bot APIs are included — no human
+/// impersonation, no phone-number-required flows (Iron Law #1).
+///
 /// Each bridge binary is downloaded from GitHub:
 /// `https://github.com/mautrix/{name}/releases/latest/download/mautrix-{name}-{arch}`
 pub(crate) const BRIDGES: &[BridgeSpec] = &[
     BridgeSpec {
-        name: "whatsapp",
-        bot_username: "whatsappbot",
-        appservice_port: 29318,
-        user_namespace: "@whatsapp_.*",
-        alias_namespace: "#whatsapp_.*",
+        name: "telegram",
+        bot_username: "telegrambot",
+        appservice_port: 29320,
+        user_namespace: "@telegram_.*",
+        alias_namespace: "#telegram_.*",
     },
     BridgeSpec {
         name: "discord",
@@ -47,20 +50,6 @@ pub(crate) const BRIDGES: &[BridgeSpec] = &[
         alias_namespace: "#discord_.*",
     },
     BridgeSpec {
-        name: "telegram",
-        bot_username: "telegrambot",
-        appservice_port: 29320,
-        user_namespace: "@telegram_.*",
-        alias_namespace: "#telegram_.*",
-    },
-    BridgeSpec {
-        name: "signal",
-        bot_username: "signalbot",
-        appservice_port: 29321,
-        user_namespace: "@signal_.*",
-        alias_namespace: "#signal_.*",
-    },
-    BridgeSpec {
         name: "slack",
         bot_username: "slackbot",
         appservice_port: 29322,
@@ -68,39 +57,11 @@ pub(crate) const BRIDGES: &[BridgeSpec] = &[
         alias_namespace: "#slack_.*",
     },
     BridgeSpec {
-        name: "meta",
-        bot_username: "metabot",
-        appservice_port: 29323,
-        user_namespace: "@meta_.*",
-        alias_namespace: "#meta_.*",
-    },
-    BridgeSpec {
-        name: "twitter",
-        bot_username: "twitterbot",
-        appservice_port: 29324,
-        user_namespace: "@twitter_.*",
-        alias_namespace: "#twitter_.*",
-    },
-    BridgeSpec {
         name: "googlechat",
         bot_username: "googlechatbot",
         appservice_port: 29325,
         user_namespace: "@googlechat_.*",
         alias_namespace: "#googlechat_.*",
-    },
-    BridgeSpec {
-        name: "gmessages",
-        bot_username: "gmessagesbot",
-        appservice_port: 29326,
-        user_namespace: "@gmessages_.*",
-        alias_namespace: "#gmessages_.*",
-    },
-    BridgeSpec {
-        name: "bluesky",
-        bot_username: "blueskybot",
-        appservice_port: 29327,
-        user_namespace: "@bluesky_.*",
-        alias_namespace: "#bluesky_.*",
     },
 ];
 
@@ -217,10 +178,8 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
         let _r = writeln!(cfg, "  permissions:");
     }
     {
+        // All cpilot-* users on localhost get user-level access
         let _r = writeln!(cfg, "    \"localhost\": user");
-    }
-    {
-        let _r = writeln!(cfg, "    \"@context-pilot:localhost\": admin");
     }
 
     cfg

@@ -10,9 +10,6 @@ use std::time::{Duration, Instant};
 
 use super::{BRIDGES, bridge_data_dir};
 
-/// Grace period before force-killing a bridge after SIGTERM.
-const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
-
 /// Time to wait for a bridge to become healthy after start.
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -159,29 +156,6 @@ pub(crate) fn start(name: &str) -> Result<u32, String> {
         }
         std::thread::sleep(HEALTH_INTERVAL);
     }
-}
-
-/// Stop a bridge process gracefully.
-///
-/// SIGTERM → wait grace period → SIGKILL. Cleans up the PID file.
-pub(crate) fn stop(name: &str) {
-    if let Some(pid) = read_pid(name) {
-        let _term = Command::new("kill").arg(pid.to_string()).status();
-
-        let deadline = Instant::now().checked_add(SHUTDOWN_GRACE);
-        loop {
-            if !is_alive(pid) {
-                break;
-            }
-            if deadline.is_some_and(|d| Instant::now() >= d) {
-                let _kill = Command::new("kill").arg("-9").arg(pid.to_string()).status();
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
-    }
-
-    let _r = std::fs::remove_file(pid_path(name));
 }
 
 // -- Health check ------------------------------------------------------------
