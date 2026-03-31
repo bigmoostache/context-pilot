@@ -267,8 +267,9 @@ fn patch_bridge_config(spec: &BridgeSpec, cfg_path: &std::path::Path) -> Result<
             }
         }
 
-        // === telegram section (platform-specific) ===
-        if section == "telegram" && spec.name == "telegram" {
+        // === network section (platform-specific credentials) ===
+        // mautrix-telegram puts api_id/api_hash/bot_token under "network:", not "telegram:".
+        if section == "network" && spec.name == "telegram" {
             if trimmed.starts_with("api_id:") {
                 let api_id =
                     cp_base::config::global::resolve_api_key("telegram_api_id").unwrap_or_else(|| "12345".to_string());
