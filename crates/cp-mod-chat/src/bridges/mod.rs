@@ -107,7 +107,28 @@ pub(crate) fn generate_bridge_configs() -> Result<(), String> {
 
         let cfg_path = dir.join("config.yaml");
         if !cfg_path.exists() {
-            continue; // No config yet — generate_registrations() will create one
+            // Config missing (maybe deleted) but registration exists — regenerate
+            // the mautrix default config by seeding {} and running -g again.
+            let reg_path = dir.join("registration.yaml");
+            if reg_path.exists() {
+                std::fs::write(&cfg_path, "{}\n")
+                    .map_err(|e| format!("Cannot seed config for mautrix-{}: {e}", spec.name))?;
+                let bin = lifecycle::ensure_binary(spec.name)?;
+                let _output = std::process::Command::new(&bin)
+                    .arg("--generate-registration")
+                    .arg("--config")
+                    .arg(&cfg_path)
+                    .arg("--registration")
+                    .arg(&reg_path)
+                    .current_dir(&dir)
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped())
+                    .output()
+                    .map_err(|e| format!("Failed to regenerate config for mautrix-{}: {e}", spec.name))?;
+                log::info!("Regenerated default config for mautrix-{}", spec.name);
+            } else {
+                continue; // No config or registration — generate_registrations() will handle
+            }
         }
 
         patch_bridge_config(spec, &cfg_path)?;
