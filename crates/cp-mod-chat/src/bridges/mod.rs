@@ -149,6 +149,10 @@ pub(crate) fn generate_bridge_configs() -> Result<(), String> {
 /// Reads the full config (typically ~600 lines from `mautrix -g`),
 /// replaces only the values we need, and writes it back. This preserves
 /// all mautrix defaults that the bridge requires to function.
+///
+/// Uses a top-level section tracker to avoid ambiguity — the mautrix
+/// config reuses keywords like `uri:` and `address:` across different
+/// sections, so naive string matching would patch the wrong fields.
 fn patch_bridge_config(spec: &BridgeSpec, cfg_path: &std::path::Path) -> Result<(), String> {
     let content = std::fs::read_to_string(cfg_path).map_err(|e| format!("Cannot read {}: {e}", cfg_path.display()))?;
 
@@ -164,82 +168,107 @@ fn patch_bridge_config(spec: &BridgeSpec, cfg_path: &std::path::Path) -> Result<
     });
 
     let mut patched = String::with_capacity(content.len());
+    // Current top-level section (indent 0, e.g. "homeserver", "database", "bridge")
+    let mut section = String::new();
+    // Current second-level key (indent 4, e.g. "bot", "relay", "permissions")
+    let mut subsection = String::new();
     let mut in_permissions = false;
-    let mut in_relay = false;
 
     for line in content.lines() {
         let trimmed = line.trim();
         let indent = line.len().saturating_sub(line.trim_start().len());
 
-        // Track relay section (indent ≥ 4 means nested under bridge:)
-        if trimmed == "relay:" && indent >= 4 {
-            in_relay = true;
-        } else if in_relay && indent <= 4 && !trimmed.is_empty() && !trimmed.starts_with('#') {
-            in_relay = false;
+        // Track top-level sections (zero-indent keys like "homeserver:", "database:")
+        if indent == 0
+            && !trimmed.is_empty()
+            && !trimmed.starts_with('#')
+            && let Some(key) = trimmed.strip_suffix(':')
+        {
+            section = key.to_string();
+            subsection.clear();
+        }
+        // Track second-level subsections (indent 4)
+        if indent == 4 && !trimmed.is_empty() && !trimmed.starts_with('#') {
+            if let Some(key) = trimmed.strip_suffix(':') {
+                subsection = key.to_string();
+            } else if let Some((key, _)) = trimmed.split_once(':') {
+                subsection = key.to_string();
+            }
         }
 
-        // Homeserver address — replace with our UDS path
-        if trimmed.starts_with("address:") && patched.contains("homeserver:") && !patched.contains("appservice:") {
-            let _r = writeln!(patched, "    address: {sock_path}");
-            continue;
-        }
-        // Homeserver domain
-        if trimmed.starts_with("domain:") && patched.contains("homeserver:") && !patched.contains("appservice:") {
-            patched.push_str("    domain: localhost\n");
-            continue;
-        }
-        // Database URI
-        if trimmed.starts_with("uri:") && patched.contains("database:") {
-            let _r = writeln!(patched, "    uri: {db_uri}");
-            continue;
-        }
-        // Bot username
-        if trimmed.starts_with("username:") && patched.contains("bot:") && !patched.contains("database:") {
-            let _r = writeln!(patched, "        username: {}", spec.bot_username);
-            continue;
-        }
-        // Bot displayname
-        if trimmed.starts_with("displayname:") && patched.contains("bot:") && !patched.contains("database:") {
-            let _r = writeln!(patched, "        displayname: {} bridge bot", capitalize(spec.name));
-            continue;
-        }
-        // Appservice as_token / hs_token
-        if trimmed.starts_with("as_token:")
-            && patched.contains("appservice:")
-            && let Some(tok) = &as_token
-        {
-            let _r = writeln!(patched, "    as_token: {tok}");
-            continue;
-        }
-        if trimmed.starts_with("hs_token:")
-            && patched.contains("appservice:")
-            && let Some(tok) = &hs_token
-        {
-            let _r = writeln!(patched, "    hs_token: {tok}");
-            continue;
-        }
-        // Relay enabled — ONLY within the relay: section
-        if trimmed.starts_with("enabled:") && in_relay {
-            patched.push_str("        enabled: true\n");
-            continue;
-        }
-        // Permissions — replace with our blanket localhost access
-        if trimmed == "permissions:" {
-            in_permissions = true;
-            patched.push_str(line);
-            patched.push('\n');
-            continue;
-        }
-        if in_permissions {
-            if trimmed.starts_with('"') || trimmed.starts_with('\'') || trimmed.starts_with('*') {
+        // === homeserver section ===
+        if section == "homeserver" {
+            if trimmed.starts_with("address:") {
+                let _r = writeln!(patched, "    address: {sock_path}");
                 continue;
             }
-            patched.push_str("        \"localhost\": user\n");
-            in_permissions = false;
+            if trimmed.starts_with("domain:") {
+                patched.push_str("    domain: localhost\n");
+                continue;
+            }
         }
 
-        // Platform-specific: Telegram credentials
-        if spec.name == "telegram" {
+        // === database section ===
+        if section == "database" {
+            if trimmed.starts_with("type:") {
+                patched.push_str("    type: sqlite3-fk-wal\n");
+                continue;
+            }
+            if trimmed.starts_with("uri:") {
+                let _r = writeln!(patched, "    uri: {db_uri}");
+                continue;
+            }
+        }
+
+        // === appservice section ===
+        if section == "appservice" {
+            if subsection == "bot" && trimmed.starts_with("username:") {
+                let _r = writeln!(patched, "        username: {}", spec.bot_username);
+                continue;
+            }
+            if subsection == "bot" && trimmed.starts_with("displayname:") {
+                let _r = writeln!(patched, "        displayname: {} bridge bot", capitalize(spec.name));
+                continue;
+            }
+            if trimmed.starts_with("as_token:")
+                && let Some(tok) = &as_token
+            {
+                let _r = writeln!(patched, "    as_token: {tok}");
+                continue;
+            }
+            if trimmed.starts_with("hs_token:")
+                && let Some(tok) = &hs_token
+            {
+                let _r = writeln!(patched, "    hs_token: {tok}");
+                continue;
+            }
+        }
+
+        // === bridge section ===
+        if section == "bridge" {
+            // Relay enabled — only within the relay subsection
+            if subsection == "relay" && trimmed.starts_with("enabled:") {
+                patched.push_str("        enabled: true\n");
+                continue;
+            }
+            // Permissions — replace with blanket localhost access
+            if trimmed == "permissions:" {
+                in_permissions = true;
+                patched.push_str(line);
+                patched.push('\n');
+                continue;
+            }
+            if in_permissions {
+                if trimmed.starts_with('"') || trimmed.starts_with('\'') || trimmed.starts_with('*') {
+                    continue;
+                }
+                patched.push_str("        \"localhost\": user\n");
+                in_permissions = false;
+            }
+        }
+
+        // === telegram section (platform-specific) ===
+        if section == "telegram" && spec.name == "telegram" {
             if trimmed.starts_with("api_id:") {
                 let api_id =
                     cp_base::config::global::resolve_api_key("telegram_api_id").unwrap_or_else(|| "12345".to_string());
