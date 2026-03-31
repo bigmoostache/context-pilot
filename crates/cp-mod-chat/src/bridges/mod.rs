@@ -221,9 +221,9 @@ pub(crate) fn build_appservice_execute_args() -> Vec<String> {
         .iter()
         .filter_map(|reg_path| {
             let yaml = std::fs::read_to_string(reg_path).ok()?;
-            // Tuwunel --execute takes a single admin command string.
-            // For appservice registration, it's: appservices register\n<yaml>
-            Some(format!("appservices register\n{yaml}"))
+            // Tuwunel's admin parser expects a code block even via --execute.
+            // Format mirrors the admin room syntax: command + ```yaml\n...\n```
+            Some(format!("appservices register\n```yaml\n{yaml}```"))
         })
         .collect()
 }
