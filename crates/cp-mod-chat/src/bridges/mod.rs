@@ -7,6 +7,8 @@
 
 /// Bridge process lifecycle: download, spawn, stop, health check.
 pub(crate) mod lifecycle;
+/// Bot token login via config or interactive Matrix commands.
+pub(crate) mod login;
 
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -25,6 +27,10 @@ pub(crate) struct BridgeSpec {
     pub user_namespace: &'static str,
     /// Puppet room alias namespace regex (e.g. `#discord_.*`).
     pub alias_namespace: &'static str,
+    /// Environment variable name for the bot token.
+    pub token_env_var: &'static str,
+    /// Whether this bridge supports config-based bot login (vs Matrix command).
+    pub config_login: bool,
 }
 
 /// All supported mautrix bridges with their configuration defaults.
@@ -41,6 +47,8 @@ pub(crate) const BRIDGES: &[BridgeSpec] = &[
         appservice_port: 29320,
         user_namespace: "@telegram_.*",
         alias_namespace: "#telegram_.*",
+        token_env_var: "TELEGRAM_BOT_TOKEN",
+        config_login: true,
     },
     BridgeSpec {
         name: "discord",
@@ -48,6 +56,8 @@ pub(crate) const BRIDGES: &[BridgeSpec] = &[
         appservice_port: 29319,
         user_namespace: "@discord_.*",
         alias_namespace: "#discord_.*",
+        token_env_var: "DISCORD_BOT_TOKEN",
+        config_login: false,
     },
     BridgeSpec {
         name: "slack",
@@ -55,6 +65,8 @@ pub(crate) const BRIDGES: &[BridgeSpec] = &[
         appservice_port: 29322,
         user_namespace: "@slack_.*",
         alias_namespace: "#slack_.*",
+        token_env_var: "SLACK_BOT_TOKEN",
+        config_login: false,
     },
     BridgeSpec {
         name: "googlechat",
@@ -62,6 +74,8 @@ pub(crate) const BRIDGES: &[BridgeSpec] = &[
         appservice_port: 29325,
         user_namespace: "@googlechat_.*",
         alias_namespace: "#googlechat_.*",
+        token_env_var: "GOOGLECHAT_SERVICE_ACCOUNT",
+        config_login: true,
     },
 ];
 
@@ -181,6 +195,15 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
         // All cpilot-* users on localhost get user-level access
         let _r = writeln!(cfg, "    \"localhost\": user");
     }
+    {
+        let _r = writeln!(cfg, "  relay:");
+    }
+    {
+        let _r = writeln!(cfg, "    enabled: true");
+    }
+
+    // Platform-specific bot configuration
+    write_platform_config(spec, &mut cfg);
 
     cfg
 }
@@ -275,6 +298,54 @@ pub(crate) fn update_appservice_registrations() -> Result<bool, String> {
 }
 
 // -- Helpers -----------------------------------------------------------------
+
+/// Write platform-specific bot configuration into the config YAML.
+///
+/// Injects the bot token from environment variables directly into the
+/// config file so the bridge auto-authenticates on startup. Only
+/// applies to bridges with `config_login = true`.
+fn write_platform_config(spec: &BridgeSpec, cfg: &mut String) {
+    let token = std::env::var(spec.token_env_var).ok();
+
+    match spec.name {
+        "telegram" => {
+            {
+                let _r = writeln!(cfg);
+            }
+            {
+                let _r = writeln!(cfg, "telegram:");
+            }
+            let val = token.as_deref().unwrap_or("YOUR_BOT_TOKEN_HERE");
+            {
+                let _r = writeln!(cfg, "  bot_token: \"{val}\"");
+            }
+        }
+        "googlechat" => {
+            {
+                let _r = writeln!(cfg);
+            }
+            {
+                let _r = writeln!(cfg, "googlechat:");
+            }
+            let val = token.as_deref().unwrap_or("/path/to/service-account.json");
+            {
+                let _r = writeln!(cfg, "  service_account_key: \"{val}\"");
+            }
+        }
+        // Discord and Slack use interactive Matrix commands for login —
+        // no config-based token injection needed. See ensure_bridge_login().
+        _ => {}
+    }
+}
+
+/// Resolve the bot token for a bridge from environment variables.
+///
+/// Returns `None` if the env var is unset or empty.
+pub(crate) fn resolve_bot_token(bridge_name: &str) -> Option<String> {
+    let spec = BRIDGES.iter().find(|b| b.name == bridge_name)?;
+    let val = std::env::var(spec.token_env_var).ok()?;
+    if val.is_empty() { None } else { Some(val) }
+}
 
 /// Render a sample `registration.yaml` for documentation purposes.
 #[must_use]

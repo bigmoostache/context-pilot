@@ -58,7 +58,7 @@ impl Module for ChatModule {
     }
 
     fn description(&self) -> &'static str {
-        "Matrix-based universal messaging (Discord, WhatsApp, Telegram, etc.)"
+        "Matrix-based universal messaging (Telegram, Discord, Slack, Google Chat)"
     }
 
     fn is_global(&self) -> bool {
@@ -307,7 +307,7 @@ impl Module for ChatModule {
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("Chat", "Matrix-based messaging across Discord, WhatsApp, Telegram, and more")]
+        vec![("Chat", "Matrix-based messaging across Telegram, Discord, Slack, and Google Chat")]
     }
 
     fn context_display_name(&self, context_type: &str) -> Option<&'static str> {
@@ -424,6 +424,13 @@ fn recover_bridges(state: &mut State) {
                 Ok(pid) => {
                     let _inserted =
                         cs.bridge_status.insert(spec.name.to_string(), types::BridgeStatus::Running { pid });
+
+                    // Attempt bot login for command-based bridges (Discord, Slack)
+                    if !spec.config_login
+                        && let Err(e) = bridges::login::ensure_bridge_login(spec.name)
+                    {
+                        log::debug!("Bridge {} auto-login skipped: {e}", spec.name);
+                    }
                 }
                 Err(e) => {
                     log::debug!("Bridge {} not recovered: {e}", spec.name);
