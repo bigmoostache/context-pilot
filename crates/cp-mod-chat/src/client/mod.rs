@@ -97,15 +97,25 @@ async fn connect_async() -> Result<(), String> {
     let device_id = creds.get("device_id").and_then(serde_json::Value::as_str).unwrap_or("CONTEXT_PILOT");
     let user_id = creds.get("user_id").and_then(serde_json::Value::as_str).unwrap_or("@context-pilot:localhost");
 
-    // Build the client pointing at the local homeserver via dummy URL
-    // (actual transport will be switched to UDS in Phase 2)
-    let server_url = "http://localhost:6167";
+    // Build a reqwest client that routes all HTTP through the global UDS.
+    // The homeserver_url is still needed for matrix-sdk internals (room aliases,
+    // federation references) but no TCP connection is ever made — everything
+    // flows through tuwunel.sock.
+    let sock_path = crate::server::global_socket_path().ok_or("Cannot determine socket path for UDS client")?;
+    let http_client = reqwest::Client::builder()
+        .unix_socket(sock_path)
+        .build()
+        .map_err(|e| format!("Cannot build UDS reqwest client: {e}"))?;
+
+    let server_url = "http://localhost";
     let store_path = PathBuf::from(".context-pilot/matrix/sdk-store");
     std::fs::create_dir_all(&store_path).map_err(|e| format!("Cannot create SDK store dir: {e}"))?;
 
-    let client = Box::pin(Client::builder().homeserver_url(server_url).sqlite_store(&store_path, None).build())
-        .await
-        .map_err(|e| format!("Failed to build Matrix client: {e}"))?;
+    let client = Box::pin(
+        Client::builder().homeserver_url(server_url).http_client(http_client).sqlite_store(&store_path, None).build(),
+    )
+    .await
+    .map_err(|e| format!("Failed to build Matrix client: {e}"))?;
 
     // Restore the session with stored credentials
     let session = MatrixSession {
