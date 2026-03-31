@@ -144,9 +144,18 @@ fn patch_bridge_config(spec: &BridgeSpec, cfg_path: &std::path::Path) -> Result<
 
     let mut patched = String::with_capacity(content.len());
     let mut in_permissions = false;
+    let mut in_relay = false;
 
     for line in content.lines() {
         let trimmed = line.trim();
+        let indent = line.len().saturating_sub(line.trim_start().len());
+
+        // Track relay section (indent ≥ 4 means nested under bridge:)
+        if trimmed == "relay:" && indent >= 4 {
+            in_relay = true;
+        } else if in_relay && indent <= 4 && !trimmed.is_empty() && !trimmed.starts_with('#') {
+            in_relay = false;
+        }
 
         // Homeserver address — replace with our UDS path
         if trimmed.starts_with("address:") && patched.contains("homeserver:") && !patched.contains("appservice:") {
@@ -188,8 +197,8 @@ fn patch_bridge_config(spec: &BridgeSpec, cfg_path: &std::path::Path) -> Result<
             let _r = writeln!(patched, "    hs_token: {tok}");
             continue;
         }
-        // Relay mode
-        if trimmed.starts_with("enabled:") && patched.contains("relay:") {
+        // Relay enabled — ONLY within the relay: section
+        if trimmed.starts_with("enabled:") && in_relay {
             patched.push_str("        enabled: true\n");
             continue;
         }
@@ -201,14 +210,11 @@ fn patch_bridge_config(spec: &BridgeSpec, cfg_path: &std::path::Path) -> Result<
             continue;
         }
         if in_permissions {
-            // Skip old permission lines, inject ours after the section header
             if trimmed.starts_with('"') || trimmed.starts_with('\'') || trimmed.starts_with('*') {
-                continue; // Skip old permission entries
+                continue;
             }
-            // First non-permission line — inject our permission and continue
             patched.push_str("        \"localhost\": user\n");
             in_permissions = false;
-            // Fall through to write the current line
         }
 
         // Platform-specific: Telegram credentials
