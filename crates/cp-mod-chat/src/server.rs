@@ -281,6 +281,9 @@ pub(crate) fn start_server(state: &mut State) -> Result<(), String> {
     // Phase 2: wait for health over UDS
     match wait_for_health() {
         Ok(()) => {
+            // Give --execute commands time to finish (appservice registration).
+            // The health endpoint responds before admin commands complete.
+            std::thread::sleep(Duration::from_millis(1500));
             ChatState::get_mut(state).server_status = ServerStatus::Running;
         }
         Err(ref e) => {
