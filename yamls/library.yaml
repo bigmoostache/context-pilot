@@ -288,4 +288,91 @@ skills:
       - Combine goggles with `site:` operator in query for precise targeting
       - Goggles are most effective for broad queries where source quality matters
 
+  - id: chat-setup-guide
+    name: Chat Setup Guide
+    description: How to set up Telegram, Discord, Slack, and Google Chat bridges
+    content: |
+      # Chat Setup Guide
+
+      Context Pilot includes a built-in Matrix chat server (Tuwunel) with bridges to external platforms. Everything runs locally — no cloud services, no external Matrix servers. The server starts automatically when the chat module is active.
+
+      ## Architecture
+
+      - **Tuwunel** — local Matrix homeserver at `~/.context-pilot/matrix/`, communicates via Unix domain socket only (no TCP ports)
+      - **mautrix bridges** — Go binaries that connect Telegram/Discord/Slack/Google Chat to the local Matrix server
+      - **Per-project bot** — each cpilot project gets its own Matrix user (`cpilot-<hash>`) with its own rooms
+      - Bridges are global (shared across all cpilot instances on the machine)
+
+      ## Supported Platforms
+
+      | Platform | Auth Method | Env Variable | How to Get Token |
+      |----------|------------|--------------|------------------|
+      | **Telegram** | Bot token in config | `TELEGRAM_BOT_TOKEN` | Message `@BotFather` on Telegram → `/newbot` → copy the token |
+      | **Discord** | Login command via DM | `DISCORD_BOT_TOKEN` | Discord Developer Portal → New Application → Bot → Reset Token → copy |
+      | **Slack** | Login command via DM | `SLACK_BOT_TOKEN` | Slack API → Create App → OAuth & Permissions → Bot User OAuth Token |
+      | **Google Chat** | Service account in config | `GOOGLECHAT_SERVICE_ACCOUNT` | Google Cloud Console → Service Account → download JSON key path |
+
+      ## Setup Steps (any platform)
+
+      1. **Get the bot token** from the platform (see table above)
+      2. **Store the token** — use `store_api_key()` from the global config module, or have the user add it to their `.env` file:
+         ```
+         TELEGRAM_BOT_TOKEN=123456:ABCdef...
+         ```
+      3. **Reload the TUI** — the bridge binary is auto-downloaded on first run (~30-50 MB), config is generated with the token baked in, and the bridge starts automatically
+      4. **Verify** — the Chat dashboard should show the bridge's rooms. Use `Chat_open` to open a room
+
+      No manual config editing, no docker, no Matrix knowledge needed.
+
+      ## Telegram-Specific Notes
+
+      - The bot must be added to groups/channels you want to bridge (or users must message it directly)
+      - Telegram bots cannot read group messages unless added as admin or "Group Privacy" is disabled in BotFather (`/setprivacy` → Disable)
+      - The bridge creates puppet users for each Telegram user (e.g., `@telegram_12345:localhost`)
+
+      ## Discord-Specific Notes
+
+      - After creating the bot in the Developer Portal, invite it to your server using an OAuth2 URL with `bot` + `messages.read` scopes
+      - The bridge uses a "login-token" Matrix DM command — this happens automatically if `DISCORD_BOT_TOKEN` is set
+      - Each Discord channel becomes a separate Matrix room
+
+      ## Slack-Specific Notes
+
+      - The Slack app needs these OAuth scopes: `channels:history`, `channels:read`, `chat:write`, `users:read`
+      - Install the app to your workspace after configuring scopes
+      - The bridge uses a "login-token" Matrix DM command — automatic if `SLACK_BOT_TOKEN` is set
+
+      ## Google Chat-Specific Notes
+
+      - Requires a Google Workspace account (not personal Gmail)
+      - The service account JSON file path goes in the env var
+      - The bot must be published in the Google Workspace Marketplace or added to spaces directly
+
+      ## Troubleshooting
+
+      - **Bridge not starting?** — Check `~/.context-pilot/matrix/bridges/<name>/bridge.log`
+      - **Server not starting?** — Check `~/.context-pilot/matrix/server.log`
+      - **No rooms appearing?** — The bot needs to be in conversations on the platform side first
+      - **Token rejected?** — Regenerate and update the env var, then reload
+      - **Zombie processes?** — Kill all (`pkill -9 -f tuwunel && pkill -9 -f mautrix`), delete PID files (`rm ~/.context-pilot/matrix/*.pid ~/.context-pilot/matrix/bridges/*/bridge.pid`), reload
+
+      ## File Locations
+
+      ```
+      ~/.context-pilot/
+      ├── bin/                    # Binaries (tuwunel, mautrix-*)
+      └── matrix/                 # All Matrix data
+          ├── homeserver.toml     # Tuwunel config
+          ├── tuwunel.sock        # Unix domain socket
+          ├── tuwunel.pid         # Server PID file
+          ├── server.log          # Server logs
+          ├── data/db/            # Matrix database (RocksDB)
+          └── bridges/
+              └── <name>/         # Per-bridge directory
+                  ├── config.yaml # Bridge config (auto-generated)
+                  ├── bridge.pid  # Bridge PID file
+                  ├── bridge.log  # Bridge logs
+                  └── <name>.db   # Bridge database (SQLite)
+      ```
+
 commands: []
