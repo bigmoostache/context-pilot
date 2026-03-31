@@ -71,6 +71,56 @@ pub(crate) fn ensure_binary(name: &str) -> Result<PathBuf, String> {
     Ok(bin)
 }
 
+// -- Registration generation -------------------------------------------------
+
+/// Generate `registration.yaml` for all bridges that have a config but
+/// no registration yet. Runs `mautrix-{name} -g` which populates both
+/// the registration file AND the `as_token`/`hs_token` in config.yaml.
+///
+/// # Errors
+///
+/// Returns a description if binary download or generation fails.
+pub(crate) fn generate_registrations() -> Result<(), String> {
+    for spec in BRIDGES {
+        let data_dir = bridge_data_dir(spec.name);
+        let cfg_path = data_dir.join("config.yaml");
+        let reg_path = data_dir.join("registration.yaml");
+
+        // Skip if no config exists yet, or registration already generated
+        if !cfg_path.exists() || reg_path.exists() {
+            continue;
+        }
+
+        let bin = ensure_binary(spec.name)?;
+
+        log::info!("Generating registration for mautrix-{}...", spec.name);
+        let output = Command::new(&bin)
+            .arg("--generate-registration")
+            .arg("--config")
+            .arg(&cfg_path)
+            .arg("--registration")
+            .arg(&reg_path)
+            .current_dir(&data_dir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| format!("Failed to run mautrix-{} -g: {e}", spec.name))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("mautrix-{} registration generation failed: {stderr}", spec.name));
+        }
+
+        if !reg_path.exists() {
+            return Err(format!("mautrix-{} -g completed but {} was not created", spec.name, reg_path.display()));
+        }
+
+        log::info!("Registration generated for mautrix-{} at {}", spec.name, reg_path.display());
+    }
+
+    Ok(())
+}
+
 // -- Process lifecycle -------------------------------------------------------
 
 /// PID file path: `~/.context-pilot/matrix/bridges/{name}/bridge.pid`
@@ -122,6 +172,16 @@ pub(crate) fn start(name: &str) -> Result<u32, String> {
     let cfg_path = data_dir.join("config.yaml");
     if !cfg_path.exists() {
         return Err(format!("Bridge config not found at {}. Run bootstrap first.", cfg_path.display()));
+    }
+
+    // Ensure registration exists — generate if missing
+    let reg_path = data_dir.join("registration.yaml");
+    if !reg_path.exists() {
+        log::info!("No registration.yaml for mautrix-{name}, generating...");
+        generate_registrations()?;
+        if !reg_path.exists() {
+            return Err(format!("Registration file missing for mautrix-{name}. Cannot start bridge."));
+        }
     }
 
     let log_path = data_dir.join("bridge.log");

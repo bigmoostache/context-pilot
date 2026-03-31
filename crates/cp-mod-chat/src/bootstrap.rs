@@ -43,6 +43,18 @@ pub(crate) fn bootstrap() -> Result<(), String> {
     // 3. Scaffold bridge config templates (idempotent — skips existing)
     crate::bridges::generate_bridge_configs()?;
 
+    // 4. Generate bridge registrations (runs -g for bridges without registration.yaml)
+    if let Err(e) = crate::bridges::lifecycle::generate_registrations() {
+        log::warn!("Bridge registration generation failed: {e}");
+    }
+
+    // 5. Register appservice files with Tuwunel (updates homeserver.toml)
+    match crate::bridges::update_appservice_registrations() {
+        Ok(true) => log::info!("Updated homeserver appservice registrations during bootstrap"),
+        Ok(false) => {}
+        Err(e) => log::warn!("Failed to update appservice registrations: {e}"),
+    }
+
     Ok(())
 }
 
