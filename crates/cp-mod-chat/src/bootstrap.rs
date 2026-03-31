@@ -98,12 +98,9 @@ pub(crate) fn project_post_start(state: &mut State) -> Result<(), String> {
         log::warn!("Failed to set display name: {e}");
     }
 
-    // 6. Register any detected bridge appservices with Tuwunel (admin room command)
-    match crate::bridges::register_appservices_with_tuwunel() {
-        Ok(true) => log::info!("Registered bridge appservices with Tuwunel"),
-        Ok(false) => {} // No registrations found
-        Err(e) => log::warn!("Failed to register appservices: {e}"),
-    }
+    // Note: appservice registration with Tuwunel happens in init_state()
+    // after client::connect() — requires a live Matrix client to send
+    // admin room commands.
 
     Ok(())
 }
