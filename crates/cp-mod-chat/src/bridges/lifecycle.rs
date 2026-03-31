@@ -86,9 +86,18 @@ pub(crate) fn generate_registrations() -> Result<(), String> {
         let cfg_path = data_dir.join("config.yaml");
         let reg_path = data_dir.join("registration.yaml");
 
-        // Skip if no config exists yet, or registration already generated
-        if !cfg_path.exists() || reg_path.exists() {
+        // Skip if registration already generated
+        if reg_path.exists() {
             continue;
+        }
+
+        // Seed a minimal config if none exists — mautrix -g needs *something*
+        // to read. Our real config (with tokens, DB, etc.) overwrites this
+        // after -g finishes via generate_bridge_configs().
+        if !cfg_path.exists() {
+            std::fs::create_dir_all(&data_dir).map_err(|e| format!("Cannot create {}: {e}", data_dir.display()))?;
+            std::fs::write(&cfg_path, "{}\n")
+                .map_err(|e| format!("Cannot seed config for mautrix-{}: {e}", spec.name))?;
         }
 
         let bin = ensure_binary(spec.name)?;
