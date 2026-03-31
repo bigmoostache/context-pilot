@@ -93,6 +93,11 @@ pub(crate) fn generate_registrations() -> Result<(), String> {
 
         let bin = ensure_binary(spec.name)?;
 
+        // Save our hand-crafted config — mautrix -g will overwrite it
+        // with a default template. We restore it afterwards.
+        let saved_cfg =
+            std::fs::read_to_string(&cfg_path).map_err(|e| format!("Cannot read {}: {e}", cfg_path.display()))?;
+
         log::info!("Generating registration for mautrix-{}...", spec.name);
         let output = Command::new(&bin)
             .arg("--generate-registration")
@@ -114,6 +119,10 @@ pub(crate) fn generate_registrations() -> Result<(), String> {
         if !reg_path.exists() {
             return Err(format!("mautrix-{} -g completed but {} was not created", spec.name, reg_path.display()));
         }
+
+        // Restore our config — -g clobbered it with mautrix defaults
+        std::fs::write(&cfg_path, &saved_cfg)
+            .map_err(|e| format!("Cannot restore config for mautrix-{}: {e}", spec.name))?;
 
         log::info!("Registration generated for mautrix-{} at {}", spec.name, reg_path.display());
     }
