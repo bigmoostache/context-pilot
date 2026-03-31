@@ -252,45 +252,6 @@ pub(crate) fn send_image(room_id: &str, path: &str) -> Result<String, String> {
     }))
 }
 
-/// Send an admin command to the Tuwunel admin room.
-///
-/// Finds the admin room (`#admins:localhost`) and sends the message as
-/// plain text. Used for appservice registration and server administration.
-///
-/// # Errors
-///
-/// Returns a description if the admin room cannot be found or the send fails.
-pub(crate) fn send_admin_command(message: &str) -> Result<(), String> {
-    let client = get_client().ok_or("Not connected to Matrix server")?;
-    let message = message.to_owned();
-
-    ASYNC_RT.block_on(Box::pin(async {
-        // Find the admin room — Tuwunel creates it as a DM with the server user
-        let admin_room = client.joined_rooms().into_iter().find(|r| {
-            // The admin room typically has the server user as a member
-            r.room_id().as_str().contains("admin") || r.name().is_some_and(|n| n.to_lowercase().contains("admin"))
-        });
-
-        let room = if let Some(r) = admin_room {
-            r
-        } else {
-            // Fallback: try resolving the alias directly
-            let alias: matrix_sdk::ruma::OwnedRoomAliasId =
-                "#admins:localhost".try_into().map_err(|e| format!("Invalid admin alias: {e}"))?;
-            let response = client
-                .resolve_room_alias(&alias)
-                .await
-                .map_err(|e| format!("Cannot resolve #admins:localhost: {e}"))?;
-            client.get_room(&response.room_id).ok_or_else(|| "Admin room resolved but not joined".to_string())?
-        };
-
-        let content = matrix_sdk::ruma::events::room::message::RoomMessageEventContent::text_plain(&message);
-        let _response = room.send(content).await.map_err(|e| format!("Admin command failed: {e}"))?;
-
-        Ok(())
-    }))
-}
-
 /// Send or clear a typing indicator in a room.
 ///
 /// `typing` = `true` starts a 30-second typing indicator;

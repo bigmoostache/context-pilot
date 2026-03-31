@@ -102,14 +102,6 @@ impl Module for ChatModule {
 
         client::start_sync();
 
-        // Register bridge appservices with Tuwunel via admin room command.
-        // Must happen after client::connect() since it sends Matrix messages.
-        match bridges::register_appservices_with_tuwunel() {
-            Ok(true) => log::info!("Registered bridge appservices with Tuwunel"),
-            Ok(false) => {} // No registrations to send
-            Err(e) => log::warn!("Appservice registration failed: {e}"),
-        }
-
         // Recover any running bridge processes from a previous session
         recover_bridges(state);
     }

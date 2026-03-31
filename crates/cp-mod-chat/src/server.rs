@@ -255,17 +255,21 @@ pub(crate) fn start_server(state: &mut State) -> Result<(), String> {
         format!("Cannot duplicate log file handle: {e}")
     })?;
 
-    let child = Command::new(&bin)
-        .arg("--config")
-        .arg(&cfg)
-        .stdin(Stdio::null())
-        .stdout(log_file)
-        .stderr(log_err)
-        .spawn()
-        .map_err(|e| {
-            ChatState::get_mut(state).server_status = ServerStatus::Error(e.to_string());
-            format!("Failed to spawn Tuwunel: {e}")
-        })?;
+    // Build the command with --execute for appservice registrations
+    let mut cmd = Command::new(&bin);
+    {
+        let _r = cmd.arg("--config").arg(&cfg);
+    }
+
+    // Here be dragons: Tuwunel only accepts --execute at startup
+    for reg_yaml in crate::bridges::build_appservice_execute_args() {
+        let _r = cmd.arg("--execute").arg(reg_yaml);
+    }
+
+    let child = cmd.stdin(Stdio::null()).stdout(log_file).stderr(log_err).spawn().map_err(|e| {
+        ChatState::get_mut(state).server_status = ServerStatus::Error(e.to_string());
+        format!("Failed to spawn Tuwunel: {e}")
+    })?;
 
     let pid = child.id();
     ChatState::get_mut(state).server_pid = Some(pid);

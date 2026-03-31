@@ -208,6 +208,26 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
     cfg
 }
 
+/// Build `--execute` argument strings for registering all bridges with Tuwunel.
+///
+/// Each returned string is a Tuwunel admin command that registers one
+/// appservice. Pass these as `--execute <arg>` to the Tuwunel binary
+/// at startup. Bridges without a `registration.yaml` are skipped.
+///
+/// Format: `"appservices register\n<yaml_content>"`
+#[must_use]
+pub(crate) fn build_appservice_execute_args() -> Vec<String> {
+    find_registration_files()
+        .iter()
+        .filter_map(|reg_path| {
+            let yaml = std::fs::read_to_string(reg_path).ok()?;
+            // Tuwunel --execute takes a single admin command string.
+            // For appservice registration, it's: appservices register\n<yaml>
+            Some(format!("appservices register\n{yaml}"))
+        })
+        .collect()
+}
+
 // -- Registration file management --------------------------------------------
 
 /// Scan for `registration.yaml` files across all global bridge directories.
@@ -221,64 +241,6 @@ pub(crate) fn find_registration_files() -> Vec<PathBuf> {
         }
     }
     found
-}
-
-/// Register all bridge appservices with Tuwunel via the admin room.
-///
-/// Tuwunel (Conduit/Conduwuit family) does **not** support the Synapse-style
-/// `app_service_config_files` in `homeserver.toml`. Instead, appservices
-/// are registered by sending `!admin appservices register` followed by
-/// the registration YAML in a code block to the admin room.
-///
-/// This function reads each `registration.yaml`, sends the admin command
-/// via the connected Matrix client, and logs the result. Must be called
-/// **after** the Matrix client is connected (i.e., in `project_post_start`,
-/// not during `bootstrap`).
-///
-/// # Errors
-///
-/// Returns a description if no client is connected or a send fails.
-pub(crate) fn register_appservices_with_tuwunel() -> Result<bool, String> {
-    let registrations = find_registration_files();
-    if registrations.is_empty() {
-        return Ok(false);
-    }
-
-    let mut registered_any = false;
-
-    for reg_path in &registrations {
-        let yaml_content =
-            std::fs::read_to_string(reg_path).map_err(|e| format!("Cannot read {}: {e}", reg_path.display()))?;
-
-        // Extract the appservice ID from the YAML to check if already registered
-        let appservice_id = yaml_content
-            .lines()
-            .find(|l| l.starts_with("id:"))
-            .and_then(|l| l.strip_prefix("id:"))
-            .map(|s| s.trim().trim_matches('"').to_string())
-            .unwrap_or_default();
-
-        if appservice_id.is_empty() {
-            log::warn!("Skipping registration — no 'id:' found in {}", reg_path.display());
-            continue;
-        }
-
-        // Send the admin command to register the appservice
-        let admin_msg = format!("!admin appservices register\n```yaml\n{yaml_content}```");
-
-        match crate::client::send::send_admin_command(&admin_msg) {
-            Ok(()) => {
-                log::info!("Registered appservice '{appservice_id}' with Tuwunel");
-                registered_any = true;
-            }
-            Err(e) => {
-                // Not fatal — might already be registered, or admin room not found
-                log::warn!("Failed to register appservice '{appservice_id}': {e}");
-            }
-        }
-    }
-
-    Ok(registered_any)
 }
 
 // -- Helpers -----------------------------------------------------------------
