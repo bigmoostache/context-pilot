@@ -223,78 +223,62 @@ pub(crate) fn find_registration_files() -> Vec<PathBuf> {
     found
 }
 
-/// Update the homeserver config to include all detected registration files.
+/// Register all bridge appservices with Tuwunel via the admin room.
 ///
-/// Reads the global `homeserver.toml`, appends any registration paths
-/// not already listed to `app_service_config_files`, and writes back.
+/// Tuwunel (Conduit/Conduwuit family) does **not** support the Synapse-style
+/// `app_service_config_files` in `homeserver.toml`. Instead, appservices
+/// are registered by sending `!admin appservices register` followed by
+/// the registration YAML in a code block to the admin room.
+///
+/// This function reads each `registration.yaml`, sends the admin command
+/// via the connected Matrix client, and logs the result. Must be called
+/// **after** the Matrix client is connected (i.e., in `project_post_start`,
+/// not during `bootstrap`).
 ///
 /// # Errors
 ///
-/// Returns a description if the config cannot be read or written.
-pub(crate) fn update_appservice_registrations() -> Result<bool, String> {
+/// Returns a description if no client is connected or a send fails.
+pub(crate) fn register_appservices_with_tuwunel() -> Result<bool, String> {
     let registrations = find_registration_files();
     if registrations.is_empty() {
         return Ok(false);
     }
 
-    let cfg_path = server::global_config_path().ok_or("Cannot determine global config path")?;
-    let content = std::fs::read_to_string(&cfg_path).map_err(|e| format!("Cannot read {}: {e}", cfg_path.display()))?;
+    let mut registered_any = false;
 
-    let cfg_dir = cfg_path.parent().unwrap_or_else(|| std::path::Path::new("."));
-    let reg_strs: Vec<String> = registrations
-        .iter()
-        .filter_map(|p| p.strip_prefix(cfg_dir).ok())
-        .map(|p| p.to_string_lossy().to_string())
-        .collect();
+    for reg_path in &registrations {
+        let yaml_content =
+            std::fs::read_to_string(reg_path).map_err(|e| format!("Cannot read {}: {e}", reg_path.display()))?;
 
-    let has_new = reg_strs.iter().any(|r| !content.contains(r.as_str()));
-    if !has_new {
-        return Ok(false);
-    }
+        // Extract the appservice ID from the YAML to check if already registered
+        let appservice_id = yaml_content
+            .lines()
+            .find(|l| l.starts_with("id:"))
+            .and_then(|l| l.strip_prefix("id:"))
+            .map(|s| s.trim().trim_matches('"').to_string())
+            .unwrap_or_default();
 
-    let mut list = String::from("app_service_config_files = [");
-    for (i, reg) in reg_strs.iter().enumerate() {
-        if i > 0 {
-            list.push_str(", ");
+        if appservice_id.is_empty() {
+            log::warn!("Skipping registration — no 'id:' found in {}", reg_path.display());
+            continue;
         }
-        {
-            let _r = write!(list, "\"{reg}\"");
-        }
-    }
-    list.push(']');
 
-    let updated = if content.contains("app_service_config_files") {
-        let mut result = String::with_capacity(content.len());
-        for line in content.lines() {
-            if line.trim_start().starts_with("app_service_config_files") {
-                result.push_str(&list);
-            } else {
-                result.push_str(line);
+        // Send the admin command to register the appservice
+        let admin_msg = format!("!admin appservices register\n```yaml\n{yaml_content}```");
+
+        match crate::client::send::send_admin_command(&admin_msg) {
+            Ok(()) => {
+                log::info!("Registered appservice '{appservice_id}' with Tuwunel");
+                registered_any = true;
             }
-            result.push('\n');
-        }
-        result
-    } else {
-        let mut result = String::with_capacity(content.len().saturating_add(list.len()).saturating_add(2));
-        let mut inserted = false;
-        for line in content.lines() {
-            result.push_str(line);
-            result.push('\n');
-            if !inserted && line.trim() == "[global]" {
-                result.push_str(&list);
-                result.push('\n');
-                inserted = true;
+            Err(e) => {
+                // Not fatal — might already be registered, or admin room not found
+                log::warn!("Failed to register appservice '{appservice_id}': {e}");
             }
         }
-        if !inserted {
-            result.push_str(&list);
-            result.push('\n');
-        }
-        result
-    };
+    }
 
-    std::fs::write(&cfg_path, updated).map_err(|e| format!("Cannot write {}: {e}", cfg_path.display()))?;
-    Ok(true)
+    Ok(registered_any)
 }
 
 // -- Helpers -----------------------------------------------------------------

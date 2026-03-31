@@ -48,12 +48,9 @@ pub(crate) fn bootstrap() -> Result<(), String> {
         log::warn!("Bridge registration generation failed: {e}");
     }
 
-    // 5. Register appservice files with Tuwunel (updates homeserver.toml)
-    match crate::bridges::update_appservice_registrations() {
-        Ok(true) => log::info!("Updated homeserver appservice registrations during bootstrap"),
-        Ok(false) => {}
-        Err(e) => log::warn!("Failed to update appservice registrations: {e}"),
-    }
+    // Note: appservice registration with Tuwunel happens in project_post_start()
+    // after the Matrix client is connected — Tuwunel uses admin room commands,
+    // not config-file-based registration.
 
     Ok(())
 }
@@ -101,11 +98,11 @@ pub(crate) fn project_post_start(state: &mut State) -> Result<(), String> {
         log::warn!("Failed to set display name: {e}");
     }
 
-    // 6. Register any detected bridge appservice files (global, idempotent)
-    match crate::bridges::update_appservice_registrations() {
-        Ok(true) => log::info!("Updated homeserver appservice registrations"),
-        Ok(false) => {} // No new registrations found
-        Err(e) => log::warn!("Failed to update appservice registrations: {e}"),
+    // 6. Register any detected bridge appservices with Tuwunel (admin room command)
+    match crate::bridges::register_appservices_with_tuwunel() {
+        Ok(true) => log::info!("Registered bridge appservices with Tuwunel"),
+        Ok(false) => {} // No registrations found
+        Err(e) => log::warn!("Failed to register appservices: {e}"),
     }
 
     Ok(())
