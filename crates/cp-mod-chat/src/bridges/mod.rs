@@ -125,6 +125,12 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
 
     let mut cfg = String::with_capacity(1024);
 
+    // Pre-read tokens from registration.yaml if it exists
+    let reg_path = bridge_data_dir(spec.name).join("registration.yaml");
+    let (as_token, hs_token) = std::fs::read_to_string(&reg_path).map_or((None, None), |reg| {
+        (lifecycle::extract_yaml_value(&reg, "as_token"), lifecycle::extract_yaml_value(&reg, "hs_token"))
+    });
+
     {
         let _r = writeln!(cfg, "# mautrix-{} configuration", spec.name);
     }
@@ -162,15 +168,6 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
         let _r = writeln!(cfg, "  port: {}", spec.appservice_port);
     }
     {
-        let _r = writeln!(cfg, "  database:");
-    }
-    {
-        let _r = writeln!(cfg, "    type: sqlite3-fk-wal");
-    }
-    {
-        let _r = writeln!(cfg, "    uri: {db_uri}");
-    }
-    {
         let _r = writeln!(cfg, "  bot:");
     }
     {
@@ -178,6 +175,25 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
     }
     {
         let _r = writeln!(cfg, "    displayname: {} bridge bot", capitalize(spec.name));
+    }
+    // Inject as_token/hs_token inside appservice section
+    if let Some(tok) = &as_token {
+        let _r = writeln!(cfg, "  as_token: {tok}");
+    }
+    if let Some(tok) = &hs_token {
+        let _r = writeln!(cfg, "  hs_token: {tok}");
+    }
+    {
+        let _r = writeln!(cfg);
+    }
+    {
+        let _r = writeln!(cfg, "database:");
+    }
+    {
+        let _r = writeln!(cfg, "  type: sqlite3-fk-wal");
+    }
+    {
+        let _r = writeln!(cfg, "  uri: \"{db_uri}\"");
     }
     {
         let _r = writeln!(cfg);
@@ -201,29 +217,6 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
 
     // Platform-specific bot configuration
     write_platform_config(spec, &mut cfg);
-
-    // Inject appservice tokens from registration.yaml if available.
-    // The bridge reads as_token/hs_token from config.yaml, not registration.yaml.
-    let reg_path = bridge_data_dir(spec.name).join("registration.yaml");
-    if let Ok(reg) = std::fs::read_to_string(&reg_path) {
-        let as_tok = lifecycle::extract_yaml_value(&reg, "as_token");
-        let hs_tok = lifecycle::extract_yaml_value(&reg, "hs_token");
-        if as_tok.is_some() || hs_tok.is_some() {
-            {
-                let _r = writeln!(cfg);
-            }
-            {
-                // Overrides the appservice section above with generated tokens
-                let _r = writeln!(cfg, "# Tokens auto-injected from registration.yaml");
-            }
-            if let Some(tok) = &as_tok {
-                let _r = writeln!(cfg, "  as_token: {tok}");
-            }
-            if let Some(tok) = &hs_tok {
-                let _r = writeln!(cfg, "  hs_token: {tok}");
-            }
-        }
-    }
 
     cfg
 }
