@@ -29,9 +29,6 @@ const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(15);
 /// Interval between health check retries during startup.
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_millis(500);
 
-/// Grace period before force-killing after SIGTERM.
-const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
-
 // -- Global paths ------------------------------------------------------------
 
 /// Root of all global Matrix data: `~/.context-pilot/matrix/`.
@@ -289,36 +286,6 @@ pub(crate) fn start_server(state: &mut State) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-/// Stop the global Tuwunel homeserver.
-///
-/// Sends SIGTERM, waits up to 5 seconds, then force-kills.
-/// Cleans up the PID file. **Use sparingly** — other cpilots may
-/// be connected.
-pub(crate) fn stop_server(state: &mut State) {
-    let pid = ChatState::get(state).server_pid.or_else(read_pid);
-
-    if let Some(pid) = pid {
-        let _term = Command::new("kill").arg(pid.to_string()).status();
-
-        let deadline = Instant::now().checked_add(SHUTDOWN_GRACE);
-        loop {
-            if !is_pid_alive(pid) {
-                break;
-            }
-            if deadline.is_some_and(|d| Instant::now() >= d) {
-                let _kill = Command::new("kill").arg("-9").arg(pid.to_string()).status();
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
-    }
-
-    remove_pid();
-    let cs = ChatState::get_mut(state);
-    cs.server_pid = None;
-    cs.server_status = ServerStatus::Stopped;
 }
 
 /// Check if the homeserver is healthy via the versions endpoint over UDS.

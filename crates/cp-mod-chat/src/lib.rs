@@ -107,10 +107,13 @@ impl Module for ChatModule {
     }
 
     fn reset_state(&self, state: &mut State) {
-        // Tear down in reverse order: bridges → client → server → state
+        // Only disconnect the Matrix SDK client and clear local state.
+        // The server and bridges are global, shared resources — they
+        // survive reloads and are reused by init_state() on restart.
+        // Explicit stop_server() is reserved for full module deactivation
+        // via module_toggle, which calls reset_state() + drop.
         shutdown_bridges(state);
         client::disconnect();
-        server::stop_server(state);
         state.set_ext(ChatState::default());
     }
 
