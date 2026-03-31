@@ -101,9 +101,6 @@ pub(crate) fn generate_bridge_configs() -> Result<(), String> {
         std::fs::create_dir_all(&dir).map_err(|e| format!("Cannot create {}: {e}", dir.display()))?;
 
         let cfg_path = dir.join("config.yaml");
-        if cfg_path.exists() {
-            continue;
-        }
 
         let content = render_bridge_config(spec);
         std::fs::write(&cfg_path, content).map_err(|e| format!("Cannot write {}: {e}", cfg_path.display()))?;
@@ -204,6 +201,29 @@ fn render_bridge_config(spec: &BridgeSpec) -> String {
 
     // Platform-specific bot configuration
     write_platform_config(spec, &mut cfg);
+
+    // Inject appservice tokens from registration.yaml if available.
+    // The bridge reads as_token/hs_token from config.yaml, not registration.yaml.
+    let reg_path = bridge_data_dir(spec.name).join("registration.yaml");
+    if let Ok(reg) = std::fs::read_to_string(&reg_path) {
+        let as_tok = lifecycle::extract_yaml_value(&reg, "as_token");
+        let hs_tok = lifecycle::extract_yaml_value(&reg, "hs_token");
+        if as_tok.is_some() || hs_tok.is_some() {
+            {
+                let _r = writeln!(cfg);
+            }
+            {
+                // Overrides the appservice section above with generated tokens
+                let _r = writeln!(cfg, "# Tokens auto-injected from registration.yaml");
+            }
+            if let Some(tok) = &as_tok {
+                let _r = writeln!(cfg, "  as_token: {tok}");
+            }
+            if let Some(tok) = &hs_tok {
+                let _r = writeln!(cfg, "  hs_token: {tok}");
+            }
+        }
+    }
 
     cfg
 }

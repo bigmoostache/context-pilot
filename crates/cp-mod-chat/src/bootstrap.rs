@@ -40,13 +40,16 @@ pub(crate) fn bootstrap() -> Result<(), String> {
         write_config(&cfg, &matrix_dir)?;
     }
 
-    // 3. Scaffold bridge config templates (idempotent — skips existing)
-    crate::bridges::generate_bridge_configs()?;
-
-    // 4. Generate bridge registrations (runs -g for bridges without registration.yaml)
+    // 3. Generate bridge registrations (runs mautrix -g for bridges that
+    //    lack a registration.yaml; note: -g clobbers config.yaml with defaults)
     if let Err(e) = crate::bridges::lifecycle::generate_registrations() {
         log::warn!("Bridge registration generation failed: {e}");
     }
+
+    // 4. Write our config templates ON TOP of the mautrix defaults.
+    //    This restores homeserver address, database URI, bot token, etc.
+    //    Always writes — not idempotent-skip — because -g may have clobbered.
+    crate::bridges::generate_bridge_configs()?;
 
     // Note: appservice registration with Tuwunel happens in project_post_start()
     // after the Matrix client is connected — Tuwunel uses admin room commands,

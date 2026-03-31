@@ -4,7 +4,6 @@
 //! them as child processes, PID file tracking, and health checks.
 //! Follows the same pattern as Tuwunel's own server lifecycle.
 
-use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -94,11 +93,6 @@ pub(crate) fn generate_registrations() -> Result<(), String> {
 
         let bin = ensure_binary(spec.name)?;
 
-        // Save our hand-crafted config — mautrix -g will overwrite it
-        // with a default template. We restore it afterwards.
-        let saved_cfg =
-            std::fs::read_to_string(&cfg_path).map_err(|e| format!("Cannot read {}: {e}", cfg_path.display()))?;
-
         log::info!("Generating registration for mautrix-{}...", spec.name);
         let output = Command::new(&bin)
             .arg("--generate-registration")
@@ -121,30 +115,9 @@ pub(crate) fn generate_registrations() -> Result<(), String> {
             return Err(format!("mautrix-{} -g completed but {} was not created", spec.name, reg_path.display()));
         }
 
-        // Extract as_token / hs_token from the freshly-generated registration
-        // and graft them into our saved config. The bridge reads these from
-        // config.yaml (appservice section), not from registration.yaml.
-        let reg_content =
-            std::fs::read_to_string(&reg_path).map_err(|e| format!("Cannot read {}: {e}", reg_path.display()))?;
-        let as_token = extract_yaml_value(&reg_content, "as_token");
-        let hs_token = extract_yaml_value(&reg_content, "hs_token");
-        let sender = extract_yaml_value(&reg_content, "sender_localpart");
-
-        let mut restored_cfg = saved_cfg;
-        // Append the generated tokens to our config's appservice section
-        restored_cfg.push_str("\n# Auto-injected from registration.yaml by generate_registrations()\n");
-        if let Some(tok) = &as_token {
-            let _r = writeln!(restored_cfg, "appservice:\n  as_token: {tok}");
-        }
-        if let Some(tok) = &hs_token {
-            let _r = writeln!(restored_cfg, "  hs_token: {tok}");
-        }
-        if let Some(s) = &sender {
-            let _r = writeln!(restored_cfg, "  sender_localpart: {s}");
-        }
-
-        std::fs::write(&cfg_path, &restored_cfg)
-            .map_err(|e| format!("Cannot restore config for mautrix-{}: {e}", spec.name))?;
+        // Note: -g clobbers config.yaml with mautrix defaults. That's fine —
+        // generate_bridge_configs() runs AFTER this and overwrites with our
+        // config (including as_token/hs_token read from registration.yaml).
 
         log::info!("Registration generated for mautrix-{} at {}", spec.name, reg_path.display());
     }
@@ -279,7 +252,7 @@ fn health_check(port: u16) -> Result<(), String> {
 ///
 /// Looks for `key: value` lines and returns the trimmed value with any
 /// surrounding quotes stripped. Only handles flat YAML — no nesting.
-fn extract_yaml_value(yaml: &str, key: &str) -> Option<String> {
+pub(crate) fn extract_yaml_value(yaml: &str, key: &str) -> Option<String> {
     let prefix = format!("{key}:");
     yaml.lines()
         .find(|l| l.trim_start().starts_with(&prefix))
