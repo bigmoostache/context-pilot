@@ -14,6 +14,7 @@ use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_
 use cp_base::state::actions::Action;
 use cp_base::state::context::{Entry, Kind, estimate_tokens};
 use cp_base::state::runtime::State;
+use cp_base::ui::{self, Cell, TextCell};
 
 use crate::types::{ChatState, RoomInfo, ServerStatus};
 
@@ -50,17 +51,12 @@ impl ChatDashboardPanel {
         }
     }
 
-    /// Append the room list YAML block, sorted by last activity.
+    /// Append the room list table, sorted by last activity.
     fn write_room_list(out: &mut String, cs: &ChatState) {
         if cs.rooms.is_empty() {
             return;
         }
-        let mut sorted: Vec<&RoomInfo> = cs.rooms.iter().collect();
-        sorted.sort_by(|a, b| {
-            let ts_a = a.last_message.as_ref().map_or(0, |m| m.timestamp);
-            let ts_b = b.last_message.as_ref().map_or(0, |m| m.timestamp);
-            ts_b.cmp(&ts_a)
-        });
+        let sorted = Self::sorted_rooms(cs);
 
         // Summary line
         let total_unread: u64 = cs.rooms.iter().map(|r| r.unread_count).sum();
@@ -69,38 +65,36 @@ impl ChatDashboardPanel {
             let _r = writeln!(out, "rooms: {} total, {} bridged, {} unread", cs.rooms.len(), bridged, total_unread,);
         }
 
-        // Table header
-        out.push_str("  | ID | Room | Platform | Members | Unread | Last Message | Time |\n");
-        out.push_str("  |----|------|----------|---------|--------|--------------|------|\n");
-        for room in &sorted {
-            let ref_str = cs.room_id_to_ref.get(&room.room_id).map_or("-", String::as_str);
-            Self::write_room_row(out, room, ref_str);
-        }
+        // Build table rows
+        let rows: Vec<Vec<TextCell>> = sorted.iter().map(|room| Self::room_text_row(room, cs)).collect();
+        out.push_str(&ui::render_table_text(
+            &["ID", "Room", "Platform", "Members", "Unread", "Last Message", "Time"],
+            &rows,
+        ));
     }
 
-    /// Append a single room row to the table.
-    fn write_room_row(out: &mut String, room: &RoomInfo, ref_str: &str) {
+    /// Build a single text row for the LLM context table.
+    fn room_text_row(room: &RoomInfo, cs: &ChatState) -> Vec<TextCell> {
+        let ref_str = cs.room_id_to_ref.get(&room.room_id).map_or("-", String::as_str);
         let platform = room.bridge_source.map_or("Matrix", |b| b.label());
         let unread = if room.unread_count > 0 { room.unread_count.to_string() } else { "-".to_string() };
         let (last_msg, last_time) = room.last_message.as_ref().map_or_else(
             || ("-".to_string(), "-".to_string()),
             |msg| {
-                let preview = format!("{}: {}", msg.sender_display_name, truncate_body(&msg.body, 50));
+                let preview = format!("{}: {}", msg.sender_display_name, &msg.body);
                 let time = format_timestamp_short(msg.timestamp);
                 (preview, time)
             },
         );
-        let _r = writeln!(
-            out,
-            "  | {} | {} | {} | {} | {} | {} | {} |",
-            ref_str,
-            truncate_body(&room.display_name, 20),
-            platform,
-            room.member_count,
-            unread,
-            last_msg,
-            last_time,
-        );
+        vec![
+            TextCell::left(ref_str),
+            TextCell::left(truncate_body(&room.display_name, 20)),
+            TextCell::left(platform),
+            TextCell::right(room.member_count.to_string()),
+            TextCell::right(unread),
+            TextCell::left(last_msg),
+            TextCell::left(last_time),
+        ]
     }
 
     /// Append the search results YAML block (if a search is active).
@@ -127,85 +121,84 @@ impl ChatDashboardPanel {
         }
     }
 
-    /// Build the TUI render lines for the room list as a table.
-    fn render_room_lines(cs: &ChatState) -> Vec<Line<'static>> {
-        let mut lines = Vec::new();
-
-        if cs.rooms.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "  No rooms yet — use Chat_create_room or bridge a platform",
-                Style::default().fg(Color::DarkGray),
-            )));
-            return lines;
-        }
-
-        // Sort by last activity (newest first)
+    /// Sort rooms by last activity (newest first).
+    fn sorted_rooms(cs: &ChatState) -> Vec<&RoomInfo> {
         let mut sorted: Vec<&RoomInfo> = cs.rooms.iter().collect();
         sorted.sort_by(|a, b| {
             let ts_a = a.last_message.as_ref().map_or(0, |m| m.timestamp);
             let ts_b = b.last_message.as_ref().map_or(0, |m| m.timestamp);
             ts_b.cmp(&ts_a)
         });
+        sorted
+    }
+
+    /// Build the TUI render lines for the room list as a table.
+    fn render_room_lines(cs: &ChatState) -> Vec<Line<'static>> {
+        if cs.rooms.is_empty() {
+            return vec![Line::from(Span::styled(
+                "  No rooms yet — use Chat_create_room or bridge a platform",
+                Style::default().fg(Color::DarkGray),
+            ))];
+        }
+
+        let sorted = Self::sorted_rooms(cs);
 
         // Summary header
         let total_unread: u64 = cs.rooms.iter().map(|r| r.unread_count).sum();
         let bridged = cs.rooms.iter().filter(|r| r.bridge_source.is_some()).count();
-        lines.push(Line::from(vec![
-            Span::styled("  Rooms ", Style::default().fg(Color::White)),
-            Span::styled(
-                format!("{} total, {} bridged, {} unread", cs.rooms.len(), bridged, total_unread),
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]));
-        lines.push(Line::from(""));
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled("  Rooms ", Style::default().fg(Color::White)),
+                Span::styled(
+                    format!("{} total, {} bridged, {} unread", cs.rooms.len(), bridged, total_unread),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]),
+            Line::from(""),
+        ];
 
-        // Table header
-        lines.push(Line::from(vec![
-            Span::styled("  ID  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Room                 ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Platform  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Unread  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Last Message", Style::default().fg(Color::DarkGray)),
-        ]));
+        // Table via shared render_table helper
+        let accent = cp_base::config::accessors::theme::accent();
+        let header = [
+            Cell::new("ID", Style::default().fg(accent)),
+            Cell::new("Room", Style::default().fg(accent)),
+            Cell::new("Platform", Style::default().fg(accent)),
+            Cell::right("Unread", Style::default().fg(accent)),
+            Cell::new("Last Message", Style::default().fg(accent)),
+            Cell::new("Time", Style::default().fg(accent)),
+        ];
 
-        for room in &sorted {
-            let ref_str = cs.room_id_to_ref.get(&room.room_id).map_or("-", String::as_str);
-            let platform = room.bridge_source.map_or("Matrix", |b| b.label());
-
-            // ID column color: cyan for easy identification
-            let id_span = Span::styled(format!("  {ref_str:<4}"), Style::default().fg(Color::Cyan));
-
-            // Room name: yellow if unread, gray otherwise
-            let name_display = truncate_body(&room.display_name, 20);
-            let name_span = if room.unread_count > 0 {
-                Span::styled(format!("{name_display:<21}"), Style::default().fg(Color::Yellow))
-            } else {
-                Span::styled(format!("{name_display:<21}"), Style::default().fg(Color::White))
-            };
-
-            // Platform badge
-            let platform_span = Span::styled(format!("{platform:<10}"), Style::default().fg(Color::DarkGray));
-
-            // Unread count
-            let unread_span = if room.unread_count > 0 {
-                Span::styled(format!("{:<8}", room.unread_count), Style::default().fg(Color::Yellow))
-            } else {
-                Span::styled(format!("{:<8}", "-"), Style::default().fg(Color::DarkGray))
-            };
-
-            // Last message preview
-            let msg_span = room.last_message.as_ref().map_or_else(
-                || Span::styled("-", Style::default().fg(Color::DarkGray)),
-                |msg| {
-                    let preview = format!("{}: {}", msg.sender_display_name, truncate_body(&msg.body, 40));
-                    Span::styled(preview, Style::default().fg(Color::DarkGray))
-                },
-            );
-
-            lines.push(Line::from(vec![id_span, name_span, platform_span, unread_span, msg_span]));
-        }
+        let rows: Vec<Vec<Cell>> = sorted.iter().map(|room| Self::room_tui_row(room, cs)).collect();
+        lines.extend(ui::render_table(
+            &header, &rows, None, 2, // indent
+        ));
 
         lines
+    }
+
+    /// Build a single TUI cell row for the room table.
+    fn room_tui_row(room: &RoomInfo, cs: &ChatState) -> Vec<Cell> {
+        let ref_str = cs.room_id_to_ref.get(&room.room_id).map_or_else(|| "-".to_string(), Clone::clone);
+        let platform = room.bridge_source.map_or("Matrix", |b| b.label());
+        let name_color = if room.unread_count > 0 { Color::Yellow } else { Color::White };
+        let unread = if room.unread_count > 0 { room.unread_count.to_string() } else { "-".to_string() };
+        let unread_color = if room.unread_count > 0 { Color::Yellow } else { Color::DarkGray };
+        let (last_msg, last_time) = room.last_message.as_ref().map_or_else(
+            || ("-".to_string(), "-".to_string()),
+            |msg| {
+                let preview = format!("{}: {}", msg.sender_display_name, &msg.body);
+                let time = format_timestamp_short(msg.timestamp);
+                (preview, time)
+            },
+        );
+        vec![
+            Cell::new(ref_str, Style::default().fg(Color::Cyan)),
+            Cell::new(&room.display_name, Style::default().fg(name_color)),
+            Cell::new(platform, Style::default().fg(Color::DarkGray)),
+            Cell::right(unread, Style::default().fg(unread_color)),
+            Cell::new(last_msg, Style::default().fg(Color::DarkGray)),
+            Cell::new(last_time, Style::default().fg(Color::DarkGray)),
+        ]
     }
 
     /// Build search result render lines.
