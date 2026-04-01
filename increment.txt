@@ -1263,3 +1263,4 @@
 11:24:52.158999620 fmt crates/cp-mod-chat/src/tools/mod.rs
 11:25:07.281738346 fmt crates/cp-mod-chat/src/client/sync.rs
 11:25:20.356109969 fmt crates/cp-mod-chat/src/client/sync.rs
+11:35:35.955837405 fmt crates/cp-mod-spine/src/types.rs

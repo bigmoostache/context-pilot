@@ -196,15 +196,17 @@ impl SpineState {
         // LLM sees them immediately, regardless of auto-continuation timing.
         // Guard: never inject between a tool_use and its tool_result — that
         // breaks the Anthropic API contract and causes 400 errors.
-        let should_inject = !matches!(kind, NotificationType::UserMessage | NotificationType::ReloadResume);
+        // Only inject mid-stream: when idle, auto-continuation delivers the
+        // content itself — injecting here too would create a doublon.
+        let should_inject = !matches!(kind, NotificationType::UserMessage | NotificationType::ReloadResume)
+            && state.flags.stream.phase.is_streaming();
         if should_inject {
             let safe_to_inject = state.messages.last().is_none_or(|last| {
                 // Unsafe if the last message is an assistant with pending tool calls
-                // (tool_result hasn't been appended yet), OR if the stream is active
-                // (assistant message is being built — tool calls may be in flight).
+                // (tool_result hasn't been appended yet).
                 last.role != "assistant" || last.tool_uses.is_empty()
             });
-            if safe_to_inject && !state.flags.stream.phase.is_streaming() {
+            if safe_to_inject {
                 let msg = format!("/* Notification [{source}]: {content} */");
                 let _id = state.push_user_message(msg);
             }
