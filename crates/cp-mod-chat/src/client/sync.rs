@@ -53,6 +53,14 @@ pub(crate) fn drain_sync_events(state: &mut cp_base::state::runtime::State) -> b
                 // Don't count our own messages as unread — no self-notifications
                 let is_own = bot_user.as_ref().is_some_and(|bot| bot == sender);
 
+                // Bridge echo suppression: if we recently sent this exact body
+                // to this room, treat the puppet's echo as our own message.
+                let is_echo = !is_own && {
+                    let now_ms = cp_base::panels::now_ms();
+                    let cutoff = now_ms.saturating_sub(30_000);
+                    cs.recent_sends.iter().any(|(rid, b, ts)| rid == room_id && b == body && *ts > cutoff)
+                };
+
                 let msg = MessageInfo {
                     event_id: event_id.clone(),
                     sender: sender.clone(),
@@ -69,7 +77,7 @@ pub(crate) fn drain_sync_events(state: &mut cp_base::state::runtime::State) -> b
                 // Update room list last_message + unread counter
                 if let Some(room) = cs.rooms.iter_mut().find(|r| r.room_id == *room_id) {
                     room.last_message = Some(msg.clone());
-                    if !is_own {
+                    if !is_own && !is_echo {
                         room.unread_count = room.unread_count.saturating_add(1);
                         new_messages = new_messages.saturating_add(1);
                         let _inserted = cs.report_here.insert(room_id.clone());

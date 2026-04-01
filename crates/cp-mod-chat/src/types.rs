@@ -66,6 +66,14 @@ pub struct ChatState {
     /// Next room ref counter (monotonically increasing).
     #[serde(default, rename = "next_room_ref")]
     pub next_room_ref: u32,
+
+    /// Recently sent messages for echo suppression.
+    ///
+    /// Entries: `(room_id, body, timestamp_ms)`. When the sync loop sees
+    /// a message matching room + body within a short window, it treats
+    /// the message as our own (bridge puppet echo). Pruned lazily.
+    #[serde(skip)]
+    pub recent_sends: Vec<(String, String, u64)>,
 }
 
 impl Default for ChatState {
@@ -84,6 +92,7 @@ impl Default for ChatState {
             room_refs: HashMap::new(),
             room_id_to_ref: HashMap::new(),
             next_room_ref: 1,
+            recent_sends: Vec::new(),
         }
     }
 }

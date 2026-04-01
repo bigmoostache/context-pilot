@@ -21,6 +21,19 @@ pub(crate) fn clear_report_here(state: &mut State, room_id: &str) {
     }
 }
 
+/// Record a sent message for bridge echo suppression.
+///
+/// Called after every successful `Chat_send`. The sync loop checks
+/// incoming messages against this list to avoid self-notifications.
+pub(crate) fn record_sent_message(state: &mut State, room_id: &str, body: &str) {
+    let now_ms = cp_base::panels::now_ms();
+    let cs = ChatState::get_mut(state);
+    cs.recent_sends.push((room_id.to_string(), body.to_string(), now_ms));
+    // Prune entries older than 30 seconds
+    let cutoff = now_ms.saturating_sub(30_000);
+    cs.recent_sends.retain(|(_, _, ts)| *ts > cutoff);
+}
+
 /// Resolve a room parameter to a Matrix room ID.
 ///
 /// Tries in order: `C<n>` short ref → raw room ID → alias via Matrix API.

@@ -15,7 +15,7 @@ use crate::client;
 use crate::server;
 use crate::types::{ChatState, OpenRoom, ServerStatus};
 
-use helpers::{clear_report_here, resolve_event_ref, resolve_room_param};
+use helpers::{clear_report_here, record_sent_message, resolve_event_ref, resolve_room_param};
 
 /// Route a `Chat_*` tool call to the appropriate handler.
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -232,6 +232,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 if !report_later {
                     clear_report_here(state, &room_id);
                 }
+                record_sent_message(state, &room_id, body);
                 ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Reply sent to {reply_ref} in '{room_input}' (event: {new_event_id})."),
@@ -252,6 +253,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 if !report_later {
                     clear_report_here(state, &room_id);
                 }
+                record_sent_message(state, &room_id, body);
                 ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Message sent to '{room_input}' (event: {new_event_id})."),

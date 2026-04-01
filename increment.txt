@@ -1255,3 +1255,11 @@
 11:18:33.007270604 fmt crates/cp-mod-chat/src/tools/mod.rs
 11:18:52.804615451 fmt crates/cp-mod-chat/src/tools/helpers.rs
 11:19:02.167502785 fmt crates/cp-mod-chat/src/tools/helpers.rs
+11:24:03.638051668 fmt crates/cp-mod-chat/src/types.rs
+11:24:10.896094966 fmt crates/cp-mod-chat/src/types.rs
+11:24:24.569302161 fmt crates/cp-mod-chat/src/tools/helpers.rs
+11:24:33.180372759 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:24:42.694439526 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:24:52.158999620 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:25:07.281738346 fmt crates/cp-mod-chat/src/client/sync.rs
+11:25:20.356109969 fmt crates/cp-mod-chat/src/client/sync.rs
