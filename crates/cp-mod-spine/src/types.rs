@@ -236,6 +236,24 @@ impl SpineState {
         id
     }
 
+    /// Delete all unprocessed notifications matching a source prefix.
+    ///
+    /// Used by modules that handle their own notifications internally
+    /// (e.g. `Chat_send` deletes the chat notification that triggered it).
+    /// Returns the number of notifications removed.
+    pub fn delete_notifications_by_source(state: &mut State, source: &str) -> usize {
+        let removed = {
+            let ss = Self::get_mut(state);
+            let before = ss.notifications.len();
+            ss.notifications.retain(|n| !(n.source == source && n.is_unprocessed()));
+            before.saturating_sub(ss.notifications.len())
+        };
+        if removed > 0 {
+            state.touch_panel(Kind::SPINE);
+        }
+        removed
+    }
+
     /// Mark a notification as processed by ID. Returns true if found.
     pub fn mark_notification_processed(state: &mut State, id: &str) -> bool {
         let found = {

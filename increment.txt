@@ -1245,3 +1245,13 @@
 11:05:14.994041592 fmt crates/cp-mod-chat/src/tools/mod.rs
 11:05:30.173024772 fmt crates/cp-mod-chat/src/client/sync.rs
 11:11:09.882516813 fmt crates/cp-mod-chat/src/lib.rs
+11:17:09.775539408 fmt crates/cp-mod-spine/src/types.rs
+11:17:17.041729942 fmt crates/cp-mod-spine/src/types.rs
+11:17:40.993597947 fmt crates/cp-mod-chat/src/tools/helpers.rs
+11:17:52.170139510 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:18:01.589495813 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:18:10.358634118 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:18:21.734545856 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:18:33.007270604 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:18:52.804615451 fmt crates/cp-mod-chat/src/tools/helpers.rs
+11:19:02.167502785 fmt crates/cp-mod-chat/src/tools/helpers.rs

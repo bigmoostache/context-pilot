@@ -5,6 +5,22 @@ use cp_base::state::runtime::State;
 use crate::client;
 use crate::types::ChatState;
 
+/// Clear a room from the pending-response queue and delete its notification.
+///
+/// Removes the room from `report_here` and deletes any unprocessed
+/// chat notifications from the Spine. Called after a successful send
+/// or empty-message acknowledgement.
+pub(crate) fn clear_report_here(state: &mut State, room_id: &str) {
+    let _removed = ChatState::get_mut(state).report_here.remove(room_id);
+    // Scuttle the notifications that woke us — no ghost echoes
+    {
+        let _deleted = cp_mod_spine::types::SpineState::delete_notifications_by_source(state, "chat");
+    }
+    {
+        let _deleted = cp_mod_spine::types::SpineState::delete_notifications_by_source(state, "chat_report_here");
+    }
+}
+
 /// Resolve a room parameter to a Matrix room ID.
 ///
 /// Tries in order: `C<n>` short ref → raw room ID → alias via Matrix API.

@@ -15,7 +15,7 @@ use crate::client;
 use crate::server;
 use crate::types::{ChatState, OpenRoom, ServerStatus};
 
-use helpers::{resolve_event_ref, resolve_room_param};
+use helpers::{clear_report_here, resolve_event_ref, resolve_room_param};
 
 /// Route a `Chat_*` tool call to the appropriate handler.
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -158,7 +158,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         return match client::send::send_image(&room_id, img_path) {
             Ok(event_id) => {
                 if !report_later {
-                    let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
+                    clear_report_here(state, &room_id);
                 }
                 ToolResult {
                     tool_use_id: tool.id.clone(),
@@ -207,7 +207,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Empty message = silent opt-out from report_here (send nothing)
     if body.is_empty() {
-        let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
+        clear_report_here(state, &room_id);
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Acknowledged '{room_input}' — removed from pending responses."),
@@ -230,7 +230,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         match client::send::send_reply(&room_id, body, &event_id, is_notice) {
             Ok(new_event_id) => {
                 if !report_later {
-                    let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
+                    clear_report_here(state, &room_id);
                 }
                 ToolResult {
                     tool_use_id: tool.id.clone(),
@@ -250,7 +250,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         match client::send::send_message(&room_id, body, is_notice) {
             Ok(new_event_id) => {
                 if !report_later {
-                    let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
+                    clear_report_here(state, &room_id);
                 }
                 ToolResult {
                     tool_use_id: tool.id.clone(),
