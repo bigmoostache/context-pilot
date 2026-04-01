@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use ignore::gitignore::GitignoreBuilder;
 use sha2::{Digest as _, Sha256};
@@ -11,6 +12,10 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{TreeFileDescription, TreeState};
 use std::fmt::Write as _;
+
+/// Whether to show `.context-pilot/` in the tree (opt-in via env var).
+static SHOW_CONTEXT_PILOT: LazyLock<bool> =
+    LazyLock::new(|| std::env::var("SHOW_CONTEXT_PILOT_IN_TREE").is_ok_and(|v| v == "1" || v == "true"));
 
 /// Mark tree context cache as deprecated (needs refresh)
 fn invalidate_tree_cache(state: &mut State) {
@@ -302,6 +307,11 @@ pub fn list_dir_entries(
             let is_dir = path.is_dir();
             let name = entry.file_name().to_string_lossy().to_string();
 
+            // .context-pilot/ is internal rigging — hide unless explicitly opted in
+            if is_dir && name == ".context-pilot" && !*SHOW_CONTEXT_PILOT {
+                return None;
+            }
+
             // Apply gitignore filter
             if let Some(ref gi) = gitignore
                 && gi.matched(&path, is_dir).is_ignore()
@@ -357,6 +367,10 @@ fn build_tree_new(node: &TreeNode<'_>, ctx: &TreeContext<'_>, output: &mut Strin
         .filter(|e| {
             let path = e.path();
             let is_dir = path.is_dir();
+            // .context-pilot/ is internal rigging — hide unless explicitly opted in
+            if is_dir && e.file_name() == ".context-pilot" && !*SHOW_CONTEXT_PILOT {
+                return false;
+            }
             ctx.gitignore.as_ref().is_none_or(|gi| !gi.matched(&path, is_dir).is_ignore())
         })
         .collect();
