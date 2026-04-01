@@ -70,15 +70,16 @@ impl ChatDashboardPanel {
         }
 
         // Table header
-        out.push_str("  | Room | Platform | Members | Unread | Last Message | Time |\n");
-        out.push_str("  |------|----------|---------|--------|--------------|------|\n");
+        out.push_str("  | ID | Room | Platform | Members | Unread | Last Message | Time |\n");
+        out.push_str("  |----|------|----------|---------|--------|--------------|------|\n");
         for room in &sorted {
-            Self::write_room_row(out, room);
+            let ref_str = cs.room_id_to_ref.get(&room.room_id).map_or("-", String::as_str);
+            Self::write_room_row(out, room, ref_str);
         }
     }
 
     /// Append a single room row to the table.
-    fn write_room_row(out: &mut String, room: &RoomInfo) {
+    fn write_room_row(out: &mut String, room: &RoomInfo, ref_str: &str) {
         let platform = room.bridge_source.map_or("Matrix", |b| b.label());
         let unread = if room.unread_count > 0 { room.unread_count.to_string() } else { "-".to_string() };
         let (last_msg, last_time) = room.last_message.as_ref().map_or_else(
@@ -91,7 +92,8 @@ impl ChatDashboardPanel {
         );
         let _r = writeln!(
             out,
-            "  | {} | {} | {} | {} | {} | {} |",
+            "  | {} | {} | {} | {} | {} | {} | {} |",
+            ref_str,
             truncate_body(&room.display_name, 20),
             platform,
             room.member_count,
@@ -299,6 +301,10 @@ impl Panel for ChatDashboardPanel {
         let rooms = crate::client::fetch_room_list();
         if !rooms.is_empty() {
             let cs = ChatState::get_mut(state);
+            // Assign stable short refs (C1, C2, ...) to any new rooms
+            for room in &rooms {
+                let _ref = cs.assign_room_ref(&room.room_id);
+            }
             cs.rooms = rooms;
         }
 

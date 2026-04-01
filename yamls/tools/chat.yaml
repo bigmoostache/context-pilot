@@ -9,8 +9,10 @@ tools:
       The panel auto-refreshes as new messages arrive via the sync loop.
       If the room is already open, returns success without creating a
       duplicate. Close the panel with Close_panel to stop watching.
-      Room is resolved by alias (e.g. '#general') via Matrix API.
-      Default: shows last 30 messages. Use Chat_configure to filter.
+      Room is resolved by short ref (e.g. 'C1'), room ID, or alias
+      (e.g. '#general') via Matrix API. Short refs are shown in the
+      Chat dashboard table. Default: shows last 30 messages. Use
+      Chat_configure to filter.
 
   Chat_send:
     description: >

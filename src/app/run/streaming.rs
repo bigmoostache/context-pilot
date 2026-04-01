@@ -280,11 +280,16 @@ fn check_chat_report_here(state: &mut State) {
         cs.report_here.iter().cloned().collect()
     };
 
-    // Resolve room IDs to display names for the notification
+    // Resolve room IDs to display names with C-refs for the notification
     let cs = ChatState::get(state);
     let room_names: Vec<String> = report_rooms
         .iter()
-        .map(|rid| cs.rooms.iter().find(|r| &r.room_id == rid).map_or_else(|| rid.clone(), |r| r.display_name.clone()))
+        .map(|rid| {
+            let name =
+                cs.rooms.iter().find(|r| &r.room_id == rid).map_or_else(|| rid.clone(), |r| r.display_name.clone());
+            // Prepend C-ref if assigned (e.g. "C1 MyBots")
+            cs.room_id_to_ref.get(rid).map_or_else(|| name.clone(), |cref| format!("{cref} {name}"))
+        })
         .collect();
 
     // Deduplicate: don't fire if an unprocessed report_here notification exists

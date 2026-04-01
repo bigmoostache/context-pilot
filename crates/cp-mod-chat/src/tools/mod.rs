@@ -2,6 +2,7 @@
 //!
 //! Each tool is routed to its implementation sub-module.
 
+mod helpers;
 mod secondary;
 
 use std::fmt::Write as _;
@@ -11,9 +12,10 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::client;
-
 use crate::server;
 use crate::types::{ChatState, OpenRoom, ServerStatus};
+
+use helpers::{apply_mute_for, resolve_event_ref, resolve_room_param};
 
 /// Route a `Chat_*` tool call to the appropriate handler.
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -57,13 +59,13 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
 
-    // Resolve alias to room ID
-    let room_id = match client::resolve_room(room_input) {
-        Ok(id) => id.to_string(),
+    // Resolve alias/ref to room ID
+    let room_id = match resolve_room_param(room_input, state) {
+        Ok(id) => id,
         Err(e) => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Cannot resolve room '{room_input}': {e}"),
+                content: e,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -131,12 +133,12 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
 
-    let room_id = match client::resolve_room(room_input) {
-        Ok(id) => id.to_string(),
+    let room_id = match resolve_room_param(room_input, state) {
+        Ok(id) => id,
         Err(e) => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Cannot resolve room '{room_input}': {e}"),
+                content: e,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -323,12 +325,12 @@ fn execute_react(tool: &ToolUse, state: &State) -> ToolResult {
     let event_ref = tool.input.get("event_id").and_then(serde_json::Value::as_str).unwrap_or("");
     let emoji = tool.input.get("emoji").and_then(serde_json::Value::as_str).unwrap_or("👍");
 
-    let room_id = match client::resolve_room(room_input) {
-        Ok(id) => id.to_string(),
+    let room_id = match resolve_room_param(room_input, state) {
+        Ok(id) => id,
         Err(e) => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Cannot resolve room '{room_input}': {e}"),
+                content: e,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -369,12 +371,12 @@ fn execute_react(tool: &ToolUse, state: &State) -> ToolResult {
 fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
 
-    let room_id = match client::resolve_room(room_input) {
-        Ok(id) => id.to_string(),
+    let room_id = match resolve_room_param(room_input, state) {
+        Ok(id) => id,
         Err(e) => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Cannot resolve room '{room_input}': {e}"),
+                content: e,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -436,52 +438,4 @@ fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     ToolResult { tool_use_id: tool.id.clone(), content: summary, is_error: false, tool_name: tool.name.clone() }
-}
-
-/// Resolve a short event ref (`"E3"`) or raw event ID to a full event ID.
-///
-/// Checks the open room's ref map first. If the input already looks like
-/// a full event ID (`$...`), returns it directly.
-fn resolve_event_ref(state: &State, room_id: &str, ref_str: &str) -> Option<String> {
-    // Already a full event ID
-    if ref_str.starts_with('$') {
-        return Some(ref_str.to_string());
-    }
-
-    let cs = ChatState::get(state);
-    let open = cs.open_rooms.get(room_id)?;
-    open.resolve_ref(ref_str).map(String::from)
-}
-
-/// Parse a human-readable mute duration and apply it to a room.
-///
-/// Accepts: `1h`, `2h`, `6h`, `12h`, `24h`, `1w`.
-/// Inserts an expiry timestamp into `ChatState::muted_until` and
-/// removes the room from `report_here`. Returns a suffix string
-/// for the tool result message, or empty if no mute was requested.
-fn apply_mute_for(state: &mut State, room_id: &str, mute_for: Option<&str>) -> String {
-    let Some(duration_str) = mute_for else {
-        return String::new();
-    };
-
-    let millis: u64 = match duration_str.trim() {
-        "1h" => 3_600_000,
-        "2h" => 7_200_000,
-        "6h" => 21_600_000,
-        "12h" => 43_200_000,
-        "24h" => 86_400_000,
-        "1w" => 604_800_000,
-        other => {
-            return format!(" (unknown mute duration '{other}' — ignored)");
-        }
-    };
-
-    let now_ms = cp_base::panels::now_ms();
-    let expiry = now_ms.saturating_add(millis);
-
-    let cs = ChatState::get_mut(state);
-    let _prev = cs.muted_until.insert(room_id.to_string(), expiry);
-    let _removed = cs.report_here.remove(room_id);
-
-    format!(" Room muted for {duration_str}.")
 }

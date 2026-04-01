@@ -135,24 +135,28 @@ fn fire_chat_notification(state: &mut cp_base::state::runtime::State) {
         return;
     }
 
-    // Build per-room summaries: "Room (sender): message preview..."
+    // Build per-room summaries: "[C1 Room] (sender): message preview..."
     let mut parts: Vec<String> = Vec::new();
     for room in &cs.rooms {
         if room.unread_count == 0 {
             continue;
         }
         let room_name = if room.display_name.is_empty() { &room.room_id } else { &room.display_name };
+        let ref_prefix = cs.room_id_to_ref.get(&room.room_id).map_or(String::new(), |r| format!("{r} "));
         if let Some(msg) = &room.last_message {
             let sender = if msg.sender_display_name.is_empty() { &msg.sender } else { &msg.sender_display_name };
             let preview: String = msg.body.chars().take(80).collect();
             let ellipsis = if msg.body.len() > 80 { "…" } else { "" };
             if room.unread_count == 1 {
-                parts.push(format!("[{room_name}] {sender}: {preview}{ellipsis}"));
+                parts.push(format!("[{ref_prefix}{room_name}] {sender}: {preview}{ellipsis}"));
             } else {
-                parts.push(format!("[{room_name}] {} new — {sender}: {preview}{ellipsis}", room.unread_count));
+                parts.push(format!(
+                    "[{ref_prefix}{room_name}] {} new — {sender}: {preview}{ellipsis}",
+                    room.unread_count
+                ));
             }
         } else {
-            parts.push(format!("[{room_name}] {} unread", room.unread_count));
+            parts.push(format!("[{ref_prefix}{room_name}] {} unread", room.unread_count));
         }
     }
 

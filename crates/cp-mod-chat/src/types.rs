@@ -59,6 +59,21 @@ pub struct ChatState {
     /// `report_here`. Expired entries are lazily pruned.
     #[serde(default)]
     pub muted_until: HashMap<String, u64>,
+
+    /// Short room refs: `"C1"` → full Matrix room ID.
+    ///
+    /// Assigned lazily when rooms first appear in the sync loop.
+    /// Stable across the session — a room keeps its ref until restart.
+    #[serde(default)]
+    pub room_refs: HashMap<String, String>,
+
+    /// Reverse map: full Matrix room ID → `"C1"`.
+    #[serde(default)]
+    pub room_id_to_ref: HashMap<String, String>,
+
+    /// Next room ref counter (monotonically increasing).
+    #[serde(default, rename = "next_room_ref")]
+    pub next_room_ref: u32,
 }
 
 impl Default for ChatState {
@@ -75,6 +90,9 @@ impl Default for ChatState {
             bridge_status: HashMap::new(),
             report_here: HashSet::new(),
             muted_until: HashMap::new(),
+            room_refs: HashMap::new(),
+            room_id_to_ref: HashMap::new(),
+            next_room_ref: 1,
         }
     }
 }
@@ -97,6 +115,30 @@ impl ChatState {
     /// Panics if the chat module was not initialised.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.ext_mut()
+    }
+
+    /// Assign a short room ref (`C1`, `C2`, ...) to a room ID.
+    ///
+    /// Returns the existing ref if already assigned, or mints a new one.
+    pub fn assign_room_ref(&mut self, room_id: &str) -> String {
+        if let Some(existing) = self.room_id_to_ref.get(room_id) {
+            return existing.clone();
+        }
+        let ref_str = format!("C{}", self.next_room_ref);
+        self.next_room_ref = self.next_room_ref.saturating_add(1);
+        {
+            let _prev = self.room_refs.insert(ref_str.clone(), room_id.to_string());
+        }
+        {
+            let _prev = self.room_id_to_ref.insert(room_id.to_string(), ref_str.clone());
+        }
+        ref_str
+    }
+
+    /// Resolve a short room ref (`"C3"`) to a full Matrix room ID.
+    #[must_use]
+    pub fn resolve_room_ref(&self, ref_str: &str) -> Option<&str> {
+        self.room_refs.get(ref_str).map(String::as_str)
     }
 }
 

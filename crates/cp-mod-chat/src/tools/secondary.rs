@@ -8,6 +8,8 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::client;
 use crate::types::ChatState;
 
+use super::helpers::resolve_room_param;
+
 /// `Chat_search` — cross-room message search.
 ///
 /// Populates `ChatState.search_results` and triggers dashboard refresh.
@@ -30,7 +32,7 @@ pub(crate) fn execute_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Resolve optional room scope
-    let room_id = room_input.map(|r| client::resolve_room(r).map(|id| id.to_string())).transpose();
+    let room_id = room_input.map(|r| resolve_room_param(r, state)).transpose();
 
     let room_id = match room_id {
         Ok(rid) => rid,
@@ -103,7 +105,7 @@ pub(crate) fn execute_create_room(tool: &ToolUse, _state: &State) -> ToolResult 
 }
 
 /// `Chat_invite` — invite a user to a room.
-pub(crate) fn execute_invite(tool: &ToolUse, _state: &State) -> ToolResult {
+pub(crate) fn execute_invite(tool: &ToolUse, state: &State) -> ToolResult {
     let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
     let user_id = tool.input.get("user_id").and_then(serde_json::Value::as_str).unwrap_or("");
 
@@ -116,12 +118,12 @@ pub(crate) fn execute_invite(tool: &ToolUse, _state: &State) -> ToolResult {
         };
     }
 
-    let room_id = match client::resolve_room(room_input) {
-        Ok(id) => id.to_string(),
+    let room_id = match resolve_room_param(room_input, state) {
+        Ok(id) => id,
         Err(e) => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: format!("Cannot resolve room '{room_input}': {e}"),
+                content: e,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
