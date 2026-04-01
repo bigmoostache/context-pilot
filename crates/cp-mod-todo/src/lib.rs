@@ -94,6 +94,7 @@ impl Module for TodoModule {
             ToolDefinition::from_yaml("todo_create", t)
                 .short_desc("Add task items")
                 .category("Todo")
+                .reverie_allowed(true)
                 .param_array(
                     "todos",
                     ParamType::Object(vec![
@@ -107,6 +108,7 @@ impl Module for TodoModule {
             ToolDefinition::from_yaml("todo_update", t)
                 .short_desc("Modify task items")
                 .category("Todo")
+                .reverie_allowed(true)
                 .param_array(
                     "updates",
                     ParamType::Object(vec![
