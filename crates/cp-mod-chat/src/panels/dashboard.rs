@@ -127,7 +127,7 @@ impl ChatDashboardPanel {
         }
     }
 
-    /// Build the TUI render lines for the room list.
+    /// Build the TUI render lines for the room list as a table.
     fn render_room_lines(cs: &ChatState) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
 
@@ -147,42 +147,62 @@ impl ChatDashboardPanel {
             ts_b.cmp(&ts_a)
         });
 
-        lines.push(Line::from(Span::styled("  Rooms", Style::default().fg(Color::White))));
+        // Summary header
+        let total_unread: u64 = cs.rooms.iter().map(|r| r.unread_count).sum();
+        let bridged = cs.rooms.iter().filter(|r| r.bridge_source.is_some()).count();
+        lines.push(Line::from(vec![
+            Span::styled("  Rooms ", Style::default().fg(Color::White)),
+            Span::styled(
+                format!("{} total, {} bridged, {} unread", cs.rooms.len(), bridged, total_unread),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
         lines.push(Line::from(""));
 
+        // Table header
+        lines.push(Line::from(vec![
+            Span::styled("  ID  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Room                 ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Platform  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Unread  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Last Message", Style::default().fg(Color::DarkGray)),
+        ]));
+
         for room in &sorted {
-            let mut spans = Vec::new();
+            let ref_str = cs.room_id_to_ref.get(&room.room_id).map_or("-", String::as_str);
+            let platform = room.bridge_source.map_or("Matrix", |b| b.label());
 
-            // Unread indicator
-            if room.unread_count > 0 {
-                spans.push(Span::styled(format!("  ● {}", room.display_name), Style::default().fg(Color::Yellow)));
-                spans.push(Span::styled(format!(" ({})", room.unread_count), Style::default().fg(Color::Yellow)));
+            // ID column color: cyan for easy identification
+            let id_span = Span::styled(format!("  {ref_str:<4}"), Style::default().fg(Color::Cyan));
+
+            // Room name: yellow if unread, gray otherwise
+            let name_display = truncate_body(&room.display_name, 20);
+            let name_span = if room.unread_count > 0 {
+                Span::styled(format!("{name_display:<21}"), Style::default().fg(Color::Yellow))
             } else {
-                spans.push(Span::styled(format!("  ○ {}", room.display_name), Style::default().fg(Color::Gray)));
-            }
+                Span::styled(format!("{name_display:<21}"), Style::default().fg(Color::White))
+            };
 
-            // Bridge badge
-            if let Some(ref bridge) = room.bridge_source {
-                spans.push(Span::styled(format!(" [{}]", bridge.label()), Style::default().fg(Color::Cyan)));
-            }
+            // Platform badge
+            let platform_span = Span::styled(format!("{platform:<10}"), Style::default().fg(Color::DarkGray));
 
-            // DM indicator
-            if room.is_direct {
-                spans.push(Span::styled(" DM", Style::default().fg(Color::DarkGray)));
-            }
+            // Unread count
+            let unread_span = if room.unread_count > 0 {
+                Span::styled(format!("{:<8}", room.unread_count), Style::default().fg(Color::Yellow))
+            } else {
+                Span::styled(format!("{:<8}", "-"), Style::default().fg(Color::DarkGray))
+            };
 
-            // Encryption badge
-            if room.encrypted {
-                spans.push(Span::styled(" 🔒", Style::default()));
-            }
+            // Last message preview
+            let msg_span = room.last_message.as_ref().map_or_else(
+                || Span::styled("-", Style::default().fg(Color::DarkGray)),
+                |msg| {
+                    let preview = format!("{}: {}", msg.sender_display_name, truncate_body(&msg.body, 40));
+                    Span::styled(preview, Style::default().fg(Color::DarkGray))
+                },
+            );
 
-            lines.push(Line::from(spans));
-
-            // Last message preview (indented)
-            if let Some(ref msg) = room.last_message {
-                let preview = format!("    {} — {}", msg.sender_display_name, truncate_body(&msg.body, 60),);
-                lines.push(Line::from(Span::styled(preview, Style::default().fg(Color::DarkGray))));
-            }
+            lines.push(Line::from(vec![id_span, name_span, platform_span, unread_span, msg_span]));
         }
 
         lines

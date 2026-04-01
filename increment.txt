@@ -1229,3 +1229,4 @@
 10:45:43.512220951 fmt crates/cp-mod-chat/src/client/sync.rs
 10:45:52.377205402 fmt crates/cp-mod-chat/src/client/sync.rs
 10:46:34.849165813 fmt src/app/run/streaming.rs
+10:50:48.543516756 fmt crates/cp-mod-chat/src/panels/dashboard.rs
