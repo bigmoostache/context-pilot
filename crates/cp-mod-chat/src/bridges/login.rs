@@ -55,6 +55,7 @@ pub(crate) fn ensure_bridge_login(bridge_name: &str) -> Result<String, String> {
 /// Build the Matrix login command for a specific bridge.
 fn build_login_command(bridge_name: &str, token: &str) -> String {
     match bridge_name {
+        "telegram" => format!("login-bot {token}"),
         "discord" => format!("login-token bot {token}"),
         "slack" => format!("login-token {token}"),
         _ => format!("login {token}"),

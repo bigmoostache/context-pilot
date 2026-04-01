@@ -44,11 +44,11 @@ pub(crate) const BRIDGES: &[BridgeSpec] = &[
     BridgeSpec {
         name: "telegram",
         bot_username: "telegrambot",
-        appservice_port: 29320,
+        appservice_port: 29317,
         user_namespace: "@telegram_.*",
         alias_namespace: "#telegram_.*",
         token_env_var: "TELEGRAM_BOT_TOKEN",
-        config_login: true,
+        config_login: false, // mautrix-telegram Go rewrite: login via Matrix DM command
     },
     BridgeSpec {
         name: "discord",
