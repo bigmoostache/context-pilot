@@ -238,6 +238,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> Entry {
         panel_cache_hit: false,
         panel_total_cost: panel.panel_total_cost.unwrap_or(0.0),
         freeze_count: 0,
+        total_freezes: 0,
         last_emitted_content: None,
         last_emitted_hash: None,
     }

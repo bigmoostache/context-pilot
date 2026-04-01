@@ -116,6 +116,7 @@ pub(super) fn prepare_stream_context(
                     // Freeze: emit old content to preserve cache prefix
                     item.content = old_content.clone();
                     entry.freeze_count = entry.freeze_count.saturating_add(1);
+                    entry.total_freezes = entry.total_freezes.saturating_add(1);
                     emitted_hash = entry.last_emitted_hash.clone().unwrap_or(fresh_hash);
                 } else {
                     // max_freezes exhausted OR no prior content → forced update

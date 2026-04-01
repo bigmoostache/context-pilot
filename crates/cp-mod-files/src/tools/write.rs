@@ -79,6 +79,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             panel_cache_hit: false,
             panel_total_cost: 0.0,
             freeze_count: 0,
+            total_freezes: 0,
             last_emitted_content: None,
             last_emitted_hash: None,
         };
