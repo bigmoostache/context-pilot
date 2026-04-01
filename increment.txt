@@ -1382,3 +1382,8 @@
 15:03:22.469928469 fmt crates/cp-base/src/state/data/config.rs
 15:05:10.605419690 fmt crates/cp-base/src/state/data/config.rs
 15:05:21.819841933 fmt crates/cp-base/src/state/data/config.rs
+15:13:12.508819437 fmt src/modules/overview/render.rs
+15:13:19.720441648 fmt src/modules/overview/render.rs
+15:13:35.949250539 fmt src/modules/overview/context.rs
+15:13:40.606484105 fmt src/modules/overview/render.rs
+15:13:40.657248770 fmt src/modules/overview/context.rs

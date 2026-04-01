@@ -85,7 +85,15 @@ pub(crate) fn generate_context_content(state: &State) -> String {
 
         let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
-        let hit_miss = if ctx.panel_cache_hit { "\u{2713}" } else { "\u{2717}" };
+        let hit_miss = if ctx.panel_cache_hit {
+            "\u{2713}".to_string()
+        } else if ctx.freeze_count > 0 {
+            let panel = crate::app::panels::get_panel(&ctx.context_type);
+            let max = panel.max_freezes();
+            format!("\u{2717} ({}/{})", ctx.freeze_count, max)
+        } else {
+            "\u{2717}".to_string()
+        };
         let cost = format!("${:.2}", ctx.panel_total_cost);
         let freeze_info = if ctx.total_freezes > 0 { format!(" ❄{}", ctx.total_freezes) } else { String::new() };
         let miss_info =

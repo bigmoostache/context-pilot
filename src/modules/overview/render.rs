@@ -296,8 +296,15 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
         let id_with_icon = format!("{}{}", icon, ctx.id);
 
         let cost_str = format!("${:.2}", ctx.panel_total_cost);
-        let (hit_str, hit_color) =
-            if ctx.panel_cache_hit { ("\u{2713}", theme::success()) } else { ("\u{2717}", theme::error()) };
+        let (hit_str, hit_color) = if ctx.panel_cache_hit {
+            ("\u{2713}".to_string(), theme::success())
+        } else if ctx.freeze_count > 0 {
+            let panel = crate::app::panels::get_panel(&ctx.context_type);
+            let max = panel.max_freezes();
+            (format!("\u{2717} ({}/{})", ctx.freeze_count, max), theme::warning())
+        } else {
+            ("\u{2717}".to_string(), theme::error())
+        };
 
         let freeze_str = if ctx.total_freezes > 0 { format!("{}", ctx.total_freezes) } else { String::new() };
         let freeze_color = if ctx.total_freezes > 0 { theme::accent_dim() } else { theme::text_muted() };
