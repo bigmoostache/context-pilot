@@ -34,36 +34,3 @@ pub(crate) fn resolve_event_ref(state: &State, room_id: &str, ref_str: &str) -> 
     let open = cs.open_rooms.get(room_id)?;
     open.resolve_ref(ref_str).map(String::from)
 }
-
-/// Parse a human-readable mute duration and apply it to a room.
-///
-/// Accepts: `1h`, `2h`, `6h`, `12h`, `24h`, `1w`.
-/// Inserts an expiry timestamp into `ChatState::muted_until` and
-/// removes the room from `report_here`. Returns a suffix string
-/// for the tool result message, or empty if no mute was requested.
-pub(crate) fn apply_mute_for(state: &mut State, room_id: &str, mute_for: Option<&str>) -> String {
-    let Some(duration_str) = mute_for else {
-        return String::new();
-    };
-
-    let millis: u64 = match duration_str.trim() {
-        "1h" => 3_600_000,
-        "2h" => 7_200_000,
-        "6h" => 21_600_000,
-        "12h" => 43_200_000,
-        "24h" => 86_400_000,
-        "1w" => 604_800_000,
-        other => {
-            return format!(" (unknown mute duration '{other}' — ignored)");
-        }
-    };
-
-    let now_ms = cp_base::panels::now_ms();
-    let expiry = now_ms.saturating_add(millis);
-
-    let cs = ChatState::get_mut(state);
-    let _prev = cs.muted_until.insert(room_id.to_string(), expiry);
-    let _removed = cs.report_here.remove(room_id);
-
-    format!(" Room muted for {duration_str}.")
-}

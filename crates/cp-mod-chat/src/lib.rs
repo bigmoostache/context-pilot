@@ -189,7 +189,6 @@ impl Module for ChatModule {
                 .param("delete", ParamType::String, false)
                 .param("notice", ParamType::Boolean, false)
                 .param("report_later_here", ParamType::Boolean, false)
-                .param("mute_for", ParamType::String, false)
                 .param("image", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("Chat_react", t)

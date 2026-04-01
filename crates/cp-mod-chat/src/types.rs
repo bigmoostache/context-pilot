@@ -52,14 +52,6 @@ pub struct ChatState {
     #[serde(default)]
     pub report_here: HashSet<String>,
 
-    /// Rooms muted from `report_here` notifications until a timestamp.
-    ///
-    /// Key: room ID. Value: unix timestamp (ms) when the mute expires.
-    /// While muted, incoming messages do NOT add the room to
-    /// `report_here`. Expired entries are lazily pruned.
-    #[serde(default)]
-    pub muted_until: HashMap<String, u64>,
-
     /// Short room refs: `"C1"` → full Matrix room ID.
     ///
     /// Assigned lazily when rooms first appear in the sync loop.
@@ -89,7 +81,6 @@ impl Default for ChatState {
             typing_room: None,
             bridge_status: HashMap::new(),
             report_here: HashSet::new(),
-            muted_until: HashMap::new(),
             room_refs: HashMap::new(),
             room_id_to_ref: HashMap::new(),
             next_room_ref: 1,

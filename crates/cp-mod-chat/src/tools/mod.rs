@@ -15,7 +15,7 @@ use crate::client;
 use crate::server;
 use crate::types::{ChatState, OpenRoom, ServerStatus};
 
-use helpers::{apply_mute_for, resolve_event_ref, resolve_room_param};
+use helpers::{resolve_event_ref, resolve_room_param};
 
 /// Route a `Chat_*` tool call to the appropriate handler.
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -152,7 +152,6 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     let is_notice = tool.input.get("notice").and_then(serde_json::Value::as_bool).unwrap_or(true);
     let report_later = tool.input.get("report_later_here").and_then(serde_json::Value::as_bool).unwrap_or(false);
     let image_path = tool.input.get("image").and_then(serde_json::Value::as_str);
-    let mute_for = tool.input.get("mute_for").and_then(serde_json::Value::as_str);
 
     // Image upload path — send a local file as m.image
     if let Some(img_path) = image_path {
@@ -161,10 +160,9 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 if !report_later {
                     let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
                 }
-                let mute_suffix = apply_mute_for(state, &room_id, mute_for);
                 ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!("Image '{img_path}' sent to '{room_input}' (event: {event_id}).{mute_suffix}"),
+                    content: format!("Image '{img_path}' sent to '{room_input}' (event: {event_id})."),
                     is_error: false,
                     tool_name: tool.name.clone(),
                 }
@@ -207,6 +205,17 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
     };
 
+    // Empty message = silent opt-out from report_here (send nothing)
+    if body.is_empty() {
+        let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
+        return ToolResult {
+            tool_use_id: tool.id.clone(),
+            content: format!("Acknowledged '{room_input}' — removed from pending responses."),
+            is_error: false,
+            tool_name: tool.name.clone(),
+        };
+    }
+
     if let Some(reply_ref) = reply_to {
         // Resolve the short ref to a full event ID
         let event_id = resolve_event_ref(state, &room_id, reply_ref);
@@ -223,12 +232,9 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 if !report_later {
                     let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
                 }
-                let mute_suffix = apply_mute_for(state, &room_id, mute_for);
                 ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!(
-                        "Reply sent to {reply_ref} in '{room_input}' (event: {new_event_id}).{mute_suffix}"
-                    ),
+                    content: format!("Reply sent to {reply_ref} in '{room_input}' (event: {new_event_id})."),
                     is_error: false,
                     tool_name: tool.name.clone(),
                 }
@@ -246,10 +252,9 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 if !report_later {
                     let _removed = ChatState::get_mut(state).report_here.remove(&room_id);
                 }
-                let mute_suffix = apply_mute_for(state, &room_id, mute_for);
                 ToolResult {
                     tool_use_id: tool.id.clone(),
-                    content: format!("Message sent to '{room_input}' (event: {new_event_id}).{mute_suffix}"),
+                    content: format!("Message sent to '{room_input}' (event: {new_event_id})."),
                     is_error: false,
                     tool_name: tool.name.clone(),
                 }

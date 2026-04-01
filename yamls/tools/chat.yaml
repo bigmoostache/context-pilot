@@ -25,9 +25,8 @@ tools:
       After a successful send, the room is removed from the "report_here"
       queue (rooms awaiting your response). Set report_later_here=true to
       keep the room in the queue — useful when you plan to follow up later.
-      Set mute_for to silence a room's report_here notifications for a
-      duration: '1h', '2h', '6h', '12h', '24h', or '1w'. While muted,
-      incoming messages in that room won't trigger response reminders.
+      Send an empty message to silently acknowledge a room without sending
+      anything — this removes it from the pending response queue.
 
   Chat_react:
     description: >

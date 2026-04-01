@@ -1236,3 +1236,12 @@
 10:54:08.704103638 fmt crates/cp-mod-chat/src/panels/dashboard.rs
 10:54:25.930902802 fmt crates/cp-mod-chat/src/panels/dashboard.rs
 10:54:38.852041729 fmt crates/cp-mod-chat/src/panels/dashboard.rs
+11:01:29.538254726 fmt crates/cp-mod-chat/src/types.rs
+11:01:53.027087805 fmt crates/cp-mod-chat/src/types.rs
+11:02:10.419580347 fmt crates/cp-mod-chat/src/tools/helpers.rs
+11:02:35.395695958 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:03:10.204923036 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:03:25.779826086 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:05:14.994041592 fmt crates/cp-mod-chat/src/tools/mod.rs
+11:05:30.173024772 fmt crates/cp-mod-chat/src/client/sync.rs
+11:11:09.882516813 fmt crates/cp-mod-chat/src/lib.rs
