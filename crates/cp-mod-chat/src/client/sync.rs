@@ -72,8 +72,13 @@ pub(crate) fn drain_sync_events(state: &mut cp_base::state::runtime::State) -> b
                     if !is_own {
                         room.unread_count = room.unread_count.saturating_add(1);
                         new_messages = new_messages.saturating_add(1);
-                        // Track that this room needs a response from the AI
-                        let _inserted = cs.report_here.insert(room_id.clone());
+
+                        // Only track for report_here if the room is not muted
+                        let now_ms = cp_base::panels::now_ms();
+                        let is_muted = cs.muted_until.get(room_id).is_some_and(|&expiry| expiry > now_ms);
+                        if !is_muted {
+                            let _inserted = cs.report_here.insert(room_id.clone());
+                        }
                     }
                 }
 
