@@ -12,11 +12,9 @@ readme.workspace = true
 [dependencies]
 cp-base.workspace = true
 cp-render.workspace = true
-ratatui.workspace = true
 crossterm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-unicode-width.workspace = true
 
 [lints]
 workspace = true

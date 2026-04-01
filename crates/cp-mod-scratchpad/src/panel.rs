@@ -1,7 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel, scroll_key_action};
 use cp_base::state::actions::Action;
 use cp_base::state::context::{Kind, estimate_tokens};
@@ -134,60 +132,5 @@ impl Panel for ScratchpadPanel {
     }
     fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
         false
-    }
-
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let ss = ScratchpadState::get(state);
-        let mut text: Vec<Line<'_>> = Vec::new();
-
-        if ss.scratchpad_cells.is_empty() {
-            text.push(Line::from(vec![
-                Span::styled(" ".to_string(), base_style),
-                Span::styled("No scratchpad cells".to_string(), Style::default().fg(theme::text_muted()).italic()),
-            ]));
-            text.push(Line::from(vec![
-                Span::styled(" ".to_string(), base_style),
-                Span::styled(
-                    "Use scratchpad_create_cell to add notes".to_string(),
-                    Style::default().fg(theme::text_muted()),
-                ),
-            ]));
-        } else {
-            for cell in &ss.scratchpad_cells {
-                // Cell header
-                text.push(Line::from(vec![
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled(cell.id.clone(), Style::default().fg(theme::accent()).bold()),
-                    Span::styled(" ", base_style),
-                    Span::styled(cell.title.clone(), Style::default().fg(theme::text()).bold()),
-                ]));
-
-                // Cell content (show first few lines, truncated)
-                let lines: Vec<&str> = cell.content.lines().take(5).collect();
-                for line in &lines {
-                    text.push(Line::from(vec![
-                        Span::styled("   ".to_string(), base_style),
-                        Span::styled(line.to_string(), Style::default().fg(theme::text_secondary())),
-                    ]));
-                }
-
-                // Show ellipsis if content is longer
-                let total_lines = cell.content.lines().count();
-                if total_lines > 5 {
-                    text.push(Line::from(vec![
-                        Span::styled("   ".to_string(), base_style),
-                        Span::styled(
-                            format!("... ({} more lines)", total_lines.saturating_sub(5)),
-                            Style::default().fg(theme::text_muted()).italic(),
-                        ),
-                    ]));
-                }
-
-                // Blank line between cells
-                text.push(Line::from(vec![Span::styled(String::new(), base_style)]));
-            }
-        }
-
-        text
     }
 }

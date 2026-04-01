@@ -8,11 +8,11 @@ use crate::tools::ToolDefinition;
 use crate::tools::pre_flight::Verdict;
 use crate::tools::{ToolResult, ToolUse};
 
-/// A function that transforms tool result content into styled terminal lines.
+/// A function that transforms tool result content into IR blocks.
 ///
 /// Receives the raw content string and available display width.
 /// Used by modules to register custom visualizations for their tool results.
-pub type ToolVisualizer = fn(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>>;
+pub type ToolVisualizer = fn(content: &str, width: usize) -> Vec<cp_render::Block>;
 
 /// Run a Command with a timeout. Returns `TimedOut` error if the command exceeds the limit.
 ///
@@ -168,12 +168,8 @@ pub trait Module: Send + Sync {
     }
 
     /// Return TUI-rendered overview section(s) for this module.
-    /// Each element is (`section_order`, `rendered_lines`). Sections are sorted by order.
-    fn overview_render_sections(
-        &self,
-        _state: &State,
-        _base_style: ratatui::prelude::Style,
-    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+    /// Each element is (`section_order`, `rendered_blocks`). Sections are sorted by order.
+    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
         vec![]
     }
 

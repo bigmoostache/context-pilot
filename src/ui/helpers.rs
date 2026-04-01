@@ -240,6 +240,80 @@ fn do_highlight(path: &str, content: &str) -> Vec<Vec<(Color, String)>> {
     result
 }
 
+// ─── IR-aware Syntax Highlighting ────────────────────────────────────────────
+
+/// Type alias for IR-highlighted line data (RGB colour spans).
+type IrHighlightResult = Vec<Vec<cp_render::Span>>;
+/// LRU-style cache for IR syntax highlighting results.
+type IrHighlightCache = Mutex<HashMap<String, Arc<IrHighlightResult>>>;
+/// Cached IR highlight results, keyed by `path:content_len`.
+static IR_HIGHLIGHT_CACHE: LazyLock<IrHighlightCache> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Get IR-aware syntax-highlighted spans for a file.
+///
+/// Returns `Vec` of lines, where each line is `Vec<cp_render::Span>` with
+/// RGB colour overrides from the syntect theme. Used by `FilePanel::blocks()`
+/// to emit IR blocks instead of ratatui-coupled `(Color, String)` tuples.
+pub(crate) fn highlight_file_ir(path: &str, content: &str) -> Arc<IrHighlightResult> {
+    let cache_key = format!("{}:{}", path, content.len());
+    {
+        let cache = IR_HIGHLIGHT_CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(cached) = cache.get(&cache_key) {
+            return Arc::clone(cached);
+        }
+    }
+
+    let result = Arc::new(do_highlight_ir(path, content));
+
+    {
+        let mut cache = IR_HIGHLIGHT_CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if cache.len() > 50 {
+            cache.clear();
+        }
+        let _r = cache.insert(cache_key, Arc::clone(&result));
+    }
+
+    result
+}
+
+/// Perform syntax highlighting, returning IR spans with RGB colour overrides.
+fn do_highlight_ir(path: &str, content: &str) -> IrHighlightResult {
+    let syntax = SYNTAX_SET
+        .find_syntax_for_file(path)
+        .ok()
+        .flatten()
+        .or_else(|| {
+            Path::new(path)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .and_then(|ext| SYNTAX_SET.find_syntax_by_extension(ext))
+        })
+        .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text());
+
+    let Some(theme_ref) = THEME_SET.themes.get("base16-ocean.dark") else {
+        return Vec::new();
+    };
+
+    let mut highlighter = HighlightLines::new(syntax, theme_ref);
+    let mut result = Vec::new();
+
+    for line in LinesWithEndings::from(content) {
+        let ranges: Vec<(Style, &str)> = highlighter.highlight_line(line, &SYNTAX_SET).unwrap_or_default();
+
+        let spans: Vec<cp_render::Span> = ranges
+            .into_iter()
+            .map(|(style, text)| {
+                let text = text.trim_end_matches('\n').to_string();
+                cp_render::Span::rgb(text, style.foreground.r, style.foreground.g, style.foreground.b)
+            })
+            .collect();
+
+        result.push(spans);
+    }
+
+    result
+}
+
 // ─── Typewriter Buffer ───────────────────────────────────────────────────────
 
 use std::collections::VecDeque;

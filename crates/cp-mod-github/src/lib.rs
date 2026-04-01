@@ -160,11 +160,7 @@ impl Module for GithubModule {
         None
     }
 
-    fn overview_render_sections(
-        &self,
-        _state: &State,
-        _base_style: ratatui::prelude::Style,
-    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
         vec![]
     }
 
@@ -204,54 +200,40 @@ impl Module for GithubModule {
 
 /// Visualizer for `gh_execute` tool results.
 /// Color-codes PR/issue output with status badges, labels, authors, and highlights URLs and PR numbers.
-fn visualize_gh_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::{Color, Line, Span, Style};
+fn visualize_gh_output(content: &str, width: usize) -> Vec<cp_render::Block> {
+    use cp_render::{Block, Semantic, Span};
 
-    let success_color = Color::Rgb(80, 250, 123); // Green for open/merged
-    let error_color = Color::Rgb(255, 85, 85); // Red for closed
-    let info_color = Color::Rgb(139, 233, 253); // Cyan for PR numbers
-    let warning_color = Color::Rgb(241, 250, 140); // Yellow for pending/draft
-    let link_color = Color::Rgb(189, 147, 249); // Purple for URLs
-    let secondary_color = Color::Rgb(150, 150, 170); // Gray
-
-    let mut lines = Vec::new();
-
-    for line in content.lines() {
-        if line.is_empty() {
-            lines.push(Line::from(""));
-            continue;
-        }
-
-        // Determine color based on line content
-        let style = if line.starts_with("Panel created:") || line.starts_with("Panel updated:") {
-            Style::default().fg(success_color)
-        } else if line.starts_with("Error:") {
-            Style::default().fg(error_color)
-        } else if line.contains("OPEN") || line.contains("MERGED") || line.contains("✓") {
-            Style::default().fg(success_color)
-        } else if line.contains("CLOSED") || line.contains("✗") {
-            Style::default().fg(error_color)
-        } else if line.contains("DRAFT") || line.contains("PENDING") {
-            Style::default().fg(warning_color)
-        } else if line.contains("http://") || line.contains("https://") {
-            Style::default().fg(link_color)
-        } else if line.contains('#') && line.chars().any(|c| c.is_ascii_digit()) {
-            // PR/issue numbers like #123
-            Style::default().fg(info_color)
-        } else if line.starts_with('#') {
-            // Comments
-            Style::default().fg(secondary_color)
-        } else {
-            Style::default()
-        };
-
-        let display = if line.len() > width {
-            format!("{}...", &line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
-        } else {
-            line.to_string()
-        };
-        lines.push(Line::from(Span::styled(display, style)));
-    }
-
-    lines
+    content
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                return Block::empty();
+            }
+            let semantic = if line.starts_with("Panel created:") || line.starts_with("Panel updated:") {
+                Semantic::Success
+            } else if line.starts_with("Error:") {
+                Semantic::Error
+            } else if line.contains("OPEN") || line.contains("MERGED") || line.contains("✓") {
+                Semantic::Success
+            } else if line.contains("CLOSED") || line.contains("✗") {
+                Semantic::Error
+            } else if line.contains("DRAFT") || line.contains("PENDING") {
+                Semantic::Warning
+            } else if line.contains("http://") || line.contains("https://") {
+                Semantic::Accent
+            } else if line.contains('#') && line.chars().any(|c| c.is_ascii_digit()) {
+                Semantic::Info
+            } else if line.starts_with('#') {
+                Semantic::Muted
+            } else {
+                Semantic::Default
+            };
+            let display = if line.len() > width {
+                format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
+            } else {
+                line.to_string()
+            };
+            Block::Line(vec![Span::styled(display, semantic)])
+        })
+        .collect()
 }

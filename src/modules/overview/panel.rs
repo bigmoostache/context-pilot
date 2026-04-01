@@ -1,11 +1,9 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Style};
 
 use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel};
 use crate::state::{Kind, State};
 
-use super::render;
 use cp_base::panels::scroll_key_action;
 
 /// Panel that displays overview statistics, token usage, and context elements.
@@ -16,8 +14,24 @@ impl Panel for OverviewPanel {
         scroll_key_action(key)
     }
 
-    fn blocks(&self, _state: &State) -> Vec<cp_render::Block> {
-        Vec::new()
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        let mut blocks = Vec::new();
+
+        blocks.extend(super::blocks::token_usage_blocks(state));
+        blocks.push(cp_render::Block::Separator);
+
+        let git_section = super::blocks::git_blocks(state);
+        if !git_section.is_empty() {
+            blocks.extend(git_section);
+            blocks.push(cp_render::Block::Separator);
+        }
+
+        blocks.extend(super::blocks::context_elements_blocks(state));
+        blocks.push(cp_render::Block::Separator);
+
+        blocks.extend(super::blocks::statistics_blocks(state));
+
+        blocks
     }
     fn title(&self, _state: &State) -> String {
         "Statistics".to_string()
@@ -57,27 +71,6 @@ impl Panel for OverviewPanel {
             ctx.cached_content = Some(content.clone());
             let _r = crate::app::panels::update_if_changed(ctx, &content);
         }
-    }
-
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let _guard = crate::profile!("panel::overview::content");
-        let mut text: Vec<Line<'_>> = Vec::new();
-
-        text.extend(render::render_token_usage(state, base_style));
-        text.extend(render::separator());
-
-        let git_section = render::render_git_status(state, base_style);
-        if !git_section.is_empty() {
-            text.extend(git_section);
-            text.extend(render::separator());
-        }
-
-        text.extend(render::render_context_elements(state, base_style));
-        text.extend(render::separator());
-
-        text.extend(render::render_statistics(state, base_style));
-
-        text
     }
 
     fn needs_cache(&self) -> bool {

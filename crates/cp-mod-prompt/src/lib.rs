@@ -379,11 +379,7 @@ impl Module for PromptModule {
         None
     }
 
-    fn overview_render_sections(
-        &self,
-        _state: &State,
-        _base_style: ratatui::prelude::Style,
-    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
         vec![]
     }
 
@@ -415,46 +411,38 @@ impl Module for PromptModule {
 
 /// Visualizer for prompt/agent/skill/command tool results.
 /// Highlights entity names, shows active status, and differentiates CRUD operations visually.
-fn visualize_prompt_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::{Color, Line, Span, Style};
+fn visualize_prompt_output(content: &str, width: usize) -> Vec<cp_render::Block> {
+    use cp_render::{Block, Semantic, Span};
 
-    let success_color = Color::Rgb(80, 250, 123);
-    let info_color = Color::Rgb(139, 233, 253);
-    let warning_color = Color::Rgb(241, 250, 140);
-    let error_color = Color::Rgb(255, 85, 85);
-
-    let mut lines = Vec::new();
-
-    for line in content.lines() {
-        if line.is_empty() {
-            lines.push(Line::from(""));
-            continue;
-        }
-
-        let style = if line.starts_with("Error:") {
-            Style::default().fg(error_color)
-        } else if line.starts_with("Created") || line.starts_with("Loaded") {
-            Style::default().fg(success_color)
-        } else if line.starts_with("Updated") || line.starts_with("Edited") {
-            Style::default().fg(info_color)
-        } else if line.starts_with("Deleted") || line.starts_with("Unloaded") {
-            Style::default().fg(warning_color)
-        } else if line.contains("agent") || line.contains("skill") || line.contains("command") {
-            Style::default().fg(info_color)
-        } else if line.contains('\'') {
-            // Entity names in quotes
-            Style::default().fg(info_color)
-        } else {
-            Style::default()
-        };
-
-        let display = if line.len() > width {
-            format!("{}...", &line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
-        } else {
-            line.to_string()
-        };
-        lines.push(Line::from(Span::styled(display, style)));
-    }
-
-    lines
+    content
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                return Block::empty();
+            }
+            let semantic = if line.starts_with("Error:") {
+                Semantic::Error
+            } else if line.starts_with("Created") || line.starts_with("Loaded") {
+                Semantic::Success
+            } else if line.starts_with("Updated") || line.starts_with("Edited") {
+                Semantic::Info
+            } else if line.starts_with("Deleted") || line.starts_with("Unloaded") {
+                Semantic::Warning
+            } else if line.contains("agent")
+                || line.contains("skill")
+                || line.contains("command")
+                || line.contains('\'')
+            {
+                Semantic::Info
+            } else {
+                Semantic::Default
+            };
+            let display = if line.len() > width {
+                format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
+            } else {
+                line.to_string()
+            };
+            Block::Line(vec![Span::styled(display, semantic)])
+        })
+        .collect()
 }

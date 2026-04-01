@@ -14,11 +14,9 @@ cp-base.workspace = true
 cp-render.workspace = true
 cp-mod-console = { path = "../cp-mod-console" }
 crossterm.workspace = true
-ratatui.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 globset.workspace = true
-unicode-width.workspace = true
 
 [lints]
 workspace = true

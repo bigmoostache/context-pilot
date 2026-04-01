@@ -113,8 +113,9 @@ pub(crate) fn render_message(msg: &Message, opts: &MessageRenderOpts) -> Vec<Lin
                 }
             };
 
-            if let Some(vis_lines) = custom_lines {
-                // Use module-provided visualization
+            if let Some(vis_blocks) = custom_lines {
+                // Use module-provided visualization (convert IR blocks → ratatui lines)
+                let vis_lines = crate::ui::ir::blocks_to_lines(&vis_blocks);
                 for vis_line in vis_lines {
                     push_with_prefix(vis_line.spans, &mut output_lines);
                 }

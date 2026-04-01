@@ -7,6 +7,10 @@
 /// Takes (`file_path`, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>
 pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>;
 
+/// IR-aware syntax highlighting callback.
+/// Takes (`file_path`, content) and returns IR spans per line (RGB colour override).
+pub type HighlightIrFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<cp_render::Span>>>;
+
 /// The phase of the LLM stream lifecycle.
 ///
 /// Encodes the only three legal combinations of the old `is_streaming` / `is_tooling`

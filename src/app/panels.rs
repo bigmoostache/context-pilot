@@ -4,9 +4,6 @@
 //! This module re-exports them and adds binary-specific functionality
 //! (rendering with theme/profiling, panel registry).
 
-use ratatui::prelude::Style;
-use ratatui::text::Line;
-
 use crate::state::{Kind, State};
 use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::state::context::Entry;
@@ -29,9 +26,6 @@ impl Panel for FallbackPanel {
     }
     fn title(&self, _state: &State) -> String {
         "(removed)".to_string()
-    }
-    fn content(&self, _state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        vec![Line::from("Panel module no longer available")]
     }
     fn handle_key(&self, _key: &crossterm::event::KeyEvent, _state: &State) -> Option<cp_base::state::actions::Action> {
         None

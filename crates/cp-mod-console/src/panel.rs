@@ -1,6 +1,3 @@
-use ratatui::prelude::{Line, Span, Style};
-
-use cp_base::config::accessors::{chars, theme};
 use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
 use cp_base::panels::{ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens};
@@ -191,53 +188,6 @@ impl Panel for ConsolePanel {
                 format!("console: {desc} ({status})")
             },
         )
-    }
-
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let (content, command, status) = state.context.get(state.selected_context).map_or_else(
-            || (String::new(), String::new(), String::new()),
-            |ctx| {
-                let content = ctx.cached_content.clone().unwrap_or_else(|| {
-                    if ctx.cache_deprecated { "Loading...".to_string() } else { "No output".to_string() }
-                });
-                let cmd = ctx.get_meta_str("console_command").unwrap_or("").to_string();
-                let st = ctx.get_meta_str("console_status").unwrap_or("?").to_string();
-                (content, cmd, st)
-            },
-        );
-
-        let mut lines: Vec<Line<'_>> = Vec::new();
-
-        // Header: $ command [status]
-        let status_color = if status.starts_with("running") {
-            theme::accent()
-        } else if status.starts_with("exited(0)") {
-            theme::success()
-        } else {
-            theme::error()
-        };
-
-        lines.push(Line::from(vec![
-            Span::styled(" $ ".to_string(), Style::default().fg(theme::accent_dim())),
-            Span::styled(command, Style::default().fg(theme::text())),
-            Span::styled(format!("  [{status}]"), Style::default().fg(status_color)),
-        ]));
-
-        // Divider
-        lines.push(Line::from(vec![Span::styled(
-            format!(" {}", chars::HORIZONTAL.repeat(40)),
-            Style::default().fg(theme::border()),
-        )]));
-
-        // Output lines
-        for line in content.lines() {
-            lines.push(Line::from(vec![
-                Span::styled(" ".to_string(), base_style),
-                Span::styled(line.to_string(), Style::default().fg(theme::text())),
-            ]));
-        }
-
-        lines
     }
 
     fn handle_key(&self, _key: &crossterm::event::KeyEvent, _state: &State) -> Option<cp_base::state::actions::Action> {

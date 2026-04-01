@@ -1,6 +1,3 @@
-use ratatui::prelude::{Line, Span, Style};
-
-use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
@@ -124,62 +121,6 @@ impl Panel for QueuePanel {
     }
     fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
         false
-    }
-
-    fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        let qs = QueueState::get(state);
-        let accent = theme::accent();
-        let muted = theme::text_muted();
-        let warning = theme::warning();
-
-        let mut lines = Vec::new();
-
-        // Always show the shared-queue note
-        lines.push(Line::from(Span::styled(
-            "  This queue is shared between the main consciousness and background",
-            Style::default().fg(muted).italic(),
-        )));
-        lines.push(Line::from(Span::styled(
-            "  reverie sub-agents. Items may appear here from either source.",
-            Style::default().fg(muted).italic(),
-        )));
-        lines.push(Line::from(""));
-
-        if !qs.active && qs.queued_calls.is_empty() {
-            lines.push(Line::from(Span::styled("  Queue inactive.", Style::default().fg(muted))));
-            return lines;
-        }
-
-        // Status header
-        let status = if qs.active { "Active" } else { "Paused" };
-        let status_color = if qs.active { accent } else { warning };
-        lines.push(Line::from(vec![
-            Span::styled("  Queue ", Style::default().fg(muted)),
-            Span::styled(status, Style::default().fg(status_color).bold()),
-            Span::styled(format!(" — {} action(s)", qs.queued_calls.len()), Style::default().fg(muted)),
-        ]));
-        lines.push(Line::from(""));
-
-        // Queued calls list
-        for call in &qs.queued_calls {
-            let params = serde_json::to_string(&call.input).unwrap_or_default();
-            let short = if params.len() > 80 {
-                let mut end = 77;
-                while !params.is_char_boundary(end) {
-                    end = end.saturating_sub(1);
-                }
-                format!("{}...", params.get(..end).unwrap_or(""))
-            } else {
-                params
-            };
-            lines.push(Line::from(vec![
-                Span::styled(format!("  {}. ", call.index), Style::default().fg(muted)),
-                Span::styled(call.tool_name.clone(), Style::default().fg(accent).bold()),
-                Span::styled(format!("({short})"), Style::default().fg(muted)),
-            ]));
-        }
-
-        lines
     }
 }
 

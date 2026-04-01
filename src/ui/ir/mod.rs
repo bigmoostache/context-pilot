@@ -49,7 +49,12 @@ fn semantic_to_style(semantic: Semantic) -> Style {
 
 /// Convert a single IR span to a ratatui `Span`.
 fn ir_span_to_ratatui(ir: &IrSpan) -> Span<'static> {
-    let mut style = semantic_to_style(ir.semantic);
+    let mut style = if let Some((r, g, b)) = ir.color {
+        // Raw RGB override — syntax highlighting bypass
+        Style::default().fg(ratatui::style::Color::Rgb(r, g, b))
+    } else {
+        semantic_to_style(ir.semantic)
+    };
     if ir.bold || matches!(ir.semantic, Semantic::Bold | Semantic::Active | Semantic::KeyHint | Semantic::Header) {
         style = style.add_modifier(Modifier::BOLD);
     }

@@ -7,7 +7,6 @@
 use std::fmt::Write as _;
 
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Color, Line, Span, Style};
 
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action, time_arith};
 use cp_base::state::actions::Action;
@@ -150,71 +149,6 @@ impl ChatRoomPanel {
         }
     }
 
-    /// Render the message list for TUI display.
-    fn render_messages(open: &OpenRoom) -> Vec<Line<'static>> {
-        let mut lines = Vec::new();
-
-        if open.messages.is_empty() {
-            lines.push(Line::from(Span::styled("  No messages yet", Style::default().fg(Color::DarkGray))));
-            return lines;
-        }
-
-        for msg in &open.messages {
-            let event_ref = open.event_id_to_ref.get(&msg.event_id).cloned().unwrap_or_default();
-
-            let timestamp = format_timestamp_short(msg.timestamp);
-            let mut spans = Vec::new();
-
-            // Timestamp + event ref
-            spans.push(Span::styled(format!("  {timestamp} "), Style::default().fg(Color::DarkGray)));
-            spans.push(Span::styled(format!("[{event_ref}] "), Style::default().fg(Color::Cyan)));
-
-            // Sender name
-            spans.push(Span::styled(format!("{}: ", msg.sender_display_name), Style::default().fg(Color::Yellow)));
-
-            // Message body (truncated for single-line display)
-            let body = if msg.body.len() > 120 {
-                let boundary = msg.body.floor_char_boundary(119);
-                format!("{}…", msg.body.get(..boundary).unwrap_or(""))
-            } else {
-                msg.body.clone()
-            };
-            spans.push(Span::styled(body, Style::default().fg(Color::White)));
-
-            lines.push(Line::from(spans));
-
-            // Reply indicator (indented)
-            if let Some(ref reply_to) = msg.reply_to {
-                let reply_ref = open.event_id_to_ref.get(reply_to).map_or("?", String::as_str);
-                lines.push(Line::from(Span::styled(
-                    format!("    ↳ reply to {reply_ref}"),
-                    Style::default().fg(Color::DarkGray),
-                )));
-            }
-
-            // Reactions (indented)
-            if !msg.reactions.is_empty() {
-                let reactions_str: String = msg
-                    .reactions
-                    .iter()
-                    .map(|r| format!("{} {}", r.emoji, r.sender_name))
-                    .collect::<Vec<_>>()
-                    .join("  ");
-                lines.push(Line::from(Span::styled(
-                    format!("    {reactions_str}"),
-                    Style::default().fg(Color::DarkGray),
-                )));
-            }
-
-            // Media indicator
-            if let Some(ref path) = msg.media_path {
-                lines.push(Line::from(Span::styled(format!("    📎 {path}"), Style::default().fg(Color::Cyan))));
-            }
-        }
-
-        lines
-    }
-
     /// Render messages as IR blocks for platform-agnostic display.
     fn render_messages_blocks(open: &OpenRoom) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
@@ -305,24 +239,6 @@ impl Panel for ChatRoomPanel {
             }
         }
         "Room".to_string()
-    }
-
-    fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        let cs = ChatState::get(state);
-
-        // Find the OpenRoom that corresponds to this panel
-        // The panel discovers its room by matching panel IDs in context
-        for ctx in &state.context {
-            if ctx.context_type.as_str().starts_with("chat:")
-                && ctx.context_type.as_str() != "chat-dashboard"
-                && let Some(room_id) = ctx.get_meta_str("room_id")
-                && let Some(open) = cs.open_rooms.get(room_id)
-            {
-                return Self::render_messages(open);
-            }
-        }
-
-        vec![Line::from(Span::styled("  Room not connected", Style::default().fg(Color::DarkGray)))]
     }
 
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {

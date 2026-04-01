@@ -20,7 +20,6 @@ use std::any::Any;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ratatui::prelude::{Line, Style};
 use sha2::{Digest as _, Sha256};
 
 use crossterm::event::{KeyCode, KeyEvent};
@@ -330,15 +329,11 @@ pub trait Panel {
     /// Generate the panel's title for display
     fn title(&self, state: &State) -> String;
 
-    /// Generate the panel's content lines for rendering (uses 'static since we create owned data)
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>>;
-
     /// Generate semantic IR blocks for platform-agnostic rendering.
     ///
-    /// Override this to migrate a panel from ratatui-coupled `content()` to
-    /// the intermediate representation. The TUI adapter calls `blocks()`
-    /// first; if the result is non-empty it renders from IR, otherwise it
-    /// falls back to `content()`.
+    /// Returns a `Vec<Block>` that the TUI adapter converts to
+    /// ratatui `Line` vectors for display. This is the primary
+    /// rendering method — all panels must implement it.
     fn blocks(&self, _state: &State) -> Vec<cp_render::Block> {
         Vec::new()
     }

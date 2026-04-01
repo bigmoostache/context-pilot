@@ -69,7 +69,9 @@ pub enum Semantic {
 ///
 /// Every piece of visible text in the IR is a `Span`. The adapter reads
 /// `semantic` + modifiers (`bold`, `italic`, `dimmed`) to produce the
-/// final visual style.
+/// final visual style. When `color` is `Some`, the adapter uses the raw
+/// RGB value instead of mapping `semantic` — this supports syntax
+/// highlighting where colours come from a theme, not from semantics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Span {
     /// The text content.
@@ -82,19 +84,35 @@ pub struct Span {
     pub italic: bool,
     /// Dim the output (reduce intensity).
     pub dimmed: bool,
+    /// Optional raw RGB colour override (syntax highlighting).
+    /// When set, the adapter uses this instead of mapping `semantic`.
+    pub color: Option<(u8, u8, u8)>,
 }
 
 impl Span {
     /// Plain span with default styling.
     #[must_use]
     pub const fn new(text: String) -> Self {
-        Self { text, semantic: Semantic::Default, bold: false, italic: false, dimmed: false }
+        Self { text, semantic: Semantic::Default, bold: false, italic: false, dimmed: false, color: None }
     }
 
     /// Span with a specific semantic token.
     #[must_use]
     pub const fn styled(text: String, semantic: Semantic) -> Self {
-        Self { text, semantic, bold: false, italic: false, dimmed: false }
+        Self { text, semantic, bold: false, italic: false, dimmed: false, color: None }
+    }
+
+    /// Span with a raw RGB colour override (syntax highlighting).
+    #[must_use]
+    pub const fn rgb(text: String, red: u8, green: u8, blue: u8) -> Self {
+        Self {
+            text,
+            semantic: Semantic::Default,
+            bold: false,
+            italic: false,
+            dimmed: false,
+            color: Some((red, green, blue)),
+        }
     }
 
     /// Accent-coloured span.

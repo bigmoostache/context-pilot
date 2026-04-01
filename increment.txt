@@ -1652,3 +1652,8 @@
 00:06:29.803503193 fmt src/app/panels.rs
 00:06:36.368992979 fmt src/app/panels.rs
 00:08:30.001757430 fmt src/modules/conversation/panel.rs
+01:48:48.611431021 fmt crates/cp-mod-git/src/lib.rs
+01:48:58.584080758 fmt crates/cp-mod-memory/src/lib.rs
+01:49:04.696086391 fmt crates/cp-mod-spine/src/lib.rs
+01:49:11.462589101 fmt crates/cp-mod-tree/src/lib.rs
+01:50:19.394419281 fmt src/modules/overview/mod.rs

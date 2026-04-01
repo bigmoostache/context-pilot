@@ -199,11 +199,7 @@ impl Module for PresetModule {
         Some(output)
     }
 
-    fn overview_render_sections(
-        &self,
-        _state: &State,
-        _base_style: ratatui::prelude::Style,
-    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
         vec![]
     }
 
@@ -247,39 +243,30 @@ impl Module for PresetModule {
 
 /// Visualizer for preset tool results.
 /// Shows preset name and lists captured modules/tools with colored indicators.
-fn visualize_preset_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::{Color, Line, Span, Style};
+fn visualize_preset_output(content: &str, width: usize) -> Vec<cp_render::Block> {
+    use cp_render::{Block, Semantic, Span};
 
-    let success_color = Color::Rgb(80, 250, 123);
-    let info_color = Color::Rgb(139, 233, 253);
-    let error_color = Color::Rgb(255, 85, 85);
-
-    let mut lines = Vec::new();
-
-    for line in content.lines() {
-        if line.is_empty() {
-            lines.push(Line::from(""));
-            continue;
-        }
-
-        let style = if line.starts_with("Error:") {
-            Style::default().fg(error_color)
-        } else if line.starts_with("Snapshot saved:") || line.starts_with("Loaded preset") {
-            Style::default().fg(success_color)
-        } else if line.contains('\'') {
-            // Preset names in quotes
-            Style::default().fg(info_color)
-        } else {
-            Style::default()
-        };
-
-        let display = if line.len() > width {
-            format!("{}...", &line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
-        } else {
-            line.to_string()
-        };
-        lines.push(Line::from(Span::styled(display, style)));
-    }
-
-    lines
+    content
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                return Block::empty();
+            }
+            let semantic = if line.starts_with("Error:") {
+                Semantic::Error
+            } else if line.starts_with("Snapshot saved:") || line.starts_with("Loaded preset") {
+                Semantic::Success
+            } else if line.contains('\'') {
+                Semantic::Info
+            } else {
+                Semantic::Default
+            };
+            let display = if line.len() > width {
+                format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
+            } else {
+                line.to_string()
+            };
+            Block::Line(vec![Span::styled(display, semantic)])
+        })
+        .collect()
 }

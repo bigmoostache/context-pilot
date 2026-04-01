@@ -745,7 +745,6 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "reqwest",
  "serde",
  "serde_json",
@@ -761,10 +760,8 @@ dependencies = [
  "cp-render",
  "crossterm",
  "globset",
- "ratatui",
  "serde",
  "serde_json",
- "unicode-width",
 ]
 
 [[package]]
@@ -779,7 +776,6 @@ dependencies = [
  "log",
  "matrix-sdk",
  "mime",
- "ratatui",
  "reqwest",
  "serde",
  "serde_json",
@@ -794,7 +790,6 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "regex",
  "serde",
  "serde_json",
@@ -807,7 +802,6 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "serde_json",
 ]
 
@@ -818,7 +812,6 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "reqwest",
  "serde",
  "serde_json",
@@ -832,7 +825,6 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "regex",
  "serde_json",
 ]
@@ -844,7 +836,6 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "regex",
  "secrecy",
  "serde_json",
@@ -861,7 +852,6 @@ dependencies = [
  "cp-mod-queue",
  "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
 ]
@@ -873,10 +863,8 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
- "unicode-width",
 ]
 
 [[package]]
@@ -885,7 +873,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-prompt",
- "ratatui",
+ "cp-render",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -899,7 +887,6 @@ dependencies = [
  "cp-mod-files",
  "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -912,7 +899,6 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
 ]
@@ -924,7 +910,6 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
 ]
@@ -937,10 +922,8 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
- "unicode-width",
 ]
 
 [[package]]
@@ -950,7 +933,6 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
 ]
@@ -963,7 +945,6 @@ dependencies = [
  "cp-render",
  "crossterm",
  "ignore",
- "ratatui",
  "serde",
  "serde_json",
  "sha2",
@@ -976,8 +957,8 @@ dependencies = [
  "chrono",
  "cp-base",
  "cp-mod-callback",
+ "cp-render",
  "flate2",
- "ratatui",
  "reqwest",
  "serde",
  "serde_json",

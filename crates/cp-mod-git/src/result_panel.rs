@@ -1,7 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::accessors::theme;
 use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{CacheRequest, CacheUpdate};
@@ -164,45 +162,6 @@ impl Panel for GitResultPanel {
             items.push(ContextItem::new(&ctx.id, header, output, ctx.last_refresh_ms));
         }
         items
-    }
-
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let mut text: Vec<Line<'_>> = Vec::new();
-
-        // Find the selected GitResult panel
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
-
-        let Some(ctx) = ctx else {
-            text.push(Line::from(vec![Span::styled(" No git result panel", Style::default().fg(theme::text_muted()))]));
-            return text;
-        };
-
-        if let Some(content) = &ctx.cached_content {
-            // Render with diff-aware highlighting
-            for line in content.lines() {
-                let (style, display_line) = if line.starts_with('+') && !line.starts_with("+++") {
-                    (Style::default().fg(theme::success()), line.to_string())
-                } else if line.starts_with('-') && !line.starts_with("---") {
-                    (Style::default().fg(theme::error()), line.to_string())
-                } else if line.starts_with("@@") {
-                    (Style::default().fg(theme::accent()), line.to_string())
-                } else if line.starts_with("diff --git") || line.starts_with("+++") || line.starts_with("---") {
-                    (Style::default().fg(theme::text_secondary()).bold(), line.to_string())
-                } else if line.starts_with("commit ") {
-                    (Style::default().fg(theme::accent()).bold(), line.to_string())
-                } else {
-                    (Style::default().fg(theme::text()), line.to_string())
-                };
-                text.push(Line::from(vec![
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled(display_line, style),
-                ]));
-            }
-        } else {
-            text.push(Line::from(vec![Span::styled(" Loading...", Style::default().fg(theme::text_muted()).italic())]));
-        }
-
-        text
     }
 
     fn refresh(&self, _state: &mut State) {}

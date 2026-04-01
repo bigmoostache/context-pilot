@@ -1,7 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::accessors::theme;
 use cp_base::panels::scroll_key_action;
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::actions::Action;
@@ -141,34 +139,5 @@ impl Panel for Results {
 
     fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
-    }
-
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let ctx =
-            state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(FIRECRAWL_PANEL_TYPE));
-
-        let Some(ctx) = ctx else {
-            return vec![Line::from(vec![Span::styled(
-                " No firecrawl result panel",
-                Style::default().fg(theme::text_muted()),
-            )])];
-        };
-
-        let Some(content) = &ctx.cached_content else {
-            return vec![Line::from(vec![Span::styled(
-                " Loading...",
-                Style::default().fg(theme::text_muted()).italic(),
-            )])];
-        };
-
-        content
-            .lines()
-            .map(|line| {
-                Line::from(vec![
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled(line.to_string(), Style::default().fg(theme::text())),
-                ])
-            })
-            .collect()
     }
 }

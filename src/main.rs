@@ -338,6 +338,7 @@ fn main() -> ExitCode {
 
     // Phase 4 continued: Initialize modules
     state.highlight_fn = Some(ui::helpers::highlight_file);
+    state.highlight_ir_fn = Some(ui::helpers::highlight_file_ir);
     modules::validate_dependencies(&state.active_modules);
     modules::init_registry();
 

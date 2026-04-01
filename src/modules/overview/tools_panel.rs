@@ -1,5 +1,4 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Style};
 
 use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel};
@@ -15,8 +14,20 @@ impl Panel for ToolsPanel {
         scroll_key_action(key)
     }
 
-    fn blocks(&self, _state: &State) -> Vec<cp_render::Block> {
-        Vec::new()
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        let mut blocks = Vec::new();
+
+        blocks.extend(super::tools_blocks::tools_blocks(state));
+        blocks.push(cp_render::Block::Separator);
+        blocks.extend(super::tools_blocks::seeds_blocks(state));
+
+        let presets_section = super::tools_blocks::presets_blocks();
+        if !presets_section.is_empty() {
+            blocks.push(cp_render::Block::Separator);
+            blocks.extend(presets_section);
+        }
+
+        blocks
     }
     fn title(&self, _state: &State) -> String {
         "Configuration".to_string()
@@ -45,22 +56,6 @@ impl Panel for ToolsPanel {
             ctx.cached_content = Some(content.clone());
             let _r = crate::app::panels::update_if_changed(ctx, &content);
         }
-    }
-
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        use super::render::separator;
-
-        let mut text = super::render_details::render_tools(state, base_style);
-        text.extend(separator());
-        text.extend(super::render_details::render_seeds(state, base_style));
-
-        let presets_section = super::render_details::render_presets(base_style);
-        if !presets_section.is_empty() {
-            text.extend(separator());
-            text.extend(presets_section);
-        }
-
-        text
     }
 
     fn needs_cache(&self) -> bool {

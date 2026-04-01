@@ -2,10 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Span, Style};
 
 use cp_base::cast::Safe as _;
-use cp_base::config::accessors::theme;
+
 use cp_base::config::constants;
 use cp_base::panels::scroll_key_action;
 use cp_base::panels::{CacheRequest, CacheUpdate, hash_content};
@@ -48,8 +47,50 @@ impl Panel for FilePanel {
         scroll_key_action(key)
     }
 
-    fn blocks(&self, _state: &State) -> Vec<cp_render::Block> {
-        Vec::new()
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        let selected = state.context.get(state.selected_context);
+
+        let (content, file_path) = selected.map_or_else(
+            || (String::new(), String::new()),
+            |ctx| {
+                let path = ctx.get_meta_str("file_path").unwrap_or("");
+                let content = ctx.cached_content.clone().unwrap_or_else(|| {
+                    if ctx.cache_deprecated { "Loading...".to_string() } else { "No content".to_string() }
+                });
+                (content, path.to_string())
+            },
+        );
+
+        // Get IR syntax highlighting (RGB spans)
+        let highlighted = if file_path.is_empty() {
+            std::sync::Arc::new(Vec::new())
+        } else {
+            state.highlight_ir_fn.map_or_else(|| std::sync::Arc::new(Vec::new()), |f| f(&file_path, &content))
+        };
+
+        let mut blocks = Vec::new();
+
+        if highlighted.is_empty() {
+            // Plain text fallback — no syntax highlighting available
+            for (i, line) in content.lines().enumerate() {
+                let line_num = i.saturating_add(1);
+                blocks.push(cp_render::Block::Line(vec![
+                    cp_render::Span::muted(format!(" {line_num:4} ")),
+                    cp_render::Span::new(" ".to_string()),
+                    cp_render::Span::new(line.to_string()),
+                ]));
+            }
+        } else {
+            for (i, spans) in highlighted.iter().enumerate() {
+                let line_num = i.saturating_add(1);
+                let mut line_spans =
+                    vec![cp_render::Span::muted(format!(" {line_num:4} ")), cp_render::Span::new(" ".to_string())];
+                line_spans.extend(spans.iter().cloned());
+                blocks.push(cp_render::Block::Line(line_spans));
+            }
+        }
+
+        blocks
     }
     fn title(&self, state: &State) -> String {
         state.context.get(state.selected_context).map_or_else(|| "File".to_string(), |ctx| ctx.name.clone())
@@ -138,64 +179,6 @@ impl Panel for FilePanel {
                 Some(ContextItem::new(&c.id, format!("File: {path}"), output, c.last_refresh_ms))
             })
             .collect()
-    }
-
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let selected = state.context.get(state.selected_context);
-
-        let (content, file_path) = selected.map_or_else(
-            || (String::new(), String::new()),
-            |ctx| {
-                let path = ctx.get_meta_str("file_path").unwrap_or("");
-                // Use cached content only - no blocking file reads
-                let content = ctx.cached_content.clone().unwrap_or_else(|| {
-                    if ctx.cache_deprecated { "Loading...".to_string() } else { "No content".to_string() }
-                });
-                (content, path.to_string())
-            },
-        );
-
-        // Get syntax highlighting
-        let highlighted = if file_path.is_empty() {
-            std::sync::Arc::new(Vec::new())
-        } else {
-            state.highlight_fn.map_or_else(|| std::sync::Arc::new(Vec::new()), |f| f(&file_path, &content))
-        };
-
-        let mut text: Vec<Line<'_>> = Vec::new();
-
-        if highlighted.is_empty() {
-            for (i, line) in content.lines().enumerate() {
-                let line_num = i.saturating_add(1);
-                text.push(Line::from(vec![
-                    Span::styled(
-                        format!(" {line_num:4} "),
-                        Style::default().fg(theme::text_muted()).bg(theme::bg_base()),
-                    ),
-                    Span::styled(" ", base_style),
-                    Span::styled(line.to_string(), Style::default().fg(theme::text())),
-                ]));
-            }
-        } else {
-            for (i, spans) in highlighted.iter().enumerate() {
-                let line_num = i.saturating_add(1);
-                let mut line_spans = vec![
-                    Span::styled(
-                        format!(" {line_num:4} "),
-                        Style::default().fg(theme::text_muted()).bg(theme::bg_base()),
-                    ),
-                    Span::styled(" ", base_style),
-                ];
-
-                for (color, span_text) in spans {
-                    line_spans.push(Span::styled(span_text.clone(), Style::default().fg(*color)));
-                }
-
-                text.push(Line::from(line_spans));
-            }
-        }
-
-        text
     }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {

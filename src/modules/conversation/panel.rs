@@ -361,11 +361,6 @@ impl Panel for ConversationPanel {
         }
     }
 
-    fn content(&self, _state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        // Content built via build_content_cached() which needs &mut State for caching.
-        Vec::new()
-    }
-
     fn refresh(&self, _state: &mut State) {}
 
     fn needs_cache(&self) -> bool {

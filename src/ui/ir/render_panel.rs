@@ -38,15 +38,10 @@ pub(crate) fn render_panel_from_ir(frame: &mut Frame<'_>, state: &mut State, are
     let content_area = block.inner(inner_area);
     frame.render_widget(block, inner_area);
 
-    // Resolve content: IR blocks first, legacy content() fallback if empty
+    // Resolve content from IR blocks
     let text: Vec<Line<'static>> = if panel_content.blocks.is_empty() {
-        // Fallback: look up the panel and call content() directly
-        let context_type = state.context.get(state.selected_context).map_or_else(
-            || cp_base::state::context::Kind::new(cp_base::state::context::Kind::CONVERSATION),
-            |c| c.context_type.clone(),
-        );
-        let panel = crate::app::panels::get_panel(&context_type);
-        panel.content(state, base_style)
+        // No blocks — render an empty panel
+        Vec::new()
     } else {
         super::blocks_to_lines(&panel_content.blocks)
     };
