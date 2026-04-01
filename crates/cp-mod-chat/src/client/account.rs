@@ -79,6 +79,43 @@ pub(crate) fn load_credentials(path: &Path) -> Result<Credentials, String> {
     serde_json::from_str(&contents).map_err(|e| format!("Invalid credentials JSON: {e}"))
 }
 
+/// Validate an existing access token against the homeserver.
+///
+/// Calls `GET /_matrix/client/v3/account/whoami` over UDS.
+/// Returns `true` if the server recognises the token, `false` if
+/// it responds with `M_UNKNOWN_TOKEN` or any non-2xx status.
+pub(crate) fn validate_token(access_token: &str) -> bool {
+    use std::io::{Read as _, Write as _};
+
+    let Some(sock) = crate::server::global_socket_path() else {
+        return false;
+    };
+    let Ok(mut stream) = std::os::unix::net::UnixStream::connect(&sock) else {
+        return false;
+    };
+    let _r = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
+
+    let request = format!(
+        "GET /_matrix/client/v3/account/whoami HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {access_token}\r\nConnection: close\r\n\r\n"
+    );
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
+
+    let mut response = Vec::with_capacity(2048);
+    let _n = stream.read_to_end(&mut response);
+    let response_str = String::from_utf8_lossy(&response);
+
+    let status_code = response_str
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(0);
+
+    (200..300).contains(&status_code)
+}
+
 /// Save credentials to disk.
 pub(crate) fn save_credentials(path: &Path, creds: &Credentials) -> Result<(), String> {
     // Ensure parent directory exists

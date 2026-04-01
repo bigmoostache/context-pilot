@@ -71,9 +71,12 @@ pub(crate) fn bootstrap() -> Result<(), String> {
 pub(crate) fn project_post_start(state: &mut State) -> Result<(), String> {
     let creds_path = account::project_credentials_path();
 
-    // Load existing credentials to check if registration already done
+    // Load existing credentials and validate the token is still accepted.
+    // Tuwunel may have restarted, invalidating old access tokens —
+    // if so, fall through to re-registration instead of using a stale token.
     if let Ok(existing) = account::load_credentials(&creds_path)
         && !existing.access_token.is_empty()
+        && account::validate_token(&existing.access_token)
     {
         let cs = ChatState::get_mut(state);
         cs.bot_user_id = Some(existing.user_id);
