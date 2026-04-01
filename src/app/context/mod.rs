@@ -201,6 +201,33 @@ pub(super) fn prepare_stream_context(
     }
 }
 
+/// Build `StreamParams` from the current state and a `StreamContext`.
+///
+/// This is the **single canonical constructor** for streaming parameters. Both the main
+/// worker and reverie sub-agents MUST use this function. It locks the shared prompt prefix
+/// (provider, model, `max_output_tokens`, `system_prompt`) to the active worker config,
+/// making it structurally impossible for the two paths to drift apart. The ONLY divergence
+/// point is `seed_content` — the main worker re-injects its system prompt, while the
+/// reverie injects its agent instructions + tool restrictions.
+pub(crate) fn build_stream_params(
+    state: &State,
+    ctx: StreamContext,
+    seed_content: Option<String>,
+) -> crate::infra::api::StreamParams {
+    let system_prompt = get_active_agent_content(state);
+    crate::infra::api::StreamParams {
+        provider: state.llm_provider,
+        model: state.current_model(),
+        max_output_tokens: state.current_max_output_tokens(),
+        messages: ctx.messages,
+        context_items: ctx.context_items,
+        tools: ctx.tools,
+        system_prompt,
+        seed_content,
+        worker_id: crate::infra::constants::DEFAULT_WORKER_ID.to_string(),
+    }
+}
+
 // ─── Initialization ─────────────────────────────────────────────────────────
 
 // Re-export agent/seed functions from prompt module

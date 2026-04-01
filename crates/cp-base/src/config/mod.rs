@@ -176,8 +176,6 @@ pub struct ProviderInjections {
 /// Loaded from `yamls/reverie.yaml`.
 #[derive(Debug, Deserialize)]
 pub struct Reverie {
-    /// System prompt given to reverie sub-agents.
-    pub system_prompt: String,
     /// First user message that kicks off the reverie session.
     pub kickoff_message: String,
     /// Tool restriction header/footer and Report tool instructions.

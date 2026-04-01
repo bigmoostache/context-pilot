@@ -1,11 +1,11 @@
 use std::sync::mpsc::{Receiver, Sender};
 
 use crate::app::actions::{Action, ActionResult, apply_action};
-use crate::infra::api::{StreamEvent, StreamParams, start_streaming};
-use crate::infra::constants::{DEFAULT_WORKER_ID, MAX_API_RETRIES};
+use crate::infra::api::{StreamEvent, start_streaming};
+use crate::infra::constants::MAX_API_RETRIES;
 
 use crate::app::App;
-use crate::app::context::{get_active_agent_content, prepare_stream_context};
+use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
 use crate::state::cache::{CacheUpdate, process_cache_request};
 use crate::state::{State, StreamPhase, get_context_type_meta};
 
@@ -99,20 +99,8 @@ pub(super) fn handle_retry(app: &mut App, tx: &Sender<StreamEvent>) {
             let system_prompt = get_active_agent_content(&app.state);
             app.typewriter.reset();
             app.pending_done = None;
-            start_streaming(
-                StreamParams {
-                    provider: app.state.llm_provider,
-                    model: app.state.current_model(),
-                    max_output_tokens: app.state.current_max_output_tokens(),
-                    messages: ctx.messages,
-                    context_items: ctx.context_items,
-                    tools: ctx.tools,
-                    system_prompt: system_prompt.clone(),
-                    seed_content: Some(system_prompt),
-                    worker_id: DEFAULT_WORKER_ID.to_string(),
-                },
-                tx.clone(),
-            );
+            let params = build_stream_params(&app.state, ctx, Some(system_prompt));
+            start_streaming(params, tx.clone());
             app.state.flags.ui.dirty = true;
         }
     }
@@ -149,20 +137,8 @@ pub(super) fn continue_streaming(app: &mut App, tx: &Sender<StreamEvent>) {
     let system_prompt = get_active_agent_content(&app.state);
     app.typewriter.reset();
     app.pending_done = None;
-    start_streaming(
-        StreamParams {
-            provider: app.state.llm_provider,
-            model: app.state.current_model(),
-            max_output_tokens: app.state.current_max_output_tokens(),
-            messages: ctx.messages,
-            context_items: ctx.context_items,
-            tools: ctx.tools,
-            system_prompt: system_prompt.clone(),
-            seed_content: Some(system_prompt),
-            worker_id: DEFAULT_WORKER_ID.to_string(),
-        },
-        tx.clone(),
-    );
+    let params = build_stream_params(&app.state, ctx, Some(system_prompt));
+    start_streaming(params, tx.clone());
 }
 
 /// Finalize a completed stream: apply `StreamDone`, reset counters, and unblock spine.

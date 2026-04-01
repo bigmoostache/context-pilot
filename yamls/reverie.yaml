@@ -1,9 +1,10 @@
-# Reverie sub-agent prompts — system prompt, kickoff, nudge, restrictions.
+# Reverie sub-agent prompts — kickoff, nudge, restrictions.
 # These shape the behavior of background reverie agents (cleaner, cartographer).
-
-# System prompt for the reverie LLM call — kept minimal since real instructions
-# are injected into the P-reverie panel (for cache-friendly placement).
-system_prompt: "You are a background sub-agent. Follow the instructions in the P-reverie panel."
+#
+# CACHE INVARIANT: The reverie uses the EXACT same system prompt, provider,
+# model, and panel prefix as the main worker. Its identity comes entirely
+# from seed_content (agent instructions + tool restrictions), NOT from the
+# system prompt. This is structurally enforced by build_stream_params().
 
 # Initial user message sent to kick off a fresh reverie session.
 # Framed as a dispatch from the main AI so the sub-agent has context.

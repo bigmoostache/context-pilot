@@ -8,15 +8,15 @@ use ratatui::prelude::{CrosstermBackend, Terminal};
 use crate::app::actions::{Action, ActionResult, apply_action};
 use crate::app::events::handle_event;
 use crate::app::panels::now_ms;
-use crate::infra::api::{StreamEvent, StreamParams, start_streaming};
-use crate::infra::constants::{DEFAULT_WORKER_ID, EVENT_POLL_MS, RENDER_THROTTLE_MS};
+use crate::infra::api::{StreamEvent, start_streaming};
+use crate::infra::constants::{EVENT_POLL_MS, RENDER_THROTTLE_MS};
 use crate::state::Kind;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::{check_ownership, save_state};
 use crate::ui;
 
 use crate::app::App;
-use crate::app::context::{get_active_agent_content, prepare_stream_context};
+use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
 
@@ -318,20 +318,8 @@ impl App {
                     self.pending_tools.clear();
                     let ctx = prepare_stream_context(&mut self.state, false, None);
                     let system_prompt = get_active_agent_content(&self.state);
-                    start_streaming(
-                        StreamParams {
-                            provider: self.state.llm_provider,
-                            model: self.state.current_model(),
-                            max_output_tokens: self.state.current_max_output_tokens(),
-                            messages: ctx.messages,
-                            context_items: ctx.context_items,
-                            tools: ctx.tools,
-                            system_prompt: system_prompt.clone(),
-                            seed_content: Some(system_prompt),
-                            worker_id: DEFAULT_WORKER_ID.to_string(),
-                        },
-                        tx.clone(),
-                    );
+                    let params = build_stream_params(&self.state, ctx, Some(system_prompt));
+                    start_streaming(params, tx.clone());
                     self.save_state_async();
                     self.state.flags.ui.dirty = true;
                 }
