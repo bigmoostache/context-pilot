@@ -8,10 +8,7 @@ panel:
   footer: |
     End of dynamic panel displays. All content displayed above may be considered up to date: it is automatically kept updated as we speak.
 
-    {message_timestamps}
-    Current datetime: {current_datetime}
-  footer_msg_line: "  - {role}: {iso_time} ({time_delta})"
-  footer_msg_header: "Last message datetimes:"
+    Current date: {current_date}
   footer_ack: "Panel display complete. Proceeding with conversation."
 
 # Context threshold notification - sent to spine when context usage crosses the intermediary cleaning threshold

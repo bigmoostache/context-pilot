@@ -292,14 +292,6 @@ pub(crate) mod prompts {
     pub(crate) fn panel_footer() -> &'static str {
         &PROMPTS.panel.footer
     }
-    /// Prompt template for panel footer message lines.
-    pub(crate) fn panel_footer_msg_line() -> &'static str {
-        &PROMPTS.panel.footer_msg_line
-    }
-    /// Prompt template for panel footer message headers.
-    pub(crate) fn panel_footer_msg_header() -> &'static str {
-        &PROMPTS.panel.footer_msg_header
-    }
     /// Prompt template for panel footer acknowledgment.
     pub(crate) fn panel_footer_ack() -> &'static str {
         &PROMPTS.panel.footer_ack

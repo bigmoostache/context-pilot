@@ -25,7 +25,7 @@ pub(super) fn messages_to_api(
     if !fake_panels.is_empty() {
         inject_panel_messages(
             &mut api_messages,
-            &PanelInjection { fake_panels: &fake_panels, messages, current_ms, seed_content },
+            &PanelInjection { fake_panels: &fake_panels, current_ms, seed_content },
         );
     }
 
@@ -92,8 +92,6 @@ pub(super) fn messages_to_api(
 struct PanelInjection<'ctx> {
     /// Prepared panel messages to inject
     fake_panels: &'ctx [crate::llms::FakePanelMessage],
-    /// Conversation messages for footer timestamps
-    messages: &'ctx [Message],
     /// Current time in milliseconds since UNIX epoch
     current_ms: u64,
     /// Seed/system content to re-inject after panels
@@ -127,7 +125,7 @@ fn inject_panel_messages(api_messages: &mut Vec<ApiMessage>, ctx: &PanelInjectio
     }
 
     // Footer after all panels
-    let footer = panel_footer_text(ctx.messages, ctx.current_ms);
+    let footer = panel_footer_text(ctx.current_ms);
     api_messages.push(ApiMessage {
         role: "assistant".to_string(),
         content: vec![

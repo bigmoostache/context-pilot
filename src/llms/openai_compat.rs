@@ -308,7 +308,7 @@ fn build_from_raw(
         }
 
         // Footer after all panels
-        let footer = panel_footer_text(messages, current_ms);
+        let footer = panel_footer_text(current_ms);
         out.push(OaiMessage {
             role: "assistant".to_string(),
             content: Some(footer),

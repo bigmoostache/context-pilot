@@ -204,23 +204,13 @@ fn ms_to_iso8601(ms: u64) -> String {
         .map_or_else(|| "1970-01-01T00:00:00Z".to_string(), |dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
 
-/// Format a time delta in a human-readable way.
-fn format_time_delta(delta_ms: u64) -> String {
-    use cp_base::panels::time_arith;
+/// Convert milliseconds since UNIX epoch to date-only format (YYYY-MM-DD).
+fn ms_to_date(ms: u64) -> String {
+    use chrono::{DateTime, Utc};
 
-    let seconds = time_arith::ms_to_secs(delta_ms);
-    if seconds < 60 {
-        format!("{seconds} seconds ago")
-    } else {
-        let (hours, minutes, _secs) = time_arith::secs_to_hms_unwrapped(seconds);
-        if hours == 0 {
-            if minutes == 1 { "1 minute ago".to_string() } else { format!("{minutes} minutes ago") }
-        } else if hours == 1 {
-            "1 hour ago".to_string()
-        } else {
-            format!("{hours} hours ago")
-        }
-    }
+    let secs = cp_base::panels::time_arith::ms_to_secs(ms);
+    DateTime::<Utc>::from_timestamp(secs.to_i64(), 0)
+        .map_or_else(|| "1970-01-01".to_string(), |dt| dt.format("%Y-%m-%d").to_string())
 }
 
 /// Generate the header text for dynamic panel display
@@ -244,39 +234,13 @@ pub(crate) fn panel_timestamp_text(timestamp_ms: u64) -> String {
     prompts::panel_timestamp().replace(concat!("{", "iso_time", "}"), &iso_time)
 }
 
-/// Generate the footer text for dynamic panel display, including message timestamps
-pub(crate) fn panel_footer_text(messages: &[Message], current_ms: u64) -> String {
+/// Generate the footer text for dynamic panel display
+pub(crate) fn panel_footer_text(current_ms: u64) -> String {
     use crate::infra::constants::prompts;
 
-    // Get last 25 messages with non-zero timestamps
-    let recent_messages: Vec<&Message> = messages.iter().filter(|m| m.timestamp_ms > 0).rev().take(25).collect();
+    let current_date = ms_to_date(current_ms);
 
-    // Build message timestamps section
-    let message_timestamps = if recent_messages.is_empty() {
-        String::new()
-    } else {
-        let mut lines = String::from(prompts::panel_footer_msg_header());
-        lines.push('\n');
-        for msg in recent_messages.iter().rev() {
-            let iso_time = ms_to_iso8601(msg.timestamp_ms);
-            let time_delta = if current_ms > msg.timestamp_ms {
-                format_time_delta(current_ms.saturating_sub(msg.timestamp_ms))
-            } else {
-                "just now".to_string()
-            };
-            let line = prompts::panel_footer_msg_line()
-                .replace(concat!("{", "role", "}"), &msg.role)
-                .replace(concat!("{", "iso_time", "}"), &iso_time)
-                .replace(concat!("{", "time_delta", "}"), &time_delta);
-            lines.push_str(&line);
-            lines.push('\n');
-        }
-        lines
-    };
-
-    prompts::panel_footer()
-        .replace(concat!("{", "message_timestamps", "}"), &message_timestamps)
-        .replace(concat!("{", "current_datetime", "}"), &ms_to_iso8601(current_ms))
+    prompts::panel_footer().replace(concat!("{", "current_date", "}"), &current_date)
 }
 
 /// Prepare context items for injection as fake tool call/result pairs.

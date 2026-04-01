@@ -60,10 +60,6 @@ pub struct PanelPrompts {
     pub timestamp_unknown: String,
     /// Panel closing line.
     pub footer: String,
-    /// Format for a single message line inside the footer.
-    pub footer_msg_line: String,
-    /// Header introducing the recent-messages section in footer.
-    pub footer_msg_header: String,
     /// Assistant acknowledgment injected after the footer.
     pub footer_ack: String,
 }

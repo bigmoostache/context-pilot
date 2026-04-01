@@ -296,16 +296,6 @@ pub mod prompts {
     pub fn panel_footer() -> &'static str {
         &PROMPTS.panel.footer
     }
-    /// Format for a message line inside footer.
-    #[must_use]
-    pub fn panel_footer_msg_line() -> &'static str {
-        &PROMPTS.panel.footer_msg_line
-    }
-    /// Header for recent-messages section in footer.
-    #[must_use]
-    pub fn panel_footer_msg_header() -> &'static str {
-        &PROMPTS.panel.footer_msg_header
-    }
     /// Assistant ack injected after footer.
     #[must_use]
     pub fn panel_footer_ack() -> &'static str {
