@@ -280,6 +280,10 @@ impl Panel for LibraryPanel {
         }
     }
 
+    fn max_freezes(&self) -> u8 {
+        3
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let Some(ctx) = state.context.iter().find(|c| c.context_type == Kind::new(Kind::LIBRARY)) else {
             return Vec::new();

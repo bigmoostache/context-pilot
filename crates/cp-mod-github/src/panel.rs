@@ -132,6 +132,10 @@ impl Panel for GithubResultPanel {
         "GitHub Result".to_string()
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
         for ctx in &state.context {

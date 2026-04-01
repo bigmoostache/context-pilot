@@ -25,6 +25,10 @@ impl Panel for ConversationHistoryPanel {
             .map_or_else(|| "Chat History".to_string(), |c| c.name.clone())
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
             .context

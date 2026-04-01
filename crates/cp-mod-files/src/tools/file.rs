@@ -78,6 +78,9 @@ fn open_single_file(path: &str, state: &mut State) -> String {
         full_token_count: 0,
         panel_cache_hit: false,
         panel_total_cost: 0.0,
+        freeze_count: 0,
+        last_emitted_content: None,
+        last_emitted_hash: None,
     };
     elem.set_meta("file_path", &canonical);
     state.context.push(elem);

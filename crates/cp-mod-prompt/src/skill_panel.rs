@@ -117,6 +117,10 @@ impl Panel for SkillPanel {
         }
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Skill panels are sent to LLM as context
         let mut items = Vec::new();

@@ -78,6 +78,9 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             full_token_count: 0,
             panel_cache_hit: false,
             panel_total_cost: 0.0,
+            freeze_count: 0,
+            last_emitted_content: None,
+            last_emitted_hash: None,
         };
         elem.set_meta("file_path", &path_str.to_string());
         state.context.push(elem);

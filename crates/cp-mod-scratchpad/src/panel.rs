@@ -54,6 +54,10 @@ impl Panel for ScratchpadPanel {
         }
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_cells_for_context(state);
         // Find the Scratchpad context element to get its ID and timestamp

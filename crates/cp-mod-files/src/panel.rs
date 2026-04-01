@@ -118,6 +118,10 @@ impl Panel for FilePanel {
         Some(CacheUpdate::Content { context_id, content, token_count })
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
             .context

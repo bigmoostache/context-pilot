@@ -333,6 +333,10 @@ impl Panel for ChatDashboardPanel {
         }
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::build_context(state);
         let (id, last_refresh_ms) = state

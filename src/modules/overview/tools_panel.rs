@@ -19,6 +19,10 @@ impl Panel for ToolsPanel {
         "Configuration".to_string()
     }
 
+    fn max_freezes(&self) -> u8 {
+        3
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = generate_tools_context(state);
         let (id, last_refresh_ms) = state

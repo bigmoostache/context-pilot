@@ -116,6 +116,10 @@ impl Panel for FallbackPanel {
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
         None
     }
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, _state: &State) -> Vec<ContextItem> {
         Vec::new()
     }

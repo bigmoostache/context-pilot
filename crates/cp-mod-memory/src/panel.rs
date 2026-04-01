@@ -112,6 +112,10 @@ impl Panel for MemoryPanel {
         }
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_memories_for_context(state);
         let (id, last_refresh_ms) = state

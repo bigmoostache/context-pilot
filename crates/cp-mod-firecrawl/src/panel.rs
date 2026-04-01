@@ -100,6 +100,10 @@ impl Panel for Results {
         state.context.get(state.selected_context).map_or_else(|| "Firecrawl Result".to_string(), |ctx| ctx.name.clone())
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
             .context

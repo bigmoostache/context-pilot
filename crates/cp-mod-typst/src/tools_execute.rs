@@ -209,6 +209,9 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
         full_token_count: 0,
         panel_cache_hit: false,
         panel_total_cost: 0.0,
+        freeze_count: 0,
+        last_emitted_content: None,
+        last_emitted_hash: None,
     };
     elem.set_meta("dynamic_label", &"typst-fonts".to_string());
     state.context.push(elem);
@@ -270,6 +273,9 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str) ->
         full_token_count: 0,
         panel_cache_hit: false,
         panel_total_cost: 0.0,
+        freeze_count: 0,
+        last_emitted_content: None,
+        last_emitted_hash: None,
     };
     elem.set_meta("dynamic_label", &"typst-query".to_string());
     state.context.push(elem);

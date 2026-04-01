@@ -294,6 +294,10 @@ impl ConversationPanel {
 
 impl Panel for ConversationPanel {
     // Conversations are sent to the API as messages, not as context items
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, _state: &State) -> Vec<ContextItem> {
         Vec::new()
     }

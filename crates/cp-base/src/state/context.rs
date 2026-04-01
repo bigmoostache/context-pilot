@@ -227,6 +227,17 @@ pub struct Entry {
     /// Accumulated cost of this panel across all ticks ($USD). Never resets.
     #[serde(skip)]
     pub panel_total_cost: f64,
+
+    // === Freeze fields (prompt cache preservation) ===
+    /// Consecutive times this panel's changed content was suppressed to preserve the cache prefix.
+    #[serde(skip)]
+    pub freeze_count: u8,
+    /// Content string last emitted to the LLM (used as substitute when frozen).
+    #[serde(skip)]
+    pub last_emitted_content: Option<String>,
+    /// SHA-256 of `last_emitted_content` (compared against fresh content to detect changes).
+    #[serde(skip)]
+    pub last_emitted_hash: Option<String>,
 }
 
 // === Entry metadata helpers ===
@@ -294,5 +305,8 @@ pub fn make_default_entry(id: &str, context_type: Kind, name: &str, cache_deprec
         full_token_count: 0,
         panel_cache_hit: false,
         panel_total_cost: 0.0,
+        freeze_count: 0,
+        last_emitted_content: None,
+        last_emitted_hash: None,
     }
 }

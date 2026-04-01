@@ -239,10 +239,12 @@ pub fn update_if_changed(ctx: &mut Entry, content: &str) -> bool {
 
 /// Mark all panels of a given context type as cache-deprecated (dirty).
 /// Also sets `state.dirty = true` so the UI re-renders.
+/// Resets freeze protection so the next prompt assembly emits fresh content.
 pub fn mark_panels_dirty(state: &mut State, context_type: &str) {
     for ctx in &mut state.context {
         if ctx.context_type.as_str() == context_type {
             ctx.cache_deprecated = true;
+            ctx.freeze_count = u8::MAX;
         }
     }
     state.flags.ui.dirty = true;
@@ -370,6 +372,20 @@ pub trait Panel {
     /// Timer interval in ms for auto-refresh. None = no timer (uses watchers or no refresh).
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
         None
+    }
+
+    /// Max consecutive freezes before a forced cache-breaking update.
+    ///
+    /// When a panel's content changes but no earlier panel has broken the
+    /// prompt cache yet, emitting new content would break the cache prefix
+    /// for every panel that follows. Returning a value > 0 allows the system
+    /// to emit the **previous** content up to N times, preserving the cache.
+    /// Once the counter is exhausted — or the cache is already broken
+    /// upstream — the panel updates for free.
+    ///
+    /// Default `0` means "never freeze, always emit fresh content".
+    fn max_freezes(&self) -> u8 {
+        0
     }
 
     /// Generate context items to send to the LLM

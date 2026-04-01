@@ -146,6 +146,10 @@ impl Panel for SpinePanel {
         }
     }
 
+    fn max_freezes(&self) -> u8 {
+        2
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_notifications_for_context(state);
         let (id, last_refresh_ms) = state

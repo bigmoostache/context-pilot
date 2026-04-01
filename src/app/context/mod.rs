@@ -5,7 +5,7 @@ use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::refresh_conversation_context;
 use crate::modules;
 use crate::state::cache::hash_content;
-use crate::state::{Kind, Message, State, estimate_tokens};
+use crate::state::{Kind, Message, State};
 
 mod detach;
 
@@ -67,44 +67,89 @@ pub(super) fn prepare_stream_context(
     // means earlier panels are more likely to be cache hits.
     context_items.sort_by_key(|item| item.last_refresh_ms);
 
-    // === Panel cache cost tracking ===
-    // Hash each panel's content (what the LLM literally sees), build an ordered
-    // hash list, compare to previous tick's list via prefix matching, and
-    // accumulate per-panel costs based on cache hit/miss pricing.
+    // === Panel freeze + cache cost tracking (merged single pass) ===
+    // Iterate sorted panels, decide whether to freeze changed content to
+    // preserve the prompt cache prefix, then track cost from what we emit.
     {
-        // Build hash list from panel content (excluding "chat" which is conversation)
-        let panel_hashes: Vec<(String, String, usize)> = context_items
-            .iter()
-            .filter(|item| item.id != "chat")
-            .map(|item| {
-                let h = hash_content(&item.content);
-                (item.id.clone(), h, estimate_tokens(&item.content))
-            })
-            .collect();
+        let mut cache_broken = false;
+        let mut new_hash_list: Vec<String> = Vec::new();
 
-        let new_hash_list: Vec<String> = panel_hashes.iter().map(|(id, h, _)| format!("{id}:{h}")).collect();
-
-        // Find max prefix match index
-        let prev = &state.previous_panel_hash_list;
-        let prefix_len = new_hash_list.iter().zip(prev.iter()).take_while(|(a, b)| a == b).count();
-
-        // Get pricing from current model
         let hit_price = state.cache_hit_price_per_mtok();
         let miss_price = state.cache_miss_price_per_mtok();
 
-        // Update each panel's cache hit status and accumulate cost
-        for (i, (panel_id, _, token_count)) in panel_hashes.iter().enumerate() {
+        for item in &mut context_items {
+            if item.id == "chat" {
+                continue;
+            }
+
+            let fresh_hash = hash_content(&item.content);
+
+            // Look up this panel's Entry and its freeze state
+            let entry = state.context.iter_mut().find(|c| c.id == item.id);
+            let Some(entry) = entry else {
+                // Orphaned item — emit as-is, breaks cache
+                new_hash_list.push(format!("{}:{fresh_hash}", item.id));
+                cache_broken = true;
+                continue;
+            };
+
+            let last_hash = entry.last_emitted_hash.as_deref();
+            let content_changed = last_hash.is_none_or(|lh| lh != fresh_hash);
+
+            // Hash we'll record for cost tracking (may differ if we freeze)
+            let emitted_hash;
+
+            if content_changed {
+                let panel = crate::app::panels::get_panel(&entry.context_type);
+                let max_freezes = panel.max_freezes();
+
+                if cache_broken || max_freezes == 0 {
+                    // Cache already broken upstream OR panel never freezes → emit new
+                    entry.freeze_count = 0;
+                    entry.last_emitted_content = Some(item.content.clone());
+                    entry.last_emitted_hash = Some(fresh_hash.clone());
+                    emitted_hash = fresh_hash;
+                    cache_broken = true;
+                } else if entry.freeze_count < max_freezes
+                    && let Some(old_content) = &entry.last_emitted_content
+                {
+                    // Freeze: emit old content to preserve cache prefix
+                    item.content = old_content.clone();
+                    entry.freeze_count = entry.freeze_count.saturating_add(1);
+                    emitted_hash = entry.last_emitted_hash.clone().unwrap_or(fresh_hash);
+                } else {
+                    // max_freezes exhausted OR no prior content → forced update
+                    entry.freeze_count = 0;
+                    entry.last_emitted_content = Some(item.content.clone());
+                    entry.last_emitted_hash = Some(fresh_hash.clone());
+                    emitted_hash = fresh_hash;
+                    cache_broken = true;
+                }
+            } else {
+                // Content unchanged since last emit — cache preserved naturally
+                emitted_hash = fresh_hash;
+            }
+
+            // Cost tracking: compare emitted hashes to previous tick
+            new_hash_list.push(format!("{}:{emitted_hash}", item.id));
+        }
+
+        // Prefix-match for per-panel cache hit/miss cost tracking
+        let prev = &state.previous_panel_hash_list;
+        let prefix_len = new_hash_list.iter().zip(prev.iter()).take_while(|(a, b)| a == b).count();
+
+        for (i, entry_str) in new_hash_list.iter().enumerate() {
+            let panel_id = entry_str.split(':').next().unwrap_or("");
             let is_hit = i < prefix_len;
             let price = if is_hit { hit_price } else { miss_price };
-            let cost = (*token_count).to_f64() * f64::from(price) / 1_000_000.0;
 
-            if let Some(ctx) = state.context.iter_mut().find(|c| c.id == *panel_id) {
+            if let Some(ctx) = state.context.iter_mut().find(|c| c.id == panel_id) {
+                let cost = ctx.token_count.to_f64() * f64::from(price) / 1_000_000.0;
                 ctx.panel_cache_hit = is_hit;
                 ctx.panel_total_cost += cost;
             }
         }
 
-        // Store hash list for next tick
         state.previous_panel_hash_list = new_hash_list;
     }
 

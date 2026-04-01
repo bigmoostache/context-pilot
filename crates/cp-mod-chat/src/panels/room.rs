@@ -317,6 +317,10 @@ impl Panel for ChatRoomPanel {
         }
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let cs = ChatState::get(state);
 

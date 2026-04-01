@@ -20,6 +20,10 @@ impl Panel for OverviewPanel {
         "Statistics".to_string()
     }
 
+    fn max_freezes(&self) -> u8 {
+        2
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Use cached content if available (set by refresh)
         if let Some(ctx) = state.context.iter().find(|c| c.context_type.as_str() == Kind::OVERVIEW)

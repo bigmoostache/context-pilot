@@ -33,6 +33,10 @@ impl Panel for QueuePanel {
         }
     }
 
+    fn max_freezes(&self) -> u8 {
+        0
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_context_text(state);
         let (id, last_refresh_ms) = state

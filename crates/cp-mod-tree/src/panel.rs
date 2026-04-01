@@ -81,6 +81,10 @@ impl Panel for TreePanel {
         Some(CacheUpdate::Content { context_id, content, token_count })
     }
 
+    fn max_freezes(&self) -> u8 {
+        3
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Find tree context and use cached content
         for ctx in &state.context {

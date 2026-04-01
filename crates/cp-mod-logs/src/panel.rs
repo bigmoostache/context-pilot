@@ -127,6 +127,10 @@ impl Panel for LogsPanel {
         }
     }
 
+    fn max_freezes(&self) -> u8 {
+        3
+    }
+
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_logs_tree(state);
         let (id, last_refresh_ms) = state
