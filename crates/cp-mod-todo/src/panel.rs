@@ -56,6 +56,58 @@ impl Panel for TodoPanel {
         scroll_key_action(key)
     }
 
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        fn collect_todo_lines(
+            todos: &[TodoItem],
+            parent_id: Option<&String>,
+            indent: usize,
+            lines: &mut Vec<TodoLine>,
+        ) {
+            for todo in todos.iter().filter(|t| t.parent_id.as_ref() == parent_id) {
+                lines.push((indent, todo.id.clone(), todo.name.clone(), todo.status, todo.description.clone()));
+                collect_todo_lines(todos, Some(&todo.id), indent.saturating_add(1), lines);
+            }
+        }
+
+        use cp_render::{Block, Semantic, Span as S};
+        let ts = TodoState::get(state);
+
+        if ts.todos.is_empty() {
+            return vec![Block::Line(vec![S::muted("  No todos".into()).italic()])];
+        }
+
+        let mut todo_lines: Vec<TodoLine> = Vec::new();
+        collect_todo_lines(&ts.todos, None, 0, &mut todo_lines);
+
+        let mut blocks = Vec::new();
+        for (indent, id, name, status, description) in todo_lines {
+            let prefix = "  ".repeat(indent);
+            let (status_char, status_sem) = match status {
+                TodoStatus::Pending => (' ', Semantic::Muted),
+                TodoStatus::InProgress => ('~', Semantic::Warning),
+                TodoStatus::Done => ('x', Semantic::Success),
+            };
+            let name_sem = if status == TodoStatus::Done { Semantic::Muted } else { Semantic::Default };
+
+            blocks.push(Block::Line(vec![
+                S::new(format!(" {prefix}")),
+                S::muted("[".into()),
+                S::styled(format!("{status_char}"), status_sem),
+                S::muted("] ".into()),
+                S::styled(id, Semantic::AccentDim),
+                S::new(" ".into()),
+                S::styled(name, name_sem),
+            ]));
+
+            if !description.is_empty() {
+                let desc_prefix = "  ".repeat(indent.saturating_add(1));
+                blocks
+                    .push(Block::Line(vec![S::new(format!(" {desc_prefix}")), S::styled(description, Semantic::Code)]));
+            }
+        }
+
+        blocks
+    }
     fn title(&self, _state: &State) -> String {
         "Todo".to_string()
     }
@@ -120,8 +172,6 @@ impl Panel for TodoPanel {
     fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
         false
     }
-
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let mut text: Vec<Line<'_>> = Vec::new();

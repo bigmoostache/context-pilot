@@ -48,6 +48,9 @@ impl Panel for FilePanel {
         scroll_key_action(key)
     }
 
+    fn blocks(&self, _state: &State) -> Vec<cp_render::Block> {
+        Vec::new()
+    }
     fn title(&self, state: &State) -> String {
         state.context.get(state.selected_context).map_or_else(|| "File".to_string(), |ctx| ctx.name.clone())
     }
@@ -198,5 +201,4 @@ impl Panel for FilePanel {
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
         None
     }
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }

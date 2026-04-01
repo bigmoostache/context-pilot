@@ -43,8 +43,9 @@ impl Panel for LibraryPanel {
         false
     }
 
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
-
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        crate::library_blocks::library_blocks(state)
+    }
     fn title(&self, state: &State) -> String {
         PromptState::get(state)
             .open_prompt_id

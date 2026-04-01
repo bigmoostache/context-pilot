@@ -7,8 +7,7 @@
 use std::fmt::Write as _;
 
 use crossterm::event::KeyEvent;
-use ratatui::Frame;
-use ratatui::prelude::{Color, Line, Rect, Span, Style};
+use ratatui::prelude::{Color, Line, Span, Style};
 
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action, time_arith};
 use cp_base::state::actions::Action;
@@ -215,11 +214,84 @@ impl ChatRoomPanel {
 
         lines
     }
+
+    /// Render messages as IR blocks for platform-agnostic display.
+    fn render_messages_blocks(open: &OpenRoom) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
+
+        if open.messages.is_empty() {
+            return vec![Block::styled_text("  No messages yet".into(), Semantic::Muted)];
+        }
+
+        let mut blocks = Vec::new();
+
+        for msg in &open.messages {
+            let event_ref = open.event_id_to_ref.get(&msg.event_id).map_or_else(|| msg.event_id.clone(), Clone::clone);
+            let timestamp = format_timestamp_short(msg.timestamp);
+
+            // Truncate long messages for display
+            let body = if msg.body.len() > 120 {
+                let boundary = msg.body.floor_char_boundary(119);
+                format!("{}…", msg.body.get(..boundary).unwrap_or(""))
+            } else {
+                msg.body.clone()
+            };
+
+            blocks.push(Block::Line(vec![
+                S::muted(format!("  {timestamp} ")),
+                S::styled(format!("[{event_ref}] "), Semantic::Info),
+                S::warning(format!("{}: ", msg.sender_display_name)),
+                S::new(body),
+            ]));
+
+            // Reply indicator
+            if let Some(ref reply_to) = msg.reply_to {
+                let reply_ref = open.event_id_to_ref.get(reply_to).map_or_else(|| "?".to_string(), Clone::clone);
+                blocks.push(Block::Line(vec![S::muted(format!("    ↳ reply to {reply_ref}"))]));
+            }
+
+            // Reactions
+            if !msg.reactions.is_empty() {
+                let reactions_str: String = msg
+                    .reactions
+                    .iter()
+                    .map(|r| format!("{} {}", r.emoji, r.sender_name))
+                    .collect::<Vec<_>>()
+                    .join("  ");
+                blocks.push(Block::Line(vec![S::muted(format!("    {reactions_str}"))]));
+            }
+
+            // Media indicator
+            if let Some(ref path) = msg.media_path {
+                blocks.push(Block::Line(vec![S::styled(format!("    📎 {path}"), Semantic::Info)]));
+            }
+        }
+
+        blocks
+    }
 }
 
 // -- Panel trait implementation -----------------------------------------------
 
 impl Panel for ChatRoomPanel {
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic};
+
+        let cs = ChatState::get(state);
+
+        // Find the OpenRoom that corresponds to this panel
+        for ctx in &state.context {
+            if ctx.context_type.as_str().starts_with("chat:")
+                && ctx.context_type.as_str() != "chat-dashboard"
+                && let Some(room_id) = ctx.get_meta_str("room_id")
+                && let Some(open) = cs.open_rooms.get(room_id)
+            {
+                return Self::render_messages_blocks(open);
+            }
+        }
+
+        vec![Block::styled_text("  Room not connected".into(), Semantic::Muted)]
+    }
     fn title(&self, state: &State) -> String {
         let cs = ChatState::get(state);
         // Find the room_id from the context entry, then look up the display name
@@ -280,8 +352,6 @@ impl Panel for ChatRoomPanel {
     fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
-
-    fn render(&self, _frame: &mut Frame<'_>, _state: &mut State, _area: Rect) {}
 
     fn refresh(&self, state: &mut State) {
         // Each room panel refreshes its YAML context from ChatState.

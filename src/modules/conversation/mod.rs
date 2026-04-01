@@ -11,6 +11,8 @@ mod render_input;
 /// Best-effort JSON field extraction for streaming tool call display.
 mod render_json;
 
+pub(crate) use panel::build_content_cached;
+
 use crate::app::panels::Panel;
 use crate::infra::tools::{ToolDefinition, ToolResult, ToolUse};
 use crate::state::{Kind, State, TypeMeta};

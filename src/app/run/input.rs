@@ -9,8 +9,8 @@ use crate::infra::watcher::FileWatcher;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::{build_message_op, build_save_batch};
 use crate::state::{Message, State};
+use crate::ui::TypewriterBuffer;
 use crate::ui::help::CommandPalette;
-use crate::ui::typewriter::TypewriterBuffer;
 use cp_base::panels::now_ms;
 
 impl App {

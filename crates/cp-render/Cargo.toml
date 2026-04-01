@@ -1,20 +1,16 @@
 [package]
-name = "cp-mod-files"
+name = "cp-render"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Context Pilot module"
+description = "Context Pilot intermediate rendering representation"
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
 
 [dependencies]
-cp-base.workspace = true
-cp-render.workspace = true
-ratatui.workspace = true
-crossterm.workspace = true
-serde_json.workspace = true
+serde = { version = "1.0", features = ["derive"] }
 
 [lints]
 workspace = true

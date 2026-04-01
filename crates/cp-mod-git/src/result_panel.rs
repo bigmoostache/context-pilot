@@ -99,6 +99,40 @@ impl Panel for GitResultPanel {
         scroll_key_action(key)
     }
 
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
+
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
+
+        let Some(ctx) = ctx else {
+            return vec![Block::styled_text(" No git result panel".into(), Semantic::Muted)];
+        };
+
+        let Some(content) = &ctx.cached_content else {
+            return vec![Block::Line(vec![S::muted(" Loading...".into()).italic()])];
+        };
+
+        content
+            .lines()
+            .map(|line| {
+                let (sem, bold) = if line.starts_with('+') && !line.starts_with("+++") {
+                    (Semantic::DiffAdd, false)
+                } else if line.starts_with('-') && !line.starts_with("---") {
+                    (Semantic::DiffRemove, false)
+                } else if line.starts_with("@@") {
+                    (Semantic::Accent, false)
+                } else if line.starts_with("diff --git") || line.starts_with("+++") || line.starts_with("---") {
+                    (Semantic::Code, true)
+                } else if line.starts_with("commit ") {
+                    (Semantic::Accent, true)
+                } else {
+                    (Semantic::Default, false)
+                };
+                let span = S::styled(format!(" {line}"), sem);
+                Block::Line(vec![if bold { span.bold() } else { span }])
+            })
+            .collect()
+    }
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
             && ctx.context_type.as_str() == Kind::GIT_RESULT
@@ -175,5 +209,4 @@ impl Panel for GitResultPanel {
     fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }

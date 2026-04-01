@@ -108,8 +108,67 @@ impl Panel for LogsPanel {
         false
     }
 
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        struct IrCtx<'src> {
+            all_logs: &'src [LogEntry],
+            open_ids: &'src [String],
+        }
 
+        fn render_log_ir(blocks: &mut Vec<Block>, entry: &LogEntry, ctx: &IrCtx<'_>, depth: usize) {
+            let indent = "  ".repeat(depth);
+            let time_str = format_timestamp(entry.timestamp_ms);
+
+            if entry.is_summary() {
+                let is_open = ctx.open_ids.contains(&entry.id);
+                let icon = if is_open { "▼" } else { "▶" };
+
+                let mut spans = vec![
+                    S::new(indent),
+                    S::accent(format!("{icon} ")),
+                    S::styled(format!("{} ", entry.id), Semantic::AccentDim),
+                    S::muted(format!("{time_str} ")),
+                    S::new(entry.content.clone()),
+                ];
+
+                if !is_open {
+                    spans.push(S::muted(format!(" ({} children)", entry.children_ids.len())));
+                }
+
+                blocks.push(Block::Line(spans));
+
+                if is_open {
+                    for child_id in &entry.children_ids {
+                        if let Some(child) = ctx.all_logs.iter().find(|l| l.id == *child_id) {
+                            render_log_ir(blocks, child, ctx, depth.saturating_add(1));
+                        }
+                    }
+                }
+            } else {
+                blocks.push(Block::Line(vec![
+                    S::new(indent),
+                    S::styled(format!("{} ", entry.id), Semantic::AccentDim),
+                    S::muted(format!("{time_str} ")),
+                    S::new(entry.content.clone()),
+                ]));
+            }
+        }
+
+        use cp_render::{Block, Semantic, Span as S};
+
+        let ls = LogsState::get(state);
+        if ls.logs.is_empty() {
+            return vec![Block::Line(vec![S::muted("No logs yet".into()).italic()])];
+        }
+
+        let ctx = IrCtx { all_logs: &ls.logs, open_ids: &ls.open_log_ids };
+        let mut blocks = Vec::new();
+        let top_level: Vec<&LogEntry> = ls.logs.iter().filter(|l| l.is_top_level()).collect();
+
+        for log in &top_level {
+            render_log_ir(&mut blocks, log, &ctx, 0);
+        }
+        blocks
+    }
     fn title(&self, _state: &State) -> String {
         "Logs".to_string()
     }

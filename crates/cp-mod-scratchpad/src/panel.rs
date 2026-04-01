@@ -37,6 +37,45 @@ impl Panel for ScratchpadPanel {
         scroll_key_action(key)
     }
 
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Span as S};
+
+        let ss = ScratchpadState::get(state);
+
+        if ss.scratchpad_cells.is_empty() {
+            return vec![
+                Block::Line(vec![S::muted("  No scratchpad cells".into()).italic()]),
+                Block::Line(vec![S::muted("  Use scratchpad_create_cell to add notes".into())]),
+            ];
+        }
+
+        let mut blocks = Vec::new();
+        for cell in &ss.scratchpad_cells {
+            blocks.push(Block::Line(vec![
+                S::new("  ".into()),
+                S::accent(cell.id.clone()).bold(),
+                S::new(" ".into()),
+                S::new(cell.title.clone()).bold(),
+            ]));
+
+            let lines: Vec<&str> = cell.content.lines().take(5).collect();
+            for line in &lines {
+                blocks.push(Block::Line(vec![S::new("   ".into()), S::muted(line.to_string())]));
+            }
+
+            let total_lines = cell.content.lines().count();
+            if total_lines > 5 {
+                blocks.push(Block::Line(vec![
+                    S::new("   ".into()),
+                    S::muted(format!("... ({} more lines)", total_lines.saturating_sub(5))).italic(),
+                ]));
+            }
+
+            blocks.push(Block::Empty);
+        }
+
+        blocks
+    }
     fn title(&self, _state: &State) -> String {
         "Scratchpad".to_string()
     }
@@ -96,7 +135,6 @@ impl Panel for ScratchpadPanel {
     fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
         false
     }
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let ss = ScratchpadState::get(state);

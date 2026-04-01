@@ -95,6 +95,21 @@ impl Panel for Results {
         scroll_key_action(key)
     }
 
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
+
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(BRAVE_PANEL_TYPE));
+
+        let Some(ctx) = ctx else {
+            return vec![Block::styled_text(" No brave result panel".into(), Semantic::Muted)];
+        };
+
+        let Some(content) = &ctx.cached_content else {
+            return vec![Block::Line(vec![S::muted(" Loading...".into()).italic()])];
+        };
+
+        content.lines().map(|line| Block::text(format!(" {line}"))).collect()
+    }
     fn title(&self, state: &State) -> String {
         state.context.get(state.selected_context).map_or_else(|| "Brave Result".to_string(), |ctx| ctx.name.clone())
     }
@@ -125,8 +140,6 @@ impl Panel for Results {
     fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
-
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
         let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(BRAVE_PANEL_TYPE));

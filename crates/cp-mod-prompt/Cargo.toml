@@ -11,6 +11,7 @@ readme.workspace = true
 
 [dependencies]
 cp-base.workspace = true
+cp-render.workspace = true
 cp-mod-files = { path = "../cp-mod-files" }
 crossterm.workspace = true
 ratatui.workspace = true

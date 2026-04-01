@@ -15,6 +15,9 @@ impl Panel for ToolsPanel {
         scroll_key_action(key)
     }
 
+    fn blocks(&self, _state: &State) -> Vec<cp_render::Block> {
+        Vec::new()
+    }
     fn title(&self, _state: &State) -> String {
         "Configuration".to_string()
     }
@@ -88,8 +91,6 @@ impl Panel for ToolsPanel {
     fn suicide(&self, _ctx: &crate::state::Entry, _state: &State) -> bool {
         false
     }
-
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }
 
 /// Generate the plain-text/markdown tools context sent to the LLM.

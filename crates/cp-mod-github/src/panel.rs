@@ -115,8 +115,49 @@ impl Panel for GithubResultPanel {
         false
     }
 
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
 
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
+
+        let Some(ctx) = ctx else {
+            return vec![Block::styled_text(" No GitHub result panel".into(), Semantic::Muted)];
+        };
+
+        let Some(content) = &ctx.cached_content else {
+            return vec![Block::Line(vec![S::muted(" Loading...".into()).italic()])];
+        };
+
+        content
+            .lines()
+            .map(|line| {
+                if line.contains('\t') {
+                    let parts: Vec<&str> = line.split('\t').collect();
+                    let mut spans = vec![S::new(" ".into())];
+                    for (i, part) in parts.iter().enumerate() {
+                        if i > 0 {
+                            spans.push(S::new("  ".into()));
+                        }
+                        let sem = match i {
+                            0 => Semantic::Accent,
+                            1 => match part.trim() {
+                                "OPEN" => Semantic::Success,
+                                "CLOSED" => Semantic::Error,
+                                "MERGED" => Semantic::Accent,
+                                _ => Semantic::Code,
+                            },
+                            2 => Semantic::Default,
+                            _ => Semantic::Muted,
+                        };
+                        spans.push(S::styled(part.to_string(), sem));
+                    }
+                    Block::Line(spans)
+                } else {
+                    Block::text(format!(" {line}"))
+                }
+            })
+            .collect()
+    }
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
             && ctx.context_type.as_str() == Kind::GITHUB_RESULT

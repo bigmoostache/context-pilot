@@ -4,6 +4,8 @@
 //! panels), and commands (input shortcuts), plus a library editor for inline
 //! content editing.
 
+/// IR block generation for the library panel (extracted for file size).
+mod library_blocks;
 /// Panel rendering for the prompt library overview.
 mod library_panel;
 /// Built-in agent and skill definitions seeded on first run.

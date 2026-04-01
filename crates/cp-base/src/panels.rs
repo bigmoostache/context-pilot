@@ -20,8 +20,7 @@ use std::any::Any;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ratatui::Frame;
-use ratatui::prelude::{Line, Rect, Style};
+use ratatui::prelude::{Line, Style};
 use sha2::{Digest as _, Sha256};
 
 use crossterm::event::{KeyCode, KeyEvent};
@@ -334,6 +333,16 @@ pub trait Panel {
     /// Generate the panel's content lines for rendering (uses 'static since we create owned data)
     fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>>;
 
+    /// Generate semantic IR blocks for platform-agnostic rendering.
+    ///
+    /// Override this to migrate a panel from ratatui-coupled `content()` to
+    /// the intermediate representation. The TUI adapter calls `blocks()`
+    /// first; if the result is non-empty it renders from IR, otherwise it
+    /// falls back to `content()`.
+    fn blocks(&self, _state: &State) -> Vec<cp_render::Block> {
+        Vec::new()
+    }
+
     /// Handle keyboard input for this panel
     /// Returns None to use default handling, Some(action) to override
     fn handle_key(&self, _key: &KeyEvent, _state: &State) -> Option<Action> {
@@ -405,7 +414,4 @@ pub trait Panel {
     fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
-
-    /// Render the panel to the frame (default: no-op, override in binary)
-    fn render(&self, _frame: &mut Frame<'_>, _state: &mut State, _area: Rect) {}
 }

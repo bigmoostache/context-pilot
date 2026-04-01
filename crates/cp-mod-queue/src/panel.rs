@@ -12,6 +12,54 @@ use std::fmt::Write as _;
 pub(crate) struct QueuePanel;
 
 impl Panel for QueuePanel {
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
+
+        let qs = QueueState::get(state);
+        let mut blocks = Vec::new();
+
+        blocks.push(Block::Line(vec![
+            S::muted("  This queue is shared between the main consciousness and background".into()).italic(),
+        ]));
+        blocks.push(Block::Line(vec![
+            S::muted("  reverie sub-agents. Items may appear here from either source.".into()).italic(),
+        ]));
+        blocks.push(Block::empty());
+
+        if !qs.active && qs.queued_calls.is_empty() {
+            blocks.push(Block::Line(vec![S::muted("  Queue inactive.".into())]));
+            return blocks;
+        }
+
+        let (status_text, status_sem) =
+            if qs.active { ("Active", Semantic::Accent) } else { ("Paused", Semantic::Warning) };
+        blocks.push(Block::Line(vec![
+            S::muted("  Queue ".into()),
+            S::styled(status_text.into(), status_sem).bold(),
+            S::muted(format!(" — {} action(s)", qs.queued_calls.len())),
+        ]));
+        blocks.push(Block::empty());
+
+        for call in &qs.queued_calls {
+            let params = serde_json::to_string(&call.input).unwrap_or_default();
+            let short = if params.len() > 80 {
+                let mut end = 77;
+                while !params.is_char_boundary(end) {
+                    end = end.saturating_sub(1);
+                }
+                format!("{}...", params.get(..end).unwrap_or(""))
+            } else {
+                params
+            };
+            blocks.push(Block::Line(vec![
+                S::muted(format!("  {}. ", call.index)),
+                S::accent(call.tool_name.clone()).bold(),
+                S::muted(format!("({short})")),
+            ]));
+        }
+
+        blocks
+    }
     fn title(&self, state: &State) -> String {
         let qs = QueueState::get(state);
         if qs.active { format!("Queue ({})", qs.queued_calls.len()) } else { "Queue".to_string() }
@@ -77,7 +125,6 @@ impl Panel for QueuePanel {
     fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
         false
     }
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 
     fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         let qs = QueueState::get(state);
