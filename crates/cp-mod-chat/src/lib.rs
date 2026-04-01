@@ -91,8 +91,11 @@ impl Module for ChatModule {
 
         // Register this project's bot user, create its room, set display name
         if let Err(e) = bootstrap::project_post_start(state) {
+            drop(std::fs::write(".context-pilot/matrix/init_debug.log", format!("project_post_start FAILED: {e}\n")));
             log::warn!("Project post-start setup failed: {e}");
             // Non-fatal — client can still connect with existing credentials
+        } else {
+            drop(std::fs::write(".context-pilot/matrix/init_debug.log", "project_post_start OK\n"));
         }
 
         if let Err(e) = client::connect() {

@@ -328,8 +328,8 @@ pub(crate) fn create_default_room(access_token: &str) -> Result<(), String> {
         return Ok(());
     }
 
-    let resp_body = response_str.split("\r\n\r\n").nth(1).unwrap_or("");
-    let resp: serde_json::Value = serde_json::from_str(resp_body).unwrap_or_default();
+    let resp_body = crate::server::extract_body(&response_str);
+    let resp: serde_json::Value = serde_json::from_str(&resp_body).unwrap_or_default();
     let errcode = resp.get("errcode").and_then(serde_json::Value::as_str).unwrap_or("");
 
     if errcode == "M_ROOM_IN_USE" {

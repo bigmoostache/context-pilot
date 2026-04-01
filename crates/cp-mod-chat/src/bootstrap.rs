@@ -84,7 +84,14 @@ pub(crate) fn project_post_start(state: &mut State) -> Result<(), String> {
     }
 
     // 1. Register this project's bot account on the homeserver
-    let creds = account::register_bot_account()?;
+    let creds = match account::register_bot_account() {
+        Ok(c) => c,
+        Err(e) => {
+            // Temporary debug trace — write to file so we can see what went wrong
+            drop(std::fs::write(".context-pilot/matrix/registration_debug.log", format!("Registration failed: {e}\n")));
+            return Err(e);
+        }
+    };
 
     // 2. Persist the credentials (per-project)
     account::save_credentials(&creds_path, &creds)?;

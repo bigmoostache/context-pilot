@@ -114,6 +114,62 @@ fn is_pid_alive(pid: u32) -> bool {
 
 // -- UDS HTTP helpers --------------------------------------------------------
 
+/// Decode an HTTP chunked transfer-encoded body.
+///
+/// Format: `<hex-size>\r\n<data>\r\n` repeated, terminated by `0\r\n\r\n`.
+/// Returns the reassembled body. If the input doesn't look chunked
+/// (no valid hex prefix), returns it unchanged as a fallback.
+fn decode_chunked(raw: &str) -> String {
+    let mut result = String::with_capacity(raw.len());
+    let mut remaining = raw;
+
+    loop {
+        let Some(size_end) = remaining.find("\r\n") else {
+            return if result.is_empty() { raw.to_string() } else { result };
+        };
+
+        let size_str = remaining.get(..size_end).unwrap_or("");
+        let chunk_size = match usize::from_str_radix(size_str.trim(), 16) {
+            Ok(0) => return result, // Terminal chunk
+            Ok(n) => n,
+            Err(_) => return if result.is_empty() { raw.to_string() } else { result },
+        };
+
+        // Skip past "<size>\r\n"
+        let data_start = size_end.saturating_add(2);
+        let data_end = data_start.saturating_add(chunk_size);
+
+        if data_end > remaining.len() {
+            if let Some(data) = remaining.get(data_start..) {
+                result.push_str(data);
+            }
+            return result;
+        }
+
+        if let Some(chunk) = remaining.get(data_start..data_end) {
+            result.push_str(chunk);
+        }
+
+        // Skip past data + \r\n
+        remaining = remaining.get(data_end.saturating_add(2)..).unwrap_or("");
+    }
+}
+
+/// Extract the HTTP response body, handling chunked transfer encoding.
+///
+/// Splits headers from body at the first `\r\n\r\n` boundary, then
+/// decodes chunked encoding if the `transfer-encoding: chunked` header
+/// is present.
+pub(crate) fn extract_body(response: &str) -> String {
+    let (headers, raw_body) = response.split_once("\r\n\r\n").unwrap_or((response, ""));
+
+    let is_chunked = headers.lines().any(|line| {
+        line.to_ascii_lowercase().starts_with("transfer-encoding:") && line.to_ascii_lowercase().contains("chunked")
+    });
+
+    if is_chunked { decode_chunked(raw_body) } else { raw_body.to_string() }
+}
+
 /// Send a raw HTTP/1.1 GET request over a Unix domain socket.
 ///
 /// Returns the response body on success (HTTP 2xx), or an error
@@ -135,9 +191,7 @@ fn uds_get(path: &str) -> Result<String, String> {
     let status_code = status_line.split_whitespace().nth(1).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
 
     if (200..300).contains(&status_code) {
-        // Extract body after \r\n\r\n
-        let body = response.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
-        Ok(body)
+        Ok(extract_body(&response))
     } else {
         Err(format!("HTTP {status_code}: {status_line}"))
     }
@@ -165,7 +219,7 @@ pub(crate) fn uds_post(path: &str, json_body: &str) -> Result<(u16, String), Str
     let status_line = response_str.lines().next().unwrap_or("");
     let status_code = status_line.split_whitespace().nth(1).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
 
-    let body = response_str.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+    let body = extract_body(&response_str);
     Ok((status_code, body))
 }
 
@@ -190,7 +244,7 @@ pub(crate) fn uds_put(path: &str, json_body: &str, access_token: &str) -> Result
     let status_line = response_str.lines().next().unwrap_or("");
     let status_code = status_line.split_whitespace().nth(1).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
 
-    let body = response_str.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+    let body = extract_body(&response_str);
     Ok((status_code, body))
 }
 
