@@ -214,6 +214,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
         Cell::right("Acc", Style::default()),
         Cell::right("Cost", Style::default()),
         Cell::new("Hit", Style::default()),
+        Cell::right("❄", Style::default()),
         Cell::new("Refreshed", Style::default()),
         Cell::new("Details", Style::default()),
     ];
@@ -235,6 +236,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
         Cell::right(format_number(accumulated), Style::default().fg(theme::text_muted())),
         Cell::right("—", Style::default().fg(theme::text_muted())),
         Cell::new("—", Style::default().fg(theme::text_muted())),
+        Cell::right("—", Style::default().fg(theme::text_muted())),
         Cell::new("—", Style::default().fg(theme::text_muted())),
         Cell::new("", Style::default()),
     ]);
@@ -250,6 +252,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
         Cell::right(format_number(accumulated), Style::default().fg(theme::text_muted())),
         Cell::right("—", Style::default().fg(theme::text_muted())),
         Cell::new("—", Style::default().fg(theme::text_muted())),
+        Cell::right("—", Style::default().fg(theme::text_muted())),
         Cell::new("—", Style::default().fg(theme::text_muted())),
         Cell::new("", Style::default()),
     ]);
@@ -293,6 +296,9 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
         let (hit_str, hit_color) =
             if ctx.panel_cache_hit { ("\u{2713}", theme::success()) } else { ("\u{2717}", theme::error()) };
 
+        let freeze_str = if ctx.total_freezes > 0 { format!("{}", ctx.total_freezes) } else { String::new() };
+        let freeze_color = if ctx.total_freezes > 0 { theme::accent_dim() } else { theme::text_muted() };
+
         accumulated = accumulated.saturating_add(ctx.token_count);
 
         rows.push(vec![
@@ -302,6 +308,7 @@ pub(super) fn render_context_elements(state: &State, base_style: Style) -> Vec<L
             Cell::right(format_number(accumulated), Style::default().fg(theme::text_muted())),
             Cell::right(cost_str, Style::default().fg(theme::text_muted())),
             Cell::new(hit_str, Style::default().fg(hit_color)),
+            Cell::right(freeze_str, Style::default().fg(freeze_color)),
             Cell::new(refreshed, Style::default().fg(theme::text_muted())),
             Cell::new(truncated_details, Style::default().fg(theme::text_muted())),
         ]);
