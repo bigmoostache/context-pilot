@@ -232,9 +232,12 @@ pub struct Entry {
     /// Consecutive times this panel's changed content was suppressed to preserve the cache prefix.
     #[serde(skip)]
     pub freeze_count: u8,
-    /// Total lifetime freezes — how many times this panel was frozen instead of updated. Never resets.
-    #[serde(skip)]
+    /// Total lifetime freezes — how many times this panel was frozen instead of updated. Persisted.
+    #[serde(default)]
     pub total_freezes: u64,
+    /// Total lifetime cache misses — how many times this panel's content changed and was emitted. Persisted.
+    #[serde(default)]
+    pub total_cache_misses: u64,
     /// Content string last emitted to the LLM (used as substitute when frozen).
     #[serde(skip)]
     pub last_emitted_content: Option<String>,
@@ -310,6 +313,7 @@ pub fn make_default_entry(id: &str, context_type: Kind, name: &str, cache_deprec
         panel_total_cost: 0.0,
         freeze_count: 0,
         total_freezes: 0,
+        total_cache_misses: 0,
         last_emitted_content: None,
         last_emitted_hash: None,
     }

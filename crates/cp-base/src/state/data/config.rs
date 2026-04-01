@@ -183,6 +183,12 @@ pub struct PanelData {
     /// Accumulated panel cost in USD (never resets)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub panel_total_cost: Option<f64>,
+    /// Total lifetime freezes (persisted across reloads)
+    #[serde(default)]
+    pub total_freezes: u64,
+    /// Total lifetime cache misses (persisted across reloads)
+    #[serde(default)]
+    pub total_cache_misses: u64,
 }
 
 /// UIDs for important/fixed panels that a worker uses.

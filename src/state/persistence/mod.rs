@@ -239,6 +239,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> Entry {
         panel_total_cost: panel.panel_total_cost.unwrap_or(0.0),
         freeze_count: 0,
         total_freezes: 0,
+        total_cache_misses: 0,
         last_emitted_content: None,
         last_emitted_hash: None,
     }
@@ -370,6 +371,8 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
                 metadata: ctx.metadata.clone(),
                 content_hash: ctx.content_hash.clone(),
                 panel_total_cost: (ctx.panel_total_cost > 0.0).then_some(ctx.panel_total_cost),
+                total_freezes: ctx.total_freezes,
+                total_cache_misses: ctx.total_cache_misses,
             };
             if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
                 writes.push(WriteOp { path: panels_dir.join(format!("{uid}.json")), content: json.into_bytes() });

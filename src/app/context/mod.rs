@@ -108,6 +108,7 @@ pub(super) fn prepare_stream_context(
                     entry.freeze_count = 0;
                     entry.last_emitted_content = Some(item.content.clone());
                     entry.last_emitted_hash = Some(fresh_hash.clone());
+                    entry.total_cache_misses = entry.total_cache_misses.saturating_add(1);
                     emitted_hash = fresh_hash;
                     cache_broken = true;
                 } else if entry.freeze_count < max_freezes
@@ -123,6 +124,7 @@ pub(super) fn prepare_stream_context(
                     entry.freeze_count = 0;
                     entry.last_emitted_content = Some(item.content.clone());
                     entry.last_emitted_hash = Some(fresh_hash.clone());
+                    entry.total_cache_misses = entry.total_cache_misses.saturating_add(1);
                     emitted_hash = fresh_hash;
                     cache_broken = true;
                 }
