@@ -1387,3 +1387,8 @@
 15:13:35.949250539 fmt src/modules/overview/context.rs
 15:13:40.606484105 fmt src/modules/overview/render.rs
 15:13:40.657248770 fmt src/modules/overview/context.rs
+15:39:19.917980090 fmt src/app/context/detach.rs
+15:39:51.824355952 fmt src/app/context/detach.rs
+15:39:59.484136263 fmt src/app/context/detach.rs
+15:40:08.804134748 fmt src/app/context/detach.rs
+15:40:18.964944016 fmt src/app/context/detach.rs

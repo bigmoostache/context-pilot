@@ -7,6 +7,7 @@ use crate::infra::constants::{
     DETACH_CHUNK_MIN_MESSAGES, DETACH_CHUNK_MIN_TOKENS, DETACH_KEEP_MIN_MESSAGES, DETACH_KEEP_MIN_TOKENS,
 };
 use crate::modules::conversation::refresh::estimate_message_tokens;
+use crate::state::cache::hash_content;
 use crate::state::{Entry, Kind, Message, MsgKind, MsgStatus, compute_total_pages, estimate_tokens};
 use cp_base::panels::time_arith;
 
@@ -179,7 +180,7 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
             name: chunk_name,
             token_count,
             metadata: std::collections::HashMap::new(),
-            cached_content: Some(content),
+            cached_content: Some(content.clone()),
             history_messages: Some(history_msgs),
             cache_deprecated: false,
             cache_in_flight: false,
@@ -194,8 +195,8 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
             freeze_count: 0,
             total_freezes: 0,
             total_cache_misses: 0,
-            last_emitted_content: None,
-            last_emitted_hash: None,
+            last_emitted_hash: Some(hash_content(&content)),
+            last_emitted_content: Some(content),
         });
 
         // 8. Remove detached messages from state and disk
