@@ -79,7 +79,6 @@ jobs:
         chmod 755 "${PKG}/DEBIAN/postinst"
 
         dpkg-deb --build "${PKG}"
-        mv "${PKG}.deb" "cpilot_${VERSION}_amd64.deb"
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
