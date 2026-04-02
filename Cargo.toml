@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-mod-callback", "crates/cp-mod-chat", "crates/cp-mod-console", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-preset", "crates/cp-mod-typst", "crates/cp-mod-brave", "crates/cp-mod-firecrawl"]
+members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-mod-callback", "crates/cp-mod-chat", "crates/cp-mod-console", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-preset", "crates/cp-mod-typst", "crates/cp-mod-brave", "crates/cp-mod-firecrawl"]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,6 +13,7 @@ readme = "README.md"
 
 [workspace.dependencies]
 cp-base = { path = "crates/cp-base" }
+cp-render = { path = "crates/cp-render" }
 ratatui = "0.30"
 crossterm = "0.29"
 serde = { version = "1.0", features = ["derive"] }
@@ -1004,6 +1005,7 @@ categories.workspace = true
 
 [dependencies]
 cp-base.workspace = true
+cp-render = { path = "crates/cp-render" }
 log = "0.4"
 cp-mod-console = { path = "crates/cp-mod-console" }
 cp-mod-callback = { path = "crates/cp-mod-callback" }

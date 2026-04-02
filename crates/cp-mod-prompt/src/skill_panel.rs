@@ -1,8 +1,7 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Span, Style};
 
 use crate::types::PromptState;
-use cp_base::config::accessors::theme;
+
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action};
 use cp_base::state::actions::Action;
 use cp_base::state::context::{Entry, Kind, estimate_tokens};
@@ -40,8 +39,31 @@ impl Panel for SkillPanel {
         false
     }
 
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
 
+        let selected = state.context.get(state.selected_context);
+        if let Some(ctx) = selected
+            && ctx.context_type == Kind::new(Kind::SKILL)
+            && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id")
+            && let Some(skill) = PromptState::get(state).skills.iter().find(|s| s.id == skill_id)
+        {
+            let mut blocks = vec![
+                Block::Line(vec![
+                    S::muted("Skill: ".into()),
+                    S::accent(format!("[{}] {}", skill.id, skill.name)).bold(),
+                ]),
+                Block::Line(vec![S::styled(skill.description.clone(), Semantic::Code)]),
+                Block::Empty,
+            ];
+            for line in skill.content.lines() {
+                blocks.push(Block::text(line.to_string()));
+            }
+            return blocks;
+        }
+
+        vec![Block::styled_text("Skill not found".into(), Semantic::Error)]
+    }
     fn title(&self, state: &State) -> String {
         // Find the skill name from the selected context element
         let selected = state.context.get(state.selected_context);
@@ -53,34 +75,6 @@ impl Panel for SkillPanel {
             return format!("Skill: {}", skill.name);
         }
         "Skill".to_string()
-    }
-
-    fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        let mut lines = Vec::new();
-
-        // Find the skill panel context element that is currently selected
-        let selected = state.context.get(state.selected_context);
-        if let Some(ctx) = selected
-            && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id")
-            && let Some(skill) = PromptState::get(state).skills.iter().find(|s| s.id == skill_id)
-        {
-            lines.push(Line::from(vec![
-                Span::styled("Skill: ", Style::default().fg(theme::text_muted())),
-                Span::styled(format!("[{}] {}", skill.id, skill.name), Style::default().fg(theme::accent()).bold()),
-            ]));
-            lines.push(Line::from(Span::styled(
-                skill.description.clone(),
-                Style::default().fg(theme::text_secondary()),
-            )));
-            lines.push(Line::from(""));
-            for line in skill.content.lines() {
-                lines.push(Line::from(Span::styled(line.to_string(), Style::default().fg(theme::text()))));
-            }
-            return lines;
-        }
-
-        lines.push(Line::from(Span::styled("Skill not found", Style::default().fg(theme::error()))));
-        lines
     }
 
     fn refresh(&self, state: &mut State) {

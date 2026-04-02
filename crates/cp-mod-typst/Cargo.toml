@@ -11,6 +11,7 @@ readme.workspace = true
 
 [dependencies]
 cp-base.workspace = true
+cp-render = { path = "../cp-render" }
 cp-mod-callback = { path = "../cp-mod-callback" }
 serde.workspace = true
 serde_json.workspace = true
@@ -18,7 +19,6 @@ chrono.workspace = true
 typst = "0.13"
 typst-pdf = "0.13"
 reqwest = { workspace = true }
-ratatui.workspace = true
 flate2 = "1"
 tar = "0.4"
 

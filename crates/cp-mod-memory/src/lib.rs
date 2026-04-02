@@ -232,11 +232,7 @@ impl Module for MemoryModule {
         None
     }
 
-    fn overview_render_sections(
-        &self,
-        _state: &State,
-        _base_style: ratatui::prelude::Style,
-    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
         vec![]
     }
 
@@ -276,50 +272,43 @@ impl Module for MemoryModule {
 
 /// Visualizer for memory tool results.
 /// Colors importance levels and highlights created/updated memory summaries.
-fn visualize_memory_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::{Color, Line, Span, Style};
+fn visualize_memory_output(content: &str, width: usize) -> Vec<cp_render::Block> {
+    use cp_render::{Block, Span};
 
-    let critical_color = Color::Rgb(255, 85, 85); // Red for critical
-    let high_color = Color::Rgb(255, 184, 108); // Orange for high
-    let medium_color = Color::Rgb(241, 250, 140); // Yellow for medium
-    let low_color = Color::Rgb(139, 233, 253); // Cyan for low
-    let success_color = Color::Rgb(80, 250, 123); // Green for success messages
-    let error_color = Color::Rgb(255, 85, 85); // Red for errors
+    content
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                return Block::empty();
+            }
+            // Memory visualizer uses RGB for the importance gradient
+            let rgb = if line.starts_with("Error:") {
+                (255, 85, 85)
+            } else if line.starts_with("Created") || line.starts_with("Updated") {
+                (80, 250, 123)
+            } else if line.contains("critical") {
+                (255, 85, 85)
+            } else if line.contains("high") {
+                (255, 184, 108)
+            } else if line.contains("medium") {
+                (241, 250, 140)
+            } else if line.contains("low")
+                || (line.starts_with('M') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()))
+            {
+                (139, 233, 253)
+            } else {
+                return Block::text(truncate_mem_line(line, width));
+            };
+            Block::Line(vec![Span::rgb(truncate_mem_line(line, width), rgb.0, rgb.1, rgb.2)])
+        })
+        .collect()
+}
 
-    let mut lines = Vec::new();
-
-    for line in content.lines() {
-        if line.is_empty() {
-            lines.push(Line::from(""));
-            continue;
-        }
-
-        let style = if line.starts_with("Error:") {
-            Style::default().fg(error_color)
-        } else if line.starts_with("Created") || line.starts_with("Updated") {
-            Style::default().fg(success_color)
-        } else if line.contains("critical") {
-            Style::default().fg(critical_color)
-        } else if line.contains("high") {
-            Style::default().fg(high_color)
-        } else if line.contains("medium") {
-            Style::default().fg(medium_color)
-        } else if line.contains("low") {
-            Style::default().fg(low_color)
-        } else if line.starts_with('M') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
-            // Memory IDs like M1, M2
-            Style::default().fg(low_color)
-        } else {
-            Style::default()
-        };
-
-        let display = if line.len() > width {
-            format!("{}...", &line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
-        } else {
-            line.to_string()
-        };
-        lines.push(Line::from(Span::styled(display, style)));
+/// Truncate a line for memory visualizer output.
+fn truncate_mem_line(line: &str, width: usize) -> String {
+    if line.len() > width {
+        format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
+    } else {
+        line.to_string()
     }
-
-    lines
 }

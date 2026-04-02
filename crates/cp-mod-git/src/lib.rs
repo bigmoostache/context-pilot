@@ -327,11 +327,7 @@ impl Module for GitModule {
     fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
         None
     }
-    fn overview_render_sections(
-        &self,
-        _state: &State,
-        _base_style: ratatui::prelude::Style,
-    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
         vec![]
     }
     fn on_close_context(
@@ -350,63 +346,47 @@ impl Module for GitModule {
 }
 
 /// Visualizer for `git_execute` tool results.
-/// Color-codes git command output with branch names in cyan, status indicators,
-/// diff hunks with +/- in green/red, file names in yellow.
-fn visualize_git_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::{Color, Line, Span, Style};
+/// Color-codes git command output with branch names, status indicators,
+/// diff hunks with +/- in green/red, file names highlighted.
+fn visualize_git_output(content: &str, width: usize) -> Vec<cp_render::Block> {
+    use cp_render::{Block, Semantic, Span};
 
-    let success_color = Color::Rgb(80, 250, 123); // Green
-    let error_color = Color::Rgb(255, 85, 85); // Red
-    let branch_color = Color::Rgb(139, 233, 253); // Cyan
-    let warning_color = Color::Rgb(241, 250, 140); // Yellow
-    let secondary_color = Color::Rgb(150, 150, 170); // Gray
-
-    let mut lines = Vec::new();
-
-    for line in content.lines() {
-        if line.is_empty() {
-            lines.push(Line::from(""));
-            continue;
-        }
-
-        // Determine color based on line content
-        let style = if line.starts_with("Panel created:") || line.starts_with("Panel updated:") {
-            Style::default().fg(success_color)
-        } else if line.starts_with("Error:") || line.starts_with("fatal:") || line.starts_with("error:") {
-            Style::default().fg(error_color)
-        } else if line.starts_with("+ ") || line.starts_with("+++ ") {
-            // Git diff additions
-            Style::default().fg(success_color)
-        } else if line.starts_with("- ") || line.starts_with("--- ") {
-            // Git diff deletions
-            Style::default().fg(error_color)
-        } else if line.starts_with("@@") {
-            // Diff hunk headers
-            Style::default().fg(branch_color)
-        } else if line.starts_with("commit ") || line.starts_with("Author:") || line.starts_with("Date:") {
-            // Git log headers
-            Style::default().fg(branch_color)
-        } else if line.starts_with("* ") || line.contains("HEAD ->") || line.contains("origin/") {
-            // Branch indicators
-            Style::default().fg(branch_color)
-        } else if line.starts_with("modified:") || line.starts_with("new file:") || line.starts_with("deleted:") {
-            // Git status file indicators
-            Style::default().fg(warning_color)
-        } else if line.starts_with('#') {
-            // Git comments
-            Style::default().fg(secondary_color)
-        } else {
-            Style::default()
-        };
-
-        // Truncate long lines
-        let display = if line.len() > width {
-            format!("{}...", &line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
-        } else {
-            line.to_string()
-        };
-        lines.push(Line::from(Span::styled(display, style)));
-    }
-
-    lines
+    content
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                return Block::empty();
+            }
+            let semantic = if line.starts_with("Panel created:") || line.starts_with("Panel updated:") {
+                Semantic::Success
+            } else if line.starts_with("Error:") || line.starts_with("fatal:") || line.starts_with("error:") {
+                Semantic::Error
+            } else if line.starts_with("+ ") || line.starts_with("+++ ") {
+                Semantic::DiffAdd
+            } else if line.starts_with("- ") || line.starts_with("--- ") {
+                Semantic::DiffRemove
+            } else if line.starts_with("@@")
+                || line.starts_with("commit ")
+                || line.starts_with("Author:")
+                || line.starts_with("Date:")
+                || line.starts_with("* ")
+                || line.contains("HEAD ->")
+                || line.contains("origin/")
+            {
+                Semantic::Info
+            } else if line.starts_with("modified:") || line.starts_with("new file:") || line.starts_with("deleted:") {
+                Semantic::Warning
+            } else if line.starts_with('#') {
+                Semantic::Muted
+            } else {
+                Semantic::Default
+            };
+            let display = if line.len() > width {
+                format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
+            } else {
+                line.to_string()
+            };
+            Block::Line(vec![Span::styled(display, semantic)])
+        })
+        .collect()
 }

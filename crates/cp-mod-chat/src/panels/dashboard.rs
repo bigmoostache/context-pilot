@@ -7,14 +7,12 @@
 use std::fmt::Write as _;
 
 use crossterm::event::KeyEvent;
-use ratatui::Frame;
-use ratatui::prelude::{Color, Line, Rect, Span, Style};
 
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action};
 use cp_base::state::actions::Action;
 use cp_base::state::context::{Entry, Kind, estimate_tokens};
 use cp_base::state::runtime::State;
-use cp_base::ui::{self, Cell, TextCell};
+use cp_base::ui::{self, TextCell};
 
 use crate::types::{ChatState, RoomInfo, ServerStatus};
 
@@ -131,149 +129,116 @@ impl ChatDashboardPanel {
         });
         sorted
     }
-
-    /// Build the TUI render lines for the room list as a table.
-    fn render_room_lines(cs: &ChatState) -> Vec<Line<'static>> {
-        if cs.rooms.is_empty() {
-            return vec![Line::from(Span::styled(
-                "  No rooms yet — use Chat_create_room or bridge a platform",
-                Style::default().fg(Color::DarkGray),
-            ))];
-        }
-
-        let sorted = Self::sorted_rooms(cs);
-
-        // Summary header
-        let total_unread: u64 = cs.rooms.iter().map(|r| r.unread_count).sum();
-        let bridged = cs.rooms.iter().filter(|r| r.bridge_source.is_some()).count();
-        let mut lines = vec![
-            Line::from(vec![
-                Span::styled("  Rooms ", Style::default().fg(Color::White)),
-                Span::styled(
-                    format!("{} total, {} bridged, {} unread", cs.rooms.len(), bridged, total_unread),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]),
-            Line::from(""),
-        ];
-
-        // Table via shared render_table helper
-        let accent = cp_base::config::accessors::theme::accent();
-        let header = [
-            Cell::new("ID", Style::default().fg(accent)),
-            Cell::new("Room", Style::default().fg(accent)),
-            Cell::new("Platform", Style::default().fg(accent)),
-            Cell::right("Unread", Style::default().fg(accent)),
-            Cell::new("Last Message", Style::default().fg(accent)),
-            Cell::new("Time", Style::default().fg(accent)),
-        ];
-
-        let rows: Vec<Vec<Cell>> = sorted.iter().map(|room| Self::room_tui_row(room, cs)).collect();
-        lines.extend(ui::render_table(
-            &header, &rows, None, 2, // indent
-        ));
-
-        lines
-    }
-
-    /// Build a single TUI cell row for the room table.
-    fn room_tui_row(room: &RoomInfo, cs: &ChatState) -> Vec<Cell> {
-        let ref_str = cs.room_id_to_ref.get(&room.room_id).map_or_else(|| "-".to_string(), Clone::clone);
-        let platform = room.bridge_source.map_or("Matrix", |b| b.label());
-        let name_color = if room.unread_count > 0 { Color::Yellow } else { Color::White };
-        let unread = if room.unread_count > 0 { room.unread_count.to_string() } else { "-".to_string() };
-        let unread_color = if room.unread_count > 0 { Color::Yellow } else { Color::DarkGray };
-        let (last_msg, last_time) = room.last_message.as_ref().map_or_else(
-            || ("-".to_string(), "-".to_string()),
-            |msg| {
-                let preview = format!("{}: {}", msg.sender_display_name, &msg.body);
-                let time = format_timestamp_short(msg.timestamp);
-                (preview, time)
-            },
-        );
-        vec![
-            Cell::new(ref_str, Style::default().fg(Color::Cyan)),
-            Cell::new(&room.display_name, Style::default().fg(name_color)),
-            Cell::new(platform, Style::default().fg(Color::DarkGray)),
-            Cell::right(unread, Style::default().fg(unread_color)),
-            Cell::new(last_msg, Style::default().fg(Color::DarkGray)),
-            Cell::new(last_time, Style::default().fg(Color::DarkGray)),
-        ]
-    }
-
-    /// Build search result render lines.
-    fn render_search_lines(cs: &ChatState) -> Vec<Line<'static>> {
-        let mut lines = Vec::new();
-        let Some(ref query) = cs.search_query else {
-            return lines;
-        };
-
-        lines.push(Line::from(""));
-        lines.push(Line::from(vec![
-            Span::styled("  Search: ", Style::default().fg(Color::White)),
-            Span::styled(format!("\"{query}\""), Style::default().fg(Color::Yellow)),
-        ]));
-
-        if cs.search_results.is_empty() {
-            lines.push(Line::from(Span::styled("  No results", Style::default().fg(Color::DarkGray))));
-        } else {
-            for sr in &cs.search_results {
-                lines.push(Line::from(vec![
-                    Span::styled(format!("  [{}] ", sr.room_name), Style::default().fg(Color::Cyan)),
-                    Span::styled(sr.sender.clone(), Style::default().fg(Color::White)),
-                    Span::styled(format!(": {}", truncate_body(&sr.body, 60)), Style::default().fg(Color::Gray)),
-                ]));
-            }
-        }
-
-        lines
-    }
 }
 
 impl Panel for ChatDashboardPanel {
-    fn title(&self, _state: &State) -> String {
-        "Chat".to_string()
-    }
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Align, Block, Cell as IrCell, Semantic, Span as S};
 
-    fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
         let cs = ChatState::get(state);
+        let mut blocks = Vec::new();
 
-        let status_line = match &cs.server_status {
-            ServerStatus::Stopped => {
-                Line::from(vec![Span::raw("  Server: "), Span::styled("● Stopped", Style::default().fg(Color::Red))])
-            }
-            ServerStatus::Starting => Line::from(vec![
-                Span::raw("  Server: "),
-                Span::styled("● Starting…", Style::default().fg(Color::Yellow)),
-            ]),
-            ServerStatus::Running => {
-                let sock = crate::server::global_socket_path()
-                    .map_or_else(|| "unknown".to_string(), |p| p.to_string_lossy().to_string());
-                let mut spans = vec![
-                    Span::raw("  Server: "),
-                    Span::styled("● Running", Style::default().fg(Color::Green)),
-                    Span::styled(format!(" (UDS: {sock})"), Style::default().fg(Color::DarkGray)),
-                ];
-                if let Some(ref uid) = cs.bot_user_id {
-                    spans.push(Span::styled(format!("  as {uid}"), Style::default().fg(Color::DarkGray)));
-                }
-                Line::from(spans)
-            }
-            ServerStatus::Error(e) => Line::from(vec![
-                Span::raw("  Server: "),
-                Span::styled(format!("● Error: {e}"), Style::default().fg(Color::Red)),
-            ]),
+        // Server status
+        let (status_text, status_sem) = match &cs.server_status {
+            ServerStatus::Stopped => ("● Stopped", Semantic::Error),
+            ServerStatus::Starting => ("● Starting…", Semantic::Warning),
+            ServerStatus::Running => ("● Running", Semantic::Success),
+            ServerStatus::Error(_) => ("● Error", Semantic::Error),
         };
 
-        let mut lines = vec![status_line, Line::from("")];
+        let mut status_spans = vec![S::muted("  Server: ".into()), S::styled(status_text.into(), status_sem)];
+        if matches!(cs.server_status, ServerStatus::Running) {
+            let sock = crate::server::global_socket_path()
+                .map_or_else(|| "unknown".to_string(), |p| p.to_string_lossy().to_string());
+            status_spans.push(S::muted(format!(" (UDS: {sock})")));
+            if let Some(ref uid) = cs.bot_user_id {
+                status_spans.push(S::muted(format!("  as {uid}")));
+            }
+        }
+        if let ServerStatus::Error(e) = &cs.server_status {
+            status_spans.push(S::error(format!(": {e}")));
+        }
+        blocks.push(Block::Line(status_spans));
+        blocks.push(Block::Empty);
 
-        // Room list (sorted by activity)
-        lines.extend(Self::render_room_lines(cs));
+        // Room list
+        if cs.rooms.is_empty() {
+            blocks
+                .push(Block::Line(vec![S::muted("  No rooms yet — use Chat_create_room or bridge a platform".into())]));
+        } else {
+            let sorted = Self::sorted_rooms(cs);
+            let total_unread: u64 = cs.rooms.iter().map(|r| r.unread_count).sum();
+            let bridged = cs.rooms.iter().filter(|r| r.bridge_source.is_some()).count();
 
-        // Search results (if active)
-        lines.extend(Self::render_search_lines(cs));
+            blocks.push(Block::Line(vec![
+                S::new("  Rooms ".into()),
+                S::muted(format!("{} total, {} bridged, {} unread", cs.rooms.len(), bridged, total_unread)),
+            ]));
+            blocks.push(Block::Empty);
 
-        lines
+            let rows: Vec<Vec<IrCell>> = sorted
+                .iter()
+                .map(|room| {
+                    let ref_str = cs.room_id_to_ref.get(&room.room_id).map_or_else(|| "-".to_string(), Clone::clone);
+                    let platform = room.bridge_source.map_or("Matrix", |b| b.label());
+                    let unread_str =
+                        if room.unread_count > 0 { room.unread_count.to_string() } else { "-".to_string() };
+                    let unread_sem = if room.unread_count > 0 { Semantic::Warning } else { Semantic::Muted };
+                    let name_sem = if room.unread_count > 0 { Semantic::Warning } else { Semantic::Default };
+                    let (last_msg, last_time) = room.last_message.as_ref().map_or_else(
+                        || ("-".to_string(), "-".to_string()),
+                        |msg| {
+                            let preview = format!("{}: {}", msg.sender_display_name, &msg.body);
+                            let time = format_timestamp_short(msg.timestamp);
+                            (preview, time)
+                        },
+                    );
+                    vec![
+                        IrCell::styled(ref_str, Semantic::Info),
+                        IrCell::styled(room.display_name.clone(), name_sem),
+                        IrCell::styled(platform.into(), Semantic::Muted),
+                        IrCell::right(S::styled(unread_str, unread_sem)),
+                        IrCell::styled(last_msg, Semantic::Muted),
+                        IrCell::styled(last_time, Semantic::Muted),
+                    ]
+                })
+                .collect();
+
+            blocks.push(Block::table(
+                vec![
+                    ("ID", Align::Left),
+                    ("Room", Align::Left),
+                    ("Platform", Align::Left),
+                    ("Unread", Align::Right),
+                    ("Last Message", Align::Left),
+                    ("Time", Align::Left),
+                ],
+                rows,
+            ));
+        }
+
+        // Search results
+        if let Some(ref query) = cs.search_query {
+            blocks.push(Block::Empty);
+            blocks.push(Block::Line(vec![S::new("  Search: ".into()), S::warning(format!("\"{query}\""))]));
+
+            if cs.search_results.is_empty() {
+                blocks.push(Block::Line(vec![S::muted("  No results".into())]));
+            } else {
+                for sr in &cs.search_results {
+                    blocks.push(Block::Line(vec![
+                        S::info(format!("  [{}] ", sr.room_name)),
+                        S::new(sr.sender.clone()),
+                        S::muted(format!(": {}", truncate_body(&sr.body, 60))),
+                    ]));
+                }
+            }
+        }
+
+        blocks
+    }
+    fn title(&self, _state: &State) -> String {
+        "Chat".to_string()
     }
 
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
@@ -303,8 +268,6 @@ impl Panel for ChatDashboardPanel {
     fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
-
-    fn render(&self, _frame: &mut Frame<'_>, _state: &mut State, _area: Rect) {}
 
     fn refresh(&self, state: &mut State) {
         // Drain sync events from the async loop into ChatState + fire Spine notifications

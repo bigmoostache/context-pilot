@@ -1,7 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::accessors::theme;
 use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{CacheRequest, CacheUpdate};
@@ -99,6 +97,40 @@ impl Panel for GitResultPanel {
         scroll_key_action(key)
     }
 
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
+
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
+
+        let Some(ctx) = ctx else {
+            return vec![Block::styled_text(" No git result panel".into(), Semantic::Muted)];
+        };
+
+        let Some(content) = &ctx.cached_content else {
+            return vec![Block::Line(vec![S::muted(" Loading...".into()).italic()])];
+        };
+
+        content
+            .lines()
+            .map(|line| {
+                let (sem, bold) = if line.starts_with('+') && !line.starts_with("+++") {
+                    (Semantic::DiffAdd, false)
+                } else if line.starts_with('-') && !line.starts_with("---") {
+                    (Semantic::DiffRemove, false)
+                } else if line.starts_with("@@") {
+                    (Semantic::Accent, false)
+                } else if line.starts_with("diff --git") || line.starts_with("+++") || line.starts_with("---") {
+                    (Semantic::Code, true)
+                } else if line.starts_with("commit ") {
+                    (Semantic::Accent, true)
+                } else {
+                    (Semantic::Default, false)
+                };
+                let span = S::styled(format!(" {line}"), sem);
+                Block::Line(vec![if bold { span.bold() } else { span }])
+            })
+            .collect()
+    }
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
             && ctx.context_type.as_str() == Kind::GIT_RESULT
@@ -132,48 +164,8 @@ impl Panel for GitResultPanel {
         items
     }
 
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let mut text: Vec<Line<'_>> = Vec::new();
-
-        // Find the selected GitResult panel
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
-
-        let Some(ctx) = ctx else {
-            text.push(Line::from(vec![Span::styled(" No git result panel", Style::default().fg(theme::text_muted()))]));
-            return text;
-        };
-
-        if let Some(content) = &ctx.cached_content {
-            // Render with diff-aware highlighting
-            for line in content.lines() {
-                let (style, display_line) = if line.starts_with('+') && !line.starts_with("+++") {
-                    (Style::default().fg(theme::success()), line.to_string())
-                } else if line.starts_with('-') && !line.starts_with("---") {
-                    (Style::default().fg(theme::error()), line.to_string())
-                } else if line.starts_with("@@") {
-                    (Style::default().fg(theme::accent()), line.to_string())
-                } else if line.starts_with("diff --git") || line.starts_with("+++") || line.starts_with("---") {
-                    (Style::default().fg(theme::text_secondary()).bold(), line.to_string())
-                } else if line.starts_with("commit ") {
-                    (Style::default().fg(theme::accent()).bold(), line.to_string())
-                } else {
-                    (Style::default().fg(theme::text()), line.to_string())
-                };
-                text.push(Line::from(vec![
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled(display_line, style),
-                ]));
-            }
-        } else {
-            text.push(Line::from(vec![Span::styled(" Loading...", Style::default().fg(theme::text_muted()).italic())]));
-        }
-
-        text
-    }
-
     fn refresh(&self, _state: &mut State) {}
     fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }

@@ -1,7 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::accessors::theme;
 use cp_base::panels::scroll_key_action;
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, paginate_content, update_if_changed};
 use cp_base::state::actions::Action;
@@ -95,6 +93,21 @@ impl Panel for Results {
         scroll_key_action(key)
     }
 
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
+
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(BRAVE_PANEL_TYPE));
+
+        let Some(ctx) = ctx else {
+            return vec![Block::styled_text(" No brave result panel".into(), Semantic::Muted)];
+        };
+
+        let Some(content) = &ctx.cached_content else {
+            return vec![Block::Line(vec![S::muted(" Loading...".into()).italic()])];
+        };
+
+        content.lines().map(|line| Block::text(format!(" {line}"))).collect()
+    }
     fn title(&self, state: &State) -> String {
         state.context.get(state.selected_context).map_or_else(|| "Brave Result".to_string(), |ctx| ctx.name.clone())
     }
@@ -124,35 +137,5 @@ impl Panel for Results {
 
     fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
-    }
-
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
-
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(BRAVE_PANEL_TYPE));
-
-        let Some(ctx) = ctx else {
-            return vec![Line::from(vec![Span::styled(
-                " No brave result panel",
-                Style::default().fg(theme::text_muted()),
-            )])];
-        };
-
-        let Some(content) = &ctx.cached_content else {
-            return vec![Line::from(vec![Span::styled(
-                " Loading...",
-                Style::default().fg(theme::text_muted()).italic(),
-            )])];
-        };
-
-        content
-            .lines()
-            .map(|line| {
-                Line::from(vec![
-                    Span::styled(" ".to_string(), base_style),
-                    Span::styled(line.to_string(), Style::default().fg(theme::text())),
-                ])
-            })
-            .collect()
     }
 }

@@ -206,11 +206,7 @@ impl Module for ScratchpadModule {
     fn overview_context_section(&self, _state: &State) -> Option<String> {
         None
     }
-    fn overview_render_sections(
-        &self,
-        _state: &State,
-        _base_style: ratatui::prelude::Style,
-    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
         vec![]
     }
     fn on_close_context(
@@ -244,47 +240,36 @@ impl Module for ScratchpadModule {
 
 /// Visualizer for scratchpad tool results.
 /// Highlights cell titles and shows creation vs edit vs deletion actions.
-fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::{Color, Line, Span, Style};
+fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<cp_render::Block> {
+    use cp_render::{Block, Semantic, Span};
 
-    let success_color = Color::Rgb(80, 250, 123);
-    let info_color = Color::Rgb(139, 233, 253);
-    let error_color = Color::Rgb(255, 85, 85);
-    let secondary_color = Color::Rgb(150, 150, 170);
-
-    let mut lines = Vec::new();
-
-    for line in content.lines() {
-        if line.is_empty() {
-            lines.push(Line::from(""));
-            continue;
-        }
-
-        let style = if line.starts_with("Error:") {
-            Style::default().fg(error_color)
-        } else if line.starts_with("Created cell") {
-            Style::default().fg(success_color)
-        } else if line.starts_with("Updated") {
-            Style::default().fg(info_color)
-        } else if line.starts_with("Deleted") {
-            Style::default().fg(error_color)
-        } else if line.starts_with('C') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
-            // Cell IDs like C1, C2
-            Style::default().fg(info_color)
-        } else if line.contains(':') {
-            // Cell titles
-            Style::default().fg(secondary_color)
-        } else {
-            Style::default()
-        };
-
-        let display = if line.len() > width {
-            format!("{}...", &line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
-        } else {
-            line.to_string()
-        };
-        lines.push(Line::from(Span::styled(display, style)));
-    }
-
-    lines
+    content
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                return Block::empty();
+            }
+            let semantic = if line.starts_with("Error:") {
+                Semantic::Error
+            } else if line.starts_with("Created cell") {
+                Semantic::Success
+            } else if line.starts_with("Updated") {
+                Semantic::Info
+            } else if line.starts_with("Deleted") {
+                Semantic::Error
+            } else if line.starts_with('C') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
+                Semantic::Info
+            } else if line.contains(':') {
+                Semantic::Muted
+            } else {
+                Semantic::Default
+            };
+            let display = if line.len() > width {
+                format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
+            } else {
+                line.to_string()
+            };
+            Block::Line(vec![Span::styled(display, semantic)])
+        })
+        .collect()
 }

@@ -716,6 +716,7 @@ dependencies = [
 name = "cp-base"
 version = "0.1.0"
 dependencies = [
+ "cp-render",
  "crossterm",
  "dirs",
  "log",
@@ -742,8 +743,8 @@ name = "cp-mod-brave"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "reqwest",
  "serde",
  "serde_json",
@@ -756,12 +757,11 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-console",
+ "cp-render",
  "crossterm",
  "globset",
- "ratatui",
  "serde",
  "serde_json",
- "unicode-width",
 ]
 
 [[package]]
@@ -771,11 +771,11 @@ dependencies = [
  "chrono",
  "cp-base",
  "cp-mod-spine",
+ "cp-render",
  "crossterm",
  "log",
  "matrix-sdk",
  "mime",
- "ratatui",
  "reqwest",
  "serde",
  "serde_json",
@@ -788,8 +788,8 @@ name = "cp-mod-console"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "regex",
  "serde",
  "serde_json",
@@ -800,8 +800,8 @@ name = "cp-mod-files"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "serde_json",
 ]
 
@@ -810,8 +810,8 @@ name = "cp-mod-firecrawl"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "reqwest",
  "serde",
  "serde_json",
@@ -823,8 +823,8 @@ name = "cp-mod-git"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "regex",
  "serde_json",
 ]
@@ -834,8 +834,8 @@ name = "cp-mod-github"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "regex",
  "secrecy",
  "serde_json",
@@ -850,8 +850,8 @@ dependencies = [
  "cp-base",
  "cp-mod-memory",
  "cp-mod-queue",
+ "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
 ]
@@ -861,11 +861,10 @@ name = "cp-mod-memory"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
- "unicode-width",
 ]
 
 [[package]]
@@ -874,7 +873,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-prompt",
- "ratatui",
+ "cp-render",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -886,8 +885,8 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-files",
+ "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -898,8 +897,8 @@ name = "cp-mod-queue"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
 ]
@@ -909,8 +908,8 @@ name = "cp-mod-scratchpad"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
 ]
@@ -921,11 +920,10 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
- "unicode-width",
 ]
 
 [[package]]
@@ -933,8 +931,8 @@ name = "cp-mod-todo"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
- "ratatui",
  "serde",
  "serde_json",
 ]
@@ -944,9 +942,9 @@ name = "cp-mod-tree"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-render",
  "crossterm",
  "ignore",
- "ratatui",
  "serde",
  "serde_json",
  "sha2",
@@ -959,14 +957,21 @@ dependencies = [
  "chrono",
  "cp-base",
  "cp-mod-callback",
+ "cp-render",
  "flate2",
- "ratatui",
  "reqwest",
  "serde",
  "serde_json",
  "tar",
  "typst",
  "typst-pdf",
+]
+
+[[package]]
+name = "cp-render"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -6006,6 +6011,7 @@ dependencies = [
  "cp-mod-todo",
  "cp-mod-tree",
  "cp-mod-typst",
+ "cp-render",
  "crossterm",
  "dotenvy",
  "log",

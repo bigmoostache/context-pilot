@@ -1,6 +1,3 @@
-use ratatui::prelude::{Line, Span, Style};
-
-use cp_base::config::accessors::theme;
 use cp_base::panels::{ContextItem, Panel};
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
@@ -108,8 +105,67 @@ impl Panel for LogsPanel {
         false
     }
 
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        struct IrCtx<'src> {
+            all_logs: &'src [LogEntry],
+            open_ids: &'src [String],
+        }
 
+        fn render_log_ir(blocks: &mut Vec<Block>, entry: &LogEntry, ctx: &IrCtx<'_>, depth: usize) {
+            let indent = "  ".repeat(depth);
+            let time_str = format_timestamp(entry.timestamp_ms);
+
+            if entry.is_summary() {
+                let is_open = ctx.open_ids.contains(&entry.id);
+                let icon = if is_open { "▼" } else { "▶" };
+
+                let mut spans = vec![
+                    S::new(indent),
+                    S::accent(format!("{icon} ")),
+                    S::styled(format!("{} ", entry.id), Semantic::AccentDim),
+                    S::muted(format!("{time_str} ")),
+                    S::new(entry.content.clone()),
+                ];
+
+                if !is_open {
+                    spans.push(S::muted(format!(" ({} children)", entry.children_ids.len())));
+                }
+
+                blocks.push(Block::Line(spans));
+
+                if is_open {
+                    for child_id in &entry.children_ids {
+                        if let Some(child) = ctx.all_logs.iter().find(|l| l.id == *child_id) {
+                            render_log_ir(blocks, child, ctx, depth.saturating_add(1));
+                        }
+                    }
+                }
+            } else {
+                blocks.push(Block::Line(vec![
+                    S::new(indent),
+                    S::styled(format!("{} ", entry.id), Semantic::AccentDim),
+                    S::muted(format!("{time_str} ")),
+                    S::new(entry.content.clone()),
+                ]));
+            }
+        }
+
+        use cp_render::{Block, Semantic, Span as S};
+
+        let ls = LogsState::get(state);
+        if ls.logs.is_empty() {
+            return vec![Block::Line(vec![S::muted("No logs yet".into()).italic()])];
+        }
+
+        let ctx = IrCtx { all_logs: &ls.logs, open_ids: &ls.open_log_ids };
+        let mut blocks = Vec::new();
+        let top_level: Vec<&LogEntry> = ls.logs.iter().filter(|l| l.is_top_level()).collect();
+
+        for log in &top_level {
+            render_log_ir(&mut blocks, log, &ctx, 0);
+        }
+        blocks
+    }
     fn title(&self, _state: &State) -> String {
         "Logs".to_string()
     }
@@ -139,65 +195,6 @@ impl Panel for LogsPanel {
             .find(|c| c.context_type.as_str() == Kind::LOGS)
             .map_or(("P10", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Logs", content, last_refresh_ms)]
-    }
-
-    fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        let ls = LogsState::get(state);
-        if ls.logs.is_empty() {
-            return vec![Line::from(vec![Span::styled(
-                "No logs yet".to_string(),
-                Style::default().fg(theme::text_muted()).italic(),
-            )])];
-        }
-
-        let mut lines = Vec::new();
-        let top_level: Vec<&LogEntry> = ls.logs.iter().filter(|l| l.is_top_level()).collect();
-
-        for log in &top_level {
-            render_log_entry(&mut lines, log, &LogTreeContext { all_logs: &ls.logs, open_ids: &ls.open_log_ids }, 0);
-        }
-        lines
-    }
-}
-
-/// Recursively render a log entry as styled TUI lines.
-fn render_log_entry(lines: &mut Vec<Line<'static>>, entry: &LogEntry, ctx: &LogTreeContext<'_>, depth: usize) {
-    let indent = "  ".repeat(depth);
-    let time_str = format_timestamp(entry.timestamp_ms);
-
-    if entry.is_summary() {
-        let is_open = ctx.open_ids.contains(&entry.id);
-        let icon = if is_open { "▼" } else { "▶" };
-        let child_count = entry.children_ids.len();
-
-        let mut spans = vec![
-            Span::styled(indent, Style::default()),
-            Span::styled(format!("{icon} "), Style::default().fg(theme::accent())),
-            Span::styled(format!("{} ", entry.id), Style::default().fg(theme::accent_dim())),
-            Span::styled(format!("{time_str} "), Style::default().fg(theme::text_muted())),
-            Span::styled(entry.content.clone(), Style::default().fg(theme::text())),
-        ];
-
-        if !is_open {
-            spans.push(Span::styled(format!(" ({child_count} children)"), Style::default().fg(theme::text_muted())));
-        }
-
-        lines.push(Line::from(spans));
-
-        if is_open {
-            for child_id in &entry.children_ids {
-                if let Some(child) = ctx.all_logs.iter().find(|l| l.id == *child_id) {
-                    render_log_entry(lines, child, ctx, depth.saturating_add(1));
-                }
-            }
-        }
-    } else {
-        lines.push(Line::from(vec![
-            Span::styled(indent, Style::default()),
-            Span::styled(format!("{} ", entry.id), Style::default().fg(theme::accent_dim())),
-            Span::styled(format!("{time_str} "), Style::default().fg(theme::text_muted())),
-            Span::styled(entry.content.clone(), Style::default().fg(theme::text())),
-        ]));
     }
 }
 

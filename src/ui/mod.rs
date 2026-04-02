@@ -6,22 +6,21 @@ pub(crate) mod help;
 pub(crate) mod helpers;
 /// Status bar, question form, and autocomplete popup rendering.
 mod input;
+/// IR-to-ratatui adapter: converts semantic blocks to terminal widgets.
+pub(crate) mod ir;
 /// Markdown parsing and table rendering utilities.
 pub(crate) mod markdown;
 /// Performance monitoring overlay and metrics.
 pub(crate) mod perf;
-/// Sidebar rendering (full and collapsed modes).
-mod sidebar;
 /// Theme color constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::theme;
-/// Typewriter animation buffer for streaming text.
-pub(crate) mod typewriter;
+/// Typewriter animation buffer re-exported from helpers.
+pub(crate) use helpers::TypewriterBuffer;
 
 use ratatui::Frame;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect, Style};
 use ratatui::widgets::Block;
 
-use crate::app::panels;
 use crate::infra::constants::STATUS_BAR_HEIGHT;
 use crate::state::{Kind, State};
 use crate::ui::perf::PERF;
@@ -31,6 +30,10 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     PERF.frame_start();
     let _guard = crate::profile!("ui::render");
     let area = frame.area();
+
+    // Build the IR frame snapshot (Phase 4 integration point).
+    // Phase 5 progressively replaces direct-render code paths below.
+    let ir_frame = ir::build_frame(state);
 
     // Fill base background
     frame.render_widget(Block::default().style(Style::default().bg(theme::bg_base())), area);
@@ -48,25 +51,22 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         debug_assert!(false, "main_layout must have at least 2 chunks");
         return;
     };
-    render_body(frame, state, body_area);
-    input::render_status_bar(frame, state, status_area);
+    render_body(frame, state, body_area, &ir_frame);
+    ir::render_status_bar::render_status_bar_from_ir(frame, &ir_frame.status_bar, status_area, state.spinner_frame);
 
     // Render performance overlay if enabled
     if state.flags.ui.perf_enabled {
         perf::render_perf_overlay(frame, area);
     }
 
-    // Render autocomplete popup if active
-    if let Some(ac) = state.get_ext::<cp_base::state::autocomplete::Suggestions>()
-        && ac.active
+    // Render autocomplete popup if active (via IR overlays)
     {
-        // Position in main content area (right of sidebar, above status bar)
         let sw = state.sidebar_mode.width();
         let content_x = area.x.saturating_add(sw);
         let content_width = area.width.saturating_sub(sw);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
         let content_area = Rect::new(content_x, area.y, content_width, content_height);
-        input::render_autocomplete_popup(frame, state, content_area);
+        ir::render_conversation::render_autocomplete_if_active(frame, state, content_area, &ir_frame.overlays);
     }
 
     // Render config overlay if open
@@ -78,11 +78,11 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
 }
 
 /// Render the body area: sidebar (if visible) and main content panel.
-fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
+fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
     let sw = state.sidebar_mode.width();
     if sw == 0 {
         // Hidden mode — no sidebar at all
-        render_main_content(frame, state, area);
+        render_main_content(frame, state, area, ir_frame);
         return;
     }
 
@@ -99,26 +99,15 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
         debug_assert!(false, "body_layout must have at least 2 chunks");
         return;
     };
-    match state.sidebar_mode {
-        cp_base::state::data::config::SidebarMode::Normal => {
-            sidebar::render_sidebar(frame, state, sidebar_area);
-        }
-        cp_base::state::data::config::SidebarMode::Collapsed => {
-            sidebar::render_sidebar_collapsed(frame, state, sidebar_area);
-        }
-        cp_base::state::data::config::SidebarMode::Hidden => {} // handled above
-    }
-    render_main_content(frame, state, content_area);
+    ir::render_sidebar::render_sidebar_from_ir(frame, &ir_frame.sidebar, sidebar_area);
+    render_main_content(frame, state, content_area, ir_frame);
 }
 
 /// Render the main content area, splitting for question form if active.
-fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
-    // Check if question form is active — render it at bottom of content area
-    if let Some(form) = state.get_ext::<cp_base::ui::question_form::PendingForm>()
-        && !form.resolved
-    {
+fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
+    // Check if question form is active via IR overlays
+    if let Some(form_height) = ir::render_conversation::render_question_form_if_active(state, &ir_frame.overlays) {
         // Split: content panel on top, question form at bottom
-        let form_height = input::calculate_question_form_height(form);
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -131,7 +120,7 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
             debug_assert!(false, "question form layout must have at least 2 chunks");
             return;
         };
-        render_content_panel(frame, state, panel_area);
+        render_content_panel(frame, state, panel_area, ir_frame);
         // Indent form by 1 col to avoid overlapping sidebar border
         let form_area = Rect {
             x: raw_form_area.x.saturating_add(1),
@@ -143,24 +132,24 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     }
 
     // Normal rendering — no separate input box, panels handle their own
-    render_content_panel(frame, state, area);
+    render_content_panel(frame, state, area, ir_frame);
 }
 
 /// Render the active content panel (conversation or generic panel).
-fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
+fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
     let _guard = crate::profile!("ui::render_panel");
     let context_type = state
         .context
         .get(state.selected_context)
         .map_or_else(|| Kind::new(Kind::CONVERSATION), |c| c.context_type.clone());
 
-    let panel = panels::get_panel(&context_type);
-
-    // ConversationPanel overrides render() with custom scrollbar + caching.
-    // All other panels use render_panel_default (which calls panel.content()).
+    // ConversationPanel renders from its multi-level cached content builder,
+    // wrapped in IR-controlled chrome (border, scrollbar, auto-scroll).
+    // All other panels render from the IR snapshot, falling back to content()
+    // for panels whose blocks() returns empty (not yet migrated).
     if context_type.as_str() == Kind::CONVERSATION {
-        panel.render(frame, state, area);
+        ir::render_conversation::render_conversation_from_ir(frame, state, area, &ir_frame.conversation);
     } else {
-        panels::render_panel_default(panel.as_ref(), frame, state, area);
+        ir::render_panel::render_panel_from_ir(frame, state, area, &ir_frame.active_panel);
     }
 }

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use super::context::{Entry, Kind};
 use super::data::config::SidebarMode;
 use super::data::message::Message;
-use super::flags::{ConfigOverlay, HighlightFn, StatusBools, StreamPhase, StreamingTool, UiState};
+use super::flags::{ConfigOverlay, HighlightFn, HighlightIrFn, StatusBools, StreamPhase, StreamingTool, UiState};
 use crate::cast::Safe as _;
 use crate::config::llm_types::{LlmProvider, ModelInfo as _};
 use crate::tools::ToolDefinition;
@@ -139,6 +139,9 @@ pub struct State {
     /// Syntax highlighting function (provided by binary's highlight module).
     /// Takes `(file_path, content)` and returns highlighted spans per line.
     pub highlight_fn: Option<HighlightFn>,
+    /// IR-aware syntax highlighting (RGB colour spans for the IR pipeline).
+    /// Takes `(file_path, content)` and returns `cp_render::Span` per line.
+    pub highlight_ir_fn: Option<HighlightIrFn>,
 
     // === Module extension data (TypeMap pattern) ===
     /// Module-owned state stored by `TypeId`. Each module registers its own state struct
@@ -213,6 +216,7 @@ impl Default for State {
             input_cache: None,
             full_content_cache: None,
             highlight_fn: None,
+            highlight_ir_fn: None,
             module_data: HashMap::new(),
         }
     }

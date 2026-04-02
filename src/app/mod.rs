@@ -23,8 +23,8 @@ use crate::infra::watcher::FileWatcher;
 use crate::state::State;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::PersistenceWriter;
+use crate::ui::TypewriterBuffer;
 use crate::ui::help::CommandPalette;
-use crate::ui::typewriter::TypewriterBuffer;
 
 /// Deferred `StreamDone` data: (`input_tokens`, `output_tokens`, `cache_hit`, `cache_miss`, `stop_reason`).
 pub(crate) type PendingDone = (usize, usize, usize, usize, Option<String>);

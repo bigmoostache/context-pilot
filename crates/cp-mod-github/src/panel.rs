@@ -1,8 +1,7 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Span, Style};
 
 use super::GH_CMD_TIMEOUT_SECS;
-use cp_base::config::accessors::theme;
+
 use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::{CacheRequest, CacheUpdate};
@@ -115,8 +114,49 @@ impl Panel for GithubResultPanel {
         false
     }
 
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
 
+        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
+
+        let Some(ctx) = ctx else {
+            return vec![Block::styled_text(" No GitHub result panel".into(), Semantic::Muted)];
+        };
+
+        let Some(content) = &ctx.cached_content else {
+            return vec![Block::Line(vec![S::muted(" Loading...".into()).italic()])];
+        };
+
+        content
+            .lines()
+            .map(|line| {
+                if line.contains('\t') {
+                    let parts: Vec<&str> = line.split('\t').collect();
+                    let mut spans = vec![S::new(" ".into())];
+                    for (i, part) in parts.iter().enumerate() {
+                        if i > 0 {
+                            spans.push(S::new("  ".into()));
+                        }
+                        let sem = match i {
+                            0 => Semantic::Accent,
+                            1 => match part.trim() {
+                                "OPEN" => Semantic::Success,
+                                "CLOSED" => Semantic::Error,
+                                "MERGED" => Semantic::Accent,
+                                _ => Semantic::Code,
+                            },
+                            2 => Semantic::Default,
+                            _ => Semantic::Muted,
+                        };
+                        spans.push(S::styled(part.to_string(), sem));
+                    }
+                    Block::Line(spans)
+                } else {
+                    Block::text(format!(" {line}"))
+                }
+            })
+            .collect()
+    }
     fn title(&self, state: &State) -> String {
         if let Some(ctx) = state.context.get(state.selected_context)
             && ctx.context_type.as_str() == Kind::GITHUB_RESULT
@@ -148,60 +188,5 @@ impl Panel for GithubResultPanel {
             items.push(ContextItem::new(&ctx.id, header, output, ctx.last_refresh_ms));
         }
         items
-    }
-
-    fn content(&self, state: &State, base_style: Style) -> Vec<Line<'static>> {
-        let mut text: Vec<Line<'_>> = Vec::new();
-
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
-
-        let Some(ctx) = ctx else {
-            text.push(Line::from(vec![Span::styled(
-                " No GitHub result panel",
-                Style::default().fg(theme::text_muted()),
-            )]));
-            return text;
-        };
-
-        if let Some(content) = &ctx.cached_content {
-            for line in content.lines() {
-                // Replace tabs with aligned spacing for readable output
-                if line.contains('\t') {
-                    let parts: Vec<&str> = line.split('\t').collect();
-                    let mut spans = vec![Span::styled(" ".to_string(), base_style)];
-                    for (i, part) in parts.iter().enumerate() {
-                        let style = match i {
-                            0 => Style::default().fg(theme::accent()), // ID / number
-                            1 => {
-                                // State field (OPEN/CLOSED/MERGED)
-                                let color = match part.trim() {
-                                    "OPEN" => theme::success(),
-                                    "CLOSED" => theme::error(),
-                                    "MERGED" => theme::accent(),
-                                    _ => theme::text_secondary(),
-                                };
-                                Style::default().fg(color)
-                            }
-                            2 => Style::default().fg(theme::text()), // Title
-                            _ => Style::default().fg(theme::text_muted()), // Labels, dates, etc.
-                        };
-                        if i > 0 {
-                            spans.push(Span::styled("  ", base_style)); // double-space separator
-                        }
-                        spans.push(Span::styled(part.to_string(), style));
-                    }
-                    text.push(Line::from(spans));
-                } else {
-                    text.push(Line::from(vec![
-                        Span::styled(" ".to_string(), base_style),
-                        Span::styled(line.to_string(), Style::default().fg(theme::text())),
-                    ]));
-                }
-            }
-        } else {
-            text.push(Line::from(vec![Span::styled(" Loading...", Style::default().fg(theme::text_muted()).italic())]));
-        }
-
-        text
     }
 }

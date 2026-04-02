@@ -11,7 +11,7 @@ readme.workspace = true
 
 [dependencies]
 cp-base.workspace = true
-ratatui.workspace = true
+cp-render.workspace = true
 crossterm.workspace = true
 regex.workspace = true
 sha2.workspace = true

@@ -1,13 +1,13 @@
+/// IR block builders for the overview panel sections.
+mod blocks;
 /// Context content generation for the LLM overview.
 pub(crate) mod context;
 /// Panel implementation for the overview statistics view.
 mod panel;
-/// TUI rendering for the overview panel sections.
-mod render;
-/// Rendering for the detailed statistics sections.
-mod render_details;
 /// Tool implementations for context management.
 mod tools;
+/// IR block builders for the tools/configuration panel sections.
+mod tools_blocks;
 /// Panel for tools/configuration display.
 mod tools_panel;
 
@@ -388,11 +388,7 @@ impl Module for OverviewModule {
         None
     }
 
-    fn overview_render_sections(
-        &self,
-        _state: &State,
-        _base_style: ratatui::prelude::Style,
-    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
         vec![]
     }
 
@@ -428,44 +424,35 @@ impl Module for OverviewModule {
 
 /// Visualizer for core tool results.
 /// Colors closed panel names, highlights enabled/disabled tool status, and shows module activation state changes.
-fn visualize_core_output(content: &str, width: usize) -> Vec<ratatui::text::Line<'static>> {
-    use ratatui::prelude::{Color, Line, Span, Style};
+fn visualize_core_output(content: &str, width: usize) -> Vec<cp_render::Block> {
+    use cp_render::{Block, Semantic, Span};
 
-    let success_color = Color::Rgb(80, 250, 123);
-    let info_color = Color::Rgb(139, 233, 253);
-    let warning_color = Color::Rgb(241, 250, 140);
-    let error_color = Color::Rgb(255, 85, 85);
-
-    let mut lines = Vec::new();
-
-    for line in content.lines() {
-        if line.is_empty() {
-            lines.push(Line::from(""));
-            continue;
-        }
-
-        let style = if line.starts_with("Error:") {
-            Style::default().fg(error_color)
-        } else if line.starts_with("Closed") || line.contains("enabled") {
-            Style::default().fg(success_color)
-        } else if line.contains("disabled") {
-            Style::default().fg(warning_color)
-        } else if line.contains("Reloading") || line.contains("TUI") {
-            Style::default().fg(info_color)
-        } else if line.starts_with('P') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
-            // Panel IDs like P1, P2
-            Style::default().fg(info_color)
-        } else {
-            Style::default()
-        };
-
-        let display = if line.len() > width {
-            format!("{}...", &line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
-        } else {
-            line.to_string()
-        };
-        lines.push(Line::from(Span::styled(display, style)));
-    }
-
-    lines
+    content
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                return Block::empty();
+            }
+            let semantic = if line.starts_with("Error:") {
+                Semantic::Error
+            } else if line.starts_with("Closed") || line.contains("enabled") {
+                Semantic::Success
+            } else if line.contains("disabled") {
+                Semantic::Warning
+            } else if line.contains("Reloading")
+                || line.contains("TUI")
+                || (line.starts_with('P') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()))
+            {
+                Semantic::Info
+            } else {
+                Semantic::Default
+            };
+            let display = if line.len() > width {
+                format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
+            } else {
+                line.to_string()
+            };
+            Block::Line(vec![Span::styled(display, semantic)])
+        })
+        .collect()
 }

@@ -11,6 +11,8 @@ mod render_input;
 /// Best-effort JSON field extraction for streaming tool call display.
 mod render_json;
 
+pub(crate) use panel::build_content_cached;
+
 use crate::app::panels::Panel;
 use crate::infra::tools::{ToolDefinition, ToolResult, ToolUse};
 use crate::state::{Kind, State, TypeMeta};
@@ -130,11 +132,7 @@ impl Module for ConversationModule {
         None
     }
 
-    fn overview_render_sections(
-        &self,
-        _state: &State,
-        _base_style: ratatui::prelude::Style,
-    ) -> Vec<(u8, Vec<ratatui::text::Line<'static>>)> {
+    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
         vec![]
     }
 

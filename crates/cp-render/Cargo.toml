@@ -1,0 +1,16 @@
+[package]
+name = "cp-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Context Pilot intermediate rendering representation"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+[lints]
+workspace = true

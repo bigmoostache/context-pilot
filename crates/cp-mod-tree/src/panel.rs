@@ -1,7 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::prelude::{Line, Span, Style};
 
-use cp_base::config::accessors::theme;
 use cp_base::panels::{CacheRequest, CacheUpdate};
 use cp_base::panels::{ContextItem, Panel, paginate_content};
 use cp_base::state::actions::Action;
@@ -36,6 +34,51 @@ impl Panel for TreePanel {
         scroll_key_action(key)
     }
 
+    fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
+        use cp_render::{Block, Semantic, Span as S};
+
+        let tree_content = state
+            .context
+            .iter()
+            .find(|c| c.context_type.as_str() == Kind::TREE)
+            .and_then(|ctx| ctx.cached_content.as_ref())
+            .cloned()
+            .unwrap_or_else(|| "Loading...".to_string());
+
+        let mut blocks = Vec::new();
+        for line in tree_content.lines() {
+            // Split off description suffix (" - ...")
+            let (main_line, description) = line
+                .find(" - ")
+                .map_or((line, None), |idx| (line.get(..idx).unwrap_or(""), Some(line.get(idx..).unwrap_or(""))));
+
+            let mut spans = vec![S::new(" ".into())];
+
+            if let Some(size_start) = find_size_pattern(main_line) {
+                let (before, size_part) = main_line.split_at(size_start);
+                spans.push(S::new(before.to_string()));
+                spans.push(S::styled(size_part.to_string(), Semantic::AccentDim));
+            } else if let Some((start, end)) = find_children_pattern(main_line) {
+                let before = main_line.get(..start).unwrap_or("");
+                let children = main_line.get(start..end).unwrap_or("");
+                let after = main_line.get(end..).unwrap_or("");
+                spans.push(S::new(before.to_string()));
+                spans.push(S::accent(children.to_string()));
+                if !after.is_empty() {
+                    spans.push(S::new(after.to_string()));
+                }
+            } else {
+                spans.push(S::new(main_line.to_string()));
+            }
+
+            if let Some(desc) = description {
+                spans.push(S::muted(desc.to_string()));
+            }
+
+            blocks.push(Block::Line(spans));
+        }
+        blocks
+    }
     fn title(&self, _state: &State) -> String {
         "Directory Tree".to_string()
     }
@@ -101,59 +144,10 @@ impl Panel for TreePanel {
         Vec::new()
     }
 
-    fn content(&self, state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        // Find tree context and use cached content
-        let tree_content = state
-            .context
-            .iter()
-            .find(|c| c.context_type.as_str() == Kind::TREE)
-            .and_then(|ctx| ctx.cached_content.as_ref())
-            .cloned()
-            .unwrap_or_else(|| "Loading...".to_string());
-
-        let mut text: Vec<Line<'_>> = Vec::new();
-        for line in tree_content.lines() {
-            let mut spans: Vec<Span<'_>> = Vec::new();
-            spans.push(Span::styled(" ".to_string(), Style::default().fg(theme::text())));
-
-            // Check for description (after " - ")
-            let (main_line, description) = line.find(" - ").map_or((line, None), |desc_idx| {
-                (line.get(..desc_idx).unwrap_or(""), Some(line.get(desc_idx..).unwrap_or("")))
-            });
-
-            // Parse the main part
-            if let Some(size_start) = find_size_pattern(main_line) {
-                let (before_size, size_part) = main_line.split_at(size_start);
-                spans.push(Span::styled(before_size.to_string(), Style::default().fg(theme::text())));
-                spans.push(Span::styled(size_part.to_string(), Style::default().fg(theme::accent_dim())));
-            } else if let Some((start, end)) = find_children_pattern(main_line) {
-                let before = main_line.get(..start).unwrap_or("");
-                let children_part = main_line.get(start..end).unwrap_or("");
-                let after = main_line.get(end..).unwrap_or("");
-                spans.push(Span::styled(before.to_string(), Style::default().fg(theme::text())));
-                spans.push(Span::styled(children_part.to_string(), Style::default().fg(theme::accent())));
-                if !after.is_empty() {
-                    spans.push(Span::styled(after.to_string(), Style::default().fg(theme::text())));
-                }
-            } else {
-                spans.push(Span::styled(main_line.to_string(), Style::default().fg(theme::text())));
-            }
-
-            if let Some(desc) = description {
-                spans.push(Span::styled(desc.to_string(), Style::default().fg(theme::text_muted())));
-            }
-
-            text.push(Line::from(spans));
-        }
-
-        text
-    }
-
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
         None
     }
     fn suicide(&self, _ctx: &Entry, _state: &State) -> bool {
         false
     }
-    fn render(&self, _frame: &mut ratatui::Frame<'_>, _state: &mut State, _area: ratatui::prelude::Rect) {}
 }

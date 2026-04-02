@@ -1,10 +1,7 @@
 use std::rc::Rc;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{
-    prelude::{Frame, Line, Margin, Rect, Span, Style},
-    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
-};
+use ratatui::prelude::{Line, Span, Style};
 
 use cp_mod_prompt::types::PromptState;
 
@@ -91,7 +88,7 @@ impl ConversationPanel {
     }
 
     /// Build content with caching - called from `render()` which has &mut State
-    fn build_content_cached(state: &mut State, base_style: Style) -> Vec<Line<'static>> {
+    fn build_content_cached_inner(state: &mut State, base_style: Style) -> Vec<Line<'static>> {
         let _guard = crate::profile!("panel::conversation::content");
         let viewport_width = state.last_viewport_width;
 
@@ -302,6 +299,9 @@ impl Panel for ConversationPanel {
         Vec::new()
     }
 
+    fn blocks(&self, _state: &State) -> Vec<cp_render::Block> {
+        Vec::new()
+    }
     fn title(&self, state: &State) -> String {
         if state.flags.stream.phase.is_streaming() { "Conversation *".to_string() } else { "Conversation".to_string() }
     }
@@ -361,82 +361,6 @@ impl Panel for ConversationPanel {
         }
     }
 
-    fn content(&self, _state: &State, _base_style: Style) -> Vec<Line<'static>> {
-        // Note: This is not called - render() is overridden and uses build_content_cached()
-        // which has &mut State access for cache updates.
-        Vec::new()
-    }
-
-    /// Override render to add scrollbar and auto-scroll behavior
-    fn render(&self, frame: &mut Frame<'_>, state: &mut State, area: Rect) {
-        let base_style = Style::default().bg(theme::bg_surface());
-        let title = self.title(state);
-
-        let inner_area = Rect::new(area.x.saturating_add(1), area.y, area.width.saturating_sub(2), area.height);
-
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(Style::default().fg(theme::border()))
-            .style(base_style)
-            .title(Span::styled(format!(" {title} "), Style::default().fg(theme::accent()).bold()));
-
-        let content_area = block.inner(inner_area);
-        frame.render_widget(block, inner_area);
-
-        // Update viewport width BEFORE building content so it can pre-wrap lines
-        state.last_viewport_width = content_area.width;
-
-        // Use cached content builder (has &mut State for cache updates)
-        let text = Self::build_content_cached(state, base_style);
-
-        // Since we pre-wrap in content(), each Line = 1 visual line
-        let viewport_height = content_area.height.to_usize();
-        let content_height = text.len();
-
-        let max_scroll = content_height.saturating_sub(viewport_height).to_f32();
-        state.max_scroll = max_scroll;
-
-        // Auto-scroll to bottom when not manually scrolled
-        if state.flags.stream.user_scrolled && state.scroll_offset >= max_scroll - 0.5 {
-            state.flags.stream.user_scrolled = false;
-        }
-        if !state.flags.stream.user_scrolled {
-            state.scroll_offset = max_scroll;
-        }
-        state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
-
-        let paragraph = {
-            let _guard = crate::profile!("conv::paragraph_new");
-            Paragraph::new(text)
-                .style(base_style)
-                // NO .wrap() - we pre-wrap in content() for performance
-                .scroll((state.scroll_offset.round().to_u16(), 0))
-        };
-
-        {
-            let _guard = crate::profile!("conv::frame_render");
-            frame.render_widget(paragraph, content_area);
-        }
-
-        // Scrollbar
-        if content_height > viewport_height {
-            let scrollbar = Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalRight)
-                .style(Style::default().fg(theme::bg_elevated()))
-                .thumb_style(Style::default().fg(theme::accent_dim()));
-
-            let mut scrollbar_state =
-                ScrollbarState::new(max_scroll.to_usize()).position(state.scroll_offset.round().to_usize());
-
-            frame.render_stateful_widget(
-                scrollbar,
-                inner_area.inner(Margin { horizontal: 0, vertical: 1 }),
-                &mut scrollbar_state,
-            );
-        }
-    }
-
     fn refresh(&self, _state: &mut State) {}
 
     fn needs_cache(&self) -> bool {
@@ -467,4 +391,12 @@ impl Panel for ConversationPanel {
     fn suicide(&self, _ctx: &crate::state::Entry, _state: &State) -> bool {
         false
     }
+}
+
+/// Public entry point for the cached conversation content builder.
+///
+/// Delegates to [`ConversationPanel::build_content_cached_inner`], which
+/// has the full multi-level cache (full → per-message → input).
+pub(crate) fn build_content_cached(state: &mut State, base_style: Style) -> Vec<Line<'static>> {
+    ConversationPanel::build_content_cached_inner(state, base_style)
 }
