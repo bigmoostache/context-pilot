@@ -15,6 +15,13 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    # Pin Rust 1.93.0 until matrix-sdk 0.16 fixes recursion depth overflow on 1.94+
+    # Upstream: https://github.com/matrix-org/matrix-rust-sdk/issues/6254
+    - name: Install Rust 1.93.0
+      run: |
+        rustup toolchain install 1.93.0 --profile minimal --component rustfmt,clippy
+        rustup default 1.93.0
+
     - name: Check formatting
       run: cargo fmt -- --check
 
