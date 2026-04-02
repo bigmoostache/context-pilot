@@ -1657,3 +1657,4 @@
 01:49:04.696086391 fmt crates/cp-mod-spine/src/lib.rs
 01:49:11.462589101 fmt crates/cp-mod-tree/src/lib.rs
 01:50:19.394419281 fmt src/modules/overview/mod.rs
+11:09:30.035847263 fmt crates/cp-mod-chat/src/lib.rs

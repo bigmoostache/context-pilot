@@ -1,3 +1,7 @@
+// Raise recursion limit for matrix-sdk 0.16 async layout computation.
+// Upstream: https://github.com/matrix-org/matrix-rust-sdk/issues/6254
+#![recursion_limit = "256"]
+
 //! Chat module — Matrix-based universal messaging layer.
 //!
 //! Provides 7 tools (`Chat_open`, `Chat_send`, `Chat_react`, `Chat_configure`,
