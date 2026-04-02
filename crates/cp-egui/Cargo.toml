@@ -1,0 +1,21 @@
+[package]
+name = "cp-egui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Context Pilot — egui desktop frontend"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[[bin]]
+name = "cpilot-gui"
+path = "src/main.rs"
+
+[dependencies]
+cp-render = { path = "../cp-render" }
+eframe = "0.31"
+
+[lints]
+workspace = true

@@ -9,6 +9,9 @@ if [ -f .env ]; then
 fi
 
 while true; do
+    # Build both binaries
+    cargo build --release -p cp-console-server || exit 1
+
     # Run the TUI
     cargo run --release -- "$@"
 
