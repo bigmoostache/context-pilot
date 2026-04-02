@@ -1,18 +1,18 @@
 use std::rc::Rc;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::prelude::{Line, Span, Style};
 
 use cp_mod_prompt::types::PromptState;
+use cp_render::Block;
 
 use crate::app::actions::Action;
 use crate::app::panels::{ContextItem, Panel};
 use crate::state::{FullCache, InputCache, Kind, MessageCache, MsgKind, MsgStatus, State, hash_values};
-use crate::ui::theme;
 use cp_base::panels::scroll_key_action;
 
 use super::list::{self, ListAction};
-use super::render;
+use super::render_blocks::{self, MessageBlockOpts};
+use super::render_input_blocks::{self, InputBlockCtx};
 use cp_base::cast::Safe as _;
 
 /// Panel for displaying the conversation messages and user input.
@@ -88,7 +88,7 @@ impl ConversationPanel {
     }
 
     /// Build content with caching - called from `render()` which has &mut State
-    fn build_content_cached_inner(state: &mut State, base_style: Style) -> Vec<Line<'static>> {
+    fn build_content_cached_inner(state: &mut State) -> Vec<Block> {
         let _guard = crate::profile!("panel::conversation::content");
         let viewport_width = state.last_viewport_width;
 
@@ -99,8 +99,7 @@ impl ConversationPanel {
         if let Some(ref cached) = state.full_content_cache
             && cached.content_hash == full_hash
         {
-            // Full cache hit - return cached lines (just clone the Rc's inner vec)
-            return cached.lines.to_vec();
+            return cached.blocks.to_vec();
         }
 
         // Cache miss - need to rebuild
@@ -111,7 +110,7 @@ impl ConversationPanel {
             state.input_cache = None;
         }
 
-        let mut text: Vec<Line<'static>> = Vec::new();
+        let mut blocks: Vec<Block> = Vec::new();
 
         // Prepend frozen `ConversationHistory` panels (oldest first)
         {
@@ -122,42 +121,42 @@ impl ConversationPanel {
             for ctx in &history_panels {
                 if let Some(ref msgs) = ctx.history_messages {
                     // Separator header
-                    text.push(Line::from(vec![Span::styled(
-                        format!("── {} ──", ctx.name),
-                        Style::default().fg(theme::text_muted()).bold(),
-                    )]));
+                    blocks.push(Block::line(vec![
+                        cp_render::Span::styled(format!("── {} ──", ctx.name), cp_render::Semantic::Muted).bold(),
+                    ]));
 
-                    // Render each frozen message with full formatting
                     for msg in msgs {
-                        let rendered_lines = render::render_message(
+                        let rendered = render_blocks::render_message_blocks(
                             msg,
-                            &render::MessageRenderOpts {
+                            &MessageBlockOpts {
                                 viewport_width,
-                                base_style,
                                 is_streaming: false,
                                 dev_mode: state.flags.ui.dev_mode,
                             },
                         );
-                        text.extend(rendered_lines);
+                        blocks.extend(rendered);
                     }
 
                     // Separator footer
-                    text.push(Line::from(vec![Span::styled(
-                        "── ── ── ──".to_string(),
-                        Style::default().fg(theme::text_muted()),
+                    blocks.push(Block::line(vec![cp_render::Span::styled(
+                        "── ── ── ──".to_owned(),
+                        cp_render::Semantic::Muted,
                     )]));
-                    text.push(Line::from(""));
+                    blocks.push(Block::empty());
                 }
             }
         }
 
         if state.messages.is_empty() {
-            text.push(Line::from(""));
-            text.push(Line::from(""));
-            text.push(Line::from(vec![Span::styled(
-                "  Start a conversation by typing below".to_string(),
-                Style::default().fg(theme::text_muted()).italic(),
-            )]));
+            blocks.push(Block::empty());
+            blocks.push(Block::empty());
+            blocks.push(Block::line(vec![
+                cp_render::Span::styled(
+                    "  Start a conversation by typing below".to_owned(),
+                    cp_render::Semantic::Muted,
+                )
+                .italic(),
+            ]));
         } else {
             let last_msg_id = state.messages.last().map(|m| m.id.clone());
 
@@ -182,17 +181,15 @@ impl ConversationPanel {
                     && cached.content_hash == hash
                     && cached.viewport_width == viewport_width
                 {
-                    // Cache hit - extend from Rc without full clone
-                    text.extend(cached.lines.iter().cloned());
+                    blocks.extend(cached.blocks.iter().cloned());
                     continue;
                 }
 
-                // Cache miss - render message
-                let rendered_lines = render::render_message(
+                // Cache miss - render message via IR
+                let rendered = render_blocks::render_message_blocks(
                     msg,
-                    &render::MessageRenderOpts {
+                    &MessageBlockOpts {
                         viewport_width,
-                        base_style,
                         is_streaming: is_streaming_this,
                         dev_mode: state.flags.ui.dev_mode,
                     },
@@ -202,21 +199,20 @@ impl ConversationPanel {
                 if !is_streaming_this {
                     let _r = state.message_cache.insert(
                         msg.id.clone(),
-                        MessageCache { lines: Rc::from(rendered_lines.as_slice()), content_hash: hash, viewport_width },
+                        MessageCache { blocks: Rc::from(rendered.as_slice()), content_hash: hash, viewport_width },
                     );
                 }
 
-                text.extend(rendered_lines);
+                blocks.extend(rendered);
             }
         }
 
         // Render streaming tool preview (between messages and input)
         if let Some(ref streaming_tool) = state.streaming_tool {
-            text.extend(render::render_streaming_tool(
+            blocks.extend(render_blocks::render_streaming_tool_blocks(
                 &streaming_tool.name,
                 &streaming_tool.input_so_far,
                 viewport_width,
-                base_style,
             ));
         }
 
@@ -226,66 +222,61 @@ impl ConversationPanel {
         if let Some(ref cached) = state.input_cache {
             if cached.input_hash == input_hash && cached.viewport_width == viewport_width {
                 // Cache hit
-                let line_count = cached.lines.len();
-                text.extend(cached.lines.iter().cloned());
-                // Update autocomplete with input visual line count
+                let block_count = cached.blocks.len();
+                blocks.extend(cached.blocks.iter().cloned());
                 if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
-                    ac.input_visual_lines = line_count.to_u16();
+                    ac.input_visual_lines = block_count.to_u16();
                 }
             } else {
                 // Cache miss
-                let input_lines = render::render_input(
+                let input_blocks = render_input_blocks::render_input_blocks(
                     &state.input,
                     state.input_cursor,
                     viewport_width,
-                    &render::InputContext {
+                    &InputBlockCtx {
                         command_ids: &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
                         paste_buffers: &state.paste_buffers,
                         paste_buffer_labels: &state.paste_buffer_labels,
-                        base_style,
                     },
                 );
-                let line_count = input_lines.len();
+                let block_count = input_blocks.len();
                 state.input_cache =
-                    Some(InputCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
-                text.extend(input_lines);
-                // Update autocomplete with input visual line count
+                    Some(InputCache { blocks: Rc::from(input_blocks.as_slice()), input_hash, viewport_width });
+                blocks.extend(input_blocks);
                 if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
-                    ac.input_visual_lines = line_count.to_u16();
+                    ac.input_visual_lines = block_count.to_u16();
                 }
             }
         } else {
             // No cache
-            let input_lines = render::render_input(
+            let input_blocks = render_input_blocks::render_input_blocks(
                 &state.input,
                 state.input_cursor,
                 viewport_width,
-                &render::InputContext {
+                &InputBlockCtx {
                     command_ids: &PromptState::get(state).commands.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
                     paste_buffers: &state.paste_buffers,
                     paste_buffer_labels: &state.paste_buffer_labels,
-                    base_style,
                 },
             );
-            let line_count = input_lines.len();
+            let block_count = input_blocks.len();
             state.input_cache =
-                Some(InputCache { lines: Rc::from(input_lines.as_slice()), input_hash, viewport_width });
-            text.extend(input_lines);
-            // Update autocomplete with input visual line count
+                Some(InputCache { blocks: Rc::from(input_blocks.as_slice()), input_hash, viewport_width });
+            blocks.extend(input_blocks);
             if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
-                ac.input_visual_lines = line_count.to_u16();
+                ac.input_visual_lines = block_count.to_u16();
             }
         }
 
         // Padding at end for scroll
         for _ in 0..3 {
-            text.push(Line::from(""));
+            blocks.push(Block::empty());
         }
 
         // Store in full content cache
-        state.full_content_cache = Some(FullCache { lines: Rc::from(text.as_slice()), content_hash: full_hash });
+        state.full_content_cache = Some(FullCache { blocks: Rc::from(blocks.as_slice()), content_hash: full_hash });
 
-        text
+        blocks
     }
 }
 
@@ -299,7 +290,7 @@ impl Panel for ConversationPanel {
         Vec::new()
     }
 
-    fn blocks(&self, _state: &State) -> Vec<cp_render::Block> {
+    fn blocks(&self, _state: &State) -> Vec<Block> {
         Vec::new()
     }
     fn title(&self, state: &State) -> String {
@@ -397,6 +388,7 @@ impl Panel for ConversationPanel {
 ///
 /// Delegates to [`ConversationPanel::build_content_cached_inner`], which
 /// has the full multi-level cache (full → per-message → input).
-pub(crate) fn build_content_cached(state: &mut State, base_style: Style) -> Vec<Line<'static>> {
-    ConversationPanel::build_content_cached_inner(state, base_style)
+/// Returns IR blocks — the TUI adapter converts to ratatui lines.
+pub(crate) fn build_content_cached(state: &mut State) -> Vec<Block> {
+    ConversationPanel::build_content_cached_inner(state)
 }

@@ -1,13 +1,15 @@
 /// List continuation detection for input editing.
 mod list;
+/// IR-native markdown parser for conversation messages.
+mod markdown_ir;
 /// Panel implementation for conversation display.
 mod panel;
 /// Token estimation and context refresh for conversation.
 pub(crate) mod refresh;
-/// Message rendering with markdown, tool calls, and tool results.
-pub(crate) mod render;
-/// Input rendering with cursor, paste placeholders, and command highlighting.
-mod render_input;
+/// IR-based message renderer emitting `Vec<Block>` instead of ratatui lines.
+pub(crate) mod render_blocks;
+/// IR-based input area renderer emitting `Vec<Block>`.
+mod render_input_blocks;
 /// Best-effort JSON field extraction for streaming tool call display.
 mod render_json;
 

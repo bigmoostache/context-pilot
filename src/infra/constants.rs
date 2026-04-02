@@ -185,10 +185,6 @@ pub(crate) mod theme {
 
     // Role-specific colors
 
-    /// User role color from the active theme.
-    pub(crate) fn user() -> Color {
-        rgb(active_theme().colors.user)
-    }
     /// Assistant role color from the active theme.
     pub(crate) fn assistant() -> Color {
         rgb(active_theme().colors.assistant)

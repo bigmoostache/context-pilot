@@ -312,51 +312,6 @@ pub(crate) fn render_markdown_table(
     result
 }
 
-/// Parse markdown text and return styled spans.
-pub(crate) fn parse_markdown_line(line: &str, base_style: Style) -> Vec<Span<'static>> {
-    let trimmed = line.trim_start();
-
-    // Headers: # ## ### etc.
-    if trimmed.starts_with('#') {
-        let level = trimmed.chars().take_while(|&c| c == '#').count();
-        let content = trimmed.get(level..).unwrap_or("").trim_start();
-
-        let style = match level {
-            1 => Style::default().fg(theme::accent()).bold(),
-            2 | 3 => Style::default().fg(theme::accent()),
-            _ => Style::default().fg(theme::text_secondary()),
-        };
-
-        return vec![Span::styled(content.to_string(), style)];
-    }
-
-    // Bullet points: - or *
-    if let Some(stripped) = trimmed.strip_prefix("- ") {
-        let content = stripped.to_string();
-        let indent = line.len().saturating_sub(trimmed.len());
-        let mut spans = vec![
-            Span::styled(" ".repeat(indent), base_style),
-            Span::styled("• ", Style::default().fg(theme::accent_dim())),
-        ];
-        spans.extend(parse_inline_markdown(&content));
-        return spans;
-    }
-
-    if trimmed.starts_with("* ") && !trimmed.starts_with("**") {
-        let content = trimmed.get(2..).unwrap_or("").to_string();
-        let indent = line.len().saturating_sub(trimmed.len());
-        let mut spans = vec![
-            Span::styled(" ".repeat(indent), base_style),
-            Span::styled("• ", Style::default().fg(theme::accent_dim())),
-        ];
-        spans.extend(parse_inline_markdown(&content));
-        return spans;
-    }
-
-    // Regular line — preserve leading whitespace, parse inline markdown on the rest
-    parse_inline_markdown(line)
-}
-
 /// Parse inline markdown (bold, italic, code) and return styled spans.
 pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
     let mut spans = Vec::new();

@@ -142,6 +142,7 @@ pub(crate) fn render_autocomplete_if_active(
 /// This calls the existing conversation panel's content builder which has
 /// the full multi-level caching (full hash → per-message → input).
 // Here be dragons (and three layers of cache invalidation)
-fn build_content_cached(state: &mut State, base_style: Style) -> Vec<Line<'static>> {
-    crate::modules::conversation::build_content_cached(state, base_style)
+fn build_content_cached(state: &mut State, _base_style: Style) -> Vec<Line<'static>> {
+    let blocks = crate::modules::conversation::build_content_cached(state);
+    crate::ui::ir::blocks_to_lines(&blocks)
 }
