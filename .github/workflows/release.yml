@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    # Pin Rust 1.93.0 until matrix-sdk 0.16 fixes recursion depth overflow on 1.94+
+    # Upstream: https://github.com/matrix-org/matrix-rust-sdk/issues/6254
+    - name: Install Rust 1.93.0
+      run: |
+        rustup toolchain install 1.93.0 --profile minimal
+        rustup default 1.93.0
+
+    - name: Build release binaries
+      run: |
+        cargo build --release
+        cargo build --release -p cp-console-server
+
+    - name: Extract version
+      id: version
+      run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+    - name: Build .deb package
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        PKG="cpilot_${VERSION}_amd64"
+        mkdir -p "${PKG}/DEBIAN"
+        mkdir -p "${PKG}/usr/local/bin"
+
+        # Copy binaries
+        cp target/release/tui "${PKG}/usr/local/bin/cpilot"
+        cp target/release/cp-console-server "${PKG}/usr/local/bin/cp-console-server"
+        chmod 755 "${PKG}/usr/local/bin/cpilot"
+        chmod 755 "${PKG}/usr/local/bin/cp-console-server"
+
+        # Control file
+        cat > "${PKG}/DEBIAN/control" << EOF
+        Package: cpilot
+        Version: ${VERSION}
+        Section: devel
+        Priority: optional
+        Architecture: amd64
+        Maintainer: Context Pilot <hello@contextpilot.dev>
+        Description: Context Pilot — AI coding assistant TUI
+         A terminal-based AI coding assistant with modular architecture,
+         intermediate rendering pipeline, and multi-provider LLM support.
+        EOF
+        # Strip leading whitespace from heredoc (DEBIAN/control is whitespace-sensitive)
+        sed -i 's/^        //' "${PKG}/DEBIAN/control"
+
+        # Post-install: set up global gitignore
+        cat > "${PKG}/DEBIAN/postinst" << 'POSTINST'
+        #!/bin/bash
+        set -e
+        GITIGNORE_GLOBAL="$HOME/.gitignore_global"
+        if [ -f "$GITIGNORE_GLOBAL" ]; then
+            if ! grep -qxF ".context-pilot/" "$GITIGNORE_GLOBAL" 2>/dev/null; then
+                echo ".context-pilot/" >> "$GITIGNORE_GLOBAL"
+            fi
+        else
+            echo ".context-pilot/" > "$GITIGNORE_GLOBAL"
+            git config --global core.excludesFile "$GITIGNORE_GLOBAL" 2>/dev/null || true
+        fi
+        POSTINST
+        sed -i 's/^        //' "${PKG}/DEBIAN/postinst"
+        chmod 755 "${PKG}/DEBIAN/postinst"
+
+        dpkg-deb --build "${PKG}"
+        mv "${PKG}.deb" "cpilot_${VERSION}_amd64.deb"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: cpilot_*_amd64.deb
+        generate_release_notes: true
+        draft: false
+        prerelease: false
