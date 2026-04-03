@@ -8,5 +8,8 @@
 /// Application struct and main update loop.
 pub mod app;
 
+/// Block → egui widget renderers (Line, Table, Tree, ProgressBar, etc.).
+pub mod renderers;
+
 /// Semantic → egui style mapping (palette, `RichText`, `LayoutJob`).
 pub mod theme;
