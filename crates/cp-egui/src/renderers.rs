@@ -179,6 +179,28 @@ fn render_progress_bar(ui: &mut Ui, segments: &[ProgressSegment], label: Option<
     }
 }
 
+/// Public progress-bar renderer with custom bar height.
+///
+/// Used by the sidebar token bar which needs a thinner gauge.
+pub fn render_progress_bar_raw(ui: &mut Ui, segments: &[ProgressSegment], bar_height: f32) {
+    let available_width = ui.available_width().min(400.0);
+    let (rect, _response) = ui.allocate_exact_size(egui::Vec2::new(available_width, bar_height), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    let _ = painter.rect_filled(rect, 3.0, Color32::from_rgb(40, 40, 40));
+
+    let mut x_offset = rect.left();
+    for seg in segments {
+        let width = available_width * f32::from(seg.percent) / 100.0;
+        if width < 0.5 {
+            continue;
+        }
+        let seg_rect =
+            egui::Rect::from_min_size(egui::Pos2::new(x_offset, rect.top()), egui::Vec2::new(width, bar_height));
+        let _ = painter.rect_filled(seg_rect, 3.0, semantic_color(seg.semantic));
+        x_offset += width;
+    }
+}
+
 /// Render a tree hierarchy with indentation.
 fn render_tree(ui: &mut Ui, nodes: &[TreeNode], depth: u16) {
     for node in nodes {
@@ -207,8 +229,6 @@ fn render_tree(ui: &mut Ui, nodes: &[TreeNode], depth: u16) {
         }
     }
 }
-
-// Here be dragons (and deeply nested key-value pairs)
 
 /// Render key-value pairs in a two-column layout.
 fn render_key_value(ui: &mut Ui, pairs: &[KeyValuePair]) {

@@ -8,6 +8,9 @@
 /// Application struct and main update loop.
 pub mod app;
 
+/// Frame → egui region layout (sidebar, status bar, panel, conversation).
+pub mod layout;
+
 /// Block → egui widget renderers (Line, Table, Tree, ProgressBar, etc.).
 pub mod renderers;
 

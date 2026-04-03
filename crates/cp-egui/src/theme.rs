@@ -88,3 +88,25 @@ pub const HEADER_FONT_SIZE: f32 = 18.0;
 
 /// Standard body font size.
 pub const BODY_FONT_SIZE: f32 = 14.0;
+
+// ── Light palette (stub) ─────────────────────────────────────────────
+
+/// Resolve a [`Semantic`] token to a concrete [`Color32`] (light theme).
+///
+/// Stub — currently mirrors the dark palette. Will be refined once
+/// the dark theme is visually validated.
+#[must_use]
+pub const fn semantic_color_light(semantic: Semantic) -> Color32 {
+    match semantic {
+        Semantic::Accent | Semantic::Active | Semantic::Header => Color32::from_rgb(0, 130, 180),
+        Semantic::AccentDim => Color32::from_rgb(0, 100, 140),
+        Semantic::Muted => Color32::from_rgb(120, 120, 120),
+        Semantic::Success | Semantic::DiffAdd => Color32::from_rgb(0, 160, 80),
+        Semantic::Warning | Semantic::KeyHint => Color32::from_rgb(200, 160, 0),
+        Semantic::Error | Semantic::DiffRemove => Color32::from_rgb(210, 50, 50),
+        Semantic::Info => Color32::from_rgb(60, 100, 200),
+        Semantic::Code => Color32::from_rgb(60, 60, 60),
+        Semantic::Border => Color32::from_rgb(200, 200, 200),
+        Semantic::Default | Semantic::Bold | _ => Color32::from_rgb(30, 30, 30),
+    }
+}
