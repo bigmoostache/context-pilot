@@ -1038,6 +1038,12 @@ unicode-width.workspace = true
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "default-themes", "regex-onig"] }
 secrecy = { version = "0.10", features = ["serde"] }
 notify = "6.1"
+cp-egui = { path = "crates/cp-egui", optional = true }
+eframe = { version = "0.31", optional = true }
+
+[features]
+## Enable the egui graphical frontend (`--gui` flag). Requires a display server.
+gui = ["dep:cp-egui", "dep:eframe"]
 
 [lints]
 workspace = true

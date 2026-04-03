@@ -89,6 +89,13 @@ pub const HEADER_FONT_SIZE: f32 = 18.0;
 /// Standard body font size.
 pub const BODY_FONT_SIZE: f32 = 14.0;
 
+// ── Global theme application ─────────────────────────────────────────
+
+/// Apply dark-mode visuals and default font configuration to an egui context.
+pub fn configure_visuals(ctx: &egui::Context) {
+    ctx.set_visuals(egui::Visuals::dark());
+}
+
 // ── Light palette (stub) ─────────────────────────────────────────────
 
 /// Resolve a [`Semantic`] token to a concrete [`Color32`] (light theme).

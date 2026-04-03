@@ -6,6 +6,9 @@
 
 /// Application logic: event loop, actions, context preparation.
 mod app;
+/// Graphical frontend (egui/eframe) — only compiled with `--features gui`.
+#[cfg(feature = "gui")]
+mod gui;
 /// Infrastructure: API clients, tools, constants, file watchers.
 mod infra;
 /// LLM provider abstraction and streaming.
@@ -218,6 +221,9 @@ fn main() -> ExitCode {
     // Parse CLI args
     let args: Vec<String> = std::env::args().collect();
     let resume_stream = args.iter().any(|a| a == "--resume-stream");
+    // Whether to launch the egui graphical frontend instead of the TUI.
+    #[cfg(feature = "gui")]
+    let use_gui = args.iter().any(|a| a == "--gui");
 
     // Handle typst subcommands (used by callback scripts)
     if args.len() >= 2 {
@@ -368,6 +374,43 @@ fn main() -> ExitCode {
     let (tx, rx) = mpsc::channel::<StreamEvent>();
     let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
 
+    // ── GUI branch ──────────────────────────────────────────────────────
+    // Same state, same channels — different event loop.
+    #[cfg(feature = "gui")]
+    if use_gui {
+        // Tear down the TUI terminal — we only needed it for the boot screen
+        let _r_raw_off = disable_raw_mode();
+        let _r_paste_off = io::stdout().execute(DisableBracketedPaste);
+        let _r_leave = io::stdout().execute(LeaveAlternateScreen);
+        drop(terminal);
+
+        let app = App::new(state, cache_tx, resume_stream);
+        let gui_app = gui::GuiApp::new(app, tx, rx, cache_rx);
+
+        let native_options = eframe::NativeOptions {
+            viewport: eframe::egui::ViewportBuilder::default()
+                .with_title("Context Pilot")
+                .with_inner_size([1400.0, 900.0]),
+            ..eframe::NativeOptions::default()
+        };
+
+        let result = eframe::run_native(
+            "Context Pilot",
+            native_options,
+            Box::new(|cc| {
+                cp_egui::theme::configure_visuals(&cc.egui_ctx);
+                Ok(Box::new(gui_app))
+            }),
+        );
+
+        if let Err(e) = result {
+            drop(writeln!(io::stderr(), "Fatal: GUI error: {e}"));
+            return ExitCode::FAILURE;
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    // ── TUI branch (default) ────────────────────────────────────────────
     // Create and run app
     let mut app = App::new(state, cache_tx, resume_stream);
     let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };

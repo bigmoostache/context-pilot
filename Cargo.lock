@@ -7732,6 +7732,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "cp-base",
+ "cp-egui",
  "cp-mod-brave",
  "cp-mod-callback",
  "cp-mod-chat",
@@ -7753,6 +7754,7 @@ dependencies = [
  "cp-render",
  "crossterm",
  "dotenvy",
+ "eframe",
  "log",
  "notify",
  "ratatui",

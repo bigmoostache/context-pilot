@@ -133,5 +133,5 @@ fn render_input_panel(ctx: &egui::Context, input: &mut InputState) {
 
 /// Apply dark-mode visuals and default font configuration.
 fn configure_visuals(ctx: &egui::Context) {
-    ctx.set_visuals(egui::Visuals::dark());
+    crate::theme::configure_visuals(ctx);
 }
