@@ -384,7 +384,8 @@ fn main() -> ExitCode {
         let _r_leave = io::stdout().execute(LeaveAlternateScreen);
         drop(terminal);
 
-        let app = App::new(state, cache_tx, resume_stream);
+        let mut app = App::new(state, cache_tx, resume_stream);
+        app.setup();
         let gui_app = gui::GuiApp::new(app, tx, rx, cache_rx);
 
         let native_options = eframe::NativeOptions {

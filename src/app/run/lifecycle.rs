@@ -38,18 +38,17 @@ pub(crate) struct EventChannels<'ch> {
 
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
-    /// Main event loop: processes input, stream events, tools, spine, and rendering.
-    pub(crate) fn run(
-        &mut self,
-        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-        ch: &EventChannels<'_>,
-    ) -> io::Result<()> {
-        // Initial cache setup - watch files and schedule initial refreshes
+    /// One-time engine initialization: file watchers, cache refreshes, ownership.
+    ///
+    /// Called once before the first `tick()`.  Both the TUI event loop
+    /// (`run()`) and the GUI wrapper (`GuiApp`) invoke this so the
+    /// engine starts in a consistent state regardless of frontend.
+    pub(crate) fn setup(&mut self) {
         super::watchers::setup_file_watchers(self);
         super::watchers::sync_gh_watches(self);
         super::watchers::schedule_initial_cache_refreshes(self);
 
-        // Claim ownership immediately
+        // Claim ownership — writes our PID so check_ownership() passes.
         save_state(&self.state);
 
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
@@ -63,6 +62,15 @@ impl App {
             );
             save_state(&self.state);
         }
+    }
+
+    /// Main event loop: processes input, stream events, tools, spine, and rendering.
+    pub(crate) fn run(
+        &mut self,
+        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        ch: &EventChannels<'_>,
+    ) -> io::Result<()> {
+        self.setup();
 
         loop {
             let current_ms = now_ms();

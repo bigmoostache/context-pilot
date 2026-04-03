@@ -1722,3 +1722,5 @@
 11:10:23.017027083 fmt crates/cp-egui/src/theme.rs
 11:11:23.376872214 fmt src/gui/mod.rs
 11:11:45.514271904 fmt src/gui/mod.rs
+11:18:54.929276719 fmt src/app/run/lifecycle.rs
+11:19:07.465050455 fmt src/main.rs
