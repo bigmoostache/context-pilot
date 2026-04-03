@@ -8,6 +8,12 @@
 /// Application struct and main update loop.
 pub mod app;
 
+/// Demo data for visual testing — creates a representative [`Frame`](cp_render::frame::Frame).
+pub mod demo;
+
+/// Input handling — text editing, history, keyboard shortcuts.
+pub mod input;
+
 /// Frame → egui region layout (sidebar, status bar, panel, conversation).
 pub mod layout;
 

@@ -2,17 +2,17 @@
 
 use eframe::egui;
 
-/// Main application state for the egui frontend.
-#[derive(Debug)]
-pub struct App {
-    /// Placeholder label displayed in the central panel.
-    title: String,
-}
+use crate::demo::build_demo_frame;
+use crate::input::{self, AppAction, State as InputState};
+use crate::layout::render_frame;
 
-impl Default for App {
-    fn default() -> Self {
-        Self { title: String::from("Context Pilot") }
-    }
+/// Main application state for the egui frontend.
+#[derive(Debug, Default)]
+pub struct App {
+    /// Interactive input state (text buffer, history, focus).
+    input: InputState,
+    /// Current sidebar mode index (0=Normal, 1=Collapsed, 2=Hidden).
+    sidebar_mode: u8,
 }
 
 impl App {
@@ -22,18 +22,59 @@ impl App {
         configure_visuals(&cc.egui_ctx);
         Self::default()
     }
+
+    /// Process application-level actions from keyboard shortcuts.
+    fn handle_actions(&mut self, actions: &[AppAction]) {
+        for action in actions {
+            match action {
+                AppAction::Submit => {
+                    if let Some(msg) = self.input.submit() {
+                        // Phase 6 will wire this to the LLM pipeline.
+                        drop(msg);
+                    }
+                }
+                AppAction::ClearInput => self.input.clear(),
+                AppAction::HistoryBack => self.input.history_back(),
+                AppAction::HistoryForward => self.input.history_forward(),
+                AppAction::ToggleSidebar => {
+                    self.sidebar_mode = match self.sidebar_mode {
+                        0 => 1,
+                        1 => 2,
+                        _ => 0,
+                    };
+                }
+                AppAction::NextPanel | AppAction::PreviousPanel | AppAction::JumpToPanel(_) | AppAction::ToggleHelp => {
+                    // Phase 6 will wire panel switching and help overlay.
+                }
+            }
+        }
+    }
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        drop(egui::CentralPanel::default().show(ctx, |ui| {
-            drop(ui.vertical_centered(|ui| {
-                ui.add_space(40.0);
-                drop(ui.heading(&self.title));
-                ui.add_space(16.0);
-                drop(ui.label("egui frontend — scaffold complete"));
-            }));
-        }));
+        // Poll keyboard shortcuts.
+        let actions = input::poll_actions(ctx);
+        self.handle_actions(&actions);
+
+        // Build the demo frame (Phase 6 replaces with live State).
+        let mut frame = build_demo_frame();
+
+        // Override sidebar mode from our toggle state.
+        frame.sidebar.mode = match self.sidebar_mode {
+            1 => cp_render::frame::SidebarMode::Collapsed,
+            2 => cp_render::frame::SidebarMode::Hidden,
+            _ => cp_render::frame::SidebarMode::Normal,
+        };
+
+        // Sync input text into the frame's conversation input area.
+        frame.conversation.input.text.clone_from(&self.input.text);
+
+        // Render the full frame layout.
+        render_frame(ctx, &frame);
+
+        // Input area — rendered as a bottom panel so it stays fixed.
+        render_input_panel(ctx, &mut self.input);
     }
 
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
@@ -53,6 +94,41 @@ impl eframe::App for App {
     }
 
     fn raw_input_hook(&mut self, _ctx: &egui::Context, _raw_input: &mut egui::RawInput) {}
+}
+
+/// Render the interactive input area as a bottom panel.
+fn render_input_panel(ctx: &egui::Context, input: &mut InputState) {
+    drop(egui::TopBottomPanel::bottom("input_panel").exact_height(36.0).show(ctx, |ui| {
+        drop(ui.horizontal_centered(|ui| {
+            let prompt =
+                egui::RichText::new("› ").color(crate::theme::semantic_color(cp_render::Semantic::Accent)).strong();
+            drop(ui.label(prompt));
+
+            let response = ui.add(
+                egui::TextEdit::singleline(&mut input.text)
+                    .desired_width(ui.available_width())
+                    .hint_text("Ask me anything, captain...")
+                    .font(egui::FontId::proportional(14.0))
+                    .text_color(crate::theme::semantic_color(cp_render::Semantic::Default))
+                    .frame(false),
+            );
+
+            // Auto-focus on first frame.
+            if input.request_focus {
+                response.request_focus();
+                input.request_focus = false;
+            }
+
+            // Enter → submit (when TextEdit has focus and Enter pressed).
+            if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                if let Some(msg) = input.submit() {
+                    // Phase 6: send to LLM.
+                    drop(msg);
+                }
+                response.request_focus();
+            }
+        }));
+    }));
 }
 
 /// Apply dark-mode visuals and default font configuration.
