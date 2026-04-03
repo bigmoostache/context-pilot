@@ -194,7 +194,7 @@ impl App {
     }
 
     /// Dispatch an `Action` through `apply_action` and handle the resulting side-effects.
-    fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
+    pub(crate) fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
         // Any action triggers a re-render
         self.state.flags.ui.dirty = true;
         match apply_action(&mut self.state, action) {

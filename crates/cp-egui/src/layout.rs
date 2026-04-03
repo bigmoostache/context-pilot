@@ -19,14 +19,32 @@ const SIDEBAR_COLLAPSED_WIDTH: f32 = 40.0;
 /// Status bar height.
 const STATUS_BAR_HEIGHT: f32 = 24.0;
 
+// ── Interaction feedback ─────────────────────────────────────────────
+
+/// Events collected during a single frame render.
+///
+/// Returned by [`render_frame`] so the caller can translate clicks and
+/// keyboard shortcuts into engine [`Action`]s.
+#[derive(Debug, Default)]
+pub struct FrameResponse {
+    /// Index of a sidebar entry that was clicked (if any).
+    pub sidebar_click: Option<usize>,
+    /// The user pressed Enter in the input area — submit this text.
+    pub submit_text: Option<String>,
+}
+
 // ── Top-level layout ─────────────────────────────────────────────────
 
 /// Render a full [`Frame`] into the egui context.
 ///
 /// Creates: left sidebar, bottom status bar, central panel + conversation.
-pub fn render_frame(ctx: &egui::Context, frame: &Frame) {
+/// Returns a [`FrameResponse`] with any user interaction events.
+#[must_use]
+pub fn render_frame(ctx: &egui::Context, frame: &Frame) -> FrameResponse {
+    let mut response = FrameResponse::default();
+
     // Sidebar (left).
-    render_sidebar(ctx, &frame.sidebar);
+    render_sidebar(ctx, &frame.sidebar, &mut response);
 
     // Status bar (bottom).
     render_status_bar(ctx, &frame.status_bar);
@@ -40,12 +58,14 @@ pub fn render_frame(ctx: &egui::Context, frame: &Frame) {
     for overlay in &frame.overlays {
         render_overlay(ctx, overlay);
     }
+
+    response
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────
 
 /// Render the left sidebar panel.
-fn render_sidebar(ctx: &egui::Context, sidebar: &Sidebar) {
+fn render_sidebar(ctx: &egui::Context, sidebar: &Sidebar, response: &mut FrameResponse) {
     match sidebar.mode {
         SidebarMode::Hidden => {}
         SidebarMode::Collapsed => {
@@ -58,14 +78,14 @@ fn render_sidebar(ctx: &egui::Context, sidebar: &Sidebar) {
         }
         SidebarMode::Normal => {
             drop(egui::SidePanel::left("sidebar").exact_width(SIDEBAR_WIDTH).resizable(false).show(ctx, |ui| {
-                render_sidebar_normal(ui, sidebar);
+                render_sidebar_normal(ui, sidebar, response);
             }));
         }
     }
 }
 
 /// Render full sidebar: entries, token bar, help hints.
-fn render_sidebar_normal(ui: &mut Ui, sidebar: &Sidebar) {
+fn render_sidebar_normal(ui: &mut Ui, sidebar: &Sidebar, response: &mut FrameResponse) {
     // Token bar at the top.
     if let Some(ref token_bar) = sidebar.token_bar {
         render_token_bar(ui, token_bar);
@@ -75,9 +95,10 @@ fn render_sidebar_normal(ui: &mut Ui, sidebar: &Sidebar) {
 
     // Scrollable entry list.
     let _ = ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
-        for entry in &sidebar.entries {
-            // Click handling wired in Phase 6 when live State is available.
-            let _ = render_sidebar_entry(ui, entry);
+        for (idx, entry) in sidebar.entries.iter().enumerate() {
+            if render_sidebar_entry(ui, entry) {
+                response.sidebar_click = Some(idx);
+            }
         }
     });
 

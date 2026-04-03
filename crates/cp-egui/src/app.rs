@@ -71,7 +71,15 @@ impl eframe::App for App {
         frame.conversation.input.text.clone_from(&self.input.text);
 
         // Render the full frame layout.
-        render_frame(ctx, &frame);
+        let frame_response = render_frame(ctx, &frame);
+
+        // Handle sidebar clicks (demo mode — just update selected state).
+        if let Some(idx) = frame_response.sidebar_click
+            && idx < frame.sidebar.entries.len()
+        {
+            // In demo mode we can't mutate the frame, but the click is registered.
+            let _ = idx;
+        }
 
         // Input area — rendered as a bottom panel so it stays fixed.
         render_input_panel(ctx, &mut self.input);

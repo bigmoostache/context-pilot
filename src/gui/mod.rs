@@ -10,6 +10,7 @@
 use std::sync::mpsc;
 
 use crate::app::App;
+use crate::app::actions::Action;
 use crate::app::run::lifecycle::EventChannels;
 use crate::infra::api::StreamEvent;
 use crate::state::cache::CacheUpdate;
@@ -48,6 +49,36 @@ impl GuiApp {
     ) -> Self {
         Self { app, ch: Channels { tx, rx, cache_rx } }
     }
+
+    /// Map egui keyboard shortcuts to engine [`Action`]s and dispatch them.
+    fn poll_egui_shortcuts(&mut self, ctx: &eframe::egui::Context) {
+        let mut actions: Vec<Action> = Vec::new();
+
+        ctx.input(|input| {
+            // Ctrl+B → cycle sidebar mode.
+            if input.modifiers.ctrl && input.key_pressed(eframe::egui::Key::B) {
+                actions.push(Action::CycleSidebarMode);
+            }
+
+            // Tab / Shift+Tab → cycle panels.
+            if input.key_pressed(eframe::egui::Key::Tab) && !input.modifiers.ctrl {
+                if input.modifiers.shift {
+                    actions.push(Action::SelectPrevContext);
+                } else {
+                    actions.push(Action::SelectNextContext);
+                }
+            }
+
+            // Escape → stop streaming.
+            if input.key_pressed(eframe::egui::Key::Escape) {
+                actions.push(Action::StopStreaming);
+            }
+        });
+
+        for action in actions {
+            self.app.handle_action(action, &self.ch.tx);
+        }
+    }
 }
 
 impl eframe::App for GuiApp {
@@ -66,7 +97,19 @@ impl eframe::App for GuiApp {
         let ir_frame = build_frame(&self.app.state);
 
         // ── Paint via cp-egui adapters ──────────────────────────────
-        cp_egui::layout::render_frame(ctx, &ir_frame);
+        let response = cp_egui::layout::render_frame(ctx, &ir_frame);
+
+        // ── Handle interaction events ───────────────────────────────
+        // Sidebar click → switch active panel.
+        if let Some(idx) = response.sidebar_click
+            && idx < self.app.state.context.len()
+        {
+            self.app.state.selected_context = idx;
+            self.app.state.flags.ui.dirty = true;
+        }
+
+        // Keyboard shortcuts (Ctrl+B, Tab, etc.).
+        self.poll_egui_shortcuts(ctx);
 
         // Request continuous repainting while streaming so we don't
         // stall on an idle event loop waiting for user input.

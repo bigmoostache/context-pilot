@@ -1724,3 +1724,15 @@
 11:11:45.514271904 fmt src/gui/mod.rs
 11:18:54.929276719 fmt src/app/run/lifecycle.rs
 11:19:07.465050455 fmt src/main.rs
+11:23:58.144463960 fmt crates/cp-egui/src/layout.rs
+11:24:10.110768528 fmt crates/cp-egui/src/layout.rs
+11:24:20.571973459 fmt crates/cp-egui/src/layout.rs
+11:24:32.431754140 fmt crates/cp-egui/src/layout.rs
+11:28:43.251689118 fmt src/gui/mod.rs
+11:29:10.866359969 fmt src/gui/mod.rs
+11:29:35.728240793 fmt src/gui/mod.rs
+11:29:54.471818471 fmt src/app/run/lifecycle.rs
+11:30:22.435681296 fmt crates/cp-egui/src/app.rs
+11:30:47.181814140 fmt crates/cp-egui/src/app.rs
+11:31:46.849177004 fmt src/gui/mod.rs
+11:32:46.962202558 fmt src/gui/mod.rs
