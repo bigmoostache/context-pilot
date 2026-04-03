@@ -5,6 +5,7 @@
 //! central conversation area.
 
 use cp_render::Semantic;
+use cp_render::conversation::Overlay;
 use cp_render::frame::{Frame, HelpHint, PanelContent, Sidebar, SidebarEntry, SidebarMode, StatusBar, TokenBar};
 use eframe::egui::{self, Color32, RichText, ScrollArea, Ui};
 
@@ -34,6 +35,11 @@ pub fn render_frame(ctx: &egui::Context, frame: &Frame) {
     drop(egui::CentralPanel::default().show(ctx, |ui| {
         render_central_area(ui, &frame.active_panel, &frame.conversation);
     }));
+
+    // Modal overlays (rendered on top of everything).
+    for overlay in &frame.overlays {
+        render_overlay(ctx, overlay);
+    }
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────
@@ -70,7 +76,8 @@ fn render_sidebar_normal(ui: &mut Ui, sidebar: &Sidebar) {
     // Scrollable entry list.
     let _ = ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
         for entry in &sidebar.entries {
-            render_sidebar_entry(ui, entry);
+            // Click handling wired in Phase 6 when live State is available.
+            let _ = render_sidebar_entry(ui, entry);
         }
     });
 
@@ -91,14 +98,14 @@ fn render_sidebar_collapsed(ui: &mut Ui, sidebar: &Sidebar) {
     });
 }
 
-/// Render a single sidebar entry row.
-fn render_sidebar_entry(ui: &mut Ui, entry: &SidebarEntry) {
+/// Render a single sidebar entry row. Returns `true` if clicked.
+fn render_sidebar_entry(ui: &mut Ui, entry: &SidebarEntry) -> bool {
     let bg = entry.active.then(|| Color32::from_rgba_premultiplied(0, 215, 255, 20));
 
     let frame = egui::Frame::NONE.inner_margin(egui::Margin::symmetric(4, 2));
     let frame = bg.map_or(frame, |bg_color| frame.fill(bg_color));
 
-    drop(frame.show(ui, |ui| {
+    let response = frame.show(ui, |ui| {
         drop(ui.horizontal(|ui| {
             // Icon.
             let icon_color =
@@ -129,7 +136,10 @@ fn render_sidebar_entry(ui: &mut Ui, entry: &SidebarEntry) {
                 }
             }));
         }));
-    }));
+    });
+
+    // Make the entire row clickable.
+    response.response.interact(egui::Sense::click()).clicked()
 }
 
 /// Render the token usage gauge bar.
@@ -381,4 +391,112 @@ fn format_tokens(tokens: u32) -> String {
     } else {
         tokens.to_string()
     }
+}
+
+// ── Overlays ─────────────────────────────────────────────────────────
+
+/// Dispatch an [`Overlay`] variant to its dedicated renderer.
+fn render_overlay(ctx: &egui::Context, overlay: &Overlay) {
+    match overlay {
+        Overlay::QuestionForm(form) => render_question_form(ctx, form),
+        Overlay::Autocomplete(ac) => render_autocomplete(ctx, ac),
+        _ => {}
+    }
+}
+
+/// Render a question form overlay as a centred modal window.
+fn render_question_form(ctx: &egui::Context, form: &cp_render::conversation::QuestionForm) {
+    drop(
+        egui::Window::new("Question Form")
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .collapsible(false)
+            .resizable(false)
+            .default_width(500.0)
+            .show(ctx, |ui| {
+                for (q_idx, question) in form.questions.iter().enumerate() {
+                    let focused = q_idx == form.focused_index;
+                    let header_color =
+                        if focused { semantic_color(Semantic::Accent) } else { semantic_color(Semantic::Header) };
+                    drop(ui.label(RichText::new(&question.header).color(header_color).strong().size(HEADER_FONT_SIZE)));
+                    drop(ui.label(RichText::new(&question.text).color(semantic_color(Semantic::Default))));
+                    ui.add_space(4.0);
+
+                    for (o_idx, option) in question.options.iter().enumerate() {
+                        let selected = question.selected.contains(&o_idx);
+                        let icon = if selected { "◉" } else { "○" };
+                        let color =
+                            if selected { semantic_color(Semantic::Accent) } else { semantic_color(Semantic::Muted) };
+
+                        drop(ui.horizontal(|ui| {
+                            drop(ui.label(RichText::new(icon).color(color)));
+                            drop(
+                                ui.label(
+                                    RichText::new(&option.label).color(semantic_color(Semantic::Default)).strong(),
+                                ),
+                            );
+                            drop(ui.label(
+                                RichText::new(&option.description).color(semantic_color(Semantic::Muted)).size(12.0),
+                            ));
+                        }));
+                    }
+
+                    // "Other" free-text field.
+                    if !question.other_text.is_empty() {
+                        drop(ui.horizontal(|ui| {
+                            drop(ui.label(RichText::new("Other:").color(semantic_color(Semantic::Muted))));
+                            drop(
+                                ui.label(RichText::new(&question.other_text).color(semantic_color(Semantic::Default))),
+                            );
+                        }));
+                    }
+
+                    if q_idx < form.questions.len().saturating_sub(1) {
+                        drop(ui.separator());
+                    }
+                }
+            }),
+    );
+}
+
+/// Render an autocomplete popup near the input area.
+fn render_autocomplete(ctx: &egui::Context, ac: &cp_render::conversation::Autocomplete) {
+    drop(
+        egui::Window::new("Autocomplete")
+            .anchor(egui::Align2::LEFT_BOTTOM, [80.0, -44.0])
+            .title_bar(false)
+            .collapsible(false)
+            .resizable(false)
+            .default_width(360.0)
+            .show(ctx, |ui| {
+                // Query display.
+                drop(ui.label(
+                    RichText::new(format!("@ {}", ac.query)).color(semantic_color(Semantic::Accent)).size(12.0),
+                ));
+                drop(ui.separator());
+
+                // Entries.
+                for (idx, entry) in ac.entries.iter().enumerate() {
+                    let selected = idx == ac.selected_index;
+                    let bg = selected.then(|| Color32::from_rgba_premultiplied(0, 215, 255, 30));
+
+                    let frame = egui::Frame::NONE.inner_margin(egui::Margin::symmetric(4, 1));
+                    let frame = bg.map_or(frame, |c| frame.fill(c));
+
+                    drop(frame.show(ui, |ui| {
+                        drop(ui.horizontal(|ui| {
+                            drop(ui.label(RichText::new(&entry.icon).size(12.0)));
+                            let label_color = if selected {
+                                semantic_color(Semantic::Accent)
+                            } else {
+                                semantic_color(Semantic::Default)
+                            };
+                            drop(ui.label(RichText::new(&entry.label).color(label_color).size(12.0)));
+                            if entry.is_dir {
+                                drop(ui.label(RichText::new("/").color(semantic_color(Semantic::Muted)).size(12.0)));
+                            }
+                        }));
+                    }));
+                }
+            }),
+    );
 }
