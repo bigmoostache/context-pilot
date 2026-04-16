@@ -10,7 +10,7 @@ use crate::state::{Message, MsgKind, MsgStatus};
 
 /// Convert internal messages to Anthropic API format.
 /// Context items are injected as fake tool call/result pairs at the start.
-pub(super) fn messages_to_api(
+pub(in crate::llms) fn messages_to_api(
     messages: &[Message],
     context_items: &[crate::app::panels::ContextItem],
     include_last_tool_uses: bool,

@@ -89,6 +89,8 @@ pub enum Action {
     ConfigSelectGroqModel(crate::config::llm_types::GroqModel),
     /// Select primary `DeepSeek` model.
     ConfigSelectDeepSeekModel(crate::config::llm_types::DeepSeekModel),
+    /// Select primary `MiniMax` model.
+    ConfigSelectMiniMaxModel(crate::config::llm_types::MiniMaxModel),
     /// Move config bar selection forward (→).
     ConfigSelectNextBar,
     /// Move config bar selection backward (←).
@@ -115,6 +117,8 @@ pub enum Action {
     ConfigSelectSecondaryGroqModel(crate::config::llm_types::GroqModel),
     /// Select secondary `DeepSeek` model.
     ConfigSelectSecondaryDeepSeekModel(crate::config::llm_types::DeepSeekModel),
+    /// Select secondary `MiniMax` model.
+    ConfigSelectSecondaryMiniMaxModel(crate::config::llm_types::MiniMaxModel),
     /// Toggle reverie (background optimizer) on/off.
     ConfigToggleReverie,
     /// Toggle between primary and secondary model tabs.

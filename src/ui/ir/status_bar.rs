@@ -79,6 +79,7 @@ fn build_provider_label(state: &State) -> String {
         LlmProvider::Grok => "Grok",
         LlmProvider::Groq => "Groq",
         LlmProvider::DeepSeek => "DeepSeek",
+        LlmProvider::MiniMax => "MiniMax",
     }
     .to_string()
 }
@@ -92,6 +93,7 @@ fn build_model_label(state: &State) -> String {
         LlmProvider::Grok => ("Grok", state.grok_model.display_name()),
         LlmProvider::Groq => ("Groq", state.groq_model.display_name()),
         LlmProvider::DeepSeek => ("DeepSeek", state.deepseek_model.display_name()),
+        LlmProvider::MiniMax => ("MiniMax", state.minimax_model.display_name()),
     };
     model_name.to_string()
 }

@@ -10,9 +10,7 @@ use crate::config::llm_types::{LlmProvider, ModelInfo as _};
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
-// =============================================================================
 // Runtime State
-// =============================================================================
 
 /// Runtime state (messages loaded in memory)
 pub struct State {
@@ -74,6 +72,8 @@ pub struct State {
     pub groq_model: crate::config::llm_types::GroqModel,
     /// Active `DeepSeek` model variant.
     pub deepseek_model: crate::config::llm_types::DeepSeekModel,
+    /// Active `MiniMax` model variant.
+    pub minimax_model: crate::config::llm_types::MiniMaxModel,
     /// Secondary LLM provider (for reveries / sub-agents)
     pub secondary_provider: LlmProvider,
     /// Secondary Anthropic model variant.
@@ -84,6 +84,8 @@ pub struct State {
     pub secondary_groq_model: crate::config::llm_types::GroqModel,
     /// Secondary `DeepSeek` model variant.
     pub secondary_deepseek_model: crate::config::llm_types::DeepSeekModel,
+    /// Secondary `MiniMax` model variant.
+    pub secondary_minimax_model: crate::config::llm_types::MiniMaxModel,
     /// Sidebar display mode: Normal (full), Collapsed (icons only), Hidden
     pub sidebar_mode: SidebarMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
@@ -187,11 +189,13 @@ impl Default for State {
             grok_model: crate::config::llm_types::GrokModel::default(),
             groq_model: crate::config::llm_types::GroqModel::default(),
             deepseek_model: crate::config::llm_types::DeepSeekModel::default(),
+            minimax_model: crate::config::llm_types::MiniMaxModel::default(),
             secondary_provider: LlmProvider::Anthropic,
             secondary_anthropic_model: crate::config::llm_types::AnthropicModel::ClaudeHaiku45,
             secondary_grok_model: crate::config::llm_types::GrokModel::default(),
             secondary_groq_model: crate::config::llm_types::GroqModel::default(),
             secondary_deepseek_model: crate::config::llm_types::DeepSeekModel::default(),
+            secondary_minimax_model: crate::config::llm_types::MiniMaxModel::default(),
             sidebar_mode: SidebarMode::Normal,
             reveries: HashMap::new(),
             cache_hit_tokens: 0,
@@ -292,7 +296,7 @@ impl State {
         format!("P{id}")
     }
 
-    // === Message Creation Helpers ===
+    // === Message creation ===
 
     /// Allocate the next user message ID and UID, returning (id, uid).
     pub fn alloc_user_ids(&mut self) -> (String, String) {
@@ -348,9 +352,7 @@ impl State {
         self.tick_output_tokens = 0;
     }
 
-    // =========================================================================
-    // Model selection & context window
-    // =========================================================================
+    // === Model selection & context window ===
 
     /// Get the API model string for the current provider/model selection
     #[must_use]
@@ -362,6 +364,7 @@ impl State {
             LlmProvider::Grok => self.grok_model.api_name().to_string(),
             LlmProvider::Groq => self.groq_model.api_name().to_string(),
             LlmProvider::DeepSeek => self.deepseek_model.api_name().to_string(),
+            LlmProvider::MiniMax => self.minimax_model.api_name().to_string(),
         }
     }
 
@@ -375,6 +378,7 @@ impl State {
             LlmProvider::Grok => self.grok_model.max_output_tokens(),
             LlmProvider::Groq => self.groq_model.max_output_tokens(),
             LlmProvider::DeepSeek => self.deepseek_model.max_output_tokens(),
+            LlmProvider::MiniMax => self.minimax_model.max_output_tokens(),
         }
     }
 
@@ -388,6 +392,7 @@ impl State {
             LlmProvider::Grok => self.secondary_grok_model.max_output_tokens(),
             LlmProvider::Groq => self.secondary_groq_model.max_output_tokens(),
             LlmProvider::DeepSeek => self.secondary_deepseek_model.max_output_tokens(),
+            LlmProvider::MiniMax => self.secondary_minimax_model.max_output_tokens(),
         }
     }
 
@@ -401,6 +406,7 @@ impl State {
             LlmProvider::Grok => self.grok_model.context_window(),
             LlmProvider::Groq => self.groq_model.context_window(),
             LlmProvider::DeepSeek => self.deepseek_model.context_window(),
+            LlmProvider::MiniMax => self.minimax_model.context_window(),
         }
     }
 
@@ -410,9 +416,55 @@ impl State {
         self.context_budget.unwrap_or_else(|| self.model_context_window())
     }
 
-    // =========================================================================
-    // Cleaning thresholds
-    // =========================================================================
+    /// Cache hit price per million tokens for the current model.
+    #[must_use]
+    pub fn cache_hit_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.cache_hit_price_per_mtok()
+            }
+            LlmProvider::Grok => self.grok_model.cache_hit_price_per_mtok(),
+            LlmProvider::Groq => self.groq_model.cache_hit_price_per_mtok(),
+            LlmProvider::DeepSeek => self.deepseek_model.cache_hit_price_per_mtok(),
+            LlmProvider::MiniMax => self.minimax_model.cache_hit_price_per_mtok(),
+        }
+    }
+
+    /// Cache miss price per million tokens for the current model.
+    #[must_use]
+    pub fn cache_miss_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.cache_miss_price_per_mtok()
+            }
+            LlmProvider::Grok => self.grok_model.cache_miss_price_per_mtok(),
+            LlmProvider::Groq => self.groq_model.cache_miss_price_per_mtok(),
+            LlmProvider::DeepSeek => self.deepseek_model.cache_miss_price_per_mtok(),
+            LlmProvider::MiniMax => self.minimax_model.cache_miss_price_per_mtok(),
+        }
+    }
+
+    /// Output price per million tokens for the current model.
+    #[must_use]
+    pub fn output_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.output_price_per_mtok()
+            }
+            LlmProvider::Grok => self.grok_model.output_price_per_mtok(),
+            LlmProvider::Groq => self.groq_model.output_price_per_mtok(),
+            LlmProvider::DeepSeek => self.deepseek_model.output_price_per_mtok(),
+            LlmProvider::MiniMax => self.minimax_model.output_price_per_mtok(),
+        }
+    }
+
+    /// Calculate cost in USD for a given token count and price per `MTok`.
+    #[must_use]
+    pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
+        tokens.to_f64() * price_per_mtok.to_f64() / 1_000_000.0
+    }
+
+    // === Cleaning thresholds ===
 
     /// Get the cleaning target as absolute proportion (threshold × `target_proportion`)
     #[must_use]
@@ -430,55 +482,6 @@ impl State {
     #[must_use]
     pub fn cleaning_target_tokens(&self) -> usize {
         (self.effective_context_budget().to_f32() * self.cleaning_target()).to_usize()
-    }
-
-    // =========================================================================
-    // Pricing
-    // =========================================================================
-
-    /// Get cache hit price per million tokens for the current model
-    #[must_use]
-    pub fn cache_hit_price_per_mtok(&self) -> f32 {
-        match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.cache_hit_price_per_mtok()
-            }
-            LlmProvider::Grok => self.grok_model.cache_hit_price_per_mtok(),
-            LlmProvider::Groq => self.groq_model.cache_hit_price_per_mtok(),
-            LlmProvider::DeepSeek => self.deepseek_model.cache_hit_price_per_mtok(),
-        }
-    }
-
-    /// Get cache miss price per million tokens for the current model
-    #[must_use]
-    pub fn cache_miss_price_per_mtok(&self) -> f32 {
-        match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.cache_miss_price_per_mtok()
-            }
-            LlmProvider::Grok => self.grok_model.cache_miss_price_per_mtok(),
-            LlmProvider::Groq => self.groq_model.cache_miss_price_per_mtok(),
-            LlmProvider::DeepSeek => self.deepseek_model.cache_miss_price_per_mtok(),
-        }
-    }
-
-    /// Get output price per million tokens for the current model
-    #[must_use]
-    pub fn output_price_per_mtok(&self) -> f32 {
-        match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.output_price_per_mtok()
-            }
-            LlmProvider::Grok => self.grok_model.output_price_per_mtok(),
-            LlmProvider::Groq => self.groq_model.output_price_per_mtok(),
-            LlmProvider::DeepSeek => self.deepseek_model.output_price_per_mtok(),
-        }
-    }
-
-    /// Calculate cost in USD for a given token count and price per `MTok`
-    #[must_use]
-    pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
-        tokens.to_f64() * price_per_mtok.to_f64() / 1_000_000.0
     }
 }
 

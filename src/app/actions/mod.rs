@@ -253,6 +253,10 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.deepseek_model = m;
             config::api_check(state)
         }
+        Action::ConfigSelectMiniMaxModel(m) => {
+            state.minimax_model = m;
+            config::api_check(state)
+        }
         Action::ConfigSelectNextBar => {
             state.config_selected_bar = config::next_bar(state.config_selected_bar);
             state.flags.ui.dirty = true;
@@ -311,6 +315,11 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ConfigSelectSecondaryDeepSeekModel(m) => {
             state.secondary_deepseek_model = m;
+            state.flags.ui.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSelectSecondaryMiniMaxModel(m) => {
+            state.secondary_minimax_model = m;
             state.flags.ui.dirty = true;
             ActionResult::Save
         }

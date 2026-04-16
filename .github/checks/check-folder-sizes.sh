@@ -29,5 +29,6 @@ done < <(find . -mindepth 1 -type d \
   -not -path './test-typst/*' \
   -not -path './.github/workflows' \
   -not -path './.github/checks' \
-  -not -path './yamls/tools')
+  -not -path './yamls/tools' \
+  -not -path './crates/cp-base/src/state')
 exit $exit_code

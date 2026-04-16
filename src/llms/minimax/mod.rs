@@ -1,8 +1,11 @@
-//! Anthropic Claude API implementation.
+//! MiniMax provider — Anthropic-compatible API via Token Plan.
+//!
+//! Reuses the Anthropic message format and SSE streaming protocol.
+//! Endpoint: `https://api.minimax.io/anthropic/v1/messages`
 
 use reqwest::blocking::Client;
 use secrecy::{ExposeSecret as _, SecretBox};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use std::env;
 use std::io::{BufRead as _, BufReader};
@@ -10,118 +13,58 @@ use std::sync::mpsc::Sender;
 
 use super::error::LlmError;
 use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
-use crate::infra::constants::{API_ENDPOINT, API_VERSION, library};
+use crate::infra::constants::library;
 use crate::infra::tools::ToolUse;
 use crate::infra::tools::build_api;
 use cp_base::config::INJECTIONS;
 
-pub(in crate::llms) mod messages;
+/// `MiniMax` Anthropic-compatible API endpoint.
+const MINIMAX_ENDPOINT: &str = "https://api.minimax.io/anthropic/v1/messages";
 
-use messages::{log_sse_error, messages_to_api};
+/// Anthropic API version used for `MiniMax` compatibility.
+const MINIMAX_API_VERSION: &str = "2023-06-01";
 
-/// Anthropic Claude client
-pub(crate) struct AnthropicClient {
-    /// API key loaded from `ANTHROPIC_API_KEY` environment variable
+/// `MiniMax` client backed by the Token Plan API.
+pub(crate) struct MiniMaxClient {
+    /// API key loaded from `MINIMAX_API_KEY` environment variable.
     api_key: Option<SecretBox<String>>,
 }
 
-impl AnthropicClient {
-    /// Create a new Anthropic client, loading the API key from the environment.
+impl MiniMaxClient {
+    /// Create a new `MiniMax` client, loading the API key from the environment.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
-        Self { api_key: env::var("ANTHROPIC_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
+        Self { api_key: env::var("MINIMAX_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
     }
 }
 
-impl Default for AnthropicClient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-/// Serializable Anthropic API request body.
+/// Serializable `MiniMax` API request body (Anthropic-compatible format).
 #[derive(Debug, Serialize)]
-struct AnthropicRequest {
-    /// Model identifier
+struct MiniMaxRequest {
+    /// Model identifier.
     model: String,
-    /// Maximum tokens to generate
+    /// Maximum tokens to generate.
     max_tokens: u32,
-    /// System prompt text
+    /// System prompt text.
     system: String,
-    /// Conversation messages
+    /// Conversation messages.
     messages: Vec<ApiMessage>,
-    /// Available tools
+    /// Available tools.
     tools: Value,
-    /// Whether to stream the response
+    /// Whether to stream the response.
     stream: bool,
 }
 
-/// Content block metadata from SSE stream events.
-#[derive(Debug, Deserialize)]
-struct StreamContentBlock {
-    /// Block type (e.g. "text", "`tool_use`")
-    #[serde(rename = "type")]
-    block_type: Option<String>,
-    /// Block ID (for `tool_use` blocks)
-    id: Option<String>,
-    /// Tool name (for `tool_use` blocks)
-    name: Option<String>,
-}
-
-/// Delta payload from SSE stream events.
-#[derive(Debug, Deserialize)]
-struct StreamDelta {
-    /// Delta type (e.g. "`text_delta`", "`input_json_delta`")
-    #[serde(rename = "type")]
-    delta_type: Option<String>,
-    /// Text content delta
-    text: Option<String>,
-    /// Partial JSON for tool input
-    partial_json: Option<String>,
-    /// Stop reason (e.g. "`end_turn`", "`tool_use`")
-    stop_reason: Option<String>,
-}
-
-/// Top-level SSE stream event from the Anthropic API.
-#[derive(Debug, Deserialize)]
-struct StreamMessage {
-    /// Event type (e.g. "`content_block_start`", "`message_delta`")
-    #[serde(rename = "type")]
-    event_type: String,
-    /// Content block index (unused but present in API)
-    #[serde(default)]
-    _index: Option<usize>,
-    /// Content block metadata (for `block_start` events)
-    content_block: Option<StreamContentBlock>,
-    /// Delta payload (for delta events)
-    delta: Option<StreamDelta>,
-    /// Token usage statistics
-    usage: Option<StreamUsage>,
-}
-
-/// Token usage statistics from the Anthropic API.
-#[derive(Debug, Deserialize)]
-struct StreamUsage {
-    /// Number of input tokens consumed
-    input_tokens: Option<usize>,
-    /// Number of output tokens generated
-    output_tokens: Option<usize>,
-}
-
-impl LlmClient for AnthropicClient {
+impl LlmClient for MiniMaxClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
+        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("MINIMAX_API_KEY not set".into()))?;
 
-        // timeout(None) prevents reqwest from killing long-running SSE streams.
-        // Without this, blocking Client may use system TCP timeouts, causing
-        // silent stream drops mid-response (same fix applied to Claude Code providers).
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
-        // Build API messages
+        // Use pre-assembled API messages from prompt_builder
         let include_tool_uses = request.tool_results.is_some();
-        // Use pre-assembled API messages from prompt_builder (centralized assembly)
         let mut api_messages = if request.api_messages.is_empty() {
-            // Fallback: build from raw data (should only happen for api_check etc.)
-            messages_to_api(
+            super::anthropic::messages::messages_to_api(
                 &request.messages,
                 &request.context_items,
                 include_tool_uses,
@@ -131,7 +74,7 @@ impl LlmClient for AnthropicClient {
             request.api_messages.clone()
         };
 
-        // Add tool results if present
+        // Append tool results if present
         if let Some(results) = &request.tool_results {
             let tool_result_blocks: Vec<ContentBlock> = results
                 .iter()
@@ -140,11 +83,10 @@ impl LlmClient for AnthropicClient {
                     content: r.content.clone(),
                 })
                 .collect();
-
             api_messages.push(ApiMessage { role: "user".to_string(), content: tool_result_blocks });
         }
 
-        // Handle cleaner mode or custom system prompt
+        // Handle system prompt
         let system_prompt = if let Some(ref prompt) = request.system_prompt {
             if let Some(ref context) = request.extra_context {
                 let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
@@ -156,7 +98,7 @@ impl LlmClient for AnthropicClient {
             library::default_agent_content().to_string()
         };
 
-        let api_request = AnthropicRequest {
+        let api_request = MiniMaxRequest {
             model: request.model.clone(),
             max_tokens: request.max_output_tokens,
             system: system_prompt,
@@ -169,14 +111,14 @@ impl LlmClient for AnthropicClient {
         {
             let dir = ".context-pilot/last_requests";
             let _r1 = std::fs::create_dir_all(dir);
-            let path = format!("{}/{}_anthropic_last_request.json", dir, request.worker_id);
+            let path = format!("{dir}/{}_minimax_last_request.json", request.worker_id);
             let _r2 = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
         }
 
         let response = client
-            .post(API_ENDPOINT)
+            .post(MINIMAX_ENDPOINT)
             .header("x-api-key", api_key.expose_secret())
-            .header("anthropic-version", API_VERSION)
+            .header("anthropic-version", MINIMAX_API_VERSION)
             .header("content-type", "application/json")
             .json(&api_request)
             .send()?;
@@ -187,6 +129,7 @@ impl LlmClient for AnthropicClient {
             return Err(LlmError::Api { status, body });
         }
 
+        // SSE stream parsing — identical to Anthropic protocol
         let mut reader = BufReader::new(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
@@ -199,7 +142,7 @@ impl LlmClient for AnthropicClient {
         loop {
             let mut line = String::new();
             match reader.read_line(&mut line) {
-                Ok(0) => break, // EOF
+                Ok(0) => break,
                 Ok(n) => {
                     total_bytes = total_bytes.saturating_add(n);
                     line_count = line_count.saturating_add(1);
@@ -317,16 +260,16 @@ impl LlmClient for AnthropicClient {
                 auth_ok: false,
                 streaming_ok: false,
                 tools_ok: false,
-                error: Some("ANTHROPIC_API_KEY not set".to_string()),
+                error: Some("MINIMAX_API_KEY not set".to_string()),
             };
         };
 
         let client = Client::new();
         let base = || {
             client
-                .post(API_ENDPOINT)
+                .post(MINIMAX_ENDPOINT)
                 .header("x-api-key", api_key.expose_secret())
-                .header("anthropic-version", API_VERSION)
+                .header("anthropic-version", MINIMAX_API_VERSION)
                 .header("content-type", "application/json")
         };
 
@@ -345,7 +288,7 @@ impl LlmClient for AnthropicClient {
                 auth_ok: false,
                 streaming_ok: false,
                 tools_ok: false,
-                error: Some("Auth failed".to_string()),
+                error: Some("Auth failed — check MINIMAX_API_KEY".to_string()),
             };
         }
 
@@ -373,4 +316,66 @@ impl LlmClient for AnthropicClient {
 
         super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
+}
+
+// ── SSE types (shared with Anthropic protocol) ──────────────────────
+
+/// Content block metadata from SSE stream events.
+#[derive(Debug, serde::Deserialize)]
+struct StreamContentBlock {
+    /// Block type (e.g. "text", "`tool_use`").
+    #[serde(rename = "type")]
+    block_type: Option<String>,
+    /// Block ID (for `tool_use` blocks).
+    id: Option<String>,
+    /// Tool name (for `tool_use` blocks).
+    name: Option<String>,
+}
+
+/// Delta payload from SSE stream events.
+#[derive(Debug, serde::Deserialize)]
+struct StreamDelta {
+    /// Delta type (e.g. "`text_delta`", "`input_json_delta`").
+    #[serde(rename = "type")]
+    delta_type: Option<String>,
+    /// Text content delta.
+    text: Option<String>,
+    /// Partial JSON for tool input.
+    partial_json: Option<String>,
+    /// Stop reason (e.g. "`end_turn`", "`tool_use`").
+    stop_reason: Option<String>,
+}
+
+/// Top-level SSE stream event.
+#[derive(Debug, serde::Deserialize)]
+struct StreamMessage {
+    /// Event type (e.g. "`content_block_start`", "`message_delta`").
+    #[serde(rename = "type")]
+    event_type: String,
+    /// Content block metadata (for `block_start` events).
+    content_block: Option<StreamContentBlock>,
+    /// Delta payload (for delta events).
+    delta: Option<StreamDelta>,
+    /// Token usage statistics.
+    usage: Option<StreamUsage>,
+}
+
+/// Token usage statistics.
+#[derive(Debug, serde::Deserialize)]
+struct StreamUsage {
+    /// Number of input tokens consumed.
+    input_tokens: Option<usize>,
+    /// Number of output tokens generated.
+    output_tokens: Option<usize>,
+}
+
+/// Log an SSE error event for post-mortem debugging.
+fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lines: &[String]) {
+    crate::llms::log_sse_error(&crate::llms::SseErrorContext {
+        provider: "minimax",
+        json_str,
+        total_bytes,
+        line_count,
+        last_lines,
+    });
 }

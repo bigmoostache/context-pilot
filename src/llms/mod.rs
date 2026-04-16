@@ -5,6 +5,8 @@
 pub(crate) mod anthropic;
 pub(crate) mod claude_code;
 pub(crate) mod claude_code_api_key;
+/// MiniMax provider (Anthropic-compatible API via Token Plan).
+pub(crate) mod minimax;
 /// OpenAI-compatible provider implementations (Grok, Groq, DeepSeek).
 pub(crate) mod oai_providers;
 pub(crate) mod openai_compat;
@@ -23,7 +25,8 @@ use cp_base::cast::Safe as _;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
 pub(crate) use cp_base::config::llm_types::{
-    AnthropicModel, ApiCheckResult, DeepSeekModel, GrokModel, GroqModel, LlmProvider, ModelInfo, StreamEvent,
+    AnthropicModel, ApiCheckResult, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel, ModelInfo,
+    StreamEvent,
 };
 
 // Re-export provider clients through the module path for get_client()
@@ -77,6 +80,7 @@ pub(crate) fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
         LlmProvider::Grok => Box::new(grok::GrokClient::new()),
         LlmProvider::Groq => Box::new(groq::GroqClient::new()),
         LlmProvider::DeepSeek => Box::new(deepseek::DeepSeekClient::new()),
+        LlmProvider::MiniMax => Box::new(minimax::MiniMaxClient::new()),
     }
 }
 

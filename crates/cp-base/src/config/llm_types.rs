@@ -104,6 +104,8 @@ pub enum LlmProvider {
     Groq,
     /// `DeepSeek` models (OpenAI-compatible API).
     DeepSeek,
+    /// `MiniMax` models (Anthropic-compatible API via Token Plan).
+    MiniMax,
 }
 
 /// Anthropic model variants with per-model pricing and context limits.
@@ -360,6 +362,73 @@ impl ModelInfo for DeepSeekModel {
         match self {
             Self::DeepseekChat => 8_192,
             Self::DeepseekReasoner => 0x4000,
+        }
+    }
+}
+
+/// `MiniMax` model variants (Anthropic-compatible API via Token Plan).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MiniMaxModel {
+    /// `MiniMax` M2.7 — flagship model, 204K context.
+    #[default]
+    M27,
+    /// `MiniMax` M2.7 Highspeed — faster variant, same context window.
+    M27Highspeed,
+}
+
+impl ModelInfo for MiniMaxModel {
+    fn api_name(&self) -> &'static str {
+        match self {
+            Self::M27 | Self::M27Highspeed => "MiniMax-M2.7",
+        }
+    }
+
+    fn display_name(&self) -> &'static str {
+        match self {
+            Self::M27 => "M2.7",
+            Self::M27Highspeed => "M2.7 HS",
+        }
+    }
+
+    fn context_window(&self) -> usize {
+        match self {
+            Self::M27 => 204_800,
+            Self::M27Highspeed => 0x2_0000,
+        }
+    }
+
+    fn input_price_per_mtok(&self) -> f32 {
+        match self {
+            Self::M27 => 2.0,
+            Self::M27Highspeed => 4.0,
+        }
+    }
+
+    fn output_price_per_mtok(&self) -> f32 {
+        match self {
+            Self::M27 => 8.0,
+            Self::M27Highspeed => 16.0,
+        }
+    }
+
+    fn cache_hit_price_per_mtok(&self) -> f32 {
+        match self {
+            Self::M27 => 0.2,
+            Self::M27Highspeed => 0.4,
+        }
+    }
+
+    fn cache_miss_price_per_mtok(&self) -> f32 {
+        match self {
+            Self::M27 => 2.5,
+            Self::M27Highspeed => 5.0,
+        }
+    }
+
+    fn max_output_tokens(&self) -> u32 {
+        match self {
+            Self::M27 | Self::M27Highspeed => 128_000,
         }
     }
 }
