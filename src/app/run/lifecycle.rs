@@ -156,13 +156,13 @@ impl App {
             super::watchers::process_cache_updates(self, ch.cache_rx);
             super::watchers::process_watcher_events(self);
             // Check if we're waiting for panels and they're ready (non-blocking)
-            super::tool_pipeline::check_waiting_for_panels(self, ch.tx);
+            super::tools::checks::check_waiting_for_panels(self, ch.tx);
             // Check if deferred sleep timer has expired (non-blocking)
-            super::tool_pipeline::check_deferred_sleep(self, ch.tx);
+            super::tools::checks::check_deferred_sleep(self, ch.tx);
             // Check if a question form has been resolved by the user
-            super::tool_pipeline::check_question_form(self, ch.tx);
+            super::tools::checks::check_question_form(self, ch.tx);
             // Check watchers (blocking sentinel replacement + async → spine notifications)
-            super::tool_cleanup::check_watchers(self, ch.tx);
+            super::tools::cleanup::check_watchers(self, ch.tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
             if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
                 self.last_gh_sync_ms = current_ms;
@@ -176,7 +176,7 @@ impl App {
                 crate::app::panels::refresh_all_panels(&mut self.state);
             }
             super::watchers::check_timer_based_deprecation(self);
-            super::tool_pipeline::handle_tool_execution(self, ch.tx);
+            super::tools::pipeline::handle_tool_execution(self, ch.tx);
             super::streaming::finalize_stream(self);
             self.check_spine(ch.tx);
             super::streaming::process_api_check_results(self);
@@ -249,7 +249,7 @@ impl App {
                 // tool_use messages are properly paired with a tool_result.
                 // Without this, the orphaned tool_use causes API 400 errors on
                 // the next stream (tool_use without matching tool_result).
-                super::tool_cleanup::flush_pending_tool_results_as_interrupted(self);
+                super::tools::cleanup::flush_pending_tool_results_as_interrupted(self);
 
                 // Pause auto-continuation when user explicitly cancels streaming.
                 // Without this, the spine would immediately relaunch a new stream

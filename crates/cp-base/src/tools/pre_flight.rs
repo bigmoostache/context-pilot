@@ -15,6 +15,11 @@ pub struct Verdict {
     pub errors: Vec<String>,
     /// Non-blocking warnings — included in the result but tool runs.
     pub warnings: Vec<String>,
+    /// When `true`, the pipeline activates the tool queue before the
+    /// intercept check, ensuring this call is queued rather than
+    /// executed immediately. Used by destructive operations that need
+    /// queue protection (e.g. `Close_conversation_history`).
+    pub activate_queue: bool,
 }
 
 impl Verdict {
@@ -60,6 +65,7 @@ impl Verdict {
     pub fn merge(&mut self, other: Self) {
         self.errors.extend(other.errors);
         self.warnings.extend(other.warnings);
+        self.activate_queue = self.activate_queue || other.activate_queue;
     }
 
     /// Format errors and warnings into a human-readable string.

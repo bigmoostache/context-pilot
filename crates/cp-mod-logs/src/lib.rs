@@ -279,15 +279,8 @@ impl Module for LogsModule {
             }
             "Close_conversation_history" => {
                 let mut pf = Verdict::new();
-                // Queue must be active for destructive history panel operations
-                if !cp_mod_queue::types::QueueState::get(state).active {
-                    pf.errors.push(
-                        "Cannot close conversation history without an active queue. \
-                         Activate the queue first (Queue_activate), then queue this call. \
-                         Closing history panels causes irreversible context loss."
-                            .to_string(),
-                    );
-                }
+                // Auto-activate queue — closing history panels is destructive
+                pf.activate_queue = true;
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     match state.context.iter().find(|c| c.id == id) {
                         None => pf.errors.push(format!("Panel '{id}' not found")),

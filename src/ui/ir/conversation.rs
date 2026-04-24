@@ -113,12 +113,15 @@ fn tool_use_to_ir(tu: &ToolUseRecord) -> ToolUsePreview {
 
 /// Convert a [`ToolResultRecord`] to an IR [`ToolResultPreview`].
 fn tool_result_to_ir(tr: &ToolResultRecord) -> ToolResultPreview {
+    // Prefer display (user-facing) over content (LLM-facing) for the UI
+    let source = tr.display.as_deref().unwrap_or(&tr.content);
+
     // Truncate content for summary
-    let summary = if tr.content.len() > 80 {
-        let boundary = tr.content.floor_char_boundary(77);
-        format!("{}...", tr.content.get(..boundary).unwrap_or(""))
+    let summary = if source.len() > 80 {
+        let boundary = source.floor_char_boundary(77);
+        format!("{}...", source.get(..boundary).unwrap_or(""))
     } else {
-        tr.content.clone()
+        source.to_string()
     };
 
     ToolResultPreview { tool_name: tr.tool_name.clone(), summary, success: !tr.is_error }

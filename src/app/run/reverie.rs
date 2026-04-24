@@ -143,13 +143,7 @@ pub(super) fn handle_reverie_tools(app: &mut App) {
             // Queue_execute needs special handling (flush lives in tool_cleanup, not the module)
             let result = if tool.name == "Queue_execute" {
                 // Reverie doesn't need flushed tools (no callbacks) — just the summary
-                super::tool_cleanup::execute_queue_flush(tool, &mut app.state).0
-            } else if tool.name == "Queue_activate" {
-                // Toggle the reverie's own queue flag, NOT the main worker's QueueState.active
-                if let Some(rev) = app.state.reveries.get_mut(&agent_id) {
-                    rev.queue_active = true;
-                }
-                crate::infra::tools::ToolResult::new(tool.id.clone(), "Queue activated (reverie)".into(), false)
+                super::tools::cleanup::execute_queue_flush(tool, &mut app.state).0
             } else if tool.name == "Queue_pause" {
                 if let Some(rev) = app.state.reveries.get_mut(&agent_id) {
                     rev.queue_active = false;
@@ -253,6 +247,7 @@ pub(super) fn handle_reverie_tools(app: &mut App) {
                         tool_use_id: result.tool_use_id.clone(),
                         tool_name: result.tool_name.clone(),
                         content: result.content.clone(),
+                        display: result.display.clone(),
                         is_error: result.is_error,
                     }],
                 });

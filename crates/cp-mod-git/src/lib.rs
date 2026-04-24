@@ -26,8 +26,7 @@ pub fn refresh_git_status(state: &mut State) {
     use std::process::Command;
 
     // Check if git repo
-    let is_repo =
-        Command::new("git").args(["rev-parse", "--git-dir"]).output().map(|o| o.status.success()).unwrap_or(false);
+    let is_repo = Command::new("git").args(["rev-parse", "--git-dir"]).output().is_ok_and(|o| o.status.success());
 
     let gs = GitState::get_mut(state);
     gs.is_repo = is_repo;
@@ -113,7 +112,7 @@ pub fn refresh_git_status(state: &mut State) {
                 continue;
             }
             // Count lines for untracked files
-            let line_count = std::fs::read_to_string(&path).map(|c| c.lines().count().to_i32()).unwrap_or(0);
+            let line_count = std::fs::read_to_string(&path).map_or(0, |c| c.lines().count().to_i32());
 
             file_changes.push(GitFileChange {
                 path,

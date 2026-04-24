@@ -15,12 +15,12 @@ use std::fmt::Write as _;
 
 /// Helper to build a `ToolResult` from a tool and content.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, is_error: false, tool_name: tool.name.clone() }
+    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: false, tool_name: tool.name.clone() }
 }
 
 /// Helper to build an error `ToolResult` from a tool and content.
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, tool_name: tool.name.clone() }
+    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: true, tool_name: tool.name.clone() }
 }
 
 /// Execute the `typst_execute` tool — parse command string and dispatch to subcommand handler.
@@ -214,6 +214,7 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
         total_cache_misses: 0,
         last_emitted_content: None,
         last_emitted_hash: None,
+        last_emitted_context: None,
     };
     elem.set_meta("dynamic_label", &"typst-fonts".to_string());
     state.context.push(elem);
@@ -280,6 +281,7 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str) ->
         total_cache_misses: 0,
         last_emitted_content: None,
         last_emitted_hash: None,
+        last_emitted_context: None,
     };
     elem.set_meta("dynamic_label", &"typst-query".to_string());
     state.context.push(elem);

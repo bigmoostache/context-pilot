@@ -156,7 +156,7 @@ pub enum WatchSpec {
 /// Get current time in milliseconds since UNIX epoch
 #[must_use]
 pub fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis().to_u64()).unwrap_or(0)
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64())
 }
 
 /// Truncating time arithmetic — the sole choke-point for `/ 1000`, `% 3600`, etc.

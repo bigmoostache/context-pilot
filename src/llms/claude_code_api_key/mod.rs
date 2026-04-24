@@ -108,7 +108,7 @@ impl ClaudeCodeApiKeyClient {
             }))
             .send();
 
-        let streaming_ok = stream_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+        let streaming_ok = stream_result.as_ref().is_ok_and(|r| r.status().is_success());
 
         // Test 3: Tool calling
         let tools_msg = serde_json::json!({
@@ -136,7 +136,7 @@ impl ClaudeCodeApiKeyClient {
             }))
             .send();
 
-        let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+        let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
 
         ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }

@@ -1,0 +1,5 @@
+Treasure Map - X marks the spot
+Latitude: 42.0
+Longitude: -71.5
+Beware the coral reef at low tide
+Depth: 20 fathoms below the surface

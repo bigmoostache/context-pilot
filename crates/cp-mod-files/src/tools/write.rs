@@ -83,6 +83,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             total_cache_misses: 0,
             last_emitted_content: None,
             last_emitted_hash: None,
+            last_emitted_context: None,
         };
         elem.set_meta("file_path", &path_str.to_string());
         state.context.push(elem);

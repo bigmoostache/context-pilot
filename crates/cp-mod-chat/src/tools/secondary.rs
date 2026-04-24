@@ -26,6 +26,7 @@ pub(crate) fn execute_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Search cleared.".to_string(),
+            display: None,
             is_error: false,
             tool_name: tool.name.clone(),
         };
@@ -40,6 +41,7 @@ pub(crate) fn execute_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Cannot resolve room: {e}"),
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -55,6 +57,7 @@ pub(crate) fn execute_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Search '{query}': {count} result(s). See dashboard panel."),
+                display: None,
                 is_error: false,
                 tool_name: tool.name.clone(),
             }
@@ -62,6 +65,7 @@ pub(crate) fn execute_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Search failed: {e}"),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         },
@@ -75,6 +79,7 @@ pub(crate) fn execute_create_room(tool: &ToolUse, _state: &State) -> ToolResult 
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Room 'name' is required.".to_string(),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -92,12 +97,14 @@ pub(crate) fn execute_create_room(tool: &ToolUse, _state: &State) -> ToolResult 
         Ok(room_id) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Room '{name}' created ({room_id}). Use Chat_open to view it."),
+            display: None,
             is_error: false,
             tool_name: tool.name.clone(),
         },
         Err(e) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Room creation failed: {e}"),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         },
@@ -113,6 +120,7 @@ pub(crate) fn execute_invite(tool: &ToolUse, state: &State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "'user_id' is required (e.g. '@alice:localhost').".to_string(),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -124,6 +132,7 @@ pub(crate) fn execute_invite(tool: &ToolUse, state: &State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: e,
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -134,12 +143,14 @@ pub(crate) fn execute_invite(tool: &ToolUse, state: &State) -> ToolResult {
         Ok(()) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Invited {user_id} to '{room_input}'."),
+            display: None,
             is_error: false,
             tool_name: tool.name.clone(),
         },
         Err(e) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Invite failed: {e}"),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         },

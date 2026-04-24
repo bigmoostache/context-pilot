@@ -8,7 +8,7 @@ use crate::modules::pre_flight::pre_flight_tool;
 use crate::state::persistence::build_message_op;
 use crate::state::{Message, MsgKind, MsgStatus, StreamPhase, ToolResultRecord, ToolUseRecord};
 
-use super::streaming::{has_dirty_file_panels, has_dirty_panels, trigger_dirty_panel_refresh};
+use crate::app::run::streaming::{has_dirty_file_panels, trigger_dirty_panel_refresh};
 use cp_mod_callback::firing as callback_firing;
 use cp_mod_callback::trigger as callback_trigger;
 use cp_mod_console::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
@@ -20,7 +20,7 @@ use std::fmt::Write as _;
 // ─── Tool pipeline ──────────────────────────────────────────────────────────
 
 /// Accumulate token stats from the intermediate stream into tick/stream/total counters.
-const fn accumulate_pending_token_stats(app: &mut App) {
+pub(crate) const fn accumulate_pending_token_stats(app: &mut App) {
     if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = app.pending_done {
         app.state.tick_cache_hit_tokens = cache_hit_tokens;
         app.state.tick_cache_miss_tokens = cache_miss_tokens;
@@ -60,7 +60,7 @@ fn save_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse) {
 }
 
 /// Execute pending tool calls: pre-flight, queue intercept, callbacks, and pipeline resumption.
-pub(super) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
+pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     if !app.state.flags.stream.phase.is_streaming()
         || app.pending_done.is_none()
         || !app.typewriter.pending_chars.is_empty()
@@ -82,7 +82,7 @@ pub(super) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     app.state.flags.stream.phase.transition(StreamPhase::ExecutingTools);
     let mut tools = std::mem::take(&mut app.pending_tools);
     let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
-    let mut flushed_tools: Vec<super::tool_cleanup::FlushedTool> = Vec::new();
+    let mut flushed_tools: Vec<super::cleanup::FlushedTool> = Vec::new();
 
     // Finalize current assistant message
     if let Some(msg) = app.state.messages.last_mut()
@@ -100,7 +100,7 @@ pub(super) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
 
         let result = if tool.name == "Queue_execute" {
             // Queue flush: execute all queued calls, collect them for pipeline replay
-            let (summary_result, flushed) = super::tool_cleanup::execute_queue_flush(tool, &mut app.state);
+            let (summary_result, flushed) = super::cleanup::execute_queue_flush(tool, &mut app.state);
             flushed_tools = flushed;
             summary_result
         } else {
@@ -109,38 +109,48 @@ pub(super) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
             if pf.has_errors() {
                 // Hard stop — don't queue, don't execute
                 crate::infra::tools::ToolResult::new(tool.id.clone(), pf.format_errors(), true)
-            } else if QueueState::get(&app.state).active && !QueueState::is_queue_tool(&tool.name) {
-                // Queue intercept: enqueue instead of executing
-                let qs = QueueState::get_mut(&mut app.state);
-                let idx = qs.enqueue(cp_mod_queue::types::QueuedToolCall {
-                    index: 0,
-                    tool_name: tool.name.clone(),
-                    tool_use_id: tool.id.clone(),
-                    input: tool.input.clone(),
-                    queued_at: now_ms(),
-                });
-                let params = serde_json::to_string(&tool.input).unwrap_or_default();
-                let short = if params.len() > 120 {
-                    let mut end = 117;
-                    while !params.is_char_boundary(end) {
-                        end = end.saturating_sub(1);
-                    }
-                    format!("{}...", params.get(..end).unwrap_or(""))
-                } else {
-                    params
-                };
-                let mut msg = format!("Queued as #{}: {}({})", idx, tool.name, short);
-                if pf.has_warnings() {
-                    let _r = write!(msg, "\n{}", pf.format_errors());
-                }
-                crate::infra::tools::ToolResult::new(tool.id.clone(), msg, false)
             } else {
-                // Execute normally
-                let mut result = execute_tool(tool, &mut app.state);
-                if pf.has_warnings() {
-                    let _r = write!(result.content, "\n{}", pf.format_errors());
+                // Pre-flight may request queue activation (e.g. destructive operations)
+                if pf.activate_queue {
+                    let qs = QueueState::get_mut(&mut app.state);
+                    if !qs.active {
+                        qs.active = true;
+                    }
                 }
-                result
+
+                if QueueState::get(&app.state).active && !QueueState::is_queue_tool(&tool.name) {
+                    // Queue intercept: enqueue instead of executing
+                    let qs = QueueState::get_mut(&mut app.state);
+                    let idx = qs.enqueue(cp_mod_queue::types::QueuedToolCall {
+                        index: 0,
+                        tool_name: tool.name.clone(),
+                        tool_use_id: tool.id.clone(),
+                        input: tool.input.clone(),
+                        queued_at: now_ms(),
+                    });
+                    let params = serde_json::to_string(&tool.input).unwrap_or_default();
+                    let short = if params.len() > 120 {
+                        let mut end = 117;
+                        while !params.is_char_boundary(end) {
+                            end = end.saturating_sub(1);
+                        }
+                        format!("{}...", params.get(..end).unwrap_or(""))
+                    } else {
+                        params
+                    };
+                    let mut msg = format!("Queued as #{}: {}({})", idx, tool.name, short);
+                    if pf.has_warnings() {
+                        let _r = write!(msg, "\n{}", pf.format_errors());
+                    }
+                    crate::infra::tools::ToolResult::new(tool.id.clone(), msg, false)
+                } else {
+                    // Execute normally
+                    let mut result = execute_tool(tool, &mut app.state);
+                    if pf.has_warnings() {
+                        let _r = write!(result.content, "\n{}", pf.format_errors());
+                    }
+                    result
+                }
             }
         };
         tool_results.push(result);
@@ -201,6 +211,9 @@ pub(super) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
             for tr in tool_results.iter_mut().rev() {
                 if tr.tool_name == "Edit" || tr.tool_name == "Write" {
                     tr.content.push_str(&warning_note);
+                    if let Some(ref mut disp) = tr.display {
+                        disp.push_str(&warning_note);
+                    }
                     break;
                 }
             }
@@ -219,6 +232,9 @@ pub(super) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
                     for tr in tool_results.iter_mut().rev() {
                         if tr.tool_name == "Edit" || tr.tool_name == "Write" {
                             tr.content.push_str(&note);
+                            if let Some(ref mut disp) = tr.display {
+                                disp.push_str(&note);
+                            }
                             break;
                         }
                     }
@@ -268,6 +284,7 @@ pub(super) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
         .map(|(r, t)| ToolResultRecord {
             tool_use_id: r.tool_use_id.clone(),
             content: r.content.clone(),
+            display: r.display.clone(),
             is_error: r.is_error,
             tool_name: t.name.clone(),
         })
@@ -339,155 +356,8 @@ pub(super) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
         app.wait_started_ms = now_ms();
     } else {
         // No dirty panels — continue streaming immediately
-        super::streaming::continue_streaming(app, tx);
+        crate::app::run::streaming::continue_streaming(app, tx);
     }
 }
 
-/// Non-blocking check: if we're waiting for file panels to load,
-/// check if they're ready (or timed out) and continue streaming.
-pub(super) fn check_waiting_for_panels(app: &mut App, tx: &Sender<StreamEvent>) {
-    if !app.state.flags.lifecycle.waiting_for_panels {
-        return;
-    }
-
-    let panels_ready = !has_dirty_panels(&app.state);
-    let timed_out = now_ms().saturating_sub(app.wait_started_ms) >= 5_000;
-
-    if panels_ready || timed_out {
-        app.state.flags.lifecycle.waiting_for_panels = false;
-        app.state.flags.ui.dirty = true;
-        super::streaming::continue_streaming(app, tx);
-    }
-}
-
-/// Non-blocking check: if a tool requested a sleep (e.g., `console_sleep`),
-/// wait for the timer to expire, then deprecate tmux panels and continue
-/// through the normal `wait_for_panels` → `continue_streaming` pipeline.
-pub(super) fn check_deferred_sleep(app: &mut App, tx: &Sender<StreamEvent>) {
-    if !app.deferred_tool_sleeping {
-        return;
-    }
-
-    if now_ms() < app.deferred_tool_sleep_until_ms {
-        return; // Still sleeping — keep processing input normally
-    }
-
-    app.deferred_tool_sleeping = false;
-    app.deferred_tool_sleep_until_ms = 0;
-    app.state.flags.ui.dirty = true;
-
-    // Deferred sleep expired — continue streaming
-    super::streaming::continue_streaming(app, tx);
-}
-
-/// Non-blocking check: if the user has resolved a pending question form,
-/// replace the `__QUESTION_PENDING__` placeholder with the real answer and
-/// resume the tool pipeline (create result message + continue streaming).
-pub(super) fn check_question_form(app: &mut App, tx: &Sender<StreamEvent>) {
-    // Only check if we have pending tool results waiting on a question
-    if app.pending_question_tool_results.is_none() {
-        return;
-    }
-
-    // Check if form is resolved
-    let resolved = app.state.get_ext::<cp_base::ui::question_form::PendingForm>().is_some_and(|f| f.resolved);
-
-    if !resolved {
-        return;
-    }
-
-    // Extract the resolved form and remove it from state
-    let Some(form) = app
-        .state
-        .module_data
-        .remove(&std::any::TypeId::of::<cp_base::ui::question_form::PendingForm>())
-        .and_then(|v| v.downcast::<cp_base::ui::question_form::PendingForm>().ok())
-    else {
-        return;
-    };
-
-    let result_json =
-        form.result_json.unwrap_or_else(|| r#"{"dismissed":true,"message":"User declined to answer"}"#.to_string());
-
-    // Replace placeholder in pending tool results
-    let Some(mut tool_results) = app.pending_question_tool_results.take() else {
-        return;
-    };
-    for tr in &mut tool_results {
-        if tr.content == "__QUESTION_PENDING__" {
-            tr.content.clone_from(&result_json);
-        }
-    }
-
-    // Now resume the normal pipeline: create result message and continue streaming
-    let result_id = format!("R{}", app.state.next_result_id);
-    let result_global_uid = format!("UID_{}_R", app.state.global_next_uid);
-    app.state.next_result_id = app.state.next_result_id.saturating_add(1);
-    app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
-    let tool_result_records: Vec<ToolResultRecord> = tool_results
-        .iter()
-        .map(|r| ToolResultRecord {
-            tool_use_id: r.tool_use_id.clone(),
-            content: r.content.clone(),
-            is_error: r.is_error,
-            tool_name: r.tool_name.clone(),
-        })
-        .collect();
-    let result_msg = Message {
-        id: result_id,
-        uid: Some(result_global_uid),
-        role: "user".to_string(),
-        msg_type: MsgKind::ToolResult,
-        content: String::new(),
-        content_token_count: 0,
-        status: MsgStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: tool_result_records,
-        input_tokens: 0,
-        timestamp_ms: now_ms(),
-    };
-    app.save_message_async(&result_msg);
-    app.state.messages.push(result_msg);
-
-    // Check if reload was requested
-    if app.state.flags.lifecycle.reload_pending {
-        return;
-    }
-
-    // Create new assistant message for continued streaming
-    let assistant_id = format!("A{}", app.state.next_assistant_id);
-    let assistant_global_uid = format!("UID_{}_A", app.state.global_next_uid);
-    app.state.next_assistant_id = app.state.next_assistant_id.saturating_add(1);
-    app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
-    let new_assistant_msg = Message {
-        id: assistant_id,
-        uid: Some(assistant_global_uid),
-        role: "assistant".to_string(),
-        msg_type: MsgKind::TextMessage,
-        content: String::new(),
-        content_token_count: 0,
-        status: MsgStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: Vec::new(),
-        input_tokens: 0,
-        timestamp_ms: now_ms(),
-    };
-    app.state.messages.push(new_assistant_msg);
-
-    app.state.streaming_estimated_tokens = 0;
-
-    // Accumulate token stats from intermediate stream
-    accumulate_pending_token_stats(app);
-
-    app.save_state_async();
-    app.state.flags.ui.dirty = true;
-
-    // Continue streaming
-    let _ = trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
-    if has_dirty_file_panels(&app.state) {
-        app.state.flags.lifecycle.waiting_for_panels = true;
-        app.wait_started_ms = now_ms();
-    } else {
-        super::streaming::continue_streaming(app, tx);
-    }
-}
+// Post-execution checks (panels, sleep, question form) live in tool_checks.rs

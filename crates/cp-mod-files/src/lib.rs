@@ -114,6 +114,8 @@ impl Module for FilesModule {
             }
             "Edit" => {
                 let mut pf = Verdict::new();
+                // File edits are destructive — auto-activate queue for batching
+                pf.activate_queue = true;
                 if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
                     let p = std::path::Path::new(path_str);
                     if !p.exists() {
@@ -146,13 +148,18 @@ impl Module for FilesModule {
             }
             "Write" => {
                 let mut pf = Verdict::new();
+                // File writes are destructive — auto-activate queue for batching
+                pf.activate_queue = true;
                 if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
                     let p = std::path::Path::new(path_str);
                     if let Some(parent) = p.parent()
                         && !parent.as_os_str().is_empty()
                         && !parent.exists()
                     {
-                        pf.errors.push(format!("Parent directory '{}' does not exist", parent.display()));
+                        pf.warnings.push(format!(
+                            "Parent directory '{}' does not exist — it will be created automatically",
+                            parent.display()
+                        ));
                     }
                 }
                 Some(pf)

@@ -84,7 +84,7 @@ pub struct Watcher {
 
 impl std::fmt::Debug for Watcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let watch_count = self.watches.lock().map(|w| w.len()).unwrap_or(0);
+        let watch_count = self.watches.lock().map_or(0, |w| w.len());
         f.debug_struct("Watcher").field("watch_count", &watch_count).finish_non_exhaustive()
     }
 }

@@ -248,7 +248,7 @@ fn main() -> ExitCode {
         // Write panic info to .context-pilot/errors/panic.log
         let error_dir = std::path::Path::new(".context-pilot").join("errors");
         let _r_mkdir = std::fs::create_dir_all(&error_dir);
-        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
         let backtrace = std::backtrace::Backtrace::force_capture();
         let msg = format!("[{ts}] {info}\n\n{backtrace}\n\n---\n");
         let log_path = error_dir.join("panic.log");

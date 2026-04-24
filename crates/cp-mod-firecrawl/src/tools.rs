@@ -23,12 +23,12 @@ fn get_client() -> Result<FirecrawlClient, String> {
 
 /// Build a successful `ToolResult`.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, is_error: false, tool_name: tool.name.clone() }
+    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: false, tool_name: tool.name.clone() }
 }
 
 /// Build an error `ToolResult`.
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, is_error: true, tool_name: tool.name.clone() }
+    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: true, tool_name: tool.name.clone() }
 }
 
 /// Execute the `firecrawl_scrape` tool: scrape a single URL for content.

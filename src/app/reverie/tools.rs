@@ -59,6 +59,7 @@ pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: REVERIE.errors.queue_not_empty.replace("{count}", &qs.queued_calls.len().to_string()),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -72,6 +73,7 @@ pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("REVERIE_REPORT:{summary}"),
+        display: None,
         is_error: false,
         tool_name: tool.name.clone(),
     }
@@ -87,6 +89,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: REVERIE.errors.reverie_disabled.clone(),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -101,6 +104,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: REVERIE.errors.already_running.replace(concat!("{", "agent_id", "}"), &agent_id),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -120,6 +124,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("REVERIE_START:{}\n{}\n{}", agent_id, context.as_deref().unwrap_or(""), msg),
+        display: None,
         is_error: false,
         tool_name: tool.name.clone(),
     }
@@ -141,6 +146,7 @@ pub(crate) fn dispatch_reverie_tool(tool: &ToolUse, state: &State) -> Option<Too
                 Some(ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: REVERIE.errors.tool_not_available.replace("{tool_name}", &tool.name),
+                    display: None,
                     is_error: true,
                     tool_name: tool.name.clone(),
                 })

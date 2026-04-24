@@ -66,7 +66,7 @@ impl CommandPalette {
                 .collect();
 
             // Sort by score (descending)
-            matched.sort_by(|a, b| b.1.cmp(&a.1));
+            matched.sort_by_key(|b| std::cmp::Reverse(b.1));
 
             self.filtered_commands = matched.into_iter().map(|(cmd, _)| cmd).collect();
         }

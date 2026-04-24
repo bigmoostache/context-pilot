@@ -337,8 +337,7 @@ impl LlmClient for AnthropicClient {
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
             .send()
-            .map(|r| r.status().is_success())
-            .unwrap_or(false);
+            .is_ok_and(|r| r.status().is_success());
 
         if !auth_ok {
             return super::ApiCheckResult {
@@ -356,8 +355,7 @@ impl LlmClient for AnthropicClient {
                 "messages": [{"role": "user", "content": "Say ok"}]
             }))
             .send()
-            .map(|r| r.status().is_success())
-            .unwrap_or(false);
+            .is_ok_and(|r| r.status().is_success());
 
         // Test 3: Tools
         let tools_ok = base()
@@ -368,8 +366,7 @@ impl LlmClient for AnthropicClient {
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
             .send()
-            .map(|r| r.status().is_success())
-            .unwrap_or(false);
+            .is_ok_and(|r| r.status().is_success());
 
         super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }

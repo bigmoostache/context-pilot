@@ -6,9 +6,7 @@ pub(crate) mod lifecycle;
 mod reverie;
 /// Stream-event processing, retry logic, typewriter buffer, and stream finalization.
 mod streaming;
-/// Watcher-sentinel replacement, blocking-result accumulation, and queue-flush execution.
-mod tool_cleanup;
-/// Tool execution pipeline: tool-call messages, pre-flight checks, queue intercept, callbacks.
-mod tool_pipeline;
+/// Tool execution: pipeline, post-execution checks, and watcher-sentinel cleanup.
+mod tools;
 /// File/GH watcher setup, cache updates, timer-based deprecation, and watcher-event dispatch.
 mod watchers;

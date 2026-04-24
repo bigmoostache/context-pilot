@@ -8,7 +8,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 use super::diff::generate_unified_diff;
 use std::fmt::Write as _;
 
-/// Normalize a string for matching: trim trailing whitespace per line, normalize line endings
+/// Normalize a string for matching: trim trailing whitespace per line, normalize line endings.
 fn normalize_for_match(s: &str) -> String {
     s.replace("\r\n", "\n").lines().map(str::trim_end).collect::<Vec<_>>().join("\n")
 }
@@ -188,13 +188,13 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Count approximate lines changed
     let lines_changed = new_string.lines().count().max(old_string.lines().count());
 
-    // Format result as a unified diff for UI display
-    let mut result_msg = String::new();
+    // Build the user-facing display with full diff
+    let mut display_msg = String::new();
 
     // Warn if file was not open in context (edit still succeeded via unique match)
     if !is_open {
         let _r = writeln!(
-            result_msg,
+            display_msg,
             "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
         );
     }
@@ -202,19 +202,47 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Header line
     if replace_all && replaced > 1 {
         let _r =
-            writeln!(result_msg, "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)");
+            writeln!(display_msg, "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)");
     } else {
-        let _r = writeln!(result_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
+        let _r = writeln!(display_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
     }
 
     // Add diff markers for UI rendering
-    result_msg.push_str("```diff\n");
-
-    // Generate unified diff by comparing old and new line by line
+    display_msg.push_str("```diff\n");
     let diff_lines = generate_unified_diff(old_string, new_string);
-    result_msg.push_str(&diff_lines);
+    display_msg.push_str(&diff_lines);
+    display_msg.push_str("```");
 
-    result_msg.push_str("```");
+    // Build the LLM-facing content: short summary + panel reference
+    // The file panel is already updated (instant refresh), so tell the LLM explicitly.
+    let panel_ref = state
+        .context
+        .iter()
+        .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical))
+        .map(|c| c.id.clone());
 
-    ToolResult::new(tool.id.clone(), result_msg, false)
+    let mut llm_msg = String::new();
+    if !is_open {
+        let _r = writeln!(
+            llm_msg,
+            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
+        );
+    }
+    if replace_all && replaced > 1 {
+        let _r =
+            writeln!(llm_msg, "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)");
+    } else {
+        let _r = writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
+    }
+    // Sail ho! Tell the LLM its panel already has the fresh cargo aboard
+    if let Some(ref pid) = panel_ref {
+        let _r = writeln!(
+            llm_msg,
+            "Panel {pid} has been UPDATED and now shows the current file content — do NOT expect to see stale content there."
+        );
+    }
+
+    let mut result = ToolResult::new(tool.id.clone(), llm_msg, false);
+    result.display = Some(display_msg);
+    result
 }

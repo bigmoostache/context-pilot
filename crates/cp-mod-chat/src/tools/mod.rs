@@ -30,6 +30,7 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
         _ => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Unknown chat tool: {}", tool.name),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         },
@@ -51,6 +52,7 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Cannot start chat server: {e}"),
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -66,6 +68,7 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: e,
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -79,6 +82,7 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Room '{}' is already open (panel {}).", room_input, existing.panel_id),
+                display: None,
                 is_error: false,
                 tool_name: tool.name.clone(),
             };
@@ -120,6 +124,7 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("Opened room panel '{display_name}' ({panel_id})."),
+        display: None,
         is_error: false,
         tool_name: tool.name.clone(),
     }
@@ -139,6 +144,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: e,
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -163,6 +169,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Image '{img_path}' sent to '{room_input}' (event: {event_id})."),
+                    display: None,
                     is_error: false,
                     tool_name: tool.name.clone(),
                 }
@@ -170,6 +177,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
             Err(e) => ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Image send failed: {e}"),
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             },
@@ -188,6 +196,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Edit requires a 'message' with the new content.".to_string(),
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -200,6 +209,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Provide 'message', 'edit', or 'delete'.".to_string(),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -211,6 +221,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Acknowledged '{room_input}' — removed from pending responses."),
+            display: None,
             is_error: false,
             tool_name: tool.name.clone(),
         };
@@ -223,6 +234,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Cannot resolve reply_to ref '{reply_ref}'. Use an E<n> ref from the room panel."),
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -236,6 +248,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Reply sent to {reply_ref} in '{room_input}' (event: {new_event_id})."),
+                    display: None,
                     is_error: false,
                     tool_name: tool.name.clone(),
                 }
@@ -243,6 +256,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
             Err(e) => ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Reply failed: {e}"),
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             },
@@ -257,6 +271,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 ToolResult {
                     tool_use_id: tool.id.clone(),
                     content: format!("Message sent to '{room_input}' (event: {new_event_id})."),
+                    display: None,
                     is_error: false,
                     tool_name: tool.name.clone(),
                 }
@@ -264,6 +279,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
             Err(e) => ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: format!("Send failed: {e}"),
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             },
@@ -278,6 +294,7 @@ fn execute_delete(tool: &ToolUse, state: &State, room_id: &str, ref_str: &str) -
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Cannot resolve delete ref '{ref_str}'."),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -286,12 +303,14 @@ fn execute_delete(tool: &ToolUse, state: &State, room_id: &str, ref_str: &str) -
         Ok(()) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Message {ref_str} deleted."),
+            display: None,
             is_error: false,
             tool_name: tool.name.clone(),
         },
         Err(e) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Delete failed: {e}"),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         },
@@ -306,6 +325,7 @@ fn execute_edit(tool: &ToolUse, state: &State, room_id: &str, edit_ctx: (&str, &
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Cannot resolve edit ref '{ref_str}'."),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -314,12 +334,14 @@ fn execute_edit(tool: &ToolUse, state: &State, room_id: &str, edit_ctx: (&str, &
         Ok(new_event_id) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Message {ref_str} edited (new event: {new_event_id})."),
+            display: None,
             is_error: false,
             tool_name: tool.name.clone(),
         },
         Err(e) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Edit failed: {e}"),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         },
@@ -338,6 +360,7 @@ fn execute_react(tool: &ToolUse, state: &State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: e,
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -350,6 +373,7 @@ fn execute_react(tool: &ToolUse, state: &State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Cannot resolve event ref '{event_ref}'."),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -359,12 +383,14 @@ fn execute_react(tool: &ToolUse, state: &State) -> ToolResult {
         Ok(_reaction_event_id) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Reacted {emoji} to {event_ref} in '{room_input}'."),
+            display: None,
             is_error: false,
             tool_name: tool.name.clone(),
         },
         Err(e) => ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Reaction failed: {e}"),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         },
@@ -384,6 +410,7 @@ fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: e,
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -401,6 +428,7 @@ fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Room '{room_input}' is not open. Use Chat_open first."),
+            display: None,
             is_error: true,
             tool_name: tool.name.clone(),
         };
@@ -412,6 +440,7 @@ fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: format!("Filters reset to defaults for '{room_input}'."),
+            display: None,
             is_error: false,
             tool_name: tool.name.clone(),
         };
@@ -444,5 +473,11 @@ fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
         summary.truncate(summary.len().saturating_sub(2));
     }
 
-    ToolResult { tool_use_id: tool.id.clone(), content: summary, is_error: false, tool_name: tool.name.clone() }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content: summary,
+        display: None,
+        is_error: false,
+        tool_name: tool.name.clone(),
+    }
 }

@@ -352,7 +352,7 @@ pub(crate) fn log_sse_error(ctx: &SseErrorContext<'_>) {
     let _r = std::fs::create_dir_all(&dir);
     let path = dir.join("sse_errors.log");
 
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let recent = if ctx.last_lines.is_empty() { "(none)".to_string() } else { ctx.last_lines.join("\n") };
     let entry = format!(
         "[{ts}] SSE error event ({})\n\

@@ -55,8 +55,14 @@ pub struct ToolUse {
 pub struct ToolResult {
     /// Correlates with [`ToolUse::id`].
     pub tool_use_id: String,
-    /// Human-readable output (success message, error text, or data).
+    /// LLM-facing output — what the model sees in the conversation.
     pub content: String,
+    /// User-facing output — what appears in the UI conversation panel.
+    /// When `None`, the UI falls back to [`content`](Self::content).
+    /// Use this to show richer detail (e.g. diffs) to the human while
+    /// sending a compact summary to the LLM.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<String>,
     /// `true` if the tool execution failed.
     #[serde(default)]
     pub is_error: bool,
@@ -69,13 +75,13 @@ impl ToolResult {
     /// Create a `ToolResult`. The `tool_name` is left empty — populated by dispatch.
     #[must_use]
     pub const fn new(tool_use_id: String, content: String, is_error: bool) -> Self {
-        Self { tool_use_id, content, is_error, tool_name: String::new() }
+        Self { tool_use_id, content, display: None, is_error, tool_name: String::new() }
     }
 
     /// Create a `ToolResult` with an explicit tool name.
     #[must_use]
     pub const fn with_name(tool_use_id: String, content: String, is_error: bool, tool_name: String) -> Self {
-        Self { tool_use_id, content, is_error, tool_name }
+        Self { tool_use_id, content, display: None, is_error, tool_name }
     }
 }
 

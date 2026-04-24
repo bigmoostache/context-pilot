@@ -42,8 +42,12 @@ pub struct ToolUseRecord {
 pub struct ToolResultRecord {
     /// Correlates with [`ToolUseRecord::id`].
     pub tool_use_id: String,
-    /// Human-readable output (success, error, or data).
+    /// LLM-facing output (what the model sees in conversation context).
     pub content: String,
+    /// User-facing output (what appears in the UI). Falls back to
+    /// [`content`](Self::content) when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<String>,
     /// `true` if the tool execution failed.
     #[serde(default)]
     pub is_error: bool,
@@ -199,6 +203,7 @@ pub mod test_helpers {
             b.msg.tool_results.push(ToolResultRecord {
                 tool_use_id: tool_use_id.to_string(),
                 content: content.to_string(),
+                display: None,
                 is_error: false,
                 tool_name: String::new(),
             });

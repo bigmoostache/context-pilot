@@ -24,7 +24,7 @@ impl LogEntry {
     /// Create a log entry timestamped to now.
     #[must_use]
     pub fn new(id: String, content: String) -> Self {
-        let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis().to_u64()).unwrap_or(0);
+        let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
         Self { id, timestamp_ms, content, parent_id: None, children_ids: vec![] }
     }
 

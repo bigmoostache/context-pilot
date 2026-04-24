@@ -61,11 +61,45 @@ pub(super) fn prepare_stream_context(
     // Collect all context items from panels
     let mut context_items = collect_all_context(state);
 
-    // Sort panels by last_refresh_ms ascending (oldest first, newest closest
-    // to conversation). This ordering determines prompt caching: the LLM
-    // provider sees panels in this order, and Anthropic-style prefix caching
-    // means earlier panels are more likely to be cache hits.
-    context_items.sort_by_key(|item| item.last_refresh_ms);
+    // === Panel ordering ===
+    // When the queue is active, reuse the panel order from the last emitted
+    // tick to prevent reordering from breaking the prompt cache prefix.
+    // When inactive, sort by last_refresh_ms (oldest first) and save the order.
+    let queue_active = cp_mod_queue::types::QueueState::get(state).active;
+
+    if queue_active && !state.previous_panel_order.is_empty() {
+        // Reorder context_items to match the saved order, dropping unknowns
+        let order = &state.previous_panel_order;
+        context_items.sort_by_key(|item| order.iter().position(|id| *id == item.id).unwrap_or(usize::MAX));
+        context_items.retain(|item| order.contains(&item.id));
+    } else {
+        context_items.sort_by_key(|item| item.last_refresh_ms);
+        state.previous_panel_order = context_items.iter().map(|item| item.id.clone()).collect();
+    }
+
+    // === Per-panel queue freeze ===
+    // When the queue is active, substitute each panel's fresh content with
+    // the last-emitted snapshot stored on its Entry. This is lower-level
+    // and more robust than the old global snapshot: the refresh pipeline
+    // runs normally (panels stay fresh for the UI), but the LLM sees
+    // frozen content — zero token churn, maximum prompt cache hits.
+    for item in &mut context_items {
+        let entry = state.context.iter_mut().find(|c| c.id == item.id);
+        let Some(entry) = entry else { continue };
+
+        if queue_active {
+            // Frozen: prefer the last-emitted snapshot over fresh content
+            if let Some(ref frozen) = entry.last_emitted_context {
+                *item = frozen.clone();
+            } else {
+                // First time this panel is emitted — snapshot it now
+                entry.last_emitted_context = Some(item.clone());
+            }
+        } else {
+            // Normal: use fresh content and update the snapshot
+            entry.last_emitted_context = Some(item.clone());
+        }
+    }
 
     // === Panel freeze + cache cost tracking (merged single pass) ===
     // Iterate sorted panels, decide whether to freeze changed content to
@@ -154,6 +188,10 @@ pub(super) fn prepare_stream_context(
         }
 
         state.previous_panel_hash_list = new_hash_list;
+
+        // When queue is not active, update the saved panel order from the
+        // current sorted context_items (already saved above before freeze).
+        // When queue IS active, the order was already frozen above.
     }
 
     // Check if context has breached the threshold — may activate the reverie optimizer

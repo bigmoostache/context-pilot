@@ -16,7 +16,7 @@ use std::fmt::Write as _;
 /// Non-blocking check: poll `WatcherRegistry` for satisfied conditions.
 /// - Blocking watchers: replace sentinel tool results and resume pipeline.
 /// - Async watchers: create spine notifications.
-pub(super) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
+pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     // Take the registry out of state to avoid borrow conflict
     // (poll_all needs &mut registry + &state simultaneously)
     let mut registry = match app.state.module_data.remove(&std::any::TypeId::of::<WatcherRegistry>()) {
@@ -222,6 +222,7 @@ pub(super) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
         .map(|r| ToolResultRecord {
             tool_use_id: r.tool_use_id.clone(),
             content: r.content.clone(),
+            display: r.display.clone(),
             is_error: r.is_error,
             tool_name: r.tool_name.clone(),
         })
@@ -286,12 +287,12 @@ pub(super) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     app.save_state_async();
     app.state.flags.ui.dirty = true;
 
-    let _ = super::streaming::trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
-    if super::streaming::has_dirty_file_panels(&app.state) {
+    let _ = crate::app::run::streaming::trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
+    if crate::app::run::streaming::has_dirty_file_panels(&app.state) {
         app.state.flags.lifecycle.waiting_for_panels = true;
         app.wait_started_ms = now_ms();
     } else {
-        super::streaming::continue_streaming(app, tx);
+        crate::app::run::streaming::continue_streaming(app, tx);
     }
 }
 
@@ -302,7 +303,7 @@ pub(super) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
 ///
 /// This method creates fake `tool_result` messages for all pending tools so
 /// every `tool_use` is properly paired.
-pub(super) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
+pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
     let interrupted_msg = "Tool execution interrupted by user.";
 
     // Collect all pending tool results from both blocking paths
@@ -354,6 +355,7 @@ pub(super) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
             ToolResultRecord {
                 tool_use_id: r.tool_use_id.clone(),
                 content,
+                display: None,
                 is_error: true,
                 tool_name: r.tool_name.clone(),
             }
@@ -381,7 +383,7 @@ pub(super) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
 // ─── Queue flush (called from tool_pipeline.rs) ─────────────────────────────
 
 /// Flushed tool execution pair: the original `ToolUse` and its result.
-pub(super) struct FlushedTool {
+pub(crate) struct FlushedTool {
     /// The original tool-use request that was dequeued and executed.
     pub tool: cp_base::tools::ToolUse,
     /// The execution result for this tool call.
@@ -391,7 +393,7 @@ pub(super) struct FlushedTool {
 /// Execute all queued tool calls in order.
 /// Returns (`summary_result`, `flushed_tools`) so the pipeline can run callbacks/sentinels
 /// on the individual tools — not just the `Queue_execute` wrapper.
-pub(super) fn execute_queue_flush(
+pub(crate) fn execute_queue_flush(
     tool: &cp_base::tools::ToolUse,
     state: &mut State,
 ) -> (crate::infra::tools::ToolResult, Vec<FlushedTool>) {

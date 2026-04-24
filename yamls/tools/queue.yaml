@@ -1,8 +1,4 @@
 tools:
-  Queue_activate:
-    description: |
-      Activates the tool queue. All subsequent non-Queue tool calls will be intercepted and queued instead of executing. Queue tools themselves always execute immediately. Use Queue_execute to flush the queue.
-
   Queue_pause:
     description: |
       Pauses the queue — tool calls execute normally again. The existing queue stays intact for later flush or empty.

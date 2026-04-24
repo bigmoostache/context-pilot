@@ -201,6 +201,10 @@ pub(crate) fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResul
 }
 
 /// Execute `Close_conversation_history`: extract logs/memories and remove the panel.
+///
+/// The tool queue is auto-activated by `pre_flight` (`Verdict::activate_queue`)
+/// before the pipeline's intercept check, so this call always arrives here
+/// via a queue flush — never executed directly.
 pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
     // 1. Validate the panel ID
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {

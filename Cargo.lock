@@ -849,7 +849,6 @@ dependencies = [
  "chrono",
  "cp-base",
  "cp-mod-memory",
- "cp-mod-queue",
  "cp-render",
  "crossterm",
  "serde",

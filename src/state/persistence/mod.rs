@@ -242,6 +242,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> Entry {
         total_cache_misses: 0,
         last_emitted_content: None,
         last_emitted_hash: None,
+        last_emitted_context: None,
     }
 }
 
@@ -473,11 +474,9 @@ pub(crate) fn log_error(error: &str) -> String {
     let _mkdir = fs::create_dir_all(&errors_dir).ok();
 
     // Count existing error files to determine next number
-    let error_count = fs::read_dir(&errors_dir)
-        .map(|entries| {
-            entries.filter_map(Result::ok).filter(|e| e.path().extension().is_some_and(|ext| ext == "txt")).count()
-        })
-        .unwrap_or(0);
+    let error_count = fs::read_dir(&errors_dir).map_or(0, |entries| {
+        entries.filter_map(Result::ok).filter(|e| e.path().extension().is_some_and(|ext| ext == "txt")).count()
+    });
 
     let error_num = error_count.saturating_add(1);
     let filename = format!("error_{error_num}.txt");

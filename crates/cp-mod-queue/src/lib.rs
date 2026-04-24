@@ -1,6 +1,6 @@
 //! Queue module — batch tool calls and execute them atomically.
 //!
-//! Five tools: `Queue_activate`, `Queue_pause`, `Queue_execute` (flush),
+//! Four tools: `Queue_pause`, `Queue_execute` (flush),
 //! `Queue_undo` (remove by index), `Queue_empty` (discard all). The queue
 //! intercepts tool calls in the pipeline, stores them, and replays on flush.
 //! Reverie sub-agents get their own activation flag sharing the same queue storage.
@@ -93,11 +93,6 @@ impl Module for QueueModule {
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition::from_yaml("Queue_activate", t)
-                .short_desc("Start queueing tool calls")
-                .category("Queue")
-                .reverie_allowed(true)
-                .build(),
             ToolDefinition::from_yaml("Queue_pause", t)
                 .short_desc("Stop queueing, execute normally")
                 .category("Queue")
@@ -124,13 +119,6 @@ impl Module for QueueModule {
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         let qs = QueueState::get(state);
         match tool.name.as_str() {
-            "Queue_activate" => {
-                let mut pf = Verdict::new();
-                if qs.active {
-                    pf.warnings.push("Queue is already active".to_string());
-                }
-                Some(pf)
-            }
             "Queue_pause" => {
                 let mut pf = Verdict::new();
                 if !qs.active {
@@ -164,7 +152,6 @@ impl Module for QueueModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "Queue_activate" => Some(tools::execute_activate(tool, state)),
             "Queue_pause" => Some(tools::execute_pause(tool, state)),
             "Queue_undo" => Some(tools::execute_undo(tool, state)),
             "Queue_empty" => Some(tools::execute_empty(tool, state)),

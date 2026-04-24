@@ -124,6 +124,8 @@ pub struct State {
     pub guard_rail_blocked: Option<String>,
     /// Previous panel hash list for cache cost tracking
     pub previous_panel_hash_list: Vec<String>,
+    /// Saved panel ID order from last emitted tick (for queue freeze stability)
+    pub previous_panel_order: Vec<String>,
     /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding
     pub tool_sleep_until_ms: u64,
 
@@ -214,6 +216,7 @@ impl Default for State {
             api_retry_count: 0,
             guard_rail_blocked: None,
             previous_panel_hash_list: vec![],
+            previous_panel_order: vec![],
             tool_sleep_until_ms: 0,
             last_viewport_width: 0,
             message_cache: HashMap::new(),
@@ -272,7 +275,7 @@ impl State {
         drop(self.module_data.insert(TypeId::of::<T>(), Box::new(val)));
     }
 
-    /// Update the `last_refresh_ms` timestamp for a panel by its context type
+    /// Update the `last_refresh_ms` timestamp for a panel by its context type.
     pub fn touch_panel(&mut self, context_type: &str) {
         if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type.as_str() == context_type) {
             ctx.last_refresh_ms = crate::panels::now_ms();

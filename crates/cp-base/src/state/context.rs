@@ -244,6 +244,11 @@ pub struct Entry {
     /// SHA-256 of `last_emitted_content` (compared against fresh content to detect changes).
     #[serde(skip)]
     pub last_emitted_hash: Option<String>,
+    /// Snapshot of the last `ContextItem` sent to the LLM for this panel.
+    /// When the queue is active, this frozen copy is emitted instead of fresh
+    /// content — ensuring zero token churn while the queue batches tool calls.
+    #[serde(skip)]
+    pub last_emitted_context: Option<crate::panels::ContextItem>,
 }
 
 // === Entry metadata helpers ===
@@ -316,5 +321,6 @@ pub fn make_default_entry(id: &str, context_type: Kind, name: &str, cache_deprec
         total_cache_misses: 0,
         last_emitted_content: None,
         last_emitted_hash: None,
+        last_emitted_context: None,
     }
 }

@@ -83,6 +83,7 @@ fn open_single_file(path: &str, state: &mut State) -> String {
         total_cache_misses: 0,
         last_emitted_content: None,
         last_emitted_hash: None,
+        last_emitted_context: None,
     };
     elem.set_meta("file_path", &canonical);
     state.context.push(elem);

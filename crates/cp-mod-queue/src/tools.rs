@@ -4,28 +4,6 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::types::QueueState;
 use std::fmt::Write as _;
 
-/// Execute `Queue_activate`: start intercepting tool calls.
-pub(crate) fn execute_activate(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let qs = QueueState::get_mut(state);
-    if qs.active {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Queue is already active.".to_string(),
-            is_error: false,
-            tool_name: tool.name.clone(),
-        };
-    }
-    qs.active = true;
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content:
-            "Queue activated. All subsequent tool calls will be queued until you call Queue_execute or Queue_pause."
-                .to_string(),
-        is_error: false,
-        tool_name: tool.name.clone(),
-    }
-}
-
 /// Execute `Queue_pause`: stop intercepting, tools execute normally. Queue stays intact.
 pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
     let qs = QueueState::get_mut(state);
@@ -33,6 +11,7 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult {
             tool_use_id: tool.id.clone(),
             content: "Queue is already paused/inactive.".to_string(),
+            display: None,
             is_error: false,
             tool_name: tool.name.clone(),
         };
@@ -42,6 +21,7 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("Queue paused. Tools now execute normally. {n} action(s) still queued."),
+        display: None,
         is_error: false,
         tool_name: tool.name.clone(),
     }
@@ -55,6 +35,7 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
                 content: "Missing 'indices' parameter (expected array of numbers).".to_string(),
+                display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
             };
@@ -87,6 +68,7 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: msg,
+        display: None,
         is_error: !not_found.is_empty() && removed.is_empty(),
         tool_name: tool.name.clone(),
     }
@@ -101,6 +83,7 @@ pub(crate) fn execute_empty(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: format!("Queue emptied. Discarded {n} action(s)."),
+        display: None,
         is_error: false,
         tool_name: tool.name.clone(),
     }

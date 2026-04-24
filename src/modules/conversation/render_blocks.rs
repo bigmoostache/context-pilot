@@ -86,10 +86,12 @@ pub(crate) fn render_message_blocks(msg: &Message, opts: &MessageBlockOpts) -> V
 
             // Check for custom module visualizer
             let registry = get_visualizer_registry();
+            // Prefer display (user-facing) over content (LLM-facing) for rendering
+            let render_source = result.display.as_deref().unwrap_or(&result.content);
             let custom_blocks = if result.tool_name.is_empty() {
                 None
             } else {
-                registry.get(&result.tool_name).map(|visualizer| visualizer(&result.content, wrap_width))
+                registry.get(&result.tool_name).map(|visualizer| visualizer(render_source, wrap_width))
             };
 
             let mut is_first = true;
@@ -152,7 +154,7 @@ pub(crate) fn render_message_blocks(msg: &Message, opts: &MessageBlockOpts) -> V
                 }
             } else {
                 // Fallback: plain text rendering with wrapping
-                for line in result.content.lines() {
+                for line in render_source.lines() {
                     if line.is_empty() {
                         blocks.push(Block::line(vec![Span::new(" ".repeat(prefix_width))]));
                         continue;

@@ -258,7 +258,7 @@ impl LlmClient for DeepSeekClient {
             }))
             .send();
 
-        let auth_ok = auth_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+        let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
 
         if !auth_ok {
             let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
@@ -278,7 +278,7 @@ impl LlmClient for DeepSeekClient {
             }))
             .send();
 
-        let streaming_ok = stream_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+        let streaming_ok = stream_result.as_ref().is_ok_and(|r| r.status().is_success());
 
         // Test 3: Tools
         let tools_result = client
@@ -304,7 +304,7 @@ impl LlmClient for DeepSeekClient {
             }))
             .send();
 
-        let tools_ok = tools_result.as_ref().map(|r| r.status().is_success()).unwrap_or(false);
+        let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
 
         super::super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
