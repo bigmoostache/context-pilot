@@ -128,8 +128,15 @@ impl Module for BraveModule {
 
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::Verdict> {
-        None
+    fn pre_flight(&self, tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::Verdict> {
+        match tool.name.as_str() {
+            "brave_search" | "brave_llm_context" => {
+                let mut pf = cp_base::tools::pre_flight::Verdict::new();
+                pf.activate_queue = true;
+                Some(pf)
+            }
+            _ => None,
+        }
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {

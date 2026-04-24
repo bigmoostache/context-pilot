@@ -287,6 +287,7 @@ impl Module for OverviewModule {
         match tool.name.as_str() {
             "Close_panel" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(ids) = tool.input.get("ids").and_then(serde_json::Value::as_array) {
                     for id_val in ids {
                         if let Some(id) = id_val.as_str() {

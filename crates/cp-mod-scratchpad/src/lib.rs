@@ -117,8 +117,14 @@ impl Module for ScratchpadModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
+            "scratchpad_create_cell" => {
+                let mut pf = Verdict::new();
+                pf.activate_queue = true;
+                Some(pf)
+            }
             "scratchpad_edit_cell" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(cell_id) = tool.input.get("cell_id").and_then(|v| v.as_str()) {
                     let ss = ScratchpadState::get(state);
                     if !ss.scratchpad_cells.iter().any(|c| c.id == cell_id) {
@@ -129,6 +135,7 @@ impl Module for ScratchpadModule {
             }
             "scratchpad_wipe" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(ids) = tool.input.get("cell_ids").and_then(|v| v.as_array())
                     && !ids.is_empty()
                 {

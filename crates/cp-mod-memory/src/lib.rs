@@ -151,8 +151,14 @@ impl Module for MemoryModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
+            "memory_create" => {
+                let mut pf = Verdict::new();
+                pf.activate_queue = true;
+                Some(pf)
+            }
             "memory_update" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) {
                     let ms = MemoryState::get(state);
                     for update in updates {

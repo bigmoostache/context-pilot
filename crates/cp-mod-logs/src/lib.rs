@@ -249,8 +249,14 @@ impl Module for LogsModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
+            "log_create" => {
+                let mut pf = Verdict::new();
+                pf.activate_queue = true;
+                Some(pf)
+            }
             "log_summarize" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(ids) = tool.input.get("log_ids").and_then(|v| v.as_array()) {
                     let logs = &LogsState::get(state).logs;
                     for id_val in ids {
@@ -265,6 +271,7 @@ impl Module for LogsModule {
             }
             "log_toggle" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let logs = &LogsState::get(state).logs;
                     match logs.iter().find(|l| l.id == id) {

@@ -140,6 +140,7 @@ impl Module for TodoModule {
         match tool.name.as_str() {
             "todo_create" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(todos) = tool.input.get("todos").and_then(|v| v.as_array()) {
                     let ts = TodoState::get(state);
                     for todo in todos {
@@ -154,6 +155,7 @@ impl Module for TodoModule {
             }
             "todo_update" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) {
                     let ts = TodoState::get(state);
                     for update in updates {
@@ -168,6 +170,7 @@ impl Module for TodoModule {
             }
             "todo_move" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 let ts = TodoState::get(state);
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
                     && !ts.todos.iter().any(|t| t.id == id)

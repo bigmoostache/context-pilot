@@ -159,8 +159,14 @@ impl Module for TreeModule {
 
     fn pre_flight(&self, tool: &ToolUse, _state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
+            "tree_filter" | "tree_describe" => {
+                let mut pf = Verdict::new();
+                pf.activate_queue = true;
+                Some(pf)
+            }
             "tree_toggle" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(paths) = tool.input.get("paths").and_then(|v| v.as_array()) {
                     for path_val in paths {
                         if let Some(path) = path_val.as_str() {

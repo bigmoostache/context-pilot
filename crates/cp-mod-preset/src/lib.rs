@@ -123,6 +123,7 @@ impl Module for PresetModule {
             }
             "preset_snapshot_myself" => {
                 let mut pf = Verdict::new();
+                pf.activate_queue = true;
                 if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
                     let replace = tool.input.get("replace").and_then(|v| v.as_str());
                     let presets = tools::list_presets_with_info();
