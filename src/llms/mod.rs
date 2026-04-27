@@ -3,6 +3,7 @@
 //! Provides a unified interface for different LLM providers (Anthropic, Grok, Groq, Claude Code OAuth)
 
 pub(crate) mod anthropic;
+pub(crate) mod cache_engine;
 pub(crate) mod claude_code;
 pub(crate) mod claude_code_api_key;
 /// MiniMax provider (Anthropic-compatible API via Token Plan).
@@ -60,6 +61,9 @@ pub(crate) struct LlmRequest {
     /// Pre-assembled API messages (panels + seed + conversation).
     /// When non-empty, providers should use this instead of doing their own assembly.
     pub api_messages: Vec<ApiMessage>,
+    /// Serialized cache optimization engine state (JSON) for breakpoint placement.
+    /// Passed from `State.cache_engine_json` to the streaming thread.
+    pub cache_engine_json: Option<String>,
 }
 
 /// Trait for LLM providers
@@ -113,6 +117,8 @@ pub(crate) struct StreamParams {
     pub seed_content: Option<String>,
     /// Worker/reverie ID for debug logging
     pub worker_id: String,
+    /// Serialized cache optimization engine state for breakpoint placement.
+    pub cache_engine_json: Option<String>,
 }
 
 /// Start streaming with the specified provider and model
@@ -144,6 +150,7 @@ pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
             seed_content: params.seed_content,
             worker_id: params.worker_id,
             api_messages,
+            cache_engine_json: params.cache_engine_json,
         };
 
         if let Err(e) = client.stream(request, tx.clone()) {
@@ -268,32 +275,39 @@ pub(crate) fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakeP
         .collect()
 }
 
+/// Result of converting `ApiMessage`s to Claude Code JSON format.
+///
+/// Bundles the JSON messages with cache engine metadata for post-request bookkeeping.
+pub(crate) struct CcJsonResult {
+    /// Raw JSON messages ready for the Claude Code API.
+    pub json_messages: Vec<Value>,
+    /// Accumulated hashes at the 4 breakpoint positions (for `record_breakpoints`).
+    pub bp_hashes: Vec<String>,
+    /// How many stored BPs matched the current request's hash chain.
+    pub alive_count: usize,
+    /// Per-mille positions (0–1000) of alive BPs within the prompt.
+    pub alive_positions_permille: Vec<u16>,
+}
+
 /// Convert pre-assembled `Vec<ApiMessage>` into Claude Code's raw JSON format.
 ///
 /// Claude Code requires raw `serde_json::Value` messages (not typed structs).
-/// This injects up to 4 `cache_control` breakpoints using a **chain strategy**:
-/// BP4 = last block of last user message (tail — longest prefix).
-/// BP3 = 20 content blocks before BP4 (lookback insurance).
-/// BP2 = 20 content blocks before BP3.
-/// BP1 = 20 content blocks before BP2.
-/// Each breakpoint covers a 20-block lookback window, giving 80 blocks of total
-/// coverage for Anthropic's prefix cache matching.
+/// This injects up to 4 `cache_control` breakpoints using the **cache optimization engine**:
+/// 1. Compute accumulated hashes for every content block.
+/// 2. Find the cache frontier (deepest matching stored breakpoint within 5-min TTL).
+/// 3. Place beacon BP at frontier + 20 blocks (extends the cached prefix).
+/// 4. Place 3 remaining BPs via greedy weighted coverage to minimize expected cost.
+///
+/// When `engine_json` is `None`, uses a fresh engine (no stored breakpoints).
 ///
 /// Shared between `claude_code` and `claude_code_api_key` providers.
-pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value> {
-    // ── Phase 1: Flatten all content blocks to global positions ──
-    // Each entry: (msg_idx, blk_idx, is_user_msg)
-    let mut block_positions: Vec<(usize, usize, bool)> = Vec::new();
-    for (msg_idx, msg) in api_messages.iter().enumerate() {
-        let is_user = msg.role == "user";
-        for blk_idx in 0..msg.content.len() {
-            block_positions.push((msg_idx, blk_idx, is_user));
-        }
-    }
+pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage], engine_json: Option<&str>) -> CcJsonResult {
+    // ── Phase 1: Load and prune cache engine ──
+    let mut engine = engine_json.map_or_else(cache_engine::CacheEngine::default, cache_engine::CacheEngine::from_json);
+    engine.prune(cp_base::panels::now_ms());
 
-    // ── Phase 2: Compute chain breakpoints (BP4 → BP3 → BP2 → BP1) ──
-    // Each breakpoint tags the LAST block of a user message at or before the stepping position.
-    let breakpoint_positions = compute_chain_breakpoints(api_messages, &block_positions);
+    // ── Phase 2: Compute optimal breakpoint positions ──
+    let plan = engine.compute_breakpoints(api_messages);
 
     // ── Phase 3: Convert to JSON, tagging breakpoint blocks with cache_control ──
     let mut json_messages: Vec<Value> = Vec::new();
@@ -304,7 +318,7 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value>
             .iter()
             .enumerate()
             .map(|(blk_idx, block)| {
-                let should_tag = breakpoint_positions.contains(&(msg_idx, blk_idx));
+                let should_tag = plan.positions.contains(&(msg_idx, blk_idx));
                 match block {
                     ContentBlock::Text { text } => {
                         let mut obj = serde_json::json!({"type": "text", "text": text});
@@ -338,79 +352,12 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value>
         }));
     }
 
-    json_messages
-}
-
-/// Compute up to 4 cache breakpoint positions using the chain strategy.
-///
-/// Returns a set of `(msg_idx, blk_idx)` pairs that should be tagged with `cache_control`.
-/// The chain spaces breakpoints 20 content blocks apart, walking backward from the tail.
-/// Each breakpoint is placed on the last block of a user-role message at or before the
-/// stepping-stone position, maximizing Anthropic's 20-block lookback coverage.
-fn compute_chain_breakpoints(
-    api_messages: &[ApiMessage],
-    block_positions: &[(usize, usize, bool)],
-) -> Vec<(usize, usize)> {
-    const LOOKBACK_WINDOW: usize = 20;
-
-    if block_positions.is_empty() {
-        return Vec::new();
+    CcJsonResult {
+        json_messages,
+        bp_hashes: plan.bp_hashes,
+        alive_count: plan.alive_count,
+        alive_positions_permille: plan.alive_positions_permille,
     }
-
-    // BP4: last block of the last user message (the tail — longest cacheable prefix)
-    let bp4 = find_last_user_msg_last_block(api_messages);
-    let Some(bp4_pos) = bp4 else {
-        return Vec::new();
-    };
-
-    let mut breakpoints: Vec<(usize, usize)> = vec![bp4_pos];
-
-    // Find the global block index of BP4
-    let bp4_global = block_positions.iter().rposition(|&(m, b, _)| m == bp4_pos.0 && b == bp4_pos.1);
-    let Some(mut cursor) = bp4_global else {
-        return breakpoints;
-    };
-
-    // Walk back 20 blocks at a time for BP3, BP2, BP1
-    for _ in 0..3 {
-        if cursor < LOOKBACK_WINDOW {
-            break; // Not enough blocks to step back
-        }
-        cursor = cursor.saturating_sub(LOOKBACK_WINDOW);
-
-        // Find the nearest user message at or before this position
-        if let Some(bp) = find_user_msg_last_block_at_or_before(api_messages, block_positions, cursor) {
-            // Avoid duplicate breakpoints
-            if !breakpoints.contains(&bp) {
-                breakpoints.push(bp);
-            }
-        }
-    }
-
-    breakpoints
-}
-
-/// Find the last block of the last user-role message in the prompt.
-fn find_last_user_msg_last_block(api_messages: &[ApiMessage]) -> Option<(usize, usize)> {
-    api_messages.iter().enumerate().rev().find_map(|(msg_idx, msg)| {
-        (msg.role == "user" && !msg.content.is_empty()).then(|| (msg_idx, msg.content.len().saturating_sub(1)))
-    })
-}
-
-/// Find the last block of the nearest user-role message at or before a global block position.
-fn find_user_msg_last_block_at_or_before(
-    api_messages: &[ApiMessage],
-    block_positions: &[(usize, usize, bool)],
-    global_pos: usize,
-) -> Option<(usize, usize)> {
-    // Walk backward from global_pos to find a user message
-    for &(msg_idx, _, is_user) in block_positions.get(..=global_pos)?.iter().rev() {
-        if is_user {
-            let msg = api_messages.get(msg_idx)?;
-            return Some((msg_idx, msg.content.len().saturating_sub(1)));
-        }
-    }
-    None
 }
 
 /// Context for logging an SSE error event.

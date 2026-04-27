@@ -218,6 +218,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.total_output_tokens = 0;
             state.uncached_input_tokens = 0;
             state.guard_rail_blocked = None;
+            state.cache_engine_json = None;
             ActionResult::Save
         }
         Action::TogglePerfMonitor => {

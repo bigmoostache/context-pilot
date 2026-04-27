@@ -105,7 +105,8 @@ const fn apply_token_usage(app_state: &mut State, usage: &TokenUsage) {
     app_state.stream_cache_hit_tokens = app_state.stream_cache_hit_tokens.saturating_add(usage.cache_hit);
     app_state.stream_cache_miss_tokens = app_state.stream_cache_miss_tokens.saturating_add(usage.cache_miss);
     app_state.stream_output_tokens = app_state.stream_output_tokens.saturating_add(usage.output);
-    app_state.stream_uncached_input_tokens = app_state.stream_uncached_input_tokens.saturating_add(usage.uncached_input);
+    app_state.stream_uncached_input_tokens =
+        app_state.stream_uncached_input_tokens.saturating_add(usage.uncached_input);
 
     // Accumulate total usage
     app_state.cache_hit_tokens = app_state.cache_hit_tokens.saturating_add(usage.cache_hit);

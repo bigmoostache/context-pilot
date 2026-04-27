@@ -36,11 +36,28 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
                 app.state.streaming_tool = None;
                 app.pending_tools.push(tool);
             }
-            StreamEvent::Done { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason } => {
+            StreamEvent::Done {
+                input_tokens,
+                output_tokens,
+                cache_hit_tokens,
+                cache_miss_tokens,
+                stop_reason,
+                bp_hashes,
+                alive_count,
+                alive_positions_permille,
+            } => {
                 app.typewriter.mark_done();
                 app.state.streaming_tool = None;
-                app.pending_done =
-                    Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason));
+                app.pending_done = Some((
+                    input_tokens,
+                    output_tokens,
+                    cache_hit_tokens,
+                    cache_miss_tokens,
+                    stop_reason,
+                    bp_hashes,
+                    alive_count,
+                    alive_positions_permille,
+                ));
                 // API call succeeded — reset retry counter immediately at tick level
                 app.state.api_retry_count = 0;
             }
@@ -161,7 +178,16 @@ pub(super) fn finalize_stream(app: &mut App) {
         return;
     }
 
-    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason)) = app.pending_done
+    if let Some((
+        input_tokens,
+        output_tokens,
+        cache_hit_tokens,
+        cache_miss_tokens,
+        ref stop_reason,
+        ref bp_hashes,
+        alive_count,
+        ref alive_positions_permille,
+    )) = app.pending_done
         && app.typewriter.pending_chars.is_empty()
         && app.pending_tools.is_empty()
     {
@@ -198,6 +224,22 @@ pub(super) fn finalize_stream(app: &mut App) {
         // Check if any chat rooms are still awaiting a response from the AI.
         // If so, fire a Spine notification so the next auto-continuation addresses them.
         check_chat_report_here(&mut app.state);
+
+        // Update cache optimization engine with breakpoint hashes from this request.
+        // This records which accumulated hashes were sent as breakpoints, so the next
+        // request can detect the cache frontier and place breakpoints optimally.
+        if !bp_hashes.is_empty() {
+            let now_ms = cp_base::panels::now_ms();
+            let mut engine = app.state.cache_engine_json.as_deref().map_or_else(
+                crate::llms::cache_engine::CacheEngine::default,
+                crate::llms::cache_engine::CacheEngine::from_json,
+            );
+            engine.prune(now_ms);
+            engine.record_breakpoints(bp_hashes, now_ms);
+            app.state.tick_alive_breakpoints = alive_count;
+            app.state.tick_alive_bp_positions = alive_positions_permille.clone();
+            app.state.cache_engine_json = Some(engine.to_json());
+        }
 
         app.typewriter.reset();
         app.pending_done = None;

@@ -34,6 +34,15 @@ pub enum StreamEvent {
         cache_miss_tokens: usize,
         /// Provider stop reason (e.g., `"end_turn"`, `"tool_use"`).
         stop_reason: Option<String>,
+        /// Accumulated hashes at breakpoint positions (for cache engine update).
+        /// Only populated by providers that use the cache optimization engine.
+        bp_hashes: Vec<String>,
+        /// How many stored breakpoints were both non-expired AND matched in the
+        /// current request's accumulated hash chain. Zero for non-caching providers.
+        alive_count: usize,
+        /// Per-mille positions (0–1000) of alive BPs within the prompt, sorted.
+        /// Each value = `bp_cumulative_tokens * 1000 / total_tokens`.
+        alive_positions_permille: Vec<u16>,
     },
     /// Unrecoverable error during streaming.
     Error(String),

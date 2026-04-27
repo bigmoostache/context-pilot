@@ -339,6 +339,7 @@ pub(crate) fn build_stream_params(
         system_prompt,
         seed_content,
         worker_id: crate::infra::constants::DEFAULT_WORKER_ID.to_string(),
+        cache_engine_json: state.cache_engine_json.clone(),
     }
 }
 

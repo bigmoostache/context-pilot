@@ -135,6 +135,15 @@ pub struct State {
     pub previous_panel_order: Vec<String>,
     /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding
     pub tool_sleep_until_ms: u64,
+    /// Cache optimization engine: tracks accumulated hashes and breakpoint timestamps
+    /// for intelligent Anthropic prompt cache breakpoint placement.
+    /// Serialized through `WorkerState` modules for reload survival.
+    pub cache_engine_json: Option<String>,
+    /// Number of alive (non-pruned) breakpoints at last tick — for sidebar display only.
+    pub tick_alive_breakpoints: usize,
+    /// Per-mille positions (0–1000) of alive BPs within the prompt, sorted.
+    /// For the sidebar gauge showing WHERE breakpoints sit in the prompt.
+    pub tick_alive_bp_positions: Vec<u16>,
 
     // === Render Cache (runtime-only) ===
     /// Last viewport width used for render cache invalidation.
@@ -228,6 +237,9 @@ impl Default for State {
             previous_panel_hash_list: vec![],
             previous_panel_order: vec![],
             tool_sleep_until_ms: 0,
+            cache_engine_json: None,
+            tick_alive_breakpoints: 0,
+            tick_alive_bp_positions: vec![],
             last_viewport_width: 0,
             message_cache: HashMap::new(),
             input_cache: None,

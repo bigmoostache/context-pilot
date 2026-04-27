@@ -26,8 +26,8 @@ use crate::state::persistence::PersistenceWriter;
 use crate::ui::TypewriterBuffer;
 use crate::ui::help::CommandPalette;
 
-/// Deferred `StreamDone` data: (`input_tokens`, `output_tokens`, `cache_hit`, `cache_miss`, `stop_reason`).
-pub(crate) type PendingDone = (usize, usize, usize, usize, Option<String>);
+/// Deferred `StreamDone` data: (`input_tokens`, `output_tokens`, `cache_hit`, `cache_miss`, `stop_reason`, `bp_hashes`, `alive_count`, `alive_positions_permille`).
+pub(crate) type PendingDone = (usize, usize, usize, usize, Option<String>, Vec<String>, usize, Vec<u16>);
 
 /// Reverie stream state — holds the receiver channel for a running reverie.
 pub(crate) struct ReverieStream {

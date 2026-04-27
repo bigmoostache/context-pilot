@@ -290,7 +290,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     app.state.streaming_estimated_tokens = 0;
 
     // Accumulate token stats from intermediate stream
-    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = app.pending_done {
+    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _, _, _, _)) = app.pending_done {
         // Fold uncached input into cache_miss for correct cost accounting
         let effective_miss = cache_miss_tokens.saturating_add(input_tokens);
         app.state.tick_cache_hit_tokens = cache_hit_tokens;

@@ -99,6 +99,11 @@ pub struct TokenStats {
     /// Accumulated uncached input tokens (after last cache breakpoint).
     /// Displayed separately in the sidebar for visibility.
     pub uncached_input: u32,
+    /// Number of alive (non-pruned) cache breakpoints at last tick.
+    pub alive_breakpoints: u32,
+    /// Per-mille positions (0–1000) of alive BPs within the prompt, sorted.
+    /// Used to render a gauge bar showing WHERE breakpoints sit.
+    pub alive_bp_positions: Vec<u16>,
     /// Total cost in USD for this conversation.
     pub total_cost: Option<f64>,
 }

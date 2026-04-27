@@ -211,11 +211,17 @@ impl ClaudeCodeClient {
             request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_string(), Clone::clone);
 
         // Build messages from pre-assembled API messages or raw data
-        let mut json_messages = if request.api_messages.is_empty() {
-            Vec::new()
-        } else {
-            super::api_messages_to_cc_json(&request.api_messages)
-        };
+        let super::CcJsonResult { mut json_messages, bp_hashes, alive_count, alive_positions_permille } =
+            if request.api_messages.is_empty() {
+                super::CcJsonResult {
+                    json_messages: Vec::new(),
+                    bp_hashes: Vec::new(),
+                    alive_count: 0,
+                    alive_positions_permille: Vec::new(),
+                }
+            } else {
+                super::api_messages_to_cc_json(&request.api_messages, request.cache_engine_json.as_deref())
+            };
 
         // Handle cleaner mode extra context
         if let Some(ref context) = request.extra_context {
@@ -463,6 +469,9 @@ impl ClaudeCodeClient {
             cache_hit_tokens,
             cache_miss_tokens,
             stop_reason,
+            bp_hashes,
+            alive_count,
+            alive_positions_permille,
         });
         Ok(())
     }

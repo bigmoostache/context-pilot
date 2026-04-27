@@ -430,6 +430,36 @@ fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenStats) {
         )]));
     }
 
+    // Alive cache breakpoints (non-pruned stored BPs at last tick)
+    if stats.alive_breakpoints > 0 {
+        lines.push(Line::from(vec![Span::styled(
+            format!(" alive BPs: {}", stats.alive_breakpoints),
+            Style::default().fg(theme::success()),
+        )]));
+
+        // BP position gauge — shows WHERE in the prompt alive BPs sit
+        if !stats.alive_bp_positions.is_empty() {
+            let gauge_width = 34usize;
+            let mut gauge_spans = vec![Span::styled(" ", Style::default().bg(theme::bg_base()))];
+            for i in 0..gauge_width {
+                // Map gauge column i to permille position: i * 1000 / gauge_width
+                let col_permille_start = i.saturating_mul(1000).checked_div(gauge_width).unwrap_or(0);
+                let col_permille_end = (i.saturating_add(1)).saturating_mul(1000).checked_div(gauge_width).unwrap_or(0);
+                // Check if any alive BP falls in this column's range
+                let has_bp = stats
+                    .alive_bp_positions
+                    .iter()
+                    .any(|&p| usize::from(p) >= col_permille_start && usize::from(p) < col_permille_end);
+                if has_bp {
+                    gauge_spans.push(Span::styled("|", Style::default().fg(theme::success())));
+                } else {
+                    gauge_spans.push(Span::styled(chars::BLOCK_LIGHT, Style::default().fg(theme::bg_elevated())));
+                }
+            }
+            lines.push(Line::from(gauge_spans));
+        }
+    }
+
     // Total cost
     if let Some(total) = stats.total_cost {
         let total_str = if total < 0.01 { format!("${total:.3}") } else { format!("${total:.2}") };

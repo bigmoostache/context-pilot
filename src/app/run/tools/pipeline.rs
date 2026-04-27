@@ -21,7 +21,7 @@ use std::fmt::Write as _;
 
 /// Accumulate token stats from the intermediate stream into tick/stream/total counters.
 pub(crate) const fn accumulate_pending_token_stats(app: &mut App) {
-    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = app.pending_done {
+    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _, _, _, _)) = app.pending_done {
         // Fold uncached input into cache_miss for correct cost accounting
         let effective_miss = cache_miss_tokens.saturating_add(input_tokens);
         app.state.tick_cache_hit_tokens = cache_hit_tokens;

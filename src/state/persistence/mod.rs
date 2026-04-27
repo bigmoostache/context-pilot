@@ -172,6 +172,10 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
 
     // Module init + data loading is driven by main.rs via boot_init_modules()
     // so it can render per-module progress on the loading screen.
+
+    // Restore cache engine state from worker modules
+    let cache_engine_json = cfg.worker.modules.get("cache_engine").and_then(|v| serde_json::to_string(v).ok());
+
     State {
         context: panels.context,
         messages,
@@ -184,6 +188,7 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
         input_cursor: cfg.shared.draft_cursor,
         sidebar_mode: cfg.shared.sidebar_mode,
         active_theme: cfg.shared.active_theme,
+        cache_engine_json,
         ..State::default()
     }
 }
@@ -277,6 +282,13 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         if !worker_data.is_null() {
             let _r = worker_modules.insert(format!("{}_worker", module.id()), worker_data);
         }
+    }
+
+    // Cache optimization engine (survives reloads via worker state)
+    if let Some(ref json) = state.cache_engine_json
+        && let Ok(val) = serde_json::from_str::<serde_json::Value>(json)
+    {
+        let _r = worker_modules.insert("cache_engine".to_string(), val);
     }
 
     // Shared config
