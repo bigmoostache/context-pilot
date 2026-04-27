@@ -96,6 +96,9 @@ pub struct TokenBar {
 pub struct TokenStats {
     /// Individual stat rows.
     pub rows: Vec<TokenRow>,
+    /// Accumulated uncached input tokens (after last cache breakpoint).
+    /// Displayed separately in the sidebar for visibility.
+    pub uncached_input: u32,
     /// Total cost in USD for this conversation.
     pub total_cost: Option<f64>,
 }

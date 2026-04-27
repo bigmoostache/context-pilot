@@ -422,6 +422,14 @@ fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenStats) {
 
     lines.extend(render_table(&header_cells, &rows, None, 1));
 
+    // Uncached input tokens (after last cache breakpoint, billed at base price)
+    if stats.uncached_input > 0 {
+        lines.push(Line::from(vec![Span::styled(
+            format!(" uncached: {}", format_number(stats.uncached_input.to_usize())),
+            Style::default().fg(theme::error()),
+        )]));
+    }
+
     // Total cost
     if let Some(total) = stats.total_cost {
         let total_str = if total < 0.01 { format!("${total:.3}") } else { format!("${total:.2}") };

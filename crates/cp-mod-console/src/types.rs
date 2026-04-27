@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{Watcher, WatcherResult};
+use cp_base::state::watchers::{DeferredPanel, Watcher, WatcherResult};
 use serde::{Deserialize, Serialize};
 
 use crate::manager::SessionHandle;
+use crate::tools::truncate_str;
 
 /// Serializable metadata for a console session (used for persistence across reloads).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,6 +142,9 @@ pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, la
 // Console Watcher — implements cp_base::state::watchers::Watcher trait
 // ============================================================
 
+/// Maximum lines for `easy_bash` inline output. Beyond this, a panel is created.
+const EASY_BASH_INLINE_MAX_LINES: usize = 150;
+
 /// A watcher that monitors a console session for a condition.
 #[derive(Debug)]
 pub struct ConsoleWatcher {
@@ -160,12 +164,16 @@ pub struct ConsoleWatcher {
     pub registered_at_ms: u64,
     /// Deadline for timeout (ms since epoch). None = no timeout.
     pub deadline_ms: Option<u64>,
-    /// If true, format result as `easy_bash` output summary.
+    /// If true, this watcher was created by `easy_bash`.
     pub easy_bash: bool,
-    /// Panel ID for this console session.
+    /// Panel ID for this console session (empty for panelless `easy_bash`).
     pub panel_id: String,
     /// Human-readable description.
     pub desc: String,
+    /// Shell command (needed for deferred panel creation on `easy_bash` overflow).
+    pub command: String,
+    /// Working directory (needed for deferred panel creation).
+    pub cwd: Option<String>,
 }
 
 impl Watcher for ConsoleWatcher {
@@ -200,18 +208,46 @@ impl Watcher for ConsoleWatcher {
         }
 
         if self.easy_bash {
-            let output =
-                std::fs::read_to_string(cs.sessions.get(&self.session_name).map_or("", |h| h.log_path.as_str()))
-                    .unwrap_or_default();
+            let log_path = &handle.log_path;
+            let output = std::fs::read_to_string(log_path).unwrap_or_default();
             let exit_code = handle.get_status().exit_code().unwrap_or(-1);
             let line_count = output.lines().count();
+
+            // Short output → return inline, kill session, no panel
+            if line_count <= EASY_BASH_INLINE_MAX_LINES {
+                let description = if output.trim().is_empty() {
+                    format!("(no output, exit_code={exit_code})")
+                } else {
+                    format!("{}\n\n(exit_code={exit_code})", output.trim_end())
+                };
+                return Some(WatcherResult {
+                    description,
+                    panel_id: None,
+                    tool_use_id: self.tool_use_id.clone(),
+                    close_panel: false,
+                    create_panel: None,
+                    processed_already: false,
+                    kill_session: Some(self.session_name.clone()),
+                });
+            }
+
+            // Long output → create panel via deferred, keep session alive
             Some(WatcherResult {
-                description: format!("Output in {} ({} lines, exit_code={})", self.panel_id, line_count, exit_code),
-                panel_id: Some(self.panel_id.clone()),
+                description: format!("Output too long for inline ({line_count} lines, exit_code={exit_code})"),
+                panel_id: None,
                 tool_use_id: self.tool_use_id.clone(),
                 close_panel: false,
-                create_panel: None,
+                create_panel: Some(DeferredPanel {
+                    session_key: self.session_name.clone(),
+                    display_name: truncate_str(&self.command, 30).to_string(),
+                    command: self.command.clone(),
+                    description: truncate_str(&self.command, 60).to_string(),
+                    cwd: self.cwd.clone(),
+                    callback_id: String::new(),
+                    callback_name: String::new(),
+                }),
                 processed_already: false,
+                kill_session: None,
             })
         } else {
             let exit_code = handle.get_status().exit_code();
@@ -223,6 +259,7 @@ impl Watcher for ConsoleWatcher {
                 close_panel: false,
                 create_panel: None,
                 processed_already: false,
+                kill_session: None,
             })
         }
     }
@@ -237,16 +274,23 @@ impl Watcher for ConsoleWatcher {
         let elapsed_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(self.registered_at_ms));
 
         if self.easy_bash {
+            // Timeout → create panel so user can inspect partial output
             Some(WatcherResult {
-                description: format!(
-                    "Output in {} (TIMED OUT after {}s, process may still be running)",
-                    self.panel_id, elapsed_s
-                ),
-                panel_id: Some(self.panel_id.clone()),
+                description: format!("TIMED OUT after {elapsed_s}s, process may still be running"),
+                panel_id: None,
                 tool_use_id: self.tool_use_id.clone(),
                 close_panel: false,
-                create_panel: None,
+                create_panel: Some(DeferredPanel {
+                    session_key: self.session_name.clone(),
+                    display_name: truncate_str(&self.command, 30).to_string(),
+                    command: self.command.clone(),
+                    description: truncate_str(&self.command, 60).to_string(),
+                    cwd: self.cwd.clone(),
+                    callback_id: String::new(),
+                    callback_name: String::new(),
+                }),
                 processed_already: false,
+                kill_session: None,
             })
         } else {
             Some(WatcherResult {
@@ -259,6 +303,7 @@ impl Watcher for ConsoleWatcher {
                 close_panel: false,
                 create_panel: None,
                 processed_already: false,
+                kill_session: None,
             })
         }
     }

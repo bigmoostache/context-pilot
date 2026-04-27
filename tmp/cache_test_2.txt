@@ -1,0 +1,2 @@
+Second cache test write — 2026-04-27
+Verifying queue freeze preserves prompt cache prefix.

@@ -216,6 +216,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.cache_hit_tokens = 0;
             state.cache_miss_tokens = 0;
             state.total_output_tokens = 0;
+            state.uncached_input_tokens = 0;
             state.guard_rail_blocked = None;
             ActionResult::Save
         }

@@ -41,3 +41,6 @@ check_sender
 increment.txt
 workdir/
 increment.txt
+tmp/freeze_test_2.txt
+tmp/freeze_test.txt
+tmp/test_queue.txt

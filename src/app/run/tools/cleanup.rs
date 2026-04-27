@@ -35,6 +35,24 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     // Put registry back
     app.state.set_ext(registry);
 
+    // --- Session cleanup for inline easy_bash results (no panel to close) ---
+    for result in blocking_results.iter().chain(async_results.iter()) {
+        if let Some(ref name) = result.kill_session {
+            let log_path = {
+                let cs = cp_mod_console::types::ConsoleState::get(&app.state);
+                cs.sessions.get(name).map(|h| h.log_path.clone()).unwrap_or_default()
+            };
+            cp_mod_console::types::ConsoleState::kill_session(&mut app.state, name);
+            {
+                let cs = cp_mod_console::types::ConsoleState::get_mut(&mut app.state);
+                drop(cs.sessions.remove(name));
+            }
+            if !log_path.is_empty() {
+                let _: Option<()> = std::fs::remove_file(&log_path).ok();
+            }
+        }
+    }
+
     // --- Async completions → spine notifications ---
     if !async_results.is_empty() {
         // Handle deferred panel creation FIRST (so we have panel IDs for notifications)
@@ -272,16 +290,21 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     app.state.streaming_estimated_tokens = 0;
 
     // Accumulate token stats from intermediate stream
-    if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = app.pending_done {
+    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = app.pending_done {
+        // Fold uncached input into cache_miss for correct cost accounting
+        let effective_miss = cache_miss_tokens.saturating_add(input_tokens);
         app.state.tick_cache_hit_tokens = cache_hit_tokens;
-        app.state.tick_cache_miss_tokens = cache_miss_tokens;
+        app.state.tick_cache_miss_tokens = effective_miss;
         app.state.tick_output_tokens = output_tokens;
+        app.state.tick_uncached_input_tokens = input_tokens;
         app.state.stream_cache_hit_tokens = app.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
-        app.state.stream_cache_miss_tokens = app.state.stream_cache_miss_tokens.saturating_add(cache_miss_tokens);
+        app.state.stream_cache_miss_tokens = app.state.stream_cache_miss_tokens.saturating_add(effective_miss);
         app.state.stream_output_tokens = app.state.stream_output_tokens.saturating_add(output_tokens);
+        app.state.stream_uncached_input_tokens = app.state.stream_uncached_input_tokens.saturating_add(input_tokens);
         app.state.cache_hit_tokens = app.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
-        app.state.cache_miss_tokens = app.state.cache_miss_tokens.saturating_add(cache_miss_tokens);
+        app.state.cache_miss_tokens = app.state.cache_miss_tokens.saturating_add(effective_miss);
         app.state.total_output_tokens = app.state.total_output_tokens.saturating_add(output_tokens);
+        app.state.uncached_input_tokens = app.state.uncached_input_tokens.saturating_add(input_tokens);
     }
 
     app.save_state_async();

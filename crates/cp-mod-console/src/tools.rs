@@ -9,7 +9,7 @@ use crate::manager::SessionHandle;
 use crate::types::{ConsoleState, ConsoleWatcher, format_wait_result};
 
 /// Truncate a string to at most `max_bytes` without splitting a UTF-8 char.
-fn truncate_str(s: &str, max_bytes: usize) -> &str {
+pub(crate) fn truncate_str(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {
         return s;
     }
@@ -239,6 +239,8 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         easy_bash: false,
         panel_id,
         desc,
+        command: String::new(),
+        cwd: None,
     };
 
     let registry = WatcherRegistry::get_mut(state);
@@ -315,6 +317,8 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
         easy_bash: false,
         panel_id: panel_id.clone(),
         desc,
+        command: String::new(),
+        cwd: None,
     };
 
     let registry = WatcherRegistry::get_mut(state);
@@ -327,7 +331,8 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
     )
 }
 
-/// Handle `console_easy_bash`: spawn, block until exit or 10s timeout, return output summary.
+/// Handle `console_easy_bash`: spawn, block until exit or 10s timeout, return output inline
+/// if short (≤150 lines), or create a console panel if long/timeout.
 pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),
@@ -354,23 +359,8 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {e}"), true),
     };
 
-    // Create a panel so output goes there instead of flooding the conversation
-    let display_name = truncate_str(&command, 30);
-    let panel_id = state.next_available_context_id();
-    let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid = state.global_next_uid.saturating_add(1);
-    let mut ctx = make_default_entry(&panel_id, Kind::new(Kind::CONSOLE), display_name, true);
-    ctx.uid = Some(uid);
-    ctx.set_meta("console_name", &session_key);
-    ctx.set_meta("console_command", &command);
-    ctx.set_meta("console_status", &handle.get_status().label());
-    ctx.set_meta("console_is_easy_bash", &"true".to_string());
-    if let Some(ref dir) = cwd {
-        ctx.set_meta("console_cwd", dir);
-    }
-    state.context.push(ctx);
-
-    // Store the handle (needed for waiter to check status + read buffer)
+    // Store the handle (needed for watcher to check status + read output)
+    // NO panel created — the watcher decides inline vs. deferred panel at completion.
     let cs = ConsoleState::get_mut(state);
     drop(cs.sessions.insert(session_key.clone(), handle));
 
@@ -386,8 +376,10 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         registered_at_ms: now,
         deadline_ms: Some(now.saturating_add(BASH_MAX_EXECUTION_SECS.saturating_mul(1000))),
         easy_bash: true,
-        panel_id,
+        panel_id: String::new(),
         desc: format!("⏳ easy_bash: {}", truncate_str(&command, 40)),
+        command,
+        cwd,
     };
 
     let registry = WatcherRegistry::get_mut(state);

@@ -31,8 +31,11 @@ struct TokenUsage {
     output: usize,
     /// Number of cache-hit input tokens.
     cache_hit: usize,
-    /// Number of cache-miss input tokens.
+    /// Number of cache-miss input tokens (`cache_creation` + uncached input).
     cache_miss: usize,
+    /// Uncached input tokens (after last cache breakpoint, billed at base price).
+    /// Already folded into `cache_miss` — tracked separately for display.
+    uncached_input: usize,
 }
 
 /// Aggregated fields from the LLM API response when a stream finishes.
@@ -57,7 +60,14 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
     state.flags.stream.phase.transition(StreamPhase::Idle);
     state.last_stop_reason = event.stop_reason.map(ToString::to_string);
 
-    let usage = TokenUsage { output: event.output_tokens, cache_hit: event.cache_hit, cache_miss: event.cache_miss };
+    let usage = TokenUsage {
+        output: event.output_tokens,
+        cache_hit: event.cache_hit,
+        // Uncached input tokens (after the last cache breakpoint) are billed at base input price.
+        // Folding them into cache_miss ensures the cost display accounts for all input costs.
+        cache_miss: event.cache_miss.saturating_add(event.input_tokens),
+        uncached_input: event.input_tokens,
+    };
     apply_token_usage(state, &usage);
 
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
@@ -89,16 +99,19 @@ const fn apply_token_usage(app_state: &mut State, usage: &TokenUsage) {
     app_state.tick_cache_hit_tokens = usage.cache_hit;
     app_state.tick_cache_miss_tokens = usage.cache_miss;
     app_state.tick_output_tokens = usage.output;
+    app_state.tick_uncached_input_tokens = usage.uncached_input;
 
     // Accumulate per-stream usage (reset at InputSubmit)
     app_state.stream_cache_hit_tokens = app_state.stream_cache_hit_tokens.saturating_add(usage.cache_hit);
     app_state.stream_cache_miss_tokens = app_state.stream_cache_miss_tokens.saturating_add(usage.cache_miss);
     app_state.stream_output_tokens = app_state.stream_output_tokens.saturating_add(usage.output);
+    app_state.stream_uncached_input_tokens = app_state.stream_uncached_input_tokens.saturating_add(usage.uncached_input);
 
     // Accumulate total usage
     app_state.cache_hit_tokens = app_state.cache_hit_tokens.saturating_add(usage.cache_hit);
     app_state.cache_miss_tokens = app_state.cache_miss_tokens.saturating_add(usage.cache_miss);
     app_state.total_output_tokens = app_state.total_output_tokens.saturating_add(usage.output);
+    app_state.uncached_input_tokens = app_state.uncached_input_tokens.saturating_add(usage.uncached_input);
 }
 
 /// Handle `StreamError` action — clean up streaming state, log error.

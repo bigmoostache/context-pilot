@@ -97,18 +97,25 @@ pub struct State {
     pub cache_miss_tokens: usize,
     /// Accumulated output tokens across all API calls (persisted)
     pub total_output_tokens: usize,
+    /// Accumulated uncached input tokens (after last cache breakpoint, billed at base price).
+    /// Subset of `cache_miss_tokens` — tracked separately for sidebar display.
+    pub uncached_input_tokens: usize,
     /// Current stream token accumulators (runtime-only, reset per user input)
     pub stream_cache_hit_tokens: usize,
     /// Cache misses in current stream.
     pub stream_cache_miss_tokens: usize,
     /// Output tokens in current stream.
     pub stream_output_tokens: usize,
+    /// Uncached input tokens in current stream.
+    pub stream_uncached_input_tokens: usize,
     /// Last tick token accumulators (runtime-only, set per `StreamDone`)
     pub tick_cache_hit_tokens: usize,
     /// Cache misses in last completed tick.
     pub tick_cache_miss_tokens: usize,
     /// Output tokens in last completed tick.
     pub tick_output_tokens: usize,
+    /// Uncached input tokens in last completed tick.
+    pub tick_uncached_input_tokens: usize,
     /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
     pub cleaning_threshold: f32,
     /// Cleaning target as proportion of threshold (0.0 - 1.0)
@@ -203,12 +210,15 @@ impl Default for State {
             cache_hit_tokens: 0,
             cache_miss_tokens: 0,
             total_output_tokens: 0,
+            uncached_input_tokens: 0,
             stream_cache_hit_tokens: 0,
             stream_cache_miss_tokens: 0,
             stream_output_tokens: 0,
+            stream_uncached_input_tokens: 0,
             tick_cache_hit_tokens: 0,
             tick_cache_miss_tokens: 0,
             tick_output_tokens: 0,
+            tick_uncached_input_tokens: 0,
             cleaning_threshold: 0.70,
             cleaning_target_proportion: 0.70,
             context_budget: None,
@@ -353,6 +363,7 @@ impl State {
         self.tick_cache_hit_tokens = 0;
         self.tick_cache_miss_tokens = 0;
         self.tick_output_tokens = 0;
+        self.tick_uncached_input_tokens = 0;
     }
 
     // === Model selection & context window ===

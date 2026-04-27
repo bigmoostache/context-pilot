@@ -281,7 +281,7 @@ fn build_token_stats(state: &State) -> Option<TokenStats> {
         + State::token_cost(state.total_output_tokens, out_price);
     let total_cost_opt = (total_cost >= 0.001).then_some(total_cost);
 
-    Some(TokenStats { rows, total_cost: total_cost_opt })
+    Some(TokenStats { rows, uncached_input: state.uncached_input_tokens.to_u32(), total_cost: total_cost_opt })
 }
 
 // ── PR card ──────────────────────────────────────────────────────────

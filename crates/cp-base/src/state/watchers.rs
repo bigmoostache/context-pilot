@@ -26,6 +26,9 @@ pub struct WatcherResult {
     /// If true, the spine notification is created already processed (no auto-continuation).
     /// Used for success notifications that don't need attention.
     pub processed_already: bool,
+    /// If set, kill and remove this console session after processing.
+    /// Used by `easy_bash` inline path to clean up sessions that have no panel.
+    pub kill_session: Option<String>,
 }
 
 /// Info needed to create a console panel after a watcher fires.

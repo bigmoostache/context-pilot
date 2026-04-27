@@ -80,9 +80,12 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     state.stream_cache_hit_tokens = 0;
     state.stream_cache_miss_tokens = 0;
     state.stream_output_tokens = 0;
+    state.stream_uncached_input_tokens = 0;
+    state.stream_uncached_input_tokens = 0;
     state.tick_cache_hit_tokens = 0;
     state.tick_cache_miss_tokens = 0;
     state.tick_output_tokens = 0;
+    state.tick_uncached_input_tokens = 0;
 
     // Return Save — the spine check in handle_action will detect the unprocessed
     // notification and start streaming synchronously for responsive feel.

@@ -258,6 +258,7 @@ impl Watcher for CallbackWatcher {
                 close_panel: false,
                 create_panel: None,
                 processed_already: true,
+                kill_session: None,
             });
         }
 
@@ -273,6 +274,7 @@ impl Watcher for CallbackWatcher {
                 close_panel: false,
                 create_panel: None,
                 processed_already: true,
+                kill_session: None,
             })
         } else {
             // Panel content is already final — the pipeline waited for process exit before resuming
@@ -292,6 +294,7 @@ impl Watcher for CallbackWatcher {
                     callback_name: self.deferred_panel.callback_name.clone(),
                 }),
                 processed_already: false,
+                kill_session: None,
             })
         }
     }
@@ -318,6 +321,7 @@ impl Watcher for CallbackWatcher {
                 callback_name: self.deferred_panel.callback_name.clone(),
             }),
             processed_already: false,
+            kill_session: None,
         })
     }
 

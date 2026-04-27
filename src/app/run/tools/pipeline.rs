@@ -21,16 +21,21 @@ use std::fmt::Write as _;
 
 /// Accumulate token stats from the intermediate stream into tick/stream/total counters.
 pub(crate) const fn accumulate_pending_token_stats(app: &mut App) {
-    if let Some((_, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = app.pending_done {
+    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _)) = app.pending_done {
+        // Fold uncached input into cache_miss for correct cost accounting
+        let effective_miss = cache_miss_tokens.saturating_add(input_tokens);
         app.state.tick_cache_hit_tokens = cache_hit_tokens;
-        app.state.tick_cache_miss_tokens = cache_miss_tokens;
+        app.state.tick_cache_miss_tokens = effective_miss;
         app.state.tick_output_tokens = output_tokens;
+        app.state.tick_uncached_input_tokens = input_tokens;
         app.state.stream_cache_hit_tokens = app.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
-        app.state.stream_cache_miss_tokens = app.state.stream_cache_miss_tokens.saturating_add(cache_miss_tokens);
+        app.state.stream_cache_miss_tokens = app.state.stream_cache_miss_tokens.saturating_add(effective_miss);
         app.state.stream_output_tokens = app.state.stream_output_tokens.saturating_add(output_tokens);
+        app.state.stream_uncached_input_tokens = app.state.stream_uncached_input_tokens.saturating_add(input_tokens);
         app.state.cache_hit_tokens = app.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
-        app.state.cache_miss_tokens = app.state.cache_miss_tokens.saturating_add(cache_miss_tokens);
+        app.state.cache_miss_tokens = app.state.cache_miss_tokens.saturating_add(effective_miss);
         app.state.total_output_tokens = app.state.total_output_tokens.saturating_add(output_tokens);
+        app.state.uncached_input_tokens = app.state.uncached_input_tokens.saturating_add(input_tokens);
     }
 }
 
