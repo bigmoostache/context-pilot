@@ -129,6 +129,9 @@ pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
             params.seed_content.as_deref(),
         );
 
+        // Dump prompt tick CSV for debugging cache behavior
+        dump_prompt_tick_csv(&api_messages);
+
         let request = LlmRequest {
             model: params.model,
             max_output_tokens: params.max_output_tokens,
@@ -268,55 +271,63 @@ pub(crate) fn prepare_panel_messages(context_items: &[ContextItem]) -> Vec<FakeP
 /// Convert pre-assembled `Vec<ApiMessage>` into Claude Code's raw JSON format.
 ///
 /// Claude Code requires raw `serde_json::Value` messages (not typed structs).
-/// This also injects `cache_control` breakpoints at 25/50/75/100% of panel
-/// `tool_result` positions for prefix-based cache optimization.
+/// This injects up to 4 `cache_control` breakpoints using a **chain strategy**:
+/// BP4 = last block of last user message (tail — longest prefix).
+/// BP3 = 20 content blocks before BP4 (lookback insurance).
+/// BP2 = 20 content blocks before BP3.
+/// BP1 = 20 content blocks before BP2.
+/// Each breakpoint covers a 20-block lookback window, giving 80 blocks of total
+/// coverage for Anthropic's prefix cache matching.
 ///
 /// Shared between `claude_code` and `claude_code_api_key` providers.
 pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value> {
-    // Find all panel tool_result indices for cache breakpoints
-    let panel_result_indices: Vec<usize> = api_messages
-        .iter()
-        .enumerate()
-        .filter(|(_, m)| {
-            m.role == "user"
-                && m.content.iter().any(
-                    |b| matches!(b, ContentBlock::ToolResult { tool_use_id, .. } if tool_use_id.starts_with("panel_")),
-                )
-        })
-        .map(|(i, _)| i)
-        .collect();
-
-    let panel_count = panel_result_indices.len();
-    let mut cache_breakpoints = std::collections::BTreeSet::new();
-    if panel_count > 0 {
-        for quarter in 1..=4usize {
-            let pos = (panel_count.saturating_mul(quarter)).div_ceil(4);
-            let _r = cache_breakpoints.insert(pos.saturating_sub(1));
+    // ── Phase 1: Flatten all content blocks to global positions ──
+    // Each entry: (msg_idx, blk_idx, is_user_msg)
+    let mut block_positions: Vec<(usize, usize, bool)> = Vec::new();
+    for (msg_idx, msg) in api_messages.iter().enumerate() {
+        let is_user = msg.role == "user";
+        for blk_idx in 0..msg.content.len() {
+            block_positions.push((msg_idx, blk_idx, is_user));
         }
     }
 
+    // ── Phase 2: Compute chain breakpoints (BP4 → BP3 → BP2 → BP1) ──
+    // Each breakpoint tags the LAST block of a user message at or before the stepping position.
+    let breakpoint_positions = compute_chain_breakpoints(api_messages, &block_positions);
+
+    // ── Phase 3: Convert to JSON, tagging breakpoint blocks with cache_control ──
     let mut json_messages: Vec<Value> = Vec::new();
 
     for (msg_idx, msg) in api_messages.iter().enumerate() {
         let content_blocks: Vec<Value> = msg
             .content
             .iter()
-            .map(|block| match block {
-                ContentBlock::Text { text } => serde_json::json!({"type": "text", "text": text}),
-                ContentBlock::ToolUse { id, name, input } => {
-                    serde_json::json!({"type": "tool_use", "id": id, "name": name, "input": input})
-                }
-                ContentBlock::ToolResult { tool_use_id, content } => {
-                    let mut result =
-                        serde_json::json!({"type": "tool_result", "tool_use_id": tool_use_id, "content": content});
-                    // Add cache_control at breakpoint positions
-                    if let Some(panel_pos) = panel_result_indices.iter().position(|&i| i == msg_idx)
-                        && cache_breakpoints.contains(&panel_pos)
-                        && let Some(obj) = result.as_object_mut()
-                    {
-                        let _prev = obj.insert("cache_control".to_string(), serde_json::json!({"type": "ephemeral"}));
+            .enumerate()
+            .map(|(blk_idx, block)| {
+                let should_tag = breakpoint_positions.contains(&(msg_idx, blk_idx));
+                match block {
+                    ContentBlock::Text { text } => {
+                        let mut obj = serde_json::json!({"type": "text", "text": text});
+                        if should_tag && let Some(o) = obj.as_object_mut() {
+                            let _prev = o.insert("cache_control".to_string(), serde_json::json!({"type": "ephemeral"}));
+                        }
+                        obj
                     }
-                    result
+                    ContentBlock::ToolUse { id, name, input } => {
+                        let mut obj = serde_json::json!({"type": "tool_use", "id": id, "name": name, "input": input});
+                        if should_tag && let Some(o) = obj.as_object_mut() {
+                            let _prev = o.insert("cache_control".to_string(), serde_json::json!({"type": "ephemeral"}));
+                        }
+                        obj
+                    }
+                    ContentBlock::ToolResult { tool_use_id, content } => {
+                        let mut obj =
+                            serde_json::json!({"type": "tool_result", "tool_use_id": tool_use_id, "content": content});
+                        if should_tag && let Some(o) = obj.as_object_mut() {
+                            let _prev = o.insert("cache_control".to_string(), serde_json::json!({"type": "ephemeral"}));
+                        }
+                        obj
+                    }
                 }
             })
             .collect();
@@ -328,6 +339,78 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage]) -> Vec<Value>
     }
 
     json_messages
+}
+
+/// Compute up to 4 cache breakpoint positions using the chain strategy.
+///
+/// Returns a set of `(msg_idx, blk_idx)` pairs that should be tagged with `cache_control`.
+/// The chain spaces breakpoints 20 content blocks apart, walking backward from the tail.
+/// Each breakpoint is placed on the last block of a user-role message at or before the
+/// stepping-stone position, maximizing Anthropic's 20-block lookback coverage.
+fn compute_chain_breakpoints(
+    api_messages: &[ApiMessage],
+    block_positions: &[(usize, usize, bool)],
+) -> Vec<(usize, usize)> {
+    const LOOKBACK_WINDOW: usize = 20;
+
+    if block_positions.is_empty() {
+        return Vec::new();
+    }
+
+    // BP4: last block of the last user message (the tail — longest cacheable prefix)
+    let bp4 = find_last_user_msg_last_block(api_messages);
+    let Some(bp4_pos) = bp4 else {
+        return Vec::new();
+    };
+
+    let mut breakpoints: Vec<(usize, usize)> = vec![bp4_pos];
+
+    // Find the global block index of BP4
+    let bp4_global = block_positions.iter().rposition(|&(m, b, _)| m == bp4_pos.0 && b == bp4_pos.1);
+    let Some(mut cursor) = bp4_global else {
+        return breakpoints;
+    };
+
+    // Walk back 20 blocks at a time for BP3, BP2, BP1
+    for _ in 0..3 {
+        if cursor < LOOKBACK_WINDOW {
+            break; // Not enough blocks to step back
+        }
+        cursor = cursor.saturating_sub(LOOKBACK_WINDOW);
+
+        // Find the nearest user message at or before this position
+        if let Some(bp) = find_user_msg_last_block_at_or_before(api_messages, block_positions, cursor) {
+            // Avoid duplicate breakpoints
+            if !breakpoints.contains(&bp) {
+                breakpoints.push(bp);
+            }
+        }
+    }
+
+    breakpoints
+}
+
+/// Find the last block of the last user-role message in the prompt.
+fn find_last_user_msg_last_block(api_messages: &[ApiMessage]) -> Option<(usize, usize)> {
+    api_messages.iter().enumerate().rev().find_map(|(msg_idx, msg)| {
+        (msg.role == "user" && !msg.content.is_empty()).then(|| (msg_idx, msg.content.len().saturating_sub(1)))
+    })
+}
+
+/// Find the last block of the nearest user-role message at or before a global block position.
+fn find_user_msg_last_block_at_or_before(
+    api_messages: &[ApiMessage],
+    block_positions: &[(usize, usize, bool)],
+    global_pos: usize,
+) -> Option<(usize, usize)> {
+    // Walk backward from global_pos to find a user message
+    for &(msg_idx, _, is_user) in block_positions.get(..=global_pos)?.iter().rev() {
+        if is_user {
+            let msg = api_messages.get(msg_idx)?;
+            return Some((msg_idx, msg.content.len().saturating_sub(1)));
+        }
+    }
+    None
 }
 
 /// Context for logging an SSE error event.
@@ -368,6 +451,139 @@ pub(crate) fn log_sse_error(ctx: &SseErrorContext<'_>) {
         .append(true)
         .open(&path)
         .and_then(|mut f| f.write_all(entry.as_bytes()));
+}
+
+// ─── Prompt Tick CSV Dumper ─────────────────────────────────────────────────
+
+/// Dump every message in the assembled prompt to a CSV file for debugging.
+///
+/// Each tick writes a new file to `.context-pilot/prompt_ticks/` named by
+/// datetime (second precision). Rolling deletion keeps only the 20 most recent.
+fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
+    struct CsvRow {
+        hash: String,
+        role: String,
+        block_type: &'static str,
+        context: String,
+        preview: String,
+        tokens: usize,
+    }
+
+    let mut row_data: Vec<CsvRow> = Vec::new();
+
+    let dir = std::path::Path::new(".context-pilot").join("prompt_ticks");
+    let _mkdir = std::fs::create_dir_all(&dir);
+
+    // Rolling cleanup: keep only 20 most recent CSVs
+    if let Ok(mut entries) = std::fs::read_dir(&dir) {
+        let mut files: Vec<std::path::PathBuf> = entries
+            .by_ref()
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("csv"))
+            .collect();
+        if files.len() >= 20 {
+            files.sort();
+            for old in files.iter().take(files.len().saturating_sub(19)) {
+                let _del = std::fs::remove_file(old);
+            }
+        }
+    }
+
+    // Filename: datetime with second precision
+    let ts = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+    let path = dir.join(format!("{ts}.csv"));
+
+    for msg in api_messages {
+        for block in &msg.content {
+            let (block_type, context, raw_text) = match block {
+                ContentBlock::Text { text } => {
+                    let ctx = classify_text_context(text, &msg.role);
+                    ("text", ctx, text.as_str())
+                }
+                ContentBlock::ToolUse { id, name, .. } => {
+                    let ctx =
+                        if name == "dynamic_panel" { format!("panel_call:{id}") } else { format!("tool_use:{name}") };
+                    ("tool_use", ctx, name.as_str())
+                }
+                ContentBlock::ToolResult { tool_use_id, content } => {
+                    let ctx = if tool_use_id.starts_with("panel_") {
+                        let panel_info = content
+                            .lines()
+                            .next()
+                            .unwrap_or("")
+                            .trim_start_matches("======= [")
+                            .split(']')
+                            .next()
+                            .unwrap_or(tool_use_id);
+                        format!("panel_result:{panel_info}")
+                    } else {
+                        format!("tool_result:{tool_use_id}")
+                    };
+                    ("tool_result", ctx, content.as_str())
+                }
+            };
+
+            let full_hash = crate::state::cache::hash_content(raw_text);
+            let short_hash = full_hash.get(..16).unwrap_or(&full_hash).to_string();
+            let tokens = cp_base::state::context::estimate_tokens(raw_text);
+
+            let preview: String = raw_text
+                .chars()
+                .take(60)
+                .map(|c| if c == ',' || c == '\n' || c == '\r' || c == '"' { ' ' } else { c })
+                .collect();
+
+            row_data.push(CsvRow { hash: short_hash, role: msg.role.clone(), block_type, context, preview, tokens });
+        }
+    }
+
+    // Second pass: compute accumulated and reverse-accumulated token counts
+    let total_tokens: usize = row_data.iter().map(|r| r.tokens).sum();
+    let mut acc: usize = 0;
+    let mut rows: Vec<String> = vec!["hash,role,type,context,tokens,acc_tokens,rev_acc_tokens,preview".to_string()];
+
+    for row in &row_data {
+        acc = acc.saturating_add(row.tokens);
+        let rev_acc = total_tokens.saturating_sub(acc);
+        rows.push(format!(
+            "{},{},{},{},{},{},{},{}",
+            row.hash, row.role, row.block_type, row.context, row.tokens, acc, rev_acc, row.preview
+        ));
+    }
+
+    let csv_content = rows.join("\n");
+    let _write = std::fs::write(&path, csv_content.as_bytes());
+}
+
+/// Classify a text block's context based on content and role.
+fn classify_text_context(text: &str, role: &str) -> String {
+    // Panel header (first text in the panel injection sequence)
+    if text.contains("Beginning of dynamic panel display") {
+        return "panel_header".to_string();
+    }
+    // Panel timestamp lines
+    if text.starts_with("Panel automatically generated at") {
+        return "panel_timestamp".to_string();
+    }
+    // Panel footer
+    if text.contains("End of dynamic panel display") {
+        return "panel_footer".to_string();
+    }
+    // Seed re-injection header
+    if text.contains("System instructions") {
+        return "seed_reinjection".to_string();
+    }
+    // Seed re-injection ack
+    if role == "assistant" && text.contains("Understood") && text.len() < 100 {
+        return "seed_ack".to_string();
+    }
+    // Footer ack
+    if role == "user" && text.contains("Proceeding with conversation") {
+        return "footer_ack".to_string();
+    }
+    // Conversation messages
+    if role == "user" { "conversation:user".to_string() } else { "conversation:assistant".to_string() }
 }
 
 /// LLM error types.

@@ -21,7 +21,7 @@ use cp_base::config::INJECTIONS;
 
 use helpers::{
     BILLING_HEADER, CLAUDE_CODE_ENDPOINT, SYSTEM_REMINDER, apply_claude_code_headers, dump_last_request,
-    ensure_message_alternation, inject_system_reminder, map_model_name,
+    inject_system_reminder, map_model_name,
 };
 
 /// Claude Code API Key client
@@ -190,7 +190,6 @@ impl LlmClient for ClaudeCodeApiKeyClient {
             }));
         }
 
-        ensure_message_alternation(&mut json_messages);
         inject_system_reminder(&mut json_messages);
 
         let api_request = serde_json::json!({

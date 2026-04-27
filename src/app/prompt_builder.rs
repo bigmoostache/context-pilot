@@ -105,7 +105,66 @@ pub(crate) fn assemble_prompt(
         }
     }
 
+    // ── Phase 3: Message alternation ──────────────────────────
+    // Ensure strict user/assistant alternation as required by all providers.
+    // Done here (not in providers) so the CSV dump captures the actual wire structure.
+    ensure_message_alternation(&mut api_messages);
+
     api_messages
+}
+
+// ── Message alternation ─────────────────────────────────────────
+
+/// Ensure strict user/assistant message alternation.
+///
+/// API providers require no consecutive same-role messages. This function:
+/// - Prepends a placeholder user `"ok"` if the first message is assistant
+/// - Merges consecutive same-role messages (unless mixing `ToolResult` with text)
+/// - Inserts a placeholder assistant `"ok"` between incompatible same-role messages
+fn ensure_message_alternation(messages: &mut Vec<ApiMessage>) {
+    if messages.len() <= 1 {
+        return;
+    }
+
+    let mut result: Vec<ApiMessage> = Vec::with_capacity(messages.len());
+
+    for msg in messages.drain(..) {
+        let same_role = result.last().is_some_and(|last| last.role == msg.role);
+
+        if !same_role {
+            result.push(msg);
+            continue;
+        }
+
+        // Same role — check if we can merge or need a separator
+        let prev_has_tool_result =
+            result.last().is_some_and(|last| last.content.iter().any(|b| matches!(b, ContentBlock::ToolResult { .. })));
+        let curr_has_tool_result = msg.content.iter().any(|b| matches!(b, ContentBlock::ToolResult { .. }));
+
+        if prev_has_tool_result == curr_has_tool_result {
+            // Same content type — safe to merge blocks into previous message
+            if let Some(last) = result.last_mut() {
+                last.content.extend(msg.content);
+            }
+        } else {
+            // Different content types (tool_result vs text) — insert separator
+            result.push(ApiMessage {
+                role: "assistant".to_string(),
+                content: vec![ContentBlock::Text { text: "ok".to_string() }],
+            });
+            result.push(msg);
+        }
+    }
+
+    // API requires first message to be user role
+    if result.first().is_some_and(|m| m.role == "assistant") {
+        result.insert(
+            0,
+            ApiMessage { role: "user".to_string(), content: vec![ContentBlock::Text { text: "ok".to_string() }] },
+        );
+    }
+
+    *messages = result;
 }
 
 // ── Panel injection ─────────────────────────────────────────────

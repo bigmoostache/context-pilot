@@ -81,9 +81,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             freeze_count: 0,
             total_freezes: 0,
             total_cache_misses: 0,
-            last_emitted_content: None,
-            last_emitted_hash: None,
-            last_emitted_context: None,
+            emitted: cp_base::state::context::EmittedState::default(),
         };
         elem.set_meta("file_path", &path_str.to_string());
         state.context.push(elem);

@@ -8,6 +8,7 @@ use crate::cast::Safe;
 use crate::config::accessors::active_theme;
 use crate::config::constants::CHARS_PER_TOKEN;
 use crate::config::normalize_icon;
+use crate::panels::ContextItem;
 
 // =============================================================================
 // Kind Registry — modules register metadata at startup
@@ -169,6 +170,28 @@ impl std::fmt::Display for Kind {
     }
 }
 
+// =============================================================================
+// Emitted State — frozen snapshot of what the LLM last received
+// =============================================================================
+
+/// What the LLM last saw for a given panel.
+///
+/// Updated at the end of each prompt-assembly tick: if the freeze system
+/// chose "fresh", this is overwritten to match; if it chose "freeze",
+/// the old snapshot is reused as-is. Downstream logic never needs to
+/// know which path was taken — it just reads `emitted.context`.
+#[derive(Debug, Clone, Default)]
+pub struct EmittedState {
+    /// Full `ContextItem` last sent to the LLM (id, header, content, timestamp).
+    pub context: Option<ContextItem>,
+    /// SHA-256 of the content that was emitted (for change detection).
+    pub hash: Option<String>,
+}
+
+// =============================================================================
+// Entry
+// =============================================================================
+
 /// A single context panel in the LLM prompt — the core unit of the context window.
 /// Fixed panels (P1–P7) are always present; dynamic panels (P8+) are created by tools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,17 +261,11 @@ pub struct Entry {
     /// Total lifetime cache misses — how many times this panel's content changed and was emitted. Persisted.
     #[serde(default)]
     pub total_cache_misses: u64,
-    /// Content string last emitted to the LLM (used as substitute when frozen).
+    /// Frozen snapshot of what the LLM last received for this panel.
+    /// Compared against fresh content each tick to detect changes;
+    /// restored verbatim when the freeze system suppresses an update.
     #[serde(skip)]
-    pub last_emitted_content: Option<String>,
-    /// SHA-256 of `last_emitted_content` (compared against fresh content to detect changes).
-    #[serde(skip)]
-    pub last_emitted_hash: Option<String>,
-    /// Snapshot of the last `ContextItem` sent to the LLM for this panel.
-    /// When the queue is active, this frozen copy is emitted instead of fresh
-    /// content — ensuring zero token churn while the queue batches tool calls.
-    #[serde(skip)]
-    pub last_emitted_context: Option<crate::panels::ContextItem>,
+    pub emitted: EmittedState,
 }
 
 // === Entry metadata helpers ===
@@ -319,8 +336,6 @@ pub fn make_default_entry(id: &str, context_type: Kind, name: &str, cache_deprec
         freeze_count: 0,
         total_freezes: 0,
         total_cache_misses: 0,
-        last_emitted_content: None,
-        last_emitted_hash: None,
-        last_emitted_context: None,
+        emitted: EmittedState::default(),
     }
 }

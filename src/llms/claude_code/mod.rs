@@ -244,10 +244,7 @@ impl ClaudeCodeClient {
             }));
         }
 
-        // Ensure strict user/assistant alternation (merges consecutive same-role messages)
-        message_format::ensure_message_alternation(&mut json_messages);
-
-        // Inject system-reminder into first user message for Claude Code validation
+        // System-reminder injection for Claude Code validation
         message_format::inject_system_reminder(&mut json_messages);
 
         // Build final request (cache_control breakpoints are on panel tool_results above)

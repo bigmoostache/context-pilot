@@ -145,9 +145,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 freeze_count: 0,
                 total_freezes: 0,
                 total_cache_misses: 0,
-                last_emitted_content: None,
-                last_emitted_hash: None,
-                last_emitted_context: None,
+                emitted: cp_base::state::context::EmittedState::default(),
             });
             ActionResult::Save
         }

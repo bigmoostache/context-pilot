@@ -195,9 +195,7 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
             freeze_count: 0,
             total_freezes: 0,
             total_cache_misses: 0,
-            last_emitted_hash: Some(hash_content(&content)),
-            last_emitted_content: Some(content),
-            last_emitted_context: None,
+            emitted: cp_base::state::context::EmittedState { hash: Some(hash_content(&content)), context: None },
         });
 
         // 8. Remove detached messages from state and disk

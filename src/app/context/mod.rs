@@ -9,6 +9,57 @@ use crate::state::{Kind, Message, State};
 
 mod detach;
 
+// ─── Unified Freeze Backend ─────────────────────────────────────────────────
+
+/// Whether a panel's content should be frozen (emit last-known) or fresh (emit current).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FreezeDecision {
+    /// Emit fresh content — cache may break at this point.
+    Fresh,
+    /// Freeze: emit the last-emitted snapshot — cache prefix preserved.
+    Freeze,
+}
+
+/// Single source of truth: should panel ORDERING be frozen this tick?
+///
+/// When true, panels keep their previous sorted positions (no reordering
+/// from `last_refresh_ms` changes). Prevents cache prefix breaks due to
+/// panels shuffling positions between ticks.
+fn should_freeze_order(state: &State) -> bool {
+    cp_mod_queue::types::QueueState::get(state).active
+}
+
+/// Single source of truth: should a specific panel's CONTENT be frozen this tick?
+///
+/// Priority (first match wins):
+/// 1. Queue active → always Freeze (infinite budget, overrides everything)
+/// 2. Cache already broken upstream → Fresh (update is "free", no prefix to save)
+/// 3. Breath budget remaining → Freeze (preserve prefix for a few more ticks)
+/// 4. No budget left (or `max_freezes=0`) → Fresh
+const fn should_freeze_panel(
+    queue_active: bool,
+    cache_broken: bool,
+    freeze_count: u8,
+    max_freezes: u8,
+) -> FreezeDecision {
+    // Queue freeze: unconditional, infinite budget — overrides breath limits
+    if queue_active {
+        return FreezeDecision::Freeze;
+    }
+
+    // Cache already broken by an upstream panel — updates are free
+    if cache_broken {
+        return FreezeDecision::Fresh;
+    }
+
+    // Breath freeze: limited per-panel budget
+    if max_freezes > 0 && freeze_count < max_freezes {
+        return FreezeDecision::Freeze;
+    }
+
+    FreezeDecision::Fresh
+}
+
 /// Context data prepared for streaming
 pub(super) struct StreamContext {
     /// Filtered conversation messages for the LLM.
@@ -62,10 +113,9 @@ pub(super) fn prepare_stream_context(
     let mut context_items = collect_all_context(state);
 
     // === Panel ordering ===
-    // When the queue is active, reuse the panel order from the last emitted
-    // tick to prevent reordering from breaking the prompt cache prefix.
-    // When inactive, sort by last_refresh_ms (oldest first) and save the order.
-    let queue_active = cp_mod_queue::types::QueueState::get(state).active;
+    // When frozen, panels keep their previous sorted positions — no reordering
+    // from `last_refresh_ms` changes. When unfrozen, sort by freshness and save.
+    let queue_active = should_freeze_order(state);
 
     if queue_active && !state.previous_panel_order.is_empty() {
         // Reorder context_items to match the saved order, dropping unknowns
@@ -77,33 +127,18 @@ pub(super) fn prepare_stream_context(
         state.previous_panel_order = context_items.iter().map(|item| item.id.clone()).collect();
     }
 
-    // === Per-panel queue freeze ===
-    // When the queue is active, substitute each panel's fresh content with
-    // the last-emitted snapshot stored on its Entry. This is lower-level
-    // and more robust than the old global snapshot: the refresh pipeline
-    // runs normally (panels stay fresh for the UI), but the LLM sees
-    // frozen content — zero token churn, maximum prompt cache hits.
-    for item in &mut context_items {
-        let entry = state.context.iter_mut().find(|c| c.id == item.id);
-        let Some(entry) = entry else { continue };
-
-        if queue_active {
-            // Frozen: prefer the last-emitted snapshot over fresh content
-            if let Some(ref frozen) = entry.last_emitted_context {
-                *item = frozen.clone();
-            } else {
-                // First time this panel is emitted — snapshot it now
-                entry.last_emitted_context = Some(item.clone());
-            }
-        } else {
-            // Normal: use fresh content and update the snapshot
-            entry.last_emitted_context = Some(item.clone());
-        }
-    }
-
-    // === Panel freeze + cache cost tracking (merged single pass) ===
-    // Iterate sorted panels, decide whether to freeze changed content to
-    // preserve the prompt cache prefix, then track cost from what we emit.
+    // === Unified freeze pass (queue + breath + cost tracking) ═══════════════
+    //
+    // Single pass over all panels. For each one:
+    //   1. Hash fresh content
+    //   2. Detect whether content changed since last emission
+    //   3. If changed: consult should_freeze_panel() → Freeze or Fresh
+    //   4. Apply decision (restore snapshot OR emit fresh)
+    //   5. Snapshot what was ACTUALLY emitted (post-decision)
+    //   6. Track cache cost (prefix-match against previous tick)
+    //
+    // This replaces the former two-pass approach (queue freeze → breath freeze)
+    // which suffered from snapshot desync between the passes.
     {
         let mut cache_broken = false;
         let mut new_hash_list: Vec<String> = Vec::new();
@@ -112,62 +147,59 @@ pub(super) fn prepare_stream_context(
         let miss_price = state.cache_miss_price_per_mtok();
 
         for item in &mut context_items {
+            // The conversation panel flows through messages, not the freeze system
             if item.id == "chat" {
                 continue;
             }
 
             let fresh_hash = hash_content(&item.content);
 
-            // Look up this panel's Entry and its freeze state
+            // Look up this panel's Entry
             let entry = state.context.iter_mut().find(|c| c.id == item.id);
             let Some(entry) = entry else {
-                // Orphaned item — emit as-is, breaks cache
+                // Orphaned item (no Entry in state) — emit as-is, breaks cache
                 new_hash_list.push(format!("{}:{fresh_hash}", item.id));
                 cache_broken = true;
                 continue;
             };
 
-            let last_hash = entry.last_emitted_hash.as_deref();
+            // Detect change: compare fresh content hash to what was last emitted
+            let last_hash = entry.emitted.hash.as_deref();
             let content_changed = last_hash.is_none_or(|lh| lh != fresh_hash);
 
-            // Hash we'll record for cost tracking (may differ if we freeze)
+            // The hash we'll record (may differ from fresh_hash if we freeze)
             let emitted_hash;
 
             if content_changed {
+                // Content differs from last emission — consult freeze policy
                 let panel = crate::app::panels::get_panel(&entry.context_type);
-                let max_freezes = panel.max_freezes();
+                let decision = should_freeze_panel(queue_active, cache_broken, entry.freeze_count, panel.max_freezes());
 
-                if cache_broken || max_freezes == 0 {
-                    // Cache already broken upstream OR panel never freezes → emit new
-                    entry.freeze_count = 0;
-                    entry.last_emitted_content = Some(item.content.clone());
-                    entry.last_emitted_hash = Some(fresh_hash.clone());
-                    entry.total_cache_misses = entry.total_cache_misses.saturating_add(1);
-                    emitted_hash = fresh_hash;
-                    cache_broken = true;
-                } else if entry.freeze_count < max_freezes
-                    && let Some(old_content) = &entry.last_emitted_content
+                if decision == FreezeDecision::Freeze
+                    && let Some(ref frozen) = entry.emitted.context
                 {
-                    // Freeze: emit old content to preserve cache prefix
-                    item.content = old_content.clone();
+                    // FREEZE: restore the full snapshot (content + header + timestamp)
+                    *item = frozen.clone();
                     entry.freeze_count = entry.freeze_count.saturating_add(1);
                     entry.total_freezes = entry.total_freezes.saturating_add(1);
-                    emitted_hash = entry.last_emitted_hash.clone().unwrap_or(fresh_hash);
+                    emitted_hash = entry.emitted.hash.clone().unwrap_or(fresh_hash);
                 } else {
-                    // max_freezes exhausted OR no prior content → forced update
+                    // FRESH: emit new content (no snapshot, or policy says Fresh)
                     entry.freeze_count = 0;
-                    entry.last_emitted_content = Some(item.content.clone());
-                    entry.last_emitted_hash = Some(fresh_hash.clone());
+                    entry.emitted.hash = Some(fresh_hash.clone());
                     entry.total_cache_misses = entry.total_cache_misses.saturating_add(1);
                     emitted_hash = fresh_hash;
                     cache_broken = true;
                 }
             } else {
-                // Content unchanged since last emit — cache preserved naturally
+                // Content unchanged — cache preserved naturally, no action needed
                 emitted_hash = fresh_hash;
             }
 
-            // Cost tracking: compare emitted hashes to previous tick
+            // Snapshot what was ACTUALLY emitted (post-decision)
+            entry.emitted.context = Some(item.clone());
+
+            // Cost tracking: build hash list for prefix-match
             new_hash_list.push(format!("{}:{emitted_hash}", item.id));
         }
 
@@ -188,10 +220,6 @@ pub(super) fn prepare_stream_context(
         }
 
         state.previous_panel_hash_list = new_hash_list;
-
-        // When queue is not active, update the saved panel order from the
-        // current sorted context_items (already saved above before freeze).
-        // When queue IS active, the order was already frozen above.
     }
 
     // Check if context has breached the threshold — may activate the reverie optimizer
