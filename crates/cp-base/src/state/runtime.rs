@@ -88,8 +88,7 @@ pub struct State {
     pub secondary_minimax_model: crate::config::llm_types::MiniMaxModel,
     /// Sidebar display mode: Normal (full), Collapsed (icons only), Hidden
     pub sidebar_mode: SidebarMode,
-    /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
-    /// Ephemeral — not persisted, discarded after each run.
+    /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer"). Not persisted.
     pub reveries: HashMap<String, super::reverie::Session>,
     /// Accumulated `prompt_cache_hit_tokens` across all API calls (persisted)
     pub cache_hit_tokens: usize,
@@ -126,8 +125,10 @@ pub struct State {
     pub previous_panel_hash_list: Vec<String>,
     /// Saved panel ID order from last emitted tick (for queue freeze stability)
     pub previous_panel_order: Vec<String>,
-    /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding
+    /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding.
     pub tool_sleep_until_ms: u64,
+    /// `true` if any tool in the current tick changed panel-visible state; panels stay frozen when `false`.
+    pub something_moved_in_the_darkness: bool,
 
     // === Render Cache (runtime-only) ===
     /// Last viewport width used for render cache invalidation.
@@ -218,6 +219,7 @@ impl Default for State {
             previous_panel_hash_list: vec![],
             previous_panel_order: vec![],
             tool_sleep_until_ms: 0,
+            something_moved_in_the_darkness: false,
             last_viewport_width: 0,
             message_cache: HashMap::new(),
             input_cache: None,

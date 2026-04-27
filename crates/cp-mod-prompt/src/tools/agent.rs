@@ -95,7 +95,8 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
             tool.id.clone(),
             format!("Switched to default agent ({})", library::default_agent_id()),
             false,
-        );
+        )
+        .moved();
     };
 
     if !PromptState::get(state).agents.iter().any(|a| a.id == id) {
@@ -108,5 +109,5 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let name = PromptState::get(state).agents.iter().find(|a| a.id == id).map_or("unknown", |a| a.name.as_str());
 
-    ToolResult::new(tool.id.clone(), format!("Loaded agent '{name}' ({id})"), false)
+    ToolResult::new(tool.id.clone(), format!("Loaded agent '{name}' ({id})"), false).moved()
 }

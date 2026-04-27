@@ -213,6 +213,12 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     }
 
     // All resolved — resume normal pipeline: create result message + continue streaming
+
+    // Aggregate the darkness flag from the resolved tool results.
+    if tool_results.iter().any(|r| r.something_moved_in_the_darkness) {
+        app.state.something_moved_in_the_darkness = true;
+    }
+
     let result_id = format!("R{}", app.state.next_result_id);
     let result_global_uid = format!("UID_{}_R", app.state.global_next_uid);
     app.state.next_result_id = app.state.next_result_id.saturating_add(1);

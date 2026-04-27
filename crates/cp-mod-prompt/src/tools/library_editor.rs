@@ -30,7 +30,7 @@ pub(crate) fn open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
         |prev| format!("Opened '{id}' in Library editor (closed previous: '{prev}'). Content is now visible in the Library panel."),
     );
 
-    ToolResult::new(tool.id.clone(), msg, false)
+    ToolResult::new(tool.id.clone(), msg, false).moved()
 }
 
 /// Closes the prompt editor in the Library panel.
@@ -47,4 +47,5 @@ pub(crate) fn close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
         format!("Closed prompt editor (was editing '{previous}'). Library panel restored to normal view."),
         false,
     )
+    .moved()
 }

@@ -126,6 +126,7 @@ pub(crate) fn load(tool: &ToolUse, state: &mut State) -> ToolResult {
         format!("Loaded skill '{}' as {} ({} tokens)", skill.name, panel_id, tokens),
         false,
     )
+    .moved()
 }
 
 /// Remove a loaded skill from the active context.
@@ -157,4 +158,5 @@ pub(crate) fn unload(tool: &ToolUse, state: &mut State) -> ToolResult {
         format!("Unloaded skill '{}'{}", name, panel_id.map(|p| format!(" (removed {p})")).unwrap_or_default()),
         false,
     )
+    .moved()
 }

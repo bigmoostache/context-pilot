@@ -39,7 +39,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                 // Reuse existing panel — mark deprecated to trigger re-fetch
                 ctx_elem.cache_deprecated = true;
                 let panel_id = ctx_elem.id.clone();
-                ToolResult::new(tool.id.clone(), format!("Panel updated: {panel_id}"), false)
+                ToolResult::new(tool.id.clone(), format!("Panel updated: {panel_id}"), false).moved()
             } else {
                 // Create new GitResult panel
                 let panel_id = state.next_available_context_id();
@@ -52,7 +52,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                 elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);
 
-                ToolResult::new(tool.id.clone(), format!("Panel created: {panel_id}"), false)
+                ToolResult::new(tool.id.clone(), format!("Panel created: {panel_id}"), false).moved()
             }
         }
         CommandClass::Mutating => {

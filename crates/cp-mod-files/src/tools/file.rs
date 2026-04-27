@@ -27,7 +27,13 @@ pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let content = results.join("\n");
     let has_error = paths.len() == 1 && results.first().is_some_and(|r| r.starts_with("Error:"));
-    ToolResult::new(tool.id.clone(), content, has_error)
+    // Any successfully opened file adds a new panel to context
+    let any_opened = results.iter().any(|r| r.starts_with("Opened "));
+    let mut result = ToolResult::new(tool.id.clone(), content, has_error);
+    if any_opened {
+        result.something_moved_in_the_darkness = true;
+    }
+    result
 }
 
 /// Open a single file and add it as a context element, returning a status message.

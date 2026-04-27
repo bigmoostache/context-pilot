@@ -106,5 +106,5 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     result_msg.push_str("```");
 
-    ToolResult::new(tool.id.clone(), result_msg, false)
+    ToolResult::new(tool.id.clone(), result_msg, false).moved()
 }

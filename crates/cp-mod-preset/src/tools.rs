@@ -332,6 +332,7 @@ pub(crate) fn execute_load(tool: &ToolUse, state: &mut State, cb: &LoadCallbacks
         ),
         false,
     )
+    .moved()
 }
 
 /// List all available preset names

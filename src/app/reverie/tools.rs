@@ -62,6 +62,7 @@ pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         };
     }
 
@@ -76,6 +77,7 @@ pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
         display: None,
         is_error: false,
         tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
     }
 }
 
@@ -92,6 +94,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         };
     }
 
@@ -107,6 +110,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         };
     }
 
@@ -127,6 +131,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
         display: None,
         is_error: false,
         tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
     }
 }
 
@@ -149,6 +154,7 @@ pub(crate) fn dispatch_reverie_tool(tool: &ToolUse, state: &State) -> Option<Too
                     display: None,
                     is_error: true,
                     tool_name: tool.name.clone(),
+                    something_moved_in_the_darkness: false,
                 })
             }
         }

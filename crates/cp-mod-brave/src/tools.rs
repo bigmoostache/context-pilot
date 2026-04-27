@@ -21,12 +21,26 @@ fn get_client() -> Result<BraveClient, String> {
 
 /// Build a successful `ToolResult`.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: false, tool_name: tool.name.clone() }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content,
+        display: None,
+        is_error: false,
+        tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
+    }
 }
 
 /// Build an error `ToolResult`.
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: true, tool_name: tool.name.clone() }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content,
+        display: None,
+        is_error: true,
+        tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
+    }
 }
 /// Execute the `brave_search` tool: web search with snippet results.
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -85,7 +99,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             // Create dynamic panel
             let panel_id = crate::panel::create(state, &format!("brave_search: {query}"), &panel_content);
 
-            ok_result(tool, format!("Created panel {panel_id}: {result_count} results for '{query}'"))
+            ok_result(tool, format!("Created panel {panel_id}: {result_count} results for '{query}'")).moved()
         }
         Err(e) => err_result(tool, e),
     }
@@ -136,6 +150,7 @@ fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
             let panel_id = crate::panel::create(state, &format!("brave_llm_context: {query}"), &panel_content);
 
             ok_result(tool, format!("Created panel {panel_id}: {url_count} URLs, ~{max_tokens} tokens for '{query}'"))
+                .moved()
         }
         Err(e) => err_result(tool, e),
     }

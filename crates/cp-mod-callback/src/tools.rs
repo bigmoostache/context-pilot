@@ -72,7 +72,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
         |prev| format!("Opened callback {anchor_id} in editor (closed previous: {prev}). Script content is now visible in the Callbacks panel."),
     );
 
-    ToolResult::new(tool.id.clone(), msg, false)
+    ToolResult::new(tool.id.clone(), msg, false).moved()
 }
 
 /// Close the callback editor, restoring the normal table view.
@@ -96,6 +96,7 @@ pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
         format!("Closed callback editor (was viewing '{previous}'). Callbacks panel restored to table view."),
         false,
     )
+    .moved()
 }
 
 /// Execute the `Callback_toggle` tool (activate/deactivate per worker).

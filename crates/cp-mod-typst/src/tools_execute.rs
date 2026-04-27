@@ -15,12 +15,26 @@ use std::fmt::Write as _;
 
 /// Helper to build a `ToolResult` from a tool and content.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: false, tool_name: tool.name.clone() }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content,
+        display: None,
+        is_error: false,
+        tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
+    }
 }
 
 /// Helper to build an error `ToolResult` from a tool and content.
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: true, tool_name: tool.name.clone() }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content,
+        display: None,
+        is_error: true,
+        tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
+    }
 }
 
 /// Execute the `typst_execute` tool — parse command string and dispatch to subcommand handler.
@@ -228,6 +242,7 @@ fn exec_fonts(tool: &ToolUse, state: &mut State, variants: bool) -> ToolResult {
             context_id
         ),
     )
+    .moved()
 }
 
 /// Subcommand: query — query document metadata/labels.
@@ -286,7 +301,7 @@ fn exec_query(tool: &ToolUse, state: &mut State, input: &str, selector: &str) ->
     elem.set_meta("dynamic_label", &"typst-query".to_string());
     state.context.push(elem);
 
-    ok_result(tool, format!("Query result shown in panel {context_id}."))
+    ok_result(tool, format!("Query result shown in panel {context_id}.")).moved()
 }
 
 /// Subcommand: update — re-download cached packages.

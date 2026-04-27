@@ -14,6 +14,7 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
             display: None,
             is_error: false,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         };
     }
     qs.active = false;
@@ -24,6 +25,7 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
         display: None,
         is_error: false,
         tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
     }
 }
 
@@ -38,6 +40,7 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             };
         }
     };
@@ -71,6 +74,7 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
         display: None,
         is_error: !not_found.is_empty() && removed.is_empty(),
         tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
     }
 }
 
@@ -86,5 +90,6 @@ pub(crate) fn execute_empty(tool: &ToolUse, state: &mut State) -> ToolResult {
         display: None,
         is_error: false,
         tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
     }
 }

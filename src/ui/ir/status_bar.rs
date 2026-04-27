@@ -25,6 +25,7 @@ pub(crate) fn build_status_bar(state: &State) -> StatusBar {
         auto_continue: Some(build_auto_continue(state)),
         reveries: build_reveries(state),
         queue: build_queue(state),
+        darkness_moved: state.something_moved_in_the_darkness,
         stop_reason: build_stop_reason(state),
         retry_count: state.api_retry_count.to_u8(),
         max_retries: crate::infra::constants::MAX_API_RETRIES.to_u8(),

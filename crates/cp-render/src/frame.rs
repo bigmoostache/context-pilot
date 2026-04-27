@@ -168,6 +168,8 @@ pub struct StatusBar {
     pub reveries: Vec<ReverieCard>,
     /// Queue status.
     pub queue: Option<QueueCard>,
+    /// Whether any tool in the current tick changed panel-visible state.
+    pub darkness_moved: bool,
     /// Stop reason from last completion.
     pub stop_reason: Option<StopReason>,
     /// API retry count (0 = no retry in progress).

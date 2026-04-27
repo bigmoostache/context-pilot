@@ -49,6 +49,9 @@ pub(super) fn prepare_stream_context(
     // the notification would still be "unprocessed" when the stream ends).
     cp_mod_spine::types::SpineState::mark_user_message_notifications_processed(state);
 
+    // Reset the darkness flag — nothing moved yet in this new tick.
+    state.something_moved_in_the_darkness = false;
+
     // Detach old conversation chunks before anything else
     detach::detach_conversation_chunks(state);
 
@@ -62,12 +65,14 @@ pub(super) fn prepare_stream_context(
     let mut context_items = collect_all_context(state);
 
     // === Panel ordering ===
-    // When the queue is active, reuse the panel order from the last emitted
-    // tick to prevent reordering from breaking the prompt cache prefix.
-    // When inactive, sort by last_refresh_ms (oldest first) and save the order.
+    // When the queue is active OR nothing moved in the darkness (no tool
+    // changed panel-visible state), reuse the panel order from the last
+    // emitted tick to prevent reordering from breaking the prompt cache prefix.
+    // When panels actually changed, sort by last_refresh_ms and save the order.
     let queue_active = cp_mod_queue::types::QueueState::get(state).active;
+    let should_freeze = queue_active || !state.something_moved_in_the_darkness;
 
-    if queue_active && !state.previous_panel_order.is_empty() {
+    if should_freeze && !state.previous_panel_order.is_empty() {
         // Reorder context_items to match the saved order, dropping unknowns
         let order = &state.previous_panel_order;
         context_items.sort_by_key(|item| order.iter().position(|id| *id == item.id).unwrap_or(usize::MAX));
@@ -78,16 +83,15 @@ pub(super) fn prepare_stream_context(
     }
 
     // === Per-panel queue freeze ===
-    // When the queue is active, substitute each panel's fresh content with
-    // the last-emitted snapshot stored on its Entry. This is lower-level
-    // and more robust than the old global snapshot: the refresh pipeline
-    // runs normally (panels stay fresh for the UI), but the LLM sees
-    // frozen content — zero token churn, maximum prompt cache hits.
+    // When freezing (queue active OR nothing moved in the darkness),
+    // substitute each panel's fresh content with the last-emitted snapshot
+    // stored on its Entry. The refresh pipeline runs normally (panels stay
+    // fresh for the UI), but the LLM sees frozen content — zero token churn.
     for item in &mut context_items {
         let entry = state.context.iter_mut().find(|c| c.id == item.id);
         let Some(entry) = entry else { continue };
 
-        if queue_active {
+        if should_freeze {
             // Frozen: prefer the last-emitted snapshot over fresh content
             if let Some(ref frozen) = entry.last_emitted_context {
                 *item = frozen.clone();
@@ -96,7 +100,7 @@ pub(super) fn prepare_stream_context(
                 entry.last_emitted_context = Some(item.clone());
             }
         } else {
-            // Normal: use fresh content and update the snapshot
+            // Not frozen: use fresh content and update the snapshot
             entry.last_emitted_context = Some(item.clone());
         }
     }
@@ -189,9 +193,9 @@ pub(super) fn prepare_stream_context(
 
         state.previous_panel_hash_list = new_hash_list;
 
-        // When queue is not active, update the saved panel order from the
+        // When not freezing, update the saved panel order from the
         // current sorted context_items (already saved above before freeze).
-        // When queue IS active, the order was already frozen above.
+        // When freezing, the order was already frozen above.
     }
 
     // Check if context has breached the threshold — may activate the reverie optimizer

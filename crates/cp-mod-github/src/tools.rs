@@ -60,7 +60,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                 // Reuse existing panel — mark deprecated to trigger re-fetch
                 ctx.cache_deprecated = true;
                 let panel_id = ctx.id.clone();
-                ToolResult::new(tool.id.clone(), format!("Panel updated: {panel_id}"), false)
+                ToolResult::new(tool.id.clone(), format!("Panel updated: {panel_id}"), false).moved()
             } else {
                 // Create new GithubResult panel
                 let panel_id = state.next_available_context_id();
@@ -72,7 +72,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
                 elem.set_meta("result_command", &command.to_string());
                 state.context.push(elem);
 
-                ToolResult::new(tool.id.clone(), format!("Panel created: {panel_id}"), false)
+                ToolResult::new(tool.id.clone(), format!("Panel created: {panel_id}"), false).moved()
             }
         }
         CommandClass::Mutating => {

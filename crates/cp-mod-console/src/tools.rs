@@ -123,7 +123,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cs = ConsoleState::get_mut(state);
     drop(cs.sessions.insert(session_key, handle));
 
-    ToolResult::new(tool.id.clone(), format!("Console created in {panel_id}"), false)
+    ToolResult::new(tool.id.clone(), format!("Console created in {panel_id}"), false).moved()
 }
 
 /// Handle `console_send_keys`: write input text to a running process's stdin.
@@ -167,7 +167,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Short delay for output to arrive
     state.tool_sleep_until_ms = now_ms().saturating_add(500);
 
-    ToolResult::new(tool.id.clone(), format!("Sent input to console '{panel_id}'"), false)
+    ToolResult::new(tool.id.clone(), format!("Sent input to console '{panel_id}'"), false).moved()
 }
 
 /// Handle `console_wait`: register a blocking watcher for exit or pattern match.
@@ -244,7 +244,8 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
     let registry = WatcherRegistry::get_mut(state);
     registry.register(Box::new(watcher));
 
-    ToolResult::new(tool.id.clone(), CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(), false)
+    // Panel was created above — mark as moved even though we return a sentinel.
+    ToolResult::new(tool.id.clone(), CONSOLE_WAIT_BLOCKING_SENTINEL.to_string(), false).moved()
 }
 
 /// Handle `console_watch`: register an async (non-blocking) watcher with spine notification.
@@ -327,7 +328,11 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
     )
 }
 
-/// Handle `console_easy_bash`: spawn, block until exit or 10s timeout, return output summary.
+/// Maximum output lines returned inline by `easy_bash`. Beyond this, output goes into a panel.
+const BASH_INLINE_MAX_LINES: usize = 50;
+
+/// Handle `console_easy_bash`: spawn, block until exit or 10s timeout, return output directly.
+/// If output exceeds [`BASH_INLINE_MAX_LINES`] or the command times out, a panel is created instead.
 pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),
@@ -354,27 +359,12 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {e}"), true),
     };
 
-    // Create a panel so output goes there instead of flooding the conversation
-    let display_name = truncate_str(&command, 30);
-    let panel_id = state.next_available_context_id();
-    let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid = state.global_next_uid.saturating_add(1);
-    let mut ctx = make_default_entry(&panel_id, Kind::new(Kind::CONSOLE), display_name, true);
-    ctx.uid = Some(uid);
-    ctx.set_meta("console_name", &session_key);
-    ctx.set_meta("console_command", &command);
-    ctx.set_meta("console_status", &handle.get_status().label());
-    ctx.set_meta("console_is_easy_bash", &"true".to_string());
-    if let Some(ref dir) = cwd {
-        ctx.set_meta("console_cwd", dir);
-    }
-    state.context.push(ctx);
-
     // Store the handle (needed for waiter to check status + read buffer)
     let cs = ConsoleState::get_mut(state);
     drop(cs.sessions.insert(session_key.clone(), handle));
 
-    // Register a blocking exit watcher via WatcherRegistry
+    // Register a blocking exit watcher — NO panel created upfront.
+    // The watcher resolution decides: inline (< 50 lines) or panel (≥ 50 / timeout).
     let now = now_ms();
     let watcher = ConsoleWatcher {
         watcher_id: format!("console_{session_key}_easy_bash"),
@@ -386,7 +376,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         registered_at_ms: now,
         deadline_ms: Some(now.saturating_add(BASH_MAX_EXECUTION_SECS.saturating_mul(1000))),
         easy_bash: true,
-        panel_id,
+        panel_id: String::new(),
         desc: format!("⏳ easy_bash: {}", truncate_str(&command, 40)),
     };
 

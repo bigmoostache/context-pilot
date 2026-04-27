@@ -5,8 +5,6 @@
 mod helpers;
 mod secondary;
 
-use std::fmt::Write as _;
-
 use cp_base::state::context::{Kind, make_default_entry};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
@@ -22,8 +20,8 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
     match tool.name.as_str() {
         "Chat_open" => execute_open(tool, state),
         "Chat_send" => execute_send(tool, state),
-        "Chat_react" => execute_react(tool, state),
-        "Chat_configure" => execute_configure(tool, state),
+        "Chat_react" => secondary::execute_react(tool, state),
+        "Chat_configure" => secondary::execute_configure(tool, state),
         "Chat_search" => secondary::execute_search(tool, state),
         "Chat_create_room" => secondary::execute_create_room(tool, state),
         "Chat_invite" => secondary::execute_invite(tool, state),
@@ -33,6 +31,7 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         },
     }
 }
@@ -55,6 +54,7 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             };
         }
     }
@@ -71,6 +71,7 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             };
         }
     };
@@ -85,6 +86,7 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: false,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             };
         }
     }
@@ -127,6 +129,7 @@ fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         display: None,
         is_error: false,
         tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: true,
     }
 }
 
@@ -147,6 +150,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             };
         }
     };
@@ -172,6 +176,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                     display: None,
                     is_error: false,
                     tool_name: tool.name.clone(),
+                    something_moved_in_the_darkness: false,
                 }
             }
             Err(e) => ToolResult {
@@ -180,6 +185,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             },
         };
     }
@@ -199,6 +205,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             };
         }
         return execute_edit(tool, state, &room_id, (ref_str, body));
@@ -212,6 +219,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         };
     };
 
@@ -224,6 +232,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
             display: None,
             is_error: false,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         };
     }
 
@@ -237,6 +246,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             };
         };
         match client::send::send_reply(&room_id, body, &event_id, is_notice) {
@@ -251,6 +261,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                     display: None,
                     is_error: false,
                     tool_name: tool.name.clone(),
+                    something_moved_in_the_darkness: false,
                 }
             }
             Err(e) => ToolResult {
@@ -259,6 +270,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             },
         }
     } else {
@@ -274,6 +286,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                     display: None,
                     is_error: false,
                     tool_name: tool.name.clone(),
+                    something_moved_in_the_darkness: false,
                 }
             }
             Err(e) => ToolResult {
@@ -282,6 +295,7 @@ fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
                 display: None,
                 is_error: true,
                 tool_name: tool.name.clone(),
+                something_moved_in_the_darkness: false,
             },
         }
     }
@@ -297,6 +311,7 @@ fn execute_delete(tool: &ToolUse, state: &State, room_id: &str, ref_str: &str) -
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         };
     };
     match client::send::redact_message(room_id, &event_id, Some("Deleted by Context Pilot")) {
@@ -306,6 +321,7 @@ fn execute_delete(tool: &ToolUse, state: &State, room_id: &str, ref_str: &str) -
             display: None,
             is_error: false,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         },
         Err(e) => ToolResult {
             tool_use_id: tool.id.clone(),
@@ -313,6 +329,7 @@ fn execute_delete(tool: &ToolUse, state: &State, room_id: &str, ref_str: &str) -
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         },
     }
 }
@@ -328,6 +345,7 @@ fn execute_edit(tool: &ToolUse, state: &State, room_id: &str, edit_ctx: (&str, &
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         };
     };
     match client::send::edit_message(room_id, &event_id, new_body) {
@@ -337,6 +355,7 @@ fn execute_edit(tool: &ToolUse, state: &State, room_id: &str, edit_ctx: (&str, &
             display: None,
             is_error: false,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         },
         Err(e) => ToolResult {
             tool_use_id: tool.id.clone(),
@@ -344,140 +363,7 @@ fn execute_edit(tool: &ToolUse, state: &State, room_id: &str, edit_ctx: (&str, &
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         },
-    }
-}
-
-/// `Chat_react` — send a reaction emoji on a message.
-fn execute_react(tool: &ToolUse, state: &State) -> ToolResult {
-    let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
-    let event_ref = tool.input.get("event_id").and_then(serde_json::Value::as_str).unwrap_or("");
-    let emoji = tool.input.get("emoji").and_then(serde_json::Value::as_str).unwrap_or("👍");
-
-    let room_id = match resolve_room_param(room_input, state) {
-        Ok(id) => id,
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: e,
-                display: None,
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
-        }
-    };
-
-    // Resolve short ref (E3) to full event ID
-    let event_id = resolve_event_ref(state, &room_id, event_ref);
-    let Some(event_id) = event_id else {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Cannot resolve event ref '{event_ref}'."),
-            display: None,
-            is_error: true,
-            tool_name: tool.name.clone(),
-        };
-    };
-
-    match client::send::send_reaction(&room_id, &event_id, emoji) {
-        Ok(_reaction_event_id) => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Reacted {emoji} to {event_ref} in '{room_input}'."),
-            display: None,
-            is_error: false,
-            tool_name: tool.name.clone(),
-        },
-        Err(e) => ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Reaction failed: {e}"),
-            display: None,
-            is_error: true,
-            tool_name: tool.name.clone(),
-        },
-    }
-}
-
-/// `Chat_configure` — update the room panel's filter settings.
-///
-/// All params optional. Omitted params keep current value.
-/// Call with no filter params to reset to defaults.
-fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let room_input = tool.input.get("room").and_then(serde_json::Value::as_str).unwrap_or("#general");
-
-    let room_id = match resolve_room_param(room_input, state) {
-        Ok(id) => id,
-        Err(e) => {
-            return ToolResult {
-                tool_use_id: tool.id.clone(),
-                content: e,
-                display: None,
-                is_error: true,
-                tool_name: tool.name.clone(),
-            };
-        }
-    };
-
-    let n_messages = tool.input.get("n_messages").and_then(serde_json::Value::as_u64);
-    let max_age = tool.input.get("max_age").and_then(serde_json::Value::as_str);
-    let query = tool.input.get("query").and_then(serde_json::Value::as_str);
-
-    let has_any_param = n_messages.is_some() || max_age.is_some() || query.is_some();
-
-    let cs = ChatState::get_mut(state);
-    let Some(open) = cs.open_rooms.get_mut(&room_id) else {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Room '{room_input}' is not open. Use Chat_open first."),
-            display: None,
-            is_error: true,
-            tool_name: tool.name.clone(),
-        };
-    };
-
-    if !has_any_param {
-        // Reset to defaults — clear all winds, return to calm seas
-        open.filter = crate::types::RoomFilter::default();
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: format!("Filters reset to defaults for '{room_input}'."),
-            display: None,
-            is_error: false,
-            tool_name: tool.name.clone(),
-        };
-    }
-
-    if let Some(n) = n_messages {
-        open.filter.n_messages = Some(n);
-    }
-    if let Some(age) = max_age {
-        open.filter.max_age = Some(age.to_string());
-    }
-    if let Some(q) = query {
-        open.filter.query = if q.is_empty() { None } else { Some(q.to_string()) };
-    }
-
-    let mut summary = String::from("Filters updated for '");
-    summary.push_str(room_input);
-    summary.push_str("': ");
-    if let Some(ref n) = open.filter.n_messages {
-        let _r = write!(summary, "n_messages={n}, ");
-    }
-    if let Some(ref age) = open.filter.max_age {
-        let _r = write!(summary, "max_age=\"{age}\", ");
-    }
-    if let Some(ref q) = open.filter.query {
-        let _r = write!(summary, "query=\"{q}\", ");
-    }
-    // Trim trailing ", "
-    if summary.ends_with(", ") {
-        summary.truncate(summary.len().saturating_sub(2));
-    }
-
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: summary,
-        display: None,
-        is_error: false,
-        tool_name: tool.name.clone(),
     }
 }

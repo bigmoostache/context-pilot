@@ -183,6 +183,7 @@ pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &
         display: None,
         is_error: true,
         tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
     }
 }
 
@@ -264,6 +265,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
             display: None,
             is_error: true,
             tool_name: tool.name.clone(),
+            something_moved_in_the_darkness: false,
         };
     };
 
@@ -351,12 +353,14 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         result_parts.push(format!("FAILED: {}", failures.join("; ")));
     }
 
+    let has_changes = !successes.is_empty();
     ToolResult {
         tool_use_id: tool.id.clone(),
         content: result_parts.join("\n"),
         display: None,
         is_error: !failures.is_empty() && successes.is_empty(),
         tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: has_changes,
     }
 }
 

@@ -69,19 +69,40 @@ pub struct ToolResult {
     /// Tool name — populated by the dispatch layer, not the caller.
     #[serde(default)]
     pub tool_name: String,
+    /// Whether this tool execution changed panel-visible state that the
+    /// LLM needs to see refreshed. When `false` across all tool results
+    /// in a tick, panels stay frozen (cache-preserving). Set dynamically
+    /// at execution time — not a static property of the tool.
+    #[serde(default)]
+    pub something_moved_in_the_darkness: bool,
 }
 
 impl ToolResult {
     /// Create a `ToolResult`. The `tool_name` is left empty — populated by dispatch.
+    /// `something_moved_in_the_darkness` defaults to `false` (caller sets it when panels changed).
     #[must_use]
     pub const fn new(tool_use_id: String, content: String, is_error: bool) -> Self {
-        Self { tool_use_id, content, display: None, is_error, tool_name: String::new() }
+        Self {
+            tool_use_id,
+            content,
+            display: None,
+            is_error,
+            tool_name: String::new(),
+            something_moved_in_the_darkness: false,
+        }
     }
 
     /// Create a `ToolResult` with an explicit tool name.
     #[must_use]
     pub const fn with_name(tool_use_id: String, content: String, is_error: bool, tool_name: String) -> Self {
-        Self { tool_use_id, content, display: None, is_error, tool_name }
+        Self { tool_use_id, content, display: None, is_error, tool_name, something_moved_in_the_darkness: false }
+    }
+
+    /// Builder: mark this result as having moved panel-visible state.
+    #[must_use]
+    pub const fn moved(mut self) -> Self {
+        self.something_moved_in_the_darkness = true;
+        self
     }
 }
 

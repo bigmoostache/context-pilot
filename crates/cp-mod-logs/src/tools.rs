@@ -198,6 +198,7 @@ pub(crate) fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResul
         format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id),
         false,
     )
+    .moved()
 }
 
 /// Execute `Close_conversation_history`: extract logs/memories and remove the panel.
@@ -318,5 +319,5 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
     state.context.retain(|c| c.id != panel_id);
     output_parts.push(format!("Closed {panel_id} ({panel_name})"));
 
-    ToolResult::new(tool.id.clone(), output_parts.join("\n"), false)
+    ToolResult::new(tool.id.clone(), output_parts.join("\n"), false).moved()
 }

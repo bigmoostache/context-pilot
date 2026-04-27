@@ -155,11 +155,16 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
         invalidate_tree_cache(state);
     }
 
-    ToolResult::new(
+    let any_changes = !opened.is_empty() || !closed.is_empty();
+    let mut tr = ToolResult::new(
         tool.id.clone(),
         if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
         false,
-    )
+    );
+    if any_changes {
+        tr.something_moved_in_the_darkness = true;
+    }
+    tr
 }
 
 /// Execute `tree_describe_files` tool - add/update/remove file descriptions
@@ -258,7 +263,7 @@ pub(crate) fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResu
     // Invalidate tree cache to trigger refresh
     invalidate_tree_cache(state);
 
-    ToolResult::new(tool.id.clone(), format!("Updated tree filter:\n{filter}"), false)
+    ToolResult::new(tool.id.clone(), format!("Updated tree filter:\n{filter}"), false).moved()
 }
 
 /// Normalize a path to a consistent format

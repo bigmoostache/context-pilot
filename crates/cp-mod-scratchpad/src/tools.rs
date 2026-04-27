@@ -86,7 +86,7 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         ss.scratchpad_cells.clear();
         // Update Scratchpad panel timestamp
         state.touch_panel(Kind::SCRATCHPAD);
-        return ToolResult::new(tool.id.clone(), format!("Wiped all {count} scratchpad cell(s)"), false);
+        return ToolResult::new(tool.id.clone(), format!("Wiped all {count} scratchpad cell(s)"), false).moved();
     }
 
     // Otherwise, delete specific cells
@@ -109,5 +109,10 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         state.touch_panel(Kind::SCRATCHPAD);
     }
 
-    ToolResult::new(tool.id.clone(), output, deleted_count == 0)
+    let has_deletions = deleted_count > 0;
+    let mut result = ToolResult::new(tool.id.clone(), output, deleted_count == 0);
+    if has_deletions {
+        result.something_moved_in_the_darkness = true;
+    }
+    result
 }

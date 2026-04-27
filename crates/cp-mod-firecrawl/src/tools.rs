@@ -23,12 +23,26 @@ fn get_client() -> Result<FirecrawlClient, String> {
 
 /// Build a successful `ToolResult`.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: false, tool_name: tool.name.clone() }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content,
+        display: None,
+        is_error: false,
+        tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
+    }
 }
 
 /// Build an error `ToolResult`.
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: true, tool_name: tool.name.clone() }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content,
+        display: None,
+        is_error: true,
+        tool_name: tool.name.clone(),
+        something_moved_in_the_darkness: false,
+    }
 }
 
 /// Execute the `firecrawl_scrape` tool: scrape a single URL for content.
@@ -116,7 +130,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
 
             let panel_id = crate::panel::create(state, &format!("firecrawl_scrape: {url}"), &content);
 
-            ok_result(tool, format!("Created panel {panel_id}: scraped {url} ({title})"))
+            ok_result(tool, format!("Created panel {panel_id}: scraped {url} ({title})")).moved()
         }
         Err(e) => err_result(tool, e),
     }
@@ -177,7 +191,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 // Fallback: dump as YAML
                 let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
                 let panel_id = crate::panel::create(state, &format!("firecrawl_search: {query}"), &panel_content);
-                return ok_result(tool, format!("Created panel {panel_id}: results for '{query}'"));
+                return ok_result(tool, format!("Created panel {panel_id}: results for '{query}'")).moved();
             };
 
             let count = results.len();
@@ -289,7 +303,7 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
 
             let panel_id = crate::panel::create(state, &format!("firecrawl_map: {domain}"), &panel_content);
 
-            ok_result(tool, format!("Created panel {panel_id}: {count} URLs discovered on '{domain}'"))
+            ok_result(tool, format!("Created panel {panel_id}: {count} URLs discovered on '{domain}'")).moved()
         }
         Err(e) => err_result(tool, e),
     }

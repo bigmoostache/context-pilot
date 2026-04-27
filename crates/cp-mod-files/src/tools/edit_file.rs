@@ -244,5 +244,6 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let mut result = ToolResult::new(tool.id.clone(), llm_msg, false);
     result.display = Some(display_msg);
+    result.something_moved_in_the_darkness = true;
     result
 }

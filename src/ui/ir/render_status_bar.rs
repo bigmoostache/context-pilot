@@ -144,6 +144,14 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
         spans.push(Span::styled(" ", base_style));
     }
 
+    // === Darkness moved card ===
+    if status.darkness_moved {
+        spans.push(Span::styled(" 🌊 Moved ", Style::default().fg(Color::White).bg(Color::Blue).bold()));
+    } else {
+        spans.push(Span::styled(" 🌊 Still ", Style::default().fg(Color::White).bg(theme::success()).bold()));
+    }
+    spans.push(Span::styled(" ", base_style));
+
     // === Right-aligned char count ===
     let right_info =
         if status.input_char_count > 0 { format!("{} chars ", status.input_char_count) } else { String::new() };

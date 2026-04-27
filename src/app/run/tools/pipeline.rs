@@ -172,6 +172,12 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
 
     // Check if any tool triggered a question form (blocking)
     let has_pending_question = tool_results.iter().any(|r| r.content == "__QUESTION_PENDING__");
+
+    // Aggregate the darkness flag: if any tool moved panel-visible state, mark it.
+    if tool_results.iter().any(|r| r.something_moved_in_the_darkness) {
+        app.state.something_moved_in_the_darkness = true;
+    }
+
     if has_pending_question {
         // Don't create result message or continue streaming yet.
         // The form is active — when user submits/dismisses, check_question_form()
