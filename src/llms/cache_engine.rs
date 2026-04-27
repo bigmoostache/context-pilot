@@ -46,6 +46,9 @@ struct BlockInfo {
     _token_count: usize,
     /// Cumulative token count from block 0 through this block.
     cumulative_tokens: usize,
+    /// Cumulative divergence weight from block 0 through this block.
+    /// Tail-heavy: later blocks are more likely to diverge between requests.
+    cumulative_weight: f64,
     /// Whether this block belongs to a user-role message.
     is_user_msg: bool,
 }
@@ -212,6 +215,12 @@ fn compute_accumulated_hashes(api_messages: &[ApiMessage]) -> Vec<BlockInfo> {
     let mut prev_hash = String::new();
     let mut cumulative_tokens: usize = 0;
 
+    // First pass: count total blocks for weight computation
+    let total_blocks: usize = api_messages.iter().map(|m| m.content.len()).sum();
+
+    let mut block_idx: usize = 0;
+    let mut cumulative_weight: f64 = 0.0;
+
     for (msg_idx, msg) in api_messages.iter().enumerate() {
         let is_user = msg.role == "user";
         for (blk_idx, block) in msg.content.iter().enumerate() {
@@ -224,6 +233,16 @@ fn compute_accumulated_hashes(api_messages: &[ApiMessage]) -> Vec<BlockInfo> {
             let token_count = cp_base::state::context::estimate_tokens(block_text);
             cumulative_tokens = cumulative_tokens.saturating_add(token_count);
 
+            // Divergence weight: quadratic tail-heavy distribution.
+            // position_ratio ∈ [0, 1], weight = ratio² so tail blocks dominate.
+            let weight = if total_blocks > 0 {
+                let ratio = block_idx.to_f64() / total_blocks.to_f64();
+                ratio * ratio
+            } else {
+                1.0
+            };
+            cumulative_weight += weight;
+
             let combined = format!("{block_text}{prev_hash}");
             let acc_hash = crate::state::cache::hash_content(&combined);
 
@@ -233,10 +252,12 @@ fn compute_accumulated_hashes(api_messages: &[ApiMessage]) -> Vec<BlockInfo> {
                 acc_hash: acc_hash.clone(),
                 _token_count: token_count,
                 cumulative_tokens,
+                cumulative_weight,
                 is_user_msg: is_user,
             });
 
             prev_hash = acc_hash;
+            block_idx = block_idx.saturating_add(1);
         }
     }
 
@@ -486,9 +507,17 @@ fn optimal_bps_in_gap(
     let cum =
         |pos: usize| -> u64 { block_infos.get(pos).map_or(0, |bi| bi.cumulative_tokens as u64) };
 
-    // val(a, b) = T[a] × (b - a) = contribution of BP at `a` covering gap to its right `b`
+    // Cumulative divergence weight for weighted gap computation
+    let cum_w =
+        |pos: usize| -> f64 { block_infos.get(pos).map_or(0.0, |bi| bi.cumulative_weight) };
+
+    // val(a, b) = T[a] × W(a..b) where W is the divergence probability mass in [a, b).
+    // Under uniform: W(a,b) = b - a. Under tail-heavy: W(a,b) = cum_w[b] - cum_w[a].
     let val = |a_pos: usize, b_pos: usize| -> u64 {
-        cum(a_pos).saturating_mul(b_pos.saturating_sub(a_pos) as u64)
+        let weight_span = cum_w(b_pos) - cum_w(a_pos);
+        // Scale weight to integer: multiply by 1000 for precision in u64 arithmetic
+        let weight_scaled = (weight_span * 1000.0).to_u64();
+        cum(a_pos).saturating_mul(weight_scaled)
     };
 
     // dp[m][j] = best "prefix value" using m BPs from candidates[0..=j], rightmost = j
@@ -586,16 +615,19 @@ fn optimal_bps_in_gap(
     GapResult { gain, positions }
 }
 
-/// Baseline value of a gap with no BPs: `T[left] × (right - left)`.
+/// Baseline value of a gap with no BPs: `T[left] × W(left, right)`.
 fn gap_baseline(block_infos: &[BlockInfo], left: usize, right: usize) -> u64 {
     let cum_left = block_infos
         .get(left)
         .map_or(0, |bi| bi.cumulative_tokens as u64);
-    cum_left.saturating_mul(right.saturating_sub(left) as u64)
+    let w_left = block_infos.get(left).map_or(0.0, |bi| bi.cumulative_weight);
+    let w_right = block_infos.get(right).map_or(w_left, |bi| bi.cumulative_weight);
+    let weight_scaled = ((w_right - w_left) * 1000.0).to_u64();
+    cum_left.saturating_mul(weight_scaled)
 }
 
-/// Compute total gap value with specific BP positions placed.
-/// `Value = T[L]×(q₁-L) + T[q₁]×(q₂-q₁) + ... + T[qₖ]×(R-qₖ)`
+/// Compute total gap value with specific BP positions placed (weighted).
+/// `Value = T[L]×W(L,q₁) + T[q₁]×W(q₁,q₂) + ... + T[qₖ]×W(qₖ,R)`
 fn gap_value_with_bps(
     block_infos: &[BlockInfo],
     left: usize,
@@ -604,25 +636,30 @@ fn gap_value_with_bps(
 ) -> u64 {
     let cum =
         |pos: usize| -> u64 { block_infos.get(pos).map_or(0, |bi| bi.cumulative_tokens as u64) };
+    let cum_w =
+        |pos: usize| -> f64 { block_infos.get(pos).map_or(0.0, |bi| bi.cumulative_weight) };
+    let weighted_val = |a: usize, b: usize| -> u64 {
+        let weight_scaled = ((cum_w(b) - cum_w(a)) * 1000.0).to_u64();
+        cum(a).saturating_mul(weight_scaled)
+    };
 
     if bps.is_empty() {
-        return cum(left).saturating_mul(right.saturating_sub(left) as u64);
+        return weighted_val(left, right);
     }
 
     // Left boundary → first BP
     let first_bp = bps.first().copied().unwrap_or(left);
-    let mut total = cum(left).saturating_mul(first_bp.saturating_sub(left) as u64);
+    let mut total = weighted_val(left, first_bp);
 
     // Internal segments via sliding window
     for window in bps.windows(2) {
         let &[bp_a, bp_b] = window else { continue };
-        total =
-            total.saturating_add(cum(bp_a).saturating_mul(bp_b.saturating_sub(bp_a) as u64));
+        total = total.saturating_add(weighted_val(bp_a, bp_b));
     }
 
     // Last BP → right boundary
     let last_bp = bps.last().copied().unwrap_or(left);
-    total.saturating_add(cum(last_bp).saturating_mul(right.saturating_sub(last_bp) as u64))
+    total.saturating_add(weighted_val(last_bp, right))
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -834,7 +871,7 @@ mod tests {
     #[test]
     fn test_optimal_placement_spreads_bps() {
         // Uniform token distribution: each block has ~equal tokens.
-        // With a gap of (0, 100), optimal 3-BP placement should spread evenly.
+        // Under tail-heavy weighting, BPs shift toward the end but still spread.
         let msgs = make_messages(100);
         let infos = compute_accumulated_hashes(&msgs);
 
@@ -845,16 +882,16 @@ mod tests {
         let mut sorted = result.clone();
         sorted.sort_unstable();
 
-        // With 100 blocks, BPs should be roughly at 25/50/75 (not all at 80+)
-        // At minimum, the first BP should be before position 50
+        // With tail-heavy weighting, BPs shift rightward but the first should
+        // still be in the first 60% (not all crammed at the end)
         assert!(
-            sorted[0] < 50,
-            "first BP should be in first half, got {sorted:?}"
+            sorted[0] < 60,
+            "first BP should be in first 60%, got {sorted:?}"
         );
-        // And the last shouldn't be at the very end
+        // BPs should be at distinct positions (not all on the same block)
         assert!(
-            sorted[2] < 95,
-            "last BP too close to tail, got {sorted:?}"
+            sorted[2] > sorted[0].saturating_add(10),
+            "BPs should be spread at least 10 apart, got {sorted:?}"
         );
     }
 
