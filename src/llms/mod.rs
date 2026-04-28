@@ -4,8 +4,10 @@
 
 pub(crate) mod anthropic;
 pub(crate) mod cache_engine;
+pub(crate) mod cache_optimizer;
 pub(crate) mod claude_code;
 pub(crate) mod claude_code_api_key;
+pub(crate) mod density;
 /// MiniMax provider (Anthropic-compatible API via Token Plan).
 pub(crate) mod minimax;
 /// OpenAI-compatible provider implementations (Grok, Groq, DeepSeek).
