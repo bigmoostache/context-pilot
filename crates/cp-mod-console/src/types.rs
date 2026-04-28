@@ -228,6 +228,7 @@ impl Watcher for ConsoleWatcher {
                     create_panel: None,
                     processed_already: false,
                     kill_session: Some(self.session_name.clone()),
+                    preserves_tempo: true,
                 });
             }
 
@@ -248,6 +249,7 @@ impl Watcher for ConsoleWatcher {
                 }),
                 processed_already: false,
                 kill_session: None,
+                preserves_tempo: false,
             })
         } else {
             let exit_code = handle.get_status().exit_code();
@@ -260,6 +262,7 @@ impl Watcher for ConsoleWatcher {
                 create_panel: None,
                 processed_already: false,
                 kill_session: None,
+                preserves_tempo: false,
             })
         }
     }
@@ -291,6 +294,7 @@ impl Watcher for ConsoleWatcher {
                 }),
                 processed_already: false,
                 kill_session: None,
+                preserves_tempo: false,
             })
         } else {
             Some(WatcherResult {
@@ -304,6 +308,7 @@ impl Watcher for ConsoleWatcher {
                 create_panel: None,
                 processed_already: false,
                 kill_session: None,
+                preserves_tempo: false,
             })
         }
     }

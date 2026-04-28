@@ -182,6 +182,7 @@ pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &
         content: format!("Unknown tool: {}", tool.name),
         display: None,
         is_error: true,
+        preserves_tempo: false,
         tool_name: tool.name.clone(),
     }
 }
@@ -263,6 +264,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
             content: "Missing 'changes' parameter (expected array)".to_string(),
             display: None,
             is_error: true,
+            preserves_tempo: false,
             tool_name: tool.name.clone(),
         };
     };
@@ -356,6 +358,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         content: result_parts.join("\n"),
         display: None,
         is_error: !failures.is_empty() && successes.is_empty(),
+        preserves_tempo: false,
         tool_name: tool.name.clone(),
     }
 }

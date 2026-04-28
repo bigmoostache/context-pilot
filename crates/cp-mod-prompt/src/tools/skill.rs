@@ -76,7 +76,9 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     state.touch_panel(Kind::LIBRARY);
 
-    ToolResult::new(tool.id.clone(), format!("Deleted skill '{}' ({})", skill.name, id), false)
+    let mut result = ToolResult::new(tool.id.clone(), format!("Deleted skill '{}' ({})", skill.name, id), false);
+    result.preserves_tempo = true;
+    result
 }
 
 /// Load a skill into the active context as a panel.

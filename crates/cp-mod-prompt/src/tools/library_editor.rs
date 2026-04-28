@@ -42,9 +42,11 @@ pub(crate) fn close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     PromptState::get_mut(state).open_prompt_id = None;
     state.touch_panel(Kind::LIBRARY);
 
-    ToolResult::new(
+    let mut result = ToolResult::new(
         tool.id.clone(),
         format!("Closed prompt editor (was editing '{previous}'). Library panel restored to normal view."),
         false,
-    )
+    );
+    result.preserves_tempo = true;
+    result
 }

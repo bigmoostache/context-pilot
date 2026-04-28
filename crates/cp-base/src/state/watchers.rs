@@ -29,6 +29,10 @@ pub struct WatcherResult {
     /// If set, kill and remove this console session after processing.
     /// Used by `easy_bash` inline path to clean up sessions that have no panel.
     pub kill_session: Option<String>,
+    /// When `true`, the cleanup code does NOT break tempo for this watcher result.
+    /// Used by blocking watchers whose resolution did not create or modify any panel
+    /// (e.g., `easy_bash` inline path with short output).
+    pub preserves_tempo: bool,
 }
 
 /// Info needed to create a console panel after a watcher fires.

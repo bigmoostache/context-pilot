@@ -207,6 +207,7 @@ impl Watcher for CoucouWatcher {
             create_panel: None,
             processed_already: false,
             kill_session: None,
+            preserves_tempo: false,
         })
     }
 

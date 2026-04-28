@@ -106,5 +106,7 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.set_ext(form);
 
     // Return a placeholder — the real result is injected by app.rs when user responds
-    ToolResult::new(tool.id.clone(), "__QUESTION_PENDING__".to_string(), false)
+    let mut result = ToolResult::new(tool.id.clone(), "__QUESTION_PENDING__".to_string(), false);
+    result.preserves_tempo = true;
+    result
 }

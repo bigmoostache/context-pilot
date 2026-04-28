@@ -155,11 +155,17 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
         invalidate_tree_cache(state);
     }
 
-    ToolResult::new(
+    let mut tool_result = ToolResult::new(
         tool.id.clone(),
         if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
         false,
-    )
+    );
+    // Closing folders reduces context content — safe to preserve tempo.
+    // Opening folders adds new tree content — break tempo to refresh.
+    if opened.is_empty() {
+        tool_result.preserves_tempo = true;
+    }
+    tool_result
 }
 
 /// Execute `tree_describe_files` tool - add/update/remove file descriptions

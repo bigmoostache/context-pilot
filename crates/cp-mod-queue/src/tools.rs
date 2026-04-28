@@ -13,6 +13,7 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
             content: "Queue is already paused/inactive.".to_string(),
             display: None,
             is_error: false,
+            preserves_tempo: false,
             tool_name: tool.name.clone(),
         };
     }
@@ -23,6 +24,7 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
         content: format!("Queue paused. Tools now execute normally. {n} action(s) still queued."),
         display: None,
         is_error: false,
+        preserves_tempo: true,
         tool_name: tool.name.clone(),
     }
 }
@@ -37,6 +39,7 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
                 content: "Missing 'indices' parameter (expected array of numbers).".to_string(),
                 display: None,
                 is_error: true,
+                preserves_tempo: false,
                 tool_name: tool.name.clone(),
             };
         }
@@ -70,6 +73,7 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
         content: msg,
         display: None,
         is_error: !not_found.is_empty() && removed.is_empty(),
+        preserves_tempo: false,
         tool_name: tool.name.clone(),
     }
 }
@@ -85,6 +89,7 @@ pub(crate) fn execute_empty(tool: &ToolUse, state: &mut State) -> ToolResult {
         content: format!("Queue emptied. Discarded {n} action(s)."),
         display: None,
         is_error: false,
+        preserves_tempo: false,
         tool_name: tool.name.clone(),
     }
 }

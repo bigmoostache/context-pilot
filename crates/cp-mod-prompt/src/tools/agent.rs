@@ -79,7 +79,9 @@ pub(crate) fn delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(Kind::SYSTEM);
     state.touch_panel(Kind::LIBRARY);
 
-    ToolResult::new(tool.id.clone(), format!("Deleted agent '{}' ({})", agent.name, id), false)
+    let mut result = ToolResult::new(tool.id.clone(), format!("Deleted agent '{}' ({})", agent.name, id), false);
+    result.preserves_tempo = true;
+    result
 }
 
 /// Set the active agent by ID, or revert to the default agent.

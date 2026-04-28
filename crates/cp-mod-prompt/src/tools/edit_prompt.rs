@@ -171,7 +171,9 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     result_msg.push_str(&generate_unified_diff(old_string, new_string));
     result_msg.push_str("```");
 
-    ToolResult::new(tool.id.clone(), result_msg, false)
+    let mut result = ToolResult::new(tool.id.clone(), result_msg, false);
+    result.preserves_tempo = true;
+    result
 }
 
 /// The kind of prompt entity being edited.

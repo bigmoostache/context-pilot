@@ -139,6 +139,12 @@ pub struct State {
     /// for intelligent Anthropic prompt cache breakpoint placement.
     /// Serialized through `WorkerState` modules for reload survival.
     pub cache_engine_json: Option<String>,
+    /// Tempo flag: `true` means "nothing meaningful changed — freeze everything next tick."
+    ///
+    /// Set to `true` at the start of each tick. Any tool execution breaks it (sets `false`)
+    /// unless the tool explicitly opts out via `ToolResult::preserves_tempo`. When the next
+    /// `prepare_stream_context()` runs with `tempo == true`, ALL panels freeze unconditionally.
+    pub tempo: bool,
     /// Number of alive (non-pruned) breakpoints at last tick — for sidebar display only.
     pub tick_alive_breakpoints: usize,
     /// Per-mille positions (0–1000) of alive BPs within the prompt, sorted.
@@ -238,6 +244,7 @@ impl Default for State {
             previous_panel_order: vec![],
             tool_sleep_until_ms: 0,
             cache_engine_json: None,
+            tempo: true,
             tick_alive_breakpoints: 0,
             tick_alive_bp_positions: vec![],
             last_viewport_width: 0,

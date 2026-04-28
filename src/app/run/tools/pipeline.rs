@@ -270,6 +270,22 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
         }
     }
 
+    // === TEMPO BREAK ===
+    // Default: any tool execution breaks tempo (sets false).
+    // Tools that self-assess "I didn't change anything worth refreshing" set
+    // `preserves_tempo = true` on their result to opt out.
+    // Blocking sentinels defer the tempo decision to the watcher result
+    // (handled in cleanup.rs when the sentinel is replaced).
+    for tr in &tool_results {
+        if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
+            continue; // Deferred — watcher decides later
+        }
+        if !tr.preserves_tempo {
+            app.state.tempo = false;
+            break; // One break is enough — tempo is already false
+        }
+    }
+
     // Check if any tool triggered a console blocking wait
     let has_console_wait = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
     if has_console_wait {

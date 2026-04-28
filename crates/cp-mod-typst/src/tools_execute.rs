@@ -15,12 +15,26 @@ use std::fmt::Write as _;
 
 /// Helper to build a `ToolResult` from a tool and content.
 fn ok_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: false, tool_name: tool.name.clone() }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content,
+        display: None,
+        is_error: false,
+        preserves_tempo: false,
+        tool_name: tool.name.clone(),
+    }
 }
 
 /// Helper to build an error `ToolResult` from a tool and content.
 fn err_result(tool: &ToolUse, content: String) -> ToolResult {
-    ToolResult { tool_use_id: tool.id.clone(), content, display: None, is_error: true, tool_name: tool.name.clone() }
+    ToolResult {
+        tool_use_id: tool.id.clone(),
+        content,
+        display: None,
+        is_error: true,
+        preserves_tempo: false,
+        tool_name: tool.name.clone(),
+    }
 }
 
 /// Execute the `typst_execute` tool — parse command string and dispatch to subcommand handler.

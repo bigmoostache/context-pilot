@@ -66,6 +66,10 @@ pub struct ToolResult {
     /// `true` if the tool execution failed.
     #[serde(default)]
     pub is_error: bool,
+    /// When `true`, the tool pipeline does NOT break tempo after this result.
+    /// Used by tools that self-assess their execution did not merit a full context refresh.
+    #[serde(default)]
+    pub preserves_tempo: bool,
     /// Tool name — populated by the dispatch layer, not the caller.
     #[serde(default)]
     pub tool_name: String,
@@ -75,13 +79,13 @@ impl ToolResult {
     /// Create a `ToolResult`. The `tool_name` is left empty — populated by dispatch.
     #[must_use]
     pub const fn new(tool_use_id: String, content: String, is_error: bool) -> Self {
-        Self { tool_use_id, content, display: None, is_error, tool_name: String::new() }
+        Self { tool_use_id, content, display: None, is_error, preserves_tempo: false, tool_name: String::new() }
     }
 
     /// Create a `ToolResult` with an explicit tool name.
     #[must_use]
     pub const fn with_name(tool_use_id: String, content: String, is_error: bool, tool_name: String) -> Self {
-        Self { tool_use_id, content, display: None, is_error, tool_name }
+        Self { tool_use_id, content, display: None, is_error, preserves_tempo: false, tool_name }
     }
 }
 

@@ -61,6 +61,7 @@ pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
             content: REVERIE.errors.queue_not_empty.replace("{count}", &qs.queued_calls.len().to_string()),
             display: None,
             is_error: true,
+            preserves_tempo: false,
             tool_name: tool.name.clone(),
         };
     }
@@ -75,6 +76,7 @@ pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
         content: format!("REVERIE_REPORT:{summary}"),
         display: None,
         is_error: false,
+        preserves_tempo: false,
         tool_name: tool.name.clone(),
     }
 }
@@ -91,6 +93,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
             content: REVERIE.errors.reverie_disabled.clone(),
             display: None,
             is_error: true,
+            preserves_tempo: false,
             tool_name: tool.name.clone(),
         };
     }
@@ -106,6 +109,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
             content: REVERIE.errors.already_running.replace(concat!("{", "agent_id", "}"), &agent_id),
             display: None,
             is_error: true,
+            preserves_tempo: false,
             tool_name: tool.name.clone(),
         };
     }
@@ -126,6 +130,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
         content: format!("REVERIE_START:{}\n{}\n{}", agent_id, context.as_deref().unwrap_or(""), msg),
         display: None,
         is_error: false,
+        preserves_tempo: false,
         tool_name: tool.name.clone(),
     }
 }
@@ -148,6 +153,7 @@ pub(crate) fn dispatch_reverie_tool(tool: &ToolUse, state: &State) -> Option<Too
                     content: REVERIE.errors.tool_not_available.replace("{tool_name}", &tool.name),
                     display: None,
                     is_error: true,
+                    preserves_tempo: false,
                     tool_name: tool.name.clone(),
                 })
             }

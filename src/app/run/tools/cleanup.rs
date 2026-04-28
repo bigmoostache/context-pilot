@@ -230,6 +230,16 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
         }
     }
 
+    // === DEFERRED TEMPO BREAK ===
+    // Blocking watchers deferred their tempo decision from pipeline.rs.
+    // Now that we have the real results, break tempo if any watcher says so.
+    for result in &merged_blocking {
+        if !result.preserves_tempo {
+            app.state.tempo = false;
+            break;
+        }
+    }
+
     // All resolved — resume normal pipeline: create result message + continue streaming
     let result_id = format!("R{}", app.state.next_result_id);
     let result_global_uid = format!("UID_{}_R", app.state.global_next_uid);
@@ -455,5 +465,9 @@ pub(crate) fn execute_queue_flush(
         flushed.push(FlushedTool { tool: queued_tool, result });
     }
 
-    (crate::infra::tools::ToolResult::new(tool.id.clone(), summary, false), flushed)
+    // The summary wrapper preserves tempo — only the individual flushed
+    // tool results should drive the tempo decision (transparent queue).
+    let mut wrapper = crate::infra::tools::ToolResult::new(tool.id.clone(), summary, false);
+    wrapper.preserves_tempo = true;
+    (wrapper, flushed)
 }

@@ -103,5 +103,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let _r = write!(output, "Errors:\n{}", errors.join("\n"));
     }
 
-    ToolResult::new(tool.id.clone(), output, closed.is_empty() && skipped.is_empty())
+    let mut result = ToolResult::new(tool.id.clone(), output, closed.is_empty() && skipped.is_empty());
+    result.preserves_tempo = true;
+    result
 }

@@ -150,11 +150,13 @@ pub(crate) fn execute_snapshot(tool: &ToolUse, state: &State, all_modules: Modul
 
     let panel_count = preset.worker_state.dynamic_panels.len();
     let module_count = preset.worker_state.active_modules.len();
-    ToolResult::new(
+    let mut result = ToolResult::new(
         tool.id.clone(),
         format!("Preset '{name}' saved ({module_count} modules, {panel_count} dynamic panels)"),
         false,
-    )
+    );
+    result.preserves_tempo = true;
+    result
 }
 
 /// Bundled function pointers for preset load operations.

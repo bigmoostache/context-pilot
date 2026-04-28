@@ -20,44 +20,53 @@ enum FreezeDecision {
     Freeze,
 }
 
+/// Snapshot of tick-level freeze conditions, shared across all panels.
+#[derive(Debug, Clone, Copy)]
+struct FreezeConditions {
+    /// Queue module is actively intercepting — infinite freeze budget.
+    queue_active: bool,
+    /// Tempo survived last tick (no tool broke it) — global freeze.
+    tempo: bool,
+}
+
 /// Single source of truth: should panel ORDERING be frozen this tick?
 ///
 /// When true, panels keep their previous sorted positions (no reordering
 /// from `last_refresh_ms` changes). Prevents cache prefix breaks due to
 /// panels shuffling positions between ticks.
-fn should_freeze_order(state: &State) -> bool {
-    cp_mod_queue::types::QueueState::get(state).active
+fn freeze_conditions(state: &State) -> FreezeConditions {
+    FreezeConditions { queue_active: cp_mod_queue::types::QueueState::get(state).active, tempo: state.tempo }
 }
 
-/// Single source of truth: should a specific panel's CONTENT be frozen this tick?
-///
-/// Priority (first match wins):
-/// 1. Queue active → always Freeze (infinite budget, overrides everything)
-/// 2. Cache already broken upstream → Fresh (update is "free", no prefix to save)
-/// 3. Breath budget remaining → Freeze (preserve prefix for a few more ticks)
-/// 4. No budget left (or `max_freezes=0`) → Fresh
-const fn should_freeze_panel(
-    queue_active: bool,
-    cache_broken: bool,
-    freeze_count: u8,
-    max_freezes: u8,
-) -> FreezeDecision {
-    // Queue freeze: unconditional, infinite budget — overrides breath limits
-    if queue_active {
-        return FreezeDecision::Freeze;
+impl FreezeConditions {
+    /// Whether panel ordering should be frozen this tick.
+    const fn freeze_order(self) -> bool {
+        self.queue_active || self.tempo
     }
 
-    // Cache already broken by an upstream panel — updates are free
-    if cache_broken {
-        return FreezeDecision::Fresh;
+    /// Whether a specific panel's content should be frozen this tick.
+    ///
+    /// Priority (first match wins):
+    /// 1. Queue active → always Freeze (infinite budget, overrides everything)
+    /// 2. Tempo = true → Freeze (no tool broke tempo last tick — global freeze)
+    /// 3. Cache already broken upstream → Fresh (update is "free", no prefix to save)
+    /// 4. Breath budget remaining → Freeze (preserve prefix for a few more ticks)
+    /// 5. No budget left (or `max_freezes=0`) → Fresh
+    const fn freeze_panel(self, cache_broken: bool, freeze_count: u8, max_freezes: u8) -> FreezeDecision {
+        if self.queue_active {
+            return FreezeDecision::Freeze;
+        }
+        if self.tempo {
+            return FreezeDecision::Freeze;
+        }
+        if cache_broken {
+            return FreezeDecision::Fresh;
+        }
+        if max_freezes > 0 && freeze_count < max_freezes {
+            return FreezeDecision::Freeze;
+        }
+        FreezeDecision::Fresh
     }
-
-    // Breath freeze: limited per-panel budget
-    if max_freezes > 0 && freeze_count < max_freezes {
-        return FreezeDecision::Freeze;
-    }
-
-    FreezeDecision::Fresh
 }
 
 /// Context data prepared for streaming
@@ -115,9 +124,15 @@ pub(super) fn prepare_stream_context(
     // === Panel ordering ===
     // When frozen, panels keep their previous sorted positions — no reordering
     // from `last_refresh_ms` changes. When unfrozen, sort by freshness and save.
-    let queue_active = should_freeze_order(state);
+    let cond = freeze_conditions(state);
 
-    if queue_active && !state.previous_panel_order.is_empty() {
+    // === Tempo lifecycle ===
+    // Read the current tempo flag for this tick's freeze decisions, then reset.
+    // If tempo is true (no tool broke it last tick), we freeze everything.
+    // (cond already captured state.tempo above)
+    state.tempo = true; // Reset for next tick — tools will break it if they execute
+
+    if cond.freeze_order() && !state.previous_panel_order.is_empty() {
         // Reorder context_items to match the saved order, dropping unknowns
         let order = &state.previous_panel_order;
         context_items.sort_by_key(|item| order.iter().position(|id| *id == item.id).unwrap_or(usize::MAX));
@@ -173,7 +188,7 @@ pub(super) fn prepare_stream_context(
             if content_changed {
                 // Content differs from last emission — consult freeze policy
                 let panel = crate::app::panels::get_panel(&entry.context_type);
-                let decision = should_freeze_panel(queue_active, cache_broken, entry.freeze_count, panel.max_freezes());
+                let decision = cond.freeze_panel(cache_broken, entry.freeze_count, panel.max_freezes());
 
                 if decision == FreezeDecision::Freeze
                     && let Some(ref frozen) = entry.emitted.context

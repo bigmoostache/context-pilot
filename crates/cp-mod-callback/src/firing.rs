@@ -259,6 +259,7 @@ impl Watcher for CallbackWatcher {
                 create_panel: None,
                 processed_already: true,
                 kill_session: None,
+                preserves_tempo: false,
             });
         }
 
@@ -275,6 +276,7 @@ impl Watcher for CallbackWatcher {
                 create_panel: None,
                 processed_already: true,
                 kill_session: None,
+                preserves_tempo: false,
             })
         } else {
             // Panel content is already final — the pipeline waited for process exit before resuming
@@ -295,6 +297,7 @@ impl Watcher for CallbackWatcher {
                 }),
                 processed_already: false,
                 kill_session: None,
+                preserves_tempo: false,
             })
         }
     }
@@ -322,6 +325,7 @@ impl Watcher for CallbackWatcher {
             }),
             processed_already: false,
             kill_session: None,
+            preserves_tempo: false,
         })
     }
 

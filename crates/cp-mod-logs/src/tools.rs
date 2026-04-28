@@ -61,7 +61,9 @@ pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResul
         touch_logs_panel(state);
     }
 
-    ToolResult::new(tool.id.clone(), format!("Created {count} log(s)"), false)
+    let mut result = ToolResult::new(tool.id.clone(), format!("Created {count} log(s)"), false);
+    result.preserves_tempo = true;
+    result
 }
 
 /// Execute `log_summarize`: collapse multiple logs under a parent summary entry.
@@ -140,7 +142,13 @@ pub(crate) fn execute_log_summarize(tool: &ToolUse, state: &mut State) -> ToolRe
 
     touch_logs_panel(state);
 
-    ToolResult::new(tool.id.clone(), format!("Created summary {} with {} children", summary_id, log_ids.len()), false)
+    let mut result = ToolResult::new(
+        tool.id.clone(),
+        format!("Created summary {} with {} children", summary_id, log_ids.len()),
+        false,
+    );
+    result.preserves_tempo = true;
+    result
 }
 
 /// Execute `log_toggle`: expand or collapse a log summary's children.
@@ -193,11 +201,17 @@ pub(crate) fn execute_log_toggle(tool: &ToolUse, state: &mut State) -> ToolResul
 
     touch_logs_panel(state);
 
-    ToolResult::new(
+    let mut result = ToolResult::new(
         tool.id.clone(),
         format!("{} {}", if action == "expand" { "Expanded" } else { "Collapsed" }, id),
         false,
-    )
+    );
+    // Collapsing a summary reduces context content — safe to preserve tempo.
+    // Expanding adds children back — panels change, break tempo.
+    if action == "collapse" {
+        result.preserves_tempo = true;
+    }
+    result
 }
 
 /// Execute `Close_conversation_history`: extract logs/memories and remove the panel.
