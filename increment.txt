@@ -2273,3 +2273,11 @@
 15:36:51.902364726 fmt crates/cp-mod-queue/src/tools.rs
 15:37:23.574225006 fmt crates/cp-mod-tree/src/tools.rs
 15:37:28.942290805 fmt crates/cp-mod-tree/src/tools.rs
+15:50:58.044743822 fmt crates/cp-render/src/frame.rs
+15:51:05.709959977 fmt src/ui/ir/status_bar.rs
+15:51:16.348318291 fmt src/ui/ir/status_bar.rs
+15:51:21.209982099 fmt src/ui/ir/status_bar.rs
+15:51:28.489045092 fmt src/ui/ir/render_status_bar.rs
+15:51:32.145342347 fmt crates/cp-render/src/frame.rs
+15:51:32.200484728 fmt src/ui/ir/status_bar.rs
+15:51:32.246778090 fmt src/ui/ir/render_status_bar.rs

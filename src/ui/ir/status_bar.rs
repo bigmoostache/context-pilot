@@ -8,7 +8,6 @@ use cp_render::frame::{
     AgentCard, AutoContinue, Badge, GitChanges, QueueCard, ReverieCard, SkillCard, StatusBar, StopReason,
 };
 
-use crate::llms::{LlmProvider, ModelInfo as _};
 use crate::state::State;
 use cp_base::cast::Safe as _;
 
@@ -17,8 +16,6 @@ use cp_base::cast::Safe as _;
 pub(crate) fn build_status_bar(state: &State) -> StatusBar {
     StatusBar {
         badge: build_badge(state),
-        provider: Some(build_provider_label(state)),
-        model: Some(build_model_label(state)),
         agent: build_agent(state),
         skills: build_skills(state),
         git: build_git(state),
@@ -66,36 +63,6 @@ fn build_badge(state: &State) -> Badge {
     } else {
         Badge { label: "READY".into(), semantic: Semantic::Muted }
     }
-}
-
-// ── Model label ──────────────────────────────────────────────────────
-
-/// Build the LLM provider display label.
-fn build_provider_label(state: &State) -> String {
-    match state.llm_provider {
-        LlmProvider::Anthropic => "Claude",
-        LlmProvider::ClaudeCode => "OAuth",
-        LlmProvider::ClaudeCodeApiKey => "APIKey",
-        LlmProvider::Grok => "Grok",
-        LlmProvider::Groq => "Groq",
-        LlmProvider::DeepSeek => "DeepSeek",
-        LlmProvider::MiniMax => "MiniMax",
-    }
-    .to_string()
-}
-
-/// Build the active model display string.
-fn build_model_label(state: &State) -> String {
-    let (_provider_name, model_name) = match state.llm_provider {
-        LlmProvider::Anthropic => ("Claude", state.anthropic_model.display_name()),
-        LlmProvider::ClaudeCode => ("OAuth", state.anthropic_model.display_name()),
-        LlmProvider::ClaudeCodeApiKey => ("APIKey", state.anthropic_model.display_name()),
-        LlmProvider::Grok => ("Grok", state.grok_model.display_name()),
-        LlmProvider::Groq => ("Groq", state.groq_model.display_name()),
-        LlmProvider::DeepSeek => ("DeepSeek", state.deepseek_model.display_name()),
-        LlmProvider::MiniMax => ("MiniMax", state.minimax_model.display_name()),
-    };
-    model_name.to_string()
 }
 
 // ── Agent + skills ───────────────────────────────────────────────────

@@ -160,10 +160,6 @@ pub struct HelpHint {
 pub struct StatusBar {
     /// Primary status badge (e.g. "Streaming", "Ready").
     pub badge: Badge,
-    /// LLM provider name (e.g. "Claude", "OAuth", "Grok").
-    pub provider: Option<String>,
-    /// Active model name.
-    pub model: Option<String>,
     /// Active agent card.
     pub agent: Option<AgentCard>,
     /// Loaded skills.

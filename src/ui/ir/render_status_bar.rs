@@ -47,19 +47,6 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
         spans.push(Span::styled(" ", base_style));
     }
 
-    // === Provider + model ===
-    if let Some(ref provider) = status.provider {
-        spans.push(Span::styled(
-            format!(" {provider} "),
-            Style::default().fg(theme::bg_base()).bg(theme::accent_dim()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-    if let Some(ref model) = status.model {
-        spans.push(Span::styled(format!(" {model} "), Style::default().fg(theme::text()).bg(theme::bg_elevated())));
-        spans.push(Span::styled(" ", base_style));
-    }
-
     // === Stop reason ===
     if let Some(ref sr) = status.stop_reason {
         let label = sr.reason.to_uppercase();
