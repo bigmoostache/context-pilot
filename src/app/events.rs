@@ -280,8 +280,8 @@ const fn dispatch_primary_model(state: &State, idx: usize) -> Action {
             _ => Action::None,
         },
         LlmProvider::DeepSeek => match idx {
-            0 => Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekChat),
-            1 => Action::ConfigSelectDeepSeekModel(DeepSeekModel::DeepseekReasoner),
+            0 => Action::ConfigSelectDeepSeekModel(DeepSeekModel::V4Flash),
+            1 => Action::ConfigSelectDeepSeekModel(DeepSeekModel::V4Pro),
             _ => Action::None,
         },
         LlmProvider::MiniMax => match idx {
@@ -314,8 +314,8 @@ const fn dispatch_secondary_model(state: &State, idx: usize) -> Action {
             _ => Action::None,
         },
         LlmProvider::DeepSeek => match idx {
-            0 => Action::ConfigSelectSecondaryDeepSeekModel(DeepSeekModel::DeepseekChat),
-            1 => Action::ConfigSelectSecondaryDeepSeekModel(DeepSeekModel::DeepseekReasoner),
+            0 => Action::ConfigSelectSecondaryDeepSeekModel(DeepSeekModel::V4Flash),
+            1 => Action::ConfigSelectSecondaryDeepSeekModel(DeepSeekModel::V4Pro),
             _ => Action::None,
         },
         LlmProvider::MiniMax => match idx {

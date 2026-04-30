@@ -2281,3 +2281,13 @@
 15:51:32.145342347 fmt crates/cp-render/src/frame.rs
 15:51:32.200484728 fmt src/ui/ir/status_bar.rs
 15:51:32.246778090 fmt src/ui/ir/render_status_bar.rs
+11:40:42.659606988 fmt crates/cp-base/src/config/llm_types.rs
+11:40:54.402085326 fmt src/llms/oai_providers/deepseek.rs
+11:41:02.319504199 fmt src/app/events.rs
+11:41:11.285645786 fmt src/app/events.rs
+11:41:18.518175998 fmt src/ui/help/config_overlay.rs
+11:41:25.089431783 fmt src/ui/help/config_overlay.rs
+11:41:44.264461775 fmt crates/cp-base/src/config/llm_types.rs
+11:41:44.311028096 fmt src/llms/oai_providers/deepseek.rs
+11:41:44.359295752 fmt src/app/events.rs
+11:41:44.416915368 fmt src/ui/help/config_overlay.rs

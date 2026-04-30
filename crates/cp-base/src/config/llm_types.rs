@@ -321,57 +321,70 @@ impl ModelInfo for GroqModel {
     }
 }
 
-/// `DeepSeek` model variants (OpenAI-compatible API, budget-friendly).
+/// `DeepSeek` V4 model variants (OpenAI + Anthropic-compatible API).
+///
+/// Both variants support thinking and non-thinking modes via the API.
+/// The legacy `deepseek-chat` / `deepseek-reasoner` names are deprecated
+/// aliases for V4 Flash.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DeepSeekModel {
-    /// `DeepSeek` Chat — general-purpose, 128K context.
+    /// `DeepSeek` V4 Flash — fast and cheap, 1M context.
     #[default]
-    DeepseekChat,
-    /// `DeepSeek` Reasoner — chain-of-thought, larger output.
-    DeepseekReasoner,
+    V4Flash,
+    /// `DeepSeek` V4 Pro — higher capability, 1M context (75% launch discount until 2026-05-31).
+    V4Pro,
 }
 
 impl ModelInfo for DeepSeekModel {
     fn api_name(&self) -> &'static str {
         match self {
-            Self::DeepseekChat => "deepseek-chat",
-            Self::DeepseekReasoner => "deepseek-reasoner",
+            Self::V4Flash => "deepseek-v4-flash",
+            Self::V4Pro => "deepseek-v4-pro",
         }
     }
 
     fn display_name(&self) -> &'static str {
         match self {
-            Self::DeepseekChat => "DeepSeek Chat",
-            Self::DeepseekReasoner => "DeepSeek Reasoner",
+            Self::V4Flash => "V4 Flash",
+            Self::V4Pro => "V4 Pro",
         }
     }
 
     fn context_window(&self) -> usize {
-        128_000
+        1_000_000
     }
 
     fn input_price_per_mtok(&self) -> f32 {
-        0.28
+        match self {
+            Self::V4Flash => 0.14,
+            Self::V4Pro => 0.435,
+        }
     }
 
     fn output_price_per_mtok(&self) -> f32 {
-        0.42
+        match self {
+            Self::V4Flash => 0.28,
+            Self::V4Pro => 0.87,
+        }
     }
 
     fn cache_hit_price_per_mtok(&self) -> f32 {
-        0.028
+        match self {
+            Self::V4Flash => 0.0028,
+            Self::V4Pro => 0.003_625,
+        }
     }
 
     fn cache_miss_price_per_mtok(&self) -> f32 {
-        0.28
+        match self {
+            Self::V4Flash => 0.14,
+            Self::V4Pro => 0.435,
+        }
     }
 
     fn max_output_tokens(&self) -> u32 {
-        match self {
-            Self::DeepseekChat => 8_192,
-            Self::DeepseekReasoner => 0x4000,
-        }
+        384_000
     }
 }
 

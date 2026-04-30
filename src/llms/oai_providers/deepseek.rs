@@ -102,7 +102,8 @@ impl LlmClient for DeepSeekClient {
         let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("DEEPSEEK_API_KEY not set".into()))?;
 
         let client = Client::new();
-        let is_reasoner = request.model == "deepseek-reasoner";
+        // V4 models use thinking mode by default — reasoning_content is always relevant
+        let is_reasoner = true;
 
         // Collect pending tool result IDs
         let pending_tool_ids: Vec<String> = request

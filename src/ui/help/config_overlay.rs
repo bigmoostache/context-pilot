@@ -160,7 +160,7 @@ fn render_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
             render_model_line_with_info(lines, state.groq_model == GroqModel::Llama31_8b, "d", &GroqModel::Llama31_8b);
         }
         LlmProvider::DeepSeek => {
-            for (model, key) in [(DeepSeekModel::DeepseekChat, "a"), (DeepSeekModel::DeepseekReasoner, "b")] {
+            for (model, key) in [(DeepSeekModel::V4Flash, "a"), (DeepSeekModel::V4Pro, "b")] {
                 render_model_line_with_info(lines, state.deepseek_model == model, key, &model);
             }
         }
@@ -318,7 +318,7 @@ fn render_secondary_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
             );
         }
         LlmProvider::DeepSeek => {
-            for (model, key) in [(DeepSeekModel::DeepseekChat, "a"), (DeepSeekModel::DeepseekReasoner, "b")] {
+            for (model, key) in [(DeepSeekModel::V4Flash, "a"), (DeepSeekModel::V4Pro, "b")] {
                 render_model_line_with_info(lines, state.secondary_deepseek_model == model, key, &model);
             }
         }
