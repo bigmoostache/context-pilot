@@ -60,8 +60,11 @@ pub(crate) fn generate_tree_string(
     output
 }
 
-/// Compute a short hash for a file's contents
-fn compute_file_hash(path: &Path) -> Option<String> {
+/// Compute a short hash (8-char truncated SHA-256) for a file's contents.
+///
+/// Used to detect stale tree descriptions via `[!]` markers.
+#[must_use]
+pub fn compute_file_hash(path: &Path) -> Option<String> {
     let content = fs::read(path).ok()?;
     let hash = Sha256::digest(&content);
     let hex = format!("{hash:x}");

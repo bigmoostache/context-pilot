@@ -296,6 +296,48 @@ impl Module for OverviewModule {
                                 pf.warnings.push(format!(
                                     "Panel '{id}' is a fixed panel and cannot be closed — will be skipped"
                                 ));
+                            } else if state.active_modules.contains("tree")
+                                && let Some(ctx) =
+                                    state.context.iter().find(|c| c.id == id && c.context_type.as_str() == Kind::FILE)
+                                && let Some(file_path) = ctx.get_meta_str("file_path")
+                                && let Ok(cwd) = std::env::current_dir().and_then(|d| d.canonicalize())
+                                && let Ok(rel) = std::path::Path::new(file_path).strip_prefix(&cwd)
+                            {
+                                let rel_str = rel.to_string_lossy();
+                                let ts = cp_mod_tree::types::TreeState::get(state);
+                                if let Some(desc) = ts.descriptions.iter().find(|d| d.path == rel_str.as_ref()) {
+                                    let current_hash =
+                                        cp_mod_tree::tools::compute_file_hash(std::path::Path::new(file_path))
+                                            .unwrap_or_default();
+                                    if !desc.file_hash.is_empty() && desc.file_hash != current_hash {
+                                        // Check for a pending tree_describe in the queue
+                                        let has_pending = state.active_modules.contains("queue")
+                                            && cp_mod_queue::types::QueueState::get(state).queued_calls.iter().any(
+                                                |call| {
+                                                    call.tool_name == "tree_describe"
+                                                        && call
+                                                            .input
+                                                            .get("descriptions")
+                                                            .and_then(|v| v.as_array())
+                                                            .is_some_and(|descs| {
+                                                                descs.iter().any(|d| {
+                                                                    d.get("path").and_then(|p| p.as_str())
+                                                                        == Some(rel_str.as_ref())
+                                                                        && d.get("delete")
+                                                                            .and_then(serde_json::Value::as_bool)
+                                                                            != Some(true)
+                                                                })
+                                                            })
+                                                },
+                                            );
+                                        if !has_pending {
+                                            pf.errors.push(format!(
+                                                "Panel '{id}' ({rel_str}) has a stale [!] tree description. \
+                                                 Update it with tree_describe before closing."
+                                            ));
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
