@@ -45,7 +45,7 @@ Integrate Meilisearch as a core search backbone for Context Pilot, enabling:
 ### Round 5 — Server & Config (2026-05-06)
 | Decision | Choice | Notes |
 |----------|--------|-------|
-| Search tool params | **`search(query, scope?, path_pattern?, limit?)`** | `scope`: all\|project\|logs. `path_pattern`: regex on relative path (replaces language param). `limit`: 1–50, default 20. |
+| Search tool params | **`search(query, scope?, path_pattern?, limit?)`** | `scope`: all\|project\|logs. `path_pattern`: regex on relative path (replaces language param). `limit`: 1–50, default 20. *Superseded by Round 9: structured params.* |
 | Server model | **Global (Tuwunel pattern)** | One Meilisearch at `~/.context-pilot/meilisearch/`. Per-project indexes: `cp_{hash8}_files`, `cp_{hash8}_logs`. First project downloads binary + starts. Subsequent reuse. |
 | Extension config | **Config file, no dedicated tool** | Hardcoded defaults + overrides in `.context-pilot/search.toml`. LLM uses file tools to edit. Config path noted in search tool's YAML description. |
 | Boot | **Like Tuwunel** | Launched at module init if not already running. Health check on connect. Background start, graceful degradation. |
@@ -77,6 +77,24 @@ Integrate Meilisearch as a core search backbone for Context Pilot, enabling:
 | Panel design | **Rich** | Files: path, line range, snippet w/ highlights, chunk type/name. Logs: datetime, importance, tags, content. |
 | CCH tool | **Keep + update** | Close_conversation_history survives. Add tags + importance params for the logs it creates. |
 | Migration | **Clean slate** | Wipe old logs on migration. Fresh start with new schema. |
+
+### Round 9 — Grey Area Resolution (2026-05-06)
+| Decision | Choice | Notes |
+|----------|--------|-------|
+| path_pattern | **Drop regex → structured params** | Replace `path_pattern` (regex) with `path_prefix` (string) + `extension` (string). Maps to Meilisearch native filters. No client-side post-filtering needed. |
+| Log indexing | **Filesystem only** | Remove `IndexerCmd::IndexLog`. Zero coupling. Watch `.context-pilot/logs/` via `notify`. |
+| File size cap | **1 MB** | Skip files > 1MB. Covers 99% of code files. |
+| Indexing overlay | **Keyboard shortcut (Ctrl+I)** | Floating overlay: queue depth, errors, indexed count, last activity. Dismissible. |
+| Error handling | **Buffer + retry** | Buffer failed ops in memory. Retry every 5s, exponential backoff. Cap buffer at 1000 items. Flush on reconnect. |
+| Panel context | **Full results + `include_context` param** | New tool param: `include_context` (bool, default true). true → YAML results in tool_result + panel. false → panel only ("peek" mode). |
+| Server shutdown | **Never stop** | Runs until machine restart or manual kill. Tiny idle footprint (~20MB). |
+| Init progress | **Overlay only (Ctrl+I)** | No spine notifications. User checks overlay for indexing progress. |
+| Debounce | **200ms** | After last FS event, wait 200ms, then batch-process all accumulated changes. |
+| MS version | **Auto-latest** | Check GitHub Releases API on first download. |
+| Symlinks | **Skip** | Don't follow. Prevents infinite loops with recursive watching. |
+| Persistence | **Full persist** | Serialize: port, key, hash, index_ready. Re-create on reload: watcher, indexer thread, channel. |
+| Transition | **Hard cutover** | Once cp-mod-search lands, old LOGS panel is removed. No deprecation period. |
+| Memories | **Out of scope** | Files + logs only. Memories as future third index. |
 
 ---
 
@@ -159,6 +177,76 @@ Integrate Meilisearch as a core search backbone for Context Pilot, enabling:
 2. **Subsequent project init**: Read port file → health check → reuse. If dead: restart.
 3. **Orphan cleanup on start**: Read `projects.json` → for each project path, check if directory exists → delete indexes for missing projects
 4. **Index creation**: On module init, create `cp_{hash8}_files` and `cp_{hash8}_logs` indexes if they don't exist
+
+### Indexer Thread Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│              Indexer Thread                       │
+│                                                  │
+│  notify::Watcher ──→ mpsc::Receiver             │
+│       │                    │                     │
+│       │              ┌─────▼──────┐              │
+│       │              │ Debounce   │ 200ms        │
+│       │              │ Buffer     │              │
+│       │              └─────┬──────┘              │
+│       │                    │                     │
+│       │              ┌─────▼──────┐              │
+│       │              │ Filter     │ allowlist    │
+│       │              │ & Validate │ + size < 1MB │
+│       │              │            │ + !symlink   │
+│       │              └─────┬──────┘              │
+│       │                    │                     │
+│       │              ┌─────▼──────┐              │
+│       │              │ Splitter   │ tree-sitter  │
+│       │              │ Chain      │ or fixed-sz  │
+│       │              └─────┬──────┘              │
+│       │                    │                     │
+│       │              ┌─────▼──────┐              │
+│       │              │ Meilisearch│ HTTP batch   │
+│       │              │ Client     │              │
+│       │              └─────┬──────┘              │
+│       │                    │                     │
+│       │              ┌─────▼──────┐              │
+│       │              │ Error      │ buffer+retry │
+│       │              │ Handler    │ exp backoff  │
+│       │              └────────────┘              │
+└─────────────────────────────────────────────────┘
+```
+
+**Debounce**: After the last FS event, wait 200ms, then batch-process all accumulated changes. Prevents thrashing during `git checkout` or bulk operations.
+
+**Error handling**: If Meilisearch is unreachable, buffer failed `IndexerCmd`s in memory (cap: 1000). Retry every 5s with exponential backoff (5s → 10s → 20s → ... → 5min max). Flush entire buffer on successful reconnect.
+
+**File filtering pipeline**:
+1. Check path against hardcoded exclusions (node_modules/, .git/, etc.)
+2. Check extension against allowlist (hardcoded + search.toml overrides)
+3. Check file size < 1MB
+4. Check not a symlink
+5. If all pass → split and index
+
+### Indexing Status Overlay (Ctrl+I)
+
+Keyboard shortcut opens a floating overlay (like Ctrl+H config view):
+
+```
+┌─ Indexing Status ───────────────────────────┐
+│                                             │
+│  Server:    http://127.0.0.1:7710 ● online │
+│  Version:   Meilisearch v1.12.0            │
+│                                             │
+│  Files index:   1,234 chunks (456 files)   │
+│  Logs index:    89 entries                  │
+│                                             │
+│  Queue:         0 pending                  │
+│  Errors:        0                          │
+│  Last indexed:  src/app/mod.rs (2s ago)    │
+│                                             │
+│  Initial scan:  ████████████████ 100%      │
+│                                             │
+│  Press Ctrl+I or Esc to dismiss            │
+└─────────────────────────────────────────────┘
+```
 
 ## 4. Data Model
 
@@ -265,20 +353,28 @@ crates/cp-mod-search/
 
 **SearchState** (stored in module_data TypeMap):
 ```rust
-struct SearchState {
+// Persisted (save_module_data / load_module_data)
+#[derive(Serialize, Deserialize)]
+struct SearchPersistData {
     server_port: u16,
     master_key: String,
     project_hash: String,          // 8-char hash of project path
-    indexer_tx: Sender<IndexerCmd>, // channel to background indexer
     index_ready: bool,             // true once initial indexing complete
+}
+
+// Runtime (re-created on load)
+struct SearchState {
+    persist: SearchPersistData,
+    indexer_tx: Sender<IndexerCmd>, // channel to background indexer
     watcher: Option<RecommendedWatcher>,
+    error_buffer: Vec<IndexerCmd>,  // failed ops awaiting retry
+    retry_backoff_ms: u64,          // current retry interval
 }
 
 enum IndexerCmd {
     IndexFile(PathBuf),
     DeleteFile(PathBuf),
-    IndexLog(LogEntry),
-    DeleteAllLogs,  // for clean-slate migration
+    DeleteAllLogs,  // clean-slate migration only
     Shutdown,
 }
 ```
@@ -346,11 +442,11 @@ search:
     structs, classes) with a character-based fallback for unsupported languages.
     Logs are indexed with tags, importance, and full-text content.
     
-    Results appear in a dynamic search panel. Use path_pattern for regex
-    filtering on file paths (e.g., '\.rs$' for Rust, '^src/app/' for a
-    directory, '\.test\.' for test files).
+    Results appear in a dynamic search panel (YAML-formatted, like brave_search).
+    Use include_context=false for "peek" searches that don't consume context tokens.
     
     The extension allowlist is configurable in .context-pilot/search.toml.
+    Press Ctrl+I to view indexing status, queue depth, and errors.
     
   params:
     query:
@@ -362,9 +458,12 @@ search:
       enum: ["all", "project", "logs"]
       default: "all"
       description: "Where to search. 'all' searches both indexes."
-    path_pattern:
+    path_prefix:
       type: string
-      description: "Regex filter on relative file paths. Only applies to project scope."
+      description: "Filter files by path prefix (e.g., 'src/app/'). Project scope only."
+    extension:
+      type: string
+      description: "Filter files by extension (e.g., 'rs', 'py'). Project scope only."
     sort:
       type: string
       enum: ["relevance", "date_asc", "date_desc"]
@@ -376,6 +475,10 @@ search:
     to_date:
       type: string
       description: "ISO 8601 date. Only results before this date."
+    include_context:
+      type: boolean
+      default: true
+      description: "If true, results are included in the tool response (YAML). If false, results appear only in the panel ('peek' mode — saves context tokens)."
     limit:
       type: integer
       default: 20
@@ -459,33 +562,42 @@ fallback_chunk_size = 4000
 ### Phase 1 — Foundation
 - [ ] Create `crates/cp-mod-search/` crate with Cargo.toml
 - [ ] Register module in `src/modules/mod.rs` (22 → 23 modules)
-- [ ] `server.rs`: Meilisearch binary download (platform detection: macOS arm64/x86, Linux)
-- [ ] `server.rs`: Start/stop, PID management, health check (`GET /health`)
+- [ ] `server.rs`: GitHub Releases API check for latest Meilisearch version
+- [ ] `server.rs`: Meilisearch binary download (platform detection: macOS arm64/x86, Linux amd64/arm64)
+- [ ] `server.rs`: Start/stop, PID management, health check (`GET /health`, retry 500ms × 30)
 - [ ] `server.rs`: Port assignment (find free port, save to `~/.context-pilot/meilisearch/port`)
-- [ ] `server.rs`: Master key generation + storage
+- [ ] `server.rs`: Master key generation (random 32-byte, base64) + storage
 - [ ] `client.rs`: HTTP wrapper for index CRUD, document CRUD, search, settings
-- [ ] `types.rs`: SearchState, Chunk, IndexDoc, SearchResult
+- [ ] `types.rs`: SearchState (persist + runtime split), SearchPersistData, Chunk, IndexDoc, SearchResult, SearchMetrics
 - [ ] `lib.rs`: Module trait impl skeleton, init_state (server start + index creation)
+- [ ] `lib.rs`: save_module_data / load_module_data (persist port, key, hash, index_ready; re-create watcher, indexer thread, channel on load)
 
 ### Phase 2 — File Indexing
 - [ ] `splitter/mod.rs`: Splitter trait + SplitterChain
 - [ ] `splitter/fixed_size.rs`: 4000-char fallback (split on line boundaries)
 - [ ] `splitter/tree_sitter.rs`: AST chunking (start with Rust, Python, JS/TS, Go, Java, C/C++)
-- [ ] `config.rs`: Extension allowlist (hardcoded + search.toml override), path exclusions
-- [ ] `indexer.rs`: Background thread with mpsc channel, notify::Watcher
-- [ ] `indexer.rs`: File change → filter (allowlist + exclusions) → split → batch index
+- [ ] `config.rs`: Extension allowlist (hardcoded + search.toml override), path exclusions, 1MB file size cap
+- [ ] `indexer.rs`: Background thread with mpsc channel, notify::Watcher (skip symlinks)
+- [ ] `indexer.rs`: 200ms debounce — collect FS events, batch-process after quiet period
+- [ ] `indexer.rs`: File filtering pipeline (exclusions → allowlist → size cap → symlink check)
+- [ ] `indexer.rs`: File change → filter → split → batch index
 - [ ] `indexer.rs`: Initial full-project scan on first boot
 - [ ] `indexer.rs`: Delete + re-insert on file modification
 - [ ] `indexer.rs`: Delete on file removal
+- [ ] `indexer.rs`: Error buffer (cap 1000) + exponential backoff retry (5s → 5min max)
+- [ ] `indexer.rs`: Expose SearchMetrics (indexed count, queue depth, errors, last activity)
 
 ### Phase 3 — Search Tool + Panel
 - [ ] `yamls/tools/search.yaml`: Tool description text
 - [ ] `tools.rs`: search tool execution (query → Meilisearch API → results)
 - [ ] `tools.rs`: Scope routing (all → multi-index, project → files index, logs → logs index)
-- [ ] `tools.rs`: Filter translation (path_pattern → Meilisearch filter, date range → timestamp filter)
-- [ ] `panel.rs`: SearchResultPanel with rich layout (file results + log results sections)
-- [ ] `panel.rs`: Highlighted matching terms in snippets
+- [ ] `tools.rs`: Filter translation (path_prefix/extension → Meilisearch native filters, date range → timestamp filter)
+- [ ] `tools.rs`: `include_context` param — true: YAML results in tool_result + panel, false: panel only ("peek" mode)
+- [ ] `panel.rs`: SearchResultPanel with rich layout (file results + log results sections, YAML-formatted like brave_search)
+- [ ] `panel.rs`: Highlighted matching terms in snippets (Meilisearch `_formatted` fields)
 - [ ] Tool visualizer for search results
+- [ ] `src/app/events.rs`: Ctrl+I → Action::ToggleIndexOverlay
+- [ ] `src/ui/`: Indexing status overlay renderer (reads SearchMetrics from module_data)
 
 ### Phase 4 — Log Migration
 - [ ] Update cp-mod-logs: remove log_summarize, log_toggle tools
