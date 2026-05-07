@@ -88,7 +88,7 @@ impl MeiliClient {
 
     /// Configure embedder settings for an index.
     ///
-    /// Uses `PUT /indexes/{uid}/settings/embedders` to set up the embedding
+    /// Uses `PATCH /indexes/{uid}/settings/embedders` to set up the embedding
     /// source (e.g. `huggingFace`). Returns the task UID for polling.
     ///
     /// Meilisearch will generate embeddings for all existing documents
@@ -102,7 +102,7 @@ impl MeiliClient {
 
         let resp = self
             .http
-            .put(&url)
+            .patch(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .body(settings.to_string())
