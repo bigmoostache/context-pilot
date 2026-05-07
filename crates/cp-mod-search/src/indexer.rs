@@ -32,6 +32,8 @@ pub(crate) struct IndexerParams {
     pub project_hash: String,
     /// Root directory of the project.
     pub project_root: PathBuf,
+    /// Shared metrics updated by the indexer thread.
+    pub metrics: std::sync::Arc<std::sync::Mutex<types::SearchMetrics>>,
 }
 
 /// Internal context for the running indexer thread.
@@ -47,6 +49,8 @@ struct IndexerCtx {
     /// Optional Datalab OCR client for converting PDFs/images to text.
     /// `None` when `DATALAB_API_KEY` is not set.
     ocr_client: Option<ocr::DatalabClient>,
+    /// Shared metrics, updated as files are indexed.
+    metrics: std::sync::Arc<std::sync::Mutex<types::SearchMetrics>>,
 }
 
 /// Start the background indexer and file watcher.
@@ -136,6 +140,7 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
                 None
             }
         }),
+        metrics: std::sync::Arc::clone(&params.metrics),
     };
 
     while let Ok(first) = rx.recv() {
@@ -246,11 +251,25 @@ fn index_one_file(ctx: &IndexerCtx, abs_path: &Path) {
             // No API key — skip silently
             return;
         };
+        if let Ok(mut m) = ctx.metrics.lock() {
+            m.ocr_attempted = m.ocr_attempted.saturating_add(1);
+        }
         match ocr_client.convert_to_text(abs_path) {
-            Ok(text) if !text.trim().is_empty() => text,
+            Ok(result) if !result.text.trim().is_empty() => {
+                if let Ok(mut m) = ctx.metrics.lock() {
+                    m.ocr_succeeded = m.ocr_succeeded.saturating_add(1);
+                    if result.cached {
+                        m.ocr_cached = m.ocr_cached.saturating_add(1);
+                    }
+                }
+                result.text
+            }
             Ok(_) => return, // Empty OCR result — nothing to index
             Err(e) => {
                 log::warn!("OCR failed for {rel_str}: {e}");
+                if let Ok(mut m) = ctx.metrics.lock() {
+                    m.ocr_failed = m.ocr_failed.saturating_add(1);
+                }
                 return;
             }
         }
@@ -310,6 +329,25 @@ fn index_one_file(ctx: &IndexerCtx, abs_path: &Path) {
     // Send to Meilisearch
     if let Ok(task) = ctx.client.add_documents(&ctx.files_uid, &serde_json::Value::Array(docs)) {
         let _r = ctx.client.wait_for_task(task);
+    }
+
+    // Update metrics
+    if let Ok(mut m) = ctx.metrics.lock() {
+        m.files_indexed = m.files_indexed.saturating_add(1);
+        let chunk_count = u64::try_from(chunks.len()).unwrap_or(0);
+        m.chunks_indexed = m.chunks_indexed.saturating_add(chunk_count);
+        let count = m.extension_counts.entry(ext.to_string()).or_insert(0);
+        *count = count.saturating_add(1);
+        for chunk in &chunks {
+            if chunk.kind == "raw" {
+                m.fallback_chunks = m.fallback_chunks.saturating_add(1);
+            } else {
+                m.tree_sitter_chunks = m.tree_sitter_chunks.saturating_add(1);
+            }
+        }
+        m.last_activity_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
     }
 }
 

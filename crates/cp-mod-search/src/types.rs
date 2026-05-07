@@ -1,5 +1,6 @@
 //! Core types for the search module.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, mpsc};
 
@@ -98,7 +99,7 @@ pub(crate) struct Chunk {
 /// Runtime metrics for the background indexer.
 ///
 /// Shared between the indexer thread and the module via `Arc<Mutex<…>>`.
-/// Read by the Ctrl+I overlay and overview panel (Phase 7).
+/// Read by the Ctrl+I overlay and overview panel.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct SearchMetrics {
     /// Number of file chunks currently in the Meilisearch index.
@@ -111,6 +112,20 @@ pub(crate) struct SearchMetrics {
     pub error_count: u64,
     /// Unix timestamp (ms) of the last indexing activity.
     pub last_activity_ms: u64,
+    /// Per-extension file counts (e.g. "rs" → 142, "py" → 37).
+    pub extension_counts: HashMap<String, u64>,
+    /// Number of tree-sitter AST chunks produced.
+    pub tree_sitter_chunks: u64,
+    /// Number of fixed-size fallback chunks produced.
+    pub fallback_chunks: u64,
+    /// OCR: files where conversion was attempted.
+    pub ocr_attempted: u64,
+    /// OCR: files successfully converted to text.
+    pub ocr_succeeded: u64,
+    /// OCR: files that failed conversion.
+    pub ocr_failed: u64,
+    /// OCR: files served from the disk cache.
+    pub ocr_cached: u64,
 }
 
 /// Commands sent to the background indexer thread.
@@ -127,7 +142,7 @@ pub(crate) enum IndexerCmd {
 /// Information exposed to the main binary for the Ctrl+I overlay.
 ///
 /// Constructed by [`crate::overlay_info`] from internal state.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct SearchOverlayInfo {
     /// TCP port the Meilisearch server is listening on.
     pub port: u16,
@@ -143,6 +158,22 @@ pub struct SearchOverlayInfo {
     pub last_activity_ms: u64,
     /// Whether the initial full-project scan has completed.
     pub index_ready: bool,
+    /// Top extensions by file count (sorted descending, max 8).
+    pub top_extensions: Vec<(String, u64)>,
+    /// Number of tree-sitter AST chunks produced.
+    pub tree_sitter_chunks: u64,
+    /// Number of fixed-size fallback chunks produced.
+    pub fallback_chunks: u64,
+    /// OCR: files where conversion was attempted.
+    pub ocr_attempted: u64,
+    /// OCR: files successfully converted to text.
+    pub ocr_succeeded: u64,
+    /// OCR: files that failed conversion.
+    pub ocr_failed: u64,
+    /// OCR: files served from the disk cache.
+    pub ocr_cached: u64,
+    /// Whether the OCR API key is configured.
+    pub ocr_available: bool,
 }
 
 // -- Search results ----------------------------------------------------------

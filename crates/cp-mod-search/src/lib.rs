@@ -95,24 +95,29 @@ fn ensure_indexes(port: u16, master_key: &str, project_hash: &str) -> Result<(),
 #[must_use]
 pub fn overlay_info(state: &State) -> Option<SearchOverlayInfo> {
     let ss = state.get_ext::<SearchState>()?;
-    let (chunks, files, queue_depth, error_count, last_activity_ms) = {
-        let metrics = ss.metrics.lock().ok()?;
-        (
-            metrics.chunks_indexed,
-            metrics.files_indexed,
-            metrics.queue_depth,
-            metrics.error_count,
-            metrics.last_activity_ms,
-        )
-    };
+    let metrics = ss.metrics.lock().ok()?;
+
+    // Sort extensions by count descending, take top 8.
+    let mut ext_vec: Vec<(String, u64)> = metrics.extension_counts.iter().map(|(k, v)| (k.clone(), *v)).collect();
+    ext_vec.sort_by_key(|e| std::cmp::Reverse(e.1));
+    ext_vec.truncate(8);
+
     Some(SearchOverlayInfo {
         port: ss.persist.port,
-        chunks_indexed: chunks,
-        files_indexed: files,
-        queue_depth,
-        error_count,
-        last_activity_ms,
+        chunks_indexed: metrics.chunks_indexed,
+        files_indexed: metrics.files_indexed,
+        queue_depth: metrics.queue_depth,
+        error_count: metrics.error_count,
+        last_activity_ms: metrics.last_activity_ms,
         index_ready: ss.persist.index_ready,
+        top_extensions: ext_vec,
+        tree_sitter_chunks: metrics.tree_sitter_chunks,
+        fallback_chunks: metrics.fallback_chunks,
+        ocr_attempted: metrics.ocr_attempted,
+        ocr_succeeded: metrics.ocr_succeeded,
+        ocr_failed: metrics.ocr_failed,
+        ocr_cached: metrics.ocr_cached,
+        ocr_available: ss.indexer_tx.is_some(),
     })
 }
 
@@ -270,6 +275,7 @@ impl Module for SearchModule {
                 master_key: master_key.clone(),
                 project_hash: project_hash.clone(),
                 project_root: std::path::PathBuf::from(&project_path),
+                metrics: std::sync::Arc::clone(&metrics),
             }) {
                 Ok((tx, w)) => (Some(tx), Some(types::WatcherHandle::new(w))),
                 Err(e) => {
@@ -314,6 +320,7 @@ impl Module for SearchModule {
                     master_key: persist.master_key.clone(),
                     project_hash: persist.project_hash.clone(),
                     project_root: std::path::PathBuf::from(&project_path),
+                    metrics: std::sync::Arc::clone(&metrics),
                 }) {
                     Ok((tx, w)) => (Some(tx), Some(types::WatcherHandle::new(w))),
                     Err(e) => {

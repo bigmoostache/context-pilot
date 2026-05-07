@@ -50,6 +50,15 @@ pub(crate) struct DatalabClient {
     http: reqwest::blocking::Client,
 }
 
+/// Result of an OCR conversion, including cache status.
+#[derive(Debug)]
+pub(crate) struct OcrResult {
+    /// Extracted markdown text.
+    pub text: String,
+    /// Whether the result was served from the disk cache.
+    pub cached: bool,
+}
+
 impl DatalabClient {
     /// Create a client from an API key string.
     ///
@@ -75,7 +84,7 @@ impl DatalabClient {
     ///
     /// Returns an error if the file cannot be read, submission fails,
     /// polling times out, or the API returns an error status.
-    pub(crate) fn convert_to_text(&self, path: &Path) -> Result<String, String> {
+    pub(crate) fn convert_to_text(&self, path: &Path) -> Result<OcrResult, String> {
         // Read file bytes (needed for both hash check and upload).
         let file_bytes = std::fs::read(path).map_err(|e| format!("Cannot read file for OCR: {e}"))?;
 
@@ -83,7 +92,7 @@ impl DatalabClient {
         let hash = sha256_hex(&file_bytes);
         if let Some(cached) = read_cache(&hash) {
             log::debug!("OCR cache hit for {} ({hash})", path.display());
-            return Ok(cached);
+            return Ok(OcrResult { text: cached, cached: true });
         }
 
         // Cache miss — call the Datalab API.
@@ -102,7 +111,7 @@ impl DatalabClient {
         // Cache the result (including empty — avoids re-calling for no-text files).
         write_cache(&hash, &markdown);
 
-        Ok(markdown)
+        Ok(OcrResult { text: markdown, cached: false })
     }
 
     /// Submit file bytes for conversion.

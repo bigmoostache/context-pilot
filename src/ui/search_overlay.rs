@@ -1,7 +1,8 @@
 //! Ctrl+I Meilisearch indexing status overlay.
 //!
 //! Renders a floating, centered info box showing the Meilisearch server
-//! status, indexing metrics, and queue depth.
+//! status, indexing metrics, extension breakdown, splitter stats,
+//! and OCR pipeline status.
 
 use ratatui::Frame;
 use ratatui::prelude::{Rect, Style};
@@ -13,17 +14,16 @@ use crate::state::State;
 use crate::ui::theme;
 
 /// Overlay width in terminal cells.
-const OVERLAY_WIDTH: u16 = 50;
-/// Overlay height in terminal cells.
-const OVERLAY_HEIGHT: u16 = 14;
+const OVERLAY_WIDTH: u16 = 58;
 
 /// Render the Meilisearch indexing status overlay.
 ///
-/// Displays server status, index metrics, queue depth, and error count
-/// in a centered, bordered box.
+/// Displays server status, index metrics, extension breakdown, splitter
+/// stats, and OCR pipeline info in a centered, bordered box.
 pub(crate) fn render_index_overlay(frame: &mut Frame<'_>, state: &State, area: Rect) {
-    let popup = centered_rect(OVERLAY_WIDTH, OVERLAY_HEIGHT, area);
     let lines = build_overlay_lines(state);
+    let height = u16::try_from(lines.len().saturating_add(2)).unwrap_or(30).min(area.height);
+    let popup = centered_rect(OVERLAY_WIDTH, height, area);
 
     let block = Block::default()
         .title(" Indexing Status ")
@@ -47,30 +47,115 @@ fn build_overlay_lines(state: &State) -> Vec<Line<'static>> {
         ];
     };
 
-    let server_url = format!("http://127.0.0.1:{}", info.port);
-    let status = if info.port > 0 { "● online" } else { "○ offline" };
-    let status_color = if info.port > 0 { theme::success() } else { theme::error() };
-    let last_activity = if info.last_activity_ms > 0 { format_ago(info.last_activity_ms) } else { "never".to_string() };
-    let ready_label = if info.index_ready { "Ready" } else { "Scanning…" };
+    let mut lines = Vec::with_capacity(32);
 
-    vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::raw("  Server:   "),
-            Span::styled(server_url, Style::default().fg(theme::text())),
-            Span::raw(" "),
-            Span::styled(status, Style::default().fg(status_color)),
-        ]),
-        Line::from(""),
-        Line::from(format!("  Files:    {} chunks ({} files)", info.chunks_indexed, info.files_indexed,)),
-        Line::from(format!("  Queue:    {} pending", info.queue_depth)),
-        Line::from(format!("  Errors:   {}", info.error_count)),
-        Line::from(format!("  Last:     {last_activity}")),
-        Line::from(format!("  Status:   {ready_label}")),
-        Line::from(""),
-        Line::from(""),
-        Line::from(dim_span("  Press Ctrl+I or Esc to dismiss")),
-    ]
+    // ── Server ──
+    let server_url = format!("http://127.0.0.1:{}", info.port);
+    let (status_label, status_color) =
+        if info.port > 0 { ("● online", theme::success()) } else { ("○ offline", theme::error()) };
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::raw("  Server  "),
+        Span::styled(server_url, Style::default().fg(theme::text())),
+        Span::raw("  "),
+        Span::styled(status_label, Style::default().fg(status_color)),
+    ]));
+
+    // ── Core Stats (two-column) ──
+    lines.push(Line::from(""));
+    lines.push(Line::from(format!("  Files  {:<10} Chunks  {}", info.files_indexed, info.chunks_indexed,)));
+    lines.push(Line::from(format!(
+        "  Queue  {:<10} Errors  {}",
+        format!("{} pending", info.queue_depth),
+        info.error_count,
+    )));
+    let last = if info.last_activity_ms > 0 { format_ago(info.last_activity_ms) } else { "never".to_string() };
+    let ready = if info.index_ready { "Ready" } else { "Scanning…" };
+    lines.push(Line::from(format!("  Status {ready:<10} Last    {last}")));
+
+    // ── Extensions ──
+    if !info.top_extensions.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(section_header("Extensions"));
+
+        let max_count = info.top_extensions.first().map_or(1, |e| e.1.max(1));
+        let total_files: u64 = info.top_extensions.iter().map(|e| e.1).sum();
+        let bar_max_width: u64 = 22;
+
+        for (ext, count) in &info.top_extensions {
+            let bar_len = count.saturating_mul(bar_max_width).checked_div(max_count).unwrap_or(0);
+            let bar_usize = usize::try_from(bar_len).unwrap_or(0).max(1);
+            let fill = "█".repeat(bar_usize);
+            let pct = if total_files > 0 { count.saturating_mul(100).checked_div(total_files).unwrap_or(0) } else { 0 };
+            lines.push(Line::from(vec![
+                Span::raw(format!("  {ext:<6} {count:>4}  ")),
+                Span::styled(fill, Style::default().fg(theme::accent())),
+                Span::styled(format!("  {pct}%"), Style::default().fg(theme::text_muted())),
+            ]));
+        }
+    }
+
+    // ── Splitter ──
+    let total_chunks = info.tree_sitter_chunks.saturating_add(info.fallback_chunks);
+    if total_chunks > 0 {
+        lines.push(Line::from(""));
+        lines.push(section_header("Splitter"));
+
+        let ts_pct = info.tree_sitter_chunks.saturating_mul(100).checked_div(total_chunks).unwrap_or(0);
+        let fb_pct = 100_u64.saturating_sub(ts_pct);
+
+        lines.push(Line::from(vec![
+            Span::raw("  Tree-sitter  "),
+            Span::styled(format!("{} chunks", info.tree_sitter_chunks), Style::default().fg(theme::success())),
+            Span::styled(format!("  ({ts_pct}%)"), Style::default().fg(theme::text_muted())),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("  Fallback     "),
+            Span::styled(format!("{} chunks", info.fallback_chunks), Style::default().fg(theme::warning())),
+            Span::styled(format!("  ({fb_pct}%)"), Style::default().fg(theme::text_muted())),
+        ]));
+    }
+
+    // ── OCR Pipeline ──
+    if info.ocr_available || info.ocr_attempted > 0 {
+        lines.push(Line::from(""));
+        lines.push(section_header("OCR Pipeline"));
+
+        if info.ocr_attempted > 0 {
+            lines.push(Line::from(format!(
+                "  Attempted  {}   Succeeded  {}   Cached  {}",
+                info.ocr_attempted, info.ocr_succeeded, info.ocr_cached,
+            )));
+            if info.ocr_failed > 0 {
+                lines.push(Line::from(vec![
+                    Span::raw("  Failed     "),
+                    Span::styled(format!("{}", info.ocr_failed), Style::default().fg(theme::error())),
+                ]));
+            }
+        } else {
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled("Enabled", Style::default().fg(theme::success())),
+                Span::styled(" — no OCR files found yet", Style::default().fg(theme::text_muted())),
+            ]));
+        }
+    }
+
+    // ── Footer ──
+    lines.push(Line::from(""));
+    lines.push(Line::from(dim_span("  Press Ctrl+I or Esc to dismiss")));
+
+    lines
+}
+
+/// Render a section header line with dashes.
+fn section_header(title: &str) -> Line<'static> {
+    let dashes = "─".repeat(48_usize.saturating_sub(title.len()).saturating_sub(4));
+    Line::from(vec![
+        Span::styled(format!("  ── {title} "), Style::default().fg(theme::accent())),
+        Span::styled(dashes, Style::default().fg(theme::text_muted())),
+    ])
 }
 
 /// Compute a centered rectangle within the given area.
