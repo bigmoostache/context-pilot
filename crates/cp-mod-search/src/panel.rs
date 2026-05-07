@@ -46,7 +46,9 @@ pub(crate) struct SearchResultPanel;
 
 /// Cache request for restoring content from metadata after reload.
 struct RestoreRequest {
+    /// Panel context ID (e.g. `"P15"`).
     context_id: String,
+    /// The full search result content to restore.
     content: String,
 }
 

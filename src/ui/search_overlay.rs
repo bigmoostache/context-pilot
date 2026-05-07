@@ -12,8 +12,9 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use crate::state::State;
 use crate::ui::theme;
 
-/// Overlay width and height in terminal cells.
+/// Overlay width in terminal cells.
 const OVERLAY_WIDTH: u16 = 50;
+/// Overlay height in terminal cells.
 const OVERLAY_HEIGHT: u16 = 14;
 
 /// Render the Meilisearch indexing status overlay.
@@ -73,25 +74,25 @@ fn build_overlay_lines(state: &State) -> Vec<Line<'static>> {
 }
 
 /// Compute a centered rectangle within the given area.
-const fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
-    let eff_w = if width > area.width { area.width } else { width };
-    let eff_h = if height > area.height { area.height } else { height };
-    let x_off = (area.width - eff_w) / 2;
-    let y_off = (area.height - eff_h) / 2;
-    Rect::new(area.x + x_off, area.y + y_off, eff_w, eff_h)
+fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
+    let eff_w = width.min(area.width);
+    let eff_h = height.min(area.height);
+    let x_off = area.width.saturating_sub(eff_w).checked_div(2).unwrap_or(0);
+    let y_off = area.height.saturating_sub(eff_h).checked_div(2).unwrap_or(0);
+    Rect::new(area.x.saturating_add(x_off), area.y.saturating_add(y_off), eff_w, eff_h)
 }
 
 /// Format a millisecond timestamp as a relative "X ago" string.
 fn format_ago(ms_then: u64) -> String {
     let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis();
     let now_u64 = u64::try_from(now_ms).unwrap_or(u64::MAX);
-    let diff_sec = now_u64.saturating_sub(ms_then) / 1000;
+    let diff_sec = now_u64.saturating_sub(ms_then).checked_div(1000).unwrap_or(0);
     if diff_sec < 60 {
         format!("{diff_sec}s ago")
     } else if diff_sec < 3600 {
-        format!("{}m ago", diff_sec / 60)
+        format!("{}m ago", diff_sec.checked_div(60).unwrap_or(0))
     } else {
-        format!("{}h ago", diff_sec / 3600)
+        format!("{}h ago", diff_sec.checked_div(3600).unwrap_or(0))
     }
 }
 

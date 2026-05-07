@@ -9,8 +9,6 @@
 
 /// Meilisearch HTTP API client: index management, document CRUD, search.
 pub mod client;
-/// Configuration constants: extension allowlists, path exclusions, size limits.
-pub mod config;
 /// Background file indexer thread and file watcher.
 pub mod indexer;
 /// Dynamic search result panel rendering and creation.
@@ -73,7 +71,7 @@ fn ensure_indexes(port: u16, master_key: &str, project_hash: &str) -> Result<(),
     if !meili.index_exists(&files_uid)? {
         let create_task = meili.create_index(&files_uid, "id")?;
         meili.wait_for_task(create_task)?;
-        let settings_task = meili.update_settings(&files_uid, &config::files_index_settings())?;
+        let settings_task = meili.update_settings(&files_uid, &types::files_index_settings())?;
         meili.wait_for_task(settings_task)?;
         log::info!("Created files index: {files_uid}");
     }
@@ -82,7 +80,7 @@ fn ensure_indexes(port: u16, master_key: &str, project_hash: &str) -> Result<(),
     if !meili.index_exists(&logs_uid)? {
         let create_task = meili.create_index(&logs_uid, "id")?;
         meili.wait_for_task(create_task)?;
-        let settings_task = meili.update_settings(&logs_uid, &config::logs_index_settings())?;
+        let settings_task = meili.update_settings(&logs_uid, &types::logs_index_settings())?;
         meili.wait_for_task(settings_task)?;
         log::info!("Created logs index: {logs_uid}");
     }
@@ -97,23 +95,24 @@ fn ensure_indexes(port: u16, master_key: &str, project_hash: &str) -> Result<(),
 #[must_use]
 pub fn overlay_info(state: &State) -> Option<SearchOverlayInfo> {
     let ss = state.get_ext::<SearchState>()?;
-    let metrics = ss.metrics.lock().ok()?;
-    let port = ss.persist.port;
-    let chunks = metrics.chunks_indexed;
-    let files = metrics.files_indexed;
-    let queue_depth = metrics.queue_depth;
-    let error_count = metrics.error_count;
-    let last_activity_ms = metrics.last_activity_ms;
-    let index_ready = ss.persist.index_ready;
-    drop(metrics);
+    let (chunks, files, queue_depth, error_count, last_activity_ms) = {
+        let metrics = ss.metrics.lock().ok()?;
+        (
+            metrics.chunks_indexed,
+            metrics.files_indexed,
+            metrics.queue_depth,
+            metrics.error_count,
+            metrics.last_activity_ms,
+        )
+    };
     Some(SearchOverlayInfo {
-        port,
+        port: ss.persist.port,
         chunks_indexed: chunks,
         files_indexed: files,
         queue_depth,
         error_count,
         last_activity_ms,
-        index_ready,
+        index_ready: ss.persist.index_ready,
     })
 }
 
@@ -266,13 +265,12 @@ impl Module for SearchModule {
         }
 
         let (indexer_tx, watcher) = if port > 0 {
-            match indexer::start(
+            match indexer::start(indexer::IndexerParams {
                 port,
-                &master_key,
-                &project_hash,
-                std::path::PathBuf::from(&project_path),
-                std::sync::Arc::clone(&metrics),
-            ) {
+                master_key: master_key.clone(),
+                project_hash: project_hash.clone(),
+                project_root: std::path::PathBuf::from(&project_path),
+            }) {
                 Ok((tx, w)) => (Some(tx), Some(types::WatcherHandle::new(w))),
                 Err(e) => {
                     log::warn!("Failed to start search indexer: {e}");
@@ -311,13 +309,12 @@ impl Module for SearchModule {
             // Restart indexer + watcher if the server was available
             let (indexer_tx, watcher) = if persist.port > 0 {
                 let project_path = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
-                match indexer::start(
-                    persist.port,
-                    &persist.master_key,
-                    &persist.project_hash,
-                    std::path::PathBuf::from(&project_path),
-                    std::sync::Arc::clone(&metrics),
-                ) {
+                match indexer::start(indexer::IndexerParams {
+                    port: persist.port,
+                    master_key: persist.master_key.clone(),
+                    project_hash: persist.project_hash.clone(),
+                    project_root: std::path::PathBuf::from(&project_path),
+                }) {
                     Ok((tx, w)) => (Some(tx), Some(types::WatcherHandle::new(w))),
                     Err(e) => {
                         log::warn!("Failed to restart search indexer: {e}");
@@ -364,15 +361,16 @@ impl Module for SearchModule {
 
     fn overview_context_section(&self, state: &State) -> Option<String> {
         let ss = state.get_ext::<SearchState>()?;
-        let metrics = ss.metrics.lock().ok()?;
         let port = ss.persist.port;
 
         if port == 0 {
             return Some("Search: server not available\n".to_string());
         }
 
-        let chunks = metrics.chunks_indexed;
-        let files = metrics.files_indexed;
+        let (chunks, files) = {
+            let metrics = ss.metrics.lock().ok()?;
+            (metrics.chunks_indexed, metrics.files_indexed)
+        };
         let status = if ss.persist.index_ready { "ready" } else { "indexing" };
 
         Some(format!("Search: {chunks} chunks indexed across ~{files} files (port {port}, {status})\n"))

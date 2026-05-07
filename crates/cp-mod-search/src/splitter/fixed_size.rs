@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use crate::config::FALLBACK_CHUNK_SIZE;
+use crate::types::FALLBACK_CHUNK_SIZE;
 use crate::splitter::Splitter;
 use crate::types::Chunk;
 
@@ -21,7 +21,7 @@ pub(crate) struct FixedSizeSplitter {
 
 impl FixedSizeSplitter {
     /// Create a new splitter with the default chunk size.
-    pub(crate) fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self { chunk_size: FALLBACK_CHUNK_SIZE }
     }
 }
@@ -49,8 +49,8 @@ impl Splitter for FixedSizeSplitter {
 
             // If adding this line would exceed the chunk size AND the buffer
             // is non-empty, flush the current chunk first.
-            if !buf.is_empty() && buf.len() + line_len > self.chunk_size {
-                let chunk_end_line = current_line - 1;
+            if !buf.is_empty() && buf.len().saturating_add(line_len) > self.chunk_size {
+                let chunk_end_line = current_line.saturating_sub(1);
                 let chunk_end_char = current_pos.try_into().unwrap_or(u32::MAX);
 
                 chunks.push(Chunk {
@@ -69,19 +69,19 @@ impl Splitter for FixedSizeSplitter {
             }
 
             buf.push_str(line);
-            current_pos += line_len;
-            current_line += 1;
+            current_pos = current_pos.saturating_add(line_len);
+            current_line = current_line.saturating_add(1);
         }
 
         // Flush remaining content
         if !buf.is_empty() {
-            let chunk_end_line = current_line - 1;
+            let chunk_end_line = current_line.saturating_sub(1);
             let chunk_end_char = current_pos.try_into().unwrap_or(u32::MAX);
 
             chunks.push(Chunk {
                 content: buf,
-                chunk_type: "raw".to_string(),
-                chunk_name: String::new(),
+                kind: "raw".to_string(),
+                name: String::new(),
                 line_start: chunk_start_line,
                 line_end: chunk_end_line,
                 char_start: chunk_start_char,

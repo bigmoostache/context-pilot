@@ -20,6 +20,22 @@ pub(crate) struct MeiliClient {
     http: reqwest::blocking::Client,
 }
 
+/// Query parameters for a single-index search.
+///
+/// Passed to [`MeiliClient::search`] to avoid excessive function arguments.
+pub(crate) struct SearchParams<'qry> {
+    /// Index UID to search.
+    pub uid: &'qry str,
+    /// Free-text query string.
+    pub query: &'qry str,
+    /// Optional Meilisearch filter expression.
+    pub filter: Option<&'qry str>,
+    /// Optional sort expression (e.g. `"last_modified_ms:desc"`).
+    pub sort: Option<&'qry str>,
+    /// Maximum number of results to return.
+    pub limit: u32,
+}
+
 impl MeiliClient {
     /// Create a new client pointing at a local Meilisearch server.
     ///
@@ -229,29 +245,27 @@ impl MeiliClient {
     /// # Errors
     ///
     /// Returns an error if the API call fails or the response cannot be parsed.
-    pub(crate) fn search(
-        &self,
-        uid: &str,
-        query: &str,
-        filter: Option<&str>,
-        sort: Option<&str>,
-        limit: u32,
-    ) -> Result<serde_json::Value, String> {
-        let url = format!("{}/indexes/{uid}/search", self.base_url);
+    pub(crate) fn search(&self, params: &SearchParams<'_>) -> Result<serde_json::Value, String> {
+        let url = format!("{}/indexes/{}/search", self.base_url, params.uid);
         let mut body = serde_json::json!({
-            "q": query,
-            "limit": limit,
+            "q": params.query,
+            "limit": params.limit,
             "attributesToHighlight": ["content"],
             "attributesToCrop": ["content"],
             "cropLength": 60,
             "showMatchesPosition": false,
         });
 
-        if let Some(f) = filter {
-            body["filter"] = serde_json::Value::String(f.to_string());
+        if let Some(f) = params.filter
+            && let Some(obj) = body.as_object_mut()
+        {
+            let _prev = obj.insert("filter".to_string(), serde_json::Value::String(f.to_string()));
         }
-        if let Some(s) = sort {
-            body["sort"] = serde_json::Value::Array(vec![serde_json::Value::String(s.to_string())]);
+        if let Some(s) = params.sort
+            && let Some(obj) = body.as_object_mut()
+        {
+            let _prev = obj
+                .insert("sort".to_string(), serde_json::Value::Array(vec![serde_json::Value::String(s.to_string())]));
         }
 
         let resp = self

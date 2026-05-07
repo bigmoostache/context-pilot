@@ -14,12 +14,36 @@ use std::time::{Duration, Instant};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _};
 
 use crate::client::MeiliClient;
-use crate::config;
+use crate::types;
 use crate::splitter::SplitterChain;
-use crate::types::{IndexerCmd, SearchMetrics};
+use crate::types::IndexerCmd;
 
 /// Duration to wait after the first event before processing a batch.
 const DEBOUNCE_MS: u64 = 200;
+
+/// Parameters for starting the background indexer.
+pub(crate) struct IndexerParams {
+    /// Meilisearch server port.
+    pub port: u16,
+    /// Meilisearch master key.
+    pub master_key: String,
+    /// Project hash for index naming.
+    pub project_hash: String,
+    /// Root directory of the project.
+    pub project_root: PathBuf,
+}
+
+/// Internal context for the running indexer thread.
+struct IndexerCtx {
+    /// Meilisearch HTTP client.
+    client: MeiliClient,
+    /// Index UID for project files.
+    files_uid: String,
+    /// Root directory of the project.
+    project_root: PathBuf,
+    /// File splitter chain (tree-sitter → fixed-size fallback).
+    splitter: SplitterChain,
+}
 
 /// Start the background indexer and file watcher.
 ///
@@ -28,15 +52,8 @@ const DEBOUNCE_MS: u64 = 200;
 ///
 /// # Errors
 ///
-/// Returns an error if the Meilisearch client or file watcher cannot
-/// be created.
-pub(crate) fn start(
-    port: u16,
-    master_key: &str,
-    project_hash: &str,
-    project_root: PathBuf,
-    metrics: std::sync::Arc<std::sync::Mutex<SearchMetrics>>,
-) -> Result<(mpsc::Sender<IndexerCmd>, RecommendedWatcher), String> {
+/// Returns an error if the file watcher cannot be created.
+pub(crate) fn start(params: IndexerParams) -> Result<(mpsc::Sender<IndexerCmd>, RecommendedWatcher), String> {
     let (tx, rx) = mpsc::channel::<IndexerCmd>();
 
     // Clone sender for the watcher callback
@@ -50,7 +67,7 @@ pub(crate) fn start(
                     let cmd = match event.kind {
                         EventKind::Create(_) | EventKind::Modify(_) => IndexerCmd::IndexFile(path.clone()),
                         EventKind::Remove(_) => IndexerCmd::DeleteFile(path.clone()),
-                        _ => continue,
+                        EventKind::Access(_) | EventKind::Other | EventKind::Any => continue,
                     };
                     let _r = watcher_tx.send(cmd);
                 }
@@ -60,12 +77,14 @@ pub(crate) fn start(
     )
     .map_err(|e| format!("Cannot create file watcher: {e}"))?;
 
-    watcher.watch(&project_root, RecursiveMode::Recursive).map_err(|e| format!("Cannot watch project root: {e}"))?;
+    watcher
+        .watch(&params.project_root, RecursiveMode::Recursive)
+        .map_err(|e| format!("Cannot watch project root: {e}"))?;
 
     // Spawn initial scan on a helper thread (queues IndexFile commands)
     let scan_tx = tx.clone();
-    let scan_root = project_root.clone();
-    let _handle = std::thread::Builder::new()
+    let scan_root = params.project_root.clone();
+    let _scan_handle = std::thread::Builder::new()
         .name("search-scan".into())
         .spawn(move || {
             scan_directory(&scan_tx, &scan_root);
@@ -73,12 +92,10 @@ pub(crate) fn start(
         .map_err(|e| format!("Cannot spawn scan thread: {e}"))?;
 
     // Spawn the indexer thread
-    let idx_key = master_key.to_string();
-    let idx_hash = project_hash.to_string();
-    let _handle = std::thread::Builder::new()
+    let _indexer_handle = std::thread::Builder::new()
         .name("search-indexer".into())
         .spawn(move || {
-            indexer_loop(rx, port, &idx_key, &idx_hash, &project_root, metrics);
+            indexer_loop(&rx, &params);
         })
         .map_err(|e| format!("Cannot spawn indexer thread: {e}"))?;
 
@@ -91,15 +108,8 @@ pub(crate) fn start(
 ///
 /// Blocks on the receiver, debounces incoming events for 200 ms,
 /// deduplicates them, and processes each command.
-fn indexer_loop(
-    rx: mpsc::Receiver<IndexerCmd>,
-    port: u16,
-    master_key: &str,
-    project_hash: &str,
-    project_root: &Path,
-    metrics: std::sync::Arc<std::sync::Mutex<SearchMetrics>>,
-) {
-    let client = match MeiliClient::new(port, master_key) {
+fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
+    let client = match MeiliClient::new(params.port, &params.master_key) {
         Ok(c) => c,
         Err(e) => {
             log::error!("Indexer: cannot create Meilisearch client: {e}");
@@ -107,20 +117,18 @@ fn indexer_loop(
         }
     };
 
-    let files_uid = format!("cp_{project_hash}_files");
-    let splitter = SplitterChain::new();
+    let ctx = IndexerCtx {
+        client,
+        files_uid: format!("cp_{}_files", params.project_hash),
+        project_root: params.project_root.clone(),
+        splitter: SplitterChain::new(),
+    };
 
-    loop {
-        // Block until first command arrives
-        let first = match rx.recv() {
-            Ok(cmd) => cmd,
-            Err(_) => break, // sender dropped
-        };
-
+    while let Ok(first) = rx.recv() {
         let mut batch = vec![first];
 
         // Debounce: collect more events for DEBOUNCE_MS
-        let deadline = Instant::now() + Duration::from_millis(DEBOUNCE_MS);
+        let deadline = Instant::now().checked_add(Duration::from_millis(DEBOUNCE_MS)).unwrap_or_else(Instant::now);
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
@@ -140,11 +148,11 @@ fn indexer_loop(
 
         for cmd in unique {
             match cmd {
-                IndexerCmd::IndexFile(path) => {
-                    index_one_file(&client, &files_uid, &path, project_root, &splitter, &metrics);
+                IndexerCmd::IndexFile(ref path) => {
+                    index_one_file(&ctx, path);
                 }
-                IndexerCmd::DeleteFile(path) => {
-                    delete_one_file(&client, &files_uid, &path, project_root, &metrics);
+                IndexerCmd::DeleteFile(ref path) => {
+                    delete_one_file(&ctx, path);
                 }
             }
         }
@@ -174,28 +182,21 @@ fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
 // -- File indexing -----------------------------------------------------------
 
 /// Index a single file: read → filter → split → upload.
-fn index_one_file(
-    client: &MeiliClient,
-    files_uid: &str,
-    abs_path: &Path,
-    project_root: &Path,
-    splitter: &SplitterChain,
-    _metrics: &std::sync::Arc<std::sync::Mutex<SearchMetrics>>,
-) {
+fn index_one_file(ctx: &IndexerCtx, abs_path: &Path) {
     // Skip symlinks
     if abs_path.is_symlink() {
         return;
     }
 
     // Relative path for storage
-    let rel_path = abs_path.strip_prefix(project_root).unwrap_or(abs_path);
+    let rel_path = abs_path.strip_prefix(&ctx.project_root).unwrap_or(abs_path);
     let rel_str = rel_path.to_string_lossy();
 
     // Check path exclusions (directory components)
     for component in rel_path.components() {
         if let std::path::Component::Normal(name) = component {
             let name_str = name.to_str().unwrap_or("");
-            if config::is_excluded_dir(name_str) {
+            if types::is_excluded_dir(name_str) {
                 return;
             }
         }
@@ -203,40 +204,38 @@ fn index_one_file(
 
     // Check extension allowlist
     let ext = rel_path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("");
-    if !config::is_allowed_extension(ext) {
+    if !types::is_allowed_extension(ext) {
         return;
     }
 
     // Check excluded file patterns
     let filename = rel_path.file_name().and_then(std::ffi::OsStr::to_str).unwrap_or("");
-    if config::is_excluded_file(filename) {
+    if types::is_excluded_file(filename) {
         return;
     }
 
     // Check file size
-    let meta = match std::fs::metadata(abs_path) {
-        Ok(m) => m,
-        Err(_) => return,
+    let Ok(meta) = std::fs::metadata(abs_path) else {
+        return;
     };
-    if meta.len() > config::MAX_FILE_SIZE {
+    if meta.len() > types::MAX_FILE_SIZE {
         return;
     }
 
     // Read content (skip binary files that fail UTF-8)
-    let content = match std::fs::read_to_string(abs_path) {
-        Ok(c) => c,
-        Err(_) => return,
+    let Ok(content) = std::fs::read_to_string(abs_path) else {
+        return;
     };
 
     // Delete existing chunks for this path (delete → re-insert strategy)
     let escaped = rel_str.replace('\'', "\\'");
     let filter = format!("file_path = '{escaped}'");
-    if let Ok(task) = client.delete_documents_by_filter(files_uid, &filter) {
-        let _r = client.wait_for_task(task);
+    if let Ok(task) = ctx.client.delete_documents_by_filter(&ctx.files_uid, &filter) {
+        let _r = ctx.client.wait_for_task(task);
     }
 
     // Split into chunks
-    let chunks = splitter.split(&content, rel_path);
+    let chunks = ctx.splitter.split(&content, rel_path);
     if chunks.is_empty() {
         return;
     }
@@ -246,7 +245,7 @@ fn index_one_file(
         .modified()
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map_or(0, |d| d.as_millis() as u64);
+        .map_or(0_u64, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
 
     let docs: Vec<serde_json::Value> = chunks
         .iter()
@@ -269,26 +268,20 @@ fn index_one_file(
         .collect();
 
     // Send to Meilisearch
-    if let Ok(task) = client.add_documents(files_uid, &serde_json::Value::Array(docs)) {
-        let _r = client.wait_for_task(task);
+    if let Ok(task) = ctx.client.add_documents(&ctx.files_uid, &serde_json::Value::Array(docs)) {
+        let _r = ctx.client.wait_for_task(task);
     }
 }
 
 /// Delete all indexed chunks for a single file.
-fn delete_one_file(
-    client: &MeiliClient,
-    files_uid: &str,
-    abs_path: &Path,
-    project_root: &Path,
-    _metrics: &std::sync::Arc<std::sync::Mutex<SearchMetrics>>,
-) {
-    let rel_path = abs_path.strip_prefix(project_root).unwrap_or(abs_path);
+fn delete_one_file(ctx: &IndexerCtx, abs_path: &Path) {
+    let rel_path = abs_path.strip_prefix(&ctx.project_root).unwrap_or(abs_path);
     let rel_str = rel_path.to_string_lossy();
     let escaped = rel_str.replace('\'', "\\'");
     let filter = format!("file_path = '{escaped}'");
 
-    if let Ok(task) = client.delete_documents_by_filter(files_uid, &filter) {
-        let _r = client.wait_for_task(task);
+    if let Ok(task) = ctx.client.delete_documents_by_filter(&ctx.files_uid, &filter) {
+        let _r = ctx.client.wait_for_task(task);
     }
 }
 
@@ -300,9 +293,8 @@ fn delete_one_file(
 /// every regular file encountered.  Filtering (extension, size) is
 /// done by the indexer thread when it processes each command.
 fn scan_directory(tx: &mpsc::Sender<IndexerCmd>, dir: &Path) {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return,
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
     };
 
     for entry in entries.flatten() {
@@ -316,7 +308,7 @@ fn scan_directory(tx: &mpsc::Sender<IndexerCmd>, dir: &Path) {
         if path.is_dir() {
             let name = entry.file_name();
             let name_str = name.to_str().unwrap_or("");
-            if !config::is_excluded_dir(name_str) {
+            if !types::is_excluded_dir(name_str) {
                 scan_directory(tx, &path);
             }
         } else if path.is_file() {

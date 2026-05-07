@@ -158,8 +158,8 @@ fn generate_master_key() -> Result<String, String> {
 
     let mut hex = String::with_capacity(64);
     for &b in &buf {
-        use std::fmt::Write;
-        let _r = write!(hex, "{b:02x}");
+        use std::fmt::Write as _;
+        _ = write!(hex, "{b:02x}");
     }
     Ok(hex)
 }
@@ -353,16 +353,15 @@ pub(crate) struct ServerInfo {
 /// Returns an error if the server cannot be started.
 pub(crate) fn ensure_server_running() -> Result<ServerInfo, String> {
     // Phase 0: try to reconnect to an existing server
-    if let (Some(port), Some(key)) = (read_port(), read_master_key()) {
-        if let Some(pid) = read_pid() {
-            if is_pid_alive(pid) && health_check(port, &key).is_ok() {
-                log::info!("Reconnected to existing Meilisearch (PID {pid}, port {port})");
-                return Ok(ServerInfo { port, master_key: key });
-            }
-            // PID is stale — clean up before restarting
-            remove_pid();
+    if let (Some(port), Some(key)) = (read_port(), read_master_key())
+        && let Some(pid) = read_pid()
+    {
+        if is_pid_alive(pid) && health_check(port, &key).is_ok() {
+            log::info!("Reconnected to existing Meilisearch (PID {pid}, port {port})");
+            return Ok(ServerInfo { port, master_key: key });
         }
-        // PID is stale or health check failed — will restart below
+        // PID is stale — clean up before restarting
+        remove_pid();
     }
 
     // Phase 1: ensure binary exists
@@ -370,13 +369,12 @@ pub(crate) fn ensure_server_running() -> Result<ServerInfo, String> {
     let _root = ensure_global_dirs()?;
 
     // Phase 2: ensure master key exists
-    let key = match read_master_key() {
-        Some(k) => k,
-        None => {
-            let k = generate_master_key()?;
-            write_master_key(&k)?;
-            k
-        }
+    let key = if let Some(k) = read_master_key() {
+        k
+    } else {
+        let k = generate_master_key()?;
+        write_master_key(&k)?;
+        k
     };
 
     // Phase 3: find a free port and start the server
@@ -424,17 +422,15 @@ pub(crate) fn ensure_server_running() -> Result<ServerInfo, String> {
 /// This runs on module init (after server is confirmed healthy).
 /// Errors are logged but don't halt startup.
 pub(crate) fn cleanup_orphan_indexes(port: u16, master_key: &str) {
-    let path = match projects_path() {
-        Ok(p) => p,
-        Err(_) => return,
+    let Ok(path) = projects_path() else {
+        return;
     };
     if !path.exists() {
         return;
     }
 
-    let content = match std::fs::read_to_string(&path) {
-        Ok(c) => c,
-        Err(_) => return,
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return;
     };
     let mut projects: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&content).unwrap_or_default();
 
@@ -447,7 +443,7 @@ pub(crate) fn cleanup_orphan_indexes(port: u16, master_key: &str) {
         .iter()
         .filter_map(|(proj_path, hash_val)| {
             let hash = hash_val.as_str()?;
-            if !std::path::Path::new(proj_path).exists() { Some((proj_path.clone(), hash.to_string())) } else { None }
+            (!std::path::Path::new(proj_path).exists()).then(|| (proj_path.clone(), hash.to_string()))
         })
         .collect();
 

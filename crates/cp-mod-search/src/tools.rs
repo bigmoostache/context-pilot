@@ -64,15 +64,15 @@ fn build_file_filter(extension: Option<&str>, from_date: Option<&str>, to_date: 
         parts.push(format!("extension = '{ext}'"));
     }
 
-    if let Some(from) = from_date {
-        if let Some(from_ms) = iso_to_ms(from) {
-            parts.push(format!("last_modified_ms >= {from_ms}"));
-        }
+    if let Some(from) = from_date
+        && let Some(from_ms) = iso_to_ms(from)
+    {
+        parts.push(format!("last_modified_ms >= {from_ms}"));
     }
-    if let Some(to) = to_date {
-        if let Some(to_ms) = iso_to_ms(to) {
-            parts.push(format!("last_modified_ms <= {to_ms}"));
-        }
+    if let Some(to) = to_date
+        && let Some(to_ms) = iso_to_ms(to)
+    {
+        parts.push(format!("last_modified_ms <= {to_ms}"));
     }
 
     if parts.is_empty() { None } else { Some(parts.join(" AND ")) }
@@ -82,15 +82,15 @@ fn build_file_filter(extension: Option<&str>, from_date: Option<&str>, to_date: 
 fn build_log_filter(from_date: Option<&str>, to_date: Option<&str>) -> Option<String> {
     let mut parts: Vec<String> = Vec::new();
 
-    if let Some(from) = from_date {
-        if let Some(from_ms) = iso_to_ms(from) {
-            parts.push(format!("timestamp_ms >= {from_ms}"));
-        }
+    if let Some(from) = from_date
+        && let Some(from_ms) = iso_to_ms(from)
+    {
+        parts.push(format!("timestamp_ms >= {from_ms}"));
     }
-    if let Some(to) = to_date {
-        if let Some(to_ms) = iso_to_ms(to) {
-            parts.push(format!("timestamp_ms <= {to_ms}"));
-        }
+    if let Some(to) = to_date
+        && let Some(to_ms) = iso_to_ms(to)
+    {
+        parts.push(format!("timestamp_ms <= {to_ms}"));
     }
 
     if parts.is_empty() { None } else { Some(parts.join(" AND ")) }
@@ -137,12 +137,12 @@ fn parse_file_hit(hit: &serde_json::Value) -> SearchResult {
 
     SearchResult {
         content,
-        file_path: hit.get("file_path").and_then(|v| v.as_str()).map(String::from),
-        chunk_type: hit.get("chunk_type").and_then(|v| v.as_str()).map(String::from),
-        chunk_name: hit.get("chunk_name").and_then(|v| v.as_str()).map(String::from),
-        line_start: hit.get("line_start").and_then(|v| v.as_u64()).and_then(|n| u32::try_from(n).ok()),
-        line_end: hit.get("line_end").and_then(|v| v.as_u64()).and_then(|n| u32::try_from(n).ok()),
-        extension: hit.get("extension").and_then(|v| v.as_str()).map(String::from),
+        file_path: hit.get("file_path").and_then(serde_json::Value::as_str).map(String::from),
+        chunk_type: hit.get("chunk_type").and_then(serde_json::Value::as_str).map(String::from),
+        chunk_name: hit.get("chunk_name").and_then(serde_json::Value::as_str).map(String::from),
+        line_start: hit.get("line_start").and_then(serde_json::Value::as_u64).and_then(|n| u32::try_from(n).ok()),
+        line_end: hit.get("line_end").and_then(serde_json::Value::as_u64).and_then(|n| u32::try_from(n).ok()),
+        extension: hit.get("extension").and_then(serde_json::Value::as_str).map(String::from),
         log_id: None,
         datetime: None,
         importance: None,
@@ -168,25 +168,27 @@ fn parse_log_hit(hit: &serde_json::Value) -> SearchResult {
         line_start: None,
         line_end: None,
         extension: None,
-        log_id: hit.get("id").and_then(|v| v.as_str()).map(String::from),
-        datetime: hit.get("datetime").and_then(|v| v.as_str()).map(String::from),
-        importance: hit.get("importance").and_then(|v| v.as_str()).map(String::from),
+        log_id: hit.get("id").and_then(serde_json::Value::as_str).map(String::from),
+        datetime: hit.get("datetime").and_then(serde_json::Value::as_str).map(String::from),
+        importance: hit.get("importance").and_then(serde_json::Value::as_str).map(String::from),
         tags: hit
             .get("tags")
-            .and_then(|v| v.as_array())
+            .and_then(serde_json::Value::as_array)
             .map(|a| a.iter().filter_map(|t| t.as_str().map(String::from)).collect()),
     }
 }
 
 /// Format search results as human-readable text for panel and tool output.
 fn format_results(query: &str, file_results: &[SearchResult], log_results: &[SearchResult]) -> String {
-    let total = file_results.len() + log_results.len();
+    use std::fmt::Write as _;
+
+    let total = file_results.len().saturating_add(log_results.len());
     let mut out = String::new();
 
-    out.push_str(&format!("# Search: \"{query}\" ({total} results)\n\n"));
+    _ = writeln!(out, "# Search: \"{query}\" ({total} results)\n");
 
     if !file_results.is_empty() {
-        out.push_str(&format!("## Files ({})\n\n", file_results.len()));
+        _ = writeln!(out, "## Files ({})\n", file_results.len());
         for r in file_results {
             let path = r.file_path.as_deref().unwrap_or("?");
             let chunk = r.chunk_type.as_deref().unwrap_or("raw");
@@ -198,22 +200,22 @@ fn format_results(query: &str, file_results: &[SearchResult], log_results: &[Sea
             let ext = r.extension.as_deref().unwrap_or("");
 
             if name.is_empty() {
-                out.push_str(&format!("- `{path}` [{chunk}]{lines} ({ext})\n"));
+                _ = writeln!(out, "- `{path}` [{chunk}]{lines} ({ext})");
             } else {
-                out.push_str(&format!("- `{path}` [{chunk}] {name}{lines} ({ext})\n"));
+                _ = writeln!(out, "- `{path}` [{chunk}] {name}{lines} ({ext})");
             }
 
             // Snippet: first 3 lines of content
             let snippet: String = r.content.lines().take(3).collect::<Vec<_>>().join("\n  ");
             if !snippet.is_empty() {
-                out.push_str(&format!("  {snippet}\n"));
+                _ = writeln!(out, "  {snippet}");
             }
         }
         out.push('\n');
     }
 
     if !log_results.is_empty() {
-        out.push_str(&format!("## Logs ({})\n\n", log_results.len()));
+        _ = writeln!(out, "## Logs ({})\n", log_results.len());
         for r in log_results {
             let id = r.log_id.as_deref().unwrap_or("?");
             let dt = r.datetime.as_deref().unwrap_or("?");
@@ -222,7 +224,7 @@ fn format_results(query: &str, file_results: &[SearchResult], log_results: &[Sea
                 r.tags.as_ref().filter(|t| !t.is_empty()).map(|t| format!(" #{}", t.join(" #"))).unwrap_or_default();
 
             let snippet: String = r.content.lines().take(3).collect::<Vec<_>>().join("\n  ");
-            out.push_str(&format!("- [{id}] {dt} · {importance}{tags_str}\n  {snippet}\n"));
+            _ = writeln!(out, "- [{id}] {dt} · {importance}{tags_str}\n  {snippet}");
         }
         out.push('\n');
     }
@@ -243,20 +245,22 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // --- Extract parameters --------------------------------------------------
 
-    let query = match tool.input.get("query").and_then(|v| v.as_str()) {
-        Some(q) => q,
-        None => return err_result(tool, "Missing required parameter 'query'".to_string()),
+    let Some(query) = tool.input.get("query").and_then(serde_json::Value::as_str) else {
+        return err_result(tool, "Missing required parameter 'query'".to_string());
     };
 
-    let scope = tool.input.get("scope").and_then(|v| v.as_str()).unwrap_or("all");
-    let path_prefix = tool.input.get("path_prefix").and_then(|v| v.as_str());
-    let extension = tool.input.get("extension").and_then(|v| v.as_str());
-    let sort = tool.input.get("sort").and_then(|v| v.as_str()).unwrap_or("relevance");
-    let from_date = tool.input.get("from_date").and_then(|v| v.as_str());
-    let to_date = tool.input.get("to_date").and_then(|v| v.as_str());
-    let include_context = tool.input.get("include_context").and_then(|v| v.as_bool()).unwrap_or(true);
-    let limit =
-        tool.input.get("limit").and_then(|v| v.as_u64()).map_or(20_u32, |n| u32::try_from(n.min(50)).unwrap_or(50));
+    let scope = tool.input.get("scope").and_then(serde_json::Value::as_str).unwrap_or("all");
+    let path_prefix = tool.input.get("path_prefix").and_then(serde_json::Value::as_str);
+    let extension = tool.input.get("extension").and_then(serde_json::Value::as_str);
+    let sort = tool.input.get("sort").and_then(serde_json::Value::as_str).unwrap_or("relevance");
+    let from_date = tool.input.get("from_date").and_then(serde_json::Value::as_str);
+    let to_date = tool.input.get("to_date").and_then(serde_json::Value::as_str);
+    let include_context = tool.input.get("include_context").and_then(serde_json::Value::as_bool).unwrap_or(true);
+    let limit = tool
+        .input
+        .get("limit")
+        .and_then(serde_json::Value::as_u64)
+        .map_or(20_u32, |n| u32::try_from(n.min(50)).unwrap_or(50));
 
     // --- Resolve index UIDs --------------------------------------------------
 
@@ -275,15 +279,18 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     if search_files {
         // Prepend path_prefix to query for relevance boost
-        let effective_query = match path_prefix {
-            Some(prefix) => format!("{prefix} {query}"),
-            None => query.to_string(),
-        };
+        let effective_query = path_prefix.map_or_else(|| query.to_string(), |prefix| format!("{prefix} {query}"));
 
         let file_filter = build_file_filter(extension, from_date, to_date);
         let file_sort = file_sort_string(sort);
 
-        match client.search(&files_uid, &effective_query, file_filter.as_deref(), file_sort, limit) {
+        match client.search(&crate::client::SearchParams {
+            uid: &files_uid,
+            query: &effective_query,
+            filter: file_filter.as_deref(),
+            sort: file_sort,
+            limit,
+        }) {
             Ok(resp) => {
                 if let Some(hits) = resp.get("hits").and_then(|h| h.as_array()) {
                     for hit in hits {
@@ -301,7 +308,13 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         let log_filter = build_log_filter(from_date, to_date);
         let log_sort = log_sort_string(sort);
 
-        match client.search(&logs_uid, query, log_filter.as_deref(), log_sort, limit) {
+        match client.search(&crate::client::SearchParams {
+            uid: &logs_uid,
+            query,
+            filter: log_filter.as_deref(),
+            sort: log_sort,
+            limit,
+        }) {
             Ok(resp) => {
                 if let Some(hits) = resp.get("hits").and_then(|h| h.as_array()) {
                     for hit in hits {

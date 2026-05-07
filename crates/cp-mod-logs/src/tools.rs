@@ -4,7 +4,6 @@
 //! - `log_create` — create timestamped entries with optional tags/importance
 //! - `Close_conversation_history` — archive a history panel, extracting logs + memories
 
-use cp_base::cast::Safe as _;
 use cp_base::panels::mark_panels_dirty;
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;

@@ -126,34 +126,38 @@ fn language_for_ext(ext: &str) -> Option<(Language, &'static [&'static str])> {
 fn extract_name(node: &tree_sitter::Node<'_>, source: &[u8]) -> String {
     // Try direct "name" field first (covers most grammars)
     if let Some(name_node) = node.child_by_field_name("name") {
-        return String::from_utf8_lossy(&source[name_node.byte_range()]).into_owned();
+        let range = name_node.byte_range();
+        return source.get(range).map(|s| String::from_utf8_lossy(s).into_owned()).unwrap_or_default();
     }
 
     // For Rust impl blocks: look for "type" field
-    if node.kind() == "impl_item" {
-        if let Some(type_node) = node.child_by_field_name("type") {
-            let type_name = String::from_utf8_lossy(&source[type_node.byte_range()]);
-            // Check for trait impl: `impl Trait for Type`
-            if let Some(trait_node) = node.child_by_field_name("trait") {
-                let trait_name = String::from_utf8_lossy(&source[trait_node.byte_range()]);
-                return format!("{trait_name} for {type_name}");
-            }
-            return type_name.into_owned();
+    if node.kind() == "impl_item"
+        && let Some(type_node) = node.child_by_field_name("type")
+    {
+        let type_range = type_node.byte_range();
+        let type_name = source.get(type_range).map(|s| String::from_utf8_lossy(s).into_owned()).unwrap_or_default();
+        // Check for trait impl: `impl Trait for Type`
+        if let Some(trait_node) = node.child_by_field_name("trait") {
+            let trait_range = trait_node.byte_range();
+            let trait_name =
+                source.get(trait_range).map(|s| String::from_utf8_lossy(s).into_owned()).unwrap_or_default();
+            return format!("{trait_name} for {type_name}");
         }
+        return type_name;
     }
 
     // For decorated definitions (Python): look inside the inner definition
-    if node.kind() == "decorated_definition" {
-        if let Some(def_node) = node.child_by_field_name("definition") {
-            return extract_name(&def_node, source);
-        }
+    if node.kind() == "decorated_definition"
+        && let Some(def_node) = node.child_by_field_name("definition")
+    {
+        return extract_name(&def_node, source);
     }
 
     // For export statements (JS/TS): look inside the declaration child
-    if node.kind() == "export_statement" {
-        if let Some(decl) = node.child_by_field_name("declaration") {
-            return extract_name(&decl, source);
-        }
+    if node.kind() == "export_statement"
+        && let Some(decl) = node.child_by_field_name("declaration")
+    {
+        return extract_name(&decl, source);
     }
 
     String::new()
@@ -194,9 +198,8 @@ impl Splitter for TreeSitterSplitter {
     fn split(&self, content: &str, path: &Path) -> Vec<Chunk> {
         let ext = path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("");
 
-        let (language, semantic_kinds) = match language_for_ext(ext) {
-            Some(pair) => pair,
-            None => return Vec::new(),
+        let Some((language, semantic_kinds)) = language_for_ext(ext) else {
+            return Vec::new();
         };
 
         let mut parser = Parser::new();
@@ -205,12 +208,9 @@ impl Splitter for TreeSitterSplitter {
             return Vec::new();
         }
 
-        let tree = match parser.parse(content, None) {
-            Some(t) => t,
-            None => {
-                log::warn!("tree-sitter: parse failed for {}", path.display());
-                return Vec::new();
-            }
+        let Some(tree) = parser.parse(content, None) else {
+            log::warn!("tree-sitter: parse failed for {}", path.display());
+            return Vec::new();
         };
 
         let source = content.as_bytes();
@@ -224,9 +224,8 @@ impl Splitter for TreeSitterSplitter {
 
         let cursor_count = u32::try_from(root.child_count()).unwrap_or(u32::MAX);
         for i in 0..cursor_count {
-            let node = match root.child(i) {
-                Some(n) => n,
-                None => continue,
+            let Some(node) = root.child(i) else {
+                continue;
             };
 
             let kind = node.kind();
@@ -237,7 +236,7 @@ impl Splitter for TreeSitterSplitter {
                 if let Some(pre_start) = preamble_start.take() {
                     let pre_end = node.start_byte();
                     if pre_end > pre_start {
-                        let pre_content = &content[pre_start..pre_end];
+                        let pre_content = content.get(pre_start..pre_end).unwrap_or("");
                         let trimmed = pre_content.trim();
                         if !trimmed.is_empty() {
                             let pre_end_line = node.start_position().row.saturating_add(1);
@@ -257,7 +256,7 @@ impl Splitter for TreeSitterSplitter {
                 // Extract the semantic chunk
                 let start_byte = node.start_byte();
                 let end_byte = node.end_byte();
-                let node_content = &content[start_byte..end_byte];
+                let node_content = content.get(start_byte..end_byte).unwrap_or("");
                 let name = extract_name(&node, source);
                 let label = chunk_type_label(kind);
                 let start_line = node.start_position().row.saturating_add(1);
@@ -286,7 +285,7 @@ impl Splitter for TreeSitterSplitter {
 
         // Flush trailing preamble
         if let Some(pre_start) = preamble_start {
-            let pre_content = &content[pre_start..];
+            let pre_content = content.get(pre_start..).unwrap_or("");
             let trimmed = pre_content.trim();
             if !trimmed.is_empty() {
                 let total_lines = content.lines().count();
@@ -302,9 +301,6 @@ impl Splitter for TreeSitterSplitter {
             }
         }
 
-        // If we got no chunks (unlikely but possible for empty/comment-only files),
-        // return empty — the SplitterChain will NOT fall through since we said
-        // we support this extension.  An empty vec is fine for empty content.
         chunks
     }
 }
