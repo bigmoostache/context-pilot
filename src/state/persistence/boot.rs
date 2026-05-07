@@ -30,6 +30,16 @@ pub(crate) fn boot_extract_module_data(cfg: &BootConfig) -> BootModuleData {
 /// Calls `progress(module_name)` before each module so the caller can
 /// render per-module progress on the boot loading screen.
 pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData, mut progress: impl FnMut(&str)) {
+    // Load .env files FIRST — modules read env vars during init_state
+    // (e.g. DATALAB_API_KEY for OCR, GITHUB_TOKEN for gh).
+    // Project-specific .env takes priority (dotenvy won't override existing).
+    let _local = dotenvy::dotenv().ok();
+    // Global .env as fallback (only sets vars not already present).
+    if let Ok(home) = std::env::var("HOME") {
+        let global_env = std::path::PathBuf::from(home).join(".context-pilot").join(".env");
+        let _global = dotenvy::from_path(&global_env).ok();
+    }
+
     let modules = crate::modules::all_modules();
 
     for module in &modules {
@@ -55,13 +65,6 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
         state.tools = crate::modules::active_tool_definitions(&state.active_modules);
     }
 
-    // Load project-specific .env first (takes priority — dotenvy won't override existing env vars)
-    let _local = dotenvy::dotenv().ok();
-    // Load global .env as fallback (only sets vars not already present from project .env)
-    if let Ok(home) = std::env::var("HOME") {
-        let global_env = std::path::PathBuf::from(home).join(".context-pilot").join(".env");
-        let _global = dotenvy::from_path(&global_env).ok();
-    }
     cp_mod_github::types::GithubState::get_mut(state).github_token = std::env::var("GITHUB_TOKEN").ok();
 
     set_active_theme(&state.active_theme);
