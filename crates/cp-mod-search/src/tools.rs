@@ -172,7 +172,12 @@ fn parse_log_hit(hit: &serde_json::Value) -> SearchResult {
 ///
 /// File results are grouped by path. All metadata is included.
 /// Uses `serde_yaml` for consistent formatting matching the brave module style.
-fn format_results(query: &str, file_results: &[SearchResult], log_results: &[SearchResult]) -> String {
+fn format_results(
+    query: &str,
+    file_results: &[SearchResult],
+    log_results: &[SearchResult],
+    hide_contents: bool,
+) -> String {
     use std::collections::BTreeMap;
 
     let total = file_results.len().saturating_add(log_results.len());
@@ -198,7 +203,8 @@ fn format_results(query: &str, file_results: &[SearchResult], log_results: &[Sea
             drop(file_obj.insert("path".into(), serde_json::Value::String(path.clone())));
             drop(file_obj.insert("extension".into(), serde_json::Value::String(ext.to_string())));
 
-            let chunks_arr: Vec<serde_json::Value> = chunks.iter().map(|chunk| build_chunk_value(chunk)).collect();
+            let chunks_arr: Vec<serde_json::Value> =
+                chunks.iter().map(|chunk| build_chunk_value(chunk, hide_contents)).collect();
 
             drop(file_obj.insert("chunks".into(), serde_json::Value::Array(chunks_arr)));
             files_arr.push(serde_json::Value::Object(file_obj));
@@ -209,7 +215,7 @@ fn format_results(query: &str, file_results: &[SearchResult], log_results: &[Sea
     // -- Log results ---------------------------------------------------------
 
     if !log_results.is_empty() {
-        let logs_arr: Vec<serde_json::Value> = log_results.iter().map(build_log_value).collect();
+        let logs_arr: Vec<serde_json::Value> = log_results.iter().map(|r| build_log_value(r, hide_contents)).collect();
         drop(root.insert("logs".into(), serde_json::Value::Array(logs_arr)));
     }
 
@@ -219,7 +225,7 @@ fn format_results(query: &str, file_results: &[SearchResult], log_results: &[Sea
 }
 
 /// Build a JSON value for a single file chunk.
-fn build_chunk_value(chunk: &SearchResult) -> serde_json::Value {
+fn build_chunk_value(chunk: &SearchResult, hide_contents: bool) -> serde_json::Value {
     let mut obj = serde_json::Map::new();
     drop(
         obj.insert("type".into(), serde_json::Value::String(chunk.chunk_type.as_deref().unwrap_or("raw").to_string())),
@@ -238,14 +244,14 @@ fn build_chunk_value(chunk: &SearchResult) -> serde_json::Value {
     if let Some(score) = chunk.ranking_score {
         drop(obj.insert("relevance".into(), serde_json::json!(format!("{score:.4}"))));
     }
-    if !chunk.content.is_empty() {
+    if !chunk.content.is_empty() && !hide_contents {
         drop(obj.insert("content".into(), serde_json::Value::String(chunk.content.clone())));
     }
     serde_json::Value::Object(obj)
 }
 
 /// Build a JSON value for a single log result.
-fn build_log_value(r: &SearchResult) -> serde_json::Value {
+fn build_log_value(r: &SearchResult, hide_contents: bool) -> serde_json::Value {
     let mut obj = serde_json::Map::new();
     if let Some(ref id) = r.log_id {
         drop(obj.insert("id".into(), serde_json::Value::String(id.clone())));
@@ -265,7 +271,7 @@ fn build_log_value(r: &SearchResult) -> serde_json::Value {
     if let Some(score) = r.ranking_score {
         drop(obj.insert("relevance".into(), serde_json::json!(format!("{score:.4}"))));
     }
-    if !r.content.is_empty() {
+    if !r.content.is_empty() && !hide_contents {
         drop(obj.insert("content".into(), serde_json::Value::String(r.content.clone())));
     }
     serde_json::Value::Object(obj)
@@ -296,6 +302,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         .and_then(serde_json::Value::as_u64)
         .map_or(20_u32, |n| u32::try_from(n.min(50)).unwrap_or(50));
     let semantic_ratio = tool.input.get("semantic_ratio").and_then(serde_json::Value::as_f64);
+    let hide_contents = tool.input.get("hide_contents").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
     // --- Resolve index UIDs --------------------------------------------------
 
@@ -367,7 +374,14 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let file_count = file_results.len();
     let log_count = log_results.len();
-    let panel_content = format_results(query, &file_results, &log_results);
+    let panel_content = format_results(query, &file_results, &log_results, hide_contents);
+
+    if hide_contents {
+        // Return compact metadata directly in tool result — no panel, preserves tempo.
+        let mut result = ok_result(tool, panel_content);
+        result.preserves_tempo = true;
+        return result;
+    }
 
     // Create dynamic panel — full content lives there, not in the tool result.
     let panel_id = crate::panel::create(state, &format!("search: {query}"), &panel_content);

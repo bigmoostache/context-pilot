@@ -132,6 +132,7 @@ impl Module for SearchModule {
                 .param("to_date", ParamType::String, false)
                 .param("limit", ParamType::Integer, false)
                 .param("semantic_ratio", ParamType::Number, false)
+                .param("hide_contents", ParamType::Boolean, false)
                 .build(),
         ]
     }

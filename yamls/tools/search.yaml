@@ -29,3 +29,4 @@ tools:
       to_date: "ISO 8601 date. Only results before this date."
       limit: "Max results per scope (1-50, default 20)."
       semantic_ratio: "Hybrid search ratio (0.0-1.0). 0.0 = pure keyword (default when omitted), 0.5 = balanced hybrid, 1.0 = pure semantic. Use ~0.5 for conceptual queries ('authentication logic', 'error handling') and omit for exact matches ('fn main', 'TODO')."
+      hide_contents: "When true, omits file/log contents from results and returns compact metadata (paths, line ranges, chunk types, relevance scores) directly in the tool result instead of creating a panel. Useful for quickly locating files or surveying matches without flooding context with code snippets. Defaults to false."
