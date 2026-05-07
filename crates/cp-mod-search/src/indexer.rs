@@ -66,6 +66,14 @@ struct IndexerCtx {
     ocr_client: Option<ocr::DatalabClient>,
     /// Shared metrics, updated as files are indexed.
     metrics: std::sync::Arc<std::sync::Mutex<types::SearchMetrics>>,
+    /// Per-file last-indexed mtime (ms since epoch).
+    ///
+    /// Used to skip re-indexing files reported by [`PollWatcher`] whose
+    /// content hasn't actually changed.  Without this, phantom watcher
+    /// events trigger a full delete→split→upload→embed cycle on every
+    /// poll interval, keeping Meilisearch at 200 %+ CPU via embedding
+    /// regeneration even when the project is idle.
+    last_indexed_mtime: HashMap<String, u64>,
 }
 
 /// Start the background indexer and file watcher.
@@ -152,7 +160,7 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
         }
     };
 
-    let ctx = IndexerCtx {
+    let mut ctx = IndexerCtx {
         client,
         files_uid: format!("cp_{}_files", params.project_hash),
         project_root: params.project_root.clone(),
@@ -168,6 +176,7 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
             }
         }),
         metrics: std::sync::Arc::clone(&params.metrics),
+        last_indexed_mtime: HashMap::new(),
     };
 
     // Record whether OCR is available for the overlay
@@ -202,10 +211,10 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
         for cmd in unique {
             match cmd {
                 IndexerCmd::IndexFile(ref path) => {
-                    index_one_file(&ctx, path);
+                    index_one_file(&mut ctx, path);
                 }
                 IndexerCmd::DeleteFile(ref path) => {
-                    delete_one_file(&ctx, path);
+                    delete_one_file(&mut ctx, path);
                 }
                 IndexerCmd::ScanComplete => {
                     if let Ok(mut m) = ctx.metrics.lock() {
@@ -250,7 +259,7 @@ fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
 // -- File indexing -----------------------------------------------------------
 
 /// Index a single file: read → filter → split → upload.
-fn index_one_file(ctx: &IndexerCtx, abs_path: &Path) {
+fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
     // Skip symlinks
     if abs_path.is_symlink() {
         return;
@@ -291,6 +300,21 @@ fn index_one_file(ctx: &IndexerCtx, abs_path: &Path) {
     let size_limit = if is_ocr { ocr::MAX_OCR_FILE_SIZE } else { types::MAX_FILE_SIZE };
     if meta.len() > size_limit {
         return;
+    }
+
+    // Compute mtime for deduplication — skip re-indexing unchanged files.
+    // PollWatcher can fire phantom events for files whose content hasn't
+    // changed (metadata updates, macOS quirks). Without this check, each
+    // phantom event triggers delete→split→upload→embed, keeping Meilisearch
+    // pegged at 200%+ CPU from constant embedding regeneration.
+    let last_modified_ms = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0_u64, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
+
+    if ctx.last_indexed_mtime.get(rel_str.as_ref()).is_some_and(|&t| t == last_modified_ms) {
+        return; // File unchanged since last index — skip
     }
 
     // Get text content — either read directly or convert via OCR
@@ -344,12 +368,6 @@ fn index_one_file(ctx: &IndexerCtx, abs_path: &Path) {
     }
 
     // Build Meilisearch documents
-    let last_modified_ms = meta
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map_or(0_u64, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
-
     let docs: Vec<serde_json::Value> = chunks
         .iter()
         .enumerate()
@@ -404,10 +422,14 @@ fn index_one_file(ctx: &IndexerCtx, abs_path: &Path) {
         *rc = rc.saturating_add(1);
         let _prev = m.last_sent_ms.insert(rel_str.to_string(), now_ms);
     }
+
+    // Record mtime so subsequent PollWatcher events for this unchanged
+    // file are skipped (the key optimisation that prevents phantom re-indexing).
+    let _prev = ctx.last_indexed_mtime.insert(rel_str.to_string(), last_modified_ms);
 }
 
 /// Delete all indexed chunks for a single file.
-fn delete_one_file(ctx: &IndexerCtx, abs_path: &Path) {
+fn delete_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
     let rel_path = abs_path.strip_prefix(&ctx.project_root).unwrap_or(abs_path);
     let rel_str = rel_path.to_string_lossy();
     let escaped = rel_str.replace('\'', "\\'");
@@ -416,6 +438,9 @@ fn delete_one_file(ctx: &IndexerCtx, abs_path: &Path) {
     if let Ok(task) = ctx.client.delete_documents_by_filter(&ctx.files_uid, &filter) {
         let _r = ctx.client.wait_for_task(task);
     }
+
+    // Clear cached mtime so the file gets re-indexed if recreated
+    let _prev = ctx.last_indexed_mtime.remove(rel_str.as_ref());
 }
 
 // -- Directory scan ----------------------------------------------------------
