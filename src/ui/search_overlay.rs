@@ -69,6 +69,18 @@ fn build_overlay_lines(state: &State) -> Vec<Line<'static>> {
         Span::styled(status_label, Style::default().fg(status_color)),
     ]));
 
+    // ── Database ──
+    if info.database_size_bytes > 0 {
+        lines.push(Line::from(""));
+        lines.push(section_header("Database"));
+        lines.push(Line::from(vec![
+            Span::raw("  Disk  "),
+            Span::styled(format_bytes(info.used_database_size_bytes), Style::default().fg(theme::text())),
+            Span::styled(" / ", Style::default().fg(theme::text_muted())),
+            Span::styled(format_bytes(info.database_size_bytes), Style::default().fg(theme::text_muted())),
+        ]));
+    }
+
     // ── Core Stats (two-column) ──
     lines.push(Line::from(""));
     lines.push(Line::from(format!("  Files  {:<10} Chunks  {}", info.files_indexed, info.chunks_indexed,)));
@@ -122,6 +134,30 @@ fn build_overlay_lines(state: &State) -> Vec<Line<'static>> {
             Span::styled(format!("{} chunks", info.fallback_chunks), Style::default().fg(theme::warning())),
             Span::styled(format!("  ({fb_pct}%)"), Style::default().fg(theme::text_muted())),
         ]));
+    }
+
+    // ── Embeddings ──
+    if !info.embedding_model.is_empty() || info.files_embedding_count > 0 {
+        lines.push(Line::from(""));
+        lines.push(section_header("Embeddings"));
+
+        if !info.embedding_model.is_empty() {
+            lines.push(Line::from(vec![
+                Span::raw("  Model   "),
+                Span::styled(info.embedding_model.clone(), Style::default().fg(theme::text())),
+            ]));
+        }
+
+        let emb_status =
+            if info.files_is_indexing { ("● generating", theme::warning()) } else { ("✓ ready", theme::success()) };
+        lines.push(Line::from(vec![
+            Span::raw(format!("  Vectors {:>4}  ", info.files_embedding_count)),
+            Span::styled(emb_status.0, Style::default().fg(emb_status.1)),
+        ]));
+
+        if info.logs_doc_count > 0 {
+            lines.push(Line::from(format!("  Logs    {} documents", info.logs_doc_count)));
+        }
     }
 
     // ── OCR Pipeline ──
@@ -193,6 +229,25 @@ fn dim_span(text: &'static str) -> Span<'static> {
     Span::styled(text, Style::default().add_modifier(Modifier::DIM))
 }
 
+/// Format a byte count as a human-readable string (e.g. "215 MB").
+fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * 1024;
+    const GB: u64 = 1024 * 1024 * 1024;
+
+    if bytes >= GB {
+        let whole = bytes.checked_div(GB).unwrap_or(0);
+        let frac = bytes.wrapping_rem(GB).saturating_mul(10).checked_div(GB).unwrap_or(0);
+        format!("{whole}.{frac} GB")
+    } else if bytes >= MB {
+        format!("{} MB", bytes.checked_div(MB).unwrap_or(0))
+    } else if bytes >= KB {
+        format!("{} KB", bytes.checked_div(KB).unwrap_or(0))
+    } else {
+        format!("{bytes} B")
+    }
+}
+
 /// Build the overlay content as plain text for clipboard copying.
 ///
 /// Produces a clean, terminal-agnostic text version of the overlay
@@ -214,6 +269,17 @@ pub(crate) fn build_overlay_text(state: &State) -> String {
         if info.port > 0 { "online" } else { "offline" },
     )
     .unwrap_or(());
+
+    // Database
+    if info.database_size_bytes > 0 {
+        writeln!(
+            out,
+            "── Database ──\nDisk  {} / {}\n",
+            format_bytes(info.used_database_size_bytes),
+            format_bytes(info.database_size_bytes),
+        )
+        .unwrap_or(());
+    }
 
     // Core stats
     writeln!(
@@ -249,6 +315,19 @@ pub(crate) fn build_overlay_text(state: &State) -> String {
             info.tree_sitter_chunks, info.fallback_chunks,
         )
         .unwrap_or(());
+    }
+
+    // Embeddings
+    if !info.embedding_model.is_empty() || info.files_embedding_count > 0 {
+        out.push_str("\n── Embeddings ──\n");
+        if !info.embedding_model.is_empty() {
+            writeln!(out, "Model   {}", info.embedding_model).unwrap_or(());
+        }
+        let status = if info.files_is_indexing { "generating" } else { "ready" };
+        writeln!(out, "Vectors {}  {status}", info.files_embedding_count).unwrap_or(());
+        if info.logs_doc_count > 0 {
+            writeln!(out, "Logs    {} documents", info.logs_doc_count).unwrap_or(());
+        }
     }
 
     // OCR

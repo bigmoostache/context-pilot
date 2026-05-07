@@ -29,44 +29,20 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
-use types::{SearchOverlayInfo, SearchPersistData, SearchState};
+use types::{SearchPersistData, SearchState};
+
+/// Read overlay information for the Ctrl+I overlay.
+///
+/// Delegates to [`meili::overlay::overlay_info`]. Returns `None` if the
+/// search module hasn't been initialized.
+#[must_use]
+pub fn overlay_info(state: &State) -> Option<types::SearchOverlayInfo> {
+    meili::overlay::overlay_info(state)
+}
 
 /// Lazily-loaded tool description texts parsed from the YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/search.yaml")));
-
-/// Read overlay information from the search module's state.
-///
-/// Returns `None` if the search module hasn't been initialized.
-/// Used by the main binary's Ctrl+I overlay renderer.
-#[must_use]
-pub fn overlay_info(state: &State) -> Option<SearchOverlayInfo> {
-    let ss = state.get_ext::<SearchState>()?;
-    let metrics = ss.metrics.lock().ok()?;
-
-    // Sort extensions by count descending, take top 8.
-    let mut ext_vec: Vec<(String, u64)> = metrics.extension_counts.iter().map(|(k, v)| (k.clone(), *v)).collect();
-    ext_vec.sort_by_key(|e| std::cmp::Reverse(e.1));
-    ext_vec.truncate(8);
-
-    Some(SearchOverlayInfo {
-        port: ss.persist.port,
-        chunks_indexed: metrics.chunks_indexed,
-        files_indexed: metrics.files_indexed,
-        queue_depth: metrics.queue_depth,
-        error_count: metrics.error_count,
-        last_activity_ms: metrics.last_activity_ms,
-        index_ready: metrics.scan_complete,
-        top_extensions: ext_vec,
-        tree_sitter_chunks: metrics.tree_sitter_chunks,
-        fallback_chunks: metrics.fallback_chunks,
-        ocr_attempted: metrics.ocr_attempted,
-        ocr_succeeded: metrics.ocr_succeeded,
-        ocr_failed: metrics.ocr_failed,
-        ocr_cached: metrics.ocr_cached,
-        ocr_available: metrics.ocr_enabled,
-    })
-}
 
 /// Meilisearch-powered search module.
 ///

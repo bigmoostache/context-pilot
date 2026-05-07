@@ -259,6 +259,26 @@ impl MeiliClient {
 
     // -- Stats ----------------------------------------------------------------
 
+    /// Get global Meilisearch statistics across all indexes.
+    ///
+    /// Uses `GET /stats`. Returns the raw JSON response including
+    /// `databaseSize`, `usedDatabaseSize`, `lastUpdate`, and per-index stats.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on network failures.
+    pub(crate) fn global_stats(&self) -> Result<serde_json::Value, String> {
+        let url = format!("{}/stats", self.base_url);
+        let resp = self
+            .http
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .send()
+            .map_err(|e| format!("global_stats request failed: {e}"))?;
+
+        resp.json().map_err(|e| format!("global_stats response parse failed: {e}"))
+    }
+
     /// Get index statistics (document count, indexing status).
     ///
     /// Uses `GET /indexes/{uid}/stats`.

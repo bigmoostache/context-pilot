@@ -10,5 +10,7 @@ pub(crate) mod bootstrap;
 pub(crate) mod client;
 /// Binary download and platform detection.
 pub(crate) mod download;
+/// Ctrl+I overlay data provider (live stats from Meilisearch).
+pub(crate) mod overlay;
 /// Server lifecycle: start, stop, health check, reconnect.
 pub(crate) mod server;

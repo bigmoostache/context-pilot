@@ -109,6 +109,28 @@ pub(crate) struct Chunk {
     pub char_end: u32,
 }
 
+/// Live statistics fetched from the Meilisearch `/stats` endpoint.
+///
+/// Cached in `SearchMetrics` and refreshed at most every 2 seconds
+/// to avoid hammering the server from the Ctrl+I overlay render loop.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct MeiliLiveStats {
+    /// Total database size on disk (bytes).
+    pub database_size_bytes: u64,
+    /// Used portion of the database (bytes).
+    pub used_database_size_bytes: u64,
+    /// Number of embeddings in the files index.
+    pub files_embedding_count: u64,
+    /// Whether the files index is currently indexing/embedding.
+    pub files_is_indexing: bool,
+    /// Number of documents in the logs index.
+    pub logs_doc_count: u64,
+    /// Name of the configured embedding model (e.g. "BAAI/bge-base-en-v1.5").
+    pub embedding_model: String,
+    /// Unix timestamp (ms) when these stats were fetched.
+    pub fetched_at_ms: u64,
+}
+
 /// Runtime metrics for the background indexer.
 ///
 /// Shared between the indexer thread and the module via `Arc<Mutex<…>>`.
@@ -146,6 +168,10 @@ pub(crate) struct SearchMetrics {
     /// Set by the indexer thread on startup.  Read by `overlay_info()`
     /// to decide whether to show the OCR section.
     pub ocr_enabled: bool,
+    /// Cached live stats from the Meilisearch `/stats` endpoint.
+    ///
+    /// Refreshed at most every 2 seconds by `overlay_info()`.
+    pub live_stats: Option<MeiliLiveStats>,
 }
 
 /// Commands sent to the background indexer thread.
@@ -196,6 +222,18 @@ pub struct SearchOverlayInfo {
     pub ocr_cached: u64,
     /// Whether the OCR API key is configured.
     pub ocr_available: bool,
+    /// Total database size on disk (bytes). From live stats.
+    pub database_size_bytes: u64,
+    /// Used portion of the database (bytes). From live stats.
+    pub used_database_size_bytes: u64,
+    /// Number of embeddings in the files index. From live stats.
+    pub files_embedding_count: u64,
+    /// Whether the files index is currently indexing/embedding.
+    pub files_is_indexing: bool,
+    /// Number of documents in the logs index.
+    pub logs_doc_count: u64,
+    /// Name of the configured embedding model.
+    pub embedding_model: String,
 }
 
 // -- Search results ----------------------------------------------------------
