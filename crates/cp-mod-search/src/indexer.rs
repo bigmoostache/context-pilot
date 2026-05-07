@@ -286,8 +286,13 @@ fn index_one_file(ctx: &IndexerCtx, abs_path: &Path) {
         .iter()
         .enumerate()
         .map(|(i, chunk)| {
+            // Meilisearch IDs: only [a-zA-Z0-9_-] allowed.
+            let safe_id: String = format!("{rel_str}-{i}")
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                .collect();
             serde_json::json!({
-                "id": format!("{rel_str}:{i}"),
+                "id": safe_id,
                 "file_path": rel_str,
                 "content": chunk.content,
                 "extension": ext,
