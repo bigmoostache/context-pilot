@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 use std::fmt::Write as _;
 
+use chrono::TimeZone as _;
 use crossterm::event::KeyEvent;
 
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action};
@@ -117,6 +118,19 @@ fn format_duration_ms(ms: f64) -> String {
     } else {
         format!("{mins}m")
     }
+}
+
+/// Format a millisecond timestamp as an ISO 8601 datetime string.
+///
+/// Falls back to `"unknown"` if the timestamp is zero or out of range.
+fn format_timestamp_ms(ms: u64) -> String {
+    if ms == 0 {
+        return "unknown".to_string();
+    }
+    let dur = std::time::Duration::from_millis(ms);
+    let secs = i64::try_from(dur.as_secs()).unwrap_or(i64::MAX);
+    let nanos = dur.subsec_nanos();
+    chrono::Utc.timestamp_opt(secs, nanos).single().map_or_else(|| "unknown".to_string(), |dt| dt.to_rfc3339())
 }
 
 /// Read the cached radar YAML from state, with fallback messages.
@@ -263,12 +277,13 @@ pub(crate) fn refresh(state: &mut State) {
         format_duration_ms(span_ms as f64)
     );
 
-    // Show the 3 most recent signals as "active signals" in YAML format
-    let recent_signals: Vec<&str> = signals.iter().rev().take(3).map(|s| s.content.as_str()).collect();
-    if !recent_signals.is_empty() {
+    // Show all task signals as anchors with timestamps (most recent first)
+    if !signals.is_empty() {
         let _h2 = writeln!(yaml, "anchors:");
-        for sig in &recent_signals {
-            let _h3 = writeln!(yaml, "  - \"{}\"", sig.replace('"', "\\\""));
+        for sig in signals.iter().rev() {
+            let datetime = format_timestamp_ms(sig.timestamp_ms);
+            let _h3 = writeln!(yaml, "  - time: \"{datetime}\"");
+            let _h4 = writeln!(yaml, "    signal: \"{}\"", sig.content.replace('"', "\\\""));
         }
     }
 
@@ -312,7 +327,7 @@ impl Panel for ContextRadarPanel {
                     Semantic::Header
                 } else if line.trim_start().starts_with("- content:") {
                     Semantic::Info
-                } else if line.trim_start().starts_with("- \"") {
+                } else if line.trim_start().starts_with("- time:") || line.trim_start().starts_with("signal:") {
                     // Anchor signal items
                     Semantic::Success
                 } else if line.contains("importance: critical") || line.contains("importance: high") {
