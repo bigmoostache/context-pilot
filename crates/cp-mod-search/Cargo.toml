@@ -11,6 +11,7 @@ readme.workspace = true
 
 [dependencies]
 cp-base.workspace = true
+cp-mod-logs = { path = "../cp-mod-logs" }
 cp-render.workspace = true
 crossterm.workspace = true
 serde.workspace = true

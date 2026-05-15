@@ -188,6 +188,13 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
         return;
     }
 
+    // === LOGS → MEILISEARCH SYNC ===
+    // Push new log entries to the search index AFTER tool execution.
+    // Cannot use on_tool_complete (fires during streaming, before execution).
+    if tools.iter().any(|t| t.name == "log_create" || t.name == "Close_conversation_history") {
+        cp_mod_search::sync_logs_to_meilisearch(&app.state);
+    }
+
     // === REVERIE TRIGGER ===
     // Check if any tool result contains a REVERIE_START: sentinel (from optimize_context).
     // Sentinel format: REVERIE_START:<agent_id>\n<context_or_empty>\n<human_readable_msg>
