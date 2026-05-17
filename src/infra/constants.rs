@@ -58,7 +58,7 @@ pub(crate) const TYPEWRITER_DEFAULT_DELAY_MS: f64 = 15.0;
 pub(crate) const STATUS_BAR_HEIGHT: u16 = 1;
 
 /// Height of the help hints section in sidebar
-pub(crate) const SIDEBAR_HELP_HEIGHT: u16 = 9;
+pub(crate) const SIDEBAR_HELP_HEIGHT: u16 = 8;
 
 // =============================================================================
 // EVENT LOOP

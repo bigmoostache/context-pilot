@@ -129,13 +129,9 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             // Global fallback handling (scrolling, context switching)
             let shift = key.modifiers.contains(KeyModifiers::SHIFT);
             let action = match key.code {
-                KeyCode::Tab | KeyCode::Up if shift => Action::SelectPrevContext,
+                KeyCode::Tab if shift => Action::SelectPrevContext,
                 KeyCode::Tab => Action::SelectNextContext,
                 KeyCode::BackTab => Action::SelectPrevContext, // Shift+Tab on some terminals
-                KeyCode::Down if shift => Action::SelectNextContext,
-                // Shift+Left/Right: page through dynamic panels
-                KeyCode::Left if shift => Action::PageDynamicPrev,
-                KeyCode::Right if shift => Action::PageDynamicNext,
                 KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => {
                     return scroll_key_action(key);
                 }

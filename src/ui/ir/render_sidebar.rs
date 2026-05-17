@@ -120,16 +120,14 @@ fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
     frame.render_widget(paragraph, context_area);
 
     // Help hints at bottom
-    let help_lines: Vec<Line<'_>> = sidebar
-        .help_hints
-        .iter()
-        .map(|hint| {
-            padded(vec![
-                Span::styled(hint.key.clone(), Style::default().fg(theme::accent())),
-                Span::styled(format!(" {}", hint.description), Style::default().fg(theme::text_muted())),
-            ])
-        })
-        .collect();
+    let mut help_lines: Vec<Line<'_>> = Vec::new();
+    help_lines.push(Line::from("")); // separator line for visibility
+    help_lines.extend(sidebar.help_hints.iter().map(|hint| {
+        padded(vec![
+            Span::styled(hint.key.clone(), Style::default().fg(theme::accent())),
+            Span::styled(format!(" {}", hint.description), Style::default().fg(theme::text_muted())),
+        ])
+    }));
 
     let help_paragraph = Paragraph::new(help_lines).style(base_style);
     let Some(&help_area) = sidebar_layout.get(1) else { return };
