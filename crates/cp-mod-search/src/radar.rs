@@ -83,13 +83,7 @@ fn decay(age_ms: f64, half_life_ms: f64) -> f64 {
 
 /// Append YAML lines for a single radar entry.
 fn write_entry(yaml: &mut String, entry: &ScoredResult) {
-    // Truncate long content to keep within token budget
-    let content = if entry.content.len() > 200 {
-        format!("{}...", entry.content.get(..entry.content.floor_char_boundary(197)).unwrap_or(""))
-    } else {
-        entry.content.clone()
-    };
-    let _w0 = writeln!(yaml, "  - content: \"{}\"", content.replace('"', "\\\""));
+    let _w0 = writeln!(yaml, "  - content: \"{}\"", entry.content.replace('"', "\\\""));
     let _w1 = writeln!(yaml, "    datetime: \"{}\"", entry.datetime);
     let _w2 = writeln!(yaml, "    importance: {}", entry.importance);
     if !entry.tags.is_empty() {
