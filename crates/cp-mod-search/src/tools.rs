@@ -221,6 +221,19 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         return err_result(tool, "Missing required parameter 'query'".to_string());
     };
 
+    let Some(semantic_query) =
+        tool.input.get("semantic_query").and_then(serde_json::Value::as_str).filter(|s| !s.trim().is_empty())
+    else {
+        return err_result(
+            tool,
+            "Missing or empty 'semantic_query' parameter. You MUST provide a fabricated example of what the \
+             target content looks like — NOT a description of what you're looking for, but an uneducated guess \
+             at the actual text/code. Semantic embeddings find near-neighbors, so a fake snippet that resembles \
+             the real content yields dramatically better results than a high-level description."
+                .to_string(),
+        );
+    };
+
     let scope = tool.input.get("scope").and_then(serde_json::Value::as_str).unwrap_or("all");
     let path_prefix = tool.input.get("path_prefix").and_then(serde_json::Value::as_str);
     let extension = tool.input.get("extension").and_then(serde_json::Value::as_str);
@@ -232,13 +245,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         .get("limit")
         .and_then(serde_json::Value::as_u64)
         .map_or(20_u32, |n| u32::try_from(n.min(50)).unwrap_or(50));
-    let semantic_ratio = tool.input.get("semantic_ratio").and_then(serde_json::Value::as_f64);
-    let semantic_query = tool.input.get("semantic_query").and_then(serde_json::Value::as_str);
     let hide_contents = tool.input.get("hide_contents").and_then(serde_json::Value::as_bool).unwrap_or(false);
-
-    // Default hybrid ratio: 0.5 (balanced keyword + semantic).
-    // Ignored when semantic_query is provided (split into two searches).
-    let effective_ratio = Some(semantic_ratio.unwrap_or(0.5));
 
     // --- Resolve index UIDs --------------------------------------------------
 
@@ -262,56 +269,35 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         let file_filter = build_file_filter(extension, from_date, to_date);
         let file_sort = file_sort_string(sort);
 
-        if let Some(sem_q) = semantic_query {
-            // Split search: keyword with `query`, semantic with `semantic_query`
-            let keyword_params = crate::meili::client::SearchParams {
-                uid: &files_uid,
-                query: &effective_query,
-                filter: file_filter.as_deref(),
-                sort: file_sort,
-                limit,
-                semantic_ratio: Some(0.0), // pure keyword
-            };
-            let semantic_params = crate::meili::client::SearchParams {
-                uid: &files_uid,
-                query: sem_q,
-                filter: file_filter.as_deref(),
-                sort: file_sort,
-                limit,
-                semantic_ratio: Some(1.0), // pure semantic
-            };
-            match client.multi_search(&[keyword_params, semantic_params]) {
-                Ok(results) => {
-                    for result_set in &results {
-                        if let Some(hits) = result_set.get("hits").and_then(|h| h.as_array()) {
-                            for hit in hits {
-                                file_results.push(parse_file_hit(hit));
-                            }
-                        }
-                    }
-                    dedup_by_score(&mut file_results, limit);
-                }
-                Err(e) => log::warn!("File multi-search failed: {e}"),
-            }
-        } else {
-            // Single hybrid search with balanced ratio
-            match client.search(&crate::meili::client::SearchParams {
-                uid: &files_uid,
-                query: &effective_query,
-                filter: file_filter.as_deref(),
-                sort: file_sort,
-                limit,
-                semantic_ratio: effective_ratio,
-            }) {
-                Ok(resp) => {
-                    if let Some(hits) = resp.get("hits").and_then(|h| h.as_array()) {
+        // Split search: keyword with `query`, semantic with `semantic_query`
+        let keyword_params = crate::meili::client::SearchParams {
+            uid: &files_uid,
+            query: &effective_query,
+            filter: file_filter.as_deref(),
+            sort: file_sort,
+            limit,
+            semantic_ratio: Some(0.0), // pure keyword
+        };
+        let semantic_params = crate::meili::client::SearchParams {
+            uid: &files_uid,
+            query: semantic_query,
+            filter: file_filter.as_deref(),
+            sort: file_sort,
+            limit,
+            semantic_ratio: Some(1.0), // pure semantic
+        };
+        match client.multi_search(&[keyword_params, semantic_params]) {
+            Ok(results) => {
+                for result_set in &results {
+                    if let Some(hits) = result_set.get("hits").and_then(|h| h.as_array()) {
                         for hit in hits {
                             file_results.push(parse_file_hit(hit));
                         }
                     }
                 }
-                Err(e) => log::warn!("File search failed: {e}"),
+                dedup_by_score(&mut file_results, limit);
             }
+            Err(e) => log::warn!("File multi-search failed: {e}"),
         }
     }
 
@@ -321,56 +307,35 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         let log_filter = build_log_filter(from_date, to_date);
         let log_sort = log_sort_string(sort);
 
-        if let Some(sem_q) = semantic_query {
-            // Split search: keyword with `query`, semantic with `semantic_query`
-            let keyword_params = crate::meili::client::SearchParams {
-                uid: &logs_uid,
-                query,
-                filter: log_filter.as_deref(),
-                sort: log_sort,
-                limit,
-                semantic_ratio: Some(0.0),
-            };
-            let semantic_params = crate::meili::client::SearchParams {
-                uid: &logs_uid,
-                query: sem_q,
-                filter: log_filter.as_deref(),
-                sort: log_sort,
-                limit,
-                semantic_ratio: Some(1.0),
-            };
-            match client.multi_search(&[keyword_params, semantic_params]) {
-                Ok(results) => {
-                    for result_set in &results {
-                        if let Some(hits) = result_set.get("hits").and_then(|h| h.as_array()) {
-                            for hit in hits {
-                                log_results.push(parse_log_hit(hit));
-                            }
-                        }
-                    }
-                    dedup_by_score(&mut log_results, limit);
-                }
-                Err(e) => log::warn!("Log multi-search failed: {e}"),
-            }
-        } else {
-            // Single hybrid search with balanced ratio
-            match client.search(&crate::meili::client::SearchParams {
-                uid: &logs_uid,
-                query,
-                filter: log_filter.as_deref(),
-                sort: log_sort,
-                limit,
-                semantic_ratio: effective_ratio,
-            }) {
-                Ok(resp) => {
-                    if let Some(hits) = resp.get("hits").and_then(|h| h.as_array()) {
+        // Split search: keyword with `query`, semantic with `semantic_query`
+        let keyword_params = crate::meili::client::SearchParams {
+            uid: &logs_uid,
+            query,
+            filter: log_filter.as_deref(),
+            sort: log_sort,
+            limit,
+            semantic_ratio: Some(0.0),
+        };
+        let semantic_params = crate::meili::client::SearchParams {
+            uid: &logs_uid,
+            query: semantic_query,
+            filter: log_filter.as_deref(),
+            sort: log_sort,
+            limit,
+            semantic_ratio: Some(1.0),
+        };
+        match client.multi_search(&[keyword_params, semantic_params]) {
+            Ok(results) => {
+                for result_set in &results {
+                    if let Some(hits) = result_set.get("hits").and_then(|h| h.as_array()) {
                         for hit in hits {
                             log_results.push(parse_log_hit(hit));
                         }
                     }
                 }
-                Err(e) => log::warn!("Log search failed: {e}"),
+                dedup_by_score(&mut log_results, limit);
             }
+            Err(e) => log::warn!("Log multi-search failed: {e}"),
         }
     }
 
