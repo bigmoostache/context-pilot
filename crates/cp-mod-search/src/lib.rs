@@ -219,6 +219,12 @@ impl Module for SearchModule {
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Ok(mut persist) = serde_json::from_value::<SearchPersistData>(data.clone()) {
+            // Sanitize persisted signals — earlier versions could store leaked
+            // thought_body content.  Truncate + strip XML artifacts.
+            for sig in &mut persist.task_signals {
+                sig.content = radar::sanitize_signal(&sig.content);
+            }
+
             // Re-validate server connection — the port may have changed if the
             // Meilisearch process was killed and restarted between saves.
             match meili::server::ensure_server_running() {
@@ -417,17 +423,7 @@ pub fn refresh_radar(state: &mut State) {
 /// Called from `pipeline.rs` after a Think tool executes with a
 /// `task_context` parameter.  Caps the buffer at [`types::MAX_TASK_SIGNALS`].
 pub fn push_task_signal(state: &mut State, content: &str) {
-    let Some(ss) = state.get_ext_mut::<SearchState>() else { return };
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
-    ss.persist.task_signals.push(types::TaskSignal { timestamp_ms: now_ms, content: content.to_string() });
-    // Ring buffer: drop oldest signals when over capacity
-    let len = ss.persist.task_signals.len();
-    if len > types::MAX_TASK_SIGNALS {
-        let excess = len.saturating_sub(types::MAX_TASK_SIGNALS);
-        drop(ss.persist.task_signals.drain(..excess));
-    }
+    radar::push_signal(state, content);
 }
 
 /// Push all log entries from the logs module into the Meilisearch logs index.

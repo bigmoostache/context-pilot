@@ -147,6 +147,57 @@ fn get_radar_yaml(state: &State) -> String {
     )
 }
 
+// ─── Signal ingestion ───────────────────────────────────────────────────────
+
+/// Maximum character length for a task context signal.
+///
+/// Signals should be 1–2 sentences (the `task_context` param).  Anything
+/// longer almost certainly contains a leaked `thought_body`.
+const MAX_SIGNAL_LEN: usize = 300;
+
+/// Truncate and sanitize a signal string.
+///
+/// - Caps at [`MAX_SIGNAL_LEN`] characters (on a char boundary).
+/// - Strips XML/tool-call artifacts that indicate a leaked `thought_body`.
+pub(crate) fn sanitize_signal(raw: &str) -> String {
+    // If the signal contains tool XML, it's a leaked thought_body — take only
+    // the text before the XML starts.
+    let content = raw
+        .find("<parameter")
+        .or_else(|| raw.find("</"))
+        .map_or(raw, |idx| raw.get(..idx).unwrap_or(raw))
+        .trim()
+        .trim_end_matches('"')
+        .trim_end_matches('>')
+        .trim();
+
+    if content.len() <= MAX_SIGNAL_LEN {
+        content.to_string()
+    } else {
+        let boundary = content.floor_char_boundary(MAX_SIGNAL_LEN);
+        format!("{}…", content.get(..boundary).unwrap_or(content))
+    }
+}
+
+/// Push a task context signal from the Think tool into the ring buffer.
+///
+/// Called from `pipeline.rs` after a Think tool executes with a
+/// `task_context` parameter.  Caps the buffer at [`crate::types::MAX_TASK_SIGNALS`].
+pub(crate) fn push_signal(state: &mut State, content: &str) {
+    let Some(ss) = state.get_ext_mut::<SearchState>() else { return };
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
+    let safe = sanitize_signal(content);
+    ss.persist.task_signals.push(crate::types::TaskSignal { timestamp_ms: now_ms, content: safe });
+    // Ring buffer: drop oldest signals when over capacity
+    let len = ss.persist.task_signals.len();
+    if len > crate::types::MAX_TASK_SIGNALS {
+        let excess = len.saturating_sub(crate::types::MAX_TASK_SIGNALS);
+        drop(ss.persist.task_signals.drain(..excess));
+    }
+}
+
 // ─── Refresh ────────────────────────────────────────────────────────────────
 
 /// Recompute the Context Radar panel content.
