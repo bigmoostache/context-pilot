@@ -1,3 +1,4 @@
+--- TRAP TEST ---
 --- VIRTUAL PREFLIGHT TEST COMPLETE (3 chained edits) ---
 10:54:31.068791184 fmt crates/cp-mod-callback/src/trigger.rs
 10:54:31.117944689 fmt crates/cp-mod-callback/src/firing.rs

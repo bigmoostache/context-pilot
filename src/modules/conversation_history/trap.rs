@@ -87,7 +87,7 @@ pub(crate) fn trap_blocks_tool(tool_name: &str, state: &State) -> Option<String>
     if !qs.trap_active {
         return None;
     }
-    if tool_name == "Close_conversation_history" {
+    if tool_name == "Close_conversation_history" || tool_name == "Think" {
         return None;
     }
     Some(format_blocked_message(state))

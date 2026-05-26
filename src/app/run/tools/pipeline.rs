@@ -9,6 +9,7 @@ use crate::state::persistence::build_message_op;
 use crate::state::{Message, MsgKind, MsgStatus, StreamPhase, ToolResultRecord, ToolUseRecord};
 
 use crate::app::run::streaming::{has_dirty_file_panels, trigger_dirty_panel_refresh};
+use cp_base::state::context::Kind;
 use cp_mod_callback::firing as callback_firing;
 use cp_mod_callback::trigger as callback_trigger;
 use cp_mod_console::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
@@ -188,6 +189,40 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     // After Close_conversation_history executes, check if the trap can be lifted.
     if tools.iter().any(|t| t.name == "Close_conversation_history") {
         crate::modules::conversation_history::trap::maybe_deactivate_trap(&mut app.state);
+    }
+
+    // === REMAINING HISTORY PANELS ===
+    // After Close_conversation_history, augment result with virtual remaining panels
+    // (subtract any panels queued for closing that haven't executed yet).
+    if tools.iter().any(|t| t.name == "Close_conversation_history") {
+        let mut remaining: Vec<String> = app
+            .state
+            .context
+            .iter()
+            .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)
+            .map(|c| c.id.clone())
+            .collect();
+
+        let qs = QueueState::get(&app.state);
+        let queued_closes: Vec<&str> = qs
+            .queued_calls
+            .iter()
+            .filter(|q| q.tool_name == "Close_conversation_history")
+            .filter_map(|q| q.input.get("id").and_then(serde_json::Value::as_str))
+            .collect();
+        remaining.retain(|id| !queued_closes.iter().any(|qc| *qc == id));
+
+        let suffix = if remaining.is_empty() {
+            "\nNo conversation history panels remaining.".to_string()
+        } else {
+            format!("\nRemaining conversation history panels: {}", remaining.join(", "))
+        };
+
+        for (tool, tr) in tools.iter().zip(tool_results.iter_mut()) {
+            if tool.name == "Close_conversation_history" && !tr.is_error {
+                tr.content.push_str(&suffix);
+            }
+        }
     }
 
     // Check if any tool triggered a question form (blocking)
