@@ -188,16 +188,18 @@ fn render_block(block: &cp_render::Block, lines: &mut Vec<Line<'static>>) {
 
 // ── Table rendering ──────────────────────────────────────────────────
 
-/// Render a table block as aligned text lines.
+/// Render a table block as aligned text lines with borders.
 ///
 /// Computes column widths from headers + data, then renders each row
-/// with appropriate padding and alignment.
+/// with `│` column separators and `─┼─` row separators — matching the
+/// conversation panel's markdown table style.
 fn render_table(columns: &[cp_render::Column], rows: &[Vec<cp_render::Cell>], lines: &mut Vec<Line<'static>>) {
     if columns.is_empty() {
         return;
     }
 
     let col_count = columns.len();
+    let border_style = semantic_to_style(Semantic::Border);
     let mut widths: Vec<usize> = columns.iter().map(|c| c.header.len()).collect();
 
     for row in rows {
@@ -216,21 +218,27 @@ fn render_table(columns: &[cp_render::Column], rows: &[Vec<cp_render::Cell>], li
     if has_headers {
         let mut spans = Vec::new();
         for (i, col) in columns.iter().enumerate() {
+            if i > 0 {
+                spans.push(Span::styled(" │ ", border_style));
+            }
             let w = widths.get(i).copied().unwrap_or(0);
             let padded = pad_str(&col.header, w, col.align);
             spans.push(Span::styled(padded, semantic_to_style(Semantic::Header)));
-            if i < col_count.saturating_sub(1) {
-                spans.push(Span::raw("  "));
-            }
         }
         lines.push(Line::from(spans));
+
+        // Header/data separator row: ─────┼───────┼─────
+        render_separator_row(&widths, col_count, border_style, lines);
     }
 
-    // Render data rows.
-    for row in rows {
+    // Render data rows with thin separators between them.
+    for (row_idx, row) in rows.iter().enumerate() {
         let mut spans = Vec::new();
         for (i, cell) in row.iter().enumerate() {
             let Some(col) = columns.get(i) else { break };
+            if i > 0 {
+                spans.push(Span::styled(" │ ", border_style));
+            }
             let w = widths.get(i).copied().unwrap_or(0);
             let align = if cell.align == Align::Left { col.align } else { cell.align };
             let content: String = cell.spans.iter().map(|s| s.text.as_str()).collect();
@@ -252,13 +260,27 @@ fn render_table(columns: &[cp_render::Column], rows: &[Vec<cp_render::Cell>], li
                     spans.push(Span::raw(" ".repeat(padding)));
                 }
             }
-
-            if i < col_count.saturating_sub(1) {
-                spans.push(Span::raw("  "));
-            }
         }
         lines.push(Line::from(spans));
+
+        // Thin separator between data rows (not after the last row).
+        if row_idx < rows.len().saturating_sub(1) {
+            render_separator_row(&widths, col_count, border_style, lines);
+        }
     }
+}
+
+/// Render a horizontal separator row: `───┼───┼───`.
+fn render_separator_row(widths: &[usize], col_count: usize, border_style: Style, lines: &mut Vec<Line<'static>>) {
+    let _ = col_count; // used implicitly via widths.len()
+    let mut spans = Vec::new();
+    for (i, width) in widths.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled("─┼─", border_style));
+        }
+        spans.push(Span::styled("─".repeat(*width), border_style));
+    }
+    lines.push(Line::from(spans));
 }
 
 /// Split total padding into (left, right) halves for centre alignment.
