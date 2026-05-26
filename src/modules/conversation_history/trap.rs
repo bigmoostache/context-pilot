@@ -47,6 +47,19 @@ pub(crate) fn check_and_trigger_trap(state: &mut State) -> Option<String> {
         .map(|c| (c.id.clone(), c.last_refresh_ms))
         .collect();
 
+    // Subtract panels that are already targeted by queued Close_conversation_history
+    // calls — the queue flush is about to close those, so they shouldn't count.
+    {
+        let qs = QueueState::get(state);
+        let queued_close_ids: Vec<&str> = qs
+            .queued_calls
+            .iter()
+            .filter(|q| q.tool_name == "Close_conversation_history")
+            .filter_map(|q| q.input.get("id").and_then(serde_json::Value::as_str))
+            .collect();
+        panels.retain(|(id, _)| !queued_close_ids.iter().any(|qc| *qc == id));
+    }
+
     if panels.len() < TRAP_THRESHOLD {
         return None;
     }
@@ -108,6 +121,12 @@ pub(crate) fn maybe_deactivate_trap(state: &mut State) {
         qs.trap_active = false;
         qs.trap_panel_ids.clear();
         qs.trap_optional_ids.clear();
+
+        // Clear stale queued Close_conversation_history calls.  These predated
+        // the trap and are now superseded by the manual closures the AI
+        // performed during the trap.  Leaving them would trigger false
+        // "duplicate close" errors on the next close attempt.
+        qs.queued_calls.retain(|q| q.tool_name != "Close_conversation_history");
     }
 }
 
