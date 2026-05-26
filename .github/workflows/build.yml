@@ -1,0 +1,77 @@
+name: Build
+
+on:
+  push:
+    branches: ["master"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: cpilot-linux-x86_64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: cpilot-linux-aarch64
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-13
+            artifact: cpilot-macos-x86_64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: cpilot-macos-aarch64
+
+    name: ${{ matrix.artifact }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pin Rust 1.93.0 until matrix-sdk 0.16 fixes recursion depth overflow on 1.94+
+      # Upstream: https://github.com/matrix-org/matrix-rust-sdk/issues/6254
+      - name: Install Rust 1.93.0
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal
+          rustup default 1.93.0
+          rustup target add ${{ matrix.target }}
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.cross
+        uses: taiki-e/install-action@cross
+
+      - name: Build (native)
+        if: ${{ !matrix.cross }}
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+          cargo build --release --target ${{ matrix.target }} -p cp-console-server
+
+      - name: Build (cross)
+        if: ${{ matrix.cross }}
+        run: |
+          cross build --release --target ${{ matrix.target }}
+          cross build --release --target ${{ matrix.target }} -p cp-console-server
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/release/tui artifacts/cpilot
+          cp target/${{ matrix.target }}/release/cp-console-server artifacts/cp-console-server
+          chmod 755 artifacts/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: artifacts/
+          retention-days: 30
