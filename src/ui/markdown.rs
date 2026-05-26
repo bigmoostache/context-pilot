@@ -224,19 +224,36 @@ pub(crate) fn render_markdown_table(
         col_widths = new_widths;
     }
 
-    // Render each row with aligned columns
+    // Render each row with aligned columns inside a bordered box
     let mut result: Vec<Vec<Span<'static>>> = Vec::new();
+    let border_style = Style::default().fg(theme::border());
+
+    // Top border: ┌───┬───┬───┐
+    {
+        let mut spans: Vec<Span<'static>> = Vec::new();
+        spans.push(Span::styled("┌─", border_style));
+        for (col, width) in col_widths.iter().enumerate() {
+            if col > 0 {
+                spans.push(Span::styled("─┬─", border_style));
+            }
+            spans.push(Span::styled("─".repeat(*width), border_style));
+        }
+        spans.push(Span::styled("─┐", border_style));
+        result.push(spans);
+    }
 
     for (row_idx, row) in rows.iter().enumerate() {
         if is_separator_row.get(row_idx).copied().unwrap_or(false) {
-            // Render separator row with dashes
+            // Render separator row: ├─────┼──────┼─────┤
             let mut spans: Vec<Span<'static>> = Vec::new();
+            spans.push(Span::styled("├─", border_style));
             for (col, width) in col_widths.iter().enumerate() {
                 if col > 0 {
-                    spans.push(Span::styled("─┼─", Style::default().fg(theme::border())));
+                    spans.push(Span::styled("─┼─", border_style));
                 }
-                spans.push(Span::styled("─".repeat(*width), Style::default().fg(theme::border())));
+                spans.push(Span::styled("─".repeat(*width), border_style));
             }
+            spans.push(Span::styled("─┤", border_style));
             result.push(spans);
         } else {
             // Render data row (with multi-line wrapping)
@@ -256,10 +273,11 @@ pub(crate) fn render_markdown_table(
             // Render each display line of this logical row
             for line_idx in 0..max_lines {
                 let mut spans: Vec<Span<'static>> = Vec::new();
+                spans.push(Span::styled("│ ", border_style));
 
                 for (col, width) in col_widths.iter().enumerate() {
                     if col > 0 {
-                        spans.push(Span::styled(" │ ", Style::default().fg(theme::border())));
+                        spans.push(Span::styled(" │ ", border_style));
                     }
 
                     let cell_text = wrapped_cells
@@ -291,6 +309,7 @@ pub(crate) fn render_markdown_table(
                         }
                     }
                 }
+                spans.push(Span::styled(" │", border_style));
                 result.push(spans);
             }
 
@@ -298,15 +317,31 @@ pub(crate) fn render_markdown_table(
             let next_row_idx = row_idx.saturating_add(1);
             if next_row_idx < rows.len() && !is_separator_row.get(next_row_idx).copied().unwrap_or(false) {
                 let mut sep_spans: Vec<Span<'static>> = Vec::new();
+                sep_spans.push(Span::styled("├─", border_style));
                 for (col, width) in col_widths.iter().enumerate() {
                     if col > 0 {
-                        sep_spans.push(Span::styled("─┼─", Style::default().fg(theme::border())));
+                        sep_spans.push(Span::styled("─┼─", border_style));
                     }
-                    sep_spans.push(Span::styled("─".repeat(*width), Style::default().fg(theme::border())));
+                    sep_spans.push(Span::styled("─".repeat(*width), border_style));
                 }
+                sep_spans.push(Span::styled("─┤", border_style));
                 result.push(sep_spans);
             }
         }
+    }
+
+    // Bottom border: └───┴───┴───┘
+    {
+        let mut spans: Vec<Span<'static>> = Vec::new();
+        spans.push(Span::styled("└─", border_style));
+        for (col, width) in col_widths.iter().enumerate() {
+            if col > 0 {
+                spans.push(Span::styled("─┴─", border_style));
+            }
+            spans.push(Span::styled("─".repeat(*width), border_style));
+        }
+        spans.push(Span::styled("─┘", border_style));
+        result.push(spans);
     }
 
     result

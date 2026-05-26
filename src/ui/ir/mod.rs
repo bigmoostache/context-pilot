@@ -188,17 +188,16 @@ fn render_block(block: &cp_render::Block, lines: &mut Vec<Line<'static>>) {
 
 // ── Table rendering ──────────────────────────────────────────────────
 
-/// Render a table block as aligned text lines with borders.
+/// Render a table block as aligned text lines with full box borders.
 ///
 /// Computes column widths from headers + data, then renders each row
-/// with `│` column separators and `─┼─` row separators — matching the
-/// conversation panel's markdown table style.
+/// inside a rounded-corner box with `│` column separators and `─┼─`
+/// row separators — matching the conversation panel's markdown table style.
 fn render_table(columns: &[cp_render::Column], rows: &[Vec<cp_render::Cell>], lines: &mut Vec<Line<'static>>) {
     if columns.is_empty() {
         return;
     }
 
-    let col_count = columns.len();
     let border_style = semantic_to_style(Semantic::Border);
     let mut widths: Vec<usize> = columns.iter().map(|c| c.header.len()).collect();
 
@@ -213,10 +212,13 @@ fn render_table(columns: &[cp_render::Column], rows: &[Vec<cp_render::Cell>], li
         }
     }
 
+    // Top border: ╭───┬───┬───╮
+    render_border_row(&widths, ("╭", "┬", "╮"), border_style, lines);
+
     // Render header row (if any column has a non-empty header).
     let has_headers = columns.iter().any(|c| !c.header.is_empty());
     if has_headers {
-        let mut spans = Vec::new();
+        let mut spans = vec![Span::styled("│ ", border_style)];
         for (i, col) in columns.iter().enumerate() {
             if i > 0 {
                 spans.push(Span::styled(" │ ", border_style));
@@ -225,15 +227,16 @@ fn render_table(columns: &[cp_render::Column], rows: &[Vec<cp_render::Cell>], li
             let padded = pad_str(&col.header, w, col.align);
             spans.push(Span::styled(padded, semantic_to_style(Semantic::Header)));
         }
+        spans.push(Span::styled(" │", border_style));
         lines.push(Line::from(spans));
 
-        // Header/data separator row: ─────┼───────┼─────
-        render_separator_row(&widths, col_count, border_style, lines);
+        // Header/data separator row: ├─────┼───────┼─────┤
+        render_border_row(&widths, ("├", "┼", "┤"), border_style, lines);
     }
 
     // Render data rows with thin separators between them.
     for (row_idx, row) in rows.iter().enumerate() {
-        let mut spans = Vec::new();
+        let mut spans = vec![Span::styled("│ ", border_style)];
         for (i, cell) in row.iter().enumerate() {
             let Some(col) = columns.get(i) else { break };
             if i > 0 {
@@ -261,25 +264,35 @@ fn render_table(columns: &[cp_render::Column], rows: &[Vec<cp_render::Cell>], li
                 }
             }
         }
+        spans.push(Span::styled(" │", border_style));
         lines.push(Line::from(spans));
 
         // Thin separator between data rows (not after the last row).
         if row_idx < rows.len().saturating_sub(1) {
-            render_separator_row(&widths, col_count, border_style, lines);
+            render_border_row(&widths, ("├", "┼", "┤"), border_style, lines);
         }
     }
+
+    // Bottom border: ╰───┴───┴───╯
+    render_border_row(&widths, ("╰", "┴", "╯"), border_style, lines);
 }
 
-/// Render a horizontal separator row: `───┼───┼───`.
-fn render_separator_row(widths: &[usize], col_count: usize, border_style: Style, lines: &mut Vec<Line<'static>>) {
-    let _ = col_count; // used implicitly via widths.len()
-    let mut spans = Vec::new();
+/// Render a horizontal border row: `left───mid───right` (e.g. `╭───┬───╮`).
+fn render_border_row(
+    widths: &[usize],
+    (left, mid, right): (&str, &str, &str),
+    border_style: Style,
+    lines: &mut Vec<Line<'static>>,
+) {
+    let mut spans = vec![Span::styled(left.to_owned(), border_style)];
     for (i, width) in widths.iter().enumerate() {
         if i > 0 {
-            spans.push(Span::styled("─┼─", border_style));
+            spans.push(Span::styled(mid.to_owned(), border_style));
         }
-        spans.push(Span::styled("─".repeat(*width), border_style));
+        // +2 for the space padding on each side of cell content
+        spans.push(Span::styled("─".repeat(width.saturating_add(2)), border_style));
     }
+    spans.push(Span::styled(right.to_owned(), border_style));
     lines.push(Line::from(spans));
 }
 
