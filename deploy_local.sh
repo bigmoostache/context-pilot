@@ -33,15 +33,41 @@ GITIGNORE_GLOBAL="$HOME/.gitignore_global"
 echo "=== Context Pilot — Local Deploy ==="
 echo ""
 
-# 1. Build release binary
-echo "[1/4] Building release binary..."
+# 1. Check for updates from remote
+echo "[1/5] Checking for updates..."
+CURRENT_BRANCH=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ "$CURRENT_BRANCH" != "master" ]; then
+    echo "      Not on master branch (on '$CURRENT_BRANCH') — skipping update check."
+elif git -C "$SCRIPT_DIR" fetch origin master --quiet 2>/dev/null; then
+    LOCAL_SHA=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
+    REMOTE_SHA=$(git -C "$SCRIPT_DIR" rev-parse origin/master)
+    if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+        BEHIND=$(git -C "$SCRIPT_DIR" rev-list --count HEAD..origin/master)
+        echo "      $BEHIND new commit(s) available."
+        if git -C "$SCRIPT_DIR" diff-index --quiet HEAD -- 2>/dev/null; then
+            git -C "$SCRIPT_DIR" pull --ff-only origin master
+            NEW_SHA=$(git -C "$SCRIPT_DIR" rev-parse --short HEAD)
+            echo "      Updated to $NEW_SHA."
+        else
+            echo "      WARNING: You have local changes — skipping pull."
+            echo "      Run 'git stash && git pull && git stash pop' to update manually."
+        fi
+    else
+        echo "      Already up to date ($(git -C "$SCRIPT_DIR" rev-parse --short HEAD))."
+    fi
+else
+    echo "      Could not reach remote — building with current version."
+fi
+
+# 2. Build release binary
+echo "[2/5] Building release binary..."
 cd "$SCRIPT_DIR"
 cargo build --release
 cargo build --release -p cp-console-server
 echo "      Build complete."
 
-# 2. Install binary (sudo only for this step)
-echo "[2/4] Installing to $INSTALL_PATH..."
+# 3. Install binary (sudo only for this step)
+echo "[3/5] Installing to $INSTALL_PATH..."
 # Remove old binary first to avoid "Text file busy" when the running process holds it open.
 # The running process keeps its inode alive, but the directory entry is freed for the new copy.
 sudo rm -f "$INSTALL_PATH"
@@ -54,8 +80,8 @@ sudo cp "$SCRIPT_DIR/target/release/cp-console-server" "$INSTALL_DIR/cp-console-
 sudo chmod +x "$INSTALL_DIR/cp-console-server"
 echo "      Installed. ($(du -h "$INSTALL_PATH" | cut -f1))"
 
-# 3. Global gitignore
-echo "[3/4] Setting up global gitignore..."
+# 4. Global gitignore
+echo "[4/5] Setting up global gitignore..."
 touch "$GITIGNORE_GLOBAL"
 if grep -qxF ".context-pilot/" "$GITIGNORE_GLOBAL" 2>/dev/null; then
     echo "      .context-pilot/ already in $GITIGNORE_GLOBAL — skipping."
@@ -65,8 +91,8 @@ else
 fi
 git config --global core.excludesFile "$GITIGNORE_GLOBAL"
 
-# 4. Export API keys from .env
-echo "[4/4] Checking API keys in ~/.bashrc..."
+# 5. Export API keys from .env
+echo "[5/5] Checking API keys in ~/.bashrc..."
 if [ -f "$SCRIPT_DIR/.env" ]; then
     KEYS_ADDED=0
     while IFS= read -r line; do
