@@ -17,19 +17,23 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
 
     // Phase 0.5: Duplicate Close_conversation_history detection
     // If another queued item already targets the same panel, reject early.
+    // Skip when trap is active — queued items are frozen (queue flush blocked),
+    // and Close_conversation_history executes directly during trap.
     if tool.name == "Close_conversation_history"
         && let Some(target_id) = tool.input.get("id").and_then(serde_json::Value::as_str)
     {
         let qs = cp_mod_queue::types::QueueState::get(state);
-        let already_queued = qs.queued_calls.iter().any(|q| {
-            q.tool_name == "Close_conversation_history"
-                && q.input.get("id").and_then(serde_json::Value::as_str) == Some(target_id)
-        });
-        if already_queued {
-            result.errors.push(format!(
-                "Panel '{target_id}' is already queued for closing by another Close_conversation_history call",
-            ));
-            return result;
+        if !qs.trap_active {
+            let already_queued = qs.queued_calls.iter().any(|q| {
+                q.tool_name == "Close_conversation_history"
+                    && q.input.get("id").and_then(serde_json::Value::as_str) == Some(target_id)
+            });
+            if already_queued {
+                result.errors.push(format!(
+                    "Panel '{target_id}' is already queued for closing by another Close_conversation_history call",
+                ));
+                return result;
+            }
         }
     }
 
