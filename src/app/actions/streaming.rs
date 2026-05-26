@@ -117,6 +117,8 @@ const fn apply_token_usage(app_state: &mut State, usage: &TokenUsage) {
 
 /// Handle `StreamError` action — clean up streaming state, log error.
 pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
+    const INLINE_LIMIT: usize = 1000;
+
     state.flags.stream.phase.transition(StreamPhase::Idle);
 
     // Remove estimated tokens on error from Conversation context
@@ -128,10 +130,19 @@ pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResul
     // Log error to file
     let error_file = log_error(error);
 
+    // Truncate error for inline display (~1000 chars, UTF-8 safe)
+    let preview = if error.len() <= INLINE_LIMIT {
+        error.to_string()
+    } else {
+        let boundary =
+            error.char_indices().map(|(i, _)| i).take_while(|&i| i <= INLINE_LIMIT).last().unwrap_or(INLINE_LIMIT);
+        format!("{}… (truncated)", error.get(..boundary).unwrap_or(error))
+    };
+
     if let Some(msg) = state.messages.last_mut()
         && msg.role == "assistant"
     {
-        msg.content = format!("[Error occurred. See details in {error_file}]");
+        msg.content = format!("[Error occurred. Full details in {error_file}]\n\n{preview}");
         let id = msg.id.clone();
         return ActionResult::SaveMessage(id);
     }
