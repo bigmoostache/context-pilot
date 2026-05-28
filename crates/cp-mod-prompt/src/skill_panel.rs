@@ -57,9 +57,7 @@ impl Panel for SkillPanel {
                     Block::Line(vec![S::styled(skill.description.clone(), Semantic::Code)]),
                     Block::Empty,
                 ];
-                for line in skill.content.lines() {
-                    blocks.push(Block::text(line.to_string()));
-                }
+                blocks.extend(cp_render::markdown::to_blocks(&skill.content));
                 return blocks;
             }
         }

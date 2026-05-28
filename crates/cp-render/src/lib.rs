@@ -21,6 +21,8 @@ use serde::Serialize;
 pub mod conversation;
 /// Frame-level IR types: sidebar, status bar, panel content.
 pub mod frame;
+/// Markdown-to-IR conversion utilities.
+pub mod markdown;
 
 // ── Shared primitives ────────────────────────────────────────────────
 
