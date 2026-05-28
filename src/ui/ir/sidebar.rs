@@ -135,8 +135,17 @@ fn build_entries(state: &State, collapsed: bool) -> Vec<SidebarEntry> {
             ctx.id.clone()
         };
 
+        let is_console = ctx.context_type.as_str() == "console";
+        let is_running_console = is_console && ctx.name.contains("(running)");
+
         let label = if collapsed {
             String::new()
+        } else if is_running_console {
+            let name = crate::ui::helpers::truncate_string(&ctx.name, 16);
+            format!("{} {name}", spinner(state.spinner_frame))
+        } else if is_console {
+            let name = crate::ui::helpers::truncate_string(&ctx.name, 16);
+            format!("  {name}")
         } else {
             let name = crate::ui::helpers::truncate_string(&ctx.name, 18);
             if is_loading { format!("{name} {spin}", spin = spinner(state.spinner_frame)) } else { name }
