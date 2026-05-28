@@ -145,6 +145,10 @@ pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, la
 /// Maximum lines for `easy_bash` inline output. Beyond this, a panel is created.
 const EASY_BASH_INLINE_MAX_LINES: usize = 150;
 
+/// Maximum raw bytes for `easy_bash` inline output (~2 000 tokens).
+/// Catches few-but-huge lines (e.g. minified JSON) that would bloat the conversation.
+const EASY_BASH_INLINE_MAX_BYTES: usize = 8_000;
+
 /// A watcher that monitors a console session for a condition.
 #[derive(Debug)]
 pub struct ConsoleWatcher {
@@ -214,7 +218,7 @@ impl Watcher for ConsoleWatcher {
             let line_count = output.lines().count();
 
             // Short output → return inline, kill session, no panel
-            if line_count <= EASY_BASH_INLINE_MAX_LINES {
+            if line_count <= EASY_BASH_INLINE_MAX_LINES && output.len() <= EASY_BASH_INLINE_MAX_BYTES {
                 let description = if output.trim().is_empty() {
                     format!("(no output, exit_code={exit_code})")
                 } else {
@@ -233,7 +237,7 @@ impl Watcher for ConsoleWatcher {
                 });
             }
 
-            // Long output → create panel via deferred, keep session alive
+            // Long output (too many lines or too large) → create panel via deferred, keep session alive
             Some(WatcherResult {
                 description: format!("Output too long for inline ({line_count} lines, exit_code={exit_code})"),
                 panel_id: None,
