@@ -879,6 +879,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-mod-ocr"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "cp-render",
+ "log",
+ "reqwest",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "cp-mod-prompt"
 version = "0.1.0"
 dependencies = [
@@ -6188,6 +6200,7 @@ dependencies = [
  "cp-mod-github",
  "cp-mod-logs",
  "cp-mod-memory",
+ "cp-mod-ocr",
  "cp-mod-prompt",
  "cp-mod-queue",
  "cp-mod-scratchpad",

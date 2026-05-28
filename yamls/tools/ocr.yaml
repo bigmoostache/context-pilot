@@ -1,0 +1,33 @@
+tools:
+  ocr:
+    description: >
+      Converts a document (PDF, image) to text using the Datalab OCR API (Surya engine).
+      Two output modes: 'markdown' for clean extracted text, 'text_boxes' for JSON with
+      bounding boxes and block types.
+
+      Returns immediately — the conversion runs in the background. When complete,
+      the result is written to the output path and a notification appears.
+
+      Supported file types: PDF, PNG, JPG/JPEG, TIFF, WEBP, BMP, HEIC, GIF.
+      Max file size: 25 MB.
+
+      Requires DATALAB_API_KEY in the environment.
+    parameters:
+      path:
+        type: string
+        required: true
+        description: >
+          Path to the document file to convert. Supports: PDF, PNG, JPG, JPEG,
+          TIFF, WEBP, BMP, HEIC, GIF.
+      mode:
+        type: string
+        required: true
+        description: >
+          Output format. 'markdown' for clean markdown text extraction.
+          'text_boxes' for JSON with bounding boxes and block types.
+      output:
+        type: string
+        required: true
+        description: >
+          Path where the conversion result will be written. For 'markdown' mode,
+          a .md file is recommended. For 'text_boxes' mode, a .json file.

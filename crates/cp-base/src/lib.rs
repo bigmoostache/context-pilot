@@ -53,6 +53,7 @@ mod tests {
             ("github", include_str!("../../../yamls/tools/github.yaml")),
             ("logs", include_str!("../../../yamls/tools/logs.yaml")),
             ("memory", include_str!("../../../yamls/tools/memory.yaml")),
+            ("ocr", include_str!("../../../yamls/tools/ocr.yaml")),
             ("prompt", include_str!("../../../yamls/tools/prompt.yaml")),
             ("questions", include_str!("../../../yamls/tools/questions.yaml")),
             ("queue", include_str!("../../../yamls/tools/queue.yaml")),
