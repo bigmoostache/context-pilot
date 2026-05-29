@@ -4,8 +4,13 @@ pub(crate) mod api;
 pub(crate) mod config;
 /// Application-wide constants (colors, icons, prompts, layout values).
 pub(crate) mod constants;
-/// Flame graph telemetry — zero overhead when disabled.
-pub(crate) mod flame;
+/// Flame graph telemetry — thin re-export from `cp_base::flame`.
+///
+/// The core implementation lives in `cp-base` so all crates can instrument.
+/// This re-exports `init()` and `flush()` for `main.rs` startup/shutdown.
+pub(crate) mod flame {
+    pub(crate) use cp_base::flame::{flush, init};
+}
 /// GitHub webhook / event watcher.
 pub(crate) mod gh_watcher;
 /// Simple profiler for identifying slow operations.
