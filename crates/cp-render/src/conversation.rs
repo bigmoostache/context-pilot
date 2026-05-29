@@ -167,6 +167,12 @@ pub struct PerfOverlay {
     pub cpu_semantic: Semantic,
     /// Memory usage in megabytes.
     pub memory_mb: f64,
+    /// Number of open file descriptors for the TUI process.
+    pub open_fds: u32,
+    /// Soft rlimit for NOFILE.
+    pub fd_limit_soft: u64,
+    /// Semantic colour for FD usage.
+    pub fd_semantic: Semantic,
     /// Optional Meilisearch process stats.
     pub meili: Option<PerfMeiliStats>,
     /// Budget bars (e.g. 60fps, 30fps).

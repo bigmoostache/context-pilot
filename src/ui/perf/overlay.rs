@@ -42,6 +42,12 @@ pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, per
         Span::styled(format!("  RAM: {:.1} MB", perf.memory_mb), semantic_to_style(Semantic::Muted)),
     ]));
 
+    // Open file descriptors
+    lines.push(Line::from(vec![
+        Span::styled(format!(" FDs: {}", perf.open_fds), semantic_to_style(perf.fd_semantic)),
+        Span::styled(format!(" / {}", perf.fd_limit_soft), semantic_to_style(Semantic::Muted)),
+    ]));
+
     // Meilisearch process stats
     if let Some(ref meili) = perf.meili {
         lines.push(Line::from(vec![

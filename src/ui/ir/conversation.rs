@@ -273,6 +273,21 @@ fn cpu_semantic(pct: f64) -> Semantic {
     }
 }
 
+/// Map FD usage ratio to a Semantic (green < 50%, yellow < 80%, red otherwise).
+fn fd_semantic(open: u32, limit: u64) -> Semantic {
+    if limit == 0 {
+        return Semantic::Muted;
+    }
+    let pct = f64::from(open) / limit as f64 * 100.0;
+    if pct < 50.0 {
+        Semantic::Success
+    } else if pct < 80.0 {
+        Semantic::Warning
+    } else {
+        Semantic::Error
+    }
+}
+
 /// Build the perf overlay IR data from the perf metrics snapshot.
 fn build_perf_overlay(state: &State) -> PerfOverlay {
     use crate::ui::perf::PERF;
@@ -361,6 +376,9 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         cpu_usage: snapshot.cpu_usage,
         cpu_semantic: cpu_semantic(f64::from(snapshot.cpu_usage)),
         memory_mb: snapshot.memory_mb,
+        open_fds: snapshot.open_fds,
+        fd_limit_soft: snapshot.fd_limit_soft,
+        fd_semantic: fd_semantic(snapshot.open_fds, snapshot.fd_limit_soft),
         meili,
         budget_bars,
         sparkline: snapshot.frame_times_ms,

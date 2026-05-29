@@ -115,6 +115,10 @@ pub(crate) struct PerfMetrics {
     pub cpu_usage: AtomicU32,
     /// Memory usage in bytes
     pub memory_bytes: AtomicU64,
+    /// Number of open file descriptors
+    pub open_fds: AtomicU32,
+    /// Soft rlimit for NOFILE (set once at init, does not change)
+    pub fd_limit_soft: AtomicU64,
 }
 
 impl Default for PerfMetrics {
@@ -133,6 +137,10 @@ impl Default for PerfMetrics {
             frame_count: AtomicU64::new(0),
             cpu_usage: AtomicU32::new(0),
             memory_bytes: AtomicU64::new(mem_bytes),
+            open_fds: AtomicU32::new(0),
+            fd_limit_soft: AtomicU64::new(
+                rlimit::getrlimit(rlimit::Resource::NOFILE).map_or(0, |(soft, _)| soft),
+            ),
         }
     }
 }
@@ -289,6 +297,10 @@ impl PerfMetrics {
             self.cpu_usage.store(cpu_pct.to_bits(), Ordering::Relaxed);
             self.memory_bytes.store(mem_bytes, Ordering::Relaxed);
         }
+
+        // FD count (works on macOS and Linux via /dev/fd)
+        let fd_count = std::fs::read_dir("/dev/fd").map_or(0, |entries| entries.count());
+        self.open_fds.store(fd_count.to_u32(), Ordering::Relaxed);
     }
 
     /// Get snapshot of metrics for display
@@ -366,6 +378,8 @@ impl PerfMetrics {
             frame_max_ms,
             cpu_usage: f32::from_bits(self.cpu_usage.load(Ordering::Relaxed)),
             memory_mb: self.memory_bytes.load(Ordering::Relaxed).to_f64() / (1024.0 * 1024.0),
+            open_fds: self.open_fds.load(Ordering::Relaxed),
+            fd_limit_soft: self.fd_limit_soft.load(Ordering::Relaxed),
         }
     }
 
@@ -417,4 +431,8 @@ pub(crate) struct PerfSnapshot {
     pub cpu_usage: f32,
     /// Memory usage in megabytes.
     pub memory_mb: f64,
+    /// Number of open file descriptors.
+    pub open_fds: u32,
+    /// Soft rlimit for NOFILE.
+    pub fd_limit_soft: u64,
 }
