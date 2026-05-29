@@ -452,13 +452,6 @@ fn ratatui_span_to_ir(span: &ratatui::prelude::Span<'_>) -> Span {
 // ── Markdown table → IR spans ────────────────────────────────────────
 
 /// Render a markdown table to IR span rows.
-///
-/// Delegates to the existing `markdown::render_markdown_table()` and converts
-/// the `ratatui::Span` output to `cp_render::Span`. This is a bridge until
-/// the markdown module is fully ported to IR.
 fn render_markdown_table_ir(table_lines: &[&str], max_width: usize) -> Vec<Vec<Span>> {
-    let base_style = ratatui::prelude::Style::default();
-    let ratatui_rows = crate::ui::markdown::render_markdown_table(table_lines, base_style, max_width);
-
-    ratatui_rows.into_iter().map(|row| row.iter().map(ratatui_span_to_ir).collect()).collect()
+    crate::ui::markdown::render_markdown_table(table_lines, max_width)
 }

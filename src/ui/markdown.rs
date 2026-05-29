@@ -1,6 +1,5 @@
-use super::theme;
 use cp_base::cast::Safe as _;
-use ratatui::prelude::{Span, Style};
+use cp_render::{Semantic, Span};
 use unicode_width::UnicodeWidthChar as _;
 
 /// Calculate the display width of text after stripping markdown markers.
@@ -150,11 +149,7 @@ fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
 /// Strategy: compute fixed column widths -> for each row, wrap cell text to fit
 /// -> render each display line as a sequence of fixed-width cells separated by |.
 /// Vertical separators are always at the same character positions.
-pub(crate) fn render_markdown_table(
-    table_lines: &[&str],
-    _base_style: Style,
-    max_width: usize,
-) -> Vec<Vec<Span<'static>>> {
+pub(crate) fn render_markdown_table(table_lines: &[&str], max_width: usize) -> Vec<Vec<Span>> {
     // Parse all rows into cells
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut is_separator_row: Vec<bool> = Vec::new();
@@ -228,35 +223,34 @@ pub(crate) fn render_markdown_table(
     }
 
     // Render each row with aligned columns inside a bordered box
-    let mut result: Vec<Vec<Span<'static>>> = Vec::new();
-    let border_style = Style::default().fg(theme::border());
+    let mut result: Vec<Vec<Span>> = Vec::new();
 
     // Top border: ┌───┬───┬───┐
     {
-        let mut spans: Vec<Span<'static>> = Vec::new();
-        spans.push(Span::styled("┌─", border_style));
+        let mut spans: Vec<Span> = Vec::new();
+        spans.push(Span::styled("┌─".to_owned(), Semantic::Border));
         for (col, width) in col_widths.iter().enumerate() {
             if col > 0 {
-                spans.push(Span::styled("─┬─", border_style));
+                spans.push(Span::styled("─┬─".to_owned(), Semantic::Border));
             }
-            spans.push(Span::styled("─".repeat(*width), border_style));
+            spans.push(Span::styled("─".repeat(*width), Semantic::Border));
         }
-        spans.push(Span::styled("─┐", border_style));
+        spans.push(Span::styled("─┐".to_owned(), Semantic::Border));
         result.push(spans);
     }
 
     for (row_idx, row) in rows.iter().enumerate() {
         if is_separator_row.get(row_idx).copied().unwrap_or(false) {
             // Render separator row: ├─────┼──────┼─────┤
-            let mut spans: Vec<Span<'static>> = Vec::new();
-            spans.push(Span::styled("├─", border_style));
+            let mut spans: Vec<Span> = Vec::new();
+            spans.push(Span::styled("├─".to_owned(), Semantic::Border));
             for (col, width) in col_widths.iter().enumerate() {
                 if col > 0 {
-                    spans.push(Span::styled("─┼─", border_style));
+                    spans.push(Span::styled("─┼─".to_owned(), Semantic::Border));
                 }
-                spans.push(Span::styled("─".repeat(*width), border_style));
+                spans.push(Span::styled("─".repeat(*width), Semantic::Border));
             }
-            spans.push(Span::styled("─┤", border_style));
+            spans.push(Span::styled("─┤".to_owned(), Semantic::Border));
             result.push(spans);
         } else {
             // Render data row (with multi-line wrapping)
@@ -275,12 +269,12 @@ pub(crate) fn render_markdown_table(
 
             // Render each display line of this logical row
             for line_idx in 0..max_lines {
-                let mut spans: Vec<Span<'static>> = Vec::new();
-                spans.push(Span::styled("│ ", border_style));
+                let mut spans: Vec<Span> = Vec::new();
+                spans.push(Span::styled("│ ".to_owned(), Semantic::Border));
 
                 for (col, width) in col_widths.iter().enumerate() {
                     if col > 0 {
-                        spans.push(Span::styled(" │ ", border_style));
+                        spans.push(Span::styled(" │ ".to_owned(), Semantic::Border));
                     }
 
                     let cell_text = wrapped_cells
@@ -296,38 +290,35 @@ pub(crate) fn render_markdown_table(
 
                     if is_header {
                         // Header: single styled span with content + padding baked in
-                        spans.push(Span::styled(
-                            format!("{cell_text}{padding}"),
-                            Style::default().fg(theme::accent()).bold(),
-                        ));
+                        spans.push(Span::styled(format!("{cell_text}{padding}"), Semantic::Accent).bold());
                     } else if cell_text.is_empty() {
                         // Empty cell: just spaces
-                        spans.push(Span::styled(" ".repeat(*width), Style::default()));
+                        spans.push(Span::new(" ".repeat(*width)));
                     } else {
                         // Data cell: render markdown, then add padding as a plain span
                         let cell_spans = parse_inline_markdown(cell_text);
                         spans.extend(cell_spans);
                         if !padding.is_empty() {
-                            spans.push(Span::styled(padding, Style::default()));
+                            spans.push(Span::new(padding));
                         }
                     }
                 }
-                spans.push(Span::styled(" │", border_style));
+                spans.push(Span::styled(" │".to_owned(), Semantic::Border));
                 result.push(spans);
             }
 
             // Add thin separator line between data rows (not after last row, not after header's separator)
             let next_row_idx = row_idx.saturating_add(1);
             if next_row_idx < rows.len() && !is_separator_row.get(next_row_idx).copied().unwrap_or(false) {
-                let mut sep_spans: Vec<Span<'static>> = Vec::new();
-                sep_spans.push(Span::styled("├─", border_style));
+                let mut sep_spans: Vec<Span> = Vec::new();
+                sep_spans.push(Span::styled("├─".to_owned(), Semantic::Border));
                 for (col, width) in col_widths.iter().enumerate() {
                     if col > 0 {
-                        sep_spans.push(Span::styled("─┼─", border_style));
+                        sep_spans.push(Span::styled("─┼─".to_owned(), Semantic::Border));
                     }
-                    sep_spans.push(Span::styled("─".repeat(*width), border_style));
+                    sep_spans.push(Span::styled("─".repeat(*width), Semantic::Border));
                 }
-                sep_spans.push(Span::styled("─┤", border_style));
+                sep_spans.push(Span::styled("─┤".to_owned(), Semantic::Border));
                 result.push(sep_spans);
             }
         }
@@ -335,23 +326,23 @@ pub(crate) fn render_markdown_table(
 
     // Bottom border: └───┴───┴───┘
     {
-        let mut spans: Vec<Span<'static>> = Vec::new();
-        spans.push(Span::styled("└─", border_style));
+        let mut spans: Vec<Span> = Vec::new();
+        spans.push(Span::styled("└─".to_owned(), Semantic::Border));
         for (col, width) in col_widths.iter().enumerate() {
             if col > 0 {
-                spans.push(Span::styled("─┴─", border_style));
+                spans.push(Span::styled("─┴─".to_owned(), Semantic::Border));
             }
-            spans.push(Span::styled("─".repeat(*width), border_style));
+            spans.push(Span::styled("─".repeat(*width), Semantic::Border));
         }
-        spans.push(Span::styled("─┘", border_style));
+        spans.push(Span::styled("─┘".to_owned(), Semantic::Border));
         result.push(spans);
     }
 
     result
 }
 
-/// Parse inline markdown (bold, italic, code) and return styled spans.
-pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
+/// Parse inline markdown (bold, italic, code) and return IR spans.
+pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut chars = text.chars().peekable();
     let mut current = String::new();
@@ -361,7 +352,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
             '`' => {
                 // Inline code
                 if !current.is_empty() {
-                    spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
+                    spans.push(Span::new(std::mem::take(&mut current)));
                 }
 
                 let mut code = String::new();
@@ -376,7 +367,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                 }
 
                 if !code.is_empty() {
-                    spans.push(Span::styled(code, Style::default().fg(theme::warning())));
+                    spans.push(Span::styled(code, Semantic::Warning));
                 }
             }
             '*' | '_' => {
@@ -387,7 +378,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                     let _r1 = chars.next(); // consume second */_
 
                     if !current.is_empty() {
-                        spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
+                        spans.push(Span::new(std::mem::take(&mut current)));
                     }
 
                     // Bold text
@@ -401,7 +392,7 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
                     }
 
                     if !bold_text.is_empty() {
-                        spans.push(Span::styled(bold_text, Style::default().fg(theme::text()).bold()));
+                        spans.push(Span::new(bold_text).bold());
                     }
                 } else {
                     // Single * or _ — treat as literal character
@@ -432,9 +423,9 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
 
                     // Display link text in accent color
                     if !current.is_empty() {
-                        spans.push(Span::styled(std::mem::take(&mut current), Style::default().fg(theme::text())));
+                        spans.push(Span::new(std::mem::take(&mut current)));
                     }
-                    spans.push(Span::styled(link_text, Style::default().fg(theme::accent()).underlined()));
+                    spans.push(Span::styled(link_text, Semantic::Accent));
                 } else {
                     // Not a valid link, restore
                     current.push('[');
@@ -451,11 +442,11 @@ pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span<'static>> {
     }
 
     if !current.is_empty() {
-        spans.push(Span::styled(current, Style::default().fg(theme::text())));
+        spans.push(Span::new(current));
     }
 
     if spans.is_empty() {
-        spans.push(Span::styled("", Style::default()));
+        spans.push(Span::new(String::new()));
     }
 
     spans
