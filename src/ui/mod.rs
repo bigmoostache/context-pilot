@@ -73,7 +73,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         let content_width = area.width.saturating_sub(sw);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
         let content_area = Rect::new(content_x, area.y, content_width, content_height);
-        ir::render_conversation::render_autocomplete_if_active(frame, state, content_area, &ir_frame.overlays);
+        ir::render_conversation::render_autocomplete_if_active(frame, content_area, &ir_frame.overlays);
     }
 
     // Render config overlay if active (from IR overlays)
@@ -124,7 +124,7 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &
 /// Render the main content area, splitting for question form if active.
 fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
     // Check if question form is active via IR overlays
-    if let Some(form_height) = ir::render_conversation::render_question_form_if_active(state, &ir_frame.overlays) {
+    if let Some(form_height) = ir::render_conversation::render_question_form_if_active(&ir_frame.overlays) {
         // Split: content panel on top, question form at bottom
         let layout = Layout::default()
             .direction(Direction::Vertical)
@@ -145,7 +145,14 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_
             width: raw_form_area.width.saturating_sub(1),
             ..raw_form_area
         };
-        input::render_question_form(frame, state, form_area);
+        // Find the QuestionForm IR data from overlays for rendering
+        if let Some(form) = ir_frame
+            .overlays
+            .iter()
+            .find_map(|o| if let cp_render::conversation::Overlay::QuestionForm(ref f) = *o { Some(f) } else { None })
+        {
+            input::render_question_form(frame, form, form_area);
+        }
         return;
     }
 

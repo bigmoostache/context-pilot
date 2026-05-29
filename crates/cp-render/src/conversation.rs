@@ -131,8 +131,12 @@ pub struct Question {
     pub options: Vec<QuestionOption>,
     /// Whether multiple selections are allowed.
     pub multi_select: bool,
+    /// Index of the cursor (which option the cursor is on).
+    pub cursor: usize,
     /// Indices of currently selected options.
     pub selected: Vec<usize>,
+    /// Whether the user is typing in the "Other" free-text field.
+    pub typing_other: bool,
     /// Free-text "Other" input value.
     pub other_text: String,
 }
@@ -320,10 +324,16 @@ pub struct PaletteEntry {
 pub struct Autocomplete {
     /// Current query / prefix.
     pub query: String,
-    /// Matching entries.
+    /// Matching entries (visible window after scrolling).
     pub entries: Vec<AutocompleteEntry>,
-    /// Index of the highlighted entry.
+    /// Index of the highlighted entry (relative to `entries`).
     pub selected_index: usize,
+    /// Directory prefix for the title (e.g. "src/ui").
+    pub dir_prefix: String,
+    /// Total number of matches (before scroll windowing).
+    pub total_matches: usize,
+    /// Number of visual lines the input occupies (for popup positioning).
+    pub input_visual_lines: u16,
 }
 
 /// A single autocomplete suggestion.

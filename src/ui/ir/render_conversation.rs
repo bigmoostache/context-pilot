@@ -104,19 +104,10 @@ pub(crate) fn render_conversation_from_ir(
 ///
 /// Returns the height consumed by the question form (for layout splitting),
 /// or `None` if no question form is active.
-pub(crate) fn render_question_form_if_active(
-    state: &State,
-    overlays: &[cp_render::conversation::Overlay],
-) -> Option<u16> {
-    if !overlays.iter().any(|o| matches!(o, cp_render::conversation::Overlay::QuestionForm(_))) {
-        return None;
-    }
-
-    // Delegate height calculation to existing input.rs code
-    let form = state.get_ext::<cp_base::ui::question_form::PendingForm>()?;
-    if form.resolved {
-        return None;
-    }
+pub(crate) fn render_question_form_if_active(overlays: &[cp_render::conversation::Overlay]) -> Option<u16> {
+    let form = overlays
+        .iter()
+        .find_map(|o| if let cp_render::conversation::Overlay::QuestionForm(ref f) = *o { Some(f) } else { None })?;
     let height = super::super::input::calculate_question_form_height(form);
     Some(height)
 }
@@ -124,15 +115,16 @@ pub(crate) fn render_question_form_if_active(
 /// Render the autocomplete popup overlay if the IR snapshot contains one.
 pub(crate) fn render_autocomplete_if_active(
     frame: &mut Frame<'_>,
-    state: &State,
     content_area: Rect,
     overlays: &[cp_render::conversation::Overlay],
 ) {
-    if !overlays.iter().any(|o| matches!(o, cp_render::conversation::Overlay::Autocomplete(_))) {
+    let Some(ac) = overlays
+        .iter()
+        .find_map(|o| if let cp_render::conversation::Overlay::Autocomplete(ref a) = *o { Some(a) } else { None })
+    else {
         return;
-    }
-    // Delegate to existing autocomplete renderer
-    super::super::input::render_autocomplete_popup(frame, state, content_area);
+    };
+    super::super::input::render_autocomplete_popup(frame, ac, content_area);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────

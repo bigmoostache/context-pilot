@@ -1,16 +1,19 @@
-use ratatui::{
-    prelude::{Frame, Line, Rect, Span, Style},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
-};
+//! Question form and autocomplete popup overlays.
+//!
+//! Adapter layer: renders [`QuestionForm`] and [`Autocomplete`] IR data
+//! to ratatui widgets. No direct `State` access.
+
+use cp_render::conversation::{Autocomplete, QuestionForm};
+use ratatui::prelude::{Frame, Line, Rect, Span, Style};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 
 use super::theme;
-use crate::state::State;
 
 use cp_base::cast::Safe as _;
 
 /// Calculate the height needed for the question form.
-pub(super) fn calculate_question_form_height(form: &cp_base::ui::question_form::PendingForm) -> u16 {
-    let Some(q) = form.questions.get(form.current_question) else { return 6 };
+pub(super) fn calculate_question_form_height(form: &QuestionForm) -> u16 {
+    let Some(q) = form.questions.get(form.focused_index) else { return 6 };
     // Header line + question text + blank + options (including Other) + blank + nav hint
     let option_lines = q.options.len().to_u16().saturating_add(1); // +1 for "Other"
     let header_lines = 2u16; // header + question text
@@ -19,19 +22,15 @@ pub(super) fn calculate_question_form_height(form: &cp_base::ui::question_form::
 }
 
 /// Render the question form at the bottom of the screen.
-pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: Rect) {
-    let Some(form) = state.get_ext::<cp_base::ui::question_form::PendingForm>() else { return };
-
-    let q_idx = form.current_question;
-    let Some(q) = form.questions.get(q_idx) else { return };
-    let Some(ans) = form.answers.get(q_idx) else { return };
+pub(super) fn render_question_form(frame: &mut Frame<'_>, form: &QuestionForm, area: Rect) {
+    let Some(q) = form.questions.get(form.focused_index) else { return };
     let other_idx = q.options.len();
 
     let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Progress indicator
     let progress = if form.questions.len() > 1 {
-        format!(" ({}/{}) ", q_idx.saturating_add(1), form.questions.len())
+        format!(" ({}/{}) ", form.focused_index.saturating_add(1), form.questions.len())
     } else {
         String::new()
     };
@@ -45,8 +44,8 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
 
     // Options
     for (i, opt) in q.options.iter().enumerate() {
-        let is_cursor = ans.cursor == i;
-        let is_selected = ans.selected.contains(&i);
+        let is_cursor = q.cursor == i;
+        let is_selected = q.selected.contains(&i);
 
         let indicator = if is_selected && q.multi_select {
             "[x]"
@@ -84,8 +83,8 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
 
     // "Other" option
     {
-        let is_cursor = ans.cursor == other_idx;
-        let is_typing = ans.typing_other;
+        let is_cursor = q.cursor == other_idx;
+        let is_typing = q.typing_other;
 
         let cursor_marker = if is_cursor { ">" } else { " " };
         let indicator = if is_typing { "(●)" } else { "( )" };
@@ -103,10 +102,7 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
                 Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
                 Span::styled(format!("{indicator} "), label_style),
                 Span::styled("Other: ", label_style),
-                Span::styled(
-                    format!("{}▏", ans.other_text),
-                    Style::default().fg(theme::text()).bg(theme::bg_elevated()),
-                ),
+                Span::styled(format!("{}▏", q.other_text), Style::default().fg(theme::text()).bg(theme::bg_elevated())),
             ]));
         } else {
             lines.push(Line::from(vec![
@@ -160,31 +156,20 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, state: &State, area: R
 }
 
 /// Calculate the height needed for the autocomplete popup.
-pub(super) fn calculate_autocomplete_height(ac: &cp_base::state::autocomplete::Suggestions) -> u16 {
-    let visible = ac.visible_matches().len().to_u16();
+pub(super) fn calculate_autocomplete_height(ac: &Autocomplete) -> u16 {
+    let visible = ac.entries.len().to_u16();
     // matches + border chrome (2)
     (visible.saturating_add(2)).clamp(4, 12)
 }
 
 /// Render the @ autocomplete popup above the input area (bottom of content panel, growing upward).
-pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, area: Rect) {
-    let ac = match state.get_ext::<cp_base::state::autocomplete::Suggestions>() {
-        Some(ac) if ac.active => ac,
-        _ => return,
-    };
-
+pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, ac: &Autocomplete, area: Rect) {
     let popup_width = 60u16.min(area.width.saturating_sub(2));
     let popup_height = calculate_autocomplete_height(ac);
 
-    // The input field (🦊 ...) occupies `input_visual_lines` at the bottom of the
+    // The input field occupies `input_visual_lines` at the bottom of the
     // conversation panel viewport. We want the popup's bottom edge to sit just above
     // the first line of the input field.
-    //
-    // area = the content region (right of sidebar, above status bar).
-    // The conversation panel fills this area with a 1-cell border on each side,
-    // so usable inner height = area.height - 2 (top/bottom border).
-    // The input starts at: area.bottom() - 1 (bottom border) - input_visual_lines
-    // We place the popup bottom at that position.
     let border_chrome = 2u16; // top + bottom border of the conversation panel
     let input_lines = ac.input_visual_lines;
     let scroll_padding = 2u16; // padding lines below input in the conversation panel
@@ -205,13 +190,11 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, ar
     let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Show matches
-    let visible = ac.visible_matches();
-    if visible.is_empty() {
+    if ac.entries.is_empty() {
         lines.push(Line::from(vec![Span::styled("  No matches", Style::default().fg(theme::text_muted()))]));
     } else {
-        for (i, entry) in visible.iter().enumerate() {
-            let abs_idx = ac.scroll_offset.saturating_add(i);
-            let is_selected = abs_idx == ac.selected;
+        for (i, entry) in ac.entries.iter().enumerate() {
+            let is_selected = i == ac.selected_index;
 
             let cursor_marker = if is_selected { ">" } else { " " };
             let path_style = if is_selected {
@@ -225,14 +208,14 @@ pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, state: &State, ar
             lines.push(Line::from(vec![
                 Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
                 Span::styled(icon.to_string(), Style::default()),
-                Span::styled(format!("{}{}", entry.name, suffix), path_style),
+                Span::styled(format!("{}{}", entry.label, suffix), path_style),
             ]));
         }
     }
 
     // Count indicator
     let dir_label = if ac.dir_prefix.is_empty() { ".".to_string() } else { ac.dir_prefix.clone() };
-    let count_text = format!(" @{} — {}/{} in {}/ ", ac.query, ac.matches.len(), ac.matches.len(), dir_label);
+    let count_text = format!(" @{} — {}/{} in {}/ ", ac.query, ac.total_matches, ac.total_matches, dir_label);
 
     let block = Block::default()
         .borders(Borders::ALL)

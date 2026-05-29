@@ -210,7 +210,9 @@ fn build_question_form(form: &cp_base::ui::question_form::PendingForm) -> Questi
                     })
                     .collect(),
                 multi_select: q.multi_select,
+                cursor: answer.map_or(0, |a| a.cursor),
                 selected: answer.map(|a| a.selected.clone()).unwrap_or_default(),
+                typing_other: answer.is_some_and(|a| a.typing_other),
                 other_text: answer.map(|a| a.other_text.clone()).unwrap_or_default(),
             }
         })
@@ -221,8 +223,9 @@ fn build_question_form(form: &cp_base::ui::question_form::PendingForm) -> Questi
 
 /// Build autocomplete from suggestions state.
 fn build_autocomplete(ac: &cp_base::state::autocomplete::Suggestions) -> Autocomplete {
-    let entries = ac
-        .visible_matches()
+    let visible = ac.visible_matches();
+    let selected_relative = ac.selected.saturating_sub(ac.scroll_offset);
+    let entries = visible
         .iter()
         .map(|e| AutocompleteEntry {
             label: e.name.clone(),
@@ -231,7 +234,14 @@ fn build_autocomplete(ac: &cp_base::state::autocomplete::Suggestions) -> Autocom
         })
         .collect();
 
-    Autocomplete { query: ac.query.clone(), entries, selected_index: ac.selected }
+    Autocomplete {
+        query: ac.query.clone(),
+        entries,
+        selected_index: selected_relative,
+        dir_prefix: ac.dir_prefix.clone(),
+        total_matches: ac.matches.len(),
+        input_visual_lines: ac.input_visual_lines,
+    }
 }
 
 // ── Perf overlay ─────────────────────────────────────────────────────
