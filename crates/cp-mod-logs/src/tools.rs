@@ -23,6 +23,7 @@ fn push_log(state: &mut State, content: String, importance: &str) {
 
 /// Execute `log_create`: add one or more timestamped log entries.
 pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("log_create");
     let Some(entries) = tool.input.get("entries").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'entries' array".to_string(), true);
     };
@@ -54,6 +55,7 @@ pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResul
 /// before the pipeline's intercept check, so this call always arrives here
 /// via a queue flush — never executed directly.
 pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("close_history");
     // 1. Validate the panels array
     let Some(panels) = tool.input.get("panels").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing required 'panels' array".to_string(), true);

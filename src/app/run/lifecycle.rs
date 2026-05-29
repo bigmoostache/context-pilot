@@ -61,7 +61,7 @@ impl App {
 
         loop {
             let current_ms = now_ms();
-            let _fg = crate::flame!("loop");
+            let _fg = cp_base::flame!("loop");
 
             // === INPUT FIRST: Process user input with minimal latency ===
             // Non-blocking check for input - handle immediately for responsive feel

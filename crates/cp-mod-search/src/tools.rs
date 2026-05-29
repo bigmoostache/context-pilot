@@ -209,6 +209,7 @@ const ASYNC_TIMEOUT_SECS: u64 = 30;
 ///
 /// Runs Meilisearch HTTP queries on a worker thread to avoid blocking the main event loop.
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("search_exec");
     let client = match get_client(state) {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),

@@ -6,6 +6,8 @@
 pub mod cast;
 /// YAML config loader: prompts, library, themes, injections, constants.
 pub mod config;
+/// Flame graph telemetry — zero overhead when disabled.
+pub mod flame;
 
 /// Module trait: tools, panels, lifecycle hooks for pluggable functionality.
 pub mod modules;

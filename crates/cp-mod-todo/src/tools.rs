@@ -7,6 +7,7 @@ use std::fmt::Write as _;
 
 /// Execute `todo_create` tool — add one or more todo items with optional nesting.
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("todo_create");
     let Some(todos) = tool.input.get("todos").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'todos' array parameter".to_string(), true);
     };
@@ -93,6 +94,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Execute `todo_update` tool — modify status, name, description, or delete todos.
 pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("todo_update");
     let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
     };
@@ -327,6 +329,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Execute `todo_move` tool — reorder a todo by placing it after another.
 pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("todo_move");
     let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'id' parameter".to_string(), true);
     };

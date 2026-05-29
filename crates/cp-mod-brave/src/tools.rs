@@ -51,6 +51,7 @@ const ASYNC_TIMEOUT_SECS: u64 = 35;
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("brave_search");
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),
@@ -132,6 +133,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
 fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("brave_llm_context");
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),

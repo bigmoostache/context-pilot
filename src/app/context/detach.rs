@@ -55,6 +55,7 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
 /// 3. Remaining tip keeps >= `DETACH_KEEP_MIN_MESSAGES` active messages
 /// 4. Remaining tip keeps >= `DETACH_KEEP_MIN_TOKENS` estimated tokens
 pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
+    let _fg = cp_base::flame!("detach");
     // Don't detach while context is frozen — detaching would invalidate
     // the cached prompt prefix that freezing is trying to preserve.
     if cp_mod_queue::types::QueueState::get(state).active || state.tempo {

@@ -14,6 +14,7 @@ use super::classify::{CommandClass, classify_git, validate_git_command};
 /// Read-only commands create/reuse `GitResult` panels.
 /// Mutating commands execute and return output directly.
 pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("git_exec");
     let Some(command) = tool.input.get("command").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_string(), true);
     };

@@ -7,6 +7,7 @@ use std::fmt::Write as _;
 
 /// Create a new scratchpad cell
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("scratch_create");
     let title = match tool.input.get("cell_title").and_then(|v| v.as_str()) {
         Some(t) => t.to_string(),
         None => {
@@ -40,6 +41,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Edit an existing scratchpad cell
 pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("scratch_edit");
     let Some(cell_id) = tool.input.get("cell_id").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'cell_id' parameter".to_string(), true);
     };
@@ -75,6 +77,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Wipe scratchpad cells (delete by IDs, or all if empty array)
 pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("scratch_wipe");
     let Some(cell_ids) = tool.input.get("cell_ids").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'cell_ids' array parameter".to_string(), true);
     };

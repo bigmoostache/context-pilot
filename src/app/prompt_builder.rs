@@ -33,7 +33,7 @@ pub(crate) fn assemble_prompt(
     include_last_tool_uses: bool,
     seed_content: Option<&str>,
 ) -> Vec<ApiMessage> {
-    let _fg = crate::flame!("prompt_build");
+    let _fg = cp_base::flame!("prompt_build");
     let mut api_messages: Vec<ApiMessage> = Vec::new();
     let current_ms = crate::app::panels::now_ms();
 

@@ -103,6 +103,7 @@ pub(super) fn prepare_stream_context(
     include_last_message: bool,
     reverie: Option<ReverieContext>,
 ) -> StreamContext {
+    let _fg = cp_base::flame!("prepare_context");
     // Mark UserMessage notifications as processed on every context rebuild.
     // This prevents the spine from firing a redundant auto-continuation for
     // messages the LLM already saw (e.g., user sent a message during a tool

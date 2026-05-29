@@ -14,7 +14,7 @@ use crate::app::App;
 /// - Blocking watchers: replace sentinel tool results and resume pipeline.
 /// - Async watchers: create spine notifications.
 pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
-    let _fg = crate::flame!("watchers");
+    let _fg = cp_base::flame!("watchers");
     // Take the registry out of state to avoid borrow conflict
     // (poll_all needs &mut registry + &state simultaneously)
     let mut registry = match app.state.module_data.remove(&std::any::TypeId::of::<WatcherRegistry>()) {

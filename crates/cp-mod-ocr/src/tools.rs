@@ -36,6 +36,7 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> 
 /// Datalab API call, and returns immediately. A spine notification fires
 /// when the conversion completes (or fails), waking the AI if idle.
 fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("ocr_exec");
     // --- Validate DATALAB_API_KEY ---
     let Some(api_key) = api_key_from_env() else {
         return err(tool, "DATALAB_API_KEY not set in environment.".to_string());

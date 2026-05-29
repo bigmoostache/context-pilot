@@ -141,6 +141,7 @@ pub(crate) fn sanitize_signal(raw: &str) -> String {
 /// Called from `pipeline.rs` after a Think tool executes with a
 /// `task_context` parameter.  Caps the buffer at [`crate::types::MAX_TASK_SIGNALS`].
 pub(crate) fn push_signal(state: &mut State, content: &str) {
+    let _fg = cp_base::flame!("radar_push_signal");
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
@@ -172,6 +173,7 @@ pub(crate) fn push_signal(state: &mut State, content: &str) {
 /// - `log_create` / `Close_conversation_history`
 /// - Boot pre-population
 pub(crate) fn refresh(state: &State) {
+    let _fg = cp_base::flame!("radar_refresh");
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));

@@ -57,6 +57,7 @@ const ASYNC_TIMEOUT_MAP_SECS: u64 = 30;
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
 fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("firecrawl_scrape");
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),
@@ -169,6 +170,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("firecrawl_search");
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),
@@ -310,6 +312,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
 fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("firecrawl_map");
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),

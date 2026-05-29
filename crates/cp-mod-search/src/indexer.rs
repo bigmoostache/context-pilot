@@ -239,6 +239,7 @@ fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
 
 /// Index a single file: read → filter → split → upload.
 fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
+    let _fg = cp_base::flame!("index_file");
     // Skip symlinks
     if abs_path.is_symlink() {
         return;

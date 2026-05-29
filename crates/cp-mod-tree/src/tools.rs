@@ -73,6 +73,7 @@ pub fn compute_file_hash(path: &Path) -> Option<String> {
 
 /// Execute `tree_toggle_folders` tool - open or close folders
 pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("tree_toggle");
     let paths = tool
         .input
         .get("paths")
@@ -173,6 +174,7 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
 
 /// Execute `tree_describe_files` tool - add/update/remove file descriptions
 pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("tree_describe");
     let descriptions = tool.input.get("descriptions").and_then(|v| v.as_array());
 
     let Some(descriptions) = descriptions else {
@@ -280,6 +282,7 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
 
 /// Execute `edit_tree_filter` tool (keep existing functionality)
 pub(crate) fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("tree_filter");
     let Some(filter) = tool.input.get("filter").and_then(|v| v.as_str()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'filter' parameter".to_string(), true);
     };

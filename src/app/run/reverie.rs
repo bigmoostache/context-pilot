@@ -105,6 +105,7 @@ pub(super) fn process_reverie_events(app: &mut App) {
 /// Execute pending reverie tool calls for all active reveries.
 /// Called from the main event loop, AFTER main tools are processed.
 pub(super) fn handle_reverie_tools(app: &mut App) {
+    let _fg = cp_base::flame!("reverie_tools");
     // Collect agent_ids that have pending tools
     let agent_ids: Vec<String> =
         app.reverie_streams.iter().filter(|(_, s)| !s.pending_tools.is_empty()).map(|(id, _)| id.clone()).collect();

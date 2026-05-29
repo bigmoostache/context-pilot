@@ -29,6 +29,7 @@ pub fn fire_callback(
     blocking_tool_use_id: Option<&str>,
     single_file: Option<&str>,
 ) -> Result<String, String> {
+    let _fg = cp_base::flame!("cb_fire");
     let def = &matched.definition;
 
     // Build the command with env vars baked in
@@ -136,6 +137,7 @@ pub fn fire_callback(
 /// Global: fires once with all files. Local: fires once per matched file.
 /// Returns one summary line per invocation in compact format.
 pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) -> Vec<String> {
+    let _fg = cp_base::flame!("cb_fire_async");
     let mut summaries = Vec::new();
     for cb in callbacks {
         if cb.definition.is_global {
@@ -159,6 +161,7 @@ pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) ->
 /// Global: fires once with all files. Local: fires once per matched file.
 /// Each gets a sentinel `tool_use_id` so `tool_pipeline` can track them.
 pub fn fire_blocking_callbacks(state: &mut State, callbacks: &[MatchedCallback], tool_use_id: &str) -> Vec<String> {
+    let _fg = cp_base::flame!("cb_fire_blocking");
     let mut summaries = Vec::new();
     for cb in callbacks {
         if cb.definition.is_global {

@@ -82,7 +82,7 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
         return;
     }
     let _guard = crate::profile!("app::tool_exec");
-    let _fg = crate::flame!("tool_pipeline");
+    let _fg = cp_base::flame!("tool_pipeline");
 
     app.state.flags.ui.dirty = true;
     app.state.flags.stream.phase.transition(StreamPhase::ExecutingTools);
@@ -285,7 +285,7 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
         tools.iter().zip(tool_results.iter()).filter(|(_, r)| !r.is_error).map(|(t, _)| t.clone()).collect();
     let changed_files = callback_trigger::collect_changed_files(&successful_tools);
     if !changed_files.is_empty() {
-        let _fg_cb = crate::flame!("callbacks");
+        let _fg_cb = cp_base::flame!("callbacks");
         let (matched, skip_warnings) = callback_trigger::match_callbacks(&app.state, &changed_files);
 
         // Inject skip_callbacks warnings into tool results so the AI sees them

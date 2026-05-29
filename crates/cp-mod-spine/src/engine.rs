@@ -31,6 +31,7 @@ pub enum SpineDecision {
 /// Returns a `SpineDecision` telling the caller what to do.
 /// The caller (app.rs) is responsible for actually starting the stream.
 pub fn check_spine(state: &mut State) -> SpineDecision {
+    let _fg = cp_base::flame!("check_spine");
     // Never launch if already streaming
     if state.flags.stream.phase.is_streaming() {
         return SpineDecision::Idle;

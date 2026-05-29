@@ -41,6 +41,7 @@ fn err_result(tool: &ToolUse, content: String) -> ToolResult {
 
 /// Execute the `typst_execute` tool — parse command string and dispatch to subcommand handler.
 pub(crate) fn execute_typst(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("typst_exec");
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),
         None => return err_result(tool, "Error: missing required 'command' parameter".to_string()),

@@ -21,6 +21,7 @@ const ERRORS_DIR: &str = "errors";
 /// into a batch of file write/delete operations.
 pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let _guard = crate::profile!("persist::build_save_batch");
+    let _fg = cp_base::flame!("save_batch");
     let dir = PathBuf::from(STORE_DIR);
     let mut writes = Vec::new();
     let mut deletes = Vec::new();
@@ -206,6 +207,7 @@ pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
 /// Used for shutdown paths and places where the `PersistenceWriter` is not available.
 /// Prefer `build_save_batch` + `PersistenceWriter::send_batch` in the main event loop.
 pub(crate) fn save_state(state: &State) {
+    let _fg = cp_base::flame!("save_state");
     let batch = build_save_batch(state);
     // Execute synchronously
     for dir in &batch.ensure_dirs {

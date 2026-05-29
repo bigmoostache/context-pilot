@@ -9,6 +9,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 /// Dispatch a tool call to the appropriate handler.
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
+    let _fg = cp_base::flame!("prompt_dispatch");
     match tool.name.as_str() {
         "Behaviour_create" => Some(behaviour_create(tool, state)),
         "agent_load" => Some(agent_load(tool, state)),

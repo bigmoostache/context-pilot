@@ -159,7 +159,7 @@ pub(crate) fn active_tool_definitions(active_modules: &HashSet<String>) -> Vec<T
 
 /// Dispatch a tool call to the appropriate active module.
 pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet<String>) -> ToolResult {
-    let _fg = crate::flame!(&format!("tool_{}", tool.name));
+    let _fg = cp_base::flame!(&format!("tool_{}", tool.name));
     // Handle module_toggle specially — it's always available when core is active
     if tool.name == "module_toggle" && active_modules.contains("core") {
         return execute_module_toggle(tool, state);

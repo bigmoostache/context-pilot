@@ -111,6 +111,7 @@ impl DatalabClient {
     /// Returns an error if the file cannot be read, is too large,
     /// submission fails, polling times out, or the API returns an error.
     pub(crate) fn convert(&self, path: &Path, mode: OcrMode) -> Result<OcrResult, String> {
+        let _fg = cp_base::flame!("ocr_convert");
         // Validate file exists and check size.
         let meta = std::fs::metadata(path).map_err(|e| format!("Cannot read file '{}': {e}", path.display()))?;
         if meta.len() > MAX_FILE_SIZE {

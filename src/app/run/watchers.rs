@@ -66,6 +66,7 @@ pub(super) fn process_cache_updates(app: &mut App, cache_rx: &Receiver<CacheUpda
 /// Static version of `process_cache_updates` for use in wait module
 fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpdate>) {
     let _guard = crate::profile!("app::cache_updates");
+    let _fg = cp_base::flame!("cache_updates");
     while let Ok(update) = cache_rx.try_recv() {
         // Handle Unchanged early — just clear in_flight, no panel dispatch needed
         if let CacheUpdate::Unchanged { ref context_id } = update {
@@ -117,6 +118,7 @@ fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpda
 /// Process file watcher events — delegates invalidation to modules via trait methods.
 pub(super) fn process_watcher_events(app: &mut App) {
     let _guard = crate::profile!("app::watcher_events");
+    let _fg = cp_base::flame!("watcher_events");
     // Collect events (immutable borrow on file_watcher released after this block)
     let events = {
         let Some(watcher) = &app.file_watcher else { return };

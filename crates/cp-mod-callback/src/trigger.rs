@@ -85,6 +85,7 @@ fn parse_skip_callbacks(input: &serde_json::Value) -> Vec<String> {
 /// Also validates `skip_callbacks` names and returns warnings for non-existent or non-matching ones.
 #[must_use]
 pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<MatchedCallback>, Vec<String>) {
+    let _fg = cp_base::flame!("cb_match");
     if changed_files.is_empty() {
         return (Vec::new(), Vec::new());
     }

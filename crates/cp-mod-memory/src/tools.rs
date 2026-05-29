@@ -20,6 +20,7 @@ fn validate_tldr(text: &str) -> Result<(), String> {
 
 /// Execute the `memory_create` tool: parse input and store new memory items.
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("memory_create");
     let Some(memories) = tool.input.get("memories").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'memories' array parameter".to_string(), true);
     };
@@ -94,6 +95,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Execute the `memory_update` tool: modify, open/close, or delete existing memories.
 pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("memory_update");
     let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
     };

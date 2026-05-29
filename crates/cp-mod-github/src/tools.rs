@@ -23,6 +23,7 @@ fn redact_token(output: &str, token: &str) -> String {
 /// Read-only commands create/reuse `GithubResult` panels.
 /// Mutating commands execute and return output directly.
 pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("gh_exec");
     // Check for GitHub token
     let token = match &GithubState::get(state).github_token {
         Some(t) => t.clone(),

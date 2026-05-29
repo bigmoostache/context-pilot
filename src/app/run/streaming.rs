@@ -13,7 +13,7 @@ use crate::state::{State, StreamPhase, get_context_type_meta};
 /// Drain the stream-event channel and apply each event (chunks, tools, done, errors).
 pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
     let _guard = crate::profile!("app::stream_events");
-    let _fg = crate::flame!("stream");
+    let _fg = cp_base::flame!("stream");
     while let Ok(evt) = rx.try_recv() {
         if !app.state.flags.stream.phase.is_streaming() {
             continue;
@@ -162,6 +162,7 @@ pub(super) fn continue_streaming(app: &mut App, tx: &Sender<StreamEvent>) {
 
 /// Finalize a completed stream: apply `StreamDone`, reset counters, and unblock spine.
 pub(super) fn finalize_stream(app: &mut App) {
+    let _fg = cp_base::flame!("finalize_stream");
     if !app.state.flags.stream.phase.is_streaming() {
         return;
     }

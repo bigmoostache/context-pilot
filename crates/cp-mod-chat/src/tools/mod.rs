@@ -20,6 +20,7 @@ use helpers::{resolve_event_ref, resolve_room_param};
 
 /// Route a `Chat_*` tool call to the appropriate handler.
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("chat_dispatch");
     match tool.name.as_str() {
         "Chat_open" => execute_open(tool, state),
         "Chat_send" => send::execute_send(tool, state),
