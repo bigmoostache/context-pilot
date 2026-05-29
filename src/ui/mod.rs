@@ -76,9 +76,13 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         ir::render_conversation::render_autocomplete_if_active(frame, state, content_area, &ir_frame.overlays);
     }
 
-    // Render config overlay if open
-    if state.flags.config.config_view {
-        help::config_overlay::render_config_overlay(frame, state, area);
+    // Render config overlay if active (from IR overlays)
+    if let Some(config_overlay) = ir_frame
+        .overlays
+        .iter()
+        .find_map(|o| if let cp_render::conversation::Overlay::Config(ref c) = *o { Some(c) } else { None })
+    {
+        help::config_overlay::render_config_overlay(frame, config_overlay, area);
     }
 
     // Render Meilisearch indexing status overlay if open

@@ -103,6 +103,8 @@ pub enum Overlay {
     Autocomplete(Autocomplete),
     /// Performance monitoring overlay (F12).
     Perf(PerfOverlay),
+    /// Configuration overlay (Ctrl+H).
+    Config(ConfigOverlay),
 }
 
 /// A question form overlay (`ask_user_question`).
@@ -206,6 +208,85 @@ pub struct PerfOp {
     pub total_display: String,
     /// Whether this operation is a hotspot (>30% of total).
     pub is_hotspot: bool,
+}
+
+/// Configuration overlay (Ctrl+H).
+#[derive(Debug, Clone, Serialize)]
+pub struct ConfigOverlay {
+    /// Whether showing secondary (reverie) model tab.
+    pub secondary_mode: bool,
+    /// LLM provider entries.
+    pub providers: Vec<ConfigProvider>,
+    /// Section title for the model list (e.g. "Model" or "Secondary Model (Reverie)").
+    pub model_section_title: String,
+    /// Model entries for the active provider.
+    pub models: Vec<ConfigModel>,
+    /// Budget bars.
+    pub budget_bars: Vec<ConfigBudgetBar>,
+    /// Index of the currently selected budget bar (0-based).
+    pub selected_bar: usize,
+    /// Toggle switches.
+    pub toggles: Vec<ConfigToggle>,
+}
+
+/// A provider entry in the config overlay.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConfigProvider {
+    /// Key hint to press (e.g. "1", "2").
+    pub key: String,
+    /// Display name (e.g. "Anthropic Claude").
+    pub name: String,
+    /// Whether this provider is currently selected.
+    pub selected: bool,
+}
+
+/// A model entry in the config overlay.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConfigModel {
+    /// Key hint to press (e.g. "a", "b").
+    pub key: String,
+    /// Display name (e.g. "Opus 4.5").
+    pub name: String,
+    /// Context window size (e.g. "200K").
+    pub context_window: String,
+    /// Pricing string (e.g. "$3/$15").
+    pub pricing: String,
+    /// Whether this model is currently selected.
+    pub selected: bool,
+}
+
+/// A budget bar in the config overlay.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConfigBudgetBar {
+    /// Display label (e.g. "Context Budget", "Clean Trigger").
+    pub label: String,
+    /// Percentage value (0–100) shown beside the bar.
+    pub percent: usize,
+    /// Fill ratio (0.0–1.0) for the bar.
+    pub fill_ratio: f64,
+    /// Value display string (e.g. "128K tok", "$5.00").
+    pub value_display: String,
+    /// Optional extra text (e.g. "(85%)").
+    pub extra: Option<String>,
+    /// Semantic colour for the filled portion.
+    pub semantic: Semantic,
+    /// Whether this bar is currently selected for adjustment.
+    pub selected: bool,
+}
+
+/// A toggle switch in the config overlay.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConfigToggle {
+    /// Label (e.g. "Auto-continue").
+    pub label: String,
+    /// Whether the toggle is on.
+    pub enabled: bool,
+    /// Status display text (e.g. "ON", "OFF", "-5").
+    pub value_display: String,
+    /// Key hint to toggle (e.g. "s", "r").
+    pub key_hint: String,
+    /// Optional second key for adjustment (e.g. `[` and `]`).
+    pub adjust_keys: Option<(String, String)>,
 }
 
 /// File path autocomplete popup.

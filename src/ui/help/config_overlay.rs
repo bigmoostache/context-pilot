@@ -3,14 +3,18 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
+use cp_render::conversation::ConfigOverlay;
+
 use crate::infra::constants::{chars, theme};
-use crate::state::State;
 
 mod budget_bars;
-use budget_bars::format_tokens_compact;
+mod builder;
+pub(crate) use builder::build_config_overlay;
 
 /// Render the configuration overlay (Ctrl+H) centered on the given area.
-pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, state: &State, area: Rect) {
+///
+/// Consumes the pre-built IR [`ConfigOverlay`] snapshot — no direct state access.
+pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, config: &ConfigOverlay, area: Rect) {
     // Center the overlay, clamped to available area
     let overlay_width = 56u16.min(area.width);
     let overlay_height = 34u16.min(area.height);
@@ -23,8 +27,7 @@ pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, state: &State, area: 
     let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Tab indicator
-    let showing_main = !state.flags.config.config_secondary_mode;
-    let tab_text = if showing_main { "Main Model" } else { "Secondary Model (Reverie)" };
+    let tab_text = if config.secondary_mode { "Secondary Model (Reverie)" } else { "Main Model" };
     lines.push(Line::from(vec![
         Span::styled("  ", Style::default()),
         Span::styled("Tab", Style::default().fg(theme::warning())),
@@ -33,19 +36,20 @@ pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, state: &State, area: 
     ]));
     add_separator(&mut lines);
 
-    render_provider_section(&mut lines, state);
+    // Provider section
+    render_provider_section(&mut lines, config);
     add_separator(&mut lines);
 
-    if showing_main {
-        render_model_section(&mut lines, state);
-    } else {
-        render_secondary_model_section(&mut lines, state);
-    }
+    // Model section
+    render_model_section(&mut lines, config);
+    add_separator(&mut lines);
 
+    // Budget bars
+    budget_bars::render_budget_section(&mut lines, config);
     add_separator(&mut lines);
-    budget_bars::render_budget_section(&mut lines, state);
-    add_separator(&mut lines);
-    render_toggles_section(&mut lines, state);
+
+    // Toggles
+    render_toggles_section(&mut lines, config);
 
     // Help text
     lines.push(Line::from(vec![
@@ -82,226 +86,81 @@ fn add_separator(lines: &mut Vec<Line<'_>>) {
     )]));
 }
 
-/// Render the provider section (always visible regardless of Tab mode)
-fn render_provider_section(lines: &mut Vec<Line<'_>>, state: &State) {
-    use crate::llms::LlmProvider;
-
+/// Render the provider section from IR data.
+fn render_provider_section(lines: &mut Vec<Line<'_>>, config: &ConfigOverlay) {
     lines.push(Line::from(vec![Span::styled("  LLM Provider", Style::default().fg(theme::text_secondary()).bold())]));
 
-    // Show selection indicator for main or secondary provider depending on Tab mode
-    let active_provider =
-        if state.flags.config.config_secondary_mode { state.secondary_provider } else { state.llm_provider };
-
-    let providers = [
-        (LlmProvider::Anthropic, "1", "Anthropic Claude"),
-        (LlmProvider::ClaudeCode, "2", "Claude Code (OAuth)"),
-        (LlmProvider::ClaudeCodeApiKey, "6", "Claude Code (API Key)"),
-        (LlmProvider::Grok, "3", "Grok (xAI)"),
-        (LlmProvider::Groq, "4", "Groq"),
-        (LlmProvider::DeepSeek, "5", "DeepSeek"),
-        (LlmProvider::MiniMax, "7", "MiniMax (Token Plan)"),
-    ];
-
-    for (provider, key, name) in providers {
-        let is_selected = active_provider == provider;
-        let indicator = if is_selected { ">" } else { " " };
-        let check = if is_selected { "[x]" } else { "[ ]" };
-        let style =
-            if is_selected { Style::default().fg(theme::accent()).bold() } else { Style::default().fg(theme::text()) };
+    for provider in &config.providers {
+        let indicator = if provider.selected { ">" } else { " " };
+        let check = if provider.selected { "[x]" } else { "[ ]" };
+        let style = if provider.selected {
+            Style::default().fg(theme::accent()).bold()
+        } else {
+            Style::default().fg(theme::text())
+        };
 
         lines.push(Line::from(vec![
             Span::styled(format!("  {indicator} "), Style::default().fg(theme::accent())),
-            Span::styled(format!("{key} "), Style::default().fg(theme::warning())),
+            Span::styled(format!("{} ", provider.key), Style::default().fg(theme::warning())),
             Span::styled(format!("{check} "), style),
-            Span::styled(name.to_string(), style),
+            Span::styled(provider.name.clone(), style),
         ]));
     }
 }
 
-/// Render the main model section with model list and pricing.
-fn render_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
-    use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel};
-
-    lines.push(Line::from(vec![Span::styled("  Model", Style::default().fg(theme::text_secondary()).bold())]));
-
-    match state.llm_provider {
-        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-            for (model, key) in [
-                (AnthropicModel::ClaudeOpus45, "a"),
-                (AnthropicModel::ClaudeSonnet45, "b"),
-                (AnthropicModel::ClaudeHaiku45, "c"),
-            ] {
-                render_model_line_with_info(lines, state.anthropic_model == model, key, &model);
-            }
-        }
-        LlmProvider::Grok => {
-            for (model, key) in [(GrokModel::Grok41Fast, "a"), (GrokModel::Grok4Fast, "b")] {
-                render_model_line_with_info(lines, state.grok_model == model, key, &model);
-            }
-        }
-        LlmProvider::Groq => {
-            render_model_line_with_info(lines, state.groq_model == GroqModel::GptOss120b, "a", &GroqModel::GptOss120b);
-            render_model_line_with_info(lines, state.groq_model == GroqModel::GptOss20b, "b", &GroqModel::GptOss20b);
-            render_model_line_with_info(
-                lines,
-                state.groq_model == GroqModel::Llama33_70b,
-                "c",
-                &GroqModel::Llama33_70b,
-            );
-            render_model_line_with_info(lines, state.groq_model == GroqModel::Llama31_8b, "d", &GroqModel::Llama31_8b);
-        }
-        LlmProvider::DeepSeek => {
-            for (model, key) in [(DeepSeekModel::V4Flash, "a"), (DeepSeekModel::V4Pro, "b")] {
-                render_model_line_with_info(lines, state.deepseek_model == model, key, &model);
-            }
-        }
-        LlmProvider::MiniMax => {
-            render_model_line_with_info(lines, state.minimax_model == MiniMaxModel::M27, "a", &MiniMaxModel::M27);
-            render_model_line_with_info(
-                lines,
-                state.minimax_model == MiniMaxModel::M27Highspeed,
-                "b",
-                &MiniMaxModel::M27Highspeed,
-            );
-        }
-    }
-}
-
-/// Render the toggle section (auto-continue, reverie).
-fn render_toggles_section(lines: &mut Vec<Line<'_>>, state: &State) {
-    // Auto-continuation toggle
-    let spine_cfg = &cp_mod_spine::types::SpineState::get(state).config;
-    let auto_on = spine_cfg.continue_until_todos_done;
-    let (auto_check, auto_status, auto_color) =
-        if auto_on { ("[x]", "ON", theme::success()) } else { ("[ ]", "OFF", theme::text_muted()) };
-    lines.push(Line::from(vec![
-        Span::styled("  Auto-continue: ", Style::default().fg(theme::text_secondary()).bold()),
-        Span::styled(format!("{auto_check} "), Style::default().fg(auto_color).bold()),
-        Span::styled(auto_status, Style::default().fg(auto_color).bold()),
-        Span::styled("  (press ", Style::default().fg(theme::text_muted())),
-        Span::styled("s", Style::default().fg(theme::warning())),
-        Span::styled(" to toggle)", Style::default().fg(theme::text_muted())),
-    ]));
-
-    // Reverie toggle
-    let rev_on = state.flags.config.reverie_enabled;
-    let (rev_check, rev_status, rev_color) =
-        if rev_on { ("[x]", "ON", theme::success()) } else { ("[ ]", "OFF", theme::text_muted()) };
-    lines.push(Line::from(vec![
-        Span::styled("  Reverie:       ", Style::default().fg(theme::text_secondary()).bold()),
-        Span::styled(format!("{rev_check} "), Style::default().fg(rev_color).bold()),
-        Span::styled(rev_status, Style::default().fg(rev_color).bold()),
-        Span::styled("  (press ", Style::default().fg(theme::text_muted())),
-        Span::styled("r", Style::default().fg(theme::warning())),
-        Span::styled(" to toggle)", Style::default().fg(theme::text_muted())),
-    ]));
-
-    // Think reminder threshold
-    let threshold = state.get_ext::<crate::modules::questions::ThinkState>().map_or(-5, |ts| ts.reminder_threshold);
-    lines.push(Line::from(vec![
-        Span::styled("  Think nudge:   ", Style::default().fg(theme::text_secondary()).bold()),
-        Span::styled(format!("{threshold:>3}  "), Style::default().fg(theme::accent()).bold()),
-        Span::styled("(press ", Style::default().fg(theme::text_muted())),
-        Span::styled("[", Style::default().fg(theme::warning())),
-        Span::styled("/", Style::default().fg(theme::text_muted())),
-        Span::styled("]", Style::default().fg(theme::warning())),
-        Span::styled(" to adjust)", Style::default().fg(theme::text_muted())),
-    ]));
-}
-
-/// Render the secondary model section (Reverie model selection).
-fn render_secondary_model_section(lines: &mut Vec<Line<'_>>, state: &State) {
-    use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel};
-
+/// Render the model section from IR data.
+fn render_model_section(lines: &mut Vec<Line<'_>>, config: &ConfigOverlay) {
     lines.push(Line::from(vec![Span::styled(
-        "  Secondary Model (Reverie)",
+        format!("  {}", config.model_section_title),
         Style::default().fg(theme::text_secondary()).bold(),
     )]));
 
-    match state.secondary_provider {
-        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-            for (model, key) in [
-                (AnthropicModel::ClaudeOpus45, "a"),
-                (AnthropicModel::ClaudeSonnet45, "b"),
-                (AnthropicModel::ClaudeHaiku45, "c"),
-            ] {
-                render_model_line_with_info(lines, state.secondary_anthropic_model == model, key, &model);
-            }
-        }
-        LlmProvider::Grok => {
-            for (model, key) in [(GrokModel::Grok41Fast, "a"), (GrokModel::Grok4Fast, "b")] {
-                render_model_line_with_info(lines, state.secondary_grok_model == model, key, &model);
-            }
-        }
-        LlmProvider::Groq => {
-            render_model_line_with_info(
-                lines,
-                state.secondary_groq_model == GroqModel::GptOss120b,
-                "a",
-                &GroqModel::GptOss120b,
-            );
-            render_model_line_with_info(
-                lines,
-                state.secondary_groq_model == GroqModel::GptOss20b,
-                "b",
-                &GroqModel::GptOss20b,
-            );
-            render_model_line_with_info(
-                lines,
-                state.secondary_groq_model == GroqModel::Llama33_70b,
-                "c",
-                &GroqModel::Llama33_70b,
-            );
-            render_model_line_with_info(
-                lines,
-                state.secondary_groq_model == GroqModel::Llama31_8b,
-                "d",
-                &GroqModel::Llama31_8b,
-            );
-        }
-        LlmProvider::DeepSeek => {
-            for (model, key) in [(DeepSeekModel::V4Flash, "a"), (DeepSeekModel::V4Pro, "b")] {
-                render_model_line_with_info(lines, state.secondary_deepseek_model == model, key, &model);
-            }
-        }
-        LlmProvider::MiniMax => {
-            render_model_line_with_info(
-                lines,
-                state.secondary_minimax_model == MiniMaxModel::M27,
-                "a",
-                &MiniMaxModel::M27,
-            );
-            render_model_line_with_info(
-                lines,
-                state.secondary_minimax_model == MiniMaxModel::M27Highspeed,
-                "b",
-                &MiniMaxModel::M27Highspeed,
-            );
-        }
+    for model in &config.models {
+        let indicator = if model.selected { ">" } else { " " };
+        let check = if model.selected { "[x]" } else { "[ ]" };
+        let style = if model.selected {
+            Style::default().fg(theme::accent()).bold()
+        } else {
+            Style::default().fg(theme::text())
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {indicator} "), Style::default().fg(theme::accent())),
+            Span::styled(format!("{} ", model.key), Style::default().fg(theme::warning())),
+            Span::styled(format!("{check} "), style),
+            Span::styled(format!("{:<12}", model.name), style),
+            Span::styled(format!("{:>4} ", model.context_window), Style::default().fg(theme::text_muted())),
+            Span::styled(model.pricing.clone(), Style::default().fg(theme::text_muted())),
+        ]));
     }
 }
 
-/// Render a single model line with context window size and pricing info.
-fn render_model_line_with_info<M: crate::llms::ModelInfo>(
-    lines: &mut Vec<Line<'_>>,
-    is_selected: bool,
-    key: &str,
-    model: &M,
-) {
-    let indicator = if is_selected { ">" } else { " " };
-    let check = if is_selected { "[x]" } else { "[ ]" };
-    let style =
-        if is_selected { Style::default().fg(theme::accent()).bold() } else { Style::default().fg(theme::text()) };
+/// Render the toggle section from IR data.
+fn render_toggles_section(lines: &mut Vec<Line<'_>>, config: &ConfigOverlay) {
+    for toggle in &config.toggles {
+        let (check, color) = if toggle.enabled { ("[x]", theme::success()) } else { ("[ ]", theme::text_muted()) };
 
-    let ctx_str = format_tokens_compact(model.context_window());
-    let price_str = format!("${:.0}/${:.0}", model.input_price_per_mtok(), model.output_price_per_mtok());
+        let mut spans = vec![
+            Span::styled(
+                format!("  {:<17}", format!("{}:", toggle.label)),
+                Style::default().fg(theme::text_secondary()).bold(),
+            ),
+            Span::styled(format!("{check} "), Style::default().fg(color).bold()),
+            Span::styled(toggle.value_display.clone(), Style::default().fg(color).bold()),
+        ];
 
-    lines.push(Line::from(vec![
-        Span::styled(format!("  {indicator} "), Style::default().fg(theme::accent())),
-        Span::styled(format!("{key} "), Style::default().fg(theme::warning())),
-        Span::styled(format!("{check} "), style),
-        Span::styled(format!("{:<12}", model.display_name()), style),
-        Span::styled(format!("{ctx_str:>4} "), Style::default().fg(theme::text_muted())),
-        Span::styled(price_str, Style::default().fg(theme::text_muted())),
-    ]));
+        if let Some((k1, k2)) = &toggle.adjust_keys {
+            spans.push(Span::styled("  (press ", Style::default().fg(theme::text_muted())));
+            spans.push(Span::styled(k1.clone(), Style::default().fg(theme::warning())));
+            spans.push(Span::styled("/", Style::default().fg(theme::text_muted())));
+            spans.push(Span::styled(k2.clone(), Style::default().fg(theme::warning())));
+            spans.push(Span::styled(" to adjust)", Style::default().fg(theme::text_muted())));
+        } else if !toggle.key_hint.is_empty() {
+            spans.push(Span::styled("  (press ", Style::default().fg(theme::text_muted())));
+            spans.push(Span::styled(toggle.key_hint.clone(), Style::default().fg(theme::warning())));
+            spans.push(Span::styled(" to toggle)", Style::default().fg(theme::text_muted())));
+        }
+
+        lines.push(Line::from(spans));
+    }
 }

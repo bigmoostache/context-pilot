@@ -172,6 +172,11 @@ pub(crate) fn build_overlays(state: &State) -> Vec<Overlay> {
         overlays.push(Overlay::Autocomplete(build_autocomplete(ac)));
     }
 
+    // Config overlay
+    if state.flags.config.config_view {
+        overlays.push(Overlay::Config(crate::ui::help::config_overlay::build_config_overlay(state)));
+    }
+
     // Perf overlay
     if state.flags.ui.perf_enabled {
         overlays.push(Overlay::Perf(build_perf_overlay(state)));
