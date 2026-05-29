@@ -3,10 +3,6 @@
 //! Extracted from `runtime.rs` to keep the main `State` file under the line-length limit.
 //! All types here are re-used by `State` (composed, not inherited).
 
-/// Type alias for the syntax highlighting callback function.
-/// Takes (`file_path`, content) and returns highlighted spans per line: Vec<Vec<(Color, String)>>
-pub type HighlightFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<(ratatui::style::Color, String)>>>;
-
 /// IR-aware syntax highlighting callback.
 /// Takes (`file_path`, content) and returns IR spans per line (RGB colour override).
 pub type HighlightIrFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<cp_render::Span>>>;

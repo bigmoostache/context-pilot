@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use super::context::{Entry, Kind};
 use super::data::config::SidebarMode;
 use super::data::message::Message;
-use super::flags::{ConfigOverlay, HighlightFn, HighlightIrFn, StatusBools, StreamPhase, StreamingTool, UiState};
+use super::flags::{ConfigOverlay, HighlightIrFn, StatusBools, StreamPhase, StreamingTool, UiState};
 use crate::config::llm_types::LlmProvider;
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
@@ -161,9 +161,6 @@ pub struct State {
     pub full_content_cache: Option<FullCache>,
 
     // === Callback hooks (set by binary, used by extracted module crates) ===
-    /// Syntax highlighting function (provided by binary's highlight module).
-    /// Takes `(file_path, content)` and returns highlighted spans per line.
-    pub highlight_fn: Option<HighlightFn>,
     /// IR-aware syntax highlighting (RGB colour spans for the IR pipeline).
     /// Takes `(file_path, content)` and returns `cp_render::Span` per line.
     pub highlight_ir_fn: Option<HighlightIrFn>,
@@ -250,7 +247,6 @@ impl Default for State {
             message_cache: HashMap::new(),
             input_cache: None,
             full_content_cache: None,
-            highlight_fn: None,
             highlight_ir_fn: None,
             module_data: HashMap::new(),
         }
