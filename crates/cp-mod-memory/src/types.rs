@@ -63,6 +63,14 @@ pub struct MemoryItem {
     /// Freeform labels for categorization
     #[serde(default)]
     pub labels: Vec<String>,
+    /// Stable key for YAML backing store.
+    ///
+    /// Generated once at creation time as `SHA-256(tl_dr)[0..16]`.
+    /// Never changes on update — ensures the same memory always maps
+    /// to the same YAML entry across branches and workers.
+    /// Old memories without a key get one via migration.
+    #[serde(default)]
+    pub yaml_key: String,
 }
 
 /// Module-owned state for the Memory module

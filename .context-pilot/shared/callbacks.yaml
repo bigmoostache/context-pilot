@@ -1,0 +1,54 @@
+078f4dccf6448ca1:
+  name: file-length
+  description: Check that no .rs file exceeds 500 lines (CI gate)
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 10
+  success_message: File lengths OK ✓
+  is_global: true
+  script_content: bash .github/checks/check-file-lengths.sh
+8a485748bfb92873:
+  name: rust-fmt
+  description: Run cargo fmt --check on Rust file changes — catches formatting issues
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 10
+  success_message: Fmt passed ✓
+  is_global: true
+  script_content: cargo fmt --check 2>&1
+8d8b466f14a06946:
+  name: lint-exceptions
+  description: 'Verify every #[expect]/#[allow] annotation is registered in allowed-lint-exceptions.yaml'
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 15
+  success_message: Lint exceptions OK ✓
+  is_global: true
+  script_content: bash .github/checks/check-lint-exceptions.sh
+bfa6214cc0381ff8:
+  name: lint-integrity
+  description: Verify lint config hash chain integrity (protected files unchanged)
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 10
+  success_message: Lint integrity OK ✓
+  is_global: true
+  script_content: bash .github/checks/check-lint-config.sh
+e9df8b57febadf23:
+  name: rust-clippy
+  description: Run cargo clippy on Rust file changes — catches compilation errors + lint warnings
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 60
+  success_message: Clippy passed ✓
+  is_global: true
+  script_content: cargo clippy --workspace --all-targets 2>&1
+fa0efdd3f8eac26f:
+  name: folder-sizes
+  description: Check that no source directory exceeds 8 entries (CI gate)
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 10
+  success_message: Folder sizes OK ✓
+  is_global: true
+  script_content: bash .github/checks/check-folder-sizes.sh

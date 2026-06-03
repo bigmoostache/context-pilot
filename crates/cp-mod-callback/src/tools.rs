@@ -31,7 +31,7 @@ pub fn execute_upsert(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Open a callback's script in the panel editor for viewing/editing.
 pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
+    let key = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
             return ToolResult::new(tool.id.clone(), "Missing required parameter 'id'".to_string(), true);
@@ -39,25 +39,26 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let cs = CallbackState::get(state);
-    let Some(def) = cs.definitions.iter().find(|d| d.id == anchor_id) else {
-        return ToolResult::new(tool.id.clone(), format!("Callback '{anchor_id}' not found"), true);
+    let Some(def) = cs.find_by_name_or_id(&key) else {
+        return ToolResult::new(tool.id.clone(), format!("Callback '{key}' not found"), true);
     };
+    let def_name = def.name.clone();
+    let def_id = def.id.clone();
 
     // Read the script file so we can confirm it exists
-    let script_path = PathBuf::from(constants::STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
+    let script_path = PathBuf::from(constants::STORE_DIR).join("scripts").join(format!("{def_name}.sh"));
     if !script_path.exists() {
         return ToolResult::new(
             tool.id.clone(),
             format!(
-                "Script file not found: .context-pilot/scripts/{}.sh — the callback definition exists but the script is missing.",
-                def.name
+                "Script file not found: .context-pilot/scripts/{def_name}.sh — the callback definition exists but the script is missing.",
             ),
             true,
         );
     }
 
     let previous = CallbackState::get(state).editor_open.clone();
-    CallbackState::get_mut(state).editor_open = Some(anchor_id.clone());
+    CallbackState::get_mut(state).editor_open = Some(def_name.clone());
 
     // Touch the callback panel to trigger re-render with editor content
     for ctx in &mut state.context {
@@ -68,8 +69,8 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let msg = previous.as_ref().map_or_else(
-        || format!("Opened callback {anchor_id} in editor. Script content is now visible in the Callbacks panel."),
-        |prev| format!("Opened callback {anchor_id} in editor (closed previous: {prev}). Script content is now visible in the Callbacks panel."),
+        || format!("Opened callback {def_id} [{def_name}] in editor. Script content is now visible in the Callbacks panel."),
+        |prev| format!("Opened callback {def_id} [{def_name}] in editor (closed previous: {prev}). Script content is now visible in the Callbacks panel."),
     );
 
     ToolResult::new(tool.id.clone(), msg, false)
@@ -100,7 +101,7 @@ pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Execute the `Callback_toggle` tool (activate/deactivate per worker).
 pub fn execute_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
+    let key = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
             return ToolResult::new(tool.id.clone(), "Missing required parameter 'id'".to_string(), true);
@@ -112,16 +113,18 @@ pub fn execute_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let cs = CallbackState::get(state);
-    if !cs.definitions.iter().any(|d| d.id == anchor_id) {
-        return ToolResult::new(tool.id.clone(), format!("Callback '{anchor_id}' not found"), true);
-    }
+    let Some(def) = cs.find_by_name_or_id(&key) else {
+        return ToolResult::new(tool.id.clone(), format!("Callback '{key}' not found"), true);
+    };
+    let def_name = def.name.clone();
+    let def_id = def.id.clone();
 
     let cs_mut = CallbackState::get_mut(state);
     if active {
-        let _ = cs_mut.active_set.insert(anchor_id.clone());
-        ToolResult::new(tool.id.clone(), format!("Callback {anchor_id} activated ✓"), false)
+        let _ = cs_mut.active_set.insert(def_name);
+        ToolResult::new(tool.id.clone(), format!("Callback {def_id} activated ✓"), false)
     } else {
-        let _ = cs_mut.active_set.remove(&anchor_id);
-        ToolResult::new(tool.id.clone(), format!("Callback {anchor_id} deactivated ✗"), false)
+        let _ = cs_mut.active_set.remove(&def_name);
+        ToolResult::new(tool.id.clone(), format!("Callback {def_id} deactivated ✗"), false)
     }
 }

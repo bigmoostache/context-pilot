@@ -10,6 +10,8 @@
 pub mod firing;
 /// Callback panel: table display and editor rendering.
 mod panel;
+/// YAML-backed persistent storage for callback definitions.
+mod storage;
 /// Tool dispatch: upsert, toggle, open/close editor.
 pub mod tools;
 /// Upsert tool internals: create, update, delete callback definitions.
@@ -31,7 +33,6 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::CallbackPanel;
 use self::types::CallbackState;
-use cp_base::cast::Safe as _;
 
 /// Lazily parsed tool texts from the callback YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -76,7 +77,6 @@ impl Module for CallbackModule {
         let cs = CallbackState::get(state);
         json!({
             "definitions": cs.definitions,
-            "next_id": cs.next_id,
         })
     }
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
@@ -85,9 +85,10 @@ impl Module for CallbackModule {
         {
             CallbackState::get_mut(state).definitions = v;
         }
-        if let Some(v) = data.get("next_id").and_then(serde_json::Value::as_u64) {
-            CallbackState::get_mut(state).next_id = v.to_usize();
-        }
+        // YAML backing store: migrate existing callbacks to shared YAML,
+        // then clean up any old hash-keyed entries from the v1 format.
+        storage::migrate_to_yaml(&CallbackState::get(state).definitions);
+        storage::cleanup_old_hash_keys();
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
@@ -105,6 +106,13 @@ impl Module for CallbackModule {
         if let Some(v) = data.get("editor_open") {
             CallbackState::get_mut(state).editor_open = v.as_str().map(ToString::to_string);
         }
+        // Populate missing callbacks from YAML backing store.
+        // This runs AFTER active_set is loaded so newly-created callbacks
+        // get inserted into active_set without being overwritten.
+        storage::populate_from_yaml(CallbackState::get_mut(state));
+        // Assign deterministic IDs (CB1, CB2, ...) based on alphabetical name order.
+        // This makes IDs reproducible across machines/workers.
+        CallbackState::get_mut(state).assign_deterministic_ids();
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {
@@ -182,7 +190,7 @@ impl Module for CallbackModule {
                     && let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
                 {
                     let cs = CallbackState::get(state);
-                    if !cs.definitions.iter().any(|d| d.id == id) {
+                    if cs.find_by_name_or_id(id).is_none() {
                         pf.errors.push(format!("Callback '{id}' not found"));
                     }
                 }
@@ -192,7 +200,7 @@ impl Module for CallbackModule {
                 let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let cs = CallbackState::get(state);
-                    if !cs.definitions.iter().any(|d| d.id == id) {
+                    if cs.find_by_name_or_id(id).is_none() {
                         pf.errors.push(format!("Callback '{id}' not found"));
                     }
                 }
@@ -210,7 +218,7 @@ impl Module for CallbackModule {
                 let mut pf = Verdict::new();
                 if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
                     let cs = CallbackState::get(state);
-                    if !cs.definitions.iter().any(|d| d.id == id) {
+                    if cs.find_by_name_or_id(id).is_none() {
                         pf.errors.push(format!("Callback '{id}' not found"));
                     }
                 }

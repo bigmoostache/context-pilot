@@ -45,13 +45,12 @@ pub struct CallbackDefinition {
 /// Stored in `State.module_data` via `TypeMap`.
 #[derive(Debug)]
 pub struct CallbackState {
-    /// All callback definitions (loaded from global config.json)
+    /// All callback definitions (loaded from YAML backing store).
     pub definitions: Vec<CallbackDefinition>,
-    /// Counter for auto-generating CB IDs
-    pub next_id: usize,
-    /// Per-worker: which callback IDs are active
+    /// Per-worker: which callback **names** are active.
+    /// Names are the stable identifier across machines/workers (not ephemeral CB IDs).
     pub active_set: HashSet<String>,
-    /// Which callback ID is currently open in the editor (if any)
+    /// Which callback **name** is currently open in the editor (if any).
     pub editor_open: Option<String>,
 }
 
@@ -62,10 +61,45 @@ impl Default for CallbackState {
 }
 
 impl CallbackState {
-    /// Create an empty callback state with ID counter at 1.
+    /// Create an empty callback state.
     #[must_use]
     pub fn new() -> Self {
-        Self { definitions: Vec::new(), next_id: 1, active_set: HashSet::new(), editor_open: None }
+        Self { definitions: Vec::new(), active_set: HashSet::new(), editor_open: None }
+    }
+
+    /// Assign deterministic IDs (CB1, CB2, ...) based on alphabetical order of names.
+    ///
+    /// Called after all definitions are loaded. Makes IDs reproducible across
+    /// machines/workers — the same set of callbacks always gets the same IDs.
+    pub fn assign_deterministic_ids(&mut self) {
+        self.definitions.sort_by(|a, b| a.name.cmp(&b.name));
+        for (i, def) in self.definitions.iter_mut().enumerate() {
+            def.id = format!("CB{}", i.saturating_add(1));
+        }
+    }
+
+    /// Look up a callback by name or CB ID.
+    ///
+    /// Accepts either the callback name (e.g., "rust-clippy") or the ephemeral
+    /// CB ID (e.g., "CB5"). Name lookup takes priority.
+    #[must_use]
+    pub fn find_by_name_or_id(&self, key: &str) -> Option<&CallbackDefinition> {
+        self.definitions.iter().find(|d| d.name == key).or_else(|| self.definitions.iter().find(|d| d.id == key))
+    }
+
+    /// Find the position of a callback by name or CB ID.
+    #[must_use]
+    pub fn position_by_name_or_id(&self, key: &str) -> Option<usize> {
+        self.definitions
+            .iter()
+            .position(|d| d.name == key)
+            .or_else(|| self.definitions.iter().position(|d| d.id == key))
+    }
+
+    /// Resolve a name-or-ID key to the callback's canonical name.
+    #[must_use]
+    pub fn resolve_name(&self, key: &str) -> Option<String> {
+        self.find_by_name_or_id(key).map(|d| d.name.clone())
     }
 
     /// Get shared ref from State's `TypeMap`.

@@ -74,10 +74,8 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         );
     }
 
-    // Generate ID
-    let cs_mut = CallbackState::get_mut(state);
-    let anchor_id = format!("CB{}", cs_mut.next_id);
-    cs_mut.next_id = cs_mut.next_id.saturating_add(1);
+    // Generate ID (placeholder — reassigned by assign_deterministic_ids on next load)
+    let anchor_id = vessel_name.clone();
 
     // Write script file to .context-pilot/scripts/{name}.sh
     let scripts_dir = PathBuf::from(constants::STORE_DIR).join("scripts");
@@ -113,7 +111,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Create the definition
     let definition = CallbackDefinition {
-        id: anchor_id.clone(),
+        id: anchor_id,
         name: vessel_name.clone(),
         description,
         pattern: chart_pattern.clone(),
@@ -126,14 +124,26 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         built_in_command: None,
     };
 
-    // Add to state and mark active
+    // Add to state and mark active (by name — names are the stable identifier)
     let cs_store = CallbackState::get_mut(state);
     cs_store.definitions.push(definition);
-    let _ = cs_store.active_set.insert(anchor_id.clone());
+    let _ = cs_store.active_set.insert(vessel_name.clone());
+    // Reassign deterministic IDs after adding a new definition
+    cs_store.assign_deterministic_ids();
+
+    // Sync to YAML backing store
+    if let Some(created) = CallbackState::get(state).definitions.iter().find(|d| d.name == vessel_name) {
+        crate::storage::upsert_yaml_entry(created);
+    }
+
+    // Look up the newly-assigned deterministic ID
+    let final_id = CallbackState::get(state)
+        .find_by_name_or_id(&vessel_name)
+        .map_or_else(|| vessel_name.clone(), |d| d.id.clone());
 
     // Build success message
     let mut msg = format!(
-        "Created callback {anchor_id} [{vessel_name}]:\n  Pattern: {chart_pattern}\n  Blocking: {blocking}\n  Script: .context-pilot/scripts/{vessel_name}.sh",
+        "Created callback {final_id} [{vessel_name}]:\n  Pattern: {chart_pattern}\n  Blocking: {blocking}\n  Script: .context-pilot/scripts/{vessel_name}.sh",
     );
     if let Some(ref sm) = success_message {
         let _r = write!(msg, "\n  Success message: {sm}");
@@ -150,7 +160,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Update an existing callback (full replace or diff-based script edit).
 pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
+    let key = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
             return ToolResult::new(
@@ -162,9 +172,14 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let cs = CallbackState::get(state);
-    let Some(def_idx) = cs.definitions.iter().position(|d| d.id == anchor_id) else {
-        return ToolResult::new(tool.id.clone(), format!("Callback '{anchor_id}' not found"), true);
+    let Some(def_idx) = cs.position_by_name_or_id(&key) else {
+        return ToolResult::new(tool.id.clone(), format!("Callback '{key}' not found"), true);
     };
+    let Some(matched_def) = cs.definitions.get(def_idx) else {
+        return ToolResult::new(tool.id.clone(), format!("Definition index {def_idx} out of bounds"), true);
+    };
+    let def_name = matched_def.name.clone();
+    let def_id = matched_def.id.clone();
 
     // Check for diff-based script update (old_string / new_string)
     let has_diff = tool.input.get("old_string").and_then(|v| v.as_str()).is_some();
@@ -182,11 +197,11 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Diff-based edits require the editor to be open first (so the AI can see current content)
     if has_diff {
         let cs_check = CallbackState::get(state);
-        if cs_check.editor_open.as_deref() != Some(&anchor_id) {
+        if cs_check.editor_open.as_deref() != Some(&def_name) {
             return ToolResult::new(
                 tool.id.clone(),
                 format!(
-                    "Diff-based script editing requires the editor to be open. Use Callback_open_editor with id='{anchor_id}' first to view current script content."
+                    "Diff-based script editing requires the editor to be open. Use Callback_open_editor with id='{key}' first to view current script content."
                 ),
                 true,
             );
@@ -298,15 +313,20 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     if changes.is_empty() {
-        return ToolResult::new(tool.id.clone(), format!("Callback {anchor_id} updated (no changes specified)"), false);
+        return ToolResult::new(tool.id.clone(), format!("Callback {def_id} updated (no changes specified)"), false);
     }
 
-    ToolResult::new(tool.id.clone(), format!("Callback {} updated:\n  {}", anchor_id, changes.join("\n  ")), false)
+    // Sync to YAML backing store
+    if let Some(updated) = CallbackState::get(state).definitions.iter().find(|d| d.name == def_name) {
+        crate::storage::upsert_yaml_entry(updated);
+    }
+
+    ToolResult::new(tool.id.clone(), format!("Callback {} updated:\n  {}", def_id, changes.join("\n  ")), false)
 }
 
 /// Delete a callback and its script file.
 pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let anchor_id = match tool.input.get("id").and_then(|v| v.as_str()) {
+    let key = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
             return ToolResult::new(
@@ -318,19 +338,29 @@ pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let cs = CallbackState::get(state);
-    let Some(def_idx) = cs.definitions.iter().position(|d| d.id == anchor_id) else {
-        return ToolResult::new(tool.id.clone(), format!("Callback '{anchor_id}' not found"), true);
+    let Some(def_idx) = cs.position_by_name_or_id(&key) else {
+        return ToolResult::new(tool.id.clone(), format!("Callback '{key}' not found"), true);
     };
+    let Some(def_ref) = cs.definitions.get(def_idx) else {
+        return ToolResult::new(tool.id.clone(), format!("Callback '{key}' not found (index out of bounds)"), true);
+    };
+    let def_id = def_ref.id.clone();
 
     // Remove definition and get the name for script cleanup
     let cs_mut = CallbackState::get_mut(state);
     let sunken_def = cs_mut.definitions.remove(def_idx);
-    let _ = cs_mut.active_set.remove(&anchor_id);
+    let _ = cs_mut.active_set.remove(&sunken_def.name);
 
     // If editor was open for this callback, close it
-    if cs_mut.editor_open.as_deref() == Some(&anchor_id) {
+    if cs_mut.editor_open.as_deref() == Some(sunken_def.name.as_str()) {
         cs_mut.editor_open = None;
     }
+
+    // Reassign deterministic IDs after removal
+    cs_mut.assign_deterministic_ids();
+
+    // Remove from YAML backing store
+    crate::storage::remove_yaml_entry(&sunken_def.name);
 
     // Delete the script file
     let script_path = PathBuf::from(constants::STORE_DIR).join("scripts").join(format!("{}.sh", sunken_def.name));
@@ -341,8 +371,8 @@ pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
                 return ToolResult::new(
                     tool.id.clone(),
                     format!(
-                        "Callback {} [{}] removed from config, but failed to delete script: {}",
-                        anchor_id, sunken_def.name, e
+                        "Callback {def_id} [{}] removed from config, but failed to delete script: {}",
+                        sunken_def.name, e
                     ),
                     false,
                 );
@@ -354,11 +384,7 @@ pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let script_msg = if script_deleted { " + script file deleted" } else { " (no script file found)" };
 
-    ToolResult::new(
-        tool.id.clone(),
-        format!("Callback {} [{}] deleted{}", anchor_id, sunken_def.name, script_msg),
-        false,
-    )
+    ToolResult::new(tool.id.clone(), format!("Callback {def_id} [{}] deleted{}", sunken_def.name, script_msg), false)
 }
 
 /// Validate that a callback script uses the correct env var for its scope.

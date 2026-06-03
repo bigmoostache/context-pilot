@@ -6,6 +6,8 @@
 
 /// Panel rendering and context generation for memory items.
 mod panel;
+/// YAML-backed persistent storage for memory items.
+mod storage;
 /// Tool execution handlers for `memory_create` and `memory_update`.
 mod tools;
 /// Memory state types: `MemoryItem`, `MemoryImportance`, `MemoryState`.
@@ -84,6 +86,9 @@ impl Module for MemoryModule {
         {
             ms.open_memory_ids = v;
         }
+        // YAML backing store: migrate existing memories, then populate gaps
+        storage::migrate_to_yaml(&mut ms.memories);
+        storage::populate_from_yaml(ms);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {

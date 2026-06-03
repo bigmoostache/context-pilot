@@ -410,6 +410,8 @@ pub mod constants;
 pub mod global;
 /// LLM provider/model type definitions and capabilities.
 pub mod llm_types;
+/// Unified YAML synchronizer for cross-branch persistent state.
+pub mod yaml_sync;
 
 /// Prompt templates — panel header/footer/timestamp formatting.
 pub static PROMPTS: LazyLock<Prompts> =

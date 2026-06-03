@@ -194,18 +194,14 @@ fn ensure_typst_callback(state: &mut State) {
             && d.name != "typst-template-recompile"
             && d.name != "typst-watchlist"
     });
-    cs.active_set.retain(|id| cs.definitions.iter().any(|d| &d.id == id));
-
-    // Single callback: watches ALL files, checks watchlist to find affected docs
-    let cb_id = format!("CB{}", cs.next_id);
-    cs.next_id = cs.next_id.saturating_add(1);
+    cs.active_set.retain(|name| cs.definitions.iter().any(|d| &d.name == name));
 
     // The CLI subcommand reads the watchlist, checks if any changed files are dependencies,
     // and recompiles affected documents (updating deps at the same time).
     let script = format!("bash -c '{binary_path} typst-recompile-watched $CP_CHANGED_FILES'");
 
     cs.definitions.push(CallbackDefinition {
-        id: cb_id.clone(),
+        id: String::new(), // Placeholder — assign_deterministic_ids() sets this
         name: "typst-watchlist".to_string(),
         description: "Recompile watched .typ documents when their dependencies change".to_string(),
         pattern: "*".to_string(),
@@ -217,5 +213,6 @@ fn ensure_typst_callback(state: &mut State) {
         built_in: true,
         built_in_command: Some(script),
     });
-    let _r = cs.active_set.insert(cb_id);
+    // Activate by name — names are the stable cross-machine identifier
+    let _r = cs.active_set.insert("typst-watchlist".to_string());
 }

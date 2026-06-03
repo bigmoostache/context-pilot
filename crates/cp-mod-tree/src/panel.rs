@@ -96,15 +96,26 @@ impl Panel for TreePanel {
         })
     }
 
-    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
+    fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, state: &mut State) -> bool {
         let CacheUpdate::Content { content, token_count, .. } = update else {
             return false;
         };
         ctx.cache_deprecated = false;
+
+        // After rebuilding tree content, check for stale descriptions that can
+        // be refreshed from the YAML backing store (e.g. after a branch switch).
+        let refreshed = crate::storage::refresh_stale_from_yaml(&mut TreeState::get_mut(state).descriptions);
+
         // Check if content actually changed before updating
-        if !cp_base::panels::update_if_changed(ctx, &content) && ctx.cached_content.is_some() {
+        if !refreshed && !cp_base::panels::update_if_changed(ctx, &content) && ctx.cached_content.is_some() {
             return false;
         }
+
+        if refreshed {
+            // Descriptions changed — re-invalidate so the tree rebuilds with fresh text.
+            ctx.cache_deprecated = true;
+        }
+
         ctx.cached_content = Some(content);
         ctx.token_count = token_count;
         ctx.total_pages = compute_total_pages(token_count);

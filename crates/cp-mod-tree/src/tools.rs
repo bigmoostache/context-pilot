@@ -10,6 +10,7 @@ use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
+use crate::storage;
 use crate::types::{TreeFileDescription, TreeState};
 use std::fmt::Write as _;
 
@@ -266,6 +267,16 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
     }
     if !errors.is_empty() {
         result.push(format!("Errors: {}", errors.join("; ")));
+    }
+
+    // Sync changes to YAML backing store
+    for path in added.iter().chain(updated.iter()) {
+        if let Some(desc) = TreeState::get(state).descriptions.iter().find(|d| d.path == *path) {
+            storage::upsert_yaml_entry(&desc.path, &desc.description);
+        }
+    }
+    for path in &removed {
+        storage::remove_yaml_entry(path);
     }
 
     // Invalidate tree cache to trigger refresh

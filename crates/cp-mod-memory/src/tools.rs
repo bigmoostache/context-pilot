@@ -3,6 +3,7 @@ use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
+use crate::storage;
 use crate::types::{MemoryImportance, MemoryItem, MemoryState};
 use std::fmt::Write as _;
 
@@ -66,7 +67,13 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         let ms = MemoryState::get_mut(state);
         let id = format!("M{}", ms.next_memory_id);
         ms.next_memory_id = ms.next_memory_id.saturating_add(1);
-        ms.memories.push(MemoryItem { id: id.clone(), tl_dr: content.clone(), contents, importance, labels });
+        let yaml_key = storage::generate_yaml_key(&content);
+        ms.memories.push(MemoryItem { id: id.clone(), tl_dr: content.clone(), contents, importance, labels, yaml_key });
+
+        // Sync to YAML backing store
+        if let Some(item) = ms.memories.last() {
+            storage::upsert_yaml_entry(item);
+        }
 
         let preview = if content.len() > 40 {
             format!("{}...", &content.get(..content.floor_char_boundary(37)).unwrap_or(""))
@@ -119,8 +126,14 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         if update_value.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false) {
             let ms = MemoryState::get_mut(state);
             let initial_len = ms.memories.len();
+            // Find the yaml_key before removing so we can sync to YAML
+            let yaml_key = ms.memories.iter().find(|m| m.id == id).map(|m| m.yaml_key.clone());
             ms.memories.retain(|m| m.id != id);
             if ms.memories.len() < initial_len {
+                // Remove from YAML backing store
+                if let Some(key) = yaml_key {
+                    storage::remove_yaml_entry(&key);
+                }
                 deleted.push(id.to_string());
             } else {
                 not_found.push(id.to_string());
@@ -164,6 +177,8 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
                 if !changes.is_empty() {
                     modified.push(format!("{}: {}", id, changes.join(", ")));
+                    // Sync updated memory to YAML backing store
+                    storage::upsert_yaml_entry(m);
                 }
             }
             None => {

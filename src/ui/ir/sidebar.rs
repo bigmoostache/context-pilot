@@ -28,7 +28,7 @@ fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String> {
             let ls = cp_mod_logs::types::LogsState::get(state);
             ls.logs.len()
         }
-        "callback" => cp_mod_callback::types::CallbackState::get(state).active_set.len(),
+        "callback" => cp_mod_callback::types::CallbackState::get(state).definitions.len(),
         "scratchpad" => cp_mod_scratchpad::types::ScratchpadState::get(state).scratchpad_cells.len(),
         "queue" => cp_mod_queue::types::QueueState::get(state).queued_calls.len(),
         "overview" => state.context.len().saturating_add(2),

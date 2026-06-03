@@ -57,11 +57,24 @@ echo "      Installed. ($(du -h "$INSTALL_PATH" | cut -f1))"
 # 3. Global gitignore
 echo "[3/4] Setting up global gitignore..."
 touch "$GITIGNORE_GLOBAL"
-if grep -qxF ".context-pilot/" "$GITIGNORE_GLOBAL" 2>/dev/null; then
-    echo "      .context-pilot/ already in $GITIGNORE_GLOBAL — skipping."
+# Use .context-pilot/* (not .context-pilot/) so git enters the directory,
+# allowing the negation !.context-pilot/shared/ to track shared configs.
+if grep -qxF ".context-pilot/*" "$GITIGNORE_GLOBAL" 2>/dev/null; then
+    echo "      .context-pilot/* already in $GITIGNORE_GLOBAL — skipping."
 else
-    echo ".context-pilot/" >> "$GITIGNORE_GLOBAL"
-    echo "      Added .context-pilot/ to $GITIGNORE_GLOBAL"
+    # Migrate old pattern if present
+    if grep -qxF ".context-pilot/" "$GITIGNORE_GLOBAL" 2>/dev/null; then
+        sed -i.bak 's|^\.context-pilot/$|.context-pilot/*|' "$GITIGNORE_GLOBAL"
+        rm -f "$GITIGNORE_GLOBAL.bak"
+        echo "      Migrated .context-pilot/ → .context-pilot/* in $GITIGNORE_GLOBAL"
+    else
+        echo ".context-pilot/*" >> "$GITIGNORE_GLOBAL"
+    fi
+    # Ensure shared/ negation is present
+    if ! grep -qxF '!.context-pilot/shared/' "$GITIGNORE_GLOBAL" 2>/dev/null; then
+        echo '!.context-pilot/shared/' >> "$GITIGNORE_GLOBAL"
+    fi
+    echo "      Set up .context-pilot/* + !.context-pilot/shared/ in $GITIGNORE_GLOBAL"
 fi
 git config --global core.excludesFile "$GITIGNORE_GLOBAL"
 

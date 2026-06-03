@@ -100,8 +100,8 @@ pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<Mat
     validate_skip_names(cs, &all_skip_names, &mut warnings);
 
     for def in &cs.definitions {
-        // Only fire active callbacks
-        if !cs.active_set.contains(&def.id) {
+        // Only fire active callbacks (active_set stores names, not IDs)
+        if !cs.active_set.contains(&def.name) {
             continue;
         }
 

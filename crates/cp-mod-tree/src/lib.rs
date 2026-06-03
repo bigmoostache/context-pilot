@@ -7,6 +7,8 @@
 
 /// Panel implementation for the directory tree view.
 mod panel;
+/// YAML-backed persistent storage for tree descriptions.
+mod storage;
 /// Tool implementations for tree filtering, toggling, and describing.
 pub mod tools;
 /// Tree state types: `TreeState`, `TreeFileDescription`.
@@ -88,6 +90,10 @@ impl Module for TreeModule {
                 ts.open_folders.insert(0, ".".to_string());
             }
         }
+        // YAML backing store: migrate existing descriptions, then populate gaps
+        let ts = TreeState::get_mut(state);
+        storage::migrate_to_yaml(&ts.descriptions);
+        storage::populate_from_yaml(&mut ts.descriptions);
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {

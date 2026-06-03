@@ -33,7 +33,7 @@ impl CallbackPanel {
         );
 
         for def in &cs.definitions {
-            let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
+            let active = if cs.active_set.contains(&def.name) { "✓" } else { "✗" };
             let blocking = if def.blocking { "yes" } else { "no" };
             let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s"));
             let success = def.success_message.as_deref().unwrap_or("—");
@@ -47,8 +47,8 @@ impl CallbackPanel {
         }
 
         // If editor is open, append the script content below the table with warning
-        if let Some(ref editor_id) = cs.editor_open
-            && let Some(def) = cs.definitions.iter().find(|d| d.id == *editor_id)
+        if let Some(ref editor_name) = cs.editor_open
+            && let Some(def) = cs.definitions.iter().find(|d| d.name == *editor_name)
         {
             lines.push(String::new());
             lines.push(INJECTIONS.editor_warnings.callback.banner.clone());
@@ -137,7 +137,7 @@ impl Panel for CallbackPanel {
         // Build table of callback definitions
         let mut rows = Vec::new();
         for def in &cs.definitions {
-            let active = if cs.active_set.contains(&def.id) { "✓" } else { "✗" };
+            let active = if cs.active_set.contains(&def.name) { "✓" } else { "✗" };
             let blocking = if def.blocking { "yes" } else { "no" };
             let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s"));
             let scope = if def.is_global { "global" } else { "local" };
@@ -174,8 +174,8 @@ impl Panel for CallbackPanel {
         ));
 
         // If editor is open, render the script content below the table
-        if let Some(ref editor_id) = cs.editor_open
-            && let Some(def) = cs.definitions.iter().find(|d| d.id == *editor_id)
+        if let Some(ref editor_name) = cs.editor_open
+            && let Some(def) = cs.definitions.iter().find(|d| d.name == *editor_name)
         {
             blocks.push(Block::Empty);
             blocks.push(Block::Line(vec![S::warning(" ⚠ CALLBACK EDITOR OPEN ".into()).bold()]));
