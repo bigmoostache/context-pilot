@@ -1,8 +1,7 @@
 //! Meilisearch server lifecycle management.
 //!
 //! Handles downloading, starting, and health-checking a global Meilisearch
-//! server at `~/.context-pilot/meilisearch/`. Follows the same pattern as
-//! the Tuwunel homeserver in cp-mod-chat: first project starts the server,
+//! server at `~/.context-pilot/meilisearch/`. First project starts the server,
 //! subsequent projects reuse it via PID + health check.
 
 use std::io::Read as _;

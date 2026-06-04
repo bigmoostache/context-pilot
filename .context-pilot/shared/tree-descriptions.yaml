@@ -6,6 +6,10 @@
   path: .github/workflows/rust.yml
   description: 'CI: fmt + clippy + build + test on ubuntu-latest. Pins Rust 1.93.0. Triggers on push/PR to master.'
   last_edited_ms: 0
+02f82c18ae41dda5:
+  path: src/state/persistence/message.rs
+  description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
+  last_edited_ms: 1780498401099
 03dd8ddbc3368dd7:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
@@ -25,6 +29,10 @@
 064c633984a0d856:
   path: crates/cp-mod-queue/src/types.rs
   description: 'QueueState + QueuedToolCall types. Trap fields: trap_active, trap_panel_ids, trap_optional_ids. Methods: enqueue, remove_by_index, flush, clear, is_queue_tool.'
+  last_edited_ms: 0
+06abaaf6166deeeb:
+  path: .gitignore
+  description: Gitignore. Excludes target/, .context-pilot/* (with !shared/ negation), .claude/, test artifacts, slides build artifacts (node_modules, package files, PDF output).
   last_edited_ms: 0
 07c4e2a77b4470b1:
   path: yamls/tools/ocr.yaml
@@ -58,6 +66,10 @@
   path: src/llms/cache/mod.rs
   description: 'Module declarations: cache_engine, cache_optimizer, density.'
   last_edited_ms: 0
+10376e0490f231c6:
+  path: crates/cp-mod-search/src/meili/server.rs
+  description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
+  last_edited_ms: 1780562263889
 107d265d94900a67:
   path: src/llms/oai_providers/mod.rs
   description: 'Module declarations: deepseek, grok, groq, openai_compat, openai_streaming.'
@@ -78,6 +90,10 @@
   path: src/modules/conversation/panel.rs
   description: 'Conversation panel. Multi-level cache (full → per-message → input). Input hash includes selection anchor. Keybindings: Shift+Arrow selection, Ctrl/Alt+Arrow word jump, Ctrl+A select all, Ctrl+Backspace delete word. Enter send-on-empty-line logic.'
   last_edited_ms: 0
+138edfd0bce25793:
+  path: crates/cp-mod-firecrawl/src/tools.rs
+  description: 'Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"), flame!("firecrawl_crawl"). All async via spawn_async_tool. Crawl: start job + poll loop (5s interval, 60 max polls, 310s timeout) + write_crawl_output to disk.'
+  last_edited_ms: 1780560886873
 13a293332f7821a0:
   path: src/ui/help/palette.rs
   description: 'Command palette state + IR adapter. CommandPalette struct (state methods: open/close/filter/select). to_ir() builds PaletteOverlay. render_command_palette_from_ir() adapter renders from IR. 19 theme:: calls in adapter only.'
@@ -98,6 +114,18 @@
   path: crates/cp-mod-search/src/radar.rs
   description: Context Radar with flame!("radar_refresh") and flame!("radar_push_signal"). Adaptive log-count-based decay scoring, Meilisearch log queries via background thread. Recent logs (10) deterministic + semantic top 40.
   last_edited_ms: 0
+1b4881ed98b5293d:
+  path: crates/cp-mod-firecrawl/src/lib.rs
+  description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. Nested object params (location). Simple dispatch pattern.'
+  last_edited_ms: 1780560886875
+1ca2e8434c046d42:
+  path: src/ui/ir/sidebar.rs
+  description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints.'
+  last_edited_ms: 0
+1cac1ab9f44615a7:
+  path: crates/cp-base/Cargo.toml
+  description: 'Base crate deps: crossterm, serde, serde_json, serde_yaml, sha2, chrono, log, parking_lot, typemap_rev, globset, syntect, tree-sitter, reqwest, tokio. No ratatui.'
+  last_edited_ms: 1780497937359
 1e4b2765708a88de:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
@@ -130,6 +158,10 @@
   path: yamls/injections.yaml
   description: LLM-facing text injections. Spine auto-continuation, editor warning banners, console guardrails (git/gh/typst → dedicated tools), history cleanup trap messages (%PANELS% templates), behavioral redirects, provider-shared text.
   last_edited_ms: 0
+22b269fd4df74fd9:
+  path: Cargo.toml
+  description: Workspace root. 22 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
+  last_edited_ms: 1780562263891
 22c2b7beb939a40b:
   path: crates/cp-mod-logs/src/tools.rs
   description: Log tool execution. flame!("log_create") and flame!("close_history"). push_log() helper. execute_log_create() creates entries from array. execute_close_conversation_history() processes panels array — per-panel logs (strings), timestamp from panel's last message, panel removal.
@@ -137,6 +169,10 @@
 263c4ff2a3ed3f0c:
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
+  last_edited_ms: 0
+26d72bccb4448f6b:
+  path: src/app/events.rs
+  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
 297ff0502006cc9d:
   path: crates/cp-mod-chat/src/lib.rs
@@ -166,6 +202,10 @@
   path: src/ui/ir/render_sidebar.rs
   description: 'Sidebar ratatui renderer — render_sidebar_from_ir(). Normal mode: token bar box, fixed/dynamic entries with pagination, PR card, token stats. Collapsed mode: icon strip. Entry rendering: indicator+icon+shortcut+label+tokens. Token color gradient (grey→red).'
   last_edited_ms: 0
+2bbde535b57f6e44:
+  path: crates/cp-base/src/state/actions.rs
+  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
+  last_edited_ms: 0
 2bf7e77f5cbca504:
   path: src/llms/claude_code/debug.rs
   description: 'Debug helpers: dump_last_request (writes API request JSON to disk) + StreamErrorContext/build_stream_read_error (verbose stream failure diagnostics).'
@@ -177,6 +217,10 @@
 305eae7b157d07fc:
   path: crates/cp-mod-callback/src/firing.rs
   description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. fire_async/blocking_callbacks() for batch dispatch. flame!("cb_fire"), flame!("cb_fire_async"), flame!("cb_fire_blocking"). CallbackWatcher: exit 0→success_message, exit 7→silent, exit !=0→deferred panel, timeout→deferred panel.'
+  last_edited_ms: 0
+30782f48a59f4094:
+  path: src/app/actions/mod.rs
+  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor. Selection-aware InputChar/Delete/InsertText/PasteText. 9 cursor/selection action dispatches.'
   last_edited_ms: 0
 30ccc9d6b72a4b76:
   path: crates/cp-mod-firecrawl/src/tools.rs
@@ -206,14 +250,26 @@
   path: src/modules/conversation/render_input_blocks.rs
   description: IR input area renderer. Cursor + paste placeholder expansion + command highlighting + selection highlighting (via apply_selection_to_spans with reversed spans). InputBlockCtx context, expand_paste_sentinels mapping, command hints.
   last_edited_ms: 0
+3a3304dedb92a1c6:
+  path: yamls/tools/firecrawl.yaml
+  description: 'Firecrawl tools YAML. 4 tools: firecrawl_scrape (single URL), firecrawl_search (search+scrape), firecrawl_map (URL discovery), firecrawl_crawl (recursive crawl to file).'
+  last_edited_ms: 1780560886866
 3b6333a154f242aa:
   path: src/state/persistence/save.rs
   description: 'Save operations: flame!("save_batch") + flame!("save_state"). build_save_batch() serializes config/worker/panels/messages/logs into WriteBatch. save_state() blocking sync persist. check_ownership(). log_error() to disk.'
+  last_edited_ms: 0
+3db99c7fa34b728d:
+  path: src/state/persistence/message.rs
+  description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
   last_edited_ms: 0
 3e684ead94cd0fcf:
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
   last_edited_ms: 0
+3ea42e434ffe36bb:
+  path: crates/cp-mod-callback/Cargo.toml
+  description: 'Callback module deps: cp-base, cp-render, cp-mod-console, crossterm, serde, serde_json, globset, sha2.'
+  last_edited_ms: 1780497937363
 40789d8290f5438f:
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
@@ -230,10 +286,22 @@
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
   last_edited_ms: 0
+457797ff3549e45c:
+  path: src/app/run/tools/pipeline.rs
+  description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
+  last_edited_ms: 0
 45f26bd593f5eb21:
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
   last_edited_ms: 0
+462da74f3732a8cd:
+  path: crates/cp-mod-callback/src/tools.rs
+  description: Callback tool dispatch with flame!("cb_dispatch"). Routes upsert/toggle/open_editor/close_editor. Delegates upsert to tools_upsert.rs.
+  last_edited_ms: 1780497937352
+47d9759007d3312b:
+  path: crates/cp-mod-callback/src/lib.rs
+  description: 'Callback module. 4 tools: upsert/toggle/open/close editor. Depends on console. CallbackState: definitions (shared) + active_set/editor_open (per-worker). Glob-matched auto-fire on file edits.'
+  last_edited_ms: 1780497937350
 49f43f5e9718e31f:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated list of allowed #[expect]/#[allow] annotations (10 entries). Every occurrence in the codebase MUST have an entry here. Fields: path, match, reason, strategy.'
@@ -278,9 +346,17 @@
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
   last_edited_ms: 1780497309373
+520bd83b42d1d2d7:
+  path: crates/cp-mod-firecrawl/src/api.rs
+  description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams structs. post_json() generic helper. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
+  last_edited_ms: 1780560368755
 53d4d56914a84a3d:
   path: src/ui/search_overlay/display.rs
   description: 'Display column builders for the search index overlay. Converts SearchIndexOverlay IR data into ratatui Line sequences for the two-column layout (left: server/database/index/extensions, right: splitter/embeddings/tasks/recomputed/recent). Centered bordered popup.'
+  last_edited_ms: 0
+549866596144eb9b:
+  path: src/app/run/reverie.rs
+  description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
   last_edited_ms: 0
 54ed34dba061f315:
   path: dummy.txt
@@ -326,6 +402,14 @@
   path: crates/cp-mod-console/src/tools.rs
   description: 'Console tools: create, send_keys, wait (blocking watcher), watch (async watcher), easy_bash (blocking exit watcher). Each instrumented with flame!(). CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh/typst guardrails.'
   last_edited_ms: 0
+65d580c1f1922e0b:
+  path: crates/cp-base/src/config/constants.rs
+  description: Layout/timing constants. SIDEBAR_HELP_HEIGHT=10 (9 help hints + separator). MAX_SIDEBAR_LABEL_LEN, INPUT_RESERVE, TEMPO_*, token thresholds, typing indicator timing.
+  last_edited_ms: 1780499299747
+6685b46338a4024a:
+  path: crates/cp-mod-memory/src/types.rs
+  description: Memory types. MemoryItem (id, yaml_key, tl_dr, contents, importance, labels, open). Importance enum (Low/Medium/High/Critical). MemoryState (memories, next_id, open_ids).
+  last_edited_ms: 1780497937368
 6699975ce9c2d697:
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data.'
@@ -334,6 +418,10 @@
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers").
   last_edited_ms: 0
+67972c83b0a57687:
+  path: src/ui/ir/sidebar.rs
+  description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
+  last_edited_ms: 1780560092032
 69a7d215ea113b10:
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
@@ -341,6 +429,14 @@
 6ca310966523a17c:
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
+  last_edited_ms: 0
+6d60d20ea67316fb:
+  path: crates/cp-mod-tree/Cargo.toml
+  description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, globset, sha2.'
+  last_edited_ms: 1780497937361
+6da8c79c1f1d06bb:
+  path: src/infra/constants.rs
+  description: API/layout/loop/persistence constants + theme color accessors (from YAML themes) + card design tokens (card_text, card_agent_bg, card_reverie_bg, card_queue_bg, card_think_bg) + icons + prompts.
   last_edited_ms: 0
 6eec1b12bd6cb8ce:
   path: crates/cp-mod-search/src/lib.rs
@@ -486,10 +582,22 @@
   path: crates/cp-mod-tree/src/storage.rs
   description: YAML-backed persistent storage for tree descriptions. Delegates YAML I/O to YamlSync engine. Content-hash keys (SHA-256 of path+content). populate_from_yaml fills gaps, refresh_stale_from_yaml swaps on branch switch.
   last_edited_ms: 0
+94391f323268729b:
+  path: src/state/persistence/message.rs
+  description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
+  last_edited_ms: 1780498269752
+94661b7c6351fd23:
+  path: crates/cp-mod-firecrawl/src/types.rs
+  description: Firecrawl response types. ScrapeResponse/Data/Metadata, SearchResponse/SearchResult (polymorphic data field), MapResponse/MapLink, CrawlStartResponse/CrawlStatusResponse/CrawlPageData. All Serialize+Deserialize.
+  last_edited_ms: 1780560886871
 9567f58da9cf921d:
   path: src/infra/mod.rs
   description: 'Re-exports: api, config, constants, flame (inline re-export of cp_base::flame init/flush), gh_watcher, profiler, tools, watcher. Infrastructure layer between app and core crates.'
   last_edited_ms: 0
+95dfcb290d81490b:
+  path: crates/cp-mod-memory/Cargo.toml
+  description: 'Memory module deps: cp-base, cp-render, crossterm, serde, serde_json, sha2.'
+  last_edited_ms: 1780497937370
 960c3ce787fb070f:
   path: crates/cp-render/src/conversation.rs
   description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm (with cursor/typing_other/other_text), Autocomplete (with dir_prefix/total_matches/input_visual_lines), PerfOverlay (with open_fds/fd_limit_soft/fd_semantic), ConfigOverlay, PaletteOverlay, SearchIndexOverlay. All serializable.'
@@ -558,6 +666,10 @@ ac4a7fbbfcf664e7:
   path: crates/cp-mod-brave/Cargo.toml
   description: 'Brave module deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml, reqwest.'
   last_edited_ms: 0
+ac9e6f95da3b14e4:
+  path: src/app/actions/input.rs
+  description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
+  last_edited_ms: 0
 ad227afdb78366f4:
   path: crates/cp-mod-files/src/tools/write.rs
   description: file_write tool. flame!("file_write"). Creates parent dirs, writes content, updates/creates context Entry. Diff-style preview in result (first 20 lines).
@@ -566,6 +678,10 @@ ad2e04f6dd571a0f:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
   last_edited_ms: 0
+adcf8b60551469d3:
+  path: src/ui/ir/sidebar.rs
+  description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
+  last_edited_ms: 1780562263886
 b11c573c6ae6f649:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -606,6 +722,14 @@ b8250e826f6a39b7:
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 0
+b8637dcb7f3162bc:
+  path: src/app/run/streaming.rs
+  description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
+  last_edited_ms: 1780562263881
+b9e499de92a61a13:
+  path: src/modules/mod.rs
+  description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
+  last_edited_ms: 1780562263879
 bba5399f6a7db655:
   path: crates/cp-mod-todo/src/tools.rs
   description: Todo CRUD tools with flame!("todo_create"), flame!("todo_update"), flame!("todo_move"). Nested parent_id validation. Status propagation (in_progress auto-cascades to parents). Orphan protection on delete. Move reorder with after_id.
@@ -626,6 +750,10 @@ bee55356d546a72a:
   path: test_file_to_describe.txt
   description: Version A of the test file
   last_edited_ms: 0
+bf1c3cf88b01c78f:
+  path: src/state/persistence/boot.rs
+  description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 2 parallel threads (Meilisearch + Console). Loads .env files (project + global).'
+  last_edited_ms: 1780562263884
 c2e8ce0b2cd68b7c:
   path: src/ui/ir/mod.rs
   description: IR-to-ratatui adapter. semantic_to_style (pub(crate)) + ir_span_to_ratatui (with reversed support). blocks_to_lines converts IR Block vec to ratatui Lines. Table/ProgressBar/Tree/KeyValue renderers. build_frame + build_active_panel frame assembly.
@@ -642,10 +770,18 @@ c499dbd657a61322:
   path: crates/cp-mod-typst/src/lib.rs
   description: 'Typst module. 1 tool: typst_execute. Embedded compiler (no external binary). Depends on core+callback. catch-all watchlist callback recompiles affected docs. Seeds shared templates. @preview/ package support.'
   last_edited_ms: 0
+c60e173425c891fe:
+  path: crates/cp-mod-callback/src/types.rs
+  description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, active_set, editor_open).
+  last_edited_ms: 1780497937347
 c62233b3861945b4:
   path: crates/cp-base/src/state/watchers.rs
   description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'
   last_edited_ms: 0
+c64acbf2bfbf9d41:
+  path: crates/cp-mod-callback/src/panel.rs
+  description: Callback panel. Table view of all definitions (name/pattern/blocking/timeout/active/scope/success_msg/cwd). Editor sub-view shows script content for one callback.
+  last_edited_ms: 1780497937354
 c6851a14a7a1ecb2:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
@@ -726,6 +862,10 @@ dc0886a13ca5908c:
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
   last_edited_ms: 0
+dc25adefd5b31fad:
+  path: crates/cp-mod-firecrawl/src/types.rs
+  description: Firecrawl response types. ScrapeResponse/Data/Metadata, SearchResponse/SearchResult (polymorphic data field), MapResponse/MapLink. All Serialize+Deserialize.
+  last_edited_ms: 1780560368758
 e0352c6a703737b4:
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). GH sync every 5s. FD cleanup (stale watch removal). suicide() auto-close.
@@ -746,6 +886,10 @@ e42b947f77dc2bb4:
   path: crates/cp-mod-spine/src/engine.rs
   description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'
   last_edited_ms: 0
+e42f22a6aaede223:
+  path: crates/cp-mod-callback/src/tools_upsert.rs
+  description: Callback upsert tool. Create/update/delete callback definitions. Script file management. Diff-based script editing (old_string/new_string). YAML sync on every mutation.
+  last_edited_ms: 1780497937357
 e493d21e31f3e450:
   path: crates/cp-mod-github/src/tools.rs
   description: GitHub CLI tool. Read-only → dynamic github_result panels. Mutating → async subprocess via spawn_async_tool. flame!("gh_exec"). Token redaction. Cache invalidation of affected panels. GIT_PROMPT_DISABLED.
@@ -794,6 +938,10 @@ f1a5f3c3f8848be3:
   path: src/app/panels.rs
   description: Thin wrapper around cp_base::panels. get_panel() delegates to module system. FallbackPanel for orphaned contexts. refresh_all_panels() and collect_all_context() helpers.
   last_edited_ms: 0
+f2416d7f3fc53dce:
+  path: crates/cp-mod-firecrawl/src/api.rs
+  description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
+  last_edited_ms: 1780560886868
 f39aced1820ba7c8:
   path: crates/cp-mod-logs/Cargo.toml
   description: Logs crate dependencies. cp-base, cp-render, log, serde, serde_json, chrono. No cp-mod-memory dependency.
@@ -818,3 +966,7 @@ fd604dcc85d708e3:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
   last_edited_ms: 0
+feeba821ce42dd7e:
+  path: crates/cp-base/src/config/yaml_sync.rs
+  description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
+  last_edited_ms: 1780497937366

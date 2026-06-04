@@ -41,7 +41,7 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
     }
 
     // Pre-start heavy daemons in parallel — the biggest boot perf win.
-    // Meilisearch, Tuwunel, and Console server all start concurrently.
+    // Meilisearch and Console server start concurrently.
     // When module init_state() runs, each daemon is already healthy and
     // the reconnect path fires instantly.
     pre_start_daemons(&mut progress);
@@ -78,10 +78,9 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
 
 /// Pre-start the three heavy daemons in parallel threads.
 ///
-/// Spawns Meilisearch, Tuwunel (Matrix homeserver), and the Console
-/// server concurrently.  Each has its own ~15 s health-check timeout.
-/// Joining waits for `max(startup₁, startup₂, startup₃)` instead of
-/// the sequential `startup₁ + startup₂ + startup₃`.
+/// Spawns Meilisearch and the Console server concurrently.  Each has
+/// its own ~15 s health-check timeout.  Joining waits for
+/// `max(startup₁, startup₂)` instead of the sequential sum.
 ///
 /// Failures are logged but never halt boot — the normal module init
 /// will retry the startup for any daemon that failed here.
@@ -89,14 +88,11 @@ fn pre_start_daemons(progress: &mut impl FnMut(&str)) {
     progress("pre-starting daemons");
 
     let meili_handle = std::thread::spawn(cp_mod_search::pre_start_daemon);
-    let chat_handle = std::thread::spawn(cp_mod_chat::pre_start_daemon);
     let console_handle = std::thread::spawn(cp_mod_console::manager::find_or_create_server);
 
-    // Join all three — each thread has internal timeouts so this won't
+    // Join both — each thread has internal timeouts so this won't
     // block indefinitely.  Log results without aborting.
-    for (name, result) in
-        [("Meilisearch", meili_handle.join()), ("Tuwunel", chat_handle.join()), ("Console", console_handle.join())]
-    {
+    for (name, result) in [("Meilisearch", meili_handle.join()), ("Console", console_handle.join())] {
         match result {
             Ok(Ok(())) => log::info!("Pre-start: {name} ready"),
             Ok(Err(e)) => log::warn!("Pre-start: {name} failed: {e}"),

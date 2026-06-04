@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-mod-callback", "crates/cp-mod-chat", "crates/cp-mod-console", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-typst", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search"]
+members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-typst", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search"]
 
 [workspace.package]
 version = "0.1.0"
@@ -1034,7 +1034,6 @@ cp-mod-typst = { path = "crates/cp-mod-typst" }
 cp-mod-brave = { path = "crates/cp-mod-brave" }
 cp-mod-firecrawl = { path = "crates/cp-mod-firecrawl" }
 cp-mod-queue = { path = "crates/cp-mod-queue" }
-cp-mod-chat = { path = "crates/cp-mod-chat" }
 cp-mod-ocr = { path = "crates/cp-mod-ocr" }
 cp-mod-search = { path = "crates/cp-mod-search" }
 crossterm.workspace = true
