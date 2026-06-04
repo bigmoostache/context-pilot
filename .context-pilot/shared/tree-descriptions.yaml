@@ -418,6 +418,10 @@
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, cp-mod-utilities, crossterm, serde, serde_json.'
   last_edited_ms: 0
+2886480e48a90922:
+  path: crates/cp-mod-files/src/panel.rs
+  description: File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based).
+  last_edited_ms: 1780608591297
 297ff0502006cc9d:
   path: crates/cp-mod-chat/src/lib.rs
   description: 'Chat module. 7 tools, 2 panels (dashboard+room). Depends on spine. init: bootstrap→Tuwunel server→Matrix client→sync loop→bridge recovery. Typing indicators via on_tool_progress. Bridge management for Telegram/Discord/Slack/GChat.'
@@ -666,6 +670,10 @@
   path: crates/cp-mod-spine/src/guard_rail.rs
   description: 'Guard rail implementations: MaxOutputTokens, MaxCost (stream/burst-based), MaxDuration, MaxMessages, MaxAutoRetries. GuardRailStopLogic trait. all_guard_rails() static list.'
   last_edited_ms: 0
+4061a04f68ccc6a0:
+  path: crates/cp-mod-entities/src/panel.rs
+  description: Fixed Entities panel. Live schema + sample data context for LLM. Empty-state onboarding guide with quick-start SQL. IR blocks with Accent/Code/Muted styling. Migration count display. EntityResultPanel for large query results (dynamic, metadata-persisted). max_freezes=2.
+  last_edited_ms: 0
 4064e9ee972c147f:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -750,6 +758,10 @@
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 4 tools: upsert/toggle/open/close editor. Depends on console. CallbackState: definitions (shared) + active_set/editor_open (per-worker). Glob-matched auto-fire on file edits.'
   last_edited_ms: 1780497937350
+4929c669e80e1829:
+  path: yamls/tools/entities.yaml
+  description: 'Entity SQL tool YAML. Single tool: entity_sql with sql param. Full SQLite support description (JOINs, CTEs, RETURNING, CREATE TABLE IF NOT EXISTS).'
+  last_edited_ms: 0
 495ebf7bcd744ad6:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -898,6 +910,10 @@
   path: crates/cp-mod-tree/src/panel.rs
   description: Tree panel. Background cache system for directory tree rendering. TreeCacheRequest data payload. Pagination. refresh_stale_from_yaml() call in apply_cache_update triggers second rebuild if descriptions changed.
   last_edited_ms: 0
+5605c4b7bd1b9140:
+  path: crates/cp-mod-entities/src/result_panel.rs
+  description: Dynamic entity result panel — large query results, static + live refresh. LivePanelMeta struct, create_result_panel, create_live_result_panel (merged via create_panel_inner), refresh_live_query with hash-based change detection. 2s cache refresh interval. EntityResultPanel Panel impl.
+  last_edited_ms: 1780608591320
 563e6951986b9876:
   path: crates/cp-mod-search/src/meili/download.rs
   description: Meilisearch binary download. Pinned v1.13.3. Platform detection (macOS/Linux, amd64/aarch64). GitHub releases download to ~/.context-pilot/meilisearch/bin/. Skips if already present. 5-min timeout.
@@ -1686,6 +1702,10 @@ adcf8b60551469d3:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
   last_edited_ms: 1780562263886
+ae7544be6efd88b2:
+  path: crates/cp-mod-entities/src/tools.rs
+  description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, ≤150 lines AND ≤8000 bytes inline+tempo, bigger entity_result panel+no tempo. 200-row cap. RETURNING support.
+  last_edited_ms: 1780606466419
 aeee549fd5ab07f2:
   path: crates/cp-mod-firecrawl/src/types.rs
   description: Firecrawl response types. ScrapeResponse/Data/Metadata, SearchResponse/SearchResult (polymorphic data field), MapResponse/MapLink, CrawlStartResponse/CrawlStatusResponse/CrawlPageData. All Serialize+Deserialize.
@@ -1746,6 +1766,10 @@ b49ceed9e40e0a12:
   path: docs/genai-france-vibe.md
   description: GenAI France 2026 conference analysis — lineup, vibe, talk positioning, title naming patterns.
   last_edited_ms: 0
+b4d042a53b65c218:
+  path: crates/cp-mod-entities/src/format.rs
+  description: SQL result formatting utilities. query_to_markdown (shared by tools.rs and result_panel.rs), format_cell, format_markdown_table, extract_table_name. MAX_RESULT_ROWS=200 cap.
+  last_edited_ms: 1780608591309
 b5351f796f673460:
   path: yamls/tools/brave.yaml
   description: Brave Search tools YAML. brave_search (snippets, Tier 1) + brave_llm_context (deep content, Tier 2). Query params, freshness filters, goggles.
@@ -2002,6 +2026,10 @@ cd506418e76f9e43:
   path: crates/cp-mod-files/src/lib.rs
   description: 'Files module. Core/global. 3 tools: Open, Edit, Write. Pre-flight: queue auto-activate, old_string match against both disk and virtual (post-queue) content via build_virtual_content(). 4-way matrix: disk✓/virtual✓→OK, disk✓/virtual✗→ERROR, disk✗/virtual✓→OK, disk✗/virtual✗→ERROR.'
   last_edited_ms: 0
+cd6dbd1b31a7a1cb:
+  path: crates/cp-mod-console/src/panel.rs
+  description: Console panel. Background cache with 200ms polling interval. Ring buffer snapshot on main thread, hash-based change detection. MAX_CONTEXT_CHARS=8000 tail truncation. Status metadata updates.
+  last_edited_ms: 1780608591303
 ce41457001145d47:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
@@ -2021,6 +2049,10 @@ cf9eeed1e42804e8:
 d0113e9c2175d3c2:
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 3 tools: scrape/search/map. Dynamic firecrawl_result panels. No state. Nested object params (location). Simple dispatch pattern.'
+  last_edited_ms: 0
+d072e4b6897feccc:
+  path: crates/cp-mod-entities/src/tools.rs
+  description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, ≤150 lines AND ≤8000 bytes inline+tempo, bigger entity_result panel+no tempo. 200-row cap. RETURNING support.
   last_edited_ms: 0
 d09b61c12bbdd00d:
   path: run.sh
@@ -2093,6 +2125,10 @@ d4f0917617a195e1:
 d4f447c4551668d1:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
+  last_edited_ms: 0
+d794e0ca2d6b10ae:
+  path: crates/cp-mod-entities/src/lib.rs
+  description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
   last_edited_ms: 0
 d8359ab8b810ded8:
   path: crates/cp-mod-spine/src/panel.rs

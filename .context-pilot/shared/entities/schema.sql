@@ -1212,6 +1212,8 @@ INSERT OR IGNORE INTO "trigger_log" VALUES (10, 'INSERT company: Coercion Test',
 INSERT OR IGNORE INTO "trigger_log" VALUES (11, 'INSERT company: Trigger+Return Co', '2026-06-04 18:27:13');
 INSERT OR IGNORE INTO "trigger_log" VALUES (12, 'INSERT company: TypeTest', '2026-06-04 18:27:13');
 INSERT OR IGNORE INTO "trigger_log" VALUES (13, 'INSERT company: PostRestoreCo', '2026-06-04 18:27:13');
+INSERT OR IGNORE INTO "trigger_log" VALUES (14, 'INSERT company: LiveTestCo', '2026-06-04 21:30:52');
+INSERT OR IGNORE INTO "trigger_log" VALUES (15, 'DELETE company: LiveTestCo', '2026-06-04 21:31:27');
 
 INSERT OR IGNORE INTO "type_edge" VALUES (1, 42, '42', 42, X'');
 INSERT OR IGNORE INTO "type_edge" VALUES (2, 999, '999', 3.14, X'0000ff00');
