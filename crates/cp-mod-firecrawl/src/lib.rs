@@ -109,6 +109,17 @@ impl Module for FirecrawlModule {
                     false,
                 )
                 .build(),
+            ToolDefinition::from_yaml("firecrawl_crawl", t)
+                .short_desc("Recursively crawl a site")
+                .category("Web Scrape")
+                .param("url", ParamType::String, true)
+                .param("output", ParamType::String, true)
+                .param("limit", ParamType::Integer, false)
+                .param("max_depth", ParamType::Integer, false)
+                .param_array("include_paths", ParamType::String, false)
+                .param_array("exclude_paths", ParamType::String, false)
+                .param("allow_subdomains", ParamType::Boolean, false)
+                .build(),
         ]
     }
 

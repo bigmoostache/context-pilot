@@ -15,6 +15,26 @@ tools:
       country: "2-letter country code"
       languages: "Language codes"
 
+  firecrawl_crawl:
+    description: |
+      Recursively crawl a website starting from a URL. Discovers and scrapes every reachable subpage up to the specified limit. Results are written as a combined markdown file to the output path.
+
+      This is an ASYNC operation — starts a crawl job on Firecrawl's servers and polls until complete. Can take several minutes for large sites. Returns immediately with a pending status.
+
+      USE CASES: Scrape entire documentation sites, gather all blog posts, build knowledge bases from multi-page sites. Use firecrawl_map first to understand site structure, then crawl specific sections with include_paths.
+
+      COST: 1 credit per page crawled. Default limit is 10 pages. Be mindful of costs — set limit explicitly.
+
+      PATH FILTERING: include_paths/exclude_paths accept regex patterns matched against URL paths. Example: include_paths=['/docs/.*'] to only crawl documentation pages.
+    parameters:
+      url: "Starting URL to crawl from (required)"
+      output: "Path to write the combined markdown output file (required). Parent directories are created automatically."
+      limit: "Max pages to crawl (1-100, default 10). Each page costs 1 credit."
+      max_depth: "Max link-following depth from the starting URL (default: server decides)"
+      include_paths: "Regex patterns — only crawl URLs whose path matches at least one pattern"
+      exclude_paths: "Regex patterns — skip URLs whose path matches any pattern"
+      allow_subdomains: "Follow links to subdomains of the starting URL (default false)"
+
   firecrawl_search:
     description: |
       Combined search + scrape in a single API call. Discovers URLs matching a query and returns full markdown content for the top results. Use when you need full pages but don't have specific URLs yet (Tier 3b).

@@ -3,9 +3,10 @@ use cp_base::state::watchers::{DYN_PANEL_ID_PLACEHOLDER, DynPanel};
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::api::{FirecrawlClient, MapParams, ScrapeParams, SearchParams};
+use crate::api::{CrawlParams, FirecrawlClient, MapParams, ScrapeParams, SearchParams};
 use cp_base::cast::Safe as _;
 use std::fmt::Write as _;
+use std::time::Duration;
 
 /// Dispatch firecrawl tool calls.
 pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
@@ -13,6 +14,7 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         "firecrawl_scrape" => Some(exec_scrape(tool, state)),
         "firecrawl_search" => Some(exec_search(tool, state)),
         "firecrawl_map" => Some(exec_map(tool, state)),
+        "firecrawl_crawl" => Some(exec_crawl(tool, state)),
         _ => None,
     }
 }
@@ -52,6 +54,16 @@ const ASYNC_TIMEOUT_SCRAPE_SECS: u64 = 60;
 /// Async timeout for Firecrawl map calls (seconds).
 /// Map is faster — just sitemap/URL discovery.
 const ASYNC_TIMEOUT_MAP_SECS: u64 = 30;
+
+/// Async timeout for Firecrawl crawl jobs (seconds).
+/// Crawls are long-running — up to 5 minutes.
+const ASYNC_TIMEOUT_CRAWL_SECS: u64 = 310;
+
+/// Polling interval between crawl status checks.
+const CRAWL_POLL_INTERVAL: Duration = Duration::from_secs(5);
+
+/// Maximum number of poll iterations before giving up internally.
+const CRAWL_MAX_POLLS: u32 = 60;
 
 /// Execute the `firecrawl_scrape` tool: scrape a single URL for content.
 ///
@@ -412,4 +424,181 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
             Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
         }
     })
+}
+/// Execute the `firecrawl_crawl` tool: recursively crawl a site.
+///
+/// Starts an async crawl job, polls until complete, then writes combined
+/// markdown output to the specified path. No panel is created — the file
+/// is the deliverable.
+fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("firecrawl_crawl");
+    let client = match get_client() {
+        Ok(c) => c,
+        Err(e) => return err_result(tool, e),
+    };
+
+    let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'url'".to_string());
+    };
+    let Some(output) = tool.input.get("output").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'output'".to_string());
+    };
+
+    let url = url.to_string();
+    let output = std::path::PathBuf::from(output);
+    let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(10).min(100).to_u32();
+    let max_depth = tool.input.get("max_depth").and_then(serde_json::Value::as_u64).map(|v| v.to_u32());
+    let include_paths: Option<Vec<String>> = tool
+        .input
+        .get("include_paths")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
+    let exclude_paths: Option<Vec<String>> = tool
+        .input
+        .get("exclude_paths")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
+    let allow_subdomains = tool.input.get("allow_subdomains").and_then(serde_json::Value::as_bool).unwrap_or(false);
+
+    spawn_async_tool(state, tool, ASYNC_TIMEOUT_CRAWL_SECS, move || {
+        let inc_refs: Option<Vec<&str>> = include_paths.as_ref().map(|v| v.iter().map(String::as_str).collect());
+        let exc_refs: Option<Vec<&str>> = exclude_paths.as_ref().map(|v| v.iter().map(String::as_str).collect());
+
+        let params = CrawlParams {
+            url: &url,
+            limit,
+            max_depth,
+            include_paths: inc_refs,
+            exclude_paths: exc_refs,
+            allow_subdomains,
+        };
+
+        // 1. Start the crawl job
+        let start = match client.start_crawl(&params) {
+            Ok(r) => r,
+            Err(e) => return ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+        };
+        if !start.success {
+            let msg = start.error.unwrap_or_else(|| "Unknown error".to_string());
+            return ToolOutput {
+                content: format!("Crawl failed to start: {msg}"),
+                is_error: true,
+                create_panel: None,
+                preserves_tempo: false,
+            };
+        }
+        let Some(job_id) = start.id else {
+            return ToolOutput {
+                content: "Crawl started but no job ID returned".to_string(),
+                is_error: true,
+                create_panel: None,
+                preserves_tempo: false,
+            };
+        };
+
+        // 2. Poll until complete
+        let mut last_completed = 0_u32;
+        for _ in 0..CRAWL_MAX_POLLS {
+            std::thread::sleep(CRAWL_POLL_INTERVAL);
+            let status = match client.poll_crawl(&job_id) {
+                Ok(s) => s,
+                Err(e) => {
+                    return ToolOutput {
+                        content: format!("Crawl poll failed: {e}"),
+                        is_error: true,
+                        create_panel: None,
+                        preserves_tempo: false,
+                    };
+                }
+            };
+            last_completed = status.completed.unwrap_or(0);
+
+            match status.status.as_str() {
+                "completed" => {
+                    return write_crawl_output(&url, &output, status);
+                }
+                "failed" => {
+                    let msg = status.error.unwrap_or_else(|| "Unknown error".to_string());
+                    return ToolOutput {
+                        content: format!("Crawl failed: {msg}"),
+                        is_error: true,
+                        create_panel: None,
+                        preserves_tempo: false,
+                    };
+                }
+                _ => {} // still scraping, keep polling
+            }
+        }
+
+        ToolOutput {
+            content: format!(
+                "Crawl timed out after {}s ({last_completed} pages scraped). \
+                 Job '{job_id}' may still be running on Firecrawl servers.",
+                CRAWL_MAX_POLLS * CRAWL_POLL_INTERVAL.as_secs().to_u32(),
+            ),
+            is_error: true,
+            create_panel: None,
+            preserves_tempo: false,
+        }
+    })
+}
+
+/// Write crawl results to a combined markdown file.
+fn write_crawl_output(
+    url: &str,
+    output: &std::path::Path,
+    status: crate::types::CrawlStatusResponse,
+) -> ToolOutput {
+    let pages = status.data.unwrap_or_default();
+    let count = pages.len();
+    let credits = status.credits_used.unwrap_or(0);
+
+    if count == 0 {
+        return ToolOutput {
+            content: format!("Crawl of '{url}' completed but returned 0 pages."),
+            is_error: false,
+            create_panel: None,
+            preserves_tempo: false,
+        };
+    }
+
+    let mut md = String::new();
+    let _r = writeln!(md, "# Crawl: {url}\n");
+    let _r = writeln!(md, "> {count} pages crawled, {credits} credits used\n");
+    let _r = writeln!(md, "---\n");
+
+    for (i, page) in pages.iter().enumerate() {
+        let title = page.metadata.as_ref().and_then(|m| m.title.as_deref()).unwrap_or("untitled");
+        let page_url = page.metadata.as_ref().and_then(|m| m.source_url.as_deref()).unwrap_or("unknown");
+        let _r = writeln!(md, "## Page {} — {} ({})\n", i.saturating_add(1), title, page_url);
+        if let Some(ref content) = page.markdown {
+            md.push_str(content);
+            md.push_str("\n\n");
+        }
+        md.push_str("---\n\n");
+    }
+
+    // Write to disk
+    if let Some(parent) = output.parent() {
+        let _r = std::fs::create_dir_all(parent);
+    }
+    if let Err(e) = std::fs::write(output, &md) {
+        return ToolOutput {
+            content: format!("Crawl completed ({count} pages) but failed to write output: {e}"),
+            is_error: true,
+            create_panel: None,
+            preserves_tempo: false,
+        };
+    }
+
+    ToolOutput {
+        content: format!(
+            "Crawl of '{url}' completed: {count} pages, {credits} credits. \
+             Results written to '{}'.",
+            output.display(),
+        ),
+        is_error: false,
+        create_panel: None,
+        preserves_tempo: false,
+    }
 }

@@ -97,3 +97,41 @@ pub struct MapLink {
     /// Page description (from sitemap metadata).
     pub description: Option<String>,
 }
+
+/// Response from `POST /v2/crawl` (start a crawl job).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CrawlStartResponse {
+    /// Whether the crawl was accepted.
+    pub success: bool,
+    /// Job identifier for polling.
+    pub id: Option<String>,
+    /// Error message on failure.
+    pub error: Option<String>,
+}
+
+/// Response from `GET /v2/crawl/{id}` (poll crawl status).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CrawlStatusResponse {
+    /// Job status: `"scraping"`, `"completed"`, or `"failed"`.
+    pub status: String,
+    /// Total pages discovered.
+    pub total: Option<u32>,
+    /// Pages scraped so far.
+    pub completed: Option<u32>,
+    /// API credits consumed.
+    #[serde(rename = "creditsUsed")]
+    pub credits_used: Option<u32>,
+    /// Crawled page data (populated when `status == "completed"`).
+    pub data: Option<Vec<CrawlPageData>>,
+    /// Error message on failure.
+    pub error: Option<String>,
+}
+
+/// A single page from a completed crawl.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CrawlPageData {
+    /// Page content as clean Markdown.
+    pub markdown: Option<String>,
+    /// Page metadata (title, source URL, etc.).
+    pub metadata: Option<ScrapeMetadata>,
+}

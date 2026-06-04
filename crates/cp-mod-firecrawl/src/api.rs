@@ -1,7 +1,7 @@
 use reqwest::blocking::Client;
 use std::time::Duration;
 
-use crate::types::{MapResponse, ScrapeResponse, SearchResponse};
+use crate::types::{CrawlStartResponse, CrawlStatusResponse, MapResponse, ScrapeResponse, SearchResponse};
 
 /// Base URL for the Firecrawl v2 REST API.
 const FIRECRAWL_BASE_URL: &str = "https://api.firecrawl.dev/v2";
@@ -53,6 +53,23 @@ pub struct MapParams<'req> {
     pub country: Option<&'req str>,
     /// Preferred response languages.
     pub languages: Option<Vec<&'req str>>,
+}
+
+/// Parameters for `firecrawl_crawl`.
+#[derive(Debug)]
+pub struct CrawlParams<'req> {
+    /// Starting URL to crawl from.
+    pub url: &'req str,
+    /// Max pages to crawl (1-100).
+    pub limit: u32,
+    /// Max link-following depth.
+    pub max_depth: Option<u32>,
+    /// Regex patterns — only crawl matching paths.
+    pub include_paths: Option<Vec<&'req str>>,
+    /// Regex patterns — skip matching paths.
+    pub exclude_paths: Option<Vec<&'req str>>,
+    /// Whether to follow links to subdomains.
+    pub allow_subdomains: bool,
 }
 
 /// HTTP client for the Firecrawl API (v2).
@@ -164,6 +181,86 @@ impl FirecrawlClient {
         }
 
         self.post_json("/map", &body)
+    }
+
+    /// Start a recursive crawl job. Returns a job ID for polling.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
+    pub fn start_crawl(&self, p: &CrawlParams<'_>) -> Result<CrawlStartResponse, String> {
+        let mut body = serde_json::json!({
+            "url": p.url,
+            "limit": p.limit,
+            "allowSubdomains": p.allow_subdomains,
+            "scrapeOptions": {
+                "formats": ["markdown"],
+            },
+        });
+
+        if let Some(obj) = body.as_object_mut() {
+            if let Some(depth) = p.max_depth {
+                drop(obj.insert("maxDepth".into(), serde_json::json!(depth)));
+            }
+            if let Some(ref paths) = p.include_paths {
+                drop(obj.insert("includePaths".into(), serde_json::json!(paths)));
+            }
+            if let Some(ref paths) = p.exclude_paths {
+                drop(obj.insert("excludePaths".into(), serde_json::json!(paths)));
+            }
+        }
+
+        self.post_json("/crawl", &body)
+    }
+
+    /// Poll crawl job status by its ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
+    pub fn poll_crawl(&self, job_id: &str) -> Result<CrawlStatusResponse, String> {
+        self.get_json(&format!("/crawl/{job_id}"))
+    }
+
+    /// GET JSON with 5xx retry (2 attempts, 1s delay).
+    fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, String> {
+        let url = format!("{FIRECRAWL_BASE_URL}{path}");
+
+        for attempt in 0..3 {
+            let resp = self
+                .client
+                .get(&url)
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .send()
+                .map_err(|e| format!("Request failed: {e}"))?;
+
+            let status = resp.status().as_u16();
+            let resp_body = resp.text().map_err(|e| format!("Failed to read response: {e}"))?;
+
+            match status {
+                200..=299 => {
+                    return serde_json::from_str(&resp_body)
+                        .map_err(|e| format!("Failed to parse response: {e}"));
+                }
+                429 => {
+                    return Err(format!(
+                        "Rate limited (429). Response: {}",
+                        truncate(&resp_body, 200)
+                    ));
+                }
+                500..=599 if attempt < 2 => {
+                    std::thread::sleep(Duration::from_secs(1));
+                }
+                _ => {
+                    return Err(format!(
+                        "HTTP {} error: {}",
+                        status,
+                        truncate(&resp_body, 200)
+                    ));
+                }
+            }
+        }
+        Err("Max retries exceeded".to_string())
     }
 
     /// POST JSON with 5xx retry (2 attempts, 1s delay).
