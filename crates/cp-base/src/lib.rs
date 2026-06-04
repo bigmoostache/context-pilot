@@ -233,7 +233,6 @@ mod tests {
             ("spine", include_str!("../../../yamls/tools/spine.yaml")),
             ("todo", include_str!("../../../yamls/tools/todo.yaml")),
             ("tree", include_str!("../../../yamls/tools/tree.yaml")),
-            ("typst", include_str!("../../../yamls/tools/typst.yaml")),
         ];
         for (name, content) in &yamls {
             // Panics with a clear message if schema doesn't match ToolTexts

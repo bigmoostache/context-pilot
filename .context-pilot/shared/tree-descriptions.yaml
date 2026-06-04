@@ -14,6 +14,10 @@
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
   last_edited_ms: 1780498401099
+03a944323757e175:
+  path: crates/cp-base/src/config/mod.rs
+  description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. ConsoleGuardrails: git/gh only. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
+  last_edited_ms: 1780568982688
 03b1eeb1ef6d98f7:
   path: crates/cp-base/src/config/global.rs
   description: 'Global config at ~/.config/context-pilot/config.json. API key resolution cascade: env var → config file. KEY_ENV_MAP for canonical names. store_api_key/resolve_api_key/env_var_for_key.'
@@ -86,6 +90,10 @@
   path: crates/cp-mod-queue/src/lib.rs
   description: 'Queue module. 3 tools: pause/execute/undo. Fixed QUEUE panel. Not core. QueueState: active, queued_calls, next_index. Trap state (trap_active/panel_ids/optional_ids) persisted in save/load. Queue_execute handled in pipeline.rs (needs dispatch). Reverie-allowed.'
   last_edited_ms: 0
+0acace4fa5eba3dd:
+  path: crates/cp-mod-console/src/tools.rs
+  description: 'Console tools: create, send_keys, wait (blocking watcher), watch (async watcher), easy_bash (blocking exit watcher). Each instrumented with flame!(). CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh guardrails.'
+  last_edited_ms: 1780568982727
 0b0d51702ded0dee:
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
@@ -646,6 +654,10 @@
   path: crates/cp-mod-callback/src/tools.rs
   description: Callback tool dispatch with flame!("cb_dispatch"). Routes upsert/toggle/open_editor/close_editor. Delegates upsert to tools_upsert.rs.
   last_edited_ms: 1780497937352
+47be3c47cf8e93af:
+  path: yamls/injections.yaml
+  description: LLM-facing text injections. Spine auto-continuation, editor warning banners, console guardrails (git/gh → dedicated tools), history cleanup trap messages (%PANELS% templates), behavioral redirects, provider-shared text.
+  last_edited_ms: 1780568982707
 47d9759007d3312b:
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 4 tools: upsert/toggle/open/close editor. Depends on console. CallbackState: definitions (shared) + active_set/editor_open (per-worker). Glob-matched auto-fire on file edits.'
@@ -806,6 +818,10 @@
   path: src/modules/overview/tools_panel.rs
   description: 'Tools panel. Title ''Tools''. Delegates blocks to tools_blocks(). Context: markdown table of all tools. No cache.'
   last_edited_ms: 0
+5c6880da92b4db77:
+  path: src/main.rs
+  description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 1780568982783
 5c6fd149da2f476c:
   path: docs/ted-talk.md
   description: Full talk script — 25min, 16 slides, speaker notes, Q&A reserve. 'Rebuilding my own Claude Code — The Whys, the Hows and the Wows'.
@@ -1342,6 +1358,10 @@
   path: crates/cp-mod-brave/src/panel.rs
   description: Brave result panel. Static content persisted in metadata (META_CONTENT). Cache restore from metadata post-reload. Pagination support. BRAVE_PANEL_TYPE constant.
   last_edited_ms: 0
+9e23c502483241c8:
+  path: crates/cp-base/src/lib.rs
+  description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (19 tool + 6 config YAML files) with #[expect(clippy::panic)].'
+  last_edited_ms: 1780568982750
 9e7b5def696af37a:
   path: crates/cp-mod-prompt/src/tools.rs
   description: Prompt tool dispatch with flame!("prompt_dispatch"). behaviour_create (agent/skill/command .md file creation), agent_load (switch active agent), skill_load (create skill Entry panel).
@@ -1590,6 +1610,10 @@ b91450545db6847c:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
   last_edited_ms: 0
+b92c4c51d2a37642:
+  path: src/modules/mod.rs
+  description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
+  last_edited_ms: 1780568982764
 b9798b6dd8b66239:
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 4 tools: upsert/toggle/open/close editor. Depends on console. CallbackState: definitions (shared) + active_set/editor_open (per-worker). Glob-matched auto-fire on file edits.'
@@ -2134,6 +2158,10 @@ fc4be9dd868a81ef:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. XAI_API_KEY auth.
   last_edited_ms: 0
+fceb53aa84039016:
+  path: Cargo.toml
+  description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
+  last_edited_ms: 1780568982802
 fd604dcc85d708e3:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.

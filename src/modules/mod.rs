@@ -37,7 +37,6 @@ pub(crate) use cp_mod_search::SearchModule;
 pub(crate) use cp_mod_spine::SpineModule;
 pub(crate) use cp_mod_todo::TodoModule;
 pub(crate) use cp_mod_tree::TreeModule;
-pub(crate) use cp_mod_typst::TypstModule;
 
 // Re-export Module trait and helpers from cp-base
 pub(crate) use cp_base::modules::{Module, ToolVisualizer};
@@ -124,7 +123,6 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(ScratchpadModule),
         Box::new(SpineModule),
         Box::new(LogsModule),
-        Box::new(TypstModule),
         Box::new(BraveModule),
         Box::new(FirecrawlModule),
         Box::new(QueueModule),

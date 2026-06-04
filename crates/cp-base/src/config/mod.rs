@@ -137,15 +137,13 @@ pub struct PromptEditorWarningSet {
 }
 
 /// Messages appended to tool results when a console command
-/// should have used a dedicated tool (git, gh, typst).
+/// should have used a dedicated tool (git, gh).
 #[derive(Debug, Deserialize)]
 pub struct ConsoleGuardrails {
     /// Shown when `git` is run via console instead of `git_execute`.
     pub git: String,
     /// Shown when `gh` is run via console instead of `gh_execute`.
     pub gh: String,
-    /// Shown when `typst` is run via console instead of `typst_execute`.
-    pub typst: String,
 }
 
 /// Behavioral redirect and trap injection types (extracted for line-count).

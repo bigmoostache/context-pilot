@@ -110,6 +110,14 @@
   - context-pilot
   - side-project
   last_edited_ms: 0
+8185ce57712b238d:
+  tl_dr: 'ALWAYS push memories (memories.yaml) and tree descriptions (tree-descriptions.yaml) alongside code commits. When committing work, include a ''chore: sync memories and tree descriptions'' commit and push everything together. Never leave these unsync''d.'
+  importance: critical
+  labels:
+  - workflow
+  - git
+  - persistence
+  last_edited_ms: 1780567164228
 b14e6817a83938b5:
   tl_dr: 'Search module: Voyage AI REST embedder (voyage-code-3) for hybrid search, zero local CPU. VOYAGE_API_KEY in ~/.context-pilot/.env. --max-indexing-threads 2. Port reconnects on reload.'
   contents: |-

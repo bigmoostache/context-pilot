@@ -54,9 +54,6 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
         if binary == "gh" {
             return Some(INJECTIONS.console_guardrails.gh.trim_end().to_string());
         }
-        if binary == "typst" {
-            return Some(INJECTIONS.console_guardrails.typst.trim_end().to_string());
-        }
     }
 
     None

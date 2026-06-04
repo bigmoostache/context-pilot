@@ -18,8 +18,6 @@ mod llms;
 mod modules;
 /// Persistent and runtime state management.
 mod state;
-/// CLI subcommands for Typst compilation.
-mod typst_cli;
 /// Terminal UI: rendering, input, theme, sidebar.
 mod ui;
 
@@ -241,23 +239,6 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     let resume_stream = args.iter().any(|a| a == "--resume-stream");
 
-    // Handle typst subcommands (used by callback scripts)
-    if args.len() >= 2 {
-        let Some(subcommand) = args.get(1) else {
-            return ExitCode::FAILURE;
-        };
-        let rest = args.get(2..).unwrap_or_default();
-        match subcommand.as_str() {
-            // Compile a .typ → .pdf in the same directory
-            "typst-compile" => return handle_cli_result(typst_cli::run_typst_compile(rest)),
-            // Recompile watched documents whose dependencies changed
-            "typst-recompile-watched" => {
-                return handle_cli_result(typst_cli::run_typst_recompile_watched(rest));
-            }
-            _ => {}
-        }
-    }
-
     // Panic hook: restore terminal state and log the panic to disk.
     // Without this, a panic leaves the terminal in raw mode + alternate screen,
     // which corrupts the SSH session and the error is lost.
@@ -404,26 +385,4 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
-}
-
-/// Handle a CLI subcommand result: write output and return an exit code.
-///
-/// `Ok(msg)` writes to stdout (if non-empty) and returns `SUCCESS`.
-/// `Err((msg, code))` writes to stderr (if non-empty) and returns `FAILURE`
-/// (or `SUCCESS` for exit code 0).
-fn handle_cli_result(result: Result<String, (String, i32)>) -> ExitCode {
-    match result {
-        Ok(msg) => {
-            if !msg.is_empty() {
-                drop(writeln!(io::stdout(), "{msg}"));
-            }
-            ExitCode::SUCCESS
-        }
-        Err((msg, code)) => {
-            if !msg.is_empty() {
-                drop(writeln!(io::stderr(), "{msg}"));
-            }
-            ExitCode::from(u8::try_from(code.clamp(0, 255)).unwrap_or(1))
-        }
-    }
 }

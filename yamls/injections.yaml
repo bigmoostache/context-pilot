@@ -28,9 +28,6 @@ console_guardrails:
   gh: |
     Blocked: use the `gh_execute` tool instead of running gh through console.
     Example: gh_execute with command="gh pr list"
-  typst: |
-    Blocked: use the `typst_execute` tool instead — typst is embedded in the TUI.
-    Example: typst_execute with command="typst compile doc.typ -o out.pdf"
 
 # History cleanup trap — forces the AI to close old conversation history panels
 # before executing a queued batch when too many accumulate.
