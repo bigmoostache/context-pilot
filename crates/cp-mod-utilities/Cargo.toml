@@ -1,0 +1,15 @@
+[package]
+name = "cp-mod-utilities"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Lightweight utility replacements for external dependencies"
+readme = "../../README.md"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

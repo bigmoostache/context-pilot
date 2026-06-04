@@ -9,8 +9,8 @@ mod streaming;
 use std::env;
 use std::sync::mpsc::Sender;
 
+use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use secrecy::{ExposeSecret as _, SecretBox};
 use serde_json::Value;
 
 use super::error::LlmError;
@@ -27,7 +27,7 @@ use helpers::{
 /// Claude Code API Key client
 pub(crate) struct ClaudeCodeApiKeyClient {
     /// Anthropic API key loaded from the `ANTHROPIC_API_KEY` environment variable
-    api_key: Option<SecretBox<String>>,
+    api_key: Option<Redacted>,
 }
 
 impl ClaudeCodeApiKeyClient {
@@ -38,9 +38,9 @@ impl ClaudeCodeApiKeyClient {
     }
 
     /// Load the API key from the `ANTHROPIC_API_KEY` environment variable.
-    pub(crate) fn load_api_key() -> Option<SecretBox<String>> {
+    pub(crate) fn load_api_key() -> Option<Redacted> {
         let key = env::var("ANTHROPIC_API_KEY").ok()?;
-        Some(SecretBox::new(Box::new(key)))
+        Some(Redacted::new(key))
     }
 
     /// Run sequential API health checks: auth, streaming, and tool calling.

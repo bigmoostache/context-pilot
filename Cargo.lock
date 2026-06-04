@@ -24,15 +24,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
-name = "android_system_properties"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -281,19 +272,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58b52a9840ffff5d4d0058ae529fa066a75e794e3125546acfc61c23ad755e49"
 
 [[package]]
-name = "chrono"
-version = "0.4.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0"
-dependencies = [
- "iana-time-zone",
- "js-sys",
- "num-traits",
- "wasm-bindgen",
- "windows-link",
-]
-
-[[package]]
 name = "ciborium"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -436,15 +414,14 @@ dependencies = [
 name = "cp-base"
 version = "0.1.0"
 dependencies = [
+ "cp-mod-utilities",
  "cp-render",
  "crossterm",
- "dirs",
  "log",
  "ratatui",
  "serde",
  "serde_json",
  "serde_yaml",
- "sha2",
  "unicode-width",
 ]
 
@@ -538,20 +515,19 @@ name = "cp-mod-github"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-mod-utilities",
  "cp-render",
  "crossterm",
  "regex",
- "secrecy",
  "serde_json",
- "sha2",
 ]
 
 [[package]]
 name = "cp-mod-logs"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "cp-base",
+ "cp-mod-utilities",
  "cp-render",
  "log",
  "serde",
@@ -563,11 +539,11 @@ name = "cp-mod-memory"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-mod-utilities",
  "cp-render",
  "crossterm",
  "serde",
  "serde_json",
- "sha2",
 ]
 
 [[package]]
@@ -575,11 +551,11 @@ name = "cp-mod-ocr"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-mod-utilities",
  "cp-render",
  "log",
  "reqwest",
  "serde_json",
- "sha2",
 ]
 
 [[package]]
@@ -620,9 +596,9 @@ dependencies = [
 name = "cp-mod-search"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "cp-base",
  "cp-mod-logs",
+ "cp-mod-utilities",
  "cp-render",
  "crossterm",
  "log",
@@ -631,7 +607,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "sha2",
  "tree-sitter",
  "tree-sitter-c",
  "tree-sitter-cpp",
@@ -647,8 +622,8 @@ dependencies = [
 name = "cp-mod-spine"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "cp-base",
+ "cp-mod-utilities",
  "cp-render",
  "crossterm",
  "serde",
@@ -671,21 +646,21 @@ name = "cp-mod-tree"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-mod-utilities",
  "cp-render",
  "crossterm",
  "ignore",
  "serde",
  "serde_json",
- "sha2",
 ]
 
 [[package]]
 name = "cp-mod-typst"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "cp-base",
  "cp-mod-callback",
+ "cp-mod-utilities",
  "cp-render",
  "flate2",
  "reqwest",
@@ -695,6 +670,10 @@ dependencies = [
  "typst",
  "typst-pdf",
 ]
+
+[[package]]
+name = "cp-mod-utilities"
+version = "0.1.0"
 
 [[package]]
 name = "cp-render"
@@ -914,27 +893,6 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
-]
-
-[[package]]
-name = "dirs"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
-dependencies = [
- "dirs-sys",
-]
-
-[[package]]
-name = "dirs-sys"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e01a3366d27ee9890022452ee61b2b63a67e6f13f58900b651ff5665f0bb1fab"
-dependencies = [
- "libc",
- "option-ext",
- "redox_users",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1570,30 +1528,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef68590049bab63a464eee1a1158ac04c6f6613a546d8d90f78636b8b94f171"
 
 [[package]]
-name = "iana-time-zone"
-version = "0.1.65"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e31bc9ad994ba00e440a8aa5c9ef0ec67d5cb5e5cb0cc7f8b744a35b389cc470"
-dependencies = [
- "android_system_properties",
- "core-foundation-sys",
- "iana-time-zone-haiku",
- "js-sys",
- "log",
- "wasm-bindgen",
- "windows-core",
-]
-
-[[package]]
-name = "iana-time-zone-haiku"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "icu_collections"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2091,15 +2025,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
-name = "libredox"
-version = "0.1.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f02ab6bace2054fb888a3c16f990117b579d14a3088e472d63c6011fa185c9d3"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "line-clipping"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2513,12 +2438,6 @@ dependencies = [
  "pkg-config",
  "vcpkg",
 ]
-
-[[package]]
-name = "option-ext"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ordered-float"
@@ -3031,17 +2950,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "redox_users"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
-dependencies = [
- "getrandom 0.2.17",
- "libredox",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "regex"
 version = "1.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3292,16 +3200,6 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
-
-[[package]]
-name = "secrecy"
-version = "0.10.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
-dependencies = [
- "serde",
- "zeroize",
-]
 
 [[package]]
 name = "security-framework"
@@ -4258,7 +4156,6 @@ dependencies = [
 name = "tui"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "cp-base",
  "cp-mod-brave",
  "cp-mod-callback",
@@ -4278,6 +4175,7 @@ dependencies = [
  "cp-mod-todo",
  "cp-mod-tree",
  "cp-mod-typst",
+ "cp-mod-utilities",
  "cp-render",
  "crossterm",
  "dotenvy",
@@ -4288,7 +4186,6 @@ dependencies = [
  "regex",
  "reqwest",
  "rlimit",
- "secrecy",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -5118,41 +5015,6 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement",
- "windows-interface",
- "windows-link",
- "windows-result",
- "windows-strings",
-]
-
-[[package]]
-name = "windows-implement"
-version = "0.60.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "windows-interface"
-version = "0.59.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
 
 [[package]]
 name = "windows-link"

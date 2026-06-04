@@ -1,7 +1,7 @@
 //! Anthropic Claude API implementation.
 
+use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use secrecy::{ExposeSecret as _, SecretBox};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
@@ -22,14 +22,14 @@ use messages::{log_sse_error, messages_to_api};
 /// Anthropic Claude client
 pub(crate) struct AnthropicClient {
     /// API key loaded from `ANTHROPIC_API_KEY` environment variable
-    api_key: Option<SecretBox<String>>,
+    api_key: Option<Redacted>,
 }
 
 impl AnthropicClient {
     /// Create a new Anthropic client, loading the API key from the environment.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
-        Self { api_key: env::var("ANTHROPIC_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
+        Self { api_key: env::var("ANTHROPIC_API_KEY").ok().map(Redacted::new) }
     }
 }
 

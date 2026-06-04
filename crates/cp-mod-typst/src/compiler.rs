@@ -270,24 +270,16 @@ impl World for ContextPilotWorld {
         self.fonts.get(index).cloned()
     }
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        use chrono::{Datelike as _, FixedOffset, Local, Timelike as _, Utc};
-        let now = Local::now();
-        let naive = if let Some(hours) = offset {
-            let utc = Utc::now();
-            let secs = hours.checked_mul(3600)?;
-            let tz = FixedOffset::east_opt(secs.to_i32())?;
-            utc.with_timezone(&tz).naive_local()
+        if let Some(hours) = offset {
+            let now_secs = cp_mod_utilities::time::now_epoch_ms().wrapping_div(1000);
+            let offset_secs = hours.checked_mul(3600)?;
+            let adjusted_secs = now_secs.saturating_add(offset_secs);
+            let dt = cp_mod_utilities::time::decompose_epoch_secs(adjusted_secs)?;
+            Datetime::from_ymd_hms(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
         } else {
-            now.naive_local()
-        };
-        Datetime::from_ymd_hms(
-            naive.year(),
-            naive.month().to_u8(),
-            naive.day().to_u8(),
-            naive.hour().to_u8(),
-            naive.minute().to_u8(),
-            naive.second().to_u8(),
-        )
+            let local = cp_mod_utilities::time::now_local();
+            Datetime::from_ymd_hms(local.year, local.month, local.day, local.hour, local.minute, local.second)
+        }
     }
 }
 

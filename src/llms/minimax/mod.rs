@@ -3,8 +3,8 @@
 //! Reuses the Anthropic message format and SSE streaming protocol.
 //! Endpoint: `https://api.minimax.io/anthropic/v1/messages`
 
+use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use secrecy::{ExposeSecret as _, SecretBox};
 use serde::Serialize;
 use serde_json::Value;
 use std::env;
@@ -27,14 +27,14 @@ const MINIMAX_API_VERSION: &str = "2023-06-01";
 /// `MiniMax` client backed by the Token Plan API.
 pub(crate) struct MiniMaxClient {
     /// API key loaded from `MINIMAX_API_KEY` environment variable.
-    api_key: Option<SecretBox<String>>,
+    api_key: Option<Redacted>,
 }
 
 impl MiniMaxClient {
     /// Create a new `MiniMax` client, loading the API key from the environment.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
-        Self { api_key: env::var("MINIMAX_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
+        Self { api_key: env::var("MINIMAX_API_KEY").ok().map(Redacted::new) }
     }
 }
 

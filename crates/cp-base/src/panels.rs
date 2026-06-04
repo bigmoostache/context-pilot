@@ -20,8 +20,6 @@ use std::any::Any;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use sha2::{Digest as _, Sha256};
-
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::cast::Safe as _;
@@ -130,12 +128,10 @@ impl fmt::Debug for CacheRequest {
     }
 }
 
-/// Hash content for change detection (SHA-256, collision-resistant)
+/// Hash content for change detection (FNV-1a 128-bit, collision-resistant)
 #[must_use]
 pub fn hash_content(content: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    format!("{:064x}", hasher.finalize())
+    cp_mod_utilities::hash::compute(content.as_bytes())
 }
 
 // =============================================================================

@@ -5,7 +5,6 @@ use std::fs;
 use std::io::Write as _;
 use std::path::PathBuf;
 
-use chrono::Local;
 use cp_mod_logs::types::LogsState;
 
 use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
@@ -262,7 +261,7 @@ pub(crate) fn log_error(error: &str) -> String {
     let filepath = errors_dir.join(&filename);
 
     // Create error log content with timestamp
-    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
+    let timestamp = cp_mod_utilities::time::now_local_ymd_hms();
     let content = format!(
         "Error Log #{error_num}\n\
          Timestamp: {timestamp}\n\

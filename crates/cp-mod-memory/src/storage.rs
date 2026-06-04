@@ -19,7 +19,6 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest as _, Sha256};
 
 use cp_base::config::yaml_sync::{SyncEntry, YamlSync};
 
@@ -79,12 +78,11 @@ impl SyncEntry for YamlMemoryEntry {
 
 /// Generate a stable YAML key for a memory item.
 ///
-/// Uses `SHA-256(tl_dr)[0..16]` — content-addressed at creation time.
+/// Uses `FNV-1a(tl_dr)[0..16]` — content-addressed at creation time.
 /// The key is stored on the `MemoryItem` and never changes on update.
 #[must_use]
 pub(crate) fn generate_yaml_key(tl_dr: &str) -> String {
-    let hash = Sha256::digest(tl_dr.as_bytes());
-    let hex = format!("{hash:x}");
+    let hex = cp_mod_utilities::hash::compute_str(tl_dr);
     hex.get(..16).unwrap_or(&hex).to_string()
 }
 

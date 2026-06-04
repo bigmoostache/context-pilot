@@ -15,7 +15,7 @@ cp-render.workspace = true
 crossterm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-sha2.workspace = true
+cp-mod-utilities.workspace = true
 
 [lints]
 workspace = true

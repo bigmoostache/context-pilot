@@ -92,9 +92,8 @@ fn build_log_filter(from_date: Option<&str>, to_date: Option<&str>) -> Option<St
 /// Returns `None` if parsing fails.
 fn iso_to_ms(s: &str) -> Option<u64> {
     let s_full = if s.len() == 10 { format!("{s}T00:00:00Z") } else { s.to_string() };
-
-    let dt = chrono::DateTime::parse_from_rfc3339(&s_full).ok()?;
-    u64::try_from(dt.timestamp_millis()).ok()
+    let ms = cp_mod_utilities::time::parse_rfc3339_to_epoch_ms(&s_full)?;
+    u64::try_from(ms).ok()
 }
 
 /// Warning appended to every panel-creating tool result.

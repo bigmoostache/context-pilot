@@ -41,7 +41,7 @@ pub(super) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
     }
 
     // Filename: datetime with second precision
-    let ts = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+    let ts = cp_mod_utilities::time::now_local_ymd_hms_file();
     let path = dir.join(format!("{ts}.csv"));
 
     for msg in api_messages {

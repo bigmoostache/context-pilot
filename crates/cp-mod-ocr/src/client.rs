@@ -121,7 +121,7 @@ impl DatalabClient {
         let file_bytes = std::fs::read(path).map_err(|e| format!("Cannot read file '{}': {e}", path.display()))?;
 
         // Check cache by content hash + mode.
-        let content_hash = sha256_hex(&file_bytes);
+        let content_hash = content_hash_hex(&file_bytes);
         let cache_key = format!("{content_hash}_{}", mode.api_format());
         if let Some(cached) = read_cache(&cache_key) {
             log::debug!("OCR cache hit for {} ({cache_key})", path.display());
@@ -282,16 +282,9 @@ fn cache_dir() -> Option<PathBuf> {
     std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".context-pilot/ocr-cache"))
 }
 
-/// Compute the SHA-256 hex digest of a byte slice.
-fn sha256_hex(data: &[u8]) -> String {
-    use sha2::Digest as _;
-    let hash = sha2::Sha256::digest(data);
-    let mut hex = String::with_capacity(64);
-    for &byte in hash.as_slice() {
-        use std::fmt::Write as _;
-        let _r = write!(hex, "{byte:02x}");
-    }
-    hex
+/// Compute the hex digest of a byte slice (FNV-1a 128-bit).
+fn content_hash_hex(data: &[u8]) -> String {
+    cp_mod_utilities::hash::compute(data)
 }
 
 /// Try to read a cached OCR result.

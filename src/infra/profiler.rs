@@ -65,7 +65,7 @@ pub(crate) fn log_tool_time(tool_name: &str, elapsed: std::time::Duration) {
     let ms = elapsed.as_millis();
     drop(std::fs::create_dir_all(TOOL_LOG_DIR));
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(TOOL_LOG_FILE) {
-        let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+        let ts = cp_mod_utilities::time::now_local_ymd_hms();
         let _r = writeln!(file, "{ts}  {ms:>6}ms  {tool_name}");
     }
 }

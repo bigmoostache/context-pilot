@@ -2,8 +2,6 @@
 
 use std::process::Command;
 
-use sha2::{Digest as _, Sha256};
-
 use cp_base::modules::run_with_timeout;
 
 use crate::GH_CMD_TIMEOUT_SECS;
@@ -41,12 +39,10 @@ pub fn extract_poll_interval(stdout: &str) -> Option<u64> {
     v.parse::<u64>().ok()
 }
 
-/// SHA-256 hex digest of a string — used for change detection.
+/// FNV-1a hex digest of a string — used for change detection.
 #[must_use]
 pub fn sha256_hex(input: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(input.as_bytes());
-    format!("{:064x}", hasher.finalize())
+    cp_mod_utilities::hash::compute_str(input)
 }
 
 /// Replace a GitHub token in output with `[REDACTED]` for safe display.

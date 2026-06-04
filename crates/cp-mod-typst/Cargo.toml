@@ -15,7 +15,7 @@ cp-render = { path = "../cp-render" }
 cp-mod-callback = { path = "../cp-mod-callback" }
 serde.workspace = true
 serde_json.workspace = true
-chrono.workspace = true
+cp-mod-utilities.workspace = true
 typst = "0.13"
 typst-pdf = "0.13"
 reqwest = { workspace = true }

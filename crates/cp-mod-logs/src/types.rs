@@ -30,11 +30,7 @@ fn default_importance() -> String {
 
 /// Format a millisecond timestamp as an ISO 8601 UTC datetime string.
 fn ms_to_iso(timestamp_ms: u64) -> String {
-    use chrono::{TimeZone as _, Utc};
-    i64::try_from(timestamp_ms)
-        .ok()
-        .and_then(|ms| Utc.timestamp_millis_opt(ms).single())
-        .map_or_else(String::new, |dt| dt.to_rfc3339())
+    i64::try_from(timestamp_ms).ok().and_then(cp_mod_utilities::time::epoch_ms_to_rfc3339).unwrap_or_default()
 }
 
 impl LogEntry {

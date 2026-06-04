@@ -16,8 +16,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::mpsc::Sender;
 
+use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use secrecy::{ExposeSecret as _, SecretBox};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -55,7 +55,7 @@ fn map_model_name(model: &str) -> &str {
 /// Claude Code OAuth client
 pub(crate) struct ClaudeCodeClient {
     /// OAuth access token loaded from the macOS Keychain or `~/.claude/.credentials.json`
-    access_token: Option<SecretBox<String>>,
+    access_token: Option<Redacted>,
 }
 
 /// On-disk credentials file structure for Claude Code OAuth.
@@ -85,7 +85,7 @@ impl ClaudeCodeClient {
     }
     /// Load the OAuth token from the macOS Keychain (where Claude Code stores
     /// credentials on macOS) or `~/.claude/.credentials.json` otherwise.
-    fn load_oauth_token() -> Option<SecretBox<String>> {
+    fn load_oauth_token() -> Option<Redacted> {
         if cfg!(target_os = "macos")
             && let Some(token) = Self::load_oauth_token_from_keychain()
         {
@@ -97,7 +97,7 @@ impl ClaudeCodeClient {
     /// Read credentials JSON from the macOS Keychain via the `security` CLI.
     /// The password stored under service "Claude Code-credentials" is the same
     /// JSON blob as the on-disk credentials file.
-    fn load_oauth_token_from_keychain() -> Option<SecretBox<String>> {
+    fn load_oauth_token_from_keychain() -> Option<Redacted> {
         let output = Command::new("security")
             .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
             .output()
@@ -110,7 +110,7 @@ impl ClaudeCodeClient {
     }
 
     /// Read credentials JSON from `~/.claude/.credentials.json` (or fallback path).
-    fn load_oauth_token_from_file() -> Option<SecretBox<String>> {
+    fn load_oauth_token_from_file() -> Option<Redacted> {
         let home = env::var("HOME").ok()?;
         let home_path = PathBuf::from(&home);
 
@@ -122,7 +122,7 @@ impl ClaudeCodeClient {
     }
 
     /// Parse a credentials JSON blob and return the access token if not expired.
-    fn parse_credentials_json(content: &str) -> Option<SecretBox<String>> {
+    fn parse_credentials_json(content: &str) -> Option<Redacted> {
         let creds: CredentialsFile = serde_json::from_str(content).ok()?;
 
         let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis().to_u64();
@@ -130,7 +130,7 @@ impl ClaudeCodeClient {
             return None;
         }
 
-        Some(SecretBox::new(Box::new(creds.claude_ai_oauth.access_token)))
+        Some(Redacted::new(creds.claude_ai_oauth.access_token))
     }
 
     /// Run sequential API health checks: auth, streaming, and tool calling.

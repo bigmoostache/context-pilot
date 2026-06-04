@@ -51,7 +51,7 @@ pub struct Config {
 
 /// `~/.config/context-pilot/`
 fn config_dir() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("context-pilot"))
+    cp_mod_utilities::dirs::config_dir().map(|d| d.join("context-pilot"))
 }
 
 /// `~/.config/context-pilot/config.json`

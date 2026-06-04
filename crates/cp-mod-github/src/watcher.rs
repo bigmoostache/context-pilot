@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 use crate::parse::{api_response, extract_poll_interval, poll_branch_pr, redact_token, sha256_hex};
-use secrecy::{ExposeSecret as _, SecretBox};
+use cp_mod_utilities::secret::Redacted;
 
 use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
@@ -31,7 +31,7 @@ const GH_WATCHER_TICK_SECS: u64 = 5;
 const GH_DEFAULT_POLL_INTERVAL_SECS: u64 = 60;
 
 /// Snapshot of a due watch for polling (`context_id`, args, token, `is_api`, etag, `last_hash`)
-type DueWatch = (String, Vec<String>, Arc<SecretBox<String>>, bool, Option<String>, Option<String>);
+type DueWatch = (String, Vec<String>, Arc<Redacted>, bool, Option<String>, Option<String>);
 
 /// Update sent when branch PR info changes
 #[derive(Debug)]
@@ -45,7 +45,7 @@ struct BranchPrWatch {
     /// Branch name being watched.
     branch: String,
     /// GitHub token for API authentication.
-    github_token: Arc<SecretBox<String>>,
+    github_token: Arc<Redacted>,
     /// Timestamp of the last poll attempt (milliseconds).
     last_poll_ms: u64,
     /// SHA-256 hash of the last output, used for change detection.
@@ -57,7 +57,7 @@ struct GhWatch {
     /// Panel context ID this watch belongs to.
     context_id: String,
     /// GitHub token for API authentication.
-    github_token: Arc<SecretBox<String>>,
+    github_token: Arc<Redacted>,
     /// Pre-parsed args (excludes "gh" prefix)
     args: Vec<String>,
     /// true if args[0] == "api" && no --jq/--template flags
@@ -125,7 +125,7 @@ impl Watcher {
 
             let is_api_command = is_api_command(&args);
 
-            let token = Arc::new(SecretBox::new(Box::new(github_token.clone())));
+            let token = Arc::new(Redacted::new(github_token.clone()));
             let _r = watches.insert(
                 context_id.clone(),
                 GhWatch {
@@ -154,12 +154,12 @@ impl Watcher {
                         w.branch = branch.to_string();
                         w.last_poll_ms = 0;
                         w.last_output_hash = None;
-                        w.github_token = Arc::new(SecretBox::new(Box::new(token.to_string())));
+                        w.github_token = Arc::new(Redacted::new(token.to_string()));
                     }
                 } else {
                     *watch = Some(BranchPrWatch {
                         branch: branch.to_string(),
-                        github_token: Arc::new(SecretBox::new(Box::new(token.to_string()))),
+                        github_token: Arc::new(Redacted::new(token.to_string())),
                         last_poll_ms: 0,
                         last_output_hash: None,
                     });

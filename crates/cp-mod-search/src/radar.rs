@@ -9,7 +9,6 @@
 use std::collections::HashMap;
 use std::fmt::Write as _;
 
-use chrono::TimeZone as _;
 use crossterm::event::KeyEvent;
 
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action};
@@ -88,10 +87,10 @@ fn format_timestamp_ms(ms: u64) -> String {
     if ms == 0 {
         return "unknown".to_string();
     }
-    let dur = std::time::Duration::from_millis(ms);
-    let secs = i64::try_from(dur.as_secs()).unwrap_or(i64::MAX);
-    let nanos = dur.subsec_nanos();
-    chrono::Utc.timestamp_opt(secs, nanos).single().map_or_else(|| "unknown".to_string(), |dt| dt.to_rfc3339())
+    i64::try_from(ms)
+        .ok()
+        .and_then(cp_mod_utilities::time::epoch_ms_to_rfc3339)
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 /// Read the cached radar YAML from state, with fallback messages.

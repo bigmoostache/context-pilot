@@ -8,20 +8,8 @@ use crate::types;
 
 /// Compute an 8-character hex hash of a path for per-project index naming.
 pub(crate) fn hash_project_path(path: &str) -> String {
-    use sha2::Digest as _;
-    let hash = sha2::Sha256::digest(path.as_bytes());
-    // Take first 4 bytes → 8 hex chars
-    hex_encode_4_bytes(hash.as_slice())
-}
-
-/// Encode the first 4 bytes of a slice as an 8-character lowercase hex string.
-fn hex_encode_4_bytes(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(8);
-    for &b in bytes.iter().take(4) {
-        use std::fmt::Write as _;
-        let _r = write!(out, "{b:02x}");
-    }
-    out
+    let hex = cp_mod_utilities::hash::compute_str(path);
+    hex.get(..8).unwrap_or(&hex).to_string()
 }
 
 /// Create per-project Meilisearch indexes if they don't already exist.

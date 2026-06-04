@@ -200,9 +200,8 @@ impl Panel for LogsPanel {
 
 /// Format a millisecond timestamp as a local `YYYY-MM-DD HH:MM:SS` string.
 fn format_timestamp(ms: u64) -> String {
-    use chrono::{Local, TimeZone as _};
     i64::try_from(ms)
         .ok()
-        .and_then(|ms| Local.timestamp_millis_opt(ms).single())
-        .map_or_else(|| format!("{ms}ms"), |dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+        .and_then(cp_mod_utilities::time::epoch_ms_to_local_ymd_hms)
+        .unwrap_or_else(|| format!("{ms}ms"))
 }

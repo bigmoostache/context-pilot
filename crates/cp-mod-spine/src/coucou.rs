@@ -6,7 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use cp_base::cast::Safe as _;
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
 use cp_base::state::watchers::{Watcher, WatcherRegistry, WatcherResult};
@@ -110,8 +109,6 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
 /// Parse an ISO 8601 datetime string into milliseconds since epoch.
 /// Supports: "2026-02-20T08:00:00", "2026-02-20 08:00:00", "2026-02-20T08:00"
 fn parse_datetime_ms(s: &str) -> Result<u64, String> {
-    use chrono::NaiveDateTime;
-
     let s = s.trim().replace(' ', "T");
 
     // Pad missing seconds: "2026-02-20T08:00" → "2026-02-20T08:00:00"
@@ -119,15 +116,12 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
     // Strip trailing Z if present
     let normalized = normalized.trim_end_matches('Z');
 
-    let dt = NaiveDateTime::parse_from_str(normalized, "%Y-%m-%dT%H:%M:%S")
-        .map_err(|e| format!("Invalid datetime: {e}. Expected format: YYYY-MM-DDTHH:MM:SS"))?;
+    // Treat as UTC by appending 'Z', matching the original behavior
+    let rfc3339 = format!("{normalized}Z");
+    let ms = cp_mod_utilities::time::parse_rfc3339_to_epoch_ms(&rfc3339)
+        .ok_or_else(|| format!("Invalid datetime: '{normalized}'. Expected format: YYYY-MM-DDTHH:MM:SS"))?;
 
-    let epoch_secs = dt.and_utc().timestamp();
-    if epoch_secs < 0 {
-        return Err("DateTime is before epoch".to_string());
-    }
-
-    Ok(epoch_secs.to_u64().saturating_mul(1000))
+    u64::try_from(ms).map_err(|_e| "DateTime is before epoch".to_string())
 }
 
 /// Format milliseconds as a human-friendly duration string.

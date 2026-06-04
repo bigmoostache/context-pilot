@@ -24,7 +24,6 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest as _, Sha256};
 
 use cp_base::config::yaml_sync::{SyncEntry, YamlSync};
 
@@ -77,16 +76,15 @@ impl SyncEntry for YamlEntry {
 // Key computation
 // ---------------------------------------------------------------------------
 
-/// Compute a description key: first 16 hex chars of SHA-256(path ∥ content).
+/// Compute a description key: first 16 hex chars of FNV-1a(path ∥ content).
 ///
 /// The combined hash means the same file at a different path (copy/rename)
 /// or the same path with different content each get their own YAML entry.
 fn compute_description_key(path: &str, content: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(path.as_bytes());
-    hasher.update(content);
-    let hash = hasher.finalize();
-    let hex = format!("{hash:x}");
+    let mut data = Vec::with_capacity(path.len().saturating_add(content.len()));
+    data.extend_from_slice(path.as_bytes());
+    data.extend_from_slice(content);
+    let hex = cp_mod_utilities::hash::compute(&data);
     hex.get(..16).unwrap_or(&hex).to_string()
 }
 

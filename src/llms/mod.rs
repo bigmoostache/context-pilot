@@ -22,7 +22,6 @@ use crate::app::panels::ContextItem;
 use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::ToolResult;
 use crate::state::Message;
-use cp_base::cast::Safe as _;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
 pub(crate) use cp_base::config::llm_types::{
@@ -211,20 +210,14 @@ pub(crate) struct FakePanelMessage {
 
 /// Convert milliseconds since UNIX epoch to ISO 8601 format.
 fn ms_to_iso8601(ms: u64) -> String {
-    use chrono::{DateTime, Utc};
-
-    let secs = cp_base::panels::time_arith::ms_to_secs(ms);
-    DateTime::<Utc>::from_timestamp(secs.to_i64(), 0)
-        .map_or_else(|| "1970-01-01T00:00:00Z".to_string(), |dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+    let ms_i64 = i64::try_from(ms).unwrap_or(i64::MAX);
+    cp_mod_utilities::time::epoch_ms_to_rfc3339(ms_i64).unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
 }
 
 /// Convert milliseconds since UNIX epoch to date-only format (YYYY-MM-DD).
 fn ms_to_date(ms: u64) -> String {
-    use chrono::{DateTime, Utc};
-
-    let secs = cp_base::panels::time_arith::ms_to_secs(ms);
-    DateTime::<Utc>::from_timestamp(secs.to_i64(), 0)
-        .map_or_else(|| "1970-01-01".to_string(), |dt| dt.format("%Y-%m-%d").to_string())
+    let ms_i64 = i64::try_from(ms).unwrap_or(i64::MAX);
+    cp_mod_utilities::time::epoch_ms_to_utc_date(ms_i64).unwrap_or_else(|| "1970-01-01".to_string())
 }
 
 /// Generate the header text for dynamic panel display

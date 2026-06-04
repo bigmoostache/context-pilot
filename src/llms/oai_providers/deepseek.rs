@@ -8,8 +8,8 @@ use std::env;
 use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
+use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use secrecy::{ExposeSecret as _, SecretBox};
 use serde::Serialize;
 
 use super::super::error::LlmError;
@@ -23,14 +23,14 @@ const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 /// `DeepSeek` client
 pub(crate) struct DeepSeekClient {
     /// API key loaded from the `DEEPSEEK_API_KEY` environment variable.
-    api_key: Option<SecretBox<String>>,
+    api_key: Option<Redacted>,
 }
 
 impl DeepSeekClient {
     /// Create a new `DeepSeekClient`, reading the API key from the environment.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
-        Self { api_key: env::var("DEEPSEEK_API_KEY").ok().map(|k| SecretBox::new(Box::new(k))) }
+        Self { api_key: env::var("DEEPSEEK_API_KEY").ok().map(Redacted::new) }
     }
 }
 
