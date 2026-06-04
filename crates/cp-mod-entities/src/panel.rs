@@ -10,12 +10,6 @@ use std::fmt::Write as _;
 use crate::types::EntitiesState;
 use crate::{db, migrations};
 
-/// Context type identifier for entity result panels.
-pub(crate) const ENTITY_RESULT_TYPE: &str = "entity_result";
-
-/// Metadata key used to persist panel content across reloads.
-const META_CONTENT: &str = "result_content";
-
 /// Fixed panel showing entity schema + sample data.
 #[derive(Debug)]
 pub(crate) struct EntitiesPanel;
@@ -103,7 +97,9 @@ impl Panel for EntitiesPanel {
     }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
-        None
+        // Live panels re-execute SQL every 2s. Static panels return None from
+        // build_cache_request (cached_content already set), so no work is done.
+        Some(2000)
     }
 
     fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
@@ -276,155 +272,4 @@ fn empty_state_blocks() -> Vec<Block> {
         Block::text("  - Use RETURNING * on INSERT/UPDATE to see results immediately".to_string()),
         Block::text("  - For graph patterns: edges(source_id, target_id, rel_type)".to_string()),
     ]
-}
-
-// =============================================================================
-// Entity result panel (dynamic, for large query results)
-// =============================================================================
-
-/// Create a dynamic entity result panel with the given content.
-///
-/// Returns the panel ID string (e.g., "P15").
-pub(crate) fn create_result_panel(state: &mut State, title: &str, content: &str) -> String {
-    use cp_base::state::context::{compute_total_pages, estimate_tokens, make_default_entry};
-
-    let panel_id = state.next_available_context_id();
-    let uid = format!("UID_{}_P", state.global_next_uid);
-    state.global_next_uid = state.global_next_uid.saturating_add(1);
-
-    let mut elem = make_default_entry(&panel_id, Kind::new(ENTITY_RESULT_TYPE), title, false);
-    elem.uid = Some(uid);
-    elem.cached_content = Some(content.to_string());
-    elem.token_count = estimate_tokens(content);
-    elem.full_token_count = elem.token_count;
-    elem.total_pages = compute_total_pages(elem.token_count);
-    drop(elem.metadata.insert(META_CONTENT.to_string(), serde_json::Value::String(content.to_string())));
-
-    state.context.push(elem);
-    panel_id
-}
-
-/// Panel renderer for entity SQL result panels.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct EntityResultPanel;
-
-/// Cache request for restoring content from metadata after reload.
-struct EntityRestoreRequest {
-    /// Panel context ID (e.g., "P15").
-    context_id: String,
-    /// Full panel content to restore.
-    content: String,
-}
-
-impl Panel for EntityResultPanel {
-    fn needs_cache(&self) -> bool {
-        true
-    }
-
-    fn build_cache_request(
-        &self,
-        ctx: &cp_base::state::context::Entry,
-        _state: &State,
-    ) -> Option<cp_base::panels::CacheRequest> {
-        // Only need to restore if cached_content is missing (post-reload)
-        if ctx.cached_content.is_some() {
-            return None;
-        }
-        let content = ctx.metadata.get(META_CONTENT)?.as_str()?;
-        Some(cp_base::panels::CacheRequest {
-            context_type: Kind::new(ENTITY_RESULT_TYPE),
-            data: Box::new(EntityRestoreRequest { context_id: ctx.id.clone(), content: content.to_string() }),
-        })
-    }
-
-    fn apply_cache_update(
-        &self,
-        update: cp_base::panels::CacheUpdate,
-        ctx: &mut cp_base::state::context::Entry,
-        _state: &mut State,
-    ) -> bool {
-        use cp_base::panels::update_if_changed;
-        use cp_base::state::context::{compute_total_pages, estimate_tokens};
-
-        if let cp_base::panels::CacheUpdate::Content { content, token_count, .. } = update {
-            ctx.cached_content = Some(content.clone());
-            ctx.full_token_count = token_count;
-            ctx.total_pages = compute_total_pages(token_count);
-            ctx.current_page = 0;
-            if ctx.total_pages > 1 {
-                let page_content = cp_base::panels::paginate_content(
-                    ctx.cached_content.as_deref().unwrap_or(""),
-                    ctx.current_page,
-                    ctx.total_pages,
-                );
-                ctx.token_count = estimate_tokens(&page_content);
-            } else {
-                ctx.token_count = token_count;
-            }
-            ctx.cache_deprecated = false;
-            let _ = update_if_changed(ctx, &content);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn refresh_cache(&self, request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
-        let req = request.data.downcast::<EntityRestoreRequest>().ok()?;
-        let token_count = cp_base::state::context::estimate_tokens(&req.content);
-        Some(cp_base::panels::CacheUpdate::Content {
-            context_id: req.context_id.clone(),
-            content: req.content.clone(),
-            token_count,
-        })
-    }
-
-    fn handle_key(&self, key: &crossterm::event::KeyEvent, _state: &State) -> Option<cp_base::state::actions::Action> {
-        cp_base::panels::scroll_key_action(key)
-    }
-
-    fn blocks(&self, state: &State) -> Vec<Block> {
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE));
-
-        let Some(ctx) = ctx else {
-            return vec![Block::styled_text("No entity result panel".into(), Semantic::Muted)];
-        };
-
-        let Some(content) = &ctx.cached_content else {
-            return vec![Block::Line(vec![Span::muted("Loading...".into()).italic()])];
-        };
-
-        content.lines().map(|line| Block::text(format!(" {line}"))).collect()
-    }
-
-    fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "Entity Result".to_string(), |ctx| ctx.name.clone())
-    }
-
-    fn max_freezes(&self) -> u8 {
-        0
-    }
-
-    fn context(&self, state: &State) -> Vec<ContextItem> {
-        state
-            .context
-            .iter()
-            .filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE))
-            .filter_map(|c| {
-                let content = c.cached_content.as_ref()?;
-                let output = cp_base::panels::paginate_content(content, c.current_page, c.total_pages);
-                Some(ContextItem::new(&c.id, &c.name, output, c.last_refresh_ms))
-            })
-            .collect()
-    }
-
-    fn refresh(&self, _state: &mut State) {}
-
-    fn cache_refresh_interval_ms(&self) -> Option<u64> {
-        None
-    }
-
-    fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
-        false
-    }
 }

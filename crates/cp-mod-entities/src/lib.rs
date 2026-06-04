@@ -8,10 +8,14 @@
 mod db;
 /// SQL error enrichment: fuzzy suggestions and schema context.
 mod errors;
+/// SQL result formatting utilities (shared by tools and panels).
+mod format;
 /// Auto-capture DDL as numbered migration files + sequential replay for recovery.
 mod migrations;
 /// Fixed Entities panel — live schema, sample data, and empty-state guide.
 mod panel;
+/// Dynamic entity result panel — large query results, static + live refresh.
+mod result_panel;
 /// Meilisearch sync: incremental dirty-tracked, delete-then-add per table.
 mod sync;
 /// SQL execution engine: classification, splitting, execution, error enrichment.
@@ -128,7 +132,7 @@ impl Module for EntitiesModule {
     fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
             Kind::ENTITIES => Some(Box::new(panel::EntitiesPanel)),
-            Kind::ENTITY_RESULT => Some(Box::new(panel::EntityResultPanel)),
+            Kind::ENTITY_RESULT => Some(Box::new(result_panel::EntityResultPanel)),
             _ => None,
         }
     }
@@ -139,7 +143,11 @@ impl Module for EntitiesModule {
             ToolDefinition::from_yaml("entity_sql", t)
                 .short_desc("Execute SQL on entity database")
                 .category("Entity")
-                .param("sql", ParamType::String, true)
+                .param("sql", ParamType::String, false)
+                .param("request_path", ParamType::String, false)
+                .param("live", ParamType::Boolean, false)
+                .param("output_path", ParamType::String, false)
+                .param("dry_run", ParamType::Boolean, false)
                 .build(),
         ]
     }

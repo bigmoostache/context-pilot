@@ -5,7 +5,9 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::errors::enrich_error;
-use crate::{db, migrations, panel};
+use crate::format::{self, extract_table_name, format_cell, format_markdown_table};
+use crate::result_panel::{self, LivePanelMeta};
+use crate::{db, migrations};
 
 // =============================================================================
 // Constants
@@ -16,9 +18,6 @@ use crate::{db, migrations, panel};
 const INLINE_MAX_LINES: usize = 150;
 /// Maximum inline byte count before routing to a panel.
 const INLINE_MAX_BYTES: usize = 8000;
-
-/// Maximum rows rendered in a single result (inline or panel).
-const MAX_RESULT_ROWS: usize = 200;
 
 /// Warning appended to panel-creating tool results.
 const PANEL_WARNING: &str = "\n\nIMPORTANT: Results live in this panel. Act on the information FIRST \
@@ -156,10 +155,51 @@ pub(crate) fn split_statements(sql: &str) -> Vec<&str> {
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("entity_sql");
 
-    let sql = tool.input.get("sql").and_then(serde_json::Value::as_str).unwrap_or_default();
+    // ── Parse parameters ────────────────────────────────────────────────
+    let sql_param = tool.input.get("sql").and_then(serde_json::Value::as_str).unwrap_or_default();
+    let request_path = tool.input.get("request_path").and_then(serde_json::Value::as_str).unwrap_or_default();
+    let live = tool.input.get("live").and_then(serde_json::Value::as_bool).unwrap_or(false);
+    let output_path_str = tool.input.get("output_path").and_then(serde_json::Value::as_str).unwrap_or_default();
+    let dry_run = tool.input.get("dry_run").and_then(serde_json::Value::as_bool).unwrap_or(false);
+
+    let has_sql = !sql_param.trim().is_empty();
+    let has_request = !request_path.trim().is_empty();
+    let has_output = !output_path_str.trim().is_empty();
+
+    // ── Validate mutual exclusions ──────────────────────────────────────
+    if has_sql && has_request {
+        return err(tool, "Cannot provide both `sql` and `request_path`. Use one or the other.");
+    }
+    if !has_sql && !has_request {
+        return err(tool, "Must provide either `sql` or `request_path`.");
+    }
+    if live && has_output {
+        return err(tool, "`live` and `output_path` are incompatible.");
+    }
+    if live && dry_run {
+        return err(tool, "`live` and `dry_run` are incompatible.");
+    }
+
+    // ── Resolve SQL source ──────────────────────────────────────────────
+    let sql_owned: String;
+    let sql: &str = if has_request {
+        let path = Path::new(request_path);
+        if !path.exists() {
+            return err(tool, &format!("File not found: {request_path}"));
+        }
+        match std::fs::read_to_string(path) {
+            Ok(content) => {
+                sql_owned = content;
+                &sql_owned
+            }
+            Err(e) => return err(tool, &format!("Failed to read {request_path}: {e}")),
+        }
+    } else {
+        sql_param
+    };
 
     if sql.trim().is_empty() {
-        return err(tool, "SQL parameter is empty.");
+        return err(tool, "SQL is empty (file contained no SQL).");
     }
 
     // Split statements early for classification and empty-input detection.
@@ -183,33 +223,71 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     // so that leading semicolons / comments don't confuse classification.
     let kind = classify(stmts.first().copied().unwrap_or(sql));
 
-    let result_content = match kind {
-        SqlKind::Select => execute_select(&conn, sql, state),
-        SqlKind::Dml => execute_dml(&conn, sql),
-        SqlKind::Ddl => execute_ddl(&conn, sql, &dump_path, &migrations_dir),
+    // ── Validate live restriction ───────────────────────────────────────
+    if live && kind != SqlKind::Select {
+        return err(tool, "`live=true` is only supported for SELECT/EXPLAIN/PRAGMA queries.");
+    }
+
+    // ── Execute ─────────────────────────────────────────────────────────
+    let result_content = if dry_run {
+        execute_dry_run(&conn, sql, kind, state)
+    } else {
+        match kind {
+            SqlKind::Select => execute_select(&conn, sql, state),
+            SqlKind::Dml => execute_dml(&conn, sql),
+            SqlKind::Ddl => execute_ddl(&conn, sql, &dump_path, &migrations_dir),
+        }
     };
 
-    // Route results: small → inline + preserve tempo, big → panel + break tempo.
-    // Thresholds match console easy_bash: ≤150 lines AND ≤8000 bytes.
+    // ── Route results ───────────────────────────────────────────────────
     let (content, is_error, preserves_tempo) = match result_content {
         Ok(text) => {
-            let line_count = text.lines().count();
-            let byte_count = text.len();
-            if line_count > INLINE_MAX_LINES || byte_count > INLINE_MAX_BYTES {
-                // Big result → entity_result panel
+            if live {
+                // Live → always panel, store SQL for periodic re-execution
                 let sql_preview: String = sql.chars().take(60).collect();
                 let title = format!("entity_sql: {sql_preview}");
-                let panel_id = panel::create_result_panel(state, &title, &text);
-                let summary = format!("{line_count} lines returned — results in panel {panel_id}.{PANEL_WARNING}");
+                let panel_id = result_panel::create_live_result_panel(
+                    state,
+                    &title,
+                    &text,
+                    LivePanelMeta { sql, db_path: &db_path.to_string_lossy() },
+                );
+                let summary = format!("Live query panel created: {panel_id}. Auto-refreshes every 2s.{PANEL_WARNING}");
+                (summary, false, false)
+            } else if has_output {
+                // output_path → write to file + create static panel
+                let out = Path::new(output_path_str);
+                if let Some(parent) = out.parent() {
+                    let _d = std::fs::create_dir_all(parent);
+                }
+                if let Err(e) = std::fs::write(out, &text) {
+                    return err(tool, &format!("Failed to write to {output_path_str}: {e}"));
+                }
+                let sql_preview: String = sql.chars().take(60).collect();
+                let title = format!("entity_sql: {sql_preview}");
+                let panel_id = result_panel::create_result_panel(state, &title, &text);
+                let summary = format!(
+                    "Results written to `{output_path_str}`. Also available in panel {panel_id}.{PANEL_WARNING}"
+                );
                 (summary, false, false)
             } else {
-                // Small result → inline + tempo
-                let note = if kind == SqlKind::Select {
-                    ""
+                // Size-based routing: small → inline + tempo, big → panel
+                let line_count = text.lines().count();
+                let byte_count = text.len();
+                if line_count > INLINE_MAX_LINES || byte_count > INLINE_MAX_BYTES {
+                    let sql_preview: String = sql.chars().take(60).collect();
+                    let title = format!("entity_sql: {sql_preview}");
+                    let panel_id = result_panel::create_result_panel(state, &title, &text);
+                    let summary = format!("{line_count} lines returned — results in panel {panel_id}.{PANEL_WARNING}");
+                    (summary, false, false)
                 } else {
-                    "\n\n(The Entities panel now reflects the updated database state.)"
-                };
-                (format!("{text}{note}"), false, true)
+                    let note = if kind == SqlKind::Select || dry_run {
+                        ""
+                    } else {
+                        "\n\n(The Entities panel now reflects the updated database state.)"
+                    };
+                    (format!("{text}{note}"), false, true)
+                }
             }
         }
         Err(e) => {
@@ -218,8 +296,8 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    // Post-execution: sync to Meilisearch on writes
-    if !is_error && kind != SqlKind::Select {
+    // ── Post-execution: Meilisearch sync (skip on dry_run or read-only) ─
+    if !is_error && !dry_run && kind != SqlKind::Select {
         let affected = crate::sync::extract_affected_tables(&stmts);
         let upper = sql.to_uppercase();
         let is_drop = upper.contains("DROP TABLE") || upper.contains("DROP TABLE IF EXISTS");
@@ -235,11 +313,13 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         crate::sync::flush_sync(state);
     }
 
-    // Post-execution: refresh schema cache + touch panel
-    let fresh_cache = db::introspect(&conn, &db_path);
-    let es_mut = crate::types::EntitiesState::get_mut(state);
-    es_mut.schema_cache = Some(fresh_cache);
-    state.touch_panel(Kind::ENTITIES);
+    // ── Post-execution: refresh schema cache (skip on dry_run) ──────────
+    if !dry_run {
+        let fresh_cache = db::introspect(&conn, &db_path);
+        let es_mut = crate::types::EntitiesState::get_mut(state);
+        es_mut.schema_cache = Some(fresh_cache);
+        state.touch_panel(Kind::ENTITIES);
+    }
 
     ToolResult {
         tool_use_id: tool.id.clone(),
@@ -250,6 +330,38 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         preserves_tempo,
         tool_name: tool.name.clone(),
     }
+}
+
+// =============================================================================
+// Dry-run execution
+// =============================================================================
+
+/// Execute SQL inside a savepoint that is immediately rolled back.
+///
+/// Returns the same result the normal path would, but with a `[DRY RUN]`
+/// header and no persistent side effects. Works for all SQL types — `SQLite`
+/// supports transactional DDL.
+fn execute_dry_run(conn: &Connection, sql: &str, kind: SqlKind, state: &State) -> Result<String, String> {
+    conn.execute_batch("SAVEPOINT dry_run_sp").map_err(|e| format!("{e}"))?;
+
+    let stmts = split_statements(sql);
+    let result = match kind {
+        SqlKind::Select => execute_select(conn, sql, state),
+        SqlKind::Dml => {
+            let upper = sql.to_uppercase();
+            let has_returning = upper.contains("RETURNING");
+            execute_dml_stmts(conn, &stmts, has_returning)
+        }
+        SqlKind::Ddl => {
+            conn.execute_batch(sql).map_err(|e| format!("{e}")).map(|()| "Schema changes would be applied.".to_string())
+        }
+    };
+
+    // Always roll back — even on error the savepoint must be cleaned up
+    let _rb = conn.execute_batch("ROLLBACK TO dry_run_sp");
+    let _rel = conn.execute_batch("RELEASE dry_run_sp");
+
+    result.map(|text| format!("[DRY RUN — no changes applied]\n\n{text}"))
 }
 
 // =============================================================================
@@ -354,111 +466,20 @@ fn execute_ddl(conn: &Connection, sql: &str, dump_path: &Path, migrations_dir: &
     Ok(format!("Schema updated. Migration saved: {filename}"))
 }
 
-// =============================================================================
-// Query formatting
-// =============================================================================
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 /// Execute a query and format results as a markdown table.
 fn query_to_markdown(conn: &Connection, sql: &str, state: &State) -> Result<String, String> {
-    let mut stmt = conn.prepare(sql).map_err(|e| format!("{e}"))?;
-    let col_names: Vec<String> = stmt.column_names().iter().map(|s| (*s).to_string()).collect();
-    let mut rows_data: Vec<Vec<String>> = Vec::new();
-
-    let mut rows = stmt.query([]).map_err(|e| format!("{e}"))?;
-    while let Some(row) = rows.next().map_err(|e| format!("{e}"))? {
-        let mut vals = Vec::with_capacity(col_names.len());
-        for idx in 0..col_names.len() {
-            vals.push(format_cell(row, idx));
-        }
-        rows_data.push(vals);
-    }
-
-    let count = rows_data.len();
-
-    if count == 0 {
-        // Provide context about total rows for filtered queries
-        let table_hint = extract_table_name(sql);
-        if let Some(tbl) = &table_hint {
-            let es = crate::types::EntitiesState::get(state);
-            if let Some(cache) = &es.schema_cache
-                && let Some(info) = cache.tables.iter().find(|t| t.name.eq_ignore_ascii_case(tbl))
-            {
-                return Ok(format!("0 rows returned. (Table '{}' has {} total rows.)", info.name, info.row_count));
-            }
-        }
-        return Ok("0 rows returned.".to_string());
-    }
-
-    // Cap results at MAX_RESULT_ROWS
-    if count > MAX_RESULT_ROWS {
-        let truncated = rows_data.get(..MAX_RESULT_ROWS).unwrap_or(&rows_data);
-        let table = format_markdown_table(&col_names, truncated);
-        return Ok(format!("{table}\n\n({count} rows, showing first {MAX_RESULT_ROWS})"));
-    }
-
-    let table = format_markdown_table(&col_names, &rows_data);
-    Ok(format!("{table}\n\n({count} rows)"))
+    // Build enrichment hint for empty-result context
+    let enrichment = extract_table_name(sql).and_then(|tbl| {
+        let es = crate::types::EntitiesState::get(state);
+        let cache = es.schema_cache.as_ref()?;
+        let info = cache.tables.iter().find(|t| t.name.eq_ignore_ascii_case(&tbl))?;
+        Some((info.name.clone(), info.row_count))
+    });
+    let hint = enrichment.as_ref().map(|(name, count)| (name.as_str(), *count));
+    format::query_to_markdown(conn, sql, hint)
 }
-
-/// Format a single cell value for markdown table display.
-fn format_cell(row: &rusqlite::Row<'_>, idx: usize) -> String {
-    use rusqlite::types::ValueRef;
-
-    let Ok(val) = row.get_ref(idx) else {
-        return "NULL".to_string();
-    };
-
-    match val {
-        ValueRef::Null => "NULL".to_string(),
-        ValueRef::Integer(n) => n.to_string(),
-        ValueRef::Real(f) => f.to_string(),
-        ValueRef::Text(bytes) => String::from_utf8_lossy(bytes).into_owned(),
-        ValueRef::Blob(b) => format!("[BLOB {} bytes]", b.len()),
-    }
-}
-
-/// Build a markdown table from column names and row data.
-fn format_markdown_table(cols: &[String], rows: &[Vec<String>]) -> String {
-    if cols.is_empty() {
-        return String::new();
-    }
-
-    let mut out = String::new();
-
-    // Header
-    out.push_str("| ");
-    out.push_str(&cols.join(" | "));
-    out.push_str(" |\n");
-
-    // Separator
-    out.push('|');
-    for _ in cols {
-        out.push_str("------|");
-    }
-    out.push('\n');
-
-    // Rows
-    for row in rows {
-        out.push_str("| ");
-        out.push_str(&row.join(" | "));
-        out.push_str(" |\n");
-    }
-
-    out
-}
-
-/// Try to extract the main table name from a SELECT query.
-fn extract_table_name(sql: &str) -> Option<String> {
-    let upper = sql.to_uppercase();
-    let from_pos = upper.find("FROM ")?;
-    let after_from = sql.get(from_pos.saturating_add(5)..)?;
-    let name: String = after_from.trim().chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
-    if name.is_empty() { None } else { Some(name) }
-}
-
-// =============================================================================
-// Helper
-// =============================================================================
 
 /// Build an error `ToolResult`.
 fn err(tool: &ToolUse, msg: &str) -> ToolResult {
