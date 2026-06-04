@@ -57,6 +57,9 @@ None support relational queries. *"Which engineers at French companies work on a
 | Schema guidance | **Suggested, not enforced** | Tool description includes conventions (PK patterns, FK constraints, edge tables). AI decides. |
 | Inline result cap | **50 rows** | ≤50 inline in tool result. >50 → dynamic panel with pagination. |
 | Git tracking | **Gitignore** | Binary files don't belong in git. AI can recreate schema. Export tool is a future extension. |
+| Schema management | **No ORM** | The AI IS the schema manager. It reads the panel, writes SQL. An ORM adds a translation layer that reduces flexibility and violates Principle 1. If the AI wants schema documentation, it creates a `_notes` table. |
+| Sample data in panel | **Yes, capped** | First 3 rows per table in panel context. Prevents wasted "exploration SELECTs." Capped: skip tables >10 columns, truncate values at 50 chars. |
+| Error enrichment | **Fuzzy suggestions** | On "table/column not found" errors, suggest closest match from schema. Include current schema in error responses for self-correction. |
 
 **Open:** Embedder for entities index — keyword search may suffice for short entity text. Decide during Phase 3.
 
@@ -256,23 +259,31 @@ Primary key: `{table}__{rowid}`. `_all_text` is a space-joined concatenation of 
 ```yaml
 entity_sql:
   description: >
-    Execute SQL against the project's entity database (SQLite). Use for
-    creating tables, inserting/updating/deleting entities, and querying
-    relationships. The database is empty on first use — create your own
-    schema as needed.
+    Execute SQL against the project's entity database (SQLite). The database
+    is empty on first use — create your own schema as needed.
+
+    WHEN TO USE (vs other storage):
+    - Entities: structured data with relationships, needs querying/updating
+    - Memories: isolated facts, preferences, context (flat key-value)
+    - Logs: events, decisions, actions (append-only record)
 
     Supports full SQLite: JOINs, CTEs, window functions, json_extract(),
-    foreign keys, triggers, views, transactions.
+    foreign keys, triggers, views. Multi-statement (semicolons) executes
+    atomically. Read queries return tables. Writes return affected row count.
 
-    Schema conventions (suggested, not enforced):
-    - Use INTEGER PRIMARY KEY for auto-increment IDs
+    TIPS:
+    - Use RETURNING * on INSERT/UPDATE to see the result without a separate SELECT
+    - Use INTEGER PRIMARY KEY for auto-increment IDs (NOT AUTOINCREMENT — it's slower and unnecessary)
+    - Use CREATE TABLE IF NOT EXISTS for idempotent schema setup
     - Use FOREIGN KEY constraints to model relationships
-    - For graph patterns, consider edges(source_type, source_id,
-      target_type, target_id, rel_type)
+    - SQLite types are flexible: TEXT, INTEGER, REAL, BLOB. No VARCHAR(N) — length is ignored.
+    - For graph patterns: edges(source_type, source_id, target_type, target_id, rel_type)
 
-    Multi-statement: separate with semicolons. Executed atomically.
-    Read queries return formatted tables. Writes return affected row count.
-    DDL returns the updated schema overview.
+    EXAMPLE — creating and querying a simple schema:
+      CREATE TABLE companies (id INTEGER PRIMARY KEY, name TEXT NOT NULL, country TEXT);
+      CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT, company_id INTEGER REFERENCES companies(id));
+      INSERT INTO companies (name, country) VALUES ('Acme', 'France') RETURNING *;
+      SELECT p.name, c.name FROM people p JOIN companies c ON p.company_id = c.id;
   params:
     sql:
       type: string
@@ -288,9 +299,20 @@ entity_sql:
 | CREATE / ALTER / DROP / CREATE INDEX | Starts with DDL keyword | Full schema summary | Yes |
 | WITH ... SELECT (CTE) | Starts with WITH, no DML keywords | Markdown table | No |
 | WITH ... INSERT/UPDATE/DELETE | Starts with WITH, contains DML | Affected rows | Yes |
-| Error | SQLite returns error | `is_error: true` + error message + failing SQL | No |
+| Error | SQLite returns error | `is_error: true` + enriched error (see below) | No |
 
 **Conservative fallback:** if classification is ambiguous, treat as write (sync is idempotent).
+
+### Error enrichment
+
+Raw SQLite errors are wrapped with context to help the AI self-correct:
+
+- **Unknown table** → `"Table 'peple' not found. Did you mean 'people'?"` (Levenshtein against `sqlite_master`)
+- **Unknown column** → `"Column 'compay_id' not found in 'people'. Columns: id, name, company_id, role"` (list actual columns)
+- **Any error** → append current schema summary so the AI can see what exists without a separate query
+- **Constraint violation** → include the constraint definition (FK target, UNIQUE columns)
+
+Implementation: wrap `rusqlite::Error` in a `fn enrich_error(err, conn) -> String` that queries the schema for fuzzy matches. Use simple Levenshtein (≤2 edits) — no external dep needed, ~30 lines.
 
 ### Multi-statement handling
 
@@ -308,6 +330,10 @@ Split on `;` respecting single-quoted string literals (state machine tracking `i
 
 NULL → `NULL`. BLOB → `[BLOB N bytes]`. No alignment padding.
 
+**Empty results:** `"0 rows returned. (Table 'X' has Y total rows.)"` — tells the AI the table isn't empty, just the filter matched nothing. Prevents unnecessary follow-up SELECTs.
+
+**INSERT/UPDATE with RETURNING:** If the SQL includes a `RETURNING` clause, format the returned rows as a table (same as SELECT). This is the preferred pattern — the tool description recommends it.
+
 ### Lifecycle
 
 Every `entity_sql` call: open connection → classify → execute → format result → refresh panel (`touch_panel(Kind::ENTITIES)`) → if write: fire-and-forget Meilisearch sync → drop connection.
@@ -324,14 +350,28 @@ Fixed panel. `Kind::ENTITIES`, `fixed_order = Some(5)` (after Memories), `needs_
 
 **Empty state:** `"No entity tables. Use entity_sql to create your schema."`
 
-**LLM context** — one line per table:
+**LLM context** — schema + sample data for quick orientation:
 
 ```
 Entity Database (3 tables, 89 rows, 48 KB):
-- companies (23 rows): id INTEGER PK, name TEXT, country TEXT, founded INTEGER, ceo_id INTEGER FK→people(id)
-- people (45 rows): id INTEGER PK, name TEXT, role TEXT, company_id INTEGER FK→companies(id), email TEXT
-- projects (21 rows): id INTEGER PK, name TEXT, status TEXT, company_id INTEGER FK→companies(id), lead_id INTEGER FK→people(id)
+
+companies (23 rows):
+  id INTEGER PK, name TEXT, country TEXT, founded INTEGER
+  FK: ceo_id → people(id)
+  Sample: (1, 'Acme Corp', 'France', 2019), (2, 'Globex', 'US', 2015), (3, 'Initech', 'UK', 2021)
+
+people (45 rows):
+  id INTEGER PK, name TEXT, role TEXT, company_id INTEGER
+  FK: company_id → companies(id)
+  Sample: (1, 'John Doe', 'CTO', 1), (2, 'Jane Smith', 'Engineer', 2), (3, 'Bob Lee', 'PM', 1)
+
+projects (21 rows):
+  id INTEGER PK, name TEXT, status TEXT, company_id INTEGER, lead_id INTEGER
+  FK: company_id → companies(id), lead_id → people(id)
+  Sample: (1, 'Phoenix', 'active', 1, 1), (2, 'Atlas', 'planning', 2, 2)
 ```
+
+**Sample data rules:** First 3 rows per table via `SELECT * FROM {table} LIMIT 3`. Truncate individual values at 50 chars. Skip sample rows for tables with >10 columns (schema-only for wide tables). Empty tables show `(empty)` instead of sample rows.
 
 **IR blocks:** `Block::KeyValue` for table headers, `Block::Line` for columns. Table names → `Accent`, types → `Code`, FKs → `Muted`.
 
