@@ -1,0 +1,1 @@
+CREATE INDEX idx_companies_country ON companies(country); CREATE INDEX idx_people_company ON people(company_id)

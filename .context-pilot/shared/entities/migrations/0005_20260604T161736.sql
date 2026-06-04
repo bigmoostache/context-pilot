@@ -1,0 +1,1 @@
+CREATE TABLE audit_log (id INTEGER PRIMARY KEY, action TEXT, table_name TEXT, row_id INTEGER, ts TEXT DEFAULT (datetime('now')))

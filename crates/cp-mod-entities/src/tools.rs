@@ -4,7 +4,7 @@ use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::types::SchemaCache;
+use crate::errors::enrich_error;
 use crate::{db, migrations};
 
 // =============================================================================
@@ -24,10 +24,13 @@ pub(crate) enum SqlKind {
 
 /// Classify a SQL statement by its first keyword.
 ///
-/// CTEs (`WITH ... SELECT` vs `WITH ... INSERT`) are detected by scanning
-/// for DML/DDL keywords after the CTE. Default is [`SqlKind::Dml`] (conservative).
+/// Leading SQL comments (`--` line and `/* */` block) are stripped before
+/// classification. CTEs (`WITH ... SELECT` vs `WITH ... INSERT`) are detected
+/// by scanning for DML/DDL keywords after the CTE. Default is [`SqlKind::Dml`]
+/// (conservative).
 pub(crate) fn classify(sql: &str) -> SqlKind {
-    let upper = sql.trim().to_uppercase();
+    let stripped = strip_leading_comments(sql);
+    let upper = stripped.trim().to_uppercase();
     let first_word: String = upper.chars().take_while(char::is_ascii_alphabetic).collect();
 
     match first_word.as_str() {
@@ -50,6 +53,28 @@ fn classify_cte(upper: &str) -> SqlKind {
         return SqlKind::Dml;
     }
     SqlKind::Select
+}
+
+/// Strip leading SQL comments from a string.
+///
+/// Removes `--` line comments and `/* ... */` block comments that appear
+/// before the first actual SQL keyword. Handles multiple consecutive comments.
+fn strip_leading_comments(sql: &str) -> &str {
+    let mut s = sql.trim_start();
+    loop {
+        if s.starts_with("--") {
+            // Skip to end of line
+            s = s.find('\n').map_or("", |pos| s.get(pos.saturating_add(1)..).unwrap_or(""));
+            s = s.trim_start();
+        } else if s.starts_with("/*") {
+            // Skip to closing */
+            s = s.get(2..).unwrap_or("").find("*/").map_or("", |pos| s.get(pos.saturating_add(4)..).unwrap_or(""));
+            s = s.trim_start();
+        } else {
+            break;
+        }
+    }
+    s
 }
 
 // =============================================================================
@@ -199,12 +224,40 @@ fn execute_select(conn: &Connection, sql: &str, state: &State) -> Result<String,
 }
 
 /// Execute a DML statement. Handles `RETURNING` clauses.
+///
+/// Multi-statement batches are wrapped in an implicit transaction for
+/// atomicity (all-or-nothing), unless the user already controls
+/// transactions explicitly with `BEGIN`.
 fn execute_dml(conn: &Connection, sql: &str) -> Result<String, String> {
     let stmts = split_statements(sql);
     let upper = sql.to_uppercase();
     let has_returning = upper.contains("RETURNING");
 
-    // Execute all statements
+    // Wrap multi-statement batches in an implicit transaction for atomicity,
+    // unless the user already starts with BEGIN (explicit transaction control).
+    let needs_implicit_tx =
+        stmts.len() > 1 && !stmts.first().is_some_and(|s| s.trim().to_uppercase().starts_with("BEGIN"));
+
+    if needs_implicit_tx {
+        conn.execute_batch("BEGIN").map_err(|e| format!("{e}"))?;
+    }
+
+    let result = execute_dml_stmts(conn, &stmts, has_returning);
+
+    if needs_implicit_tx {
+        match &result {
+            Ok(_) => conn.execute_batch("COMMIT").map_err(|e| format!("{e}"))?,
+            Err(_) => {
+                let _rb = conn.execute_batch("ROLLBACK");
+            }
+        }
+    }
+
+    result
+}
+
+/// Inner loop for DML execution — separated so the caller can wrap in a transaction.
+fn execute_dml_stmts(conn: &Connection, stmts: &[&str], has_returning: bool) -> Result<String, String> {
     let mut total_affected = 0usize;
     for (i, stmt) in stmts.iter().enumerate() {
         let is_last = i == stmts.len().saturating_sub(1);
@@ -354,115 +407,6 @@ fn extract_table_name(sql: &str) -> Option<String> {
     let after_from = sql.get(from_pos.saturating_add(5)..)?;
     let name: String = after_from.trim().chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
     if name.is_empty() { None } else { Some(name) }
-}
-
-// =============================================================================
-// Error enrichment
-// =============================================================================
-
-/// Enrich a `SQLite` error message with schema context and fuzzy suggestions.
-fn enrich_error(err: &str, schema: &SchemaCache) -> String {
-    let mut parts = vec![format!("SQL error: {err}")];
-
-    // Detect "no such table" and suggest closest match
-    if let Some(unknown) = extract_after(err, "no such table: ") {
-        let names: Vec<&str> = schema.tables.iter().map(|t| t.name.as_str()).collect();
-        if let Some(suggestion) = closest_match(&unknown, &names, 2) {
-            parts.push(format!("Did you mean table '{suggestion}'?"));
-        }
-    }
-
-    // Detect "no such column" and suggest closest match
-    if let Some(unknown) = extract_after(err, "no such column: ") {
-        let all_cols: Vec<String> =
-            schema.tables.iter().flat_map(|t| t.columns.iter().map(|c| c.name.clone())).collect();
-        let col_refs: Vec<&str> = all_cols.iter().map(String::as_str).collect();
-        if let Some(suggestion) = closest_match(&unknown, &col_refs, 2) {
-            parts.push(format!("Did you mean column '{suggestion}'?"));
-        }
-    }
-
-    // Append schema summary
-    if !schema.tables.is_empty() {
-        parts.push(String::from("\nCurrent schema:"));
-        for table in &schema.tables {
-            let cols: Vec<String> = table
-                .columns
-                .iter()
-                .map(|c| {
-                    let pk = if c.is_pk { " PK" } else { "" };
-                    format!("{} {}{pk}", c.name, c.col_type)
-                })
-                .collect();
-            parts.push(format!("  {} ({}): {}", table.name, table.row_count, cols.join(", ")));
-        }
-    }
-
-    parts.join("\n")
-}
-
-/// Extract text after a pattern in an error message.
-fn extract_after(err: &str, pattern: &str) -> Option<String> {
-    let pos = err.find(pattern)?;
-    let start = pos.saturating_add(pattern.len());
-    let rest = err.get(start..)?;
-    let word: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
-    if word.is_empty() { None } else { Some(word) }
-}
-
-/// Find the closest match within a Levenshtein distance threshold.
-fn closest_match<'candidate>(target: &str, candidates: &[&'candidate str], max_dist: usize) -> Option<&'candidate str> {
-    let target_lower = target.to_lowercase();
-    let mut best: Option<(&str, usize)> = None;
-
-    for candidate in candidates {
-        let dist = levenshtein(&target_lower, &candidate.to_lowercase());
-        if dist <= max_dist && (best.is_none() || dist < best.map_or(usize::MAX, |(_, d)| d)) {
-            best = Some((candidate, dist));
-        }
-    }
-
-    best.map(|(name, _)| name)
-}
-
-/// Levenshtein distance between two strings.
-fn levenshtein(source: &str, target: &str) -> usize {
-    let source_chars: Vec<char> = source.chars().collect();
-    let target_chars: Vec<char> = target.chars().collect();
-    let source_len = source_chars.len();
-    let target_len = target_chars.len();
-
-    if source_len == 0 {
-        return target_len;
-    }
-    if target_len == 0 {
-        return source_len;
-    }
-
-    // Use a single row (previous + current)
-    let row_len = target_len.saturating_add(1);
-    let mut prev: Vec<usize> = (0..row_len).collect();
-    let mut curr = vec![0usize; row_len];
-
-    for i in 1..=source_len {
-        if let Some(cell) = curr.get_mut(0) {
-            *cell = i;
-        }
-        for j in 1..=target_len {
-            let cost = usize::from(source_chars.get(i.saturating_sub(1)) != target_chars.get(j.saturating_sub(1)));
-
-            let del = prev.get(j).copied().unwrap_or(usize::MAX).saturating_add(1);
-            let ins = curr.get(j.saturating_sub(1)).copied().unwrap_or(usize::MAX).saturating_add(1);
-            let sub = prev.get(j.saturating_sub(1)).copied().unwrap_or(usize::MAX).saturating_add(cost);
-
-            if let Some(cell) = curr.get_mut(j) {
-                *cell = del.min(ins).min(sub);
-            }
-        }
-        std::mem::swap(&mut prev, &mut curr);
-    }
-
-    prev.get(target_len).copied().unwrap_or_default()
 }
 
 // =============================================================================

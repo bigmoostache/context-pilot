@@ -26,7 +26,7 @@ pub(crate) fn open(db_path: &Path) -> Result<Connection, String> {
         "PRAGMA journal_mode = WAL;
          PRAGMA foreign_keys = ON;
          PRAGMA busy_timeout = 5000;
-         PRAGMA journal_size_limit = 0x4_000_000;",
+         PRAGMA journal_size_limit = 67108864;",
     )
     .map_err(|e| format!("PRAGMA setup failed: {e}"))?;
 

@@ -142,6 +142,10 @@
   path: src/llms/cache/mod.rs
   description: 'Module declarations: cache_engine, cache_optimizer, density.'
   last_edited_ms: 0
+101262b84b5c5754:
+  path: yamls/tools/search.yaml
+  description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
+  last_edited_ms: 0
 10376e0490f231c6:
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
@@ -489,6 +493,10 @@
 331dca0d45b790d8:
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: Firecrawl result panel. Same pattern as brave panel — static content in metadata, cache restore post-reload, pagination. FIRECRAWL_PANEL_TYPE constant.
+  last_edited_ms: 0
+341bf99f4a188e88:
+  path: crates/cp-mod-entities/src/lib.rs
+  description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
   last_edited_ms: 0
 342271112f0c3859:
   path: src/llms/cache/cache_optimizer.rs
@@ -850,6 +858,10 @@
   path: crates/cp-mod-spine/src/types.rs
   description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom), NotificationStatus (Unprocessed/Blocked/Processed). SpineConfig: guard rail limits + runtime tracking. SpineState: create/mark/delete/unblock notifications. mark_all_unprocessed_as_processed() for continuation consumption.'
   last_edited_ms: 0
+574464bbe01f907c:
+  path: crates/cp-mod-search/src/lib.rs
+  description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
+  last_edited_ms: 0
 57b7952a9cbf9b7e:
   path: src/ui/perf/mod.rs
   description: 'In-memory perf system. LazyLock PerfMetrics: per-op AtomicU64 stats + RingBuffer<u64> samples, frame times, CPU/RAM, open FDs + rlimit. Platform-specific read_proc_stat(): Linux /proc/self/stat, macOS via ps command, fallback None. snapshot() for overlay. F12 toggle.'
@@ -918,6 +930,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.5 duplicate Close_conversation_history queue check (panels[].panel_id extraction, skipped during trap), Phase 1 schema validation, Phase 2 module semantic checks.'
   last_edited_ms: 0
+60bad2b9bbf7560b:
+  path: crates/cp-mod-search/src/panel.rs
+  description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
+  last_edited_ms: 0
 610108d1a979bbe7:
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
@@ -945,6 +961,10 @@
 625cf1ad506f9875:
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'
+  last_edited_ms: 0
+62ca35371b6fa7c3:
+  path: crates/cp-mod-entities/src/db.rs
+  description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
   last_edited_ms: 0
 6361792c7f8df4c1:
   path: src/app/run/tools/pipeline.rs
@@ -2158,6 +2178,10 @@ f1a5f3c3f8848be3:
   path: src/app/panels.rs
   description: Thin wrapper around cp_base::panels. get_panel() delegates to module system. FallbackPanel for orphaned contexts. refresh_all_panels() and collect_all_context() helpers.
   last_edited_ms: 0
+f1db8c64c998169a:
+  path: crates/cp-mod-entities/src/tools.rs
+  description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
+  last_edited_ms: 0
 f1f5ea818e50172d:
   path: crates/cp-mod-tree/src/types.rs
   description: Tree state types. TreeFileDescription (path, description, file_hash). TreeState (filter, open_folders, descriptions). DEFAULT_TREE_FILTER constant.
@@ -2266,6 +2290,10 @@ fb144d05c6aabf4c:
   path: crates/cp-mod-spine/src/engine.rs
   description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'
   last_edited_ms: 0
+fbc4be5c5bea5e56:
+  path: crates/cp-mod-entities/src/tools.rs
+  description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
+  last_edited_ms: 0
 fbdba9aa57c1a77a:
   path: crates/cp-render/Cargo.toml
   description: 'Render crate deps: serde only. Minimal.'
@@ -2273,6 +2301,10 @@ fbdba9aa57c1a77a:
 fbdfad8623375f53:
   path: src/modules/conversation/render_blocks.rs
   description: 'IR-based message renderer: emits Vec<Block>. Handles tool calls (YAML params with wrapping), tool results (custom visualizers + fallback), text messages (markdown parsing via markdown_ir, code blocks, tables). Complex visualizer blocks passed through as-is. Dev-mode token counts.'
+  last_edited_ms: 0
+fbf8fe9fb44a116e:
+  path: crates/cp-mod-entities/src/lib.rs
+  description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
   last_edited_ms: 0
 fc4be9dd868a81ef:
   path: src/llms/oai_providers/grok.rs
@@ -2289,6 +2321,10 @@ fd604dcc85d708e3:
 fdc71c3c93143d63:
   path: crates/cp-mod-utilities/src/secret.rs
   description: Redacted newtype — Debug/Display print [REDACTED]. expose_secret() for access. Replaces secrecy crate.
+  last_edited_ms: 0
+fe93f968075e94d3:
+  path: crates/cp-mod-search/src/tools.rs
+  description: Search tool execution with flame!("search_exec"). Split keyword+semantic multi-search via MeiliClient. dedup_by_score() merges overlapping results. iso_to_ms() via cp_mod_utilities::time. File/log filters. Async via spawn_async_tool. DynPanel creation. Mandatory semantic_query param.
   last_edited_ms: 0
 feeba821ce42dd7e:
   path: crates/cp-base/src/config/yaml_sync.rs

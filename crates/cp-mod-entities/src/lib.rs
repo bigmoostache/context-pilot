@@ -6,6 +6,8 @@
 
 /// SQLite connection factory, bootstrap, introspection, dump, and restore.
 mod db;
+/// SQL error enrichment: fuzzy suggestions and schema context.
+mod errors;
 /// Auto-capture DDL as numbered migration files + sequential replay for recovery.
 mod migrations;
 /// Fixed Entities panel — live schema, sample data, and empty-state guide.
