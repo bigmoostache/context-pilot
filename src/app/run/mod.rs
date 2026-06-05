@@ -1,3 +1,5 @@
+/// Daemon event loop (`App::run_daemon`) — polls socket server instead of terminal.
+pub(crate) mod daemon_loop;
 /// Constructor, state persistence helpers, autocomplete / question-form / palette input handlers.
 mod input;
 /// Main event loop (`App::run`) and spine check / auto-continuation.

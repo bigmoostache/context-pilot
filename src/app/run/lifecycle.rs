@@ -238,7 +238,7 @@ impl App {
     }
 
     /// Dispatch an `Action` through `apply_action` and handle the resulting side-effects.
-    fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
+    pub(crate) fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
         // Any action triggers a re-render
         self.state.flags.ui.dirty = true;
         match apply_action(&mut self.state, action) {
@@ -295,7 +295,7 @@ impl App {
     /// Check the spine for auto-continuation decisions.
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
-    fn check_spine(&mut self, tx: &Sender<StreamEvent>) {
+    pub(crate) fn check_spine(&mut self, tx: &Sender<StreamEvent>) {
         // Check if incomplete todos should trigger auto-continuation
         self.check_todo_continuation();
 
@@ -361,7 +361,7 @@ impl App {
 
     /// Tick dirty flag so time-based spinners re-render.
     /// Throttled to 10fps (100ms) to avoid unnecessary re-renders.
-    fn update_spinner_animation(&mut self) {
+    pub(crate) fn update_spinner_animation(&mut self) {
         let now = now_ms();
         if now.saturating_sub(self.last_spinner_ms) < 100 {
             return;

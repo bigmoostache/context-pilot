@@ -58,6 +58,10 @@
   path: crates/cp-base/src/config/accessors.rs
   description: Theme state (AtomicU8 index), color/icon/char accessors, library + prompt template getters
   last_edited_ms: 0
+04d073b81893ca46:
+  path: src/headless/client.rs
+  description: 'Thin attach client. HeadlessClient: connect (Attach handshake, reader thread→mpsc), run (terminal init/cleanup), event_loop (poll terminal+socket, Ctrl+Z detach, Ctrl+Q quit). Renders IR frames: reuses sidebar/status_bar adapters, own panel+conversation renderers with auto-scroll-to-bottom.'
+  last_edited_ms: 0
 04f4927c0b9ccd3b:
   path: crates/cp-mod-search/src/meili/api.rs
   description: Meilisearch HTTP API client. MeiliClient with index CRUD, document ops, search/multi_search, facet_distribution, stats. SearchParams for query building. pub struct for cross-module use (entities sync).
@@ -69,6 +73,10 @@
 0554dfaaec7c46af:
   path: crates/cp-mod-typst/src/lib.rs
   description: 'Typst module. 1 tool: typst_execute. Embedded compiler (no external binary). Depends on core+callback. catch-all watchlist callback recompiles affected docs. Seeds shared templates. @preview/ package support.'
+  last_edited_ms: 0
+056a5e7c9b3f2178:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
 05ab5ce0d2a53561:
   path: crates/cp-mod-files/src/tools/edit_file.rs
@@ -245,6 +253,10 @@
 118f8cac3f61eaa9:
   path: crates/cp-mod-entities/src/sync.rs
   description: Meilisearch sync for entity data — incremental dirty-tracked, delete-then-add. ensure_index, sync_table, flush_sync, full_reindex. extract_affected_tables for SQL parsing.
+  last_edited_ms: 0
+11cd23f227c54dd9:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
 123157596598d710:
   path: crates/cp-mod-prompt/src/seed.rs
@@ -426,6 +438,10 @@
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, cp-mod-utilities, log.'
   last_edited_ms: 1780565428719
+1f387f0f1be548d0:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
 1f4fe238b1cbb5df:
   path: src/app/prompt_builder.rs
   description: 'Canonical prompt assembly with flame!("prompt_build"). 3 phases: panel injection (fake tool_use/result pairs) → conversation messages (tool pairing) → message alternation. Seed re-injection after panels.'
@@ -477,6 +493,10 @@
 227369efc7058e7b:
   path: crates/cp-base/src/tools/async_exec.rs
   description: Async tool execution — spawn_async_tool() runs blocking I/O on worker thread. ToolOutput struct (content, is_error, create_panel, preserves_tempo). BLOCKING_TOOL_SENTINEL constant. ChannelWatcher registration. Error encoding via ASYNC_ERROR_PREFIX in description.
+  last_edited_ms: 0
+22ab1d6233a435b6:
+  path: increment.txt
+  description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
 22b269fd4df74fd9:
   path: Cargo.toml
@@ -550,6 +570,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+286794751b73087d:
+  path: crates/cp-render/src/frame.rs
+  description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks). All Serialize+Deserialize.
+  last_edited_ms: 1780658996337
 2886480e48a90922:
   path: crates/cp-mod-files/src/panel.rs
   description: File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based).
@@ -822,6 +846,10 @@
   path: yamls/tools/firecrawl.yaml
   description: 'Firecrawl tools YAML. 4 tools: firecrawl_scrape (single URL), firecrawl_search (search+scrape), firecrawl_map (URL discovery), firecrawl_crawl (recursive crawl to file).'
   last_edited_ms: 1780560886866
+3b5339901dc41434:
+  path: src/headless/mod.rs
+  description: Headless module glue — declares protocol and session sub-modules. Server and client commented out pending Phase 3–4.
+  last_edited_ms: 1780659331201
 3b6333a154f242aa:
   path: src/state/persistence/save.rs
   description: 'Save operations: flame!("save_batch") + flame!("save_state"). build_save_batch() serializes config/worker/panels/messages/logs into WriteBatch. save_state() blocking sync persist. check_ownership(). log_error() to disk.'
@@ -990,10 +1018,18 @@
   path: crates/cp-mod-prompt/src/types.rs
   description: PromptItem (id/name/type/content/description), PromptState, PromptType enum
   last_edited_ms: 0
+49454cb97f8e73d0:
+  path: src/headless/session.rs
+  description: Session directory management. ~/.context-pilot/sessions/<FNV1a-hash>/. PID file, project_path, socket path helpers. is_pid_alive (kill -0 probe). Stale cleanup. list_sessions() scans all dirs + auto-cleans dead PIDs.
+  last_edited_ms: 1780659331226
 495ebf7bcd744ad6:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+498dc7a60d65e32b:
+  path: Cargo.toml
+  description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation. crossterm serde feature enabled.
+  last_edited_ms: 1780658996371
 49b8bf07f497e29e:
   path: src/app/run/tools/queue_flush.rs
   description: Queue flush execution — dequeues and runs all queued tool calls. FlushedTool struct + execute_queue_flush(). save_flushed_tool_call_message() creates compact Tool_execution stubs. augment_remaining_history_panels() appends remaining panel info. Extracted from pipeline.rs for file-length limit.
@@ -1018,6 +1054,10 @@
   path: crates/cp-mod-spine/src/guard_rail.rs
   description: 'Guard rail implementations: MaxOutputTokens, MaxCost (stream/burst-based), MaxDuration, MaxMessages, MaxAutoRetries. GuardRailStopLogic trait. all_guard_rails() static list.'
   last_edited_ms: 0
+4bf1461a6217fa3f:
+  path: src/app/run/mod.rs
+  description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
+  last_edited_ms: 0
 4c1d66b03646b860:
   path: src/app/mod.rs
   description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file/gh watchers, timers, PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt_builder, reverie, run.'
@@ -1041,6 +1081,10 @@
 4d457b7ceca9acae:
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
+  last_edited_ms: 0
+4d52dc9ec6771544:
+  path: increment.txt
+  description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
 4dbb8631408985d3:
   path: crates/cp-mod-github/src/lib.rs
@@ -1190,6 +1234,10 @@
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
   last_edited_ms: 0
+574f06f022965833:
+  path: .github/checks/allowed-lint-exceptions.yaml
+  description: 'Curated list of allowed #[expect]/#[allow] annotations (11 entries). Every occurrence in the codebase MUST have an entry here. Fields: path, match, reason, strategy.'
+  last_edited_ms: 1780661234709
 576cce6ad1726f4a:
   path: docs/pdf-module.md
   description: Typst PDF module design
@@ -1326,6 +1374,10 @@
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
   last_edited_ms: 0
+6384d644a8c73bb3:
+  path: crates/cp-render/src/conversation.rs
+  description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm, Autocomplete, PerfOverlay, ConfigOverlay, PaletteOverlay, SearchIndexOverlay. All Serialize+Deserialize.'
+  last_edited_ms: 1780658996348
 6399f0afbf7eec50:
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). GH sync every 5s. FD cleanup (stale watch removal). suicide() auto-close.
@@ -1402,6 +1454,10 @@
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
   last_edited_ms: 0
+6ad583519809146d:
+  path: src/headless/mod.rs
+  description: Headless module glue — declares protocol, session, and server sub-modules. Client commented out pending Phase 4.
+  last_edited_ms: 1780659679113
 6b337c67d5dc532a:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation.
@@ -1634,6 +1690,10 @@
   path: crates/cp-mod-ocr/src/client.rs
   description: 'Datalab OCR API client with flame!("ocr_convert"). Multipart file upload, exponential backoff polling, disk cache (~/.context-pilot/ocr-cache/) keyed by SHA-256 of file bytes + mode. OcrMode: Markdown/TextBoxes.'
   last_edited_ms: 0
+7c28ad144f353147:
+  path: Cargo.toml
+  description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation. crossterm serde feature enabled.
+  last_edited_ms: 0
 7c8d1c712f95c232:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -1645,6 +1705,10 @@
 7ca281a98e876d4a:
   path: yamls/tools/logs.yaml
   description: Log tools YAML. log_create (entries with content+importance) + Close_conversation_history (panels array with panel_id + logs as simple strings). No tags, no memories.
+  last_edited_ms: 0
+7cc84db92b6da862:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
 7cfd2cfc2f568cf9:
   path: src/llms/cache/density.rs
@@ -1690,6 +1754,10 @@
   path: docs/genai-france-vibe.md
   description: GenAI France 2026 conference analysis — lineup, vibe, talk positioning, title naming patterns.
   last_edited_ms: 0
+80e358958f89a911:
+  path: src/headless/client.rs
+  description: 'Thin attach client. HeadlessClient: connect (Attach handshake, reader thread→mpsc), run (terminal init/cleanup), event_loop (poll terminal+socket, Ctrl+Z detach, Ctrl+Q quit). Renders IR frames: reuses sidebar/status_bar adapters, own panel+conversation renderers with auto-scroll-to-bottom.'
+  last_edited_ms: 1780659906909
 80e48990db9b0771:
   path: src/llms/claude_code/message_format.rs
   description: 'inject_system_reminder(): CC validation marker injection, string→array normalization, tool_result-aware fallback'
@@ -1846,6 +1914,10 @@
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+8bca24e59554fb41:
+  path: src/headless/protocol.rs
+  description: JSON-line wire protocol. ClientMessage (Input/Attach/Detach/Quit/Ping) + DaemonMessage (FrameUpdate/Pong/Shutdown). ProtocolError enum. Generic read_message/write_message helpers with BufRead/Write.
+  last_edited_ms: 1780661234697
 8c0867d815410d9d:
   path: docs/console-server.md
   description: Console server protocol and process management
@@ -1970,6 +2042,10 @@
   path: crates/cp-render/src/conversation.rs
   description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm (with cursor/typing_other/other_text), Autocomplete (with dir_prefix/total_matches/input_visual_lines), PerfOverlay (with open_fds/fd_limit_soft/fd_semantic), ConfigOverlay, PaletteOverlay, SearchIndexOverlay. All serializable.'
   last_edited_ms: 0
+9647574d4518dd6c:
+  path: src/main.rs
+  description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 0
 9789ccbb64e37192:
   path: deploy_local.sh
   description: 'Local deployment script: builds + installs binary'
@@ -2002,10 +2078,18 @@
   path: src/modules/overview/tools/manage_tools.rs
   description: 'tool_manage execute: enable/disable tools, MANAGE_TOOLS_ID + panel_goto_page protection, partial success'
   last_edited_ms: 0
+9a51b8a90eb6162a:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
 9a61a00374a7164b:
   path: src/state/mod.rs
   description: 'Re-exports from cp_base (Entry, Kind, State, Message, etc.) + local submodules: cache, persistence'
   last_edited_ms: 0
+9a7e00f3b8b1d9a6:
+  path: src/headless/protocol.rs
+  description: JSON-line wire protocol. ClientMessage (Input/Attach/Detach/Quit/Ping) + DaemonMessage (FrameUpdate/Pong/Shutdown). ProtocolError enum. Generic read_message/write_message helpers with BufRead/Write.
+  last_edited_ms: 1780659331213
 9b02dc21e25cfee8:
   path: crates/cp-mod-git/Cargo.toml
   description: 'Git module deps: cp-base, cp-render, crossterm, serde_json, regex.'
@@ -2110,6 +2194,10 @@ a139f333bbc083aa:
   path: .github/checks/clippy_lints_list.md
   description: Expected clippy lints list for comparison
   last_edited_ms: 0
+a1ad4d6d1e454de4:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
+  last_edited_ms: 0
 a24ca6a492b02678:
   path: src/llms/claude_code/mod.rs
   description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
@@ -2186,6 +2274,10 @@ a91032af6edb5c3b:
   path: test_file_to_describe.txt
   description: Version B of the test file
   last_edited_ms: 0
+a95ce1664f13f812:
+  path: src/headless/server.rs
+  description: 'Multi-client Unix socket server. SocketServer: bind, non-blocking accept, per-client reader thread→mpsc, broadcast_frame (serialize once, write all), poll_events, client_count, latest_terminal_size, shutdown. Drop cleans socket file.'
+  last_edited_ms: 0
 a9945ad52fca5540:
   path: crates/cp-base/src/config/constants.rs
   description: Layout/timing constants. SIDEBAR_HELP_HEIGHT=10 (9 help hints + separator). MAX_SIDEBAR_LABEL_LEN, INPUT_RESERVE, TEMPO_*, token thresholds, typing indicator timing.
@@ -2254,6 +2346,10 @@ ae31931415268f77:
   path: crates/cp-mod-prompt/src/library_panel.rs
   description: 'LibraryPanel: renders agent/skill/command tables, prompt editor view'
   last_edited_ms: 0
+ae44ba2be1764ac0:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
 ae7544be6efd88b2:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, ≤150 lines AND ≤8000 bytes inline+tempo, bigger entity_result panel+no tempo. 200-row cap. RETURNING support.
@@ -2269,6 +2365,10 @@ af14c600c0042c99:
 af638eaf96a0207c:
   path: crates/cp-mod-git/src/classify.rs
   description: ReadOnly/Mutating classification, shell arg parsing with quote handling, operator blocking, subcommand-aware classify_git()
+  last_edited_ms: 0
+af67071c2587601e:
+  path: src/headless/session.rs
+  description: Session directory management. ~/.context-pilot/sessions/<FNV1a-hash>/. PID file, project_path, socket path helpers. is_pid_alive (kill -0 probe). Stale cleanup. list_sessions() scans all dirs + auto-cleans dead PIDs.
   last_edited_ms: 0
 afd5f6a171e03b31:
   path: website/docs/keyboard.html
@@ -2350,6 +2450,10 @@ b49ceed9e40e0a12:
   path: docs/genai-france-vibe.md
   description: GenAI France 2026 conference analysis — lineup, vibe, talk positioning, title naming patterns.
   last_edited_ms: 0
+b4be35e50abcea4c:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
 b4d042a53b65c218:
   path: crates/cp-mod-entities/src/format.rs
   description: SQL result formatting utilities. query_to_markdown (shared by tools.rs and result_panel.rs), format_cell, format_markdown_table, extract_table_name. MAX_RESULT_ROWS=200 cap.
@@ -2381,6 +2485,10 @@ b689ff54e81da946:
 b6be0d9dc7f74661:
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, ignore, cp-mod-utilities.'
+  last_edited_ms: 0
+b725dbb57c4c2514:
+  path: src/headless/client.rs
+  description: 'Thin attach client. HeadlessClient: connect (Attach handshake, reader thread→mpsc), run (terminal init/cleanup), event_loop (poll terminal+socket, Ctrl+Z detach, Ctrl+Q quit). Renders IR frames: reuses sidebar/status_bar adapters, own panel+conversation renderers with auto-scroll-to-bottom.'
   last_edited_ms: 0
 b72e91359bc352c2:
   path: crates/cp-mod-brave/src/panel.rs
@@ -2526,6 +2634,10 @@ c38efa785cbc3000:
   path: crates/cp-mod-brave/src/types.rs
   description: 'Brave API serde types: BraveSearchResponse (web/rich results), LLMContextResponse (grounding items)'
   last_edited_ms: 0
+c3aaaf246d6d12de:
+  path: crates/cp-render/src/overlay_ir.rs
+  description: Search index overlay IR types (Ctrl+I). SearchIndexOverlay, SearchServer, SearchIndex, SearchExtension, SearchSplitter, SearchEmbeddings, SearchTask, SearchRecomputed, SearchRecentFile. All Serialize+Deserialize.
+  last_edited_ms: 1780658996360
 c3e00b84691cd46d:
   path: src/llms/claude_code/check_api.rs
   description: 'Health-check helpers: system_block(), CheckRequest struct, build_check_request() with CC-specific headers'
@@ -2862,6 +2974,10 @@ ddb10c875236eedb:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+de63581d79c6b835:
+  path: src/headless/mod.rs
+  description: Headless module glue — declares protocol, session, server, and client sub-modules.
+  last_edited_ms: 0
 def0ccd673154b9d:
   path: crates/cp-mod-todo/Cargo.toml
   description: 'Todo module deps: cp-base, cp-render, crossterm, serde, serde_json.'
@@ -2934,6 +3050,10 @@ e764dee9fb758b38:
   path: crates/cp-mod-entities/src/types.rs
   description: EntitiesState (db_path, dump_path, migrations_dir, schema_cache), SchemaCache, TableInfo, ColumnInfo, ForeignKeyInfo. get/get_mut helpers for State TypeMap access.
   last_edited_ms: 1780585450727
+e79d50f58104ffe9:
+  path: dummy_test.rs
+  description: Dummy Rust file for testing pre-flight enforcement — can be deleted
+  last_edited_ms: 1780655007567
 e82421db0781e690:
   path: yamls/tools/files.yaml
   description: 'File tools YAML. 3 tools: Open (path string/array), Edit (file_path, old_string, new_string), Write (file_path, contents, skip_callbacks).'
@@ -2998,6 +3118,10 @@ ed11d32eca739db4:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
   last_edited_ms: 0
+ed4be8103f38e3bc:
+  path: src/headless/server.rs
+  description: 'Multi-client Unix socket server. SocketServer: bind, non-blocking accept, per-client reader thread→mpsc, broadcast_frame (serialize once, write all), poll_events, client_count, latest_terminal_size, shutdown. Drop cleans socket file.'
+  last_edited_ms: 1780659679100
 ed8cdf66722e6f21:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. XAI_API_KEY auth.
@@ -3018,9 +3142,17 @@ ee59b893f856d59f:
   path: docs/web_module_design.md
   description: Brave + Firecrawl web module design
   last_edited_ms: 0
+eef821003f32c9cc:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
 f07180e69f10e6ed:
   path: crates/cp-mod-scratchpad/src/tools.rs
   description: 'Scratchpad tools with flame!("scratch_create"), flame!("scratch_edit"), flame!("scratch_wipe"). Cell CRUD. Wipe: empty array = all, otherwise by ID.'
+  last_edited_ms: 0
+f098e3e0dd8b8440:
+  path: run.sh
+  description: Development run script
   last_edited_ms: 0
 f156d809f3ca7d6c:
   path: crates/cp-mod-ocr/Cargo.toml
@@ -3070,6 +3202,10 @@ f39aced1820ba7c8:
   path: crates/cp-mod-logs/Cargo.toml
   description: Logs crate dependencies. cp-base, cp-render, log, serde, serde_json, chrono. No cp-mod-memory dependency.
   last_edited_ms: 0
+f3f5704e5fbb3291:
+  path: src/ui/help/palette.rs
+  description: 'Command palette state + IR adapter. CommandPalette struct (state methods: open/close/filter/select). to_ir() builds PaletteOverlay. render_command_palette_from_ir() adapter renders from IR. 19 theme:: calls in adapter only.'
+  last_edited_ms: 0
 f4073f6d2cafea84:
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: cp-render, cp-mod-utilities, ratatui, crossterm, serde, serde_json, serde_yaml, unicode-width, log.'
@@ -3078,6 +3214,10 @@ f443597431fc2e8e:
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. MINIMAX_API_KEY auth.
   last_edited_ms: 0
+f4992ab79f907a93:
+  path: crates/cp-render/src/lib.rs
+  description: 'IR rendering crate. Semantic styling (not RGB). Block enum: Line/Empty/Header/Table/ProgressBar/Tree/Separator/KeyValue. Span with semantic+bold/italic/dimmed/reversed+optional RGB. pub mod markdown for shared parsing. Serialize+Deserialize for headless wire protocol.'
+  last_edited_ms: 1780658996324
 f4e3bd6a1f8faf50:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'
@@ -3125,6 +3265,10 @@ f74fa3be25ccf5fa:
 f767b719075902b7:
   path: src/ui/ir/render_conversation.rs
   description: 'IR-controlled chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached(). Question form + autocomplete overlay rendering via IR data.'
+  last_edited_ms: 0
+f771be1c5d8bcd06:
+  path: Cargo.lock
+  description: Workspace lockfile
   last_edited_ms: 0
 f7d9bcc6b3edfae1:
   path: crates/cp-mod-entities/src/tools.rs
@@ -3202,6 +3346,10 @@ fceb53aa84039016:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 1780568982802
+fd57290973ff1cb8:
+  path: src/headless/mod.rs
+  description: Headless module glue — declares protocol, session, server, and client sub-modules.
+  last_edited_ms: 1780659906919
 fd604dcc85d708e3:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.

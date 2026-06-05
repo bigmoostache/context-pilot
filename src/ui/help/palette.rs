@@ -168,7 +168,7 @@ impl CommandPalette {
     }
 
     /// Build IR snapshot from current palette state.
-    fn to_ir(&self) -> PaletteOverlay {
+    pub(crate) fn to_ir(&self) -> PaletteOverlay {
         PaletteOverlay {
             query: self.query.clone(),
             cursor: self.cursor,

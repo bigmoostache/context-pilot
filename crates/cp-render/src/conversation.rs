@@ -4,7 +4,7 @@
 //! tool calls, input area) and modal overlays (question forms,
 //! autocomplete popups).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{Block, Semantic};
 
@@ -13,7 +13,7 @@ use crate::overlay_ir::SearchIndexOverlay;
 // ── Conversation ─────────────────────────────────────────────────────
 
 /// The conversation region — message history + input area.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Conversation {
     /// Collapsed history sections (previous conversations).
     pub history_sections: Vec<HistorySection>,
@@ -26,7 +26,7 @@ pub struct Conversation {
 }
 
 /// A collapsed history section header.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistorySection {
     /// Display label (e.g. "History (23 messages)").
     pub label: String,
@@ -37,7 +37,7 @@ pub struct HistorySection {
 }
 
 /// A single conversation message.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     /// Role: "user", "assistant", "system".
     pub role: String,
@@ -50,7 +50,7 @@ pub struct Message {
 }
 
 /// Preview of a tool use (collapsed in conversation view).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolUsePreview {
     /// Tool name (e.g. `Edit`, `console_easy_bash`).
     pub tool_name: String,
@@ -61,7 +61,7 @@ pub struct ToolUsePreview {
 }
 
 /// Preview of a tool result (collapsed in conversation view).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolResultPreview {
     /// Tool name.
     pub tool_name: String,
@@ -72,7 +72,7 @@ pub struct ToolResultPreview {
 }
 
 /// A tool call currently being streamed.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamingTool {
     /// Tool name.
     pub tool_name: String,
@@ -81,7 +81,7 @@ pub struct StreamingTool {
 }
 
 /// The input area at the bottom of the conversation.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InputArea {
     /// Current input text.
     pub text: String,
@@ -96,7 +96,7 @@ pub struct InputArea {
 // ── Overlays ─────────────────────────────────────────────────────────
 
 /// A modal overlay rendered on top of the main UI.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Overlay {
     /// Multiple-choice question form.
@@ -111,10 +111,13 @@ pub enum Overlay {
     CommandPalette(PaletteOverlay),
     /// Meilisearch indexing status overlay (Ctrl+I).
     SearchIndex(Box<SearchIndexOverlay>),
+    /// Catch-all for unknown variants from newer daemon versions.
+    #[serde(other)]
+    Unknown,
 }
 
 /// A question form overlay (`ask_user_question`).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuestionForm {
     /// Questions to display.
     pub questions: Vec<Question>,
@@ -123,7 +126,7 @@ pub struct QuestionForm {
 }
 
 /// A single question in the form.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Question {
     /// Short header label.
     pub header: String,
@@ -144,7 +147,7 @@ pub struct Question {
 }
 
 /// A single option in a question.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuestionOption {
     /// Display label.
     pub label: String,
@@ -153,7 +156,7 @@ pub struct QuestionOption {
 }
 
 /// Performance monitoring overlay (F12).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerfOverlay {
     /// Frames per second.
     pub fps: f64,
@@ -186,7 +189,7 @@ pub struct PerfOverlay {
 }
 
 /// Meilisearch process stats for perf overlay.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PerfMeiliStats {
     /// CPU usage percentage.
     pub cpu_pct: f64,
@@ -197,7 +200,7 @@ pub struct PerfMeiliStats {
 }
 
 /// A budget bar in the perf overlay.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerfBudgetBar {
     /// Label (e.g. "60fps", "30fps").
     pub label: String,
@@ -208,7 +211,7 @@ pub struct PerfBudgetBar {
 }
 
 /// A single operation row in the perf overlay table.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerfOp {
     /// Operation name.
     pub name: String,
@@ -227,7 +230,7 @@ pub struct PerfOp {
 }
 
 /// Configuration overlay (Ctrl+H).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigOverlay {
     /// Whether showing secondary (reverie) model tab.
     pub secondary_mode: bool,
@@ -246,7 +249,7 @@ pub struct ConfigOverlay {
 }
 
 /// A provider entry in the config overlay.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigProvider {
     /// Key hint to press (e.g. "1", "2").
     pub key: String,
@@ -257,7 +260,7 @@ pub struct ConfigProvider {
 }
 
 /// A model entry in the config overlay.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigModel {
     /// Key hint to press (e.g. "a", "b").
     pub key: String,
@@ -272,7 +275,7 @@ pub struct ConfigModel {
 }
 
 /// A budget bar in the config overlay.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigBudgetBar {
     /// Display label (e.g. "Context Budget", "Clean Trigger").
     pub label: String,
@@ -291,7 +294,7 @@ pub struct ConfigBudgetBar {
 }
 
 /// A toggle switch in the config overlay.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigToggle {
     /// Label (e.g. "Auto-continue").
     pub label: String,
@@ -306,7 +309,7 @@ pub struct ConfigToggle {
 }
 
 /// Command palette overlay (Ctrl+P / Ctrl+K).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaletteOverlay {
     /// Current search query.
     pub query: String,
@@ -319,7 +322,7 @@ pub struct PaletteOverlay {
 }
 
 /// A single command palette entry.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaletteEntry {
     /// Command label (e.g. "Close panel").
     pub label: String,
@@ -328,7 +331,7 @@ pub struct PaletteEntry {
 }
 
 /// File path autocomplete popup.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Autocomplete {
     /// Current query / prefix.
     pub query: String,
@@ -345,7 +348,7 @@ pub struct Autocomplete {
 }
 
 /// A single autocomplete suggestion.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutocompleteEntry {
     /// Display text (file name or path).
     pub label: String,

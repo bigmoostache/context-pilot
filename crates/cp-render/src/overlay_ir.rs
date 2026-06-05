@@ -3,12 +3,12 @@
 //! Split from `conversation.rs` to keep it under the 500-line limit.
 //! These types model the Meilisearch indexing status overlay.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::Semantic;
 
 /// Meilisearch indexing status overlay (Ctrl+I).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchIndexOverlay {
     /// Title text (may include "✓ Copied!" flash).
     pub title: String,
@@ -33,7 +33,7 @@ pub struct SearchIndexOverlay {
 }
 
 /// Server status for the search index overlay.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchServer {
     /// Server URL (e.g. `http://127.0.0.1:49166`).
     pub url: String,
@@ -50,7 +50,7 @@ pub struct SearchServer {
 }
 
 /// Core index statistics for the search overlay.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchIndex {
     /// Number of files indexed.
     pub files_indexed: u64,
@@ -75,7 +75,7 @@ pub struct SearchIndex {
 }
 
 /// Extension entry for the bar chart.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchExtension {
     /// Extension name (e.g. "rs", "ts").
     pub name: String,
@@ -88,7 +88,7 @@ pub struct SearchExtension {
 }
 
 /// Splitter statistics (tree-sitter vs fixed-size fallback).
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct SearchSplitter {
     /// Tree-sitter chunk count.
     pub tree_sitter_chunks: u64,
@@ -101,7 +101,7 @@ pub struct SearchSplitter {
 }
 
 /// Embedding statistics.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchEmbeddings {
     /// Model name (e.g. "voyage-code-3").
     pub model: String,
@@ -122,7 +122,7 @@ pub struct SearchEmbeddings {
 }
 
 /// A recent Meilisearch task entry.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchTask {
     /// Task UID.
     pub uid: u64,
@@ -137,7 +137,7 @@ pub struct SearchTask {
 }
 
 /// A recomputed file entry.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchRecomputed {
     /// File path (may be truncated).
     pub path: String,
@@ -146,7 +146,7 @@ pub struct SearchRecomputed {
 }
 
 /// A recently sent file entry.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchRecentFile {
     /// File path (may be truncated).
     pub path: String,

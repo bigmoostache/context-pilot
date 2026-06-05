@@ -132,6 +132,18 @@ exceptions:
     strategy: >
       Irreducible — expect_used is forbid-level so .expect() cannot be used.
 
+  # ── headless module: dead code until Phase 5 wires CLI ────────────
+
+  - path: "src/main.rs"
+    match: "TODO(Phase 5): remove once CLI wires up headless entry points"
+    reason: >
+      The headless module (protocol, session, server, client) is fully
+      implemented but nothing calls it yet — Phase 5 will add CLI arg
+      parsing and wire up the daemon/client entry points.
+    strategy: >
+      Remove #[allow(dead_code)] in Phase 5 when --daemon-internal,
+      --attach, --list, and --stop CLI paths are implemented.
+
   - path: "crates/cp-base/src/lib.rs"
     match: 'test assertions use panic for config YAML validation'
     reason: >

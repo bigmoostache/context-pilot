@@ -10,6 +10,9 @@ use openssl as _;
 
 /// Application logic: event loop, actions, context preparation.
 mod app;
+/// Headless daemon/client architecture over Unix sockets.
+#[allow(dead_code)] // TODO(Phase 5): remove once CLI wires up headless entry points
+mod headless;
 /// Infrastructure: API clients, tools, constants, file watchers.
 mod infra;
 /// LLM provider abstraction and streaming.
@@ -149,7 +152,7 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
 // Registered once at startup; no-ops if the file can't be opened.
 
 /// File-backed logger that writes trace-level messages to `.context-pilot/state-machine.log`.
-struct FileLogger(Mutex<Option<std::fs::File>>);
+pub(crate) struct FileLogger(Mutex<Option<std::fs::File>>);
 
 impl log::Log for FileLogger {
     fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
@@ -178,7 +181,7 @@ impl log::Log for FileLogger {
 
 /// Best-effort logger init: writes to `.context-pilot/state-machine.log`.
 /// Silently no-ops if the file or logger registration fails.
-fn init_file_logger() {
+pub(crate) fn init_file_logger() {
     let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(".context-pilot/state-machine.log")
     else {
         return;
@@ -192,7 +195,7 @@ fn init_file_logger() {
 /// errors. The Meilisearch server, file watchers, indexer, and console server
 /// collectively need hundreds of FDs. macOS defaults to a soft limit of 256,
 /// which is too low. We raise it to `min(hard_limit, 8192)` — no root needed.
-fn raise_fd_limit() {
+pub(crate) fn raise_fd_limit() {
     let Ok((soft, hard)) = rlimit::getrlimit(rlimit::Resource::NOFILE) else {
         return;
     };
@@ -217,6 +220,25 @@ use state::persistence::{
 };
 
 fn main() -> ExitCode {
+    // ── Headless CLI dispatch — before any terminal setup ────────────
+    // These paths exit early without touching the terminal.
+    let cli_args: Vec<String> = std::env::args().collect();
+    if cli_args.iter().any(|a| a == "--daemon-internal") {
+        return headless::launch::run_daemon(cli_args.iter().any(|a| a == "--resume-stream"));
+    }
+    if cli_args.iter().any(|a| a == "--attach") {
+        return headless::launch::run_attach();
+    }
+    if cli_args.iter().any(|a| a == "--list") {
+        return headless::launch::run_list();
+    }
+    if cli_args.iter().any(|a| a == "--stop") {
+        return headless::launch::run_stop();
+    }
+    if cli_args.iter().any(|a| a == "--headless") {
+        return headless::launch::run_standard_launch(cli_args.iter().any(|a| a == "--resume-stream"));
+    }
+
     /// Helper to mark a boot step as done, with bounds checking.
     fn mark_step_done(steps: &mut [BootStep], idx: usize) {
         if let Some(step) = steps.get_mut(idx) {

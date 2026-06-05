@@ -15,7 +15,7 @@
 //! - **Serializable** — every type derives [`Serialize`](serde::Serialize)
 //!   so the frame can be shipped over the wire to a web frontend.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Conversation and overlay IR types.
 pub mod conversation;
@@ -32,7 +32,7 @@ pub mod overlay_ir;
 ///
 /// The TUI adapter maps each variant to a concrete `ratatui::style::Style`.
 /// Web adapters map to CSS classes. This keeps the IR platform-agnostic.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Semantic {
     /// Default foreground.
@@ -67,6 +67,9 @@ pub enum Semantic {
     Border,
     /// Bold emphasis (combined with another semantic via [`Span::bold`]).
     Bold,
+    /// Catch-all for unknown variants from newer daemon versions.
+    #[serde(other)]
+    Unknown,
 }
 
 /// A styled text fragment — the atomic rendering unit.
@@ -76,7 +79,7 @@ pub enum Semantic {
 /// final visual style. When `color` is `Some`, the adapter uses the raw
 /// RGB value instead of mapping `semantic` — this supports syntax
 /// highlighting where colours come from a theme, not from semantics.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Span {
     /// The text content.
     pub text: String,
@@ -196,7 +199,7 @@ impl Span {
 }
 
 /// Horizontal alignment for table cells.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Align {
     /// Left-aligned (default).
     Left,
@@ -207,7 +210,7 @@ pub enum Align {
 }
 
 /// A table cell — one or more styled spans with alignment.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Cell {
     /// Styled fragments inside this cell.
     pub spans: Vec<Span>,
@@ -260,7 +263,7 @@ impl Cell {
 }
 
 /// Column definition for [`Block::Table`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Column {
     /// Column header text (empty string = no header).
     pub header: String,
@@ -271,7 +274,7 @@ pub struct Column {
 // ── Block: the universal panel content unit ──────────────────────────
 
 /// A segment of a progress / gauge bar.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProgressSegment {
     /// Fraction of the bar this segment occupies (0–100).
     pub percent: u8,
@@ -282,7 +285,7 @@ pub struct ProgressSegment {
 }
 
 /// A node in a [`Block::Tree`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TreeNode {
     /// Display text (may contain icon prefix).
     pub label: Vec<Span>,
@@ -299,7 +302,7 @@ pub type KeyValuePair = (Vec<Span>, Vec<Span>);
 ///
 /// Panels return `Vec<Block>` from their `blocks()` method. The adapter
 /// converts each variant into platform-specific widgets.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Block {
     /// A single line of styled spans.
@@ -335,6 +338,10 @@ pub enum Block {
 
     /// A list of key–value pairs rendered in two columns.
     KeyValue(Vec<KeyValuePair>),
+
+    /// Catch-all for unknown variants from newer daemon versions.
+    #[serde(other)]
+    Unknown,
 }
 
 impl Block {

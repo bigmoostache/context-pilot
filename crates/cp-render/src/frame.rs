@@ -3,7 +3,7 @@
 //! These types compose the outer shell of a [`Frame`] snapshot —
 //! everything except the conversation region and modal overlays.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{Block, ProgressSegment, Semantic};
 
@@ -13,7 +13,7 @@ use crate::{Block, ProgressSegment, Semantic};
 ///
 /// Built by the centralized frame builder and consumed by the platform
 /// adapter.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Frame {
     /// Left sidebar region.
     pub sidebar: Sidebar,
@@ -30,7 +30,7 @@ pub struct Frame {
 // ── Sidebar ──────────────────────────────────────────────────────────
 
 /// Sidebar display mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SidebarMode {
     /// Full sidebar with entries, token bar, help hints.
     Normal,
@@ -41,7 +41,7 @@ pub enum SidebarMode {
 }
 
 /// The left sidebar region.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sidebar {
     /// Display mode.
     pub mode: SidebarMode,
@@ -58,7 +58,7 @@ pub struct Sidebar {
 }
 
 /// A single context element entry in the sidebar.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SidebarEntry {
     /// Panel ID (e.g. "P1", "P7").
     pub id: String,
@@ -81,7 +81,7 @@ pub struct SidebarEntry {
 }
 
 /// Token usage gauge bar.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenBar {
     /// Segments of the bar (system, tools, panels, messages, etc.).
     pub segments: Vec<ProgressSegment>,
@@ -96,7 +96,7 @@ pub struct TokenBar {
 }
 
 /// Breakdown of token usage statistics.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenStats {
     /// Individual stat rows.
     pub rows: Vec<TokenRow>,
@@ -113,7 +113,7 @@ pub struct TokenStats {
 }
 
 /// A single row in the token stats breakdown.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenRow {
     /// Label (e.g. "tot", "strm", "tick").
     pub label: String,
@@ -132,7 +132,7 @@ pub struct TokenRow {
 }
 
 /// Pull request summary card shown in sidebar.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrCard {
     /// PR number.
     pub number: u32,
@@ -149,7 +149,7 @@ pub struct PrCard {
 }
 
 /// A keyboard shortcut hint shown at bottom of sidebar.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HelpHint {
     /// Key combination (e.g. "Tab", "Ctrl+P").
     pub key: String,
@@ -160,7 +160,7 @@ pub struct HelpHint {
 // ── Status bar ───────────────────────────────────────────────────────
 
 /// Bottom status bar — single-line information strip.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatusBar {
     /// Primary status badge (e.g. "Streaming", "Ready").
     pub badge: Badge,
@@ -191,7 +191,7 @@ pub struct StatusBar {
 }
 
 /// Primary status badge.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Badge {
     /// Display text.
     pub label: String,
@@ -200,7 +200,7 @@ pub struct Badge {
 }
 
 /// Stop reason indicator.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StopReason {
     /// Reason text (e.g. "end\_turn", "max\_tokens").
     pub reason: String,
@@ -209,21 +209,21 @@ pub struct StopReason {
 }
 
 /// Active agent indicator.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentCard {
     /// Agent display name.
     pub name: String,
 }
 
 /// Active skill indicator.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillCard {
     /// Skill display name.
     pub name: String,
 }
 
 /// Git branch and changes summary.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitChanges {
     /// Current branch name.
     pub branch: String,
@@ -236,7 +236,7 @@ pub struct GitChanges {
 }
 
 /// Auto-continuation status.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AutoContinue {
     /// Current continuation count.
     pub count: u32,
@@ -245,7 +245,7 @@ pub struct AutoContinue {
 }
 
 /// Active reverie sub-agent indicator.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReverieCard {
     /// Agent name driving the reverie.
     pub agent: String,
@@ -254,7 +254,7 @@ pub struct ReverieCard {
 }
 
 /// Queue status indicator.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct QueueCard {
     /// Number of queued actions.
     pub count: u32,
@@ -263,7 +263,7 @@ pub struct QueueCard {
 }
 
 /// Think tool balance indicator.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ThinkCard {
     /// Current consecutive think counter (positive = thinking streak,
     /// negative = tool streak without thinking).
@@ -276,7 +276,7 @@ pub struct ThinkCard {
 ///
 /// Built from `Panel::blocks()` + metadata. The adapter renders this
 /// as a bordered, scrollable area.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PanelContent {
     /// Panel title (shown in border).
     pub title: String,
