@@ -1,3 +1,11 @@
+00ce4673bc93be26:
+  tl_dr: NEVER activate autocontinuation (spine_configure continue_until_todos_done). User says it bugs badly. Always sail manually, batch by batch.
+  importance: critical
+  labels:
+  - user-preference
+  - workflow
+  - spine
+  last_edited_ms: 0
 07f9cb0fc782bcee:
   tl_dr: 'Meilisearch design complete (9 rounds). Embedded global server, cp-mod-search crate, tree-sitter chunking, unified search tool, log redesign (drop summarization, add tags/importance). Full spec: docs/design-meilisearch.md, branch ''meilisearch''.'
   importance: critical
@@ -5,6 +13,61 @@
   - architecture
   - meilisearch
   - design
+  last_edited_ms: 0
+0c509f3ad4df7597:
+  tl_dr: 'Reverie supports multiple concurrent sub-agents (one per agent type). HashMap<String, ReverieState> keyed by agent_id. UI shows one card per active reverie. Tool cap: 50.'
+  contents: |-
+    - State: HashMap<String, ReverieState> in runtime.rs, HashMap<String, ReverieStream> in App
+    - Guards check per-agent (reveries.contains_key(agent_id)), not global
+    - Auto-trigger only blocks if 'cleaner' is already running
+    - Manual trigger (optimize_context tool) accepts 'agent' param, default 'cleaner'
+    - UI renders one status card per active reverie with spinner + tool count
+    - ReverieContext struct includes agent_id for context.rs panel content lookup
+    - Built-in agents: 'cleaner' (context optimizer), 'cartographer' (tree describer)
+    - Tool cap: 50 calls per run (REVERIE_TOOL_CAP in constants.rs)
+  importance: critical
+  labels:
+  - architecture
+  - feature
+  - reverie
+  last_edited_ms: 0
+12fd8ad76d4cafda:
+  tl_dr: 'Think tool v4 (May 4): Single param (thought_body). ThinkState{consecutive_count:i32, reminder_threshold:i32, next_notification_at:i32}.'
+  contents: |-
+    ## Counter Logic
+    - Think called: counter = max(1, counter+1)
+    - Any other tool: counter = min(0, counter-1)
+
+    ## Notification System
+    - Fires at next_notification_at, advances by reminder_threshold each time
+    - Resets next_notification_at to reminder_threshold when Think is called
+    - Message: "Please think more. Thinking is both cheap in tokens, and drastically augments your performances."
+    - No % operator (banned by clippy) — uses marker tracking instead
+
+    ## Queue Bypass
+    - Think bypasses queue intercept in pipeline.rs (tool.name != "Think" check)
+
+    ## UI
+    - Status bar card: ThinkCard (red bg) shows negative balance, hidden when >= 0
+    - Config overlay (Ctrl+H): Think nudge threshold with [ ] keys, default -5, capped at -1 min
+    - Config overlay trimmed: removed theme picker, API check section, reduced separators to 1 line
+
+    ## State
+    - pub(crate) ThinkState re-exported from questions/mod.rs
+    - Stored via ext/ext_mut on State, serialized via save/load_worker_data
+    - Actions: ConfigThinkThresholdUp/Down in actions.rs, events.rs ([ ] keys)
+
+    ## Files Changed
+    think.rs, questions/mod.rs, core.yaml, actions.rs, events.rs, actions/mod.rs, config_overlay.rs, frame.rs, status_bar.rs, render_status_bar.rs, pipeline.rs, infra/config.rs
+  importance: high
+  labels:
+  - think-tool
+  - architecture
+  - feature
+  last_edited_ms: 0
+13a1d96ff4a4e7d0:
+  tl_dr: 'Context Pilot is a Rust TUI AI coding assistant (~15K LOC) built with Ratatui+Crossterm. Workspace has 18 module crates + 1 main binary. Branch: reverie-context-optimizer with +209 lines in src/app/reverie/tools.rs'
+  importance: high
   last_edited_ms: 0
 1552560f9d4055af:
   tl_dr: 'Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.'
@@ -33,6 +96,204 @@
   tl_dr: 'Context Pilot env vars: ANTHROPIC_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY, GITHUB_TOKEN (core). Optional LLM providers and chat bridge tokens. Loaded via dotenvy from .env, fallback to global config.'
   importance: high
   last_edited_ms: 0
+2bfb816e017b246e:
+  tl_dr: 'DOCUMENTATION PHASE: Ignore structure-check callback warnings about files >500 lines during doc additions. Lines will grow temporarily — that''s expected and acceptable.'
+  importance: critical
+  labels:
+  - workflow
+  - documentation
+  - structure-check
+  last_edited_ms: 0
+3182e8c4a21fcc81:
+  tl_dr: Secondary model selector with Tab key toggle implemented
+  contents: |-
+    Successfully implemented Tab key toggle for secondary model selection in config overlay (Ctrl+H).
+
+    Key changes:
+    1. Added config_secondary_mode field to State struct
+    2. Added ConfigToggleSecondaryMode action
+    3. Updated config overlay to show secondary model section when config_secondary_mode is true
+    4. Added Tab key handler in config view to toggle between main/secondary model selection
+    5. Secondary model uses keys e/f/g for Opus/Sonnet/Haiku selection
+    6. Fixed missing render_model_section function in config_overlay.rs
+
+    Testing shows reverie works but gets API errors due to 128K > 64K token limit for Haiku. Need to test with Opus or Sonnet as secondary model.
+  importance: high
+  labels:
+  - feature
+  - ui
+  - reverie
+  last_edited_ms: 0
+39d008d9bddac9f0:
+  tl_dr: 'Lean 4 project (X-mathsA-2019) deleted March 20. Q1-Q5b proven, Q6a in progress. Key: use linear_combination on ℂ (linarith fails, no linear order).'
+  importance: low
+  last_edited_ms: 0
+3d36396d2a618055:
+  tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
+  importance: critical
+  labels:
+  - user-preference
+  - forbidden
+  last_edited_ms: 0
+3f7ea7b0cdf9397d:
+  tl_dr: 'Cache optimizer: K=3 always (4th BP reserved for conversation tail). Optimizer runs on panels only — caching conversation body is useless.'
+  contents: 'The 4th Anthropic cache breakpoint is always placed at the tail of the conversation (last message). It is NEVER part of the optimization budget. The optimizer receives budget=3 and operates exclusively on the panels section of the prompt. Rationale: the conversation body changes every turn, so caching anything but the very tail is pointless. Only panels (which are relatively stable between turns) benefit from intelligent breakpoint placement.'
+  importance: critical
+  labels:
+  - cache-optimizer
+  - architecture
+  - constraint
+  last_edited_ms: 0
+42962fefaa6ee609:
+  tl_dr: 'FORBIDDEN: #[allow(...)] is BANNED in this project. Always use #[expect(...)] instead. Only in exceptional cases. This applies to all clippy and rustc lint suppression.'
+  importance: critical
+  labels:
+  - code-style
+  - lints
+  - forbidden
+  last_edited_ms: 0
+48f2140d3c2dee0e:
+  tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
+  contents: |-
+    ## Stress Test Results — COMPLETE (151/151)
+
+    ### Bugs Found & Fixed (9 total):
+    1. **Bug #1**: PRAGMA hex literal `0x4_000_000` → `67108864` (SQLite doesn't understand Rust hex)
+    2. **Bug #2**: SQL comments before SELECT caused misclassification → added `strip_leading_comments()`
+    3. **Bug #3**: Non-atomic multi-statement DML → implicit BEGIN/COMMIT/ROLLBACK wrapper
+    4. **Bug #4** (CRITICAL): Dump/restore data loss — db::open() auto-creates files, panel.refresh()/save_module_data could overwrite good dump. Fix: multi-layer guards.
+    5. **Bug #5**: Trailing comments after semicolons cause 'bad parameter or other API misuse' → strip in split_statements()
+    6. **Bug #6**: split_statements empty segments → filter empty after split
+    7. **Bug #7**: dump_to_file only captures tables, misses triggers/views/indexes → query sqlite_master for all types
+    8. **Bug #8**: recover_database() didn't handle db::open() failure → delete corrupt file, create fresh, restore
+    9. **Bug #9**: extract_affected_tables wrong table name for INSERT INTO table(col) → clean_identifier stops at '('
+
+    ### UX Fix:
+    - Added panel refresh note to tool result: "The Entities panel now reflects the updated database state."
+
+    ### 12 Test Categories:
+    T1: SQL Execution (18 tests) — CRUD, JOINs, CTEs, triggers, adversarial SQL
+    T2: Schema Persistence (14) — migrations, dump format, 1MB cap, rapid DDL
+    T3: Recovery (12) — fresh start, dump restore, migration replay, corrupt DB self-heal
+    T4: Panel & Context (12) — schema display, samples, empty state, extreme schema
+    T5: Meilisearch Sync (13) — CRUD sync, orphan cleanup, 1000-row batch, rogue docs
+    T6: Search Scope (9) — scope=entities/all, facets, typo tolerance, full lifecycle
+    T7: Connection & PRAGMAs (11) — WAL, FK, busy_timeout, self-healing
+    T8: Error Handling (12) — fuzzy matching, Levenshtein, constraint errors
+    T9: Data Types (13) — TEXT/INT/REAL/BLOB/NULL, unicode, SQL injection strings
+    T10: Module Integration (12) — registration, toggle, YAML validation, flame
+    T11: Dump/Restore (13) — round-trip, WITHOUT ROWID, near-1MB, crash gap
+    T12: End-to-End (12) — full workflows, stress, incremental build-up
+  importance: high
+  labels:
+  - entities
+  - complete
+  - stress-testing
+  last_edited_ms: 1780597902120
+491617a47084996a:
+  tl_dr: Fixed Haiku 4.5 token limit issue in reverie
+  contents: |-
+    Fixed API error 400: 'max_tokens: 128000 > 64000' when reverie uses Haiku as secondary model.
+
+    Key changes:
+    1. Updated anthropic client to use model-specific context windows instead of hardcoded MAX_RESPONSE_TOKENS
+    2. Haiku 4.5 (claude-3-5-haiku-20251001) now correctly uses 64K output token limit instead of 128K
+    3. Other models (Sonnet, Opus) still use 200K limit
+    4. The fix allows reverie to work with Haiku as secondary model
+    5. Tab key toggle functionality now ready for testing with proper token limits
+
+    Testing shows reverie starts successfully without API errors. Need to verify it completes and calls Report tool.
+  importance: high
+  labels:
+  - bugfix
+  - reverie
+  - api
+  last_edited_ms: 0
+6cc818f12c0d231a:
+  tl_dr: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
+  importance: critical
+  labels:
+  - documentation
+  - quality
+  last_edited_ms: 0
+6eba1bb10defa389:
+  tl_dr: 'Thinking mode plan: ThinkingConfig enum in LlmRequest, inject into claude_code + anthropic JSON body, ThinkingChunk StreamEvent variant, thinking_delta SSE parsing, TUI display. Beta header already present.'
+  importance: high
+  last_edited_ms: 0
+6fc02a69ab52f6ab:
+  tl_dr: 'Hash chain entry #5 signed (May 4). All 5 entries verified. Chain is current. Lint exceptions: 6. Protected file change was allowed-lint-exceptions.yaml (7→6 exceptions from ModelPricing refactor).'
+  importance: low
+  labels:
+  - pending
+  - hash-chain
+  - lint-exceptions
+  last_edited_ms: 0
+711abc0a918906ba:
+  tl_dr: 'BANNED: #[expect] and #[allow] lint suppressions. Always refactor the code instead. Register unavoidable exceptions in .github/checks/.'
+  contents: Zero suppressions is the goal. Refactor the CODE to eliminate the lint, not suppress it. If one is truly unavoidable, it MUST be registered in .github/checks/ lint exception registry. This is the captain's strongest code quality preference.
+  importance: critical
+  labels:
+  - code-quality
+  - lint
+  - philosophy
+  - boss-hunt
+  last_edited_ms: 0
+713d9f0a50517625:
+  tl_dr: 'MiniMax Token Plan API key: sk-cp-SML34Q-eh3y1ob1na0P68nYpXfN-8jk86fYnaAjo6H6cd_vWZ0E089CWYEhlFX6EyNh6PNRYWJRmGgj9kK5Wk88rzf_0bMW-IBuybCYQXPm08PcFTW6GwDo'
+  importance: high
+  labels:
+  - api-key
+  - minimax
+  - llm-provider
+  last_edited_ms: 0
+72815d89ebb8cd4b:
+  tl_dr: 'User preference: factor code out into new files rather than trimming comments to stay under line limits.'
+  importance: medium
+  last_edited_ms: 0
+75ab5b1b33b6add3:
+  tl_dr: 'Thinking between ticks needs adaptive thinking (type: adaptive) on 4.6+ or interleaved-thinking beta header. Manual budget_tokens is deprecated on newer models. Fix: switch to adaptive + add Opus 4.7.'
+  importance: high
+  labels:
+  - thinking
+  - llm-provider
+  last_edited_ms: 0
+77a6639f89352d52:
+  tl_dr: 'Hardcoded prompt audit: user wants EVERY occurrence of LLM-facing text noted, no matter how minor. No ''clean enough'' dismissals. User decides what''s behavioral steering vs. not. Be exhaustive — if the LLM sees it, log it as a finding.'
+  importance: critical
+  labels:
+  - audit
+  - user-preference
+  - workflow
+  last_edited_ms: 0
+77c0e9053167f28a:
+  tl_dr: 'DOCUMENTATION PHASE: Use tool queuing (Queue_activate/Queue_execute) for all file edits during doc work — otherwise cost explodes from cache breaks on every single edit.'
+  importance: critical
+  labels:
+  - workflow
+  - cost
+  - documentation
+  last_edited_ms: 0
+7b858470e0ce17bf:
+  tl_dr: Memory Architecture v2 Phase 1 PAUSED — stashed on memory-architecture-v2 branch. Resume later.
+  contents: 'Storage engine complete: db/mod.rs (CRUD, BFS, FTS5 BM25), decay.rs (Ebbinghaus), types.rs (Node/Edge/enums, field renames typ/relation), lib.rs (Module scaffold + health check), tests.rs (full coverage). 42 clippy errors fixed but uncommitted — stash has the fixes. Todo list had 92 items across 6 phases.'
+  importance: high
+  labels:
+  - memory-v2
+  - paused
+  - branch-stashed
+  last_edited_ms: 0
+7c6035d323faf713:
+  tl_dr: 'Cryptographic hash chain protects 12 critical files (Cargo.toml lint sections, clippy.toml, rustfmt.toml, CI scripts, lint exceptions YAML, deploy scripts). Password: Totordu1789. Updates via chain.sh --update.'
+  importance: critical
+  last_edited_ms: 0
+803fa2aac4f0489a:
+  tl_dr: NEVER commit or push .context-pilot/shared/entities/ files (entities.db, schema.sql, migrations/). These are local-only. Added to .gitignore.
+  importance: critical
+  labels:
+  - git
+  - entities
+  - workflow
+  last_edited_ms: 1780613144244
 8185ce57712b238d:
   tl_dr: 'ALWAYS push memories (memories.yaml) and tree descriptions (tree-descriptions.yaml) alongside code commits. When committing work, include a ''chore: sync memories and tree descriptions'' commit and push everything together. Never leave these unsync''d.'
   importance: critical
@@ -41,6 +302,26 @@
   - git
   - persistence
   last_edited_ms: 1780567164228
+82fd73098bb46d75:
+  tl_dr: 'Queue module design: fixed panel, 5 tools, pipeline intercept, shared queue (reverie + main), reverie auto-activates queue on start, Report blocks if unflushed, Queue_empty on reverie destroy/timeout.'
+  importance: high
+  last_edited_ms: 0
+8e07129a2a85fdb2:
+  tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
+  importance: critical
+  labels:
+  - documentation
+  - style
+  last_edited_ms: 0
+a8b1054e0a11c2fe:
+  tl_dr: 'Cache engine v2: gap-decomposition DP replaces greedy. F(Ω'')=ΣT[pₖ]×gap. DP per gap O(k×|gap|²) + enumerate across ≤5 gaps. In cache_engine.rs.'
+  importance: high
+  last_edited_ms: 0
+b0c2cf76e35d0b9e:
+  tl_dr: 'IR Architecture (April 1): Phases 1-6 COMPLETE. Full-frame IR pipeline committed (eea0ec0, +4619/-1305, 70 files). Phase 6.1 deferred. egui-frontend attempted April 2-4 then abandoned — branch deleted, back to master.'
+  contents: 'cp-render crate with typed IR primitives (Semantic, Span, Block, Frame, Sidebar, StatusBar, Conversation, Overlay). Panel::blocks() trait migration, Panel::render() removed. 23 panels emit IR blocks. build_frame() centralized builder. 5 TUI adapters (sidebar, status bar, panel, conversation, overlays). Dead code cleanup: deleted sidebar/ (694 lines), ConversationPanel::render() (70 lines), 25+ empty stubs. Branch: intermediate-rendering.'
+  importance: medium
+  last_edited_ms: 0
 b14e6817a83938b5:
   tl_dr: 'Search module: Voyage AI REST embedder (voyage-code-3) for hybrid search, zero local CPU. VOYAGE_API_KEY in ~/.context-pilot/.env. --max-indexing-threads 2. Port reconnects on reload.'
   contents: |-
@@ -59,6 +340,18 @@ b14e6817a83938b5:
   - meilisearch
   - search
   - operational
+  last_edited_ms: 0
+bfd5725c88443a6a:
+  tl_dr: User is at lunch. Continue the full hardcoded prompt audit (42 batches, 207 files) independently until complete. Work batch by batch, no autocontinuation. User will check results when back.
+  importance: high
+  labels:
+  - workflow
+  - audit
+  - task
+  last_edited_ms: 0
+d1e512c8273ba340:
+  tl_dr: Thinking blocks echoed as ContentBlock::Text (prefix '🧠 [Thinking]') in prompt_builder, NOT native Thinking. Signatures removed — prefix changes break them.
+  importance: high
   last_edited_ms: 0
 d76e1f4576d9458a:
   tl_dr: 'Context Pilot is a SIDE PROJECT. In <3 months: became #1 tool for all professional + personal life, enables 2-4 simultaneous projects, helps family gain weeks of time.'
@@ -79,7 +372,19 @@ d76e1f4576d9458a:
   - context-pilot
   - side-project
   last_edited_ms: 0
+d7a30d2f21fd675a:
+  tl_dr: 'Dream layer decided: Groq API with tiny model (Llama 3.2 3B), ~200-token prompts, 30-50 token completions, fires every 2-3 min, writes to soul.journal. Cost ~$0.02/day. Local models reserved for future non-text sensing.'
+  importance: high
+  last_edited_ms: 0
 e22b1ea921ff9aec:
   tl_dr: 'Datalab documentation site: documentation.datalab.to (Mintlify-hosted). API reference at documentation.datalab.to/api-reference/health. Has sections on limits, supported file types, SDK, on-prem, webhooks, billing.'
   importance: low
+  last_edited_ms: 0
+efe78c079599d3d0:
+  tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
+  importance: critical
+  last_edited_ms: 0
+fe4cc25edbfbea1f:
+  tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
+  importance: medium
   last_edited_ms: 0

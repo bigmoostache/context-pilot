@@ -18,6 +18,78 @@ folder-sizes:
   is_global: true
   script_content: bash .github/checks/check-folder-sizes.sh
   last_edited_ms: 1780496660023
+lean-check:
+  name: lean-check
+  description: Run lake build on Lean file edits to verify proofs type-check
+  pattern: '*.lean'
+  blocking: true
+  timeout_secs: 120
+  success_message: Lean proofs verified ✓
+  is_global: true
+  script_content: |
+    FIRST_FILE=$(echo "$CP_CHANGED_FILES" | head -1)
+    DIR="$CP_PROJECT_ROOT/$(dirname "$FIRST_FILE")"
+
+    while [ "$DIR" != "/" ]; do
+      if [ -f "$DIR/lakefile.toml" ] || [ -f "$DIR/lakefile.lean" ]; then
+        break
+      fi
+      DIR=$(dirname "$DIR")
+    done
+
+    if [ "$DIR" = "/" ]; then
+      echo "No lakefile found — skipping Lean check"
+      exit 0
+    fi
+
+    LEAN_PROJECT="$DIR"
+
+    # Source elan so we have lean/lake in PATH
+    export PATH="$HOME/.elan/bin:$PATH"
+
+    cd "$LEAN_PROJECT"
+
+    # Fast path: compile only the changed .lean files via `lake env lean`
+    # This sets LEAN_PATH from the lakefile but only type-checks one file (~2-3s)
+    # instead of rebuilding the entire project (~2700+ jobs).
+    BUILD_FAIL=0
+    for f in $CP_CHANGED_FILES; do
+      ABS_FILE="$CP_PROJECT_ROOT/$f"
+      echo "Checking $f ..."
+      OUTPUT=$(lake env lean "$ABS_FILE" 2>&1) && EXIT=0 || EXIT=$?
+      echo "$OUTPUT"
+      if [ $EXIT -ne 0 ]; then
+        echo ""
+        echo "FAIL: $f did not type-check (exit $EXIT)"
+        BUILD_FAIL=1
+      elif echo "$OUTPUT" | grep -q "declaration uses.*sorry"; then
+        echo ""
+        echo "FAIL: $f contains sorry (unfinished proof)"
+        BUILD_FAIL=1
+      else
+        echo "OK"
+      fi
+    done
+
+    if [ $BUILD_FAIL -ne 0 ]; then
+      exit 1
+    fi
+
+    # Belt-and-suspenders: scan source for sorry keyword
+    SORRY_COUNT=0
+    for f in $CP_CHANGED_FILES; do
+      if grep -v '^\s*--' "$CP_PROJECT_ROOT/$f" 2>/dev/null | grep -q '\bsorry\b'; then
+        echo "WARNING: '$f' contains 'sorry' — unfinished proof!"
+        SORRY_COUNT=$((SORRY_COUNT + 1))
+      fi
+    done
+
+    if [ $SORRY_COUNT -gt 0 ]; then
+      echo ""
+      echo "FAIL: $SORRY_COUNT file(s) contain unfinished proofs (sorry)"
+      exit 1
+    fi
+  last_edited_ms: 0
 lint-exceptions:
   name: lint-exceptions
   description: 'Verify every #[expect]/#[allow] annotation is registered in allowed-lint-exceptions.yaml'
@@ -38,6 +110,25 @@ lint-integrity:
   is_global: true
   script_content: bash .github/checks/check-lint-config.sh
   last_edited_ms: 1780496660022
+rust-check:
+  name: rust-check
+  description: Run cargo check, clippy, and fmt --check on Rust file edits
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 60
+  success_message: Rust checks passed ✓
+  is_global: true
+  script_content: |
+    echo "=== cargo check (deny warnings) ==="
+    RUSTFLAGS="-D warnings" cargo check 2>&1
+
+    echo ""
+    echo "=== cargo clippy (workspace lints) ==="
+    cargo clippy -- -D warnings 2>&1
+
+    echo ""
+    echo "All Rust checks passed."
+  last_edited_ms: 0
 rust-clippy:
   name: rust-clippy
   description: Run cargo clippy on Rust file changes — catches compilation errors + lint warnings
@@ -58,3 +149,35 @@ rust-fmt:
   is_global: true
   script_content: cargo fmt --check 2>&1
   last_edited_ms: 1780496660021
+structure-check:
+  name: structure-check
+  description: Check file lengths (max 500 lines) and folder sizes (max 8 entries) on Rust file edits
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 30
+  success_message: Structure checks passed ✓
+  is_global: true
+  script_content: |
+    echo "=== Cargo fmt ==="
+    cargo fmt -- $CP_CHANGED_FILES 2>&1
+    echo "Formatted. ✓"
+
+    echo ""
+    echo "=== File length check (max 500 lines) ==="
+    bash .github/checks/check-file-lengths.sh 2>&1
+
+    echo ""
+    echo "=== Folder size check (max 8 entries) ==="
+    bash .github/checks/check-folder-sizes.sh 2>&1
+
+    echo ""
+    echo "=== Lint exception registry check ==="
+    bash .github/checks/check-lint-exceptions.sh 2>&1
+
+    echo ""
+    echo "=== Lint config integrity (hash chain) ==="
+    bash .github/checks/check-lint-config.sh 2>&1
+
+    echo ""
+    echo "All structure checks passed."
+  last_edited_ms: 0

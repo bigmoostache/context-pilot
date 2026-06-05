@@ -28,6 +28,7 @@ themes:
       library: "📚"
       skill: "⚡"
       spine: "🦴"
+      entities: "📦"
     status:
       full: ""
       summarized: "◐"
@@ -79,6 +80,7 @@ themes:
       library: "📚"
       skill: "🧩"
       spine: "⚙️"
+      entities: "📦"
     status:
       full: ""
       summarized: "◐"
@@ -130,6 +132,7 @@ themes:
       library: "🗄️"
       skill: "🔌"
       spine: "🧠"
+      entities: "📦"
     status:
       full: ""
       summarized: "◐"
@@ -181,6 +184,7 @@ themes:
       library: "📖"
       skill: "🌿"
       spine: "🌲"
+      entities: "📦"
     status:
       full: ""
       summarized: "◐"
@@ -232,6 +236,7 @@ themes:
       library: "🗺️"
       skill: "🧭"
       spine: "🐙"
+      entities: "📦"
     status:
       full: ""
       summarized: "◐"
@@ -283,6 +288,7 @@ themes:
       library: "🛸"
       skill: "⚡"
       spine: "🧬"
+      entities: "📦"
     status:
       full: ""
       summarized: "◐"

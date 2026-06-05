@@ -16,7 +16,7 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::Entry;
 use cp_base::state::runtime::State;
 
-use crate::meili::client::{MeiliClient, SearchParams};
+use crate::meili::api::{MeiliClient, SearchParams};
 use crate::types::SearchState;
 
 /// Context type string for the radar panel (used by the search module registry).

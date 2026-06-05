@@ -142,6 +142,10 @@ impl Kind {
     pub const QUEUE: &str = "queue";
     /// Chat dashboard panel (always-on room list, server status).
     pub const CHAT_DASHBOARD: &str = "chat-dashboard";
+    /// Entity database panel.
+    pub const ENTITIES: &str = "entities";
+    /// Entity SQL query result panel (dynamic, for large results).
+    pub const ENTITY_RESULT: &str = "entity_result";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
     #[must_use]

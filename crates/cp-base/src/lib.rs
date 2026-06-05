@@ -218,6 +218,7 @@ mod tests {
             ("callback", include_str!("../../../yamls/tools/callback.yaml")),
             ("console", include_str!("../../../yamls/tools/console.yaml")),
             ("core", include_str!("../../../yamls/tools/core.yaml")),
+            ("entities", include_str!("../../../yamls/tools/entities.yaml")),
             ("files", include_str!("../../../yamls/tools/files.yaml")),
             ("firecrawl", include_str!("../../../yamls/tools/firecrawl.yaml")),
             ("git", include_str!("../../../yamls/tools/git.yaml")),

@@ -8,7 +8,7 @@ use cp_base::state::watchers::{DYN_PANEL_ID_PLACEHOLDER, DynPanel};
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::meili::client::MeiliClient;
+use crate::meili::api::MeiliClient;
 use crate::panel::format_results;
 use crate::types::{SearchResult, SearchState};
 
@@ -259,10 +259,12 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let effective_query = path_prefix.map_or_else(|| query.clone(), |prefix| format!("{prefix} {query}"));
     let search_files = scope == "all" || scope == "project";
     let search_logs = scope == "all" || scope == "logs";
+    let search_entities = scope == "all" || scope == "entities";
     let file_filter = build_file_filter(extension, from_date, to_date);
     let log_filter = build_log_filter(from_date, to_date);
     let file_sort = file_sort_string(sort);
     let log_sort = log_sort_string(sort);
+    let entities_uid = format!("cp_{project_hash}_entities");
 
     spawn_async_tool(state, tool, ASYNC_TIMEOUT_SECS, move || {
         let mut file_results: Vec<SearchResult> = Vec::new();
@@ -271,7 +273,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         // --- Search files ----------------------------------------------------
 
         if search_files {
-            let keyword_params = crate::meili::client::SearchParams {
+            let keyword_params = crate::meili::api::SearchParams {
                 uid: &files_uid,
                 query: &effective_query,
                 filter: file_filter.as_deref(),
@@ -279,7 +281,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 limit,
                 semantic_ratio: Some(0.0),
             };
-            let semantic_params = crate::meili::client::SearchParams {
+            let semantic_params = crate::meili::api::SearchParams {
                 uid: &files_uid,
                 query: &semantic_query,
                 filter: file_filter.as_deref(),
@@ -305,7 +307,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         // --- Search logs -----------------------------------------------------
 
         if search_logs {
-            let keyword_params = crate::meili::client::SearchParams {
+            let keyword_params = crate::meili::api::SearchParams {
                 uid: &logs_uid,
                 query: &query,
                 filter: log_filter.as_deref(),
@@ -313,7 +315,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 limit,
                 semantic_ratio: Some(0.0),
             };
-            let semantic_params = crate::meili::client::SearchParams {
+            let semantic_params = crate::meili::api::SearchParams {
                 uid: &logs_uid,
                 query: &semantic_query,
                 filter: log_filter.as_deref(),
@@ -336,11 +338,49 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             }
         }
 
+        // --- Search entities -------------------------------------------------
+
+        let mut entity_results: Vec<crate::panel::EntityHit> = Vec::new();
+        if search_entities {
+            let entity_params = crate::meili::api::SearchParams {
+                uid: &entities_uid,
+                query: &query,
+                filter: None,
+                sort: None,
+                limit,
+                semantic_ratio: None, // keyword only — no embedder on entities index
+            };
+            match client.search(&entity_params) {
+                Ok(result) => {
+                    if let Some(hits) = result.get("hits").and_then(|h| h.as_array()) {
+                        for hit in hits {
+                            let table = hit
+                                .get("entity_table")
+                                .and_then(serde_json::Value::as_str)
+                                .unwrap_or("unknown")
+                                .to_string();
+                            let all_text =
+                                hit.get("_all_text").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
+                            let rank_score = hit.get("_rankingScore").and_then(serde_json::Value::as_f64);
+                            entity_results.push(crate::panel::EntityHit { table, all_text, score: rank_score });
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Silently skip — index may not exist if entities module unused
+                    log::debug!("Entity search skipped: {e}");
+                }
+            }
+        }
+
         // --- Build output ----------------------------------------------------
 
         let file_count = file_results.len();
         let log_count = log_results.len();
-        let panel_content = format_results(&query, &file_results, &log_results, hide_contents);
+        let entity_count = entity_results.len();
+        let search_output =
+            crate::panel::SearchOutput { files: &file_results, logs: &log_results, entities: &entity_results };
+        let panel_content = format_results(&query, &search_output, hide_contents);
 
         if hide_contents {
             return ToolOutput { content: panel_content, is_error: false, create_panel: None, preserves_tempo: true };
@@ -356,7 +396,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         ToolOutput {
             content: format!(
                 "Created panel {DYN_PANEL_ID_PLACEHOLDER}: \
-                 {file_count} file chunks, {log_count} logs for \"{query}\"{PANEL_WARNING}",
+                 {file_count} file chunks, {log_count} logs, {entity_count} entities for \"{query}\"{PANEL_WARNING}",
             ),
             is_error: false,
             create_panel: Some(dyn_panel),

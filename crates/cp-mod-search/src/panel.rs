@@ -179,17 +179,34 @@ pub(crate) fn visualize_search_output(content: &str, width: usize) -> Vec<cp_ren
 
 // ─── Result formatting ──────────────────────────────────────────────────────
 
+/// A single entity search hit from the Meilisearch entities index.
+pub(crate) struct EntityHit {
+    /// Table name (e.g. `"companies"`).
+    pub table: String,
+    /// YAML-formatted row content from `_all_text`.
+    pub all_text: String,
+    /// Meilisearch ranking score (0.0–1.0).
+    pub score: Option<f64>,
+}
+
+/// Bundled search results passed to [`format_results`].
+///
+/// Groups the three result categories to avoid exceeding the 4-argument limit.
+pub(crate) struct SearchOutput<'results> {
+    /// File chunk results from the files index.
+    pub files: &'results [SearchResult],
+    /// Log entry results from the logs index.
+    pub logs: &'results [SearchResult],
+    /// Entity row results from the entities index.
+    pub entities: &'results [EntityHit],
+}
+
 /// Format search results as YAML for panel display.
 ///
 /// File results are grouped by path. All metadata is included.
 /// Uses `serde_yaml` for consistent formatting matching the brave module style.
-pub(crate) fn format_results(
-    query: &str,
-    file_results: &[SearchResult],
-    log_results: &[SearchResult],
-    hide_contents: bool,
-) -> String {
-    let total = file_results.len().saturating_add(log_results.len());
+pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_contents: bool) -> String {
+    let total = output.files.len().saturating_add(output.logs.len()).saturating_add(output.entities.len());
 
     let mut root = serde_json::Map::new();
     drop(root.insert("query".into(), serde_json::Value::String(query.to_string())));
@@ -197,9 +214,9 @@ pub(crate) fn format_results(
 
     // -- File results, grouped by path ---------------------------------------
 
-    if !file_results.is_empty() {
+    if !output.files.is_empty() {
         let mut by_path: BTreeMap<String, Vec<&SearchResult>> = BTreeMap::new();
-        for r in file_results {
+        for r in output.files {
             let path = r.file_path.as_deref().unwrap_or("unknown").to_string();
             by_path.entry(path).or_default().push(r);
         }
@@ -222,9 +239,17 @@ pub(crate) fn format_results(
 
     // -- Log results ---------------------------------------------------------
 
-    if !log_results.is_empty() {
-        let logs_arr: Vec<serde_json::Value> = log_results.iter().map(|r| build_log_value(r, hide_contents)).collect();
+    if !output.logs.is_empty() {
+        let logs_arr: Vec<serde_json::Value> = output.logs.iter().map(|r| build_log_value(r, hide_contents)).collect();
         drop(root.insert("logs".into(), serde_json::Value::Array(logs_arr)));
+    }
+
+    // -- Entity results -------------------------------------------------------
+
+    if !output.entities.is_empty() {
+        let entities_arr: Vec<serde_json::Value> =
+            output.entities.iter().map(|r| build_entity_value(r, hide_contents)).collect();
+        drop(root.insert("entities".into(), serde_json::Value::Array(entities_arr)));
     }
 
     // -- Serialize to YAML ---------------------------------------------------
@@ -275,6 +300,19 @@ fn build_log_value(r: &SearchResult, hide_contents: bool) -> serde_json::Value {
     }
     if !r.content.is_empty() && !hide_contents {
         drop(obj.insert("content".into(), serde_json::Value::String(r.content.clone())));
+    }
+    serde_json::Value::Object(obj)
+}
+
+/// Build a JSON value for a single entity search hit.
+fn build_entity_value(hit: &EntityHit, hide_contents: bool) -> serde_json::Value {
+    let mut obj = serde_json::Map::new();
+    drop(obj.insert("table".into(), serde_json::Value::String(hit.table.clone())));
+    if let Some(score) = hit.score {
+        drop(obj.insert("relevance".into(), serde_json::json!(format!("{score:.4}"))));
+    }
+    if !hit.all_text.is_empty() && !hide_contents {
+        drop(obj.insert("content".into(), serde_json::Value::String(hit.all_text.clone())));
     }
     serde_json::Value::Object(obj)
 }

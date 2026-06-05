@@ -56,6 +56,33 @@ pub fn overlay_info(state: &State) -> Option<types::SearchOverlayInfo> {
     meili::overlay::overlay_info(state)
 }
 
+/// Get the Meilisearch server credentials (port, master key).
+///
+/// Returns `None` if the search module isn't initialized or the server
+/// isn't running (port == 0). Used by other modules (e.g. entities) to
+/// connect to the shared Meilisearch instance.
+#[must_use]
+pub fn meili_credentials(state: &State) -> Option<(u16, String)> {
+    let ss = state.get_ext::<SearchState>()?;
+    if ss.persist.port == 0 {
+        return None;
+    }
+    Some((ss.persist.port, ss.persist.master_key.clone()))
+}
+
+/// Get the project hash used for per-project Meilisearch index naming.
+///
+/// Returns `None` if the search module isn't initialized. The hash is
+/// an 8-character hex string derived from the project root path.
+#[must_use]
+pub fn project_hash(state: &State) -> Option<String> {
+    let ss = state.get_ext::<SearchState>()?;
+    if ss.persist.project_hash.is_empty() {
+        return None;
+    }
+    Some(ss.persist.project_hash.clone())
+}
+
 /// Lazily-loaded tool description texts parsed from the YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/search.yaml")));
@@ -136,7 +163,7 @@ impl Module for SearchModule {
                 .short_desc("Search across project files and logs using full-text search")
                 .category("Search")
                 .param("query", ParamType::String, true)
-                .param_enum("scope", &["all", "project", "logs"], false)
+                .param_enum("scope", &["all", "project", "logs", "entities"], false)
                 .param("path_prefix", ParamType::String, false)
                 .param("extension", ParamType::String, false)
                 .param_enum("sort", &["relevance", "date_asc", "date_desc"], false)
@@ -425,7 +452,7 @@ pub fn sync_logs_to_meilisearch(state: &State) {
         })
         .collect();
 
-    let Ok(client) = meili::client::MeiliClient::new(port, &master_key) else { return };
+    let Ok(client) = meili::api::MeiliClient::new(port, &master_key) else { return };
     // Fire-and-forget: Meilisearch processes the task asynchronously (including
     // remote Voyage AI embedding calls).  No need to wait — the documents will
     // appear in search results within seconds, and blocking here freezes the UI.

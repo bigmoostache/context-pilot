@@ -8,7 +8,7 @@ use cp_base::state::runtime::State;
 
 use cp_base::cast::Safe as _;
 
-use super::client;
+use super::api;
 use crate::types::{MeiliLiveStats, SearchOverlayInfo, SearchState};
 
 /// Read overlay information from the search module's state.
@@ -119,7 +119,7 @@ fn refresh_live_stats(ss: &SearchState) {
     }
 
     // Fetch live stats — no lock held during network I/O
-    let Ok(meili) = client::MeiliClient::new(ss.persist.port, &ss.persist.master_key) else {
+    let Ok(meili) = api::MeiliClient::new(ss.persist.port, &ss.persist.master_key) else {
         return;
     };
     let Ok(stats) = meili.global_stats() else {

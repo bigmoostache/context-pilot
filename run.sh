@@ -24,6 +24,11 @@ for arg in "$@"; do
     fi
 done
 
+# Prefer system OpenSSL over vendored build (avoids Perl dependency maze)
+if pkg-config --exists openssl 2>/dev/null; then
+    export OPENSSL_NO_VENDOR=1
+fi
+
 # Build both binaries (TUI + console server) upfront
 cargo build --release -p cp-console-server
 cargo build --release

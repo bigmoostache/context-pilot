@@ -21,7 +21,7 @@ tools:
 
     parameters:
       query: "Search query. Supports natural language and exact phrases."
-      scope: "Where to search: 'all' (both files and logs), 'project' (files only), 'logs' (logs only). Default 'all'."
+      scope: "Where to search: 'all' (files, logs, and entities), 'project' (files only), 'logs' (logs only), 'entities' (entity database only). Default 'all'."
       path_prefix: "Filter files by path prefix (e.g., 'src/app/'). Project scope only."
       extension: "Filter files by extension (e.g., 'rs', 'py'). Project scope only."
       sort: "Sort order: 'relevance' (default), 'date_asc', 'date_desc'. 'date_*' sorts by timestamp (logs) or last_modified (files)."

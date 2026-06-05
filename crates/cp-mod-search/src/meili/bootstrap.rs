@@ -3,7 +3,7 @@
 //! Extracted from `lib.rs` to keep the module trait implementation focused.
 //! Called during `init_state` / `load_module_data` — not on the hot path.
 
-use super::client;
+use super::api;
 use crate::types;
 
 /// Compute an 8-character hex hash of a path for per-project index naming.
@@ -21,7 +21,7 @@ pub(crate) fn hash_project_path(path: &str) -> String {
 ///
 /// Returns an error if any API call fails.
 pub(crate) fn ensure_indexes(port: u16, master_key: &str, project_hash: &str) -> Result<(), String> {
-    let meili = client::MeiliClient::new(port, master_key)?;
+    let meili = api::MeiliClient::new(port, master_key)?;
 
     let files_uid = format!("cp_{project_hash}_files");
     let logs_uid = format!("cp_{project_hash}_logs");
@@ -62,7 +62,7 @@ pub(crate) fn populate_initial_metrics(
     project_hash: &str,
     metrics: &std::sync::Arc<std::sync::Mutex<types::SearchMetrics>>,
 ) {
-    let Ok(meili) = client::MeiliClient::new(port, master_key) else {
+    let Ok(meili) = api::MeiliClient::new(port, master_key) else {
         return;
     };
 
@@ -159,7 +159,7 @@ const VOYAGE_MODEL: &str = "voyage-code-3";
 ///
 /// This is a fire-and-forget operation: Meilisearch will call the Voyage API
 /// in the background to generate embeddings for all documents.
-fn configure_embedders(meili: &client::MeiliClient, files_uid: &str, logs_uid: &str) {
+fn configure_embedders(meili: &api::MeiliClient, files_uid: &str, logs_uid: &str) {
     let Some(api_key) = read_voyage_api_key() else {
         log::info!("VOYAGE_API_KEY not set — skipping embedder configuration (keyword-only search)");
         return;

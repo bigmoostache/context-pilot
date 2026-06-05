@@ -353,7 +353,7 @@ pub(crate) fn cleanup_orphan_indexes(port: u16, master_key: &str) {
     }
 
     // Delete indexes for orphan projects
-    let Ok(client) = super::client::MeiliClient::new(port, master_key) else {
+    let Ok(client) = super::api::MeiliClient::new(port, master_key) else {
         return;
     };
 

@@ -4,10 +4,10 @@
 //! download logic, server start/stop/health lifecycle, and init-time
 //! helpers (index creation, metrics population).
 
+/// HTTP API client for Meilisearch: index management, document CRUD, search.
+pub mod api;
 /// Init-time helpers: index creation, metrics population, project hashing.
 pub(crate) mod bootstrap;
-/// HTTP API client for Meilisearch: index management, document CRUD, search.
-pub(crate) mod client;
 /// Binary download and platform detection.
 pub(crate) mod download;
 /// Ctrl+I overlay data provider (live stats from Meilisearch).

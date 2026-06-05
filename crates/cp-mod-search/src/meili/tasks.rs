@@ -5,7 +5,7 @@
 
 use std::time::{Duration, Instant};
 
-use super::client::MeiliClient;
+use super::api::MeiliClient;
 
 /// Poll a task until it reaches a terminal state (`succeeded` or `failed`).
 ///

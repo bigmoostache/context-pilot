@@ -1,0 +1,37 @@
+# Entity SQL tool — execute SQL against the project's entity database (SQLite).
+#
+# Single tool: entity_sql. Full SQLite support (JOINs, CTEs, window functions,
+# foreign keys, triggers, views). Multi-statement executes atomically.
+
+tools:
+  entity_sql:
+    description: >
+      Execute SQL against the project's entity database (SQLite). The database
+      is empty on first use — create your own schema. See the Entities panel
+      for current schema, sample data, and getting-started tips.
+
+      Use entities for structured data with relationships that need querying.
+      Use memories for isolated facts. Use logs for events and decisions.
+
+      Supports full SQLite: JOINs, CTEs, window functions, foreign keys,
+      triggers, views. Multi-statement (semicolons) executes atomically.
+      Use RETURNING * on INSERT/UPDATE to see results without a separate SELECT.
+      Use CREATE TABLE IF NOT EXISTS for idempotent schema setup.
+      Schema changes are auto-tracked for reproducibility.
+    params:
+      sql: "SQL statement(s) to execute. Multi-statement supported (semicolons). DDL, DML, and queries all accepted."
+      request_path: "Path to a .sql file to read SQL from. Mutually exclusive with sql — provide one or the other, not both."
+      live:
+        type: boolean
+        description: >
+          When true, results always go to a dynamic panel that auto-refreshes by re-executing
+          the query periodically (every 2 seconds). Only supported for SELECT/EXPLAIN/PRAGMA queries.
+          Incompatible with output_path and dry_run.
+      output_path: "File path to write results to. The file is created (or overwritten) with the query output. A panel is also created with the content. Incompatible with live."
+      dry_run:
+        type: boolean
+        description: >
+          When true, executes the SQL inside a savepoint that is immediately rolled back.
+          Shows exactly what would happen (affected rows, returned data, schema changes)
+          without persisting any changes. No migrations, dumps, or search sync.
+          Incompatible with live.

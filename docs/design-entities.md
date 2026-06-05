@@ -1,6 +1,6 @@
 # cp-mod-entities — Design Document
 
-> **Status:** Draft v7
+> **Status:** Implemented
 > **Date:** 2026-06-04  
 > **Crate:** `crates/cp-mod-entities/`  
 > **Depends on:** cp-base, cp-render, cp-mod-search, rusqlite
@@ -50,7 +50,7 @@ Not every project needs entities. They shine when the AI accumulates structured 
 |----------|--------|-----------|
 | Storage engine | **SQLite (rusqlite, bundled)** | ACID, full SQL, in-process, 24+ years maturity. Meilisearch explicitly unsuitable as primary store (no ACID, async indexing). |
 | Schema management | **Auto migrations + dump** | Every DDL auto-captured as a numbered migration file. Full dump (schema + data) on save. DB is source of truth; files are derived. Recovery: dump (primary) → migrations (fallback) → fresh start. ~220 lines. Industry-standard Rails model. |
-| Meilisearch sync | **Fire-and-forget, full re-index** | Re-index all user tables after any write. Same pattern as `sync_logs_to_meilisearch`. Meilisearch down → skip silently. |
+| Meilisearch sync | **Incremental, dirty-tracked, delete-then-add** | Per-table sync: delete old docs → add current rows. Dirty tracking with retry on failure. Cold start: upsert all + orphan cleanup via facet_distribution. 3s HTTP timeout. YAML-formatted `_all_text` (500-char value cap). Meilisearch down → skip silently, dirty state preserved. |
 | Schema guidance | **Suggested, not enforced** | Tool description includes conventions. AI decides. |
 | Sample data in panel | **Yes, capped** | First 3 rows per table in panel context. Prevents wasted "exploration SELECTs." Capped: skip tables >10 columns, truncate values at 50 chars. |
 | Error enrichment | **Fuzzy suggestions** | On "table/column not found" errors, suggest closest match from schema. Include schema in all error responses. |
@@ -145,10 +145,12 @@ Everything else is AI-created.
 ```rust
 pub struct EntitiesState {
     pub db_path: PathBuf,
+    pub dump_path: PathBuf,
+    pub migrations_dir: PathBuf,
     pub schema_cache: Option<SchemaCache>,
-    pub meili_port: u16,            // 0 = unavailable
-    pub meili_key: String,
     pub entities_index_uid: String, // "cp_{hash}_entities"
+    pub dirty_tables: HashSet<String>,
+    pub dropped_tables: Vec<String>,
 }
 
 pub struct SchemaCache {
@@ -230,14 +232,11 @@ Two complementary mechanisms — migrations capture the **story**, the dump capt
 {
   "id": "companies__42",
   "entity_table": "companies",
-  "name": "Acme Corp",
-  "country": "France",
-  "founded": 2019,
-  "_all_text": "Acme Corp France 2019"
+  "_all_text": "name: Acme Corp\ncountry: France\nfounded: 2019"
 }
 ```
 
-Primary key: `{table}__{rowid}`. `_all_text` is a space-joined concatenation of all TEXT column values.
+Primary key: `{table}__{rowid}`. `_all_text` is the full row serialized as YAML key-value pairs — preserves column names in indexed text for richer search (e.g. "country France" matches).
 
 **Index settings:**
 
@@ -250,11 +249,17 @@ Primary key: `{table}__{rowid}`. `_all_text` is a space-joined concatenation of 
 }
 ```
 
-**Sync rules:**
-- After any write → re-index ALL user tables (fire-and-forget via `MeiliClient::add_documents`).
-- After `DROP TABLE` → `delete_documents_by_filter("entity_table = '{table}'")`.
-- On module init → full re-index.
-- Meilisearch down? Skip silently. SQL operations work independently.
+**Sync strategy — incremental with dirty tracking:**
+
+State: `dirty_tables: HashSet<String>` (tables with unsynced writes), `dropped_tables: Vec<String>` (tables dropped since last sync). Both in-memory, lost on crash (cold start catches up).
+
+**Per-table sync (delete-then-add):** For each dirty table: `delete_by_filter("entity_table = '{table}'")` then `add_documents(current_rows)`. Handles INSERT/UPDATE/DELETE correctly — no orphaned docs from deleted rows. Short HTTP timeout (3s, localhost). On failure: table stays dirty for retry.
+
+**After `entity_sql`:** Extract affected table name(s) from SQL. Mark dirty (DML/DDL) or dropped (DROP TABLE). Call `flush_sync()` — process drops first (delete by filter), then dirty tables (delete-then-add). Clear on success, keep on failure.
+
+**Cold start (init/reload):** Upsert-then-cleanup. Sync all current tables (overwrite, never empty). Then `facet_distribution("entity_table")` to discover orphan tables in Meilisearch (tables no longer in SQLite) and delete their docs. `ensure_index()` with settings if missing.
+
+**Meilisearch down?** Skip silently. Dirty state preserved. Next flush retries. SQL operations never blocked.
 
 ---
 
@@ -606,24 +611,28 @@ Three phases. Each ends with a verifiable milestone. Every step references exact
      ```
    - Re-export: `pub use meili::client::MeiliClient;` from `cp-mod-search/src/lib.rs`.
 
-2. **`crates/cp-mod-entities/src/sync.rs` (~120 lines):**
-   - `pub(crate) fn ensure_index(state: &State, entities_index_uid: &str) -> Result<(), String>` — get `(port, key)` from `cp_mod_search::meili_credentials(state)`. Create `MeiliClient::new(port, &key)`. `index_exists()` → if not, `create_index(uid, "id")` + `update_settings()` with entities-specific settings: `searchableAttributes: ["_all_text"]`, `filterableAttributes: ["entity_table"]`.
-   - `pub(crate) fn sync_all_tables(state: &State, db_path: &Path, index_uid: &str)` — open connection, query all user tables, for each: SELECT all rows, build documents (`{id: "{table}__{rowid}", entity_table: table_name, ...columns, _all_text: "space-joined text values"}`). Fire-and-forget `client.add_documents()`. Follow `sync_logs_to_meilisearch` pattern from `cp-mod-search/src/lib.rs:230-270`.
-   - `pub(crate) fn delete_table_docs(state: &State, table_name: &str, index_uid: &str)` — `client.delete_documents_by_filter(&format!("entity_table = '{table_name}'"))`.
+2. **`crates/cp-mod-entities/src/sync.rs` (~180 lines):**
+   - `pub(crate) fn ensure_index(port: u16, key: &str, index_uid: &str) -> Result<(), String>` — create `MeiliClient::new(port, key)`. `create_index(uid, "id")` + `update_settings()` with: `searchableAttributes: ["_all_text"]`, `filterableAttributes: ["entity_table"]`.
+   - `pub(crate) fn sync_table(port: u16, key: &str, db_path: &Path, index_uid: &str, table_name: &str) -> Result<(), String>` — delete-then-add: `delete_by_filter("entity_table = '{table}'")`, then open connection, SELECT all rows, build YAML docs, `add_documents()`. 3s HTTP timeout. rowid-based doc IDs with WITHOUT ROWID fallback.
+   - `pub(crate) fn flush_sync(state: &mut State)` — get credentials via `cp_mod_search::meili_credentials(state)`. Process `dropped_tables` first (delete by filter), then `dirty_tables` (sync_table). Clear entries on success, keep on failure.
+   - `pub(crate) fn full_reindex(state: &mut State)` — ensure_index, sync ALL current tables (upsert), then `facet_distribution("entity_table")` to find orphan tables and delete their docs.
+   - `pub(crate) fn extract_affected_tables(statements: &[&str]) -> Vec<String>` — parse table names from all SQL statements. Handles INSERT INTO, UPDATE, DELETE FROM, CREATE/ALTER/DROP TABLE, quoted identifiers.
+   - Helper: `fn build_docs(conn, table, columns) -> Vec<serde_json::Value>` — YAML-formatted `_all_text` (500-char value cap, newlines replaced).
 
 3. **Wire sync into tools.rs:**
-   - After DML success: call `sync::sync_all_tables()` (fire-and-forget).
-   - After DDL success: call `sync::sync_all_tables()` (captures table additions) or `sync::delete_table_docs()` if DROP TABLE.
+   - After successful execution: call `sync::extract_affected_tables()` on the SQL statements.
+   - For DML/DDL (non-DROP): add affected tables to `dirty_tables`.
+   - For DROP TABLE: add to `dropped_tables`, remove from `dirty_tables`.
+   - Call `sync::flush_sync(state)` — processes drops first, then dirty tables.
 
-4. **Wire index creation into lib.rs `init_state()` / `load_module_data()`:**
-   - After DB recovery, call `sync::ensure_index(state, &entities_index_uid)`.
-   - Then `sync::sync_all_tables()` for initial population.
-   - `entities_index_uid = format!("cp_{}_entities", project_hash)` where `project_hash` from `cp_mod_search::project_hash(state)`.
+4. **Wire cold start into lib.rs:**
+   - In `init_state()` / `load_module_data()`: compute `entities_index_uid = format!("cp_{}_entities", project_hash)`. Call `sync::full_reindex(state)`.
+   - In `save_module_data()`: call `sync::flush_sync(state)` (last chance before shutdown).
 
-5. **Add `"entities"` search scope:**
-   - `crates/cp-mod-search/src/tools.rs` — add `let search_entities = scope == "all" || scope == "entities";` alongside existing `search_files`/`search_logs`. When `search_entities`: query the entities index. Merge results.
+5. **Add `"entities"` search scope (convention-based, zero coupling):**
+   - `crates/cp-mod-search/src/tools.rs` — add `let search_entities = scope == "all" || scope == "entities";` alongside existing `search_files`/`search_logs`. When `search_entities`: construct `cp_{project_hash}_entities` by convention, query it. If index doesn't exist (Meilisearch returns `index_not_found`), skip silently with empty results. Merge entity results with file/log results.
    - `yamls/tools/search.yaml` — update `scope` description: `"'all' (files, logs, entities), 'project' (files), 'logs', 'entities'"`.
-   - `crates/cp-mod-search/src/lib.rs` — add `pub fn entities_index_uid(state: &State) -> Option<String>` that checks if entities module is active and returns the UID.
+   - No import of cp-mod-entities from cp-mod-search. Both agree on the `cp_{hash}_entities` naming convention.
 
 6. **Tool visualizer** (`lib.rs`):
    - Register `("entity_sql", visualize_entity_output)`. Color: table headers → Accent, row counts → green, NULLs → muted+dimmed, errors → red. Follow `visualize_memory_output` pattern from `cp-mod-memory/src/lib.rs:180-210`.

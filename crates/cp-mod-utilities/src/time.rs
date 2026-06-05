@@ -43,6 +43,18 @@ pub fn now_utc_rfc3339_secs() -> String {
     epoch_secs_to_rfc3339_secs(epoch_secs).unwrap_or_default()
 }
 
+/// Current UTC time in compact format: `20260604T153000`.
+///
+/// Suitable for filenames and sortable identifiers.
+#[must_use]
+pub fn now_utc_compact() -> String {
+    let epoch_secs = now_epoch_ms().wrapping_div(1000);
+    let Some(dt) = decompose_utc(epoch_secs) else {
+        return "19700101T000000".to_string();
+    };
+    format!("{:04}{:02}{:02}T{:02}{:02}{:02}", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+}
+
 /// Convert epoch seconds to RFC 3339 seconds precision.
 ///
 /// Returns `None` for negative timestamps.

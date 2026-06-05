@@ -36,6 +36,12 @@ echo ""
 # 1. Build release binary
 echo "[1/4] Building release binary..."
 cd "$SCRIPT_DIR"
+
+# Prefer system OpenSSL over vendored build (avoids Perl dependency maze)
+if pkg-config --exists openssl 2>/dev/null; then
+    export OPENSSL_NO_VENDOR=1
+fi
+
 cargo build --release
 cargo build --release -p cp-console-server
 echo "      Build complete."

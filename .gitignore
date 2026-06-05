@@ -15,6 +15,7 @@ report/code-audit.md
 test
 output
 !.context-pilot/shared/
+.context-pilot/shared/entities/
 !.context-pilot/agents/
 !.context-pilot/skills/
 !.context-pilot/commands/

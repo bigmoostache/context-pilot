@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use notify::{EventKind, PollWatcher, RecursiveMode, Watcher as _};
 
-use crate::meili::client::MeiliClient;
+use crate::meili::api::MeiliClient;
 use crate::splitter::SplitterChain;
 use crate::types;
 use crate::types::IndexerCmd;

@@ -7,11 +7,9 @@
 use std::time::Duration;
 
 /// HTTP client for a running Meilisearch server.
-///
 /// Created on-the-fly when needed (not stored in `SearchState`).
-/// The inner `reqwest::blocking::Client` is cheap to construct.
 #[derive(Debug)]
-pub(crate) struct MeiliClient {
+pub struct MeiliClient {
     /// Base URL including port, e.g. `http://127.0.0.1:7700`.
     base_url: String,
     /// Bearer token for authentication.
@@ -45,7 +43,7 @@ impl MeiliClient {
     /// # Errors
     ///
     /// Returns an error if the HTTP client cannot be built.
-    pub(crate) fn new(port: u16, api_key: &str) -> Result<Self, String> {
+    pub fn new(port: u16, api_key: &str) -> Result<Self, String> {
         let http = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -75,14 +73,12 @@ impl MeiliClient {
     ///
     /// Uses `PATCH /indexes/{uid}/settings/embedders` to set up the embedding
     /// source (e.g. `huggingFace`). Returns the task UID for polling.
-    ///
-    /// Meilisearch will generate embeddings for all existing documents
-    /// as a background task after this call.
+    /// Meilisearch generates embeddings as a background task after this call.
     ///
     /// # Errors
     ///
     /// Returns an error if the API call fails.
-    pub(crate) fn update_embedder_settings(&self, uid: &str, settings: &serde_json::Value) -> Result<u64, String> {
+    pub fn update_embedder_settings(&self, uid: &str, settings: &serde_json::Value) -> Result<u64, String> {
         let url = format!("{}/indexes/{uid}/settings/embedders", self.base_url);
 
         let resp = self
@@ -105,7 +101,7 @@ impl MeiliClient {
     /// # Errors
     ///
     /// Returns an error on network failures.
-    pub(crate) fn get_embedder_settings(&self, uid: &str) -> Result<serde_json::Value, String> {
+    pub fn get_embedder_settings(&self, uid: &str) -> Result<serde_json::Value, String> {
         let url = format!("{}/indexes/{uid}/settings/embedders", self.base_url);
         let resp = self
             .http
@@ -130,7 +126,7 @@ impl MeiliClient {
     /// # Errors
     ///
     /// Returns an error on network failures or unexpected status codes.
-    pub(crate) fn index_exists(&self, uid: &str) -> Result<bool, String> {
+    pub fn index_exists(&self, uid: &str) -> Result<bool, String> {
         let url = format!("{}/indexes/{uid}", self.base_url);
         let resp = self
             .http
@@ -155,7 +151,7 @@ impl MeiliClient {
     /// # Errors
     ///
     /// Returns an error if the API call fails.
-    pub(crate) fn create_index(&self, uid: &str, primary_key: &str) -> Result<u64, String> {
+    pub fn create_index(&self, uid: &str, primary_key: &str) -> Result<u64, String> {
         let url = format!("{}/indexes", self.base_url);
         let body = serde_json::json!({
             "uid": uid,
@@ -181,7 +177,7 @@ impl MeiliClient {
     /// # Errors
     ///
     /// Returns an error if the API call fails.
-    pub(crate) fn update_settings(&self, uid: &str, settings: &serde_json::Value) -> Result<u64, String> {
+    pub fn update_settings(&self, uid: &str, settings: &serde_json::Value) -> Result<u64, String> {
         let url = format!("{}/indexes/{uid}/settings", self.base_url);
 
         let resp = self
@@ -196,15 +192,13 @@ impl MeiliClient {
         super::tasks::extract_task_uid(resp, "update_settings")
     }
 
-    /// Delete an index.
-    ///
-    /// Uses `DELETE /indexes/{uid}`. Returns the task UID.
+    /// Delete an index. Uses `DELETE /indexes/{uid}`. Returns the task UID.
     /// Returns `Ok` even if the index doesn't exist (idempotent).
     ///
     /// # Errors
     ///
     /// Returns an error if the API call fails.
-    pub(crate) fn delete_index(&self, uid: &str) -> Result<u64, String> {
+    pub fn delete_index(&self, uid: &str) -> Result<u64, String> {
         let url = format!("{}/indexes/{uid}", self.base_url);
 
         let resp = self
@@ -226,14 +220,12 @@ impl MeiliClient {
     // -- Document operations -------------------------------------------------
 
     /// Add or update documents in an index (batch upsert).
-    ///
-    /// `documents` should be a JSON array of objects, each with a field
-    /// matching the index's primary key.  Returns the task UID.
+    /// `documents` is a JSON array with the index's primary key field. Returns the task UID.
     ///
     /// # Errors
     ///
     /// Returns an error if the API call fails.
-    pub(crate) fn add_documents(&self, uid: &str, documents: &serde_json::Value) -> Result<u64, String> {
+    pub fn add_documents(&self, uid: &str, documents: &serde_json::Value) -> Result<u64, String> {
         let url = format!("{}/indexes/{uid}/documents", self.base_url);
 
         let resp = self
@@ -256,7 +248,7 @@ impl MeiliClient {
     /// # Errors
     ///
     /// Returns an error if the API call fails.
-    pub(crate) fn delete_documents_by_filter(&self, uid: &str, filter: &str) -> Result<u64, String> {
+    pub fn delete_documents_by_filter(&self, uid: &str, filter: &str) -> Result<u64, String> {
         let url = format!("{}/indexes/{uid}/documents/delete", self.base_url);
         let body = serde_json::json!({ "filter": filter });
 
@@ -277,7 +269,11 @@ impl MeiliClient {
     /// Get global statistics across all indexes (`GET /stats`).
     ///
     /// Returns raw JSON with `databaseSize`, `usedDatabaseSize`, per-index stats.
-    pub(crate) fn global_stats(&self) -> Result<serde_json::Value, String> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the response cannot be parsed.
+    pub fn global_stats(&self) -> Result<serde_json::Value, String> {
         let url = format!("{}/stats", self.base_url);
         let resp = self
             .http
@@ -290,7 +286,11 @@ impl MeiliClient {
     }
 
     /// Get index statistics — document count and indexing status (`GET /indexes/{uid}/stats`).
-    pub(crate) fn index_stats(&self, uid: &str) -> Result<(u64, bool), String> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the response cannot be parsed.
+    pub fn index_stats(&self, uid: &str) -> Result<(u64, bool), String> {
         let url = format!("{}/indexes/{uid}/stats", self.base_url);
         let resp = self
             .http
@@ -314,7 +314,11 @@ impl MeiliClient {
     }
 
     /// Get the Meilisearch server version string (`GET /version` → `pkgVersion`).
-    pub(crate) fn version(&self) -> Result<String, String> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the response cannot be parsed.
+    pub fn version(&self) -> Result<String, String> {
         let url = format!("{}/version", self.base_url);
         let resp = self
             .http
@@ -328,7 +332,11 @@ impl MeiliClient {
     }
 
     /// Get recent tasks filtered to specific index UIDs (`GET /tasks?limit=N&indexUids=...`).
-    pub(crate) fn recent_tasks(&self, limit: u32, index_uids: &[&str]) -> Result<serde_json::Value, String> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the response cannot be parsed.
+    pub fn recent_tasks(&self, limit: u32, index_uids: &[&str]) -> Result<serde_json::Value, String> {
         let uids_param = index_uids.join(",");
         let url = format!("{}/tasks?limit={limit}&indexUids={uids_param}", self.base_url);
         let resp = self
@@ -458,7 +466,7 @@ impl MeiliClient {
     /// # Errors
     ///
     /// Returns an error if the API call fails or the response cannot be parsed.
-    pub(crate) fn facet_distribution(&self, uid: &str, facets: &[&str]) -> Result<serde_json::Value, String> {
+    pub fn facet_distribution(&self, uid: &str, facets: &[&str]) -> Result<serde_json::Value, String> {
         let url = format!("{}/indexes/{uid}/search", self.base_url);
         let facet_arr: Vec<serde_json::Value> =
             facets.iter().map(|f| serde_json::Value::String((*f).to_string())).collect();
