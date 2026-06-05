@@ -203,6 +203,14 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
         crate::modules::conversation_history::trap::maybe_deactivate_trap(&mut app.state);
     }
 
+    // === TOOL METADATA VALIDATION ===
+    // Global middleware: nudge the LLM to include intent/verb on every tool call.
+    for (tool, tr) in tools.iter().zip(tool_results.iter_mut()) {
+        if let Some(warning) = super::metadata::validate_tool_metadata(&tool.input) {
+            tr.content.push_str(&warning);
+        }
+    }
+
     // === REMAINING HISTORY PANELS ===
     // After Close_conversation_history, augment result with remaining panel count.
     if tools.iter().any(|t| t.name == "Close_conversation_history") {

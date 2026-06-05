@@ -2,3 +2,16 @@
 10:50:59.319125364 fmt src/main.rs
 10:56:21.124467417 fmt src/main.rs
 10:56:39.162893093 fmt src/main.rs
+11:15:14.951433817 fmt src/app/run/tools/pipeline.rs
+11:15:23.033500405 fmt src/app/run/tools/pipeline.rs
+11:15:29.276974057 fmt crates/cp-base/src/tools/mod.rs
+11:15:35.544065599 fmt crates/cp-base/src/tools/mod.rs
+11:15:39.653461756 fmt src/app/run/tools/pipeline.rs
+11:15:39.702753187 fmt crates/cp-base/src/tools/mod.rs
+11:17:00.773365627 fmt src/app/run/tools/metadata.rs
+11:17:07.785867833 fmt src/app/run/tools/metadata.rs
+11:17:38.336916699 fmt src/app/run/tools/mod.rs
+11:17:50.110401273 fmt src/app/run/tools/pipeline.rs
+11:17:56.822542137 fmt src/app/run/tools/pipeline.rs
+11:18:05.938777897 fmt src/app/run/tools/mod.rs
+11:18:05.976788139 fmt src/app/run/tools/pipeline.rs

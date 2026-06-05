@@ -430,8 +430,20 @@ impl ToolDefBuilder<'_> {
     }
 
     /// Finalize the builder into a [`ToolDefinition`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if any parameter uses a reserved name (`intent`, `verb`).
     #[must_use]
     pub fn build(self) -> ToolDefinition {
+        for p in &self.params {
+            if RESERVED_PARAM_NAMES.contains(&p.name.as_str()) {
+                crate::config::invariant_panic(&format!(
+                    "Tool '{}': parameter '{}' is reserved for global tool metadata",
+                    self.id, p.name
+                ));
+            }
+        }
         ToolDefinition {
             id: self.id,
             name: String::new(), // display name derived elsewhere if needed
@@ -444,6 +456,10 @@ impl ToolDefBuilder<'_> {
         }
     }
 }
+
+/// Parameter names reserved by the global tool metadata middleware.
+/// No tool definition may declare a parameter with these names.
+const RESERVED_PARAM_NAMES: &[&str] = &["intent", "verb"];
 
 /// Build the JSON array of enabled tool schemas for the LLM API.
 #[must_use]

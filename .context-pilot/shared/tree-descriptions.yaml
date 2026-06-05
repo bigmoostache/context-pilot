@@ -282,6 +282,10 @@
   path: src/app/actions/history.rs
   description: Prompt history navigation and panel clipboard copy. PromptHistoryNav struct with lazy-load from JSONL. Safe indexing via .get(), saturating arithmetic. handle_history_prev/next (Ctrl+U/D), handle_copy_panel_content (Ctrl+C via pbcopy).
   last_edited_ms: 1780563343160
+155349883e8b8d6d:
+  path: increment.txt
+  description: Throwaway test file for queue/preflight testing
+  last_edited_ms: 0
 157ba8411ad995a2:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
@@ -538,6 +542,10 @@
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, cp-mod-utilities, crossterm, serde, serde_json.'
   last_edited_ms: 0
+28535222aec6d878:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
 2886480e48a90922:
   path: crates/cp-mod-files/src/panel.rs
   description: File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based).
@@ -625,6 +633,10 @@
 2e174d5c4021ee64:
   path: src/infra/watcher.rs
   description: 'FileWatcher: notify crate wrapper, WatchEvent enum, canonical path dedup, rewatch_file() for atomic renames, non-blocking poll'
+  last_edited_ms: 0
+2e2432f5d53621ba:
+  path: src/app/run/tools/pipeline.rs
+  description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
   last_edited_ms: 0
 2e908756fdf5dd30:
   path: src/main.rs
@@ -958,6 +970,10 @@
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 4 tools: upsert/toggle/open/close editor. Depends on console. CallbackState: definitions (shared) + active_set/editor_open (per-worker). Glob-matched auto-fire on file edits.'
   last_edited_ms: 1780497937350
+480d0b99c9c60078:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
 48f679baafd75d4d:
   path: crates/cp-mod-scratchpad/src/panel.rs
   description: 'ScratchpadPanel: cell preview (5 lines max), format_cells_for_context() for LLM, no cache needed'
@@ -1526,6 +1542,10 @@
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
   last_edited_ms: 1780648757744
+75eb33edbee482d1:
+  path: src/app/run/tools/mod.rs
+  description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
+  last_edited_ms: 0
 76162aa68245be51:
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
@@ -1617,6 +1637,10 @@
 7cfd2cfc2f568cf9:
   path: src/llms/cache/density.rs
   description: 'Divergence density distributions. Production: ConversationTailDensity (zeros out assistant blocks, quadratic on user-side panels + last user turn). Test-only: Uniform, Quadratic, PowerLaw, Empirical.'
+  last_edited_ms: 0
+7d3f6d9336871a4e:
+  path: crates/cp-base/src/tools/mod.rs
+  description: 'Tool system. ToolUse/ToolResult (display, tldr, preserves_tempo). ToolDefinition + ToolDefBuilder (schema in Rust, descriptions from YAML). ParamType recursive JSON Schema. build_api() generates LLM tool array. Sub-modules: pre_flight, async_exec.'
   last_edited_ms: 0
 7d5e664ea900e309:
   path: src/ui/help/palette.rs
@@ -2461,6 +2485,10 @@ c07395815ca8865e:
 c128c6c1a8afa6e1:
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
+  last_edited_ms: 0
+c16480ad12de8da5:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
 c20be1c967ed1030:
   path: crates/cp-mod-brave/src/tools.rs
