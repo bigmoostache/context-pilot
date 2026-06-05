@@ -122,9 +122,6 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing required parameter: new_string".to_string(), true);
     };
 
-    // Get replace_all (optional, default false)
-    let replace_all = tool.input.get("replace_all").and_then(serde_json::Value::as_bool).unwrap_or(false);
-
     // Check if file is open in context (canonicalize for consistent comparison)
     let path = Path::new(path_str);
     let canonical = path.canonicalize().map_or_else(|_| path_str.to_string(), |p| p.to_string_lossy().to_string());
@@ -144,18 +141,12 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Try normalized matching (handles trailing whitespace differences).
     // Clone the match to break the borrow on `content`, allowing mutation below.
     let actual_match = find_normalized_match(&content, old_string).map(str::to_owned);
-    let replaced = actual_match.map_or(0, |actual_match| {
-        if replace_all {
-            let count = content.matches(actual_match.as_str()).count();
-            content = content.replace(actual_match.as_str(), new_string);
-            count
-        } else {
-            content = content.replacen(actual_match.as_str(), new_string, 1);
-            1
-        }
-    });
+    let replaced = actual_match.is_some();
+    if let Some(actual_match) = actual_match {
+        content = content.replacen(actual_match.as_str(), new_string, 1);
+    }
 
-    if replaced == 0 {
+    if !replaced {
         // Provide helpful error with closest match
         let hint = if let Some((line, preview)) = find_closest_match(&content, old_string) {
             format!(" (closest match at line {line}: \"{preview}\")")
@@ -201,12 +192,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Header line
-    if replace_all && replaced > 1 {
-        let _r =
-            writeln!(display_msg, "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)");
-    } else {
-        let _r = writeln!(display_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
-    }
+    let _r = writeln!(display_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
 
     // Add diff markers for UI rendering
     display_msg.push_str("```diff\n");
@@ -229,12 +215,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
         );
     }
-    if replace_all && replaced > 1 {
-        let _r =
-            writeln!(llm_msg, "Edited '{path_str}': {replaced} replacements (~{lines_changed} lines changed each)");
-    } else {
-        let _r = writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
-    }
+    let _r = writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
     // Sail ho! Tell the LLM its panel already has the fresh cargo aboard
     if let Some(ref pid) = panel_ref {
         let _r = writeln!(

@@ -13,8 +13,6 @@ tools:
       file_path: "Absolute path to the file to edit"
       old_string: "Exact text to find and replace (copy from file context)"
       new_string: "Replacement text"
-      replace_all: "Replace all occurrences (default: false)"
-      skip_callbacks: "List of callback names to skip for this edit. Use sparingly — only when you KNOW the callback will fail (e.g. mid-refactor) or when actively debugging. Callbacks exist to help you; prefer letting them run."
 
   Write:
     description: |

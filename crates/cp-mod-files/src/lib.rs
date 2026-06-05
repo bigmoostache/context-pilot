@@ -53,16 +53,11 @@ fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State
                 let base = virtual_content.as_deref().unwrap_or(disk_content);
                 let old = call.input.get("old_string").and_then(|v| v.as_str()).unwrap_or("");
                 let new = call.input.get("new_string").and_then(|v| v.as_str()).unwrap_or("");
-                let replace_all = call.input.get("replace_all").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
                 if let Some(actual) = tools::edit_file::find_normalized_match(base, old) {
                     let actual = actual.to_owned();
                     let mut buf = base.to_string();
-                    if replace_all {
-                        buf = buf.replace(&actual, new);
-                    } else {
-                        buf = buf.replacen(&actual, new, 1);
-                    }
+                    buf = buf.replacen(&actual, new, 1);
                     virtual_content = Some(buf);
                 }
                 // If the queued edit doesn't match, skip it — it may fail at flush time
@@ -121,8 +116,6 @@ impl Module for FilesModule {
                 .param("file_path", ParamType::String, true)
                 .param("old_string", ParamType::String, true)
                 .param("new_string", ParamType::String, true)
-                .param("replace_all", ParamType::Boolean, false)
-                .param_array("skip_callbacks", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("Write", t)
                 .short_desc("Create or overwrite file")

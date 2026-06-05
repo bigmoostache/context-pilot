@@ -350,6 +350,10 @@
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. Nested object params (location). Simple dispatch pattern.'
   last_edited_ms: 1780560886875
+1b4b773580481e9c:
+  path: crates/cp-mod-files/src/lib.rs
+  description: 'Files module. Core/global. 3 tools: Open, Edit, Write. Pre-flight: queue auto-activate, old_string match against both disk and virtual (post-queue) content via build_virtual_content(). 4-way matrix: disk✓/virtual✓→OK, disk✓/virtual✗→ERROR, disk✗/virtual✓→OK, disk✗/virtual✗→ERROR.'
+  last_edited_ms: 0
 1b4cade6bfe272d3:
   path: src/modules/conversation/refresh.rs
   description: estimate_message_tokens() (content+tools), refresh_conversation_context() updates Conversation context element
@@ -1473,6 +1477,10 @@
 753bc3b64810d965:
   path: src/modules/overview/tools/panel_goto_page.rs
   description: 'panel_goto_page: navigate paginated panels, range validation, recomputes token_count per page'
+  last_edited_ms: 0
+75403f53fa0dec78:
+  path: crates/cp-mod-files/src/tools/edit_file.rs
+  description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
   last_edited_ms: 0
 76162aa68245be51:
   path: crates/cp-base/src/config/mod.rs
@@ -2846,6 +2854,10 @@ ed8cdf66722e6f21:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. XAI_API_KEY auth.
   last_edited_ms: 1780565754901
+eda799977218054d:
+  path: .context-pilot/config.json
+  description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
 edf0e03e608d5a8b:
   path: test_file_to_describe.txt
   description: Version C of the test file

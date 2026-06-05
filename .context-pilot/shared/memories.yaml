@@ -349,6 +349,22 @@ bfd5725c88443a6a:
   - audit
   - task
   last_edited_ms: 0
+ceac945d9376fcf2:
+  tl_dr: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
+  contents: |-
+    Standard operating procedure when finishing work on any feature:
+    1. **Build**: `cargo build --release` (with OPENSSL_NO_VENDOR=1 if needed)
+    2. **Reload**: `system_reload` to apply changes to the running TUI
+    3. **Commit + Push**: Include memories.yaml and tree-descriptions.yaml per M37
+    4. **Clean context**: Close all work panels, update tree descriptions for changed files
+
+    This is the captain's mandated sequence. Do NOT skip steps or reorder.
+  importance: critical
+  labels:
+  - workflow
+  - feature-completion
+  - sequence
+  last_edited_ms: 1780648683027
 d1e512c8273ba340:
   tl_dr: Thinking blocks echoed as ContentBlock::Text (prefix '🧠 [Thinking]') in prompt_builder, NOT native Thinking. Signatures removed — prefix changes break them.
   importance: high
