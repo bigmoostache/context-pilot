@@ -7,12 +7,18 @@
     <div class="fe-window">
       <div class="fe-blocks" id="fe-blocks"></div>
     </div>
+    <!-- Frame navigation -->
+    <div class="fe-nav">
+      <div class="fe-nav-btn" id="fe-prev">←</div>
+      <div class="fe-nav-counter" id="fe-counter">1 / 9</div>
+      <div class="fe-nav-btn" id="fe-next">→</div>
+    </div>
   </div>
 
   <!-- Vertical separator -->
   <div class="fe-separator"></div>
 
-  <!-- Right: Statement area (no block, just text) -->
+  <!-- Right: Statement area -->
   <div class="fe-detail-col">
     <div class="fe-detail" id="fe-detail">
       <div class="fe-placeholder">
@@ -47,10 +53,9 @@
     flex-direction: column;
   }
 
-  /* Exact same container as the animated slide */
   .fe-window {
     width: 100%;
-    flex: 1;
+    height: 480px;
     border: 1.5px solid var(--light);
     border-radius: 20px;
     background: transparent;
@@ -66,48 +71,107 @@
     bottom: 5px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 0;
   }
 
-  /* Exact same block style as animated slide */
+  /* Block base — matches token jewelry animation exactly */
   .fe-block {
     border-radius: 20px;
     display: flex;
     align-items: center;
-    padding: 0 0.7rem;
+    padding: 0 0.6rem;
     font-size: 0.7rem;
     font-weight: 500;
     letter-spacing: 0.04em;
-    color: rgba(255,255,255,0.9);
+    color: rgba(255,255,255,0.85);
     cursor: pointer;
     flex-shrink: 0;
     user-select: none;
-    transition: box-shadow 0.25s ease, opacity 0.2s ease, margin 0.3s cubic-bezier(0.4,0,0.2,1), transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    overflow: hidden;
+    transition: height 0.5s cubic-bezier(0.4,0,0.2,1),
+                opacity 0.4s ease,
+                box-shadow 0.35s ease;
+    height: 0;
+    opacity: 0;
   }
+
+  .fe-block.visible { opacity: 1; margin-bottom: 2px; }
 
   .fe-block:hover {
     box-shadow: 0 0 0 2px rgba(255,255,255,0.3), 0 2px 10px rgba(0,0,0,0.1);
   }
 
+  /* Selected: vertical margin for breathing room */
   .fe-block.selected {
-    box-shadow: 0 0 0 2.5px rgba(125,90,80,0.4), 0 0 16px rgba(125,90,80,0.2);
-    margin-top: 4px;
-    margin-bottom: 4px;
-    transform: scale(1.04);
+    box-shadow: 0 0 0 2.5px rgba(125,90,80,0.5), 0 0 16px rgba(125,90,80,0.25);
   }
 
-  /* Distinct colors per panel type */
-  .fe-block.t-brave    { background: #D48B4A; }
-  .fe-block.t-file     { background: #5E9B9B; }
-  .fe-block.t-memories { background: #C49060; }
-  .fe-block.t-radar    { background: #5B7EAE; }
-  .fe-block.t-overview { background: #8B9E7C; }
+  /* Distinct colors — same as token jewelry CP blocks */
+  .fe-block.t-panel    { background: #8B9E7C; color: rgba(255,255,255,0.9); }
+  .fe-block.t-file     { background: #6B8E8E; }
   .fe-block.t-search   { background: #8E7B6B; }
-  .fe-block.t-spine    { background: #AE5B6E; }
-  .fe-block.t-tree     { background: #6B8E6B; }
-  .fe-block.t-history  { background: #A0896E; opacity: 0.75; }
-  .fe-block.t-todo     { background: #7B8B5E; }
+  .fe-block.t-console  { background: #7B7D8E; }
   .fe-block.t-chat     { background: #B4846C; }
+  .fe-block.t-entity   { background: #8B7B9E; }
+  .fe-block.t-history  { background: #A0896E; opacity: 0.7; }
+  .fe-block.t-brave    { background: #D48B4A; }
+  .fe-block.t-radar    { background: #5B7EAE; }
+  .fe-block.t-spine    { background: #AE5B6E; }
+  .fe-block.t-todo     { background: #7B8B5E; }
+  .fe-block.t-system   { background: repeating-linear-gradient(
+    -45deg, rgba(125,90,80,0.18), rgba(125,90,80,0.18) 4px,
+    rgba(125,90,80,0.08) 4px, rgba(125,90,80,0.08) 8px
+  ); color: rgba(80,50,30,0.6); }
+
+  /* Chat pulse animation — height-based, no distortion */
+  .fe-block.t-chat.visible {
+    animation: chatPulse 2.5s ease-in infinite;
+  }
+
+  @keyframes chatPulse {
+    0%   { height: var(--chat-h); }
+    95%  { height: calc(var(--chat-h) + 20px); }
+    100% { height: var(--chat-h); }
+  }
+
+  /* ===== Frame navigation ===== */
+  .fe-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    margin-top: 0.8rem;
+  }
+
+  .fe-nav-btn {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 10px;
+    border: 1.5px solid var(--light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    color: var(--mid);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .fe-nav-btn:hover {
+    background: rgba(125,90,80,0.08);
+    color: var(--dark);
+    border-color: var(--mid);
+  }
+
+  .fe-nav-counter {
+    font-size: 0.8rem;
+    color: var(--mid);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+    min-width: 3rem;
+    text-align: center;
+  }
 
   /* ===== Vertical separator ===== */
   .fe-separator {
@@ -142,7 +206,6 @@
     position: relative;
   }
 
-  /* Placeholder */
   .fe-placeholder {
     display: flex;
     flex-direction: column;
@@ -164,7 +227,6 @@
     50% { transform: translateX(-8px); opacity: 1; }
   }
 
-  /* Statement content */
   .fe-statement {
     font-size: 1.9rem;
     color: var(--text);
@@ -184,7 +246,6 @@
     color: var(--mid);
   }
 
-  /* Panel name tag */
   .fe-panel-tag {
     font-size: 0.7rem;
     text-transform: uppercase;
@@ -194,7 +255,6 @@
     margin-bottom: 1rem;
   }
 
-  /* Subtitle */
   .fe-subtitle {
     font-size: 0.85rem;
     color: var(--mid);
@@ -209,110 +269,229 @@
     display: flex;
     flex-direction: column;
   }
-
-
 </style>
 
 <script>
 if (window._feCleanup) window._feCleanup();
 
 (function() {
-  const panels = [
-    { id: 'tree', type: 'tree', h: 75, label: '🌳 Tree',
+  const WINDOW_H = 470; /* usable px inside the 480px window */
+
+  /*
+   * Panel definitions — ordered by introduction time (oldest first).
+   * h = percentage of WINDOW_H.
+   * 'system' and 'chat' are structural (always present), rest are content panels.
+   */
+  const allPanels = [
+    { id: 'system',  type: 'system',  label: '⚙️ System & Tools',
+      tag: 'System Prompt & Tools',
+      html: 'The <span class="hl">35%</span> tax — system prompt, tool definitions, agent instructions',
+      sub: 'Always loaded. Always first. The foundation everything else sits on.' },
+    { id: 'skills',  type: 'file',    label: '📖 Skills',
+      tag: 'Skills',
+      html: '<span class="hl">Interoperability</span> with other coding assistants and harnesses',
+      sub: 'Load context-as-a-skill. Works across tools, teams, and workflows.' },
+    { id: 'tree',    type: 'panel',   label: '🌳 Tree',
       tag: 'Directory Tree',
       html: 'Enforcing a <span class="hl">clear</span> and <span class="hl">simple</span> map of files and folders beats any <span class="strike">CLAUDE.md</span>',
       sub: 'Brutally forcing the LLM to maintain it.' },
-    { id: 'overview', type: 'overview', h: 30, label: '📊 Overview',
+    { id: 'mem',     type: 'panel',   label: '💾 Memories',
+      tag: 'Memories',
+      html: 'Project-wide, <span class="hl">git-committed</span>, always-loaded memories' },
+    { id: 'file',    type: 'file',    label: '📄 main.rs',
+      tag: 'File Panels',
+      html: '<span class="hl">Refreshed</span>. No Doublons. <span class="hl">Simple</span>.' },
+    { id: 'todo',    type: 'todo',    label: '📋 Todo',
+      tag: 'Todo List',
+      html: '<span class="hl">More</span> than a stupid todo.' },
+    { id: 'overview',type: 'panel',   label: '📊 Overview',
       tag: 'Overview',
       html: '<span class="hl">Cost Optimization</span> #27',
       sub: 'A complete view of open panels, token counts, costs, git status, etc.' },
-    { id: 'mem', type: 'memories', h: 50, label: '💾 Memories',
-      tag: 'Memories',
-      html: 'Project-wide, <span class="hl">git-committed</span>, always-loaded memories' },
-    { id: 'radar', type: 'radar', h: 35, label: '📡 Context Radar',
-      tag: 'Context Radar',
-      html: 'Continuity and long-term memory is f****** <span class="hl">HARD</span> to engineer',
-      sub: 'A smart combination of indexing, hybrid search, tool parametrization and LLM behaviour enforcement.' },
-    { id: 'file', type: 'file', h: 45, label: '📄 main.rs',
-      tag: 'File Panels',
-      html: '<span class="hl">Refreshed</span>. No Doublons. <span class="hl">Simple</span>.' },
-    { id: 'hist', type: 'history', h: 25, label: '📜 History (detached)',
-      tag: 'Conversation History',
-      html: '<span class="hl">Cost Optimization</span> #42' },
-    { id: 'brave', type: 'brave', h: 28, label: '🌐 Brave Search',
+    { id: 'scratch', type: 'console', label: '📝 Scratchpad',
+      tag: 'Scratchpad',
+      html: 'Everyone needs to take <span class="hl">notes</span>',
+      sub: 'Temporary cells for mid-conversation context. Create, edit, wipe.' },
+    { id: 'brave',   type: 'brave',   label: '🌐 Brave Search',
       tag: 'Web Search & APIs',
       html: 'Others do it <span class="hl">better</span> and <span class="hl">cheaper</span> than you — don\'t re-invent the wheel, ever.',
       sub: 'Surya Datalab for OCR, Firecrawl for scraping, Voyage for Embeddings, Brave for Web Search.' },
-    { id: 'search', type: 'search', h: 35, label: '🔍 Search',
+    { id: 'search',  type: 'search',  label: '🔍 Search',
       tag: 'Hybrid Search',
       html: 'Helping the LLM live in a <span class="hl">perfect world</span> for him',
       sub: 'Adding features is easy. Picking the right ones is tremendously hard.' },
-    { id: 'spine', type: 'spine', h: 25, label: '🧠 Spine',
+    { id: 'hist',    type: 'history', label: '📜 History (detached)',
+      tag: 'Conversation History',
+      html: '<span class="hl">Cost Optimization</span> #42' },
+    { id: 'radar',   type: 'radar',   label: '📡 Context Radar',
+      tag: 'Context Radar',
+      html: 'Continuity and long-term memory is f****** <span class="hl">HARD</span> to engineer',
+      sub: 'A smart combination of indexing, hybrid search, tool parametrization and LLM behaviour enforcement.' },
+    { id: 'console', type: 'console', label: '⚡ Console',
+      tag: 'Console',
+      html: 'Basically <span class="hl">TMUX</span>',
+      sub: 'A process daemon that survives TUI restarts. Spawn, monitor, kill — all from the LLM.' },
+    { id: 'spine',   type: 'spine',   label: '🧠 Spine',
       tag: 'Spine',
       html: 'LLMs are <span class="hl">lazy</span>. Whip them.' },
-    { id: 'todo', type: 'todo', h: 25, label: '📋 Todo',
-      tag: 'Todo List',
-      html: '<span class="hl">More</span> than a stupid todo.' },
-    { id: 'chat', type: 'chat', h: 55, label: '💬 Conversation',
+    { id: 'table',   type: 'entity',  label: '🗃️ Entities',
+      tag: 'Entity Database',
+      html: 'Leverage what LLMs are <span class="hl">good at</span>: SQL. Filesystem. Linux commands. etc.',
+      sub: 'SQLite under the hood — JOINs, CTEs, triggers. The LLM builds its own knowledge graph.' },
+    { id: 'queue',   type: 'console', label: '📦 Queue',
+      tag: 'Queue',
+      html: '<span class="hl">Cost Optimization</span> #31',
+      sub: 'Batch tool calls together, execute atomically. One cache break instead of N.' },
+    { id: 'chat',    type: 'chat',    label: '💬 Conversation',
       tag: 'Conversation',
       html: 'The working brain needs to be <span class="hl">unstained</span>, <span class="hl">compact</span> information about WIP',
       sub: 'Very little tokens wasted here.' },
   ];
 
+  /* Build lookup */
+  const panelMap = {};
+  allPanels.forEach(p => panelMap[p.id] = p);
+
+  /*
+   * Frames — conveyor belt with 'system' always first, 'chat' always last.
+   * h values: percentage of WINDOW_H. chat_h is per-frame conversation height.
+   *
+   * Frame 4→5 is the DETACH transition:
+   *   Frame 4: conversation is big (14%). 
+   *   Frame 5: hist appears, conversation shrinks to 6%.
+   *
+   * Survival (all ≥ 3):
+   *   tree:     1,2,3       = 3    brave:    4,5,6     = 3
+   *   mem:      1,2,3,4     = 4    search:   4,5,6     = 3
+   *   file:     2,3,4       = 3    hist:     5,6,7,8,9 = 5
+   *   todo:     2,3,4       = 3    radar:    6,7,8     = 3
+   *   overview: 3,4,5       = 3    console:  6,7,8     = 3
+   *                                spine:    6,7,8,9   = 4
+   *                                table:    7,8,9     = 3
+   */
+  const frames = [
+    { ids: ['system','skills','tree','mem','chat'],                                              h: {system:8, skills:4, tree:12, mem:8,                                                                    chat:6} },
+    { ids: ['system','skills','tree','mem','file','todo','chat'],                                 h: {system:8, skills:4, tree:12, mem:8, file:7, todo:4,                                                    chat:7} },
+    { ids: ['system','skills','tree','mem','file','todo','overview','chat'],                      h: {system:8, skills:4, tree:10, mem:7, file:6, todo:4, overview:5,                                        chat:9} },
+    { ids: ['system','skills','mem','file','todo','overview','brave','search','scratch','chat'],   h: {system:8, skills:4, mem:7, file:6, todo:4, overview:5, brave:6, search:6, scratch:4,                   chat:12} },
+    { ids: ['system','skills','overview','brave','search','hist','scratch','chat'],                h: {system:8, skills:4, overview:5, brave:6, search:6, hist:5, scratch:4,                                  chat:5} },
+    { ids: ['system','skills','brave','search','hist','radar','console','spine','scratch','chat'], h: {system:8, skills:4, brave:5, search:5, hist:4, radar:6, console:5, spine:4, scratch:4,                 chat:6} },
+    { ids: ['system','skills','hist','radar','console','spine','table','chat'],                    h: {system:8, skills:4, hist:4, radar:6, console:5, spine:4, table:4,                                     chat:7} },
+    { ids: ['system','skills','radar','console','spine','hist','table','queue','chat'],             h: {system:8, skills:4, radar:5, console:4, spine:4, hist:4, table:4, queue:3,                            chat:5} },
+    { ids: ['system','skills','spine','hist','table','queue','chat'],                               h: {system:8, skills:4, spine:5, hist:5, table:4, queue:4,                                              chat:5} },
+  ];
+
   const blocksContainer = document.getElementById('fe-blocks');
   const detailPane = document.getElementById('fe-detail');
+  const counterEl = document.getElementById('fe-counter');
+  const prevBtn = document.getElementById('fe-prev');
+  const nextBtn = document.getElementById('fe-next');
+
+  let currentFrame = 0;
   let selectedId = null;
 
-  // Build blocks
-  panels.forEach(p => {
+  /* Create all block DOM elements — ordered by introduction */
+  const blockEls = {};
+  allPanels.forEach(p => {
     const el = document.createElement('div');
-    el.className = `fe-block t-${p.type}`;
-    el.style.height = p.h + 'px';
+    el.className = 'fe-block t-' + p.type;
     el.textContent = p.label;
     el.dataset.pid = p.id;
-    el.addEventListener('click', () => selectPanel(p));
+    el.addEventListener('click', () => selectPanel(p.id));
     blocksContainer.appendChild(el);
+    blockEls[p.id] = el;
   });
 
-  function selectPanel(p) {
-    if (selectedId === p.id) return;
+  /* ===== Render a frame ===== */
+  function renderFrame(idx) {
+    const frame = frames[idx];
+    const frameIds = new Set(frame.ids);
 
-    // Highlight block
+    allPanels.forEach(p => {
+      const el = blockEls[p.id];
+      if (frameIds.has(p.id)) {
+        const pct = frame.h[p.id] || 5;
+        const hPx = Math.round((pct / 100) * WINDOW_H);
+        if (p.id === 'chat') {
+          el.style.setProperty('--chat-h', hPx + 'px');
+        } else {
+          el.style.height = hPx + 'px';
+        }
+        el.classList.add('visible');
+      } else {
+        el.style.height = '0px';
+        el.classList.remove('visible');
+        if (p.id === selectedId) {
+          el.classList.remove('selected');
+        }
+      }
+    });
+
+    /* Deselect if the selected panel is no longer visible */
+    if (selectedId && !frameIds.has(selectedId)) {
+      selectedId = null;
+      showPlaceholder();
+    }
+
+    counterEl.textContent = (idx + 1) + ' / ' + frames.length;
+  }
+
+  function showPlaceholder() {
+    detailPane.innerHTML = '<div class="fe-placeholder"><span class="fe-placeholder-arrow">←</span><span>Click a panel to explore</span></div>';
+  }
+
+  /* ===== Select a panel ===== */
+  function selectPanel(id) {
+    if (selectedId === id) return;
+
     blocksContainer.querySelectorAll('.fe-block').forEach(el => el.classList.remove('selected'));
-    const el = blocksContainer.querySelector(`[data-pid="${p.id}"]`);
-    if (el) el.classList.add('selected');
-    selectedId = p.id;
 
-    // Fade out current content to the left
+    const el = blockEls[id];
+    if (el) el.classList.add('selected');
+    selectedId = id;
+
+    const p = panelMap[id];
+
     detailPane.style.opacity = '0';
     detailPane.style.transform = 'translateX(-20px)';
     detailPane.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
 
     setTimeout(() => {
-      // Build new content
-      let content = `<div class="fe-statement-wrap">`;
-      content += `<div class="fe-panel-tag">${p.tag}</div>`;
-      content += `<div class="fe-statement">${p.html}</div>`;
-      if (p.sub) {
-        content += `<div class="fe-subtitle">${p.sub}</div>`;
-      }
-      content += `</div>`;
+      let content = '<div class="fe-statement-wrap">';
+      content += '<div class="fe-panel-tag">' + p.tag + '</div>';
+      content += '<div class="fe-statement">' + p.html + '</div>';
+      if (p.sub) content += '<div class="fe-subtitle">' + p.sub + '</div>';
+      content += '</div>';
       detailPane.innerHTML = content;
 
-      // Position off-screen right
       detailPane.style.transition = 'none';
       detailPane.style.opacity = '0';
       detailPane.style.transform = 'translateX(40px)';
-
-      // Force reflow
       void detailPane.offsetWidth;
 
-      // Slide in from right
       detailPane.style.transition = 'opacity 0.4s cubic-bezier(0.22,0.61,0.36,1), transform 0.4s cubic-bezier(0.22,0.61,0.36,1)';
       detailPane.style.opacity = '1';
       detailPane.style.transform = 'translateX(0)';
     }, 160);
   }
+
+  /* ===== Navigation ===== */
+  prevBtn.addEventListener('click', () => {
+    if (currentFrame > 0) {
+      currentFrame--;
+      renderFrame(currentFrame);
+    }
+  });
+
+  nextBtn.addEventListener('click', () => {
+    if (currentFrame < frames.length - 1) {
+      currentFrame++;
+      renderFrame(currentFrame);
+    }
+  });
+
+  /* ===== Init ===== */
+  renderFrame(0);
 
   window._feCleanup = function() { selectedId = null; };
 })();

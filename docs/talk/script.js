@@ -11,6 +11,8 @@ const SECTIONS = [
   // Section 0 — Main TOC
   [
     { path: 'slides/0-0.html', label: 'Overview', dark: true },
+    { path: 'slides/0-1.html', label: 'Where it all started' },
+    { path: 'slides/0-2.html', label: 'Where it is now' },
   ],
   // Section 1 — The WHYs
   [
@@ -227,10 +229,47 @@ document.addEventListener('keydown', (e) => {
   switch (e.key) {
     case 'ArrowRight': navigate(sectionIdx + 1, slideIdx);     break;
     case 'ArrowLeft':  navigate(sectionIdx - 1, slideIdx);     break;
-    case 'ArrowDown':  navigate(sectionIdx, slideIdx + 1);     break;
+    case 'ArrowDown':
+      if (slideIdx >= SECTIONS[sectionIdx].length - 1) {
+        navigate(sectionIdx + 1, 0);
+      } else {
+        navigate(sectionIdx, slideIdx + 1);
+      }
+      break;
     case 'ArrowUp':    navigate(sectionIdx, slideIdx - 1);     break;
   }
 });
+
+/* ---------- Persistent timer (survives reloads, click to reset) ---------- */
+(function() {
+  const STORAGE_KEY = 'slide_timer_start';
+  const timerEl = document.getElementById('timer');
+
+  if (!localStorage.getItem(STORAGE_KEY)) {
+    localStorage.setItem(STORAGE_KEY, Date.now().toString());
+  }
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function updateTimer() {
+    const start = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+    const elapsed = Math.floor((Date.now() - start) / 1000);
+    const h = Math.floor(elapsed / 3600);
+    const m = Math.floor((elapsed % 3600) / 60);
+    const s = elapsed % 60;
+    timerEl.textContent = h > 0
+      ? pad(h) + ':' + pad(m) + ':' + pad(s)
+      : pad(m) + ':' + pad(s);
+  }
+
+  timerEl.addEventListener('click', () => {
+    localStorage.setItem(STORAGE_KEY, Date.now().toString());
+    updateTimer();
+  });
+
+  updateTimer();
+  setInterval(updateTimer, 1000);
+})();
 
 /* ---------- Go ---------- */
 init();

@@ -308,3 +308,22 @@ html, body {
   font-variant-numeric: tabular-nums;
   z-index: 100;
 }
+
+/* ===== Persistent timer (bottom-right, left of position) ===== */
+#timer {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 5.5rem;
+  font-size: 0.75rem;
+  color: var(--mid);
+  opacity: 0.35;
+  font-variant-numeric: tabular-nums;
+  z-index: 100;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+
+#timer:hover {
+  opacity: 0.7;
+}
