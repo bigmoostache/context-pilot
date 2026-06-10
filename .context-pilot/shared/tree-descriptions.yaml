@@ -70,6 +70,10 @@
   path: crates/cp-mod-typst/src/lib.rs
   description: 'Typst module. 1 tool: typst_execute. Embedded compiler (no external binary). Depends on core+callback. catch-all watchlist callback recompiles affected docs. Seeds shared templates. @preview/ package support.'
   last_edited_ms: 0
+0594bb6183026335:
+  path: docs/talk/slides/0-2.html
+  description: 'Slide: Where it is now — single screenshot'
+  last_edited_ms: 1781078806873
 05ab5ce0d2a53561:
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
@@ -166,6 +170,10 @@
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
   last_edited_ms: 0
+0b3a3989d17e3599:
+  path: docs/talk/slides/3-1.html
+  description: 'Slide: WOWs Showcase — 7 domain slider (Medicine/Chemistry/Hardware/Maths/Finance/Education/Misc)'
+  last_edited_ms: 1781078806848
 0b9103ee30634685:
   path: docs/logs.md
   description: Logging system design
@@ -186,6 +194,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+0dffd96eaa2fc1fa:
+  path: src/llms/claude_code_v2/mod.rs
+  description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code (Keychain/credentials file) but with updated headers from CLI v2.1.170: 9 beta flags, billing header cc_version=2.1.170, user-agent claude-cli/2.1.170. Request body matches working V1 structure (standard fields only) — internal-only fields (diagnostics/output_config/context_management/thinking) rejected by public API. Model: claude-opus-4-8. Reuses helpers + parse_sse_stream from claude_code_api_key.'
+  last_edited_ms: 1781084621771
 0e3797b0710562ff:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
@@ -202,6 +214,10 @@
   path: crates/cp-mod-brave/Cargo.toml
   description: 'Brave module deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml, reqwest.'
   last_edited_ms: 0
+0f83c9509db27936:
+  path: src/llms/cache/prompt_tick_csv.rs
+  description: 'Prompt tick CSV dumper for cache debugging. Writes every assembled-prompt message to .context-pilot/prompt_ticks/ each tick (datetime-named). Rolling deletion keeps 20 most recent. Columns: hash, role, type, context, tokens, acc/rev_acc tokens, preview. classify_text_context() tags panel headers/timestamps/footers/seed/conversation blocks. Moved from src/llms/ to cache/ for folder-size limit.'
+  last_edited_ms: 1781084621779
 100c1173cf82b432:
   path: src/llms/cache/mod.rs
   description: 'Module declarations: cache_engine, cache_optimizer, density.'
@@ -246,6 +262,10 @@
   path: crates/cp-mod-entities/src/sync.rs
   description: Meilisearch sync for entity data — incremental dirty-tracked, delete-then-add. ensure_index, sync_table, flush_sync, full_reindex. extract_affected_tables for SQL parsing.
   last_edited_ms: 0
+11ce8bd539c9f3c1:
+  path: docs/talk/slides/1-0.html
+  description: 'Sub-TOC: WHYs section — left numeral, right slide list'
+  last_edited_ms: 1781078806892
 123157596598d710:
   path: crates/cp-mod-prompt/src/seed.rs
   description: 'Seed data: ensure_default_agent() load/merge/sort, get_active_agent_content() resolve active system prompt'
@@ -253,6 +273,10 @@
 1253cb71c93904cd:
   path: src/modules/conversation/panel.rs
   description: 'Conversation panel. Multi-level cache (full → per-message → input). Input hash includes selection anchor. Keybindings: Shift+Arrow selection, Ctrl/Alt+Arrow word jump, Ctrl+A select all, Ctrl+Backspace delete word. Enter send-on-empty-line logic.'
+  last_edited_ms: 0
+12dd2c9c1c27a124:
+  path: crates/cp-mod-files/src/tools/edit_file.rs
+  description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
   last_edited_ms: 0
 133b6adde645d270:
   path: .context-pilot/config.json
@@ -370,6 +394,10 @@
   path: crates/cp-mod-search/src/radar.rs
   description: Context Radar with flame!("radar_refresh") and flame!("radar_push_signal"). Adaptive log-count-based decay scoring, Meilisearch log queries via background thread. Recent logs (10) deterministic + semantic top 40.
   last_edited_ms: 0
+1a9c506b9198eecb:
+  path: crates/cp-base/src/config/llm_types.rs
+  description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
+  last_edited_ms: 0
 1b4881ed98b5293d:
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. Nested object params (location). Simple dispatch pattern.'
@@ -398,6 +426,10 @@
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: crossterm, serde, serde_json, serde_yaml, sha2, chrono, log, parking_lot, typemap_rev, globset, syntect, tree-sitter, reqwest, tokio. No ratatui.'
   last_edited_ms: 1780497937359
+1ccf8274fc20a003:
+  path: src/app/events.rs
+  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
+  last_edited_ms: 0
 1d9f8b14df8b4372:
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (20 tool + 6 config YAML files) with #[expect(clippy::panic)].'
@@ -510,9 +542,17 @@
   path: src/llms/cache/cache_engine_tests.rs
   description: '17 integration tests: hash chain, frontier, beacon, prune, serialization, BP limits, optimizer spread, determinism'
   last_edited_ms: 0
+2519f2f34ec0f95d:
+  path: src/llms/claude_code_api_key/streaming.rs
+  description: 'parse_sse_stream(): SSE event loop with verbose error diagnostics, log_sse_error() to .context-pilot/errors/. Types and parser are pub(crate) for reuse by claude_code_v2.'
+  last_edited_ms: 1781083072309
 25418ee7121ec201:
   path: crates/cp-mod-ocr/src/tools.rs
   description: OCR tool dispatch. flame!("ocr_exec"). Validates params, spawns background thread for Datalab API, registers OcrWatcher (non-blocking). Returns immediately with spine notification on completion.
+  last_edited_ms: 0
+2610b21d60e96425:
+  path: src/ui/help/config_overlay/builder.rs
+  description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
   last_edited_ms: 0
 2635e1cb5617597c:
   path: src/app/run/tools/pipeline.rs
@@ -550,6 +590,10 @@
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, cp-mod-utilities, crossterm, serde, serde_json.'
   last_edited_ms: 0
+280c42eb58c1c171:
+  path: docs/talk/slides/2-4.html
+  description: 'Slide: Feedbacks & Constraints with control theory (HOWs section)'
+  last_edited_ms: 1781078806788
 28535222aec6d878:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -570,6 +614,10 @@
   path: crates/cp-mod-files/src/tools/file.rs
   description: 'execute_open: accepts string or array for path param. flame!("file_open"). open_single_file: canonicalize, dedup, auto-expand tree folders. Background cache populates content.'
   last_edited_ms: 0
+2a76ebc68096b534:
+  path: docs/talk/script.js
+  description: 'Slide deck nav: 2D grid (sections×slides), keyboard arrows, sidebar, TOC clicks, persistent timer'
+  last_edited_ms: 1781078806865
 2a7806a6f97fd0f0:
   path: crates/cp-mod-search/Cargo.toml
   description: 'Search module deps: cp-base, cp-mod-logs, cp-render, crossterm, serde, serde_json, cp-mod-utilities, reqwest, notify, tree-sitter (9 langs), serde_yaml, log.'
@@ -710,6 +758,10 @@
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: Firecrawl result panel. Same pattern as brave panel — static content in metadata, cache restore post-reload, pagination. FIRECRAWL_PANEL_TYPE constant.
   last_edited_ms: 0
+336dfff56acc39c5:
+  path: docs/talk/slides/3-2.html
+  description: 'Slide: Self-Improving Loop with stats pills and feedback SVG'
+  last_edited_ms: 1781078806839
 33c60367852cda1f:
   path: rust_lints_compared_list.md
   description: Rustc lint comparison results
@@ -726,6 +778,10 @@
   path: src/llms/cache/cache_optimizer.rs
   description: 'Exact two-level DP optimizer. Minimizes expected recompute cost. Phase 1: per-super-block split DP. Phase 2: knapsack across super-blocks. O(N²·K) time. Prefix sums for O(1) block_cost. Backtracks for positions.'
   last_edited_ms: 0
+342c204046f1ad8e:
+  path: docs/talk/slides/2-2.html
+  description: 'Slide: Architecture SVG block diagram (HOWs section)'
+  last_edited_ms: 1781078806778
 342e67ec57cb9d7e:
   path: docs/custom-visualization.md
   description: Custom panel visualization system
@@ -850,6 +906,10 @@
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
   last_edited_ms: 0
+3e1dcc436a6467f8:
+  path: docs/talk/slides/2-3.html
+  description: 'Slide: Instantaneous Feedback (HOWs section)'
+  last_edited_ms: 1781078806768
 3e3cd8c1f42844db:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -870,6 +930,10 @@
   path: docs/rust-static-analysis-tools.md
   description: 'Comprehensive listing of Rust static analysis tools, modeled after Holzmann''s classic C tools page. Covers: compiler (rustc/clippy), commercial (CodeQL/Semgrep/Coverity/Klocwork/SonarQube/TrustInSoft), academic (Miri/Rudra/MIRAI/MirChecker/lockbud/Yuga), formal verification (Kani/Prusti/Verus/Creusot/Flux/Aeneas/hax), theory (RustBelt/Stacked Borrows), fuzzing (cargo-fuzz/bolero/proptest/loom), supply chain (cargo-audit/deny/geiger/vet/crev), CI pipeline recommendations, textbooks.'
   last_edited_ms: 0
+3fc30e63661d20bd:
+  path: src/app/actions/mod.rs
+  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
+  last_edited_ms: 0
 3ffcdfcd3170e1ea:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
@@ -877,6 +941,10 @@
 4030d6c14fa90c5b:
   path: crates/cp-mod-search/src/meili/overlay.rs
   description: Ctrl+I overlay data provider. Fetches live Meilisearch stats + process stats (CPU%/RAM via /proc or ps). read_process_stats(pid) platform-specific. CPU% from tick deltas cached in MeiliLiveStats. 2s refresh cache. Builds SearchOverlayInfo.
+  last_edited_ms: 0
+4049f7287a475d2f:
+  path: crates/cp-base/src/state/actions.rs
+  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
 40529559909bc342:
   path: crates/cp-mod-spine/src/guard_rail.rs
@@ -1050,6 +1118,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+4cf95560bd206cd5:
+  path: docs/talk/slides/0-0.html
+  description: 'Slide: Main TOC — 3-column layout with cross-section nav'
+  last_edited_ms: 1781078806830
 4d457b7ceca9acae:
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
@@ -1194,6 +1266,10 @@
   path: crates/cp-mod-spine/src/types.rs
   description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom), NotificationStatus (Unprocessed/Blocked/Processed). SpineConfig: guard rail limits + runtime tracking. SpineState: create/mark/delete/unblock notifications. mark_all_unprocessed_as_processed() for continuation consumption.'
   last_edited_ms: 0
+56be46c397fb36d5:
+  path: .gitignore
+  description: Git ignore rules
+  last_edited_ms: 0
 5726da2755f9e360:
   path: crates/cp-base/src/cast.rs
   description: 'Safe trait: saturating numeric casts for all int/float types, macro-driven impls, replaces raw `as` casts'
@@ -1314,6 +1390,10 @@
   path: Cargo.toml
   description: Workspace root. 22 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 1780565754923
+61b74a2bd1eccf96:
+  path: src/main.rs
+  description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 0
 61bf78700b3d4a0d:
   path: crates/cp-mod-brave/src/api.rs
   description: Brave Search HTTP client. BraveClient with retry (3 attempts, 1s delay on 5xx). SearchParams + LLMContextParams structs. Rich callback fetching. Custom URL encoding. 10s request timeout.
@@ -1398,6 +1478,10 @@
   path: .github/checks/check-file-lengths.sh
   description: File length check script (max 500 lines)
   last_edited_ms: 0
+680ee984a94b15c6:
+  path: docs/talk/slides/2-0.html
+  description: 'Sub-TOC: HOWs section — left numeral, right slide list'
+  last_edited_ms: 1781078806902
 68bb461714cf1222:
   path: src/ui/help/config_overlay.rs
   description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access.
@@ -1738,10 +1822,18 @@
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
   last_edited_ms: 0
+83548ec6e82063cd:
+  path: src/llms/mod.rs
+  description: LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging.
+  last_edited_ms: 0
 837d71bc2422a4c4:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 2 parallel threads (Meilisearch + Console). Loads .env files (project + global).'
   last_edited_ms: 0
+83c59efd682f0ecc:
+  path: tedx.md
+  description: 'Talk outline: 3×7min30 structure (WHYs/HOWs/WOWs)'
+  last_edited_ms: 1781078806798
 852931587d049008:
   path: src/llms/claude_code_api_key/helpers.rs
   description: 'CC API-key helpers: constants (endpoint/headers), map_model_name(), inject_system_reminder(), apply_claude_code_headers()'
@@ -1834,6 +1926,10 @@
   path: src/state/persistence/panel.rs
   description: 'Panel persistence (panels/{uid}.json): load_panel(uid) → Option<PanelData>'
   last_edited_ms: 0
+89e06b089aa1aa8e:
+  path: docs/talk/slides/2-1.html
+  description: 'Learnings: Pot-Pourri — interactive feature explorer with 11 panel blocks'
+  last_edited_ms: 0
 8a0e131be373167d:
   path: crates/cp-mod-utilities/Cargo.toml
   description: Zero external deps. Workspace lints.
@@ -1861,6 +1957,10 @@
 8ba9c57e812408bc:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
+  last_edited_ms: 0
+8be8066eb5d159fe:
+  path: src/app/events.rs
+  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
 8c0867d815410d9d:
   path: docs/console-server.md
@@ -1990,6 +2090,10 @@
   path: crates/cp-render/src/conversation.rs
   description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm (with cursor/typing_other/other_text), Autocomplete (with dir_prefix/total_matches/input_visual_lines), PerfOverlay (with open_fds/fd_limit_soft/fd_semantic), ConfigOverlay, PaletteOverlay, SearchIndexOverlay. All serializable.'
   last_edited_ms: 0
+9671d603bc7cefc9:
+  path: crates/cp-base/src/state/runtime.rs
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
+  last_edited_ms: 0
 9789ccbb64e37192:
   path: deploy_local.sh
   description: 'Local deployment script: builds + installs binary'
@@ -2034,6 +2138,10 @@
   path: src/llms/oai_providers/groq.rs
   description: Groq client. OpenAI-compatible with built-in tools (browser_search, code_interpreter) for GPT-OSS models. GROQ_API_KEY auth.
   last_edited_ms: 1780565754907
+9bfbd78ae78db924:
+  path: src/llms/claude_code_api_key/mod.rs
+  description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
+  last_edited_ms: 0
 9c63af9928d7274a:
   path: yamls/ui.yaml
   description: 'UI configuration: sidebar layout, status bar, keybindings'
@@ -2190,6 +2298,10 @@ a782ecbead9d4209:
   path: src/llms/anthropic/mod.rs
   description: Direct Anthropic Messages API client. SSE stream parsing (content_block_start/delta/stop, message_delta/stop). x-api-key auth from ANTHROPIC_API_KEY. No cache breakpoints. timeout(None) for long streams.
   last_edited_ms: 0
+a7b95447dd5bdb0b:
+  path: docs/talk/slides/1-2.html
+  description: 'Slide: What''s failing — 11-item slider (WHYs section)'
+  last_edited_ms: 1781078806822
 a8142bff182324b2:
   path: src/modules/questions/ask_question.rs
   description: 'ask_user_question execute: parse/validate questions array, create PendingForm, __QUESTION_PENDING__ placeholder'
@@ -2346,6 +2458,10 @@ b3831f3e391cdcc6:
   path: crates/cp-mod-scratchpad/src/lib.rs
   description: 'Scratchpad module. 3 tools: create_cell/edit_cell/wipe. Fixed SCRATCHPAD panel. Per-worker cells. Visualizer: colored create/update/delete. fixed_order=8.'
   last_edited_ms: 0
+b3b3c4b448be7ce9:
+  path: docs/talk/slides/3-0.html
+  description: 'Sub-TOC: WOWs section — left numeral, right slide list'
+  last_edited_ms: 1781078806911
 b3d6e967bbad179d:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
@@ -2510,10 +2626,18 @@ befe2f388d43c827:
   path: crates/cp-mod-entities/src/panel.rs
   description: Fixed Entities panel. Live schema + sample data context for LLM. Empty-state onboarding guide with quick-start SQL. IR blocks with Accent/Code/Muted styling. Migration count display.
   last_edited_ms: 1780585450715
+bf174a4bf0cc3c09:
+  path: src/ui/help/config_overlay/builder.rs
+  description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
+  last_edited_ms: 0
 bf1c3cf88b01c78f:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 2 parallel threads (Meilisearch + Console). Loads .env files (project + global).'
   last_edited_ms: 1780562263884
+bf372e93d15d115a:
+  path: crates/cp-base/src/config/llm_types.rs
+  description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
+  last_edited_ms: 0
 bf6550700db6c73b:
   path: crates/cp-mod-git/Cargo.toml
   description: 'Git module deps: cp-base, cp-render, crossterm, serde_json, regex.'
@@ -2574,6 +2698,10 @@ c4e9d7be47211a1c:
   path: crates/cp-mod-queue/Cargo.toml
   description: 'Queue module deps: cp-base, cp-render, crossterm, serde, serde_json.'
   last_edited_ms: 1780563847626
+c55dd96275144452:
+  path: docs/talk/style.css
+  description: 'Slide deck global styles: CSS vars, transitions, dark/light slide themes, sidebar, timer'
+  last_edited_ms: 1781078806857
 c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
@@ -2665,6 +2793,10 @@ ca3fb28c65d5c4e6:
 cb25f09fa3660254:
   path: crates/cp-mod-files/src/tools/write.rs
   description: file_write tool. flame!("file_write"). Creates parent dirs, writes content, updates/creates context Entry. Diff-style preview in result (first 20 lines).
+  last_edited_ms: 0
+cb2678759db7f441:
+  path: .github/checks/lint-config.chain
+  description: Cryptographic hash chain protecting 12 critical lint/config files
   last_edited_ms: 0
 cbb71fe5106157bc:
   path: crates/cp-mod-logs/src/types.rs
@@ -2758,6 +2890,10 @@ d165a994ae75f945:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
   last_edited_ms: 0
+d1a7efa0007771ee:
+  path: src/llms/cache/mod.rs
+  description: 'Module declarations: cache_engine, cache_optimizer, density.'
+  last_edited_ms: 0
 d1d5cdf656994f6b:
   path: src/llms/oai_providers/groq.rs
   description: Groq client. OpenAI-compatible with built-in tools (browser_search, code_interpreter) for GPT-OSS models. GROQ_API_KEY auth.
@@ -2821,6 +2957,10 @@ d4f0917617a195e1:
 d4f447c4551668d1:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
+  last_edited_ms: 0
+d5c1024fa12376ed:
+  path: crates/cp-base/src/state/data/model_helpers.rs
+  description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
   last_edited_ms: 0
 d693aa680fbe23a5:
   path: src/modules/questions/mod.rs
@@ -2962,6 +3102,10 @@ e82421db0781e690:
   path: yamls/tools/files.yaml
   description: 'File tools YAML. 3 tools: Open (path string/array), Edit (file_path, old_string, new_string), Write (file_path, contents, skip_callbacks).'
   last_edited_ms: 1780648767307
+e8400426f9791225:
+  path: docs/talk/slides/1-3.html
+  description: 'Slide: What I''d Add — Context/Feedback/LLM-X (WHYs section)'
+  last_edited_ms: 1781078806808
 e8740d926f5b34f9:
   path: src/state/cache.rs
   description: 'CachePool: 6-worker thread pool for non-blocking panel cache refresh, LazyLock global, process_cache_request() API'
@@ -3238,6 +3382,10 @@ fdc71c3c93143d63:
   path: crates/cp-mod-utilities/src/secret.rs
   description: Redacted newtype — Debug/Display print [REDACTED]. expose_secret() for access. Replaces secrecy crate.
   last_edited_ms: 0
+fe442c943f4c8e63:
+  path: docs/talk/slides/0-1.html
+  description: 'Slide: Where it all started — tilted screenshots + narcos meme'
+  last_edited_ms: 1781078806882
 fe8012896753e20c:
   path: clippy_compared_list.md
   description: Clippy lint comparison results

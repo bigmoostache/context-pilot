@@ -21,7 +21,7 @@ pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
     let active_provider = if secondary_mode { state.secondary_provider } else { state.llm_provider };
 
     // Providers
-    let provider_list: [(LlmProvider, &str, &str); 7] = [
+    let provider_list: [(LlmProvider, &str, &str); 8] = [
         (LlmProvider::Anthropic, "1", "Anthropic Claude"),
         (LlmProvider::ClaudeCode, "2", "Claude Code (OAuth)"),
         (LlmProvider::ClaudeCodeApiKey, "6", "Claude Code (API Key)"),
@@ -29,6 +29,7 @@ pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
         (LlmProvider::Groq, "4", "Groq"),
         (LlmProvider::DeepSeek, "5", "DeepSeek"),
         (LlmProvider::MiniMax, "7", "MiniMax (Token Plan)"),
+        (LlmProvider::ClaudeCodeV2, "8", "Claude Code V2 (OAuth)"),
     ];
 
     let providers = provider_list
@@ -118,6 +119,16 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
                     &MiniMaxModel::M27Highspeed,
                 ),
             ],
+            LlmProvider::ClaudeCodeV2 => {
+                use crate::llms::ClaudeCodeV2Model;
+                vec![
+                    model_entry(
+                        state.secondary_claude_code_v2_model == ClaudeCodeV2Model::ClaudeOpus48,
+                        "a",
+                        &ClaudeCodeV2Model::ClaudeOpus48,
+                    ),
+                ]
+            }
         };
         (title, models)
     } else {
@@ -160,6 +171,16 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
                 model_entry(state.minimax_model == MiniMaxModel::M27, "a", &MiniMaxModel::M27),
                 model_entry(state.minimax_model == MiniMaxModel::M27Highspeed, "b", &MiniMaxModel::M27Highspeed),
             ],
+            LlmProvider::ClaudeCodeV2 => {
+                use crate::llms::ClaudeCodeV2Model;
+                vec![
+                    model_entry(
+                        state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeOpus48,
+                        "a",
+                        &ClaudeCodeV2Model::ClaudeOpus48,
+                    ),
+                ]
+            }
         };
         (title, models)
     }

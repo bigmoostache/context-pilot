@@ -3,13 +3,13 @@
 //! Writes every message in the assembled prompt to a CSV file at each tick.
 //! Rolling deletion keeps only the 20 most recent files.
 
-use super::{ApiMessage, ContentBlock};
+use crate::llms::{ApiMessage, ContentBlock};
 
 /// Dump every message in the assembled prompt to a CSV file for debugging.
 ///
 /// Each tick writes a new file to `.context-pilot/prompt_ticks/` named by
 /// datetime (second precision). Rolling deletion keeps only the 20 most recent.
-pub(super) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
+pub(crate) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
     struct CsvRow {
         hash: String,
         role: String,

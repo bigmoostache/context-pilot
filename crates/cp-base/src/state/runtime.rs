@@ -73,6 +73,8 @@ pub struct State {
     pub deepseek_model: crate::config::llm_types::DeepSeekModel,
     /// Active `MiniMax` model variant.
     pub minimax_model: crate::config::llm_types::MiniMaxModel,
+    /// Active Claude Code V2 model variant.
+    pub claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model,
     /// Secondary LLM provider (for reveries / sub-agents)
     pub secondary_provider: LlmProvider,
     /// Secondary Anthropic model variant.
@@ -85,6 +87,8 @@ pub struct State {
     pub secondary_deepseek_model: crate::config::llm_types::DeepSeekModel,
     /// Secondary `MiniMax` model variant.
     pub secondary_minimax_model: crate::config::llm_types::MiniMaxModel,
+    /// Secondary Claude Code V2 model variant.
+    pub secondary_claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model,
     /// Sidebar display mode: Normal (full), Collapsed (icons only), Hidden
     pub sidebar_mode: SidebarMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
@@ -210,12 +214,14 @@ impl Default for State {
             groq_model: crate::config::llm_types::GroqModel::default(),
             deepseek_model: crate::config::llm_types::DeepSeekModel::default(),
             minimax_model: crate::config::llm_types::MiniMaxModel::default(),
+            claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model::default(),
             secondary_provider: LlmProvider::Anthropic,
             secondary_anthropic_model: crate::config::llm_types::AnthropicModel::ClaudeHaiku45,
             secondary_grok_model: crate::config::llm_types::GrokModel::default(),
             secondary_groq_model: crate::config::llm_types::GroqModel::default(),
             secondary_deepseek_model: crate::config::llm_types::DeepSeekModel::default(),
             secondary_minimax_model: crate::config::llm_types::MiniMaxModel::default(),
+            secondary_claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model::default(),
             sidebar_mode: SidebarMode::Normal,
             reveries: HashMap::new(),
             cache_hit_tokens: 0,

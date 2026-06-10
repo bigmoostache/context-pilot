@@ -115,6 +115,9 @@ pub enum LlmProvider {
     DeepSeek,
     /// `MiniMax` models (Anthropic-compatible API via Token Plan).
     MiniMax,
+    /// Claude Code V2 (OAuth, updated request format with Opus 4.8).
+    #[serde(alias = "claudecodev2")]
+    ClaudeCodeV2,
 }
 
 /// Anthropic model variants with per-model pricing and context limits.
@@ -451,6 +454,63 @@ impl ModelInfo for MiniMaxModel {
     fn max_output_tokens(&self) -> u32 {
         match self {
             Self::M27 | Self::M27Highspeed => 128_000,
+        }
+    }
+}
+
+/// Claude Code V2 model variants (OAuth, updated request format).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClaudeCodeV2Model {
+    /// Claude Opus 4.8 — latest flagship model.
+    #[default]
+    ClaudeOpus48,
+}
+
+impl ModelInfo for ClaudeCodeV2Model {
+    fn api_name(&self) -> &'static str {
+        match self {
+            Self::ClaudeOpus48 => "claude-opus-4-8",
+        }
+    }
+
+    fn display_name(&self) -> &'static str {
+        match self {
+            Self::ClaudeOpus48 => "Opus 4.8",
+        }
+    }
+
+    fn context_window(&self) -> usize {
+        200_000
+    }
+
+    fn input_price_per_mtok(&self) -> f32 {
+        match self {
+            Self::ClaudeOpus48 => 5.0,
+        }
+    }
+
+    fn output_price_per_mtok(&self) -> f32 {
+        match self {
+            Self::ClaudeOpus48 => 25.0,
+        }
+    }
+
+    fn cache_hit_price_per_mtok(&self) -> f32 {
+        match self {
+            Self::ClaudeOpus48 => 0.50,
+        }
+    }
+
+    fn cache_miss_price_per_mtok(&self) -> f32 {
+        match self {
+            Self::ClaudeOpus48 => 6.25,
+        }
+    }
+
+    fn max_output_tokens(&self) -> u32 {
+        match self {
+            Self::ClaudeOpus48 => 64_000,
         }
     }
 }

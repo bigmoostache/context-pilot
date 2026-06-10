@@ -53,3 +53,5 @@ docs/slides/package-lock.json
 docs/slides/package.json
 docs/slides/slides.pdf
 **/.DS_Store
+requests.log
+requests.flow

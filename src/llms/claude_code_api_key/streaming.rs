@@ -12,7 +12,7 @@ use crate::llms::error::LlmError;
 
 /// Content block metadata from SSE stream events.
 #[derive(Debug, Deserialize)]
-pub(super) struct StreamContentBlock {
+pub(crate) struct StreamContentBlock {
     /// Block type (e.g. `text`, `tool_use`)
     #[serde(rename = "type")]
     pub block_type: Option<String>,
@@ -24,7 +24,7 @@ pub(super) struct StreamContentBlock {
 
 /// Delta payload from SSE stream events.
 #[derive(Debug, Deserialize)]
-pub(super) struct StreamDelta {
+pub(crate) struct StreamDelta {
     /// Delta type (e.g. `text_delta`, `input_json_delta`)
     #[serde(rename = "type")]
     pub delta_type: Option<String>,
@@ -38,14 +38,14 @@ pub(super) struct StreamDelta {
 
 /// Message body from `message_start` events.
 #[derive(Debug, Deserialize)]
-pub(super) struct StreamMessageBody {
+pub(crate) struct StreamMessageBody {
     /// Token usage statistics
     pub usage: Option<StreamUsage>,
 }
 
 /// Top-level SSE stream event from the Claude Code API.
 #[derive(Debug, Deserialize)]
-pub(super) struct StreamMessage {
+pub(crate) struct StreamMessage {
     /// Event type (e.g. `content_block_start`, `message_delta`)
     #[serde(rename = "type")]
     pub event_type: String,
@@ -61,7 +61,7 @@ pub(super) struct StreamMessage {
 
 /// Token usage statistics from the Claude Code API.
 #[derive(Debug, Deserialize)]
-pub(super) struct StreamUsage {
+pub(crate) struct StreamUsage {
     /// Number of input tokens consumed
     #[serde(rename = "input_tokens")]
     pub input: Option<usize>,
@@ -77,11 +77,11 @@ pub(super) struct StreamUsage {
 }
 
 /// Parsed SSE stream result: (`input_tokens`, `output_tokens`, `cache_hit`, `cache_miss`, `stop_reason`).
-pub(super) type SseStreamResult = (usize, usize, usize, usize, Option<String>);
+pub(crate) type SseStreamResult = (usize, usize, usize, usize, Option<String>);
 
 /// Parse an SSE stream from a Claude API response, sending events to the channel.
 /// Returns (`input_tokens`, `output_tokens`, `cache_hit_tokens`, `cache_miss_tokens`, `stop_reason`).
-pub(super) fn parse_sse_stream(
+pub(crate) fn parse_sse_stream(
     response: reqwest::blocking::Response,
     resp_headers: &str,
     tx: &Sender<StreamEvent>,

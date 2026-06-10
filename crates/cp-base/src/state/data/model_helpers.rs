@@ -44,6 +44,7 @@ impl ModelPricing for State {
             LlmProvider::Groq => self.groq_model.api_name().to_string(),
             LlmProvider::DeepSeek => self.deepseek_model.api_name().to_string(),
             LlmProvider::MiniMax => self.minimax_model.api_name().to_string(),
+            LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.api_name().to_string(),
         }
     }
 
@@ -56,6 +57,7 @@ impl ModelPricing for State {
             LlmProvider::Groq => self.groq_model.max_output_tokens(),
             LlmProvider::DeepSeek => self.deepseek_model.max_output_tokens(),
             LlmProvider::MiniMax => self.minimax_model.max_output_tokens(),
+            LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.max_output_tokens(),
         }
     }
 
@@ -68,6 +70,7 @@ impl ModelPricing for State {
             LlmProvider::Groq => self.secondary_groq_model.max_output_tokens(),
             LlmProvider::DeepSeek => self.secondary_deepseek_model.max_output_tokens(),
             LlmProvider::MiniMax => self.secondary_minimax_model.max_output_tokens(),
+            LlmProvider::ClaudeCodeV2 => self.secondary_claude_code_v2_model.max_output_tokens(),
         }
     }
 
@@ -80,6 +83,7 @@ impl ModelPricing for State {
             LlmProvider::Groq => self.groq_model.context_window(),
             LlmProvider::DeepSeek => self.deepseek_model.context_window(),
             LlmProvider::MiniMax => self.minimax_model.context_window(),
+            LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.context_window(),
         }
     }
 
@@ -96,6 +100,7 @@ impl ModelPricing for State {
             LlmProvider::Groq => self.groq_model.cache_hit_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.cache_hit_price_per_mtok(),
             LlmProvider::MiniMax => self.minimax_model.cache_hit_price_per_mtok(),
+            LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.cache_hit_price_per_mtok(),
         }
     }
 
@@ -108,6 +113,7 @@ impl ModelPricing for State {
             LlmProvider::Groq => self.groq_model.cache_miss_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.cache_miss_price_per_mtok(),
             LlmProvider::MiniMax => self.minimax_model.cache_miss_price_per_mtok(),
+            LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.cache_miss_price_per_mtok(),
         }
     }
 
@@ -120,6 +126,7 @@ impl ModelPricing for State {
             LlmProvider::Groq => self.groq_model.output_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.output_price_per_mtok(),
             LlmProvider::MiniMax => self.minimax_model.output_price_per_mtok(),
+            LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.output_price_per_mtok(),
         }
     }
 

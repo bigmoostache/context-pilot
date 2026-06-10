@@ -69,6 +69,40 @@
   tl_dr: 'Context Pilot is a Rust TUI AI coding assistant (~15K LOC) built with Ratatui+Crossterm. Workspace has 18 module crates + 1 main binary. Branch: reverie-context-optimizer with +209 lines in src/app/reverie/tools.rs'
   importance: high
   last_edited_ms: 0
+141fecab40a0635e:
+  tl_dr: 'Claude Code V2: captured mitmproxy body fields (diagnostics, output_config, context_management, thinking, cache_control) are internal-only — public API rejects with 400. Use clean V1-style body. V2 value = headers + model claude-opus-4-8.'
+  contents: |-
+    ## Claude Code V2 Provider — Working Configuration
+
+    Built from Claude Code CLI v2.1.170 mitmproxy capture. Key lesson: the captured request BODY fields are internal-only and the public api.anthropic.com endpoint rejects them.
+
+    ### Rejected body fields (cause 400 'Extra inputs are not permitted'):
+    - `diagnostics: {previous_message_id: null}` — confirmed via curl
+    - `output_config: {effort: high}`
+    - `context_management: {edits: [...]}`
+    - `thinking: {type: adaptive}`
+    - `cache_control: {ttl, scope}` extensions on system blocks
+
+    ### Rejected beta flags (also 400):
+    code-completions-2025-01-30, code-reviews-2025-02-12, patterns-2025-03-15, model-preference-2025-04-08, expanded-citations-2025-05-05
+
+    ### Working request = clean V1 structure:
+    `{model, max_tokens, system, messages, tools, stream}`
+
+    ### V2 differentiation (vs V1) is ONLY:
+    - 9 beta flags: claude-code-20250219, oauth-2025-04-20, interleaved-thinking-2025-05-14, context-management-2025-06-27, prompt-caching-scope-2026-01-05, structured-outputs-2025-12-15, files-api-2025-04-14, mcp-client-2025-04-04, token-efficient-tools-2025-02-19
+    - billing header cc_version=2.1.170
+    - user-agent claude-cli/2.1.170 (external, sdk-cli)
+    - model claude-opus-4-8 (single model only per user request)
+
+    Reuses helpers + parse_sse_stream from claude_code_api_key. Debug tip: compare against working V1 provider (src/llms/claude_code/mod.rs) when API rejects requests.
+  importance: high
+  labels:
+  - llm-provider
+  - claude-code
+  - api
+  - v2
+  last_edited_ms: 1781084707951
 1552560f9d4055af:
   tl_dr: 'Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.'
   contents: |-

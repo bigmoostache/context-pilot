@@ -385,16 +385,17 @@ fn main() -> ExitCode {
     // Skipped when run.sh supervises (CP_RUN_SH=1) — the supervisor rebuilds via cargo run.
     // If exec fails, fall through to normal exit (run.sh catches it as before).
     #[cfg(unix)]
-    if app.state.flags.lifecycle.reload_pending && std::env::var_os("CP_RUN_SH").is_none() {
-        if let Ok(exe_path) = std::env::current_exe() {
-            use std::os::unix::process::CommandExt as _;
-            let mut args: Vec<String> = std::env::args().skip(1).collect();
-            if !args.iter().any(|a| a == "--resume-stream") {
-                args.push("--resume-stream".to_string());
-            }
-            // Replaces the current process — never returns on success
-            let _err = std::process::Command::new(exe_path).args(&args).exec();
+    if app.state.flags.lifecycle.reload_pending
+        && std::env::var_os("CP_RUN_SH").is_none()
+        && let Ok(exe_path) = std::env::current_exe()
+    {
+        use std::os::unix::process::CommandExt as _;
+        let mut exec_args: Vec<String> = std::env::args().skip(1).collect();
+        if !exec_args.iter().any(|a| a == "--resume-stream") {
+            exec_args.push("--resume-stream".to_string());
         }
+        // Replaces the current process — never returns on success
+        let _err = std::process::Command::new(exe_path).args(&exec_args).exec();
     }
 
     if let Err(e) = run_result {
