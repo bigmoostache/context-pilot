@@ -1,0 +1,112 @@
+/* Nestor — « poste de pilotage nocturne ».
+   Charbon chaud, laiton/ambre phosphore, données en mono.
+   Wordmark : Instrument Serif italique. UI : IBM Plex Sans/Mono. */
+
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Instrument Serif', ui-serif, Georgia, serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Charbon chaud */
+  --color-coal-950: #14110c;
+  --color-coal-900: #1a160f;
+  --color-coal-850: #201b13;
+  --color-coal-800: #272117;
+  --color-coal-700: #352d20;
+  --color-coal-600: #4a4030;
+
+  /* Parchemin (texte) */
+  --color-parchment-100: #f0e9da;
+  --color-parchment-300: #d6ccb6;
+  --color-parchment-500: #a89c83;
+  --color-parchment-700: #6f6753;
+
+  /* Laiton / ambre phosphore */
+  --color-brass-300: #f4c87a;
+  --color-brass-400: #e8a33d;
+  --color-brass-500: #cc8a26;
+  --color-brass-600: #a06a18;
+
+  /* Sémantique */
+  --color-sage-400: #9db87a;
+  --color-ember-400: #e06c4f;
+  --color-tide-400: #7aa6b8;
+
+  --animate-caret: caret-pulse 1.1s ease-in-out infinite;
+  --animate-rise: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes caret-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-coal-950 text-parchment-100 font-sans antialiased;
+  /* Grain + halo ambré très discret : l'atmosphère de la passerelle de nuit */
+  background-image:
+    radial-gradient(ellipse 90% 60% at 50% -10%, rgb(232 163 61 / 0.07), transparent 60%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+
+/* Barres de défilement discrètes, assorties */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-coal-700) transparent;
+}
+
+::selection {
+  background: rgb(232 163 61 / 0.30);
+}
+
+/* Markdown dans la conversation */
+.prose-nestor {
+  @apply text-[0.925rem] leading-relaxed;
+}
+.prose-nestor p { @apply my-2; }
+.prose-nestor h1, .prose-nestor h2, .prose-nestor h3 {
+  @apply font-semibold text-parchment-100 mt-4 mb-2;
+}
+.prose-nestor h1 { @apply text-lg; }
+.prose-nestor h2 { @apply text-base; }
+.prose-nestor ul { @apply list-disc pl-5 my-2 space-y-0.5; }
+.prose-nestor ol { @apply list-decimal pl-5 my-2 space-y-0.5; }
+.prose-nestor a { @apply text-brass-300 underline decoration-brass-600 underline-offset-2; }
+.prose-nestor blockquote { @apply border-l-2 border-brass-600 pl-3 text-parchment-300 my-2; }
+.prose-nestor code:not(pre code) {
+  @apply font-mono text-[0.85em] text-brass-300 bg-coal-800 rounded px-1 py-0.5;
+}
+.prose-nestor pre {
+  @apply font-mono text-[0.8rem] leading-relaxed bg-coal-900/80 border border-coal-700 rounded-lg p-3 my-2 overflow-x-auto;
+}
+.prose-nestor table { @apply text-sm my-2 w-full; }
+.prose-nestor th { @apply text-left border-b border-coal-700 py-1 pr-3 text-parchment-300; }
+.prose-nestor td { @apply border-b border-coal-800 py-1 pr-3; }
+.prose-nestor hr { @apply border-coal-700 my-3; }
+
+/* Shiki : fond transparent, on fournit le nôtre */
+.shiki, .shiki pre { background: transparent !important; }
