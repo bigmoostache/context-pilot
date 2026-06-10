@@ -53,3 +53,10 @@ docs/slides/package-lock.json
 docs/slides/package.json
 docs/slides/slides.pdf
 **/.DS_Store
+
+# mitmproxy / API capture artifacts (huge, never commit)
+requests.log
+requests.flow
+**/requests.log
+**/requests.flow
+/tmp/cc-capture/
