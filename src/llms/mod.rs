@@ -7,11 +7,12 @@ pub(crate) mod anthropic;
 pub(crate) mod cache;
 pub(crate) mod claude_code;
 pub(crate) mod claude_code_api_key;
+/// Claude Code V2 provider (OAuth, updated request format with Opus 4.8).
+pub(crate) mod claude_code_v2;
 /// MiniMax provider (Anthropic-compatible API via Token Plan).
 pub(crate) mod minimax;
 /// OpenAI-compatible provider implementations (Grok, Groq, DeepSeek).
 pub(crate) mod oai_providers;
-mod prompt_tick_csv;
 
 use std::sync::mpsc::Sender;
 
@@ -25,8 +26,8 @@ use crate::state::Message;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
 pub(crate) use cp_base::config::llm_types::{
-    AnthropicModel, ApiCheckResult, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel, ModelInfo,
-    StreamEvent,
+    AnthropicModel, ApiCheckResult, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel,
+    ModelInfo, StreamEvent,
 };
 
 // Re-export provider clients through the module path for get_client()
@@ -84,6 +85,7 @@ pub(crate) fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
         LlmProvider::Groq => Box::new(groq::GroqClient::new()),
         LlmProvider::DeepSeek => Box::new(deepseek::DeepSeekClient::new()),
         LlmProvider::MiniMax => Box::new(minimax::MiniMaxClient::new()),
+        LlmProvider::ClaudeCodeV2 => Box::new(claude_code_v2::ClaudeCodeV2Client::new()),
     }
 }
 
@@ -135,7 +137,7 @@ pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
         );
 
         // Dump prompt tick CSV for debugging cache behavior
-        prompt_tick_csv::dump_prompt_tick_csv(&api_messages);
+        cache::prompt_tick_csv::dump_prompt_tick_csv(&api_messages);
 
         let request = LlmRequest {
             model: params.model,

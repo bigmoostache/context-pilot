@@ -4,7 +4,7 @@ use cp_base::panels::scroll_key_action;
 
 use crate::app::actions::{Action, find_context_by_id, parse_context_pattern};
 use crate::app::panels::get_panel;
-use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel};
+use crate::llms::{AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel};
 use crate::state::State;
 
 /// Map a terminal event to an application action.
@@ -233,6 +233,13 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
                 Action::ConfigSelectProvider(LlmProvider::MiniMax)
             }
         }
+        KeyCode::Char('8') => {
+            if secondary {
+                Action::ConfigSelectSecondaryProvider(LlmProvider::ClaudeCodeV2)
+            } else {
+                Action::ConfigSelectProvider(LlmProvider::ClaudeCodeV2)
+            }
+        }
         // Letter keys select model based on current provider and Tab mode
         KeyCode::Char('a') => {
             if secondary {
@@ -335,6 +342,12 @@ const fn dispatch_primary_model(state: &State, idx: usize) -> Action {
             1 => Action::ConfigSelectMiniMaxModel(MiniMaxModel::M27Highspeed),
             _ => Action::None,
         },
+        LlmProvider::ClaudeCodeV2 => match idx {
+            0 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeOpus48),
+            1 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeFable5),
+            2 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeSonnet46),
+            _ => Action::None,
+        },
     }
 }
 
@@ -367,6 +380,12 @@ const fn dispatch_secondary_model(state: &State, idx: usize) -> Action {
         LlmProvider::MiniMax => match idx {
             0 => Action::ConfigSelectSecondaryMiniMaxModel(MiniMaxModel::M27),
             1 => Action::ConfigSelectSecondaryMiniMaxModel(MiniMaxModel::M27Highspeed),
+            _ => Action::None,
+        },
+        LlmProvider::ClaudeCodeV2 => match idx {
+            0 => Action::ConfigSelectSecondaryClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeOpus48),
+            1 => Action::ConfigSelectSecondaryClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeFable5),
+            2 => Action::ConfigSelectSecondaryClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeSonnet46),
             _ => Action::None,
         },
     }

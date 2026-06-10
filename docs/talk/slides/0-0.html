@@ -1,0 +1,189 @@
+<div class="main-header">
+  <h1 class="main-title">Rebuilding My Own Claude Code</h1>
+  <div class="main-meta">
+    <div class="main-event">Generative AI Paris — 9 juin 2026</div>
+    <div class="main-speaker">Guillaume Draznieks</div>
+  </div>
+</div>
+
+<div class="main-rule"></div>
+
+<div class="toc-columns">
+  <a class="toc-col toc-col-whys" data-section="1">
+    <div class="toc-col-bg">I</div>
+    <div class="toc-col-content">
+      <div class="toc-col-title">The WHYs</div>
+    </div>
+  </a>
+
+  <div class="toc-col-divider"></div>
+
+  <a class="toc-col toc-col-hows" data-section="2">
+    <div class="toc-col-bg">II</div>
+    <div class="toc-col-content">
+      <div class="toc-col-title">The HOWs</div>
+    </div>
+  </a>
+
+  <div class="toc-col-divider"></div>
+
+  <a class="toc-col toc-col-wows" data-section="3">
+    <div class="toc-col-bg">III</div>
+    <div class="toc-col-content">
+      <div class="toc-col-title">The WOWs</div>
+    </div>
+  </a>
+</div>
+
+<style>
+  /* ===== Header: 1/3 of vertical space ===== */
+  .main-header {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    gap: 1.8rem;
+  }
+
+  .main-title {
+    font-size: 3.4rem;
+    font-weight: 700;
+    color: var(--cream);
+    letter-spacing: -0.03em;
+    text-align: center;
+    line-height: 1.15;
+  }
+
+  .main-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .main-event {
+    font-size: 2.8rem;
+    font-weight: 300;
+    color: var(--light);
+    opacity: 0.55;
+    letter-spacing: 0.04em;
+    text-align: center;
+  }
+
+  .main-speaker {
+    font-size: 1.6rem;
+    font-weight: 400;
+    color: var(--cream);
+    opacity: 0.3;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* Subtle rule between header and columns */
+  .main-rule {
+    width: 6rem;
+    height: 1.5px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgba(229, 178, 153, 0.25),
+      transparent
+    );
+    flex-shrink: 0;
+  }
+
+  /* ===== Columns: 2/3 of vertical space ===== */
+  .toc-columns {
+    flex: 2;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    width: 100%;
+    max-width: 100%;
+    gap: 0;
+    padding: 0 2rem;
+  }
+
+  .toc-col {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    text-decoration: none;
+    overflow: hidden;
+    border-radius: 24px;
+    transition: background 0.5s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .toc-col:hover {
+    background: rgba(229, 178, 153, 0.06);
+    transform: scale(1.03);
+  }
+
+  /* Giant background numeral — Roman serif */
+  .toc-col-bg {
+    position: absolute;
+    font-size: 21rem;
+    font-weight: 400;
+    font-family: 'Georgia', 'Times New Roman', 'Palatino Linotype', serif;
+    font-style: italic;
+    color: var(--cream);
+    opacity: 0.035;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    user-select: none;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+
+  .toc-col:hover .toc-col-bg {
+    opacity: 0.08;
+  }
+
+  /* Foreground content */
+  .toc-col-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .toc-col-title {
+    font-size: 3.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    transition: color 0.4s ease;
+  }
+
+  /* Varying colors per section */
+  .toc-col-whys .toc-col-title { color: #E5B299; }
+  .toc-col-hows .toc-col-title { color: #FCDEC0; }
+  .toc-col-wows .toc-col-title { color: #F5D5B0; }
+
+  .toc-col-whys:hover .toc-col-title { color: #F0C4A8; }
+  .toc-col-hows:hover .toc-col-title { color: #FFF2E4; }
+  .toc-col-wows:hover .toc-col-title { color: #FFE4C8; }
+
+  /* Vertical dividers */
+  .toc-col-divider {
+    width: 1px;
+    align-self: stretch;
+    background: linear-gradient(
+      to bottom,
+      transparent 10%,
+      rgba(229, 178, 153, 0.1) 30%,
+      rgba(229, 178, 153, 0.1) 70%,
+      transparent 90%
+    );
+    flex-shrink: 0;
+    margin: 2rem 0;
+  }
+</style>

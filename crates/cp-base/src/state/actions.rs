@@ -119,6 +119,8 @@ pub enum Action {
     ConfigSelectDeepSeekModel(crate::config::llm_types::DeepSeekModel),
     /// Select primary `MiniMax` model.
     ConfigSelectMiniMaxModel(crate::config::llm_types::MiniMaxModel),
+    /// Select primary Claude Code V2 model.
+    ConfigSelectClaudeCodeV2Model(crate::config::llm_types::ClaudeCodeV2Model),
     /// Move config bar selection forward (→).
     ConfigSelectNextBar,
     /// Move config bar selection backward (←).
@@ -151,6 +153,8 @@ pub enum Action {
     ConfigSelectSecondaryDeepSeekModel(crate::config::llm_types::DeepSeekModel),
     /// Select secondary `MiniMax` model.
     ConfigSelectSecondaryMiniMaxModel(crate::config::llm_types::MiniMaxModel),
+    /// Select secondary Claude Code V2 model.
+    ConfigSelectSecondaryClaudeCodeV2Model(crate::config::llm_types::ClaudeCodeV2Model),
     /// Toggle reverie (background optimizer) on/off.
     ConfigToggleReverie,
     /// Toggle between primary and secondary model tabs.

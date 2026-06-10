@@ -1,0 +1,234 @@
+<div class="section-label" style="margin-bottom:0.5rem;">II — The HOWs</div>
+<div class="cat-title">Feedbacks and Constraints</div>
+
+<div class="cat-layout">
+  <!-- Left: theorem statement + checks -->
+  <div class="cat-left">
+    <div class="cat-theorem-label">Control Theory</div>
+    <div class="cat-theorem">
+      — <em>For any system subject to disturbances or uncertainty, the optimal
+      <span class="hl">closed-loop</span> (feedback) policy performs at least
+      as well as the optimal open-loop policy, and <span class="hl">strictly
+      better</span> whenever there is uncertainty that the feedback can respond to.</em>
+    </div>
+
+    <div class="cat-checks">
+      <div class="cat-check" style="--i:0">
+        <span class="cat-check-icon">✓</span>
+        <span>Tests</span>
+      </div>
+      <div class="cat-check" style="--i:1">
+        <span class="cat-check-icon">✓</span>
+        <span>Code formal verifiers <span class="cat-check-dim">(LEAN, mathematical provers)</span></span>
+      </div>
+      <div class="cat-check" style="--i:2">
+        <span class="cat-check-icon">✓</span>
+        <span>Linters</span>
+      </div>
+      <div class="cat-check" style="--i:3">
+        <span class="cat-check-icon">✓</span>
+        <span>Compilers</span>
+      </div>
+      <div class="cat-check" style="--i:4">
+        <span class="cat-check-icon">✓</span>
+        <span>Code formatting</span>
+      </div>
+      <div class="cat-check" style="--i:5">
+        <span class="cat-check-icon">✓</span>
+        <span>Code rules <span class="cat-check-dim">(file lengths, folder lengths)</span></span>
+      </div>
+      <div class="cat-check" style="--i:6">
+        <span class="cat-check-icon">✓</span>
+        <span>Human feedback</span>
+      </div>
+      <div class="cat-check cat-check-etc" style="--i:7">
+        <span>etc. etc.</span>
+      </div>
+      <div class="cat-check cat-check-warn" style="--i:8">
+        <span class="cat-check-warn-icon">⚠</span>
+        <span>Visual Feedback is <span class="hl">HARD</span></span>
+      </div>
+      <div class="cat-check cat-check-warn" style="--i:9">
+        <span class="cat-check-warn-icon">⚠</span>
+        <span>Browser Navigation Feedback is <span class="hl">HARD</span></span>
+      </div>
+      <div class="cat-check cat-check-etc" style="--i:10">
+        <span>etc. etc.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: clockwise flow chart (animated) -->
+  <div class="cat-right">
+    <svg viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg" class="cat-svg">
+      <defs>
+        <marker id="cat-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#7D5A50"/>
+        </marker>
+      </defs>
+
+      <!-- Harness block -->
+      <rect x="110" y="40" width="180" height="52" rx="16" fill="none" stroke="#7D5A50" stroke-width="2.5"/>
+      <text x="200" y="72" text-anchor="middle" fill="#7D5A50" font-size="19" font-weight="700" letter-spacing="0.4">Harness</text>
+
+      <!-- Feedback block -->
+      <rect x="110" y="508" width="180" height="52" rx="16" fill="none" stroke="#B85C3A" stroke-width="2.5"/>
+      <text x="200" y="540" text-anchor="middle" fill="#B85C3A" font-size="19" font-weight="700" letter-spacing="0.4">Feedback</text>
+
+      <!-- Right path (down): Harness → Feedback — animated flow -->
+      <path class="flow-right"
+            d="M 290 66 L 340 66 Q 355 66 355 81 L 355 525 Q 355 540 340 540 L 290 540"
+            fill="none" stroke="#7D5A50" stroke-width="2" marker-end="url(#cat-arr)" opacity="0.5"/>
+
+      <!-- Left path (up): Feedback → Harness — animated flow -->
+      <path class="flow-left"
+            d="M 110 540 L 60 540 Q 45 540 45 525 L 45 81 Q 45 66 60 66 L 110 66"
+            fill="none" stroke="#7D5A50" stroke-width="2" marker-end="url(#cat-arr)" opacity="0.5"/>
+
+      <!-- Right label — EXECUTE -->
+      <text x="372" y="303" text-anchor="middle" fill="#7D5A50" font-size="22" font-weight="600" letter-spacing="0.15em" opacity="0.55" transform="rotate(90, 372, 303)">EXECUTE</text>
+
+      <!-- Left label — CORRECT -->
+      <text x="28" y="303" text-anchor="middle" fill="#B85C3A" font-size="22" font-weight="600" letter-spacing="0.15em" opacity="0.55" transform="rotate(-90, 28, 303)">CORRECT</text>
+    </svg>
+  </div>
+</div>
+
+<style>
+  .cat-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -0.02em;
+    margin-bottom: 3rem;
+  }
+
+  .cat-layout {
+    display: flex;
+    gap: 5rem;
+    width: 100%;
+    max-width: 72rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Left: theorem */
+  .cat-left {
+    flex: 0 0 45%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+  }
+
+  .cat-theorem-label {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--dark);
+    opacity: 0.7;
+    font-weight: 600;
+  }
+
+  .cat-theorem {
+    font-size: 1.4rem;
+    color: var(--text);
+    line-height: 1.6;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+
+  .cat-theorem .hl {
+    color: #B85C3A;
+    font-weight: 600;
+  }
+
+  /* Checks list */
+  .cat-checks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.8rem;
+  }
+
+  .cat-check {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 1.05rem;
+    color: var(--text);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: checkIn 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+    animation-delay: calc(0.8s + var(--i) * 0.35s);
+  }
+
+  .cat-check-icon {
+    color: #8B9E7C;
+    font-weight: 700;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .cat-check-dim {
+    color: var(--mid);
+    font-size: 0.85rem;
+    opacity: 0.55;
+  }
+
+  .cat-check-etc {
+    font-style: italic;
+    color: var(--mid);
+    opacity: 0;
+    padding-left: 1.9rem;
+  }
+
+  .cat-check-warn {
+    margin-top: 0.3rem;
+  }
+
+  .cat-check-warn-icon {
+    color: #B85C3A;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .cat-check-warn span .hl {
+    color: #B85C3A;
+    font-weight: 700;
+  }
+
+  @keyframes checkIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Right: flow chart */
+  .cat-right {
+    flex: 0 0 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cat-svg {
+    width: 100%;
+    max-width: 420px;
+    height: auto;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Animated flowing dashes */
+  .flow-right {
+    stroke-dasharray: 14 10;
+    animation: flowForward 1.2s linear infinite;
+  }
+
+  .flow-left {
+    stroke-dasharray: 14 10;
+    animation: flowForward 1.2s linear infinite;
+  }
+
+  @keyframes flowForward {
+    from { stroke-dashoffset: 0; }
+    to   { stroke-dashoffset: -24; }
+  }
+</style>

@@ -23,7 +23,9 @@ pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
 
 /// Format a number with K/M suffix for compact display.
 pub(crate) fn format_number(n: usize) -> String {
-    if n >= 1_000_000 {
+    if n >= 1_000_000_000 {
+        format!("{:.1}B", n.to_f64() / 1_000_000_000.0)
+    } else if n >= 1_000_000 {
         format!("{:.1}M", n.to_f64() / 1_000_000.0)
     } else if n >= 1_000 {
         format!("{:.1}K", n.to_f64() / 1_000.0)

@@ -1,0 +1,329 @@
+/* ===== Reset & Base ===== */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --dark:    #7D5A50;
+  --mid:     #B4846C;
+  --light:   #E5B299;
+  --cream:   #FCDEC0;
+  --white:   #FFF8F2;
+  --text:    #3D2B24;
+  --transition-speed: 0.6s;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--cream);
+  color: var(--text);
+}
+
+/* ===== Deck viewport ===== */
+#deck {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ===== Sidebar (embedded, transparent) ===== */
+#sidebar {
+  position: fixed;
+  top: 50%;
+  left: 2.5rem;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  z-index: 200;
+  transition: opacity 0.4s ease;
+}
+
+.sidebar-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--mid);
+  opacity: 0.4;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+  opacity: 0.3;
+}
+
+.sidebar-item:hover {
+  opacity: 0.6;
+}
+
+.sidebar-item.active {
+  opacity: 1;
+}
+
+.sidebar-pip {
+  width: 3px;
+  height: 1.4rem;
+  border-radius: 2px;
+  background: var(--light);
+  transition: background 0.3s, height 0.3s;
+  flex-shrink: 0;
+}
+
+.sidebar-item.active .sidebar-pip {
+  background: var(--dark);
+  height: 1.8rem;
+}
+
+.sidebar-item-label {
+  font-size: 0.8rem;
+  color: var(--mid);
+  letter-spacing: 0.02em;
+  transition: color 0.3s;
+  white-space: nowrap;
+}
+
+.sidebar-item.active .sidebar-item-label {
+  color: var(--dark);
+  font-weight: 600;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 6rem;
+  opacity: 1;
+  transition:
+    transform var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1),
+    opacity   var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#slide-incoming {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ===== Transition classes ===== */
+/* Outgoing positions */
+.slide.exit-left   { transform: translateX(-100%); opacity: 0; }
+.slide.exit-right  { transform: translateX(100%);  opacity: 0; }
+.slide.exit-up     { transform: translateY(-100%); opacity: 0; }
+.slide.exit-down   { transform: translateY(100%);  opacity: 0; }
+
+/* Incoming start positions (applied instantly, then removed) */
+.slide.enter-from-right { transform: translateX(100%);  opacity: 0; }
+.slide.enter-from-left  { transform: translateX(-100%); opacity: 0; }
+.slide.enter-from-below { transform: translateY(100%);  opacity: 0; }
+.slide.enter-from-above { transform: translateY(-100%); opacity: 0; }
+
+/* Settled */
+.slide.center {
+  transform: translate(0, 0);
+  opacity: 1;
+}
+
+/* ===== Slide content styling ===== */
+.slide h1 {
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: var(--dark);
+  text-align: center;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+
+.slide h2 {
+  font-size: 2.4rem;
+  font-weight: 600;
+  color: var(--dark);
+  text-align: center;
+  line-height: 1.3;
+  margin-bottom: 0.75rem;
+}
+
+.slide h3 {
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: var(--mid);
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.slide p {
+  font-size: 1.4rem;
+  color: var(--text);
+  text-align: center;
+  line-height: 1.6;
+  max-width: 48rem;
+}
+
+.slide .subtitle {
+  font-size: 1.6rem;
+  color: var(--mid);
+  font-style: italic;
+  margin-top: 0.5rem;
+}
+
+.slide .keyword {
+  font-size: 5rem;
+  font-weight: 700;
+  color: var(--dark);
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.slide .keyword-sub {
+  font-size: 1.5rem;
+  color: var(--mid);
+  font-style: italic;
+  margin-top: 1rem;
+  text-align: center;
+  max-width: 36rem;
+}
+
+.slide .section-label {
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: var(--light);
+  margin-bottom: 2rem;
+}
+
+.slide .accent-line {
+  width: 4rem;
+  height: 3px;
+  background: var(--light);
+  border-radius: 2px;
+  margin: 1.5rem auto;
+}
+
+/* ===== Dark / Title slides (inverted) ===== */
+.slide.slide-dark {
+  background: var(--dark);
+}
+
+.slide.slide-dark .section-label {
+  color: var(--light);
+  opacity: 0.5;
+}
+
+.slide.slide-dark h1 {
+  color: var(--cream);
+}
+
+.slide.slide-dark .accent-line {
+  background: var(--light);
+  opacity: 0.4;
+}
+
+.slide.slide-dark .toc {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 32rem;
+}
+
+.slide.slide-dark .toc-item {
+  display: flex;
+  align-items: center;
+  gap: 1.8rem;
+  padding: 1.2rem 0;
+  border-bottom: 1px solid rgba(229, 178, 153, 0.1);
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s ease;
+  opacity: 0.55;
+}
+
+.slide.slide-dark .toc-item:last-child {
+  border-bottom: none;
+}
+
+.slide.slide-dark .toc-item:hover {
+  opacity: 1;
+  transform: translateX(8px);
+}
+
+.slide.slide-dark .toc-num {
+  font-size: 0.75rem;
+  font-weight: 300;
+  color: var(--light);
+  opacity: 0.35;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.8rem;
+  flex-shrink: 0;
+}
+
+.slide.slide-dark .toc-item:hover .toc-num {
+  opacity: 0.7;
+}
+
+.slide.slide-dark .toc-text {
+  font-size: 1.35rem;
+  font-weight: 300;
+  color: var(--cream);
+  letter-spacing: 0.03em;
+  line-height: 1.4;
+}
+
+.slide.slide-dark .toc-hint {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--light);
+  opacity: 0.35;
+  letter-spacing: 0.05em;
+  margin-top: 0.15rem;
+}
+
+.slide.slide-dark .subtitle {
+  color: var(--light);
+  opacity: 0.5;
+}
+
+/* ===== Position indicator (bottom-right) ===== */
+#position {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 2rem;
+  font-size: 0.75rem;
+  color: var(--mid);
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  z-index: 100;
+}
+
+/* ===== Persistent timer (bottom-right, left of position) ===== */
+#timer {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 5.5rem;
+  font-size: 0.75rem;
+  color: var(--mid);
+  opacity: 0.35;
+  font-variant-numeric: tabular-nums;
+  z-index: 100;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+
+#timer:hover {
+  opacity: 0.7;
+}

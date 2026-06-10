@@ -1,0 +1,310 @@
+<div class="section-label" style="margin-bottom:0.5rem;">I — The WHYs</div>
+<div class="slide-title-owning">What's failing</div>
+<div class="owning-separator"></div>
+
+<div class="slider-container">
+  <div class="slider-card" id="slider-card">
+    <div class="slider-text" id="slider-text"></div>
+    <div class="slider-source" id="slider-source"></div>
+  </div>
+  <div class="slider-progress" id="slider-progress"></div>
+  <div class="slider-counter" id="slider-counter"></div>
+</div>
+
+<style>
+  .slide-title-owning {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -0.02em;
+    margin-bottom: 0.6rem;
+  }
+
+  .owning-separator {
+    width: 100%;
+    max-width: 100%;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent 5%,
+      var(--light) 25%,
+      var(--mid) 50%,
+      var(--light) 75%,
+      transparent 95%
+    );
+    opacity: 0.5;
+    margin-bottom: 0.8rem;
+  }
+
+  .slider-container {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.4rem;
+  }
+
+  .slider-card {
+    width: 100%;
+    min-height: 580px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 2rem;
+    text-align: center;
+    gap: 1rem;
+    transition: opacity 0.4s cubic-bezier(0.22,0.61,0.36,1),
+                transform 0.4s cubic-bezier(0.22,0.61,0.36,1);
+  }
+
+  .slider-text {
+    font-size: 2.2rem;
+    color: var(--text);
+    line-height: 1.45;
+    font-weight: 400;
+    max-width: 100%;
+  }
+
+  .slider-text .hl {
+    color: #B85C3A;
+    font-weight: 600;
+  }
+
+  .slider-text .num {
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: #B85C3A;
+    display: block;
+    margin-bottom: 0.3rem;
+    letter-spacing: -0.02em;
+  }
+
+  .slider-text .sub {
+    font-size: 1.1rem;
+    color: var(--mid);
+    display: block;
+    margin-top: 0.4rem;
+  }
+
+  .slider-source {
+    font-size: 0.95rem;
+    color: var(--mid);
+    font-style: italic;
+    opacity: 0.6;
+    align-self: flex-end;
+    text-align: right;
+  }
+
+  /* Progress bar */
+  .slider-progress {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    gap: 3px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .slider-pip-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    padding: 2px 0;
+  }
+
+  .slider-pip-bar {
+    height: 3px;
+    width: 100%;
+    min-width: 14px;
+    border-radius: 2px;
+    background: var(--light);
+    opacity: 0.25;
+    transition: opacity 0.3s ease, background 0.3s ease;
+  }
+
+  .slider-pip-wrap.active .slider-pip-bar {
+    background: var(--dark);
+    opacity: 1;
+  }
+
+  .slider-pip-wrap.past .slider-pip-bar {
+    background: var(--mid);
+    opacity: 0.5;
+  }
+
+  .slider-pip-wrap:hover .slider-pip-bar {
+    opacity: 0.7;
+    background: var(--mid);
+  }
+
+  .slider-pip-wrap.active:hover .slider-pip-bar {
+    opacity: 1;
+    background: var(--dark);
+  }
+
+  .slider-pip-label {
+    font-size: 0.65rem;
+    color: var(--mid);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    padding: 0 4px;
+    margin-top: 4px;
+    opacity: 0.3;
+    transform: translateY(0);
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+
+  .slider-pip-wrap:hover .slider-pip-label,
+  .slider-pip-wrap.active .slider-pip-label {
+    opacity: 0.7;
+  }
+
+  .slider-pip-wrap.active .slider-pip-label {
+    opacity: 1;
+    font-weight: 600;
+    color: var(--dark);
+  }
+
+  .slider-counter {
+    font-size: 0.65rem;
+    color: var(--mid);
+    opacity: 0.35;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+
+<script>
+
+(function() {
+  const FADE_MS = 250;
+
+  const items = [
+    {
+      type: '🐛 GitHub Issue #19393', pip: 'CPU',
+      text: '<img src="img/cpu-usage.webp" alt="Claude Code CPU usage" style="max-width:100%;max-height:500px;border-radius:24px;box-shadow:0 2px 16px rgba(0,0,0,0.12);"><span class="sub">Claude Code consuming <span class="hl">100%+ CPU</span> even when <span class="hl">idle</span>. Constant freezing, fans running constantly.</span>',
+      source: ''
+    },
+    {
+      type: '🛠️ Tech Stack', pip: 'Tech Stack',
+      text: '<img src="img/typescript-logo.png" alt="TypeScript logo" style="max-width:320px;max-height:320px;border-radius:0;box-shadow:none;margin-bottom:1rem;"><span class="sub">A <span class="hl">512K-line TypeScript</span> codebase for a… terminal app.</span>',
+      source: ''
+    },
+    {
+      type: '🧠 Memory Problem', pip: 'Context Amnesia',
+      text: '<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:1.5rem;"><div style="position:relative;width:520px;height:340px;margin:0 auto;"><img src="img/memory-repo-1.png" style="position:absolute;left:0;top:20px;width:380px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.15);transform:rotate(-6deg);z-index:1;"><img src="img/memory-repo-2.png" style="position:absolute;left:60px;top:10px;width:380px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.18);transform:rotate(2deg);z-index:2;"><img src="img/memory-repo-3.png" style="position:absolute;left:120px;top:0;width:380px;border-radius:16px;box-shadow:0 6px 32px rgba(0,0,0,0.22);transform:rotate(5deg);z-index:3;"></div><div style="text-align:center;margin-top:0.5rem;"><span style="font-size:2rem;font-weight:800;color:#B85C3A;">20,000+</span><span style="font-size:1rem;color:var(--mid);margin-left:0.5rem;">repos trying to fix Claude Code\'s memory</span></div></div>',
+      source: ''
+    },
+    {
+      type: '📊 Stat', pip: 'Context Waste',
+      text: '<div style="width:100%;max-width:none;padding:0;"><div style="font-size:0.85rem;color:var(--mid);text-transform:uppercase;letter-spacing:0.2em;margin-bottom:1.2rem;opacity:0.4;">Claude Code — typical context window</div><div style="display:flex;gap:3px;width:100%;height:120px;"><div style="flex:0 0 35%;border-radius:20px;background:repeating-linear-gradient(-45deg,rgba(184,92,58,0.18),rgba(184,92,58,0.18) 5px,rgba(184,92,58,0.08) 5px,rgba(184,92,58,0.08) 10px);border:1px dashed rgba(184,92,58,0.25);"></div><div style="flex:0 0 7%;border-radius:20px;background:#6B8E8E;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:500;color:rgba(255,255,255,0.9);">📄 config.rs</div><div style="flex:0 0 10%;border-radius:20px;background:#7D5A50;"></div><div style="flex:0 0 7%;border-radius:20px;background:rgba(107,142,142,0.35);border:2px dashed rgba(107,142,142,0.5);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:500;color:rgba(255,255,255,0.7);">📄 config.rs</div><div style="flex:0 0 5%;border-radius:20px;background:#B4846C;"></div><div style="flex:0 0 12%;border-radius:20px;background:#7D5A50;"></div><div style="flex:0 0 7%;border-radius:20px;background:rgba(107,142,142,0.35);border:2px dashed rgba(107,142,142,0.5);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:500;color:rgba(255,255,255,0.7);">📄 config.rs</div><div style="flex:0 0 6%;border-radius:20px;background:#C9956B;"></div><div style="flex:0 0 8%;border-radius:20px;background:#D4A574;"></div><div style="flex:1;border-radius:20px;background:rgba(0,0,0,0.03);display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--mid);font-style:italic;opacity:0.4;">…</div></div><div style="display:flex;gap:3px;width:100%;margin-top:3px;"><div style="flex:0 0 35%;display:flex;flex-direction:column;align-items:center;"><div style="width:60%;border-left:2px solid #B85C3A;border-right:2px solid #B85C3A;border-bottom:2px solid #B85C3A;height:12px;border-radius:0 0 8px 8px;opacity:0.4;"></div><div style="font-size:0.8rem;color:#B85C3A;font-weight:600;margin-top:4px;">35% — auto-loaded before you type</div><div style="font-size:0.65rem;color:var(--mid);font-style:italic;margin-top:2px;">System prompt · MCP tools · Memories · Configs</div></div><div style="flex:0 0 7%;text-align:center;padding-top:6px;font-size:0.55rem;color:var(--mid);opacity:0.6;">File</div><div style="flex:0 0 10%;text-align:center;padding-top:6px;font-size:0.55rem;color:var(--mid);opacity:0.6;">AI</div><div style="flex:0 0 7%;text-align:center;padding-top:6px;font-size:0.55rem;color:var(--mid);opacity:0.6;">File ⚠</div><div style="flex:0 0 5%;text-align:center;padding-top:6px;font-size:0.55rem;color:var(--mid);opacity:0.6;">User</div><div style="flex:0 0 12%;text-align:center;padding-top:6px;font-size:0.55rem;color:var(--mid);opacity:0.6;">AI</div><div style="flex:0 0 7%;text-align:center;padding-top:6px;font-size:0.55rem;color:var(--mid);opacity:0.6;">File ⚠</div><div style="flex:0 0 6%;text-align:center;padding-top:6px;font-size:0.55rem;color:var(--mid);opacity:0.6;">Tool</div><div style="flex:0 0 8%;text-align:center;padding-top:6px;font-size:0.55rem;color:var(--mid);opacity:0.6;">Result</div><div style="flex:1;"></div></div><div style="display:flex;justify-content:center;margin-top:1.2rem;gap:8px;align-items:center;"><div style="width:14px;height:14px;background:rgba(107,142,142,0.35);border-radius:6px;border:2px dashed rgba(107,142,142,0.5);"></div><span style="font-size:0.8rem;color:#6B8E8E;font-weight:600;">config.rs appears 3×</span><span style="font-size:0.75rem;color:var(--mid);font-style:italic;">— same content, triple the cost</span></div></div>',
+      source: '' 
+    },
+    {
+      type: '📄 CLAUDE.md', pip: 'CLAUDE.md',
+      text: '<img src="img/claudemd-hell.png" alt="CLAUDE.md" style="max-width:100%;max-height:420px;border-radius:24px;box-shadow:0 2px 16px rgba(0,0,0,0.12);">',
+      source: ''
+    },
+    {
+      type: '🔒 Ecosystem Lock-in', pip: 'Lock-in',
+      text: '<img src="img/anthropic-logo.png" alt="Anthropic" style="max-width:480px;max-height:120px;opacity:0.9;">',
+      source: ''
+    },
+    {
+      type: '📦 Black Box', pip: 'Black Box',
+      text: '<img src="img/black-box.jpg" alt="Black box" style="max-width:100%;max-height:320px;border-radius:24px;box-shadow:0 2px 16px rgba(0,0,0,0.12);margin-bottom:1.5rem;"><div style="display:flex;flex-wrap:wrap;gap:0.6rem;justify-content:center;max-width:40rem;"><span style="background:rgba(184,92,58,0.12);color:#B85C3A;font-size:0.95rem;font-weight:600;padding:0.4rem 1rem;border-radius:12px;letter-spacing:0.02em;">Hard-coded behaviours</span><span style="background:rgba(184,92,58,0.12);color:#B85C3A;font-size:0.95rem;font-weight:600;padding:0.4rem 1rem;border-radius:12px;letter-spacing:0.02em;">Near-spyware software</span><span style="background:rgba(184,92,58,0.12);color:#B85C3A;font-size:0.95rem;font-weight:600;padding:0.4rem 1rem;border-radius:12px;letter-spacing:0.02em;">Hidden feature flags</span><span style="background:rgba(184,92,58,0.12);color:#B85C3A;font-size:0.95rem;font-weight:600;padding:0.4rem 1rem;border-radius:12px;letter-spacing:0.02em;">Anti-distillation mechanisms</span><span style="background:rgba(184,92,58,0.12);color:#B85C3A;font-size:0.95rem;font-weight:600;padding:0.4rem 1rem;border-radius:12px;letter-spacing:0.02em;">40+ hardcoded prompts</span></div>',
+      source: ''
+    },
+    {
+      type: '💬 Community Quote', pip: 'Hallucination',
+      text: '"Claude will frequently, and <span class="hl">confidently</span>, tell me it\'s done something that it just <span class="hl">has not done</span>"',
+      source: 'r/ClaudeCode — on hallucination'
+    },
+    {
+      type: '📊 TerminalBench', pip: 'TerminalBench',
+      text: '<img src="img/terminalbench.png" alt="TerminalBench leaderboard" style="max-width:100%;max-height:500px;border-radius:24px;box-shadow:0 2px 16px rgba(0,0,0,0.12);"><span class="sub"><span class="hl">#52</span> — Claude Code with Opus 4.6 at <span class="hl">58.0%</span>. The harness holds the model back.</span>',
+      source: 'TerminalBench — terminal-bench.com'
+    },
+    {
+      type: '📊 Usage', pip: 'Token Waste',
+      text: '<img src="img/claude-usage.png" alt="Claude Code /usage" style="max-width:100%;max-height:500px;border-radius:24px;box-shadow:0 2px 16px rgba(0,0,0,0.12);"><span class="sub">Claude Code Max plan — <span class="hl">rapid fillage</span>. "You type Hello and 50% of your tokens are gone."</span>',
+      source: 'Claude Code /usage'
+    },
+    {
+      type: '📊 Anthropic Postmortem', pip: 'Regressions',
+      text: '<img src="img/anthropic-postmortem.png" alt="Anthropic postmortem blog" style="max-width:100%;max-height:500px;border-radius:24px;box-shadow:0 2px 16px rgba(0,0,0,0.12);"><span class="sub"><span class="hl">3</span> confirmed product-layer regressions in one month. From the vendor itself.</span>',
+      source: 'Anthropic — April 2026 postmortem'
+    },
+
+  ];
+
+  const card = document.getElementById('slider-card');
+  const textEl = document.getElementById('slider-text');
+  const sourceEl = document.getElementById('slider-source');
+  const progressEl = document.getElementById('slider-progress');
+  const counterEl = document.getElementById('slider-counter');
+
+  // Build progress pips with labels
+  items.forEach((item, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'slider-pip-wrap';
+    wrap.dataset.idx = i;
+
+    const bar = document.createElement('div');
+    bar.className = 'slider-pip-bar';
+
+    const label = document.createElement('div');
+    label.className = 'slider-pip-label';
+    label.textContent = item.pip;
+
+    wrap.appendChild(bar);
+    wrap.appendChild(label);
+
+    wrap.addEventListener('click', () => {
+      current = i;
+      show(i);
+    });
+
+    progressEl.appendChild(wrap);
+  });
+
+  let current = 0;
+
+  function show(idx) {
+    // Slide out to the left
+    card.style.opacity = '0';
+    card.style.transform = 'translateX(-50px)';
+
+    setTimeout(() => {
+      const item = items[idx];
+      textEl.innerHTML = item.text;
+      sourceEl.textContent = item.source;
+
+      // Update progress pips
+      progressEl.querySelectorAll('.slider-pip-wrap').forEach((wrap, i) => {
+        wrap.className = 'slider-pip-wrap' +
+          (i === idx ? ' active' : i < idx ? ' past' : '');
+      });
+
+      counterEl.textContent = (idx + 1) + ' / ' + items.length;
+
+      // Position off-screen right (no transition)
+      card.style.transition = 'none';
+      card.style.opacity = '0';
+      card.style.transform = 'translateX(50px)';
+      void card.offsetWidth; // force reflow
+
+      // Slide in from the right
+      card.style.transition = 'opacity 0.4s cubic-bezier(0.22,0.61,0.36,1), transform 0.4s cubic-bezier(0.22,0.61,0.36,1)';
+      card.style.opacity = '1';
+      card.style.transform = 'translateX(0)';
+    }, FADE_MS);
+  }
+
+  // Start
+  show(0);
+})();
+</script>

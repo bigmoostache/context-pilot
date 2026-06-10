@@ -69,6 +69,47 @@
   tl_dr: 'Context Pilot is a Rust TUI AI coding assistant (~15K LOC) built with Ratatui+Crossterm. Workspace has 18 module crates + 1 main binary. Branch: reverie-context-optimizer with +209 lines in src/app/reverie/tools.rs'
   importance: high
   last_edited_ms: 0
+141fecab40a0635e:
+  tl_dr: 'Claude Code V2: only `diagnostics` body field is internal-only (400). thinking/output_config/context_management/temperature/top_p/top_k all WORK with the 9 beta flags. V2 = headers + models opus-4-8, fable-5, sonnet-4-6.'
+  contents: |-
+    ## Claude Code V2 Provider — Working Configuration
+
+    Built from Claude Code CLI v2.1.170 mitmproxy capture. OAuth Bearer token (Keychain / ~/.claude/.credentials.json).
+
+    ### Verified ACCEPTED body tunables (probed 2026-06-10 via curl, sonnet-4-6):
+    - `thinking: {type: "adaptive"}` — Claude Code default, model self-budgets
+    - `thinking: {type: "enabled", budget_tokens: N}` — forced thinking blocks
+    - `output_config: {effort: "low"|"medium"|"high"}` — reasoning/output effort dial
+    - `context_management: {edits: [{type: "clear_tool_uses_20250919"}]}` — server-side context pruning
+    - `temperature`, `top_p`, `top_k` — standard sampling
+
+    ### REJECTED (400 'Extra inputs are not permitted'):
+    - `diagnostics: {previous_message_id: null}` — internal telemetry. SOLE culprit of original 400.
+
+    ### Current request body (minimal V1-style):
+    `{model, max_tokens, system, messages, tools, stream}`
+
+    ### V2 headers:
+    - 9 beta flags: claude-code-20250219, oauth-2025-04-20, interleaved-thinking-2025-05-14, context-management-2025-06-27, prompt-caching-scope-2026-01-05, structured-outputs-2025-12-15, files-api-2025-04-14, mcp-client-2025-04-04, token-efficient-tools-2025-02-19
+    - BILLING HEADER now SYSTEMATICALLY appends `cc_is_subagent=true;` (2026-06-10) — captured CC subagent traffic carries this flag; main-agent traffic does not. Experiment: may route through distinct billing/rate bucket. Confirmed still HTTP 200 + streams fine.
+    - user-agent claude-cli/2.1.170 (external, sdk-cli)
+
+    ### Models (all verified HTTP 200 + echo):
+    - claude-opus-4-8 ($5/$25, 200K ctx)
+    - claude-fable-5 ($10/$50, ctx CAPPED at 400K — overrides full 1M window, per user 2026-06-10)
+    - claude-sonnet-4-6 ($3/$15, 1M ctx standard pricing)
+
+    ### Subagent request format (mitmproxy capture, 18 reqs):
+    Main agent=opus-4-8, 10 tools (incl Edit/Write/Agent), thinking adaptive, output_config effort:high, context_management, max_tokens 64000. Subagent=haiku-4-5, 4 tools (Bash/Read/Skill/ToolSearch — no mutate/recursion), thinking disabled, temperature set, max_tokens 32000. Three subagent markers: (1) cc_is_subagent=true in billing header; (2) file-search-specialist system prompt w/ READ-ONLY sandbox; (3) restricted toolset.
+
+    Reuses helpers + parse_sse_stream from claude_code_api_key.
+  importance: high
+  labels:
+  - llm-provider
+  - claude-code
+  - api
+  - v2
+  last_edited_ms: 1781086486551
 1552560f9d4055af:
   tl_dr: 'Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.'
   contents: |-

@@ -210,18 +210,18 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let mut llm_msg = String::new();
     if !is_open {
-        let _r = writeln!(
+        writeln!(
             llm_msg,
             "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
-        );
+        ).unwrap_or(());
     }
-    let _r = writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
+    writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed").unwrap_or(());
     // Sail ho! Tell the LLM its panel already has the fresh cargo aboard
     if let Some(ref pid) = panel_ref {
-        let _r = writeln!(
+        writeln!(
             llm_msg,
             "Panel {pid} has been UPDATED and now shows the current file content — do NOT expect to see stale content there."
-        );
+        ).unwrap_or(());
     }
 
     let mut result = ToolResult::new(tool.id.clone(), llm_msg, false);

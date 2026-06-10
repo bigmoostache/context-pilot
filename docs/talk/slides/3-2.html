@@ -1,0 +1,197 @@
+<div class="section-label" style="margin-bottom:0.5rem;">III — The WOWs</div>
+<div class="sit-title">The Accelerating Self-Improving Loop</div>
+<div class="sit-subtitle">Context Pilot codes itself</div>
+
+<!-- Stats pills -->
+<div class="sit-stats">
+  <span class="sit-pill"><span class="sit-pill-num">813</span> commits</span>
+  <span class="sit-pill"><span class="sit-pill-num">62K</span> LOC Rust</span>
+  <span class="sit-pill"><span class="sit-pill-num">22</span> crates</span>
+  <span class="sit-pill"><span class="sit-pill-num">999</span> lints</span>
+  <span class="sit-pill"><span class="sit-pill-num">4</span> months</span>
+</div>
+
+<div class="sit-layout">
+  <!-- Left: screenshot -->
+  <div class="sit-left">
+    <div class="sit-img-label">My todo list — consumed as fast as it's written</div>
+    <img src="img/todo-screenshot.png" alt="Context Pilot todo list" class="sit-screenshot">
+  </div>
+
+  <!-- Right: feedback loop + text -->
+  <div class="sit-right">
+    <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" class="sit-loop-svg">
+      <defs>
+        <marker id="sit-arr" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+          <path d="M0,0 L7,2.5 L0,5 Z" fill="#B85C3A"/>
+        </marker>
+      </defs>
+
+      <!-- Top: USE -->
+      <rect x="100" y="12" width="100" height="40" rx="12" fill="none" stroke="#7D5A50" stroke-width="2"/>
+      <text x="150" y="37" text-anchor="middle" fill="#7D5A50" font-size="13" font-weight="700">Use the tool</text>
+
+      <!-- Right: FIND -->
+      <rect x="200" y="120" width="100" height="40" rx="12" fill="none" stroke="#B85C3A" stroke-width="2"/>
+      <text x="250" y="145" text-anchor="middle" fill="#B85C3A" font-size="13" font-weight="700">Find friction</text>
+
+      <!-- Bottom: FIX -->
+      <rect x="100" y="240" width="100" height="40" rx="12" fill="none" stroke="#7D5A50" stroke-width="2"/>
+      <text x="150" y="265" text-anchor="middle" fill="#7D5A50" font-size="13" font-weight="700">Fix the tool</text>
+
+      <!-- Left: BETTER -->
+      <rect x="0" y="120" width="100" height="40" rx="12" fill="none" stroke="#8B9E7C" stroke-width="2"/>
+      <text x="50" y="145" text-anchor="middle" fill="#8B9E7C" font-size="13" font-weight="700">Better tool</text>
+
+      <!-- Arrows: clockwise flow -->
+      <path class="sit-flow" d="M 200 38 Q 230 38 248 60 Q 265 80 265 120"
+            fill="none" stroke="#B4846C" stroke-width="1.8" marker-end="url(#sit-arr)" opacity="0.6"/>
+      <path class="sit-flow" d="M 248 160 Q 248 200 230 220 Q 210 244 200 250"
+            fill="none" stroke="#B4846C" stroke-width="1.8" marker-end="url(#sit-arr)" opacity="0.6"/>
+      <path class="sit-flow" d="M 100 260 Q 70 260 52 240 Q 35 220 35 160"
+            fill="none" stroke="#B4846C" stroke-width="1.8" marker-end="url(#sit-arr)" opacity="0.6"/>
+      <path class="sit-flow" d="M 52 120 Q 52 80 70 60 Q 88 38 100 32"
+            fill="none" stroke="#B4846C" stroke-width="1.8" marker-end="url(#sit-arr)" opacity="0.6"/>
+
+      <!-- Center -->
+      <text x="150" y="148" text-anchor="middle" fill="#B85C3A" font-size="10" font-weight="600" opacity="0.4">∞</text>
+    </svg>
+
+    <div class="sit-quote">
+      Every <span class="hl">bug found</span> while coding becomes a <span class="hl">feature added</span> to the tool that codes.
+    </div>
+    <div class="sit-detail">
+      The todo list is never empty — and that's the point.<br>
+      <span class="sit-dim">Compound returns: the tool gets better every day, and so does everything built with it.</span>
+    </div>
+  </div>
+</div>
+
+<style>
+  .sit-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -0.02em;
+    margin-bottom: 0.3rem;
+  }
+
+  .sit-subtitle {
+    font-size: 1.1rem;
+    color: var(--mid);
+    font-style: italic;
+    opacity: 0.5;
+    margin-bottom: 1.2rem;
+  }
+
+  /* Stats pills row */
+  .sit-stats {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+  }
+
+  .sit-pill {
+    background: rgba(125, 90, 80, 0.07);
+    padding: 0.35rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    color: var(--dark);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .sit-pill-num {
+    font-weight: 700;
+    color: #B85C3A;
+    font-size: 1.05rem;
+  }
+
+  .sit-layout {
+    display: flex;
+    gap: 3rem;
+    width: 100%;
+    max-width: 72rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Left: screenshot */
+  .sit-left {
+    flex: 0 0 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .sit-img-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--mid);
+    opacity: 0.4;
+  }
+
+  .sit-screenshot {
+    max-width: 100%;
+    max-height: 420px;
+    border-radius: 20px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Right: loop + text */
+  .sit-right {
+    flex: 0 0 42%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .sit-loop-svg {
+    width: 220px;
+    height: auto;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  .sit-flow {
+    stroke-dasharray: 10 7;
+    animation: sitFlowForward 1.2s linear infinite;
+  }
+
+  @keyframes sitFlowForward {
+    from { stroke-dashoffset: 0; }
+    to   { stroke-dashoffset: -17; }
+  }
+
+  .sit-quote {
+    font-size: 1.3rem;
+    color: var(--text);
+    line-height: 1.5;
+    text-align: center;
+    max-width: 24rem;
+    font-weight: 400;
+  }
+
+  .sit-quote .hl {
+    color: #B85C3A;
+    font-weight: 600;
+  }
+
+  .sit-detail {
+    font-size: 0.85rem;
+    color: var(--mid);
+    line-height: 1.6;
+    text-align: center;
+    max-width: 22rem;
+  }
+
+  .sit-dim {
+    opacity: 0.55;
+    font-style: italic;
+  }
+</style>

@@ -1,0 +1,892 @@
+<div class="section-label">I — The WHYs</div>
+<div class="slide-title">Token Jewelry</div>
+
+<!-- Speaker notes lightbulb -->
+<div class="speaker-notes">
+  <div class="speaker-notes-icon">💡</div>
+  <div class="speaker-notes-popup">
+    <h4>Talking points</h4>
+    <ul>
+      <li>Compaction</li>
+      <li>Duplication of information</li>
+      <li>Self-awareness of context</li>
+      <li>Smaller context → better performance</li>
+      <li>Context optimization</li>
+    </ul>
+  </div>
+</div>
+
+<div class="context-compare">
+  <!-- Left: Classic -->
+  <div class="ctx-col">
+    <div class="ctx-header">
+      <span class="ctx-title">Classic — Incremental</span>
+      <span class="ctx-subtitle">Claude Code, Codex, Cursor…</span>
+    </div>
+    <div class="ctx-window" id="ctx-classic">
+      <div class="ctx-blocks" id="classic-blocks"></div>
+      <div class="ctx-overflow" id="classic-overflow">⚠ context overflow</div>
+    </div>
+    <div class="ctx-meter">
+      <div class="ctx-meter-fill" id="classic-meter"></div>
+    </div>
+    <div class="ctx-sub-line" id="classic-sub">&nbsp;</div>
+  </div>
+
+  <!-- Right: Context Pilot -->
+  <div class="ctx-col">
+    <div class="ctx-header">
+      <span class="ctx-title">Context Pilot</span>
+      <span class="ctx-subtitle">Dynamic panel management</span>
+    </div>
+    <div class="ctx-window" id="ctx-cp">
+      <div class="ctx-blocks" id="cp-blocks"></div>
+    </div>
+    <div class="ctx-meter">
+      <div class="ctx-meter-fill ctx-meter-ok" id="cp-meter"></div>
+    </div>
+    <div class="ctx-sub-line" id="cp-sub">&nbsp;</div>
+  </div>
+</div>
+
+<style>
+  .slide-title {
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -0.02em;
+    margin-bottom: 2.2rem;
+  }
+
+  .context-compare {
+    display: flex;
+    gap: 2.5rem;
+    width: 100%;
+    max-width: 62rem;
+    justify-content: center;
+  }
+
+  .ctx-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 28rem;
+  }
+
+  .ctx-header {
+    text-align: center;
+    margin-bottom: 0.6rem;
+  }
+
+  .ctx-title {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--dark);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .ctx-subtitle {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--mid);
+    font-style: italic;
+    margin-top: 0.15rem;
+    letter-spacing: 0.02em;
+  }
+
+  .ctx-window {
+    width: 100%;
+    height: 480px;
+    border: 1.5px solid var(--light);
+    border-radius: 20px;
+    background: transparent;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ===== Speaker notes lightbulb ===== */
+  .speaker-notes {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    z-index: 50;
+  }
+
+  .speaker-notes-icon {
+    font-size: 1.6rem;
+    cursor: pointer;
+    opacity: 0.25;
+    transition: opacity 0.3s ease;
+    filter: grayscale(60%);
+  }
+
+  .speaker-notes:hover .speaker-notes-icon {
+    opacity: 0.8;
+    filter: none;
+  }
+
+  .speaker-notes-popup {
+    position: absolute;
+    top: 2.4rem;
+    right: 0;
+    width: 280px;
+    background: var(--white);
+    border: 1.5px solid var(--light);
+    border-radius: 16px;
+    padding: 1rem 1.2rem;
+    box-shadow: 0 4px 20px rgba(125,90,80,0.12);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+
+  .speaker-notes:hover .speaker-notes-popup {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .speaker-notes-popup h4 {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--mid);
+    margin-bottom: 0.5rem;
+  }
+
+  .speaker-notes-popup ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .speaker-notes-popup li {
+    font-size: 0.75rem;
+    color: var(--text);
+    padding: 0.3rem 0;
+    border-bottom: 1px solid rgba(229,178,153,0.15);
+    line-height: 1.4;
+  }
+
+  .speaker-notes-popup li:last-child {
+    border-bottom: none;
+  }
+
+  .speaker-notes-popup li::before {
+    content: '→ ';
+    color: var(--light);
+    font-weight: 600;
+  }
+
+  .section-label {
+    margin-bottom: 0.6rem;
+  }
+
+  .ctx-blocks {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    bottom: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* Block base */
+  .ctx-block {
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    padding: 0 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: rgba(255,255,255,0.85);
+    overflow: hidden;
+    transition: height 0.5s cubic-bezier(0.4,0,0.2,1),
+                opacity 0.4s ease,
+                box-shadow 0.35s ease;
+    flex-shrink: 0;
+    height: 0;
+    opacity: 0;
+  }
+
+  .ctx-block.visible { opacity: 1; }
+
+  /* Classic block types */
+  .ctx-block.t-user    { background: #B4846C; }
+  .ctx-block.t-ai      { background: #7D5A50; }
+  .ctx-block.t-tool    { background: #C9956B; }
+  .ctx-block.t-result  { background: #D4A574; color: rgba(80,50,30,0.8); }
+  .ctx-block.t-truncated { background: repeating-linear-gradient(
+    -45deg, rgba(200,80,60,0.12), rgba(200,80,60,0.12) 4px,
+    transparent 4px, transparent 8px
+  ); color: rgba(200,80,60,0.55); border: 1px dashed rgba(200,80,60,0.25); }
+
+  /* CP panel types */
+  .ctx-block.t-panel   { background: #8B9E7C; color: rgba(255,255,255,0.9); }
+  .ctx-block.t-file    { background: #6B8E8E; }
+  .ctx-block.t-search  { background: #8E7B6B; }
+  .ctx-block.t-console { background: #7B7D8E; }
+  .ctx-block.t-chat    { background: #B4846C; }
+  .ctx-block.t-entity  { background: #8B7B9E; }
+  .ctx-block.t-history { background: #A0896E; opacity: 0.7; }
+  .ctx-block.t-git     { background: #6B7D6B; }
+
+  /* Refresh pulse */
+  .ctx-block.refreshing {
+    box-shadow: 0 0 0 2px rgba(139,158,124,0.6), 0 0 12px rgba(139,158,124,0.3);
+  }
+
+  /* Overflow warning */
+  .ctx-overflow {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    text-align: center;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #C8503C;
+    background: linear-gradient(transparent, rgba(200,80,60,0.08) 40%, rgba(200,80,60,0.15));
+    padding: 1.5rem 0 0.4rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+  }
+  .ctx-overflow.visible { opacity: 1; }
+
+  /* Meter bar */
+  .ctx-meter {
+    width: 100%;
+    height: 3px;
+    background: rgba(0,0,0,0.05);
+    border-radius: 2px;
+    margin-top: 0.4rem;
+    overflow: hidden;
+  }
+  .ctx-meter-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    background: var(--mid);
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1), background 0.4s ease;
+  }
+  .ctx-meter-fill.danger { background: #C8503C; }
+  .ctx-meter-fill.ctx-meter-ok { background: #8B9E7C; }
+
+  /* Subtitle line */
+  .ctx-sub-line {
+    font-size: 0.7rem;
+    color: var(--mid);
+    font-style: italic;
+    margin-top: 0.35rem;
+    min-height: 1.2em;
+    text-align: center;
+    transition: opacity 0.3s ease;
+  }
+</style>
+
+<script>
+/* Clean up previous instance */
+if (window._ctxAnimInterval) clearInterval(window._ctxAnimInterval);
+if (window._ctxAnimTimeout) clearTimeout(window._ctxAnimTimeout);
+if (window._ctxClassicTimer) clearTimeout(window._ctxClassicTimer);
+if (window._ctxCpTimer) clearTimeout(window._ctxCpTimer);
+
+(function() {
+  const BASE_MS = 650;
+  const JITTER = 180;
+  const WINDOW_H = 470;
+
+  /* ===== Classic frames ===== */
+  const classicFrames = [
+    /* 0  — empty */
+    [],
+    /* 1  */ [{ id:'c1', type:'user', h:5, label:'User' }],
+    /* 2  */ [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10, label:'AI Response' }],
+    /* 3  */ [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4, label:'Tool Call' }],
+    /* 4  */ [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4 },
+              { id:'c4', type:'result', h:7, label:'Tool Result' }],
+    /* 5  */ [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5, label:'User' }],
+    /* 6  */ [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12, label:'AI Response' }],
+    /* 7  */ [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12 },
+              { id:'c7', type:'tool', h:3, label:'Tool' },
+              { id:'c8', type:'result', h:6, label:'Result' }],
+    /* 8  */ [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12 },
+              { id:'c7', type:'tool', h:3 },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6, label:'User' }],
+    /* 9  */ [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12 },
+              { id:'c7', type:'tool', h:3 },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6 },
+              { id:'c10', type:'ai', h:8, label:'AI' }],
+    /* 10 */ [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12 },
+              { id:'c7', type:'tool', h:3 },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6 },
+              { id:'c10', type:'ai', h:8 },
+              { id:'c11', type:'tool', h:4, label:'Tool' },
+              { id:'c12', type:'result', h:8, label:'Result' }],
+    /* 11 — 83% */ 
+            [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12 },
+              { id:'c7', type:'tool', h:3 },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6 },
+              { id:'c10', type:'ai', h:8 },
+              { id:'c11', type:'tool', h:4 },
+              { id:'c12', type:'result', h:8 },
+              { id:'c13', type:'user', h:5, label:'User' }],
+    /* 12 — 97% */
+            [{ id:'c1', type:'user', h:5 },
+              { id:'c2', type:'ai', h:10 },
+              { id:'c3', type:'tool', h:4 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12 },
+              { id:'c7', type:'tool', h:3 },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6 },
+              { id:'c10', type:'ai', h:8 },
+              { id:'c11', type:'tool', h:4 },
+              { id:'c12', type:'result', h:8 },
+              { id:'c13', type:'user', h:5 },
+              { id:'c14', type:'ai', h:9, label:'AI' }],
+    /* 13 — 106% OVERFLOW → truncate */
+            [{ id:'t1', type:'truncated', h:5, label:'(truncated)' },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12 },
+              { id:'c7', type:'tool', h:3 },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6 },
+              { id:'c10', type:'ai', h:8 },
+              { id:'c11', type:'tool', h:4 },
+              { id:'c12', type:'result', h:8 },
+              { id:'c13', type:'user', h:5 },
+              { id:'c14', type:'ai', h:9 },
+              { id:'c15', type:'tool', h:3, label:'Tool' }],
+    /* 14 */
+            [{ id:'t1', type:'truncated', h:5 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12 },
+              { id:'c7', type:'tool', h:3 },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6 },
+              { id:'c10', type:'ai', h:8 },
+              { id:'c11', type:'tool', h:4 },
+              { id:'c12', type:'result', h:8 },
+              { id:'c13', type:'user', h:5 },
+              { id:'c14', type:'ai', h:9 },
+              { id:'c15', type:'tool', h:3 },
+              { id:'c16', type:'result', h:7, label:'Result' }],
+    /* 15 — overflow again */
+            [{ id:'t1', type:'truncated', h:5 },
+              { id:'c4', type:'result', h:7 },
+              { id:'c5', type:'user', h:5 },
+              { id:'c6', type:'ai', h:12 },
+              { id:'c7', type:'tool', h:3 },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6 },
+              { id:'c10', type:'ai', h:8 },
+              { id:'c11', type:'tool', h:4 },
+              { id:'c12', type:'result', h:8 },
+              { id:'c13', type:'user', h:5 },
+              { id:'c14', type:'ai', h:9 },
+              { id:'c15', type:'tool', h:3 },
+              { id:'c16', type:'result', h:7 },
+              { id:'c17', type:'user', h:5, label:'User' }],
+    /* 16 — bigger truncation */
+            [{ id:'t2', type:'truncated', h:8, label:'(truncated)' },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6 },
+              { id:'c10', type:'ai', h:8 },
+              { id:'c11', type:'tool', h:4 },
+              { id:'c12', type:'result', h:8 },
+              { id:'c13', type:'user', h:5 },
+              { id:'c14', type:'ai', h:9 },
+              { id:'c15', type:'tool', h:3 },
+              { id:'c16', type:'result', h:7 },
+              { id:'c17', type:'user', h:5 },
+              { id:'c18', type:'ai', h:14, label:'AI (long)' }],
+    /* 17 */
+            [{ id:'t2', type:'truncated', h:8 },
+              { id:'c8', type:'result', h:6 },
+              { id:'c9', type:'user', h:6 },
+              { id:'c10', type:'ai', h:8 },
+              { id:'c11', type:'tool', h:4 },
+              { id:'c12', type:'result', h:8 },
+              { id:'c13', type:'user', h:5 },
+              { id:'c14', type:'ai', h:9 },
+              { id:'c15', type:'tool', h:3 },
+              { id:'c16', type:'result', h:7 },
+              { id:'c17', type:'user', h:5 },
+              { id:'c18', type:'ai', h:14 },
+              { id:'c19', type:'tool', h:4, label:'Tool' }],
+    /* 18 — overflow again */
+            [{ id:'t3', type:'truncated', h:12, label:'(truncated)' },
+              { id:'c12', type:'result', h:8 },
+              { id:'c13', type:'user', h:5 },
+              { id:'c14', type:'ai', h:9 },
+              { id:'c15', type:'tool', h:3 },
+              { id:'c16', type:'result', h:7 },
+              { id:'c17', type:'user', h:5 },
+              { id:'c18', type:'ai', h:14 },
+              { id:'c19', type:'tool', h:4 },
+              { id:'c20', type:'result', h:10, label:'Result' }],
+    /* 19 */
+            [{ id:'t3', type:'truncated', h:12 },
+              { id:'c12', type:'result', h:8 },
+              { id:'c13', type:'user', h:5 },
+              { id:'c14', type:'ai', h:9 },
+              { id:'c15', type:'tool', h:3 },
+              { id:'c16', type:'result', h:7 },
+              { id:'c17', type:'user', h:5 },
+              { id:'c18', type:'ai', h:14 },
+              { id:'c19', type:'tool', h:4 },
+              { id:'c20', type:'result', h:10 },
+              { id:'c21', type:'user', h:5, label:'User' }],
+    /* 20 — massive truncation */
+            [{ id:'t4', type:'truncated', h:16, label:'(truncated)' },
+              { id:'c17', type:'user', h:5 },
+              { id:'c18', type:'ai', h:14 },
+              { id:'c19', type:'tool', h:4 },
+              { id:'c20', type:'result', h:10 },
+              { id:'c21', type:'user', h:5 },
+              { id:'c22', type:'ai', h:16, label:'AI (long)' }],
+    /* 21 — even worse */
+            [{ id:'t4', type:'truncated', h:16 },
+              { id:'c17', type:'user', h:5 },
+              { id:'c18', type:'ai', h:14 },
+              { id:'c19', type:'tool', h:4 },
+              { id:'c20', type:'result', h:10 },
+              { id:'c21', type:'user', h:5 },
+              { id:'c22', type:'ai', h:16 },
+              { id:'c23', type:'tool', h:3, label:'Tool' },
+              { id:'c24', type:'result', h:12, label:'Result' }],
+    /* 22 — total mess */
+            [{ id:'t5', type:'truncated', h:20, label:'(truncated)' },
+              { id:'c21', type:'user', h:5 },
+              { id:'c22', type:'ai', h:16 },
+              { id:'c23', type:'tool', h:3 },
+              { id:'c24', type:'result', h:12 },
+              { id:'c25', type:'user', h:6, label:'User' },
+              { id:'c26', type:'ai', h:18, label:'AI' }],
+    /* 23 — hold the mess */
+            [{ id:'t5', type:'truncated', h:20 },
+              { id:'c21', type:'user', h:5 },
+              { id:'c22', type:'ai', h:16 },
+              { id:'c23', type:'tool', h:3 },
+              { id:'c24', type:'result', h:12 },
+              { id:'c25', type:'user', h:6 },
+              { id:'c26', type:'ai', h:18 }],
+    /* 24 — fade out */
+            [],
+  ];
+
+  const classicSubs = [
+    { from:0,  to:3,  text:'User sends a message…' },
+    { from:4,  to:7,  text:'Conversation keeps growing…' },
+    { from:8,  to:11, text:'Context window fills up…' },
+    { from:12, to:15, text:'Overflow — old messages truncated' },
+    { from:16, to:19, text:'More messages, more truncation…' },
+    { from:20, to:23, text:'Context lost forever — rinse & repeat' },
+    { from:24, to:24, text:'' },
+  ];
+
+  /* ===== Context Pilot frames ===== */
+  const cpFrames = [
+    /* 0 — baseline */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+    /* 1 — file opens */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'f1',   type:'file',  h:8,  label:'📄 main.rs' },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+    /* 2 — tree refreshes after file open */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree', refresh:true },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'f1',   type:'file',  h:8,  label:'📄 main.rs' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 3 — AI edits file → file refreshes */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'f1',   type:'file',  h:8,  label:'📄 main.rs', refresh:true },
+     { id:'chat', type:'chat',  h:10, label:'💬 Conversation' }],
+    /* 4 — memories refresh */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories', refresh:true },
+     { id:'f1',   type:'file',  h:8,  label:'📄 main.rs' },
+     { id:'chat', type:'chat',  h:10, label:'💬 Conversation' }],
+    /* 5 — AI closes file, opens search */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'srch', type:'search', h:7, label:'🔍 Search' },
+     { id:'chat', type:'chat',  h:10, label:'💬 Conversation' }],
+    /* 6 — search results arrive */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'srch', type:'search', h:7, label:'🔍 Search', refresh:true },
+     { id:'chat', type:'chat',  h:10, label:'💬 Conversation' }],
+    /* 7 — search closes, entities opens */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'ent',  type:'entity', h:8, label:'🗃️ Entities' },
+     { id:'chat', type:'chat',  h:10, label:'💬 Conversation' }],
+    /* 8 — conversation history detaches upward */
+    [{ id:'hist', type:'history', h:6, label:'📜 History (detached)' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'ent',  type:'entity', h:8, label:'🗃️ Entities' },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+    /* 9 — tree refreshes */
+    [{ id:'hist', type:'history', h:6, label:'📜 History (detached)' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree', refresh:true },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'ent',  type:'entity', h:8, label:'🗃️ Entities' },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+    /* 10 — new file opens */
+    [{ id:'hist', type:'history', h:6, label:'📜 History' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:12, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'ent',  type:'entity', h:8, label:'🗃️ Entities' },
+     { id:'f2',   type:'file',  h:7,  label:'📄 lib.rs' },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+    /* 11 — entities close, console opens */
+    [{ id:'hist', type:'history', h:6, label:'📜 History' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:12, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'cons', type:'console', h:6, label:'⚡ cargo build' },
+     { id:'f2',   type:'file',  h:7,  label:'📄 lib.rs' },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+    /* 12 — console output arrives */
+    [{ id:'hist', type:'history', h:6, label:'📜 History' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:12, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'cons', type:'console', h:6, label:'⚡ cargo build', refresh:true },
+     { id:'f2',   type:'file',  h:7,  label:'📄 lib.rs' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 13 — file updates after AI edit */
+    [{ id:'hist', type:'history', h:6, label:'📜 History' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:12, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'cons', type:'console', h:6, label:'⚡ cargo build' },
+     { id:'f2',   type:'file',  h:7,  label:'📄 lib.rs', refresh:true },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 14 — console done, closes */
+    [{ id:'hist', type:'history', h:6, label:'📜 History' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo', refresh:true },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'f2',   type:'file',  h:7,  label:'📄 lib.rs' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 15 — AI closes history panel (cleanup) */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'f2',   type:'file',  h:7,  label:'📄 lib.rs' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 16 — git panel opens */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'git',  type:'git',   h:5,  label:'🔀 Git diff' },
+     { id:'f2',   type:'file',  h:7,  label:'📄 lib.rs' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 17 — file closes, tree refreshes */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree', refresh:true },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'git',  type:'git',   h:5,  label:'🔀 Git diff' },
+     { id:'chat', type:'chat',  h:10, label:'💬 Conversation' }],
+    /* 18 — git closes, memories refresh */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories', refresh:true },
+     { id:'chat', type:'chat',  h:10, label:'💬 Conversation' }],
+    /* 19 — history detaches again */
+    [{ id:'h2',   type:'history', h:5, label:'📜 History (detached)' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'chat', type:'chat',  h:5,  label:'💬 Conversation' }],
+    /* 20 — new file opens */
+    [{ id:'h2',   type:'history', h:5, label:'📜 History' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:12, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'f3',   type:'file',  h:8,  label:'📄 mod.rs' },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+    /* 21 — file refreshes after edit */
+    [{ id:'h2',   type:'history', h:5, label:'📜 History' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:12, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'f3',   type:'file',  h:8,  label:'📄 mod.rs', refresh:true },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 22 — AI cleans: history + file close */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo', refresh:true },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 23 — memories refresh, steady */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories', refresh:true },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 24 — hold lean state */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+    /* 25 — brave search opens */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:12, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'brv',  type:'search', h:7, label:'🌐 Brave Search' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 26 — brave results + file opens */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:10, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'brv',  type:'search', h:7, label:'🌐 Brave Search', refresh:true },
+     { id:'f4',   type:'file',  h:8,  label:'📄 config.rs' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 27 — brave closes, radar opens */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:10, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'rdr',  type:'entity', h:6, label:'📡 Radar' },
+     { id:'f4',   type:'file',  h:8,  label:'📄 config.rs' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 28 — file refreshes after edit */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:10, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'rdr',  type:'entity', h:6, label:'📡 Radar' },
+     { id:'f4',   type:'file',  h:8,  label:'📄 config.rs', refresh:true },
+     { id:'chat', type:'chat',  h:10, label:'💬 Conversation' }],
+    /* 29 — radar closes, second file opens */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:10, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'f4',   type:'file',  h:6,  label:'📄 config.rs' },
+     { id:'f5',   type:'file',  h:6,  label:'📄 utils.rs' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 30 — both files + tree refresh */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:10, label:'🌳 Tree', refresh:true },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'f4',   type:'file',  h:6,  label:'📄 config.rs', refresh:true },
+     { id:'f5',   type:'file',  h:6,  label:'📄 utils.rs', refresh:true },
+     { id:'chat', type:'chat',  h:10, label:'💬 Conversation' }],
+    /* 31 — files close, scratchpad opens */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo', refresh:true },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'scr',  type:'console', h:5, label:'📝 Scratchpad' },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 32 — scratchpad closes, lean */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories', refresh:true },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+    /* 33 — history detaches again */
+    [{ id:'h3',   type:'history', h:5, label:'📜 History (detached)' },
+     { id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:12, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:8,  label:'💾 Memories' },
+     { id:'f6',   type:'file',  h:7,  label:'📄 app.rs' },
+     { id:'chat', type:'chat',  h:5,  label:'💬 Conversation' }],
+    /* 34 — file edits, history closes */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'f6',   type:'file',  h:7,  label:'📄 app.rs', refresh:true },
+     { id:'chat', type:'chat',  h:8,  label:'💬 Conversation' }],
+    /* 35 — back to baseline */
+    [{ id:'todo', type:'panel', h:5, label:'📋 Todo' },
+     { id:'tree', type:'panel', h:14, label:'🌳 Tree' },
+     { id:'mem',  type:'panel', h:10, label:'💾 Memories' },
+     { id:'chat', type:'chat',  h:6,  label:'💬 Conversation' }],
+  ];
+
+  const cpSubs = [
+    { from:0,  to:3,  text:'Panels provide structured context' },
+    { from:4,  to:7,  text:'AI closes a panel, opens another' },
+    { from:8,  to:10, text:'Conversation history detaches upward' },
+    { from:11, to:14, text:'Build runs, file updates in place' },
+    { from:15, to:18, text:'AI cleans up — context stays lean' },
+    { from:19, to:21, text:'New cycle — panels swap, never overflow' },
+    { from:22, to:24, text:'Always fresh, always controlled' },
+    { from:25, to:28, text:'Web search + radar — tools swap fluidly' },
+    { from:29, to:31, text:'Multi-file editing, instant cleanup' },
+    { from:32, to:34, text:'Context always returns to baseline' },
+    { from:35, to:35, text:'' },
+  ];
+
+  /* ===== Subtitle lookup ===== */
+  function getSub(subs, idx) {
+    for (const s of subs) {
+      if (idx >= s.from && idx <= s.to) return s.text;
+    }
+    return '';
+  }
+
+  /* ===== Rendering engine ===== */
+  function renderFrame(containerId, meterId, frame, overflowId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const existingEls = {};
+    container.querySelectorAll('.ctx-block').forEach(el => {
+      existingEls[el.dataset.bid] = el;
+    });
+
+    const currentIds = new Set(frame.map(b => b.id));
+    const totalPct = frame.reduce((s, b) => s + b.h, 0);
+
+    /* Remove blocks no longer present */
+    for (const [bid, el] of Object.entries(existingEls)) {
+      if (!currentIds.has(bid)) {
+        el.style.height = '0px';
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 500);
+      }
+    }
+
+    /* Add or update blocks */
+    frame.forEach((block, i) => {
+      let el = existingEls[block.id];
+      const hPx = Math.round((block.h / 100) * WINDOW_H);
+
+      if (!el) {
+        el = document.createElement('div');
+        el.className = `ctx-block t-${block.type}`;
+        el.dataset.bid = block.id;
+        el.style.height = '0px';
+        el.style.opacity = '0';
+        const children = container.querySelectorAll('.ctx-block');
+        container.insertBefore(el, children[i] || null);
+        void el.offsetWidth;
+      }
+
+      if (block.label) el.textContent = block.label;
+      el.style.height = hPx + 'px';
+      el.style.opacity = '1';
+      el.classList.add('visible');
+
+      if (block.refresh) {
+        el.classList.add('refreshing');
+        setTimeout(() => el.classList.remove('refreshing'), 600);
+      } else {
+        el.classList.remove('refreshing');
+      }
+    });
+
+    /* Meter */
+    const meter = document.getElementById(meterId);
+    if (meter) {
+      meter.style.width = Math.min(totalPct, 100) + '%';
+      meter.classList.toggle('danger', totalPct > 90);
+    }
+
+    /* Overflow */
+    if (overflowId) {
+      const ov = document.getElementById(overflowId);
+      if (ov) ov.classList.toggle('visible', totalPct > 95);
+    }
+  }
+
+  /* ===== Animation loops (independent with jitter) ===== */
+  let classicFrame = 0;
+  let cpFrame = 0;
+
+  function jitterDelay() {
+    return BASE_MS + Math.floor(Math.random() * JITTER * 2) - JITTER;
+  }
+
+  function tickClassic() {
+    const ci = classicFrame % classicFrames.length;
+    renderFrame('classic-blocks', 'classic-meter', classicFrames[ci], 'classic-overflow');
+    const cSub = document.getElementById('classic-sub');
+    if (cSub) cSub.textContent = getSub(classicSubs, ci) || '\u00a0';
+    classicFrame++;
+    window._ctxClassicTimer = setTimeout(tickClassic, jitterDelay());
+  }
+
+  function tickCp() {
+    const pi = cpFrame % cpFrames.length;
+    renderFrame('cp-blocks', 'cp-meter', cpFrames[pi], null);
+    const pSub = document.getElementById('cp-sub');
+    if (pSub) pSub.textContent = getSub(cpSubs, pi) || '\u00a0';
+    cpFrame++;
+    window._ctxCpTimer = setTimeout(tickCp, jitterDelay());
+  }
+
+  tickClassic();
+  /* Start CP with an initial offset so they don't sync */
+  setTimeout(tickCp, Math.floor(BASE_MS * 0.4));
+})();
+</script>

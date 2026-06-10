@@ -1,0 +1,214 @@
+<div class="section-label" style="margin-bottom:0.5rem;">I — The WHYs</div>
+<div class="slide-title-missing">What I'd Add</div>
+
+<div class="missing-layout">
+  <!-- Left: clickable titles (2/5) -->
+  <div class="missing-left">
+    <div class="missing-item active" data-idx="0">
+      <div class="missing-num">01</div>
+      <div class="missing-body">
+        <div class="missing-keyword">Crafting <span class="hl">Context</span></div>
+        <div class="missing-sub">Every token is gold. Curate what the LLM sees — ruthlessly.</div>
+      </div>
+    </div>
+
+    <div class="missing-item" data-idx="1">
+      <div class="missing-num">02</div>
+      <div class="missing-body">
+        <div class="missing-keyword">LLM <span class="hl">Feedback</span></div>
+        <div class="missing-sub">The model never sees whether its code compiles, its tests pass, or its edits break anything.</div>
+      </div>
+    </div>
+
+    <div class="missing-item" data-idx="2">
+      <div class="missing-num">03</div>
+      <div class="missing-body">
+        <div class="missing-keyword">LLM-<span class="hl">X</span></div>
+        <div class="missing-sub">UX is for humans. What does <span class="hl">intuitive and natural</span> actually mean for a language model?</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: image panel (3/5) -->
+  <div class="missing-right">
+    <div class="missing-img-container" id="missing-img-container">
+      <img class="missing-img active" data-idx="0" src="img/missing-context.png" alt="Crafting Context">
+      <img class="missing-img" data-idx="1" src="img/missing-feedback.png" alt="LLM Feedback">
+      <img class="missing-img" data-idx="2" src="img/missing-llmx.png" alt="LLM-X">
+    </div>
+  </div>
+</div>
+
+<style>
+  .slide-title-missing {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -0.02em;
+    margin-bottom: 2rem;
+  }
+
+  .missing-layout {
+    display: flex;
+    gap: 3rem;
+    width: 100%;
+    max-width: 72rem;
+    align-items: stretch;
+    min-height: 440px;
+  }
+
+  /* Left column: 2/5 */
+  .missing-left {
+    flex: 0 0 40%;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    justify-content: center;
+  }
+
+  .missing-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.2rem;
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    border-radius: 16px;
+    transition: background 0.3s ease, opacity 0.3s ease;
+    opacity: 0.4;
+  }
+
+  .missing-item:hover {
+    opacity: 0.7;
+    background: rgba(125, 90, 80, 0.04);
+  }
+
+  .missing-item.active {
+    opacity: 1;
+    background: rgba(125, 90, 80, 0.06);
+  }
+
+  .missing-num {
+    font-size: 0.75rem;
+    font-weight: 300;
+    color: var(--light);
+    opacity: 0.5;
+    letter-spacing: 0.1em;
+    font-variant-numeric: tabular-nums;
+    min-width: 1.8rem;
+    padding-top: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .missing-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .missing-keyword {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .missing-keyword .hl {
+    color: #B85C3A;
+  }
+
+  .missing-sub {
+    font-size: 0.9rem;
+    color: var(--mid);
+    line-height: 1.5;
+    max-width: 24rem;
+  }
+
+  /* Right column: 3/5 */
+  .missing-right {
+    flex: 0 0 58%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .missing-img-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .missing-img {
+    position: absolute;
+    max-width: 95%;
+    max-height: 420px;
+    border-radius: 20px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+    opacity: 0;
+    transform: translateY(-40px);
+    transition: opacity 0.4s cubic-bezier(0.22, 0.61, 0.36, 1),
+                transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+    pointer-events: none;
+  }
+
+  .missing-img.active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .missing-img.exit-down {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+</style>
+
+<script>
+(function() {
+  const items = document.querySelectorAll('.missing-item');
+  const imgs = document.querySelectorAll('.missing-img');
+  let currentIdx = 0;
+
+  items.forEach(item => {
+    item.addEventListener('click', () => {
+      const newIdx = parseInt(item.dataset.idx, 10);
+      if (newIdx === currentIdx) return;
+
+      // Deactivate current title
+      items.forEach(it => it.classList.remove('active'));
+      item.classList.add('active');
+
+      // Exit current image downward
+      const currentImg = document.querySelector('.missing-img.active');
+      if (currentImg) {
+        currentImg.classList.remove('active');
+        currentImg.classList.add('exit-down');
+        setTimeout(() => currentImg.classList.remove('exit-down'), 400);
+      }
+
+      // Enter new image from above
+      const newImg = imgs[newIdx];
+      // Reset to above position instantly
+      newImg.style.transition = 'none';
+      newImg.style.opacity = '0';
+      newImg.style.transform = 'translateY(-40px)';
+      void newImg.offsetWidth; // force reflow
+
+      // Animate in — clear inline overrides so .active class takes effect
+      newImg.style.transition = '';
+      requestAnimationFrame(() => {
+        newImg.style.opacity = '';
+        newImg.style.transform = '';
+        newImg.classList.add('active');
+      });
+
+      currentIdx = newIdx;
+    });
+  });
+})();
+</script>

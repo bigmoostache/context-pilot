@@ -1,0 +1,254 @@
+<div class="section-label" style="margin-bottom:0.5rem;">II — The HOWs</div>
+<div class="arch-title">Architecture</div>
+<div class="arch-subtitle">A self-improving loop — not a pipeline</div>
+
+<div class="arch-container">
+  <svg viewBox="0 0 960 490" xmlns="http://www.w3.org/2000/svg" class="arch-svg">
+    <defs>
+      <marker id="arr" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+        <path d="M0,0 L7,2.5 L0,5 Z" fill="#B4846C"/>
+      </marker>
+      <marker id="arr-loop" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+        <path d="M0,0 L7,2.5 L0,5 Z" fill="#B85C3A"/>
+      </marker>
+      <marker id="arr-core" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+        <path d="M0,0 L6,2 L0,4 Z" fill="#7D5A50" opacity="0.5"/>
+      </marker>
+      <marker id="arr-state" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+        <path d="M0,0 L6,2 L0,4 Z" fill="#5B7EAE" opacity="0.6"/>
+      </marker>
+      <marker id="arr-user" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+        <path d="M0,0 L6,2 L0,4 Z" fill="#B4846C" opacity="0.5"/>
+      </marker>
+      <marker id="arr-infra" markerWidth="5" markerHeight="4" refX="5" refY="2" orient="auto">
+        <path d="M0,0 L5,2 L0,4 Z" fill="#B4846C" opacity="0.35"/>
+      </marker>
+      <filter id="sh">
+        <feDropShadow dx="0" dy="1.5" stdDeviation="3" flood-color="rgba(0,0,0,0.08)"/>
+      </filter>
+    </defs>
+
+    <!-- ═══════════════════════════════ -->
+    <!-- ROW 0: SPINE + USER            -->
+    <!-- ═══════════════════════════════ -->
+
+    <!-- SPINE (core backbone — border only) -->
+    <g class="block-enter" style="--d:0.1s">
+      <rect x="180" y="12" width="480" height="52" rx="16" fill="none" stroke="#7D5A50" stroke-width="2"/>
+      <text x="420" y="35" text-anchor="middle" fill="#7D5A50" font-size="15" font-weight="700" letter-spacing="0.5">Spine</text>
+      <text x="420" y="51" text-anchor="middle" fill="rgba(125,90,80,0.45)" font-size="11" letter-spacing="0.3">Guard rails · Auto-continuation · Notifications</text>
+    </g>
+
+    <!-- USER (top-right, next to Spine — photo) -->
+    <g class="block-enter" style="--d:0.15s">
+      <defs>
+        <clipPath id="user-clip">
+          <rect x="685" y="6" width="60" height="60" rx="14"/>
+        </clipPath>
+      </defs>
+      <image href="img/user-photo.png" x="685" y="6" width="60" height="60" clip-path="url(#user-clip)" preserveAspectRatio="xMidYMid slice" opacity="0.85"/>
+      <rect x="685" y="6" width="60" height="60" rx="14" fill="none" stroke="#B4846C" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.35"/>
+    </g>
+
+    <!-- Arrow: User → Spine -->
+    <g class="arrow-enter" style="--d:0.5s">
+      <line x1="685" y1="36" x2="665" y2="36" stroke="#B4846C" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr-user)" opacity="0.4"/>
+    </g>
+
+    <!-- Spine → main flow (dashed governance) -->
+    <g class="arrow-enter" style="--d:0.5s">
+      <line x1="340" y1="64" x2="340" y2="135" stroke="#7D5A50" stroke-width="1" stroke-dasharray="4,3" opacity="0.25" marker-end="url(#arr-core)"/>
+      <line x1="480" y1="64" x2="480" y2="135" stroke="#7D5A50" stroke-width="1" stroke-dasharray="4,3" opacity="0.25" marker-end="url(#arr-core)"/>
+      <line x1="590" y1="64" x2="590" y2="135" stroke="#7D5A50" stroke-width="1" stroke-dasharray="4,3" opacity="0.25" marker-end="url(#arr-core)"/>
+    </g>
+
+    <!-- ═══════════════════════════════ -->
+    <!-- ROW 1: MAIN FLOW               -->
+    <!-- ═══════════════════════════════ -->
+
+    <!-- PANELS (filled) -->
+    <g class="block-enter" style="--d:0.15s">
+      <rect x="28" y="135" width="195" height="100" rx="18" fill="#5E9B9B" filter="url(#sh)"/>
+      <text x="125" y="175" text-anchor="middle" fill="#fff" font-size="14.5" font-weight="700">Panels</text>
+      <text x="125" y="197" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="11" letter-spacing="0.3">Files · Memories · Search</text>
+      <text x="125" y="213" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="11" letter-spacing="0.3">Tree · Entities</text>
+    </g>
+
+    <!-- Arrow: Panels → Prompt Builder -->
+    <g class="arrow-enter" style="--d:0.35s">
+      <line x1="223" y1="185" x2="285" y2="185" stroke="#B4846C" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="254" y="178" text-anchor="middle" fill="#B4846C" font-size="7.5" font-style="italic" opacity="0.7">context</text>
+    </g>
+
+    <!-- PROMPT BUILDER (core backbone — border only) -->
+    <g class="block-enter" style="--d:0.2s">
+      <rect x="290" y="135" width="195" height="100" rx="18" fill="none" stroke="#7D5A50" stroke-width="2"/>
+      <text x="387" y="175" text-anchor="middle" fill="#7D5A50" font-size="14.5" font-weight="700">Prompt Builder</text>
+      <text x="387" y="197" text-anchor="middle" fill="rgba(125,90,80,0.45)" font-size="11" letter-spacing="0.3">Freeze · Tempo</text>
+      <text x="387" y="213" text-anchor="middle" fill="rgba(125,90,80,0.45)" font-size="11" letter-spacing="0.3">Cache breakpoints</text>
+    </g>
+
+    <!-- Arrow: Prompt Builder → LLM -->
+    <g class="arrow-enter" style="--d:0.4s">
+      <line x1="485" y1="185" x2="547" y2="185" stroke="#B4846C" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="516" y="178" text-anchor="middle" fill="#B4846C" font-size="7.5" font-style="italic" opacity="0.7">payload</text>
+    </g>
+
+    <!-- LLM (core backbone — border only) -->
+    <g class="block-enter" style="--d:0.25s">
+      <rect x="552" y="135" width="145" height="100" rx="18" fill="none" stroke="#7D5A50" stroke-width="2"/>
+      <text x="624" y="175" text-anchor="middle" fill="#7D5A50" font-size="14.5" font-weight="700">LLM</text>
+      <text x="624" y="197" text-anchor="middle" fill="rgba(125,90,80,0.45)" font-size="11" letter-spacing="0.3">Thinking</text>
+      <text x="624" y="213" text-anchor="middle" fill="rgba(125,90,80,0.45)" font-size="11" letter-spacing="0.3">Adaptive reasoning</text>
+    </g>
+
+    <!-- Arrow: LLM → Tools -->
+    <g class="arrow-enter" style="--d:0.45s">
+      <line x1="697" y1="185" x2="759" y2="185" stroke="#B4846C" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="728" y="178" text-anchor="middle" fill="#B4846C" font-size="7.5" font-style="italic" opacity="0.7">tool calls</text>
+    </g>
+
+    <!-- TOOLS (filled) -->
+    <g class="block-enter" style="--d:0.3s">
+      <rect x="764" y="135" width="168" height="100" rx="18" fill="#B85C3A" filter="url(#sh)"/>
+      <text x="848" y="175" text-anchor="middle" fill="#fff" font-size="14.5" font-weight="700">Tools</text>
+      <text x="848" y="197" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="11" letter-spacing="0.3">Edit · Search · Console</text>
+      <text x="848" y="213" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="11" letter-spacing="0.3">Git · Web</text>
+    </g>
+
+    <!-- ═══════════════════════════════ -->
+    <!-- ROW 2: FEEDBACK LOOP           -->
+    <!-- ═══════════════════════════════ -->
+
+    <!-- Arrow: Tools → Callbacks -->
+    <g class="arrow-enter" style="--d:0.55s">
+      <path d="M 848 235 L 848 295 Q 848 315 828 315 L 720 315" 
+            fill="none" stroke="#B85C3A" stroke-width="2" marker-end="url(#arr-loop)" opacity="0.7"/>
+      <text x="862" y="268" fill="#B85C3A" font-size="7.5" font-style="italic" opacity="0.6">file edits</text>
+    </g>
+
+    <!-- CALLBACKS (filled) -->
+    <g class="block-enter" style="--d:0.4s">
+      <rect x="510" y="290" width="210" height="100" rx="16" fill="#8B9E7C" filter="url(#sh)"/>
+      <text x="615" y="330" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Callbacks</text>
+      <text x="615" y="352" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="11" letter-spacing="0.3">Clippy · Lint integrity</text>
+      <text x="615" y="368" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="11" letter-spacing="0.3">Structure checks</text>
+    </g>
+
+    <!-- Arrow: Callbacks → State -->
+    <g class="arrow-enter" style="--d:0.6s">
+      <path d="M 510 340 L 210 340"
+            fill="none" stroke="#B85C3A" stroke-width="2" marker-end="url(#arr-loop)" opacity="0.55"/>
+      <text x="360" y="333" text-anchor="middle" fill="#B85C3A" font-size="8" font-weight="600" opacity="0.55">updates state</text>
+    </g>
+
+    <!-- STATE (filled, replaces Reverie) -->
+    <g class="block-enter" style="--d:0.35s">
+      <rect x="28" y="290" width="182" height="100" rx="16" fill="#5B7EAE" filter="url(#sh)"/>
+      <text x="119" y="330" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">State</text>
+      <text x="119" y="352" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="11" letter-spacing="0.3">Memories · Tree</text>
+      <text x="119" y="368" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="11" letter-spacing="0.3">Entities · Logs</text>
+    </g>
+
+    <!-- Arrow: State → Panels -->
+    <g class="arrow-enter" style="--d:0.6s">
+      <line x1="105" y1="290" x2="105" y2="235" stroke="#5B7EAE" stroke-width="2" marker-end="url(#arr-state)" opacity="0.6"/>
+      <text x="82" y="266" fill="#5B7EAE" font-size="8" font-style="italic" opacity="0.55" transform="rotate(-90, 82, 266)">populates</text>
+    </g>
+
+    <!-- (removed: direct Tools → Panels upper curve) -->
+
+    <!-- ═══════════════════════════════ -->
+    <!-- ROW 3: INFRASTRUCTURE           -->
+    <!-- ═══════════════════════════════ -->
+
+    <!-- Meilisearch -->
+    <g class="block-enter" style="--d:0.55s">
+      <rect x="20" y="425" width="120" height="48" rx="12" fill="#F5EAE0" stroke="#B4846C" stroke-width="1" opacity="0.8"/>
+      <text x="80" y="448" text-anchor="middle" fill="#7D5A50" font-size="11" font-weight="600">Meilisearch</text>
+      <text x="80" y="463" text-anchor="middle" fill="rgba(125,90,80,0.4)" font-size="7.5">Hybrid search</text>
+    </g>
+
+    <!-- SQLite -->
+    <g class="block-enter" style="--d:0.6s">
+      <rect x="152" y="425" width="100" height="48" rx="12" fill="#F5EAE0" stroke="#B4846C" stroke-width="1" opacity="0.8"/>
+      <text x="202" y="448" text-anchor="middle" fill="#7D5A50" font-size="11" font-weight="600">SQLite</text>
+      <text x="202" y="463" text-anchor="middle" fill="rgba(125,90,80,0.4)" font-size="7.5">Entities DB</text>
+    </g>
+
+    <!-- Console Server -->
+    <g class="block-enter" style="--d:0.65s">
+      <rect x="264" y="425" width="140" height="48" rx="12" fill="#F5EAE0" stroke="#B4846C" stroke-width="1" opacity="0.8"/>
+      <text x="334" y="448" text-anchor="middle" fill="#7D5A50" font-size="11" font-weight="600">Console Server</text>
+      <text x="334" y="463" text-anchor="middle" fill="rgba(125,90,80,0.4)" font-size="7.5">Process daemon</text>
+    </g>
+
+    <!-- File Watchers -->
+    <g class="block-enter" style="--d:0.7s">
+      <rect x="416" y="425" width="130" height="48" rx="12" fill="#F5EAE0" stroke="#B4846C" stroke-width="1" opacity="0.8"/>
+      <text x="481" y="448" text-anchor="middle" fill="#7D5A50" font-size="11" font-weight="600">File Watchers</text>
+      <text x="481" y="463" text-anchor="middle" fill="rgba(125,90,80,0.4)" font-size="7.5">Change detection</text>
+    </g>
+
+    <!-- Arrows: Infrastructure → State -->
+    <g class="arrow-enter" style="--d:0.75s">
+      <line x1="80" y1="425" x2="80" y2="390" stroke="#B4846C" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr-infra)" opacity="0.35"/>
+      <line x1="202" y1="425" x2="170" y2="390" stroke="#B4846C" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr-infra)" opacity="0.35"/>
+      <line x1="334" y1="425" x2="200" y2="390" stroke="#B4846C" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr-infra)" opacity="0.35"/>
+      <line x1="481" y1="425" x2="210" y2="390" stroke="#B4846C" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr-infra)" opacity="0.35"/>
+    </g>
+  </svg>
+</div>
+
+<style>
+  .arch-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -0.02em;
+    margin-bottom: 0.2rem;
+  }
+
+  .arch-subtitle {
+    font-size: 1rem;
+    color: var(--mid);
+    font-style: italic;
+    opacity: 0.6;
+    margin-bottom: 2rem;
+  }
+
+  .arch-container {
+    width: 100%;
+    max-width: 72rem;
+    display: flex;
+    justify-content: center;
+  }
+
+  .arch-svg {
+    width: 100%;
+    max-width: 72rem;
+    height: auto;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  .block-enter {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: blockIn 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+    animation-delay: var(--d, 0s);
+  }
+
+  .arrow-enter {
+    opacity: 0;
+    animation: arrowIn 0.35s ease forwards;
+    animation-delay: var(--d, 0s);
+  }
+
+  @keyframes blockIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes arrowIn {
+    to { opacity: 1; }
+  }
+</style>

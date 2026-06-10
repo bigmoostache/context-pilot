@@ -20,7 +20,9 @@ pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenSt
 
     let format_cost = |cost: Option<f64>| -> String {
         cost.map_or(String::new(), |c| {
-            if c < 0.01 {
+            if c >= 1000.0 {
+                format!("${:.1}K", c / 1000.0)
+            } else if c < 0.01 {
                 format!("${c:.3}")
             } else if c < 1.0 {
                 format!("${c:.2}")
@@ -143,7 +145,13 @@ pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenSt
 
     // Total cost
     if let Some(total) = stats.total_cost {
-        let total_str = if total < 0.01 { format!("${total:.3}") } else { format!("${total:.2}") };
+        let total_str = if total >= 1000.0 {
+            format!("${:.1}K", total / 1000.0)
+        } else if total < 0.01 {
+            format!("${total:.3}")
+        } else {
+            format!("${total:.2}")
+        };
         content.push(Line::from(vec![Span::styled(
             format!("total: {total_str}"),
             Style::default().fg(theme::text_muted()),

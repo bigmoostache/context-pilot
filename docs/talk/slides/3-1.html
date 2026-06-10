@@ -1,0 +1,312 @@
+<div class="section-label" style="margin-bottom:0.5rem;">III — The WOWs</div>
+<div class="wow-title">Showcase</div>
+<div class="wow-subtitle-line">One side project — 7 domains — 4 months</div>
+
+<div class="wow-container">
+  <div class="wow-card" id="wow-card">
+    <div class="wow-emoji" id="wow-emoji"></div>
+    <div class="wow-domain" id="wow-domain"></div>
+    <div class="wow-statement" id="wow-statement"></div>
+    <div class="wow-details" id="wow-details"></div>
+  </div>
+  <div class="wow-progress" id="wow-progress"></div>
+</div>
+
+<style>
+  .wow-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -0.02em;
+    margin-bottom: 0.3rem;
+  }
+
+  .wow-subtitle-line {
+    font-size: 1rem;
+    color: var(--mid);
+    font-style: italic;
+    opacity: 0.5;
+    margin-bottom: 1.5rem;
+  }
+
+  .wow-container {
+    width: 100%;
+    max-width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    min-height: 0;
+  }
+
+  .wow-card {
+    width: 100%;
+    height: 75vh;
+    max-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3rem;
+    text-align: center;
+    gap: 0.8rem;
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: opacity 0.4s cubic-bezier(0.22,0.61,0.36,1),
+                transform 0.4s cubic-bezier(0.22,0.61,0.36,1);
+  }
+
+  .wow-emoji {
+    font-size: 4rem;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .wow-domain {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--mid);
+    opacity: 0.5;
+    font-weight: 600;
+  }
+
+  .wow-statement {
+    font-size: 2.2rem;
+    color: var(--text);
+    line-height: 1.4;
+    font-weight: 400;
+    max-width: 48rem;
+  }
+
+  .wow-statement img,
+  .wow-statement video {
+    max-height: 55vh;
+    object-fit: contain;
+  }
+
+  .wow-statement .hl {
+    color: #B85C3A;
+    font-weight: 600;
+  }
+
+  .wow-statement .stat {
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: #B85C3A;
+    display: block;
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.02em;
+  }
+
+  .wow-details {
+    font-size: 1rem;
+    color: var(--mid);
+    line-height: 1.7;
+    max-width: 42rem;
+    margin-top: 0.5rem;
+  }
+
+  .wow-details .detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .wow-details .detail-pill {
+    background: rgba(125, 90, 80, 0.07);
+    padding: 0.3rem 0.9rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    color: var(--dark);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .wow-details .detail-pill .pill-num {
+    font-weight: 700;
+    color: #B85C3A;
+  }
+
+  .wow-details em {
+    font-style: italic;
+    opacity: 0.6;
+  }
+
+  /* Progress pips */
+  .wow-progress {
+    flex-shrink: 0;
+    padding-top: 1rem;
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    gap: 3px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .wow-pip-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    padding: 2px 0;
+  }
+
+  .wow-pip-bar {
+    height: 3px;
+    width: 100%;
+    min-width: 14px;
+    border-radius: 2px;
+    background: var(--light);
+    opacity: 0.25;
+    transition: opacity 0.3s ease, background 0.3s ease;
+  }
+
+  .wow-pip-wrap.active .wow-pip-bar {
+    background: var(--dark);
+    opacity: 1;
+  }
+
+  .wow-pip-wrap.past .wow-pip-bar {
+    background: var(--mid);
+    opacity: 0.5;
+  }
+
+  .wow-pip-wrap:hover .wow-pip-bar {
+    opacity: 0.7;
+    background: var(--mid);
+  }
+
+  .wow-pip-label {
+    font-size: 1.3rem;
+    color: var(--mid);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    padding: 0 4px;
+    margin-top: 4px;
+    opacity: 0.3;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+
+  .wow-pip-wrap:hover .wow-pip-label,
+  .wow-pip-wrap.active .wow-pip-label {
+    opacity: 0.7;
+  }
+
+  .wow-pip-wrap.active .wow-pip-label {
+    opacity: 1;
+    font-weight: 600;
+    color: var(--dark);
+  }
+</style>
+
+<script>
+(function() {
+  const FADE_MS = 250;
+
+  const items = [
+    {
+      emoji: '', domain: '', pip: 'Medicine',
+      statement: '<div style="display:flex;flex-direction:column;align-items:center;gap:1.8rem;width:100%;"><div style="display:flex;align-items:baseline;gap:0.6rem;"><span style="font-size:4rem;font-weight:800;color:#B85C3A;letter-spacing:-0.03em;">Hundreds</span><span style="font-size:1.4rem;color:var(--mid);font-weight:400;">of pages of medical reports</span></div><div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;justify-content:center;"><span style="background:rgba(125,90,80,0.08);padding:0.35rem 0.9rem;border-radius:10px;font-size:0.95rem;color:var(--dark);font-weight:500;">Parse</span><span style="color:var(--light);font-size:0.8rem;">→</span><span style="background:rgba(125,90,80,0.08);padding:0.35rem 0.9rem;border-radius:10px;font-size:0.95rem;color:var(--dark);font-weight:500;">Structure</span><span style="color:var(--light);font-size:0.8rem;">→</span><span style="background:rgba(125,90,80,0.08);padding:0.35rem 0.9rem;border-radius:10px;font-size:0.95rem;color:var(--dark);font-weight:500;">Hypotheses</span><span style="color:var(--light);font-size:0.8rem;">→</span><span style="background:rgba(125,90,80,0.08);padding:0.35rem 0.9rem;border-radius:10px;font-size:0.95rem;color:var(--dark);font-weight:500;">Research</span><span style="color:var(--light);font-size:0.8rem;">→</span><span style="background:rgba(125,90,80,0.08);padding:0.35rem 0.9rem;border-radius:10px;font-size:0.95rem;color:var(--dark);font-weight:500;">Interviews</span></div><div style="width:1px;height:2rem;background:linear-gradient(to bottom,var(--light),transparent);"></div><div style="font-size:2rem;font-weight:600;color:var(--dark);letter-spacing:-0.02em;">Ending her <span class=\"hl\">medical wandering</span></div></div>',
+      details: ''
+    },
+    {
+      emoji: '', domain: '', pip: 'Chemistry',
+      statement: '<img src="img/chemistry.png" alt="Chemistry" style="max-width:100%;max-height:500px;border-radius:24px;box-shadow:0 2px 16px rgba(0,0,0,0.12);">',
+      details: ''
+    },
+    {
+      emoji: '', domain: '', pip: 'Hardware',
+      statement: '<div style="display:flex;align-items:center;justify-content:center;gap:3rem;width:100%;"><video src="img/fpga-video.mov" autoplay muted loop playsinline style="flex:0 0 45%;max-height:420px;border-radius:24px;box-shadow:0 2px 16px rgba(0,0,0,0.12);"></video><div style="flex:1;text-align:left;"><div style="font-size:1.8rem;color:var(--text);line-height:1.4;font-weight:400;">600 pages of Chinese <span class=\"hl\">FPGA</span> documentation</div><div style="margin-top:1.2rem;font-size:1.2rem;color:var(--mid);line-height:1.5;">Running Neural Networks and solving Schrödinger\'s equations — circuit-level</div></div></div>',
+      details: ''
+    },
+    {
+      emoji: '', domain: '', pip: 'Maths',
+      statement: '<div style="display:flex;align-items:center;justify-content:center;gap:2.5rem;"><img src="img/lean-logo.png" alt="LEAN" style="max-height:220px;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,0.12);"><span style="font-size:4rem;font-weight:300;color:var(--mid);opacity:0.5;">×</span><img src="img/polytechnique-logo.jpg" alt="Polytechnique" style="max-height:220px;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,0.12);"></div>',
+      details: ''
+    },
+    {
+      emoji: '', domain: '', pip: 'Finance',
+      statement: '<div style="position:relative;width:820px;height:520px;margin:0 auto;"><img src="img/finance-1.png" style="position:absolute;left:0;top:40px;width:500px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.15);transform:rotate(-8deg);z-index:1;"><img src="img/finance-2.png" style="position:absolute;left:130px;top:15px;width:500px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.18);transform:rotate(3deg);z-index:2;"><img src="img/finance-3.png" style="position:absolute;left:260px;top:0;width:500px;border-radius:16px;box-shadow:0 6px 32px rgba(0,0,0,0.22);transform:rotate(6deg);z-index:3;"></div>',
+      details: ''
+    },
+    {
+      emoji: '', domain: '', pip: 'Education',
+      statement: '<img src="img/maths-lean.png" alt="Statistics course" style="max-width:100%;max-height:500px;border-radius:24px;box-shadow:0 2px 16px rgba(0,0,0,0.12);">',
+      details: '<a href="https://github.com/bigmoostache/Cours" target="_blank" style="font-size:0.65rem;color:var(--mid);opacity:0.35;text-decoration:none;letter-spacing:0.03em;transition:opacity 0.2s;">github.com/bigmoostache/Cours</a>'
+    },
+    {
+      emoji: '', domain: '', pip: 'Miscellaneous',
+      statement: '<div style="position:relative;width:820px;height:520px;margin:0 auto;"><img src="img/misc-1.png" style="position:absolute;left:0;top:40px;width:500px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.15);transform:rotate(-8deg);z-index:1;"><img src="img/misc-2-blur.png" style="position:absolute;left:130px;top:15px;width:500px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.18);transform:rotate(3deg);z-index:2;filter:blur(2px);"><img src="img/misc-3.png" style="position:absolute;left:260px;top:0;width:500px;border-radius:16px;box-shadow:0 6px 32px rgba(0,0,0,0.22);transform:rotate(6deg);z-index:3;"></div>',
+      details: ''
+    },
+  ];
+
+  const card = document.getElementById('wow-card');
+  const emojiEl = document.getElementById('wow-emoji');
+  const domainEl = document.getElementById('wow-domain');
+  const statementEl = document.getElementById('wow-statement');
+  const detailsEl = document.getElementById('wow-details');
+  const progressEl = document.getElementById('wow-progress');
+
+  // Build progress pips
+  items.forEach((item, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'wow-pip-wrap';
+
+    const bar = document.createElement('div');
+    bar.className = 'wow-pip-bar';
+
+    const label = document.createElement('div');
+    label.className = 'wow-pip-label';
+    label.textContent = item.pip;
+
+    wrap.appendChild(bar);
+    wrap.appendChild(label);
+
+    wrap.addEventListener('click', () => {
+      current = i;
+      show(i);
+    });
+
+    progressEl.appendChild(wrap);
+  });
+
+  let current = 0;
+
+  function show(idx) {
+    card.style.opacity = '0';
+    card.style.transform = 'translateX(-50px)';
+
+    setTimeout(() => {
+      const item = items[idx];
+      emojiEl.textContent = item.emoji;
+      domainEl.textContent = item.domain;
+      statementEl.innerHTML = item.statement;
+      detailsEl.innerHTML = item.details;
+
+      progressEl.querySelectorAll('.wow-pip-wrap').forEach((wrap, i) => {
+        wrap.className = 'wow-pip-wrap' +
+          (i === idx ? ' active' : i < idx ? ' past' : '');
+      });
+
+      card.style.transition = 'none';
+      card.style.opacity = '0';
+      card.style.transform = 'translateX(50px)';
+      void card.offsetWidth;
+
+      card.style.transition = 'opacity 0.4s cubic-bezier(0.22,0.61,0.36,1), transform 0.4s cubic-bezier(0.22,0.61,0.36,1)';
+      card.style.opacity = '1';
+      card.style.transform = 'translateX(0)';
+    }, FADE_MS);
+  }
+
+  show(0);
+})();
+</script>

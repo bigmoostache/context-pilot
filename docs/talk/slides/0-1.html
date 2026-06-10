@@ -1,0 +1,53 @@
+<div class="origin-title">Where it all started</div>
+
+<div class="origin-stack">
+  <img src="img/origin-2.png" class="origin-img origin-img-back">
+  <img src="img/origin-1.png" class="origin-img origin-img-front">
+  <img src="img/narcos-waiting.jpg" class="origin-img origin-img-meme">
+</div>
+
+<style>
+  .origin-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -0.02em;
+    margin-bottom: 2rem;
+  }
+
+  .origin-stack {
+    position: relative;
+    width: 820px;
+    height: 620px;
+    margin: 0 auto;
+  }
+
+  .origin-img {
+    position: absolute;
+    width: 610px;
+    border-radius: 20px;
+    box-shadow: 0 6px 32px rgba(0, 0, 0, 0.18);
+  }
+
+  .origin-img-back {
+    left: 40px;
+    top: 80px;
+    transform: rotate(-4deg);
+    z-index: 1;
+  }
+
+  .origin-img-front {
+    left: 200px;
+    top: 280px;
+    transform: rotate(3deg);
+    z-index: 2;
+  }
+
+  .origin-img-meme {
+    left: 50px;
+    top: 240px;
+    width: 300px;
+    transform: rotate(5deg);
+    z-index: 3;
+  }
+</style>

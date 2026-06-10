@@ -355,6 +355,10 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.minimax_model = m;
             config::api_check(state)
         }
+        Action::ConfigSelectClaudeCodeV2Model(m) => {
+            state.claude_code_v2_model = m;
+            config::api_check(state)
+        }
         Action::ConfigSelectNextBar => {
             state.config_selected_bar = config::next_bar(state.config_selected_bar);
             state.flags.ui.dirty = true;
@@ -429,6 +433,11 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ConfigSelectSecondaryMiniMaxModel(m) => {
             state.secondary_minimax_model = m;
+            state.flags.ui.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSelectSecondaryClaudeCodeV2Model(m) => {
+            state.secondary_claude_code_v2_model = m;
             state.flags.ui.dirty = true;
             ActionResult::Save
         }

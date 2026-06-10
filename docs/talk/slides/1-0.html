@@ -1,0 +1,173 @@
+<div class="sub-toc-layout">
+  <!-- Left: section identity (1/3) -->
+  <div class="sub-toc-left">
+    <div class="sub-toc-numeral">I</div>
+    <div class="sub-toc-title" style="color: #E5B299;">The WHYs</div>
+  </div>
+
+  <!-- Vertical rule -->
+  <div class="sub-toc-rule"></div>
+
+  <!-- Right: slide list (2/3) -->
+  <div class="sub-toc-right">
+    <div class="sub-toc-slides">
+      <a class="toc-item" data-slide="1">
+        <span class="toc-num">01</span>
+        <div class="toc-body">
+          <span class="toc-text">What's failing</span>
+          <span class="toc-hint">Claude Code under scrutiny</span>
+        </div>
+      </a>
+      <a class="toc-item" data-slide="2">
+        <span class="toc-num">02</span>
+        <div class="toc-body">
+          <span class="toc-text">What I'd Add</span>
+          <span class="toc-hint">Feedback, LLM-X, Context</span>
+        </div>
+      </a>
+      <a class="toc-item" data-slide="3">
+        <span class="toc-num">03</span>
+        <div class="toc-body">
+          <span class="toc-text">Token Jewelry</span>
+          <span class="toc-hint">Classic vs. Context Pilot</span>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<style>
+  .sub-toc-layout {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    inset: 0;
+    padding: 0;
+  }
+
+  /* Left: section identity — mirrors main TOC column exactly */
+  .sub-toc-left {
+    flex: 0 0 33.333%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sub-toc-numeral {
+    position: absolute;
+    font-size: 26rem;
+    font-weight: 400;
+    font-family: 'Georgia', 'Times New Roman', 'Palatino Linotype', serif;
+    font-style: italic;
+    color: var(--cream);
+    opacity: 0.035;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .sub-toc-title {
+    position: relative;
+    z-index: 1;
+    font-size: 3.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-align: center;
+  }
+
+  /* Vertical rule */
+  .sub-toc-rule {
+    width: 1px;
+    align-self: stretch;
+    background: linear-gradient(
+      to bottom,
+      transparent 10%,
+      rgba(229, 178, 153, 0.12) 30%,
+      rgba(229, 178, 153, 0.12) 70%,
+      transparent 90%
+    );
+    flex-shrink: 0;
+  }
+
+  /* Right: slide list */
+  .sub-toc-right {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 5rem;
+  }
+
+  .sub-toc-slides {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+    max-width: 28rem;
+  }
+
+  .sub-toc-slides .toc-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.8rem;
+    padding: 1.6rem 0;
+    border-bottom: 1px solid rgba(229, 178, 153, 0.08);
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease;
+    opacity: 0.55;
+  }
+
+  .sub-toc-slides .toc-item:last-child {
+    border-bottom: none;
+  }
+
+  .sub-toc-slides .toc-item:hover {
+    opacity: 1;
+    transform: translateX(8px);
+  }
+
+  .sub-toc-slides .toc-num {
+    font-size: 1.5rem;
+    font-weight: 300;
+    color: var(--light);
+    opacity: 0.35;
+    letter-spacing: 0.1em;
+    font-variant-numeric: tabular-nums;
+    min-width: 1.8rem;
+    flex-shrink: 0;
+    padding-top: 0.25rem;
+  }
+
+  .sub-toc-slides .toc-item:hover .toc-num {
+    opacity: 0.7;
+  }
+
+  .sub-toc-slides .toc-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .slide.slide-dark .sub-toc-slides .toc-text {
+    font-size: 3rem;
+    font-weight: 300;
+    color: var(--cream);
+    letter-spacing: 0.03em;
+    line-height: 1.3;
+  }
+
+  .slide.slide-dark .sub-toc-slides .toc-hint {
+    font-size: 1.5rem;
+    color: var(--light);
+    opacity: 0.35;
+    letter-spacing: 0.05em;
+  }
+</style>

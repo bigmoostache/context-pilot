@@ -4,7 +4,7 @@
 //! Replicates Claude Code's request signature to access Claude 4.5 models.
 
 pub(crate) mod helpers;
-mod streaming;
+pub(crate) mod streaming;
 
 use std::env;
 use std::sync::mpsc::Sender;
