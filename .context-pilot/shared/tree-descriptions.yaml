@@ -1834,6 +1834,10 @@
   path: tedx.md
   description: 'Talk outline: 3×7min30 structure (WHYs/HOWs/WOWs)'
   last_edited_ms: 1781078806798
+847041f59a0204d5:
+  path: crates/cp-base/src/config/llm_types.rs
+  description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
+  last_edited_ms: 0
 852931587d049008:
   path: src/llms/claude_code_api_key/helpers.rs
   description: 'CC API-key helpers: constants (endpoint/headers), map_model_name(), inject_system_reminder(), apply_claude_code_headers()'
@@ -2946,6 +2950,10 @@ d486285ed7025782:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
   last_edited_ms: 0
+d48f46df7a190e21:
+  path: src/app/events.rs
+  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
+  last_edited_ms: 0
 d4bbdd0fa2570002:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -3001,6 +3009,10 @@ da6796beef901a47:
 dadf52c9990a635f:
   path: crates/cp-mod-brave/src/tools.rs
   description: Brave tool dispatch with flame!("brave_search") and flame!("brave_llm_context"). Both async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER.
+  last_edited_ms: 0
+db12056c4b00bacd:
+  path: src/ui/help/config_overlay/builder.rs
+  description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
   last_edited_ms: 0
 dbeaa40a36614e5f:
   path: crates/cp-mod-entities/src/lib.rs

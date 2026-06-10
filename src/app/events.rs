@@ -344,6 +344,8 @@ const fn dispatch_primary_model(state: &State, idx: usize) -> Action {
         },
         LlmProvider::ClaudeCodeV2 => match idx {
             0 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeOpus48),
+            1 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeFable5),
+            2 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeSonnet46),
             _ => Action::None,
         },
     }
@@ -382,6 +384,8 @@ const fn dispatch_secondary_model(state: &State, idx: usize) -> Action {
         },
         LlmProvider::ClaudeCodeV2 => match idx {
             0 => Action::ConfigSelectSecondaryClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeOpus48),
+            1 => Action::ConfigSelectSecondaryClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeFable5),
+            2 => Action::ConfigSelectSecondaryClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeSonnet46),
             _ => Action::None,
         },
     }

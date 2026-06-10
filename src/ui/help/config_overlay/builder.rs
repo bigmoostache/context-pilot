@@ -127,6 +127,16 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
                         "a",
                         &ClaudeCodeV2Model::ClaudeOpus48,
                     ),
+                    model_entry(
+                        state.secondary_claude_code_v2_model == ClaudeCodeV2Model::ClaudeFable5,
+                        "b",
+                        &ClaudeCodeV2Model::ClaudeFable5,
+                    ),
+                    model_entry(
+                        state.secondary_claude_code_v2_model == ClaudeCodeV2Model::ClaudeSonnet46,
+                        "c",
+                        &ClaudeCodeV2Model::ClaudeSonnet46,
+                    ),
                 ]
             }
         };
@@ -178,6 +188,16 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
                         state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeOpus48,
                         "a",
                         &ClaudeCodeV2Model::ClaudeOpus48,
+                    ),
+                    model_entry(
+                        state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeFable5,
+                        "b",
+                        &ClaudeCodeV2Model::ClaudeFable5,
+                    ),
+                    model_entry(
+                        state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeSonnet46,
+                        "c",
+                        &ClaudeCodeV2Model::ClaudeSonnet46,
                     ),
                 ]
             }

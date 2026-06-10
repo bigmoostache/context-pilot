@@ -70,39 +70,45 @@
   importance: high
   last_edited_ms: 0
 141fecab40a0635e:
-  tl_dr: 'Claude Code V2: captured mitmproxy body fields (diagnostics, output_config, context_management, thinking, cache_control) are internal-only — public API rejects with 400. Use clean V1-style body. V2 value = headers + model claude-opus-4-8.'
+  tl_dr: 'Claude Code V2: only `diagnostics` body field is internal-only (400). thinking/output_config/context_management/temperature/top_p/top_k all WORK with the 9 beta flags. V2 = headers + models opus-4-8, fable-5, sonnet-4-6.'
   contents: |-
     ## Claude Code V2 Provider — Working Configuration
 
-    Built from Claude Code CLI v2.1.170 mitmproxy capture. Key lesson: the captured request BODY fields are internal-only and the public api.anthropic.com endpoint rejects them.
+    Built from Claude Code CLI v2.1.170 mitmproxy capture. OAuth Bearer token (Keychain / ~/.claude/.credentials.json).
 
-    ### Rejected body fields (cause 400 'Extra inputs are not permitted'):
-    - `diagnostics: {previous_message_id: null}` — confirmed via curl
-    - `output_config: {effort: high}`
-    - `context_management: {edits: [...]}`
-    - `thinking: {type: adaptive}`
-    - `cache_control: {ttl, scope}` extensions on system blocks
+    ### Verified ACCEPTED body tunables (probed 2026-06-10 via curl, sonnet-4-6):
+    - `thinking: {type: "adaptive"}` — Claude Code default, model self-budgets
+    - `thinking: {type: "enabled", budget_tokens: N}` — forced thinking blocks (confirmed ['thinking','text'])
+    - `output_config: {effort: "low"|"medium"|"high"}` — reasoning/output effort dial
+    - `context_management: {edits: [{type: "clear_tool_uses_20250919"}]}` — server-side context pruning
+    - `temperature`, `top_p`, `top_k` — standard sampling
+
+    ### REJECTED (400 'Extra inputs are not permitted'):
+    - `diagnostics: {previous_message_id: null}` — internal telemetry. This was the SOLE culprit of the original 400; Pydantic reports first bad field so we initially over-stripped.
 
     ### Rejected beta flags (also 400):
     code-completions-2025-01-30, code-reviews-2025-02-12, patterns-2025-03-15, model-preference-2025-04-08, expanded-citations-2025-05-05
 
-    ### Working request = clean V1 structure:
-    `{model, max_tokens, system, messages, tools, stream}`
+    ### Working request body (current impl, minimal V1-style):
+    `{model, max_tokens, system, messages, tools, stream}` — effort/thinking/context_management could be re-enabled.
 
-    ### V2 differentiation (vs V1) is ONLY:
+    ### V2 headers:
     - 9 beta flags: claude-code-20250219, oauth-2025-04-20, interleaved-thinking-2025-05-14, context-management-2025-06-27, prompt-caching-scope-2026-01-05, structured-outputs-2025-12-15, files-api-2025-04-14, mcp-client-2025-04-04, token-efficient-tools-2025-02-19
-    - billing header cc_version=2.1.170
-    - user-agent claude-cli/2.1.170 (external, sdk-cli)
-    - model claude-opus-4-8 (single model only per user request)
+    - billing header cc_version=2.1.170; user-agent claude-cli/2.1.170 (external, sdk-cli)
 
-    Reuses helpers + parse_sse_stream from claude_code_api_key. Debug tip: compare against working V1 provider (src/llms/claude_code/mod.rs) when API rejects requests.
+    ### Models (all verified HTTP 200 + echo):
+    - claude-opus-4-8 ($5/$25, 200K)
+    - claude-fable-5 ($10/$50, 1M ctx standard pricing)
+    - claude-sonnet-4-6 ($3/$15, 1M ctx standard pricing)
+
+    Reuses helpers + parse_sse_stream from claude_code_api_key.
   importance: high
   labels:
   - llm-provider
   - claude-code
   - api
   - v2
-  last_edited_ms: 1781084707951
+  last_edited_ms: 1781085432365
 1552560f9d4055af:
   tl_dr: 'Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.'
   contents: |-
