@@ -26,6 +26,25 @@ le cœur dedans (~3 s, reconnexion automatique). Archiver = déplacé dans
 par saisie du nom. Le projet actif est marqué « à bord » ; pointeur :
 `~/nestor/projects/.current`.
 
+## Paramètres généraux
+
+Depuis le sélecteur (engrenage en haut à droite) : page machine/installation.
+
+- **Connexion** : réseau WiFi actuel + scan + connexion (nmcli). Attention :
+  changer de réseau peut rendre la Pi inaccessible depuis ton appareil.
+- **Clés API** : gestion de `~/nestor/.env` (valeurs masquées, jamais renvoyées
+  en clair) ; badge OAuth Claude Code. Appliquées au **redémarrage du service**
+  (bouton intégré — `sudo systemctl restart nestor` relit le `.env`).
+- **Défauts des nouveaux projets** : provider/modèle (`projects/.defaults.json`),
+  appliqués au premier boot d'un projet créé depuis le sélecteur.
+- **Système** : hostname, IP, RAM/disque/température, uptime, version + boutons
+  Redémarrer Nestor / Redémarrer la Pi.
+- **Sécurité** : changement du mot de passe web (vérification de l'actuel,
+  argon2, révocation optionnelle des autres appareils).
+
+API : `/api/system/{info,wifi,wifi/connect,env,restart,reboot}`,
+`/api/projects/defaults`, `/api/auth/password` — Bearer token comme le reste.
+
 ## Service
 
 ```

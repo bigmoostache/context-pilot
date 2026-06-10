@@ -3,6 +3,7 @@ import { useNestor } from '@/lib/store'
 import { connect, getToken } from '@/lib/ws'
 import { Login } from '@/components/Login'
 import { Projects } from '@/components/Projects'
+import { Settings } from '@/components/Settings'
 import { Sidebar } from '@/components/Sidebar'
 import { Chat } from '@/components/Chat'
 import { Composer } from '@/components/Composer'
@@ -57,6 +58,7 @@ export default function App() {
   }
 
   if (screen === 'projects') return <Projects />
+  if (screen === 'settings') return <Settings />
 
   if (!hasState) {
     return (

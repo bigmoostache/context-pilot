@@ -22,6 +22,8 @@ pub mod projects;
 pub mod protocol;
 /// Axum routes and WebSocket plumbing.
 mod server;
+/// System-level settings: WiFi, API keys, info, defaults, restart.
+pub mod system;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -45,6 +47,9 @@ pub struct WebServerConfig {
     pub initial_password: Option<String>,
     /// Projects root (`--projects-dir`). `None` disables the projects API.
     pub projects_root: Option<PathBuf>,
+    /// `.env` file managed by the settings page (`--env-file`).
+    /// `None` disables the API-keys endpoints.
+    pub env_file: Option<PathBuf>,
 }
 
 /// Handle returned by [`start`]: the outbound frame channel.
@@ -130,6 +135,7 @@ pub fn start(config: &WebServerConfig, events_tx: Sender<WebEvent>) -> Result<We
         frames: frames_tx,
         events: events_tx,
         projects_root: config.projects_root.clone(),
+        env_file: config.env_file.clone(),
     };
     drop(std::thread::Builder::new().name("cp-web-server".to_string()).spawn(move || {
         runtime.block_on(server::serve(args));

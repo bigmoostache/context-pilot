@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Anchor, Archive, FolderGit2, FolderOpen, GitBranch, LogOut, Plus, Trash2 } from 'lucide-react'
+import { Anchor, Archive, FolderGit2, FolderOpen, GitBranch, LogOut, Plus, Settings2, Trash2 } from 'lucide-react'
 import { useNestor } from '@/lib/store'
 import { archiveProject, createProject, deleteProject, fetchProjects, logout, switchProject } from '@/lib/ws'
 import { cn, fmtAgo } from '@/lib/utils'
@@ -61,12 +61,19 @@ export function Projects() {
 
   return (
     <div className="flex h-full flex-col items-center overflow-y-auto p-8">
-      <header className="mb-10 mt-6 text-center animate-rise">
+      <header className="relative mb-10 mt-6 w-full max-w-3xl text-center animate-rise">
         <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl border border-brass-600/40 bg-coal-900 shadow-[0_0_36px_-8px] shadow-brass-500/30">
           <Anchor className="size-6 text-brass-400" />
         </div>
         <h1 className="font-display text-4xl italic">Nestor</h1>
         <p className="mt-1 text-sm text-parchment-500">Choisis un projet — chacun a son atelier sur la Pi.</p>
+        <button
+          onClick={() => setScreen('settings')}
+          title="Paramètres généraux (WiFi, clés API, système)"
+          className="absolute right-0 top-0 rounded-md p-2 text-parchment-500 hover:bg-coal-800 hover:text-parchment-100 cursor-pointer"
+        >
+          <Settings2 className="size-5" />
+        </button>
       </header>
 
       {error && <p className="mb-4 max-w-xl text-center text-sm text-ember-400">{error}</p>}

@@ -190,3 +190,62 @@ export async function deleteProject(name: string, confirm: string): Promise<void
   })
   await expectOk(res)
 }
+
+// ─── Paramètres généraux ─────────────────────────────────────────────────────
+
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { headers: authHeaders() })
+  await expectOk(res)
+  return res.json()
+}
+
+async function postJson(url: string, body: unknown): Promise<void> {
+  const res = await fetch(url, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) })
+  await expectOk(res)
+}
+
+export interface SystemInfo {
+  hostname: string
+  ip: string
+  version: string
+  uptime_s: number
+  mem_total_kb: number
+  mem_available_kb: number
+  cpu_temp_milli_c: number
+  disk_total_bytes: number
+  disk_avail_bytes: number
+  projects_root: string | null
+}
+
+export interface WifiNetwork {
+  ssid: string
+  signal: number
+  security: string
+  active: boolean
+}
+
+export interface EnvKey {
+  key: string
+  label: string
+  set: boolean
+  masked: string | null
+}
+
+export interface ProjectDefaults {
+  provider?: string | null
+  model?: string | null
+}
+
+export const fetchSystemInfo = () => getJson<SystemInfo>('/api/system/info')
+export const fetchWifi = () =>
+  getJson<{ ip: string; current: string | null; networks: WifiNetwork[] }>('/api/system/wifi')
+export const connectWifi = (ssid: string, password?: string) =>
+  postJson('/api/system/wifi/connect', { ssid, ...(password ? { password } : {}) })
+export const fetchEnvKeys = () => getJson<{ keys: EnvKey[]; claude_oauth: boolean }>('/api/system/env')
+export const setEnvKey = (key: string, value: string | null) => postJson('/api/system/env', { key, value })
+export const fetchDefaults = () => getJson<ProjectDefaults>('/api/projects/defaults')
+export const saveDefaults = (defaults: ProjectDefaults) => postJson('/api/projects/defaults', defaults)
+export const restartService = () => postJson('/api/system/restart', {})
+export const rebootPi = () => postJson('/api/system/reboot', {})
+export const changePassword = (current: string, newPassword: string, revokeOthers: boolean) =>
+  postJson('/api/auth/password', { current, new_password: newPassword, revoke_others: revokeOthers })

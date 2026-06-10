@@ -246,6 +246,15 @@ struct CliArgs {
     web_dist: std::path::PathBuf,
     /// Projects root: enables the workspace system (picker + switch).
     projects_dir: Option<std::path::PathBuf>,
+    /// `.env` file managed by the web settings page.
+    env_file: Option<std::path::PathBuf>,
+}
+
+/// Absolutize a CLI path: the cwd changes on every project switch,
+/// so every configured path must survive a chdir.
+fn abs_path(raw: &str) -> std::path::PathBuf {
+    let path = std::path::PathBuf::from(raw);
+    std::path::absolute(&path).unwrap_or(path)
 }
 
 /// Parse command-line arguments (tiny by design — no clap dependency).
@@ -258,6 +267,7 @@ fn parse_cli() -> CliArgs {
         web_bind_any: false,
         web_dist: std::path::PathBuf::from("web-dist"),
         projects_dir: None,
+        env_file: None,
     };
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -268,23 +278,57 @@ fn parse_cli() -> CliArgs {
             "--web-bind" => cli.web_bind = iter.next().and_then(|v| v.parse().ok()),
             "--web-dist" => {
                 if let Some(dir) = iter.next() {
-                    // Absolu : le cwd change à chaque bascule de projet.
-                    let path = std::path::PathBuf::from(dir);
-                    cli.web_dist = path.canonicalize().unwrap_or(path);
+                    cli.web_dist = abs_path(dir);
                 }
             }
-            "--projects-dir" => {
-                // Absolu obligatoire : exec() conserve le cwd de l'ancien
-                // projet, le chemin doit rester valable après bascule.
-                cli.projects_dir = iter
-                    .next()
-                    .map(std::path::PathBuf::from)
-                    .map(|dir| dir.canonicalize().unwrap_or(dir));
-            }
+            "--projects-dir" => cli.projects_dir = iter.next().map(|dir| abs_path(dir)),
+            "--env-file" => cli.env_file = iter.next().map(|file| abs_path(file)),
             _ => {}
         }
     }
     cli
+}
+
+/// Apply the new-project defaults (`<projects-dir>/.defaults.json`) to a
+/// freshly created workspace: default provider and model, set via their
+/// serde IDs (same catalog as the web settings page).
+fn apply_project_defaults(state: &mut state::State, projects_dir: &std::path::Path) {
+    use cp_base::config::llm_types::LlmProvider;
+    let defaults = cp_web_server::system::defaults_read(projects_dir);
+    if let Some(provider) = defaults.provider.as_deref()
+        && let Ok(parsed) = serde_json::from_value::<LlmProvider>(serde_json::json!(provider))
+    {
+        state.llm_provider = parsed;
+    }
+    let Some(model) = defaults.model.as_deref() else { return };
+    let value = serde_json::json!(model);
+    match state.llm_provider {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+            if let Ok(parsed) = serde_json::from_value(value) {
+                state.anthropic_model = parsed;
+            }
+        }
+        LlmProvider::Grok => {
+            if let Ok(parsed) = serde_json::from_value(value) {
+                state.grok_model = parsed;
+            }
+        }
+        LlmProvider::Groq => {
+            if let Ok(parsed) = serde_json::from_value(value) {
+                state.groq_model = parsed;
+            }
+        }
+        LlmProvider::DeepSeek => {
+            if let Ok(parsed) = serde_json::from_value(value) {
+                state.deepseek_model = parsed;
+            }
+        }
+        LlmProvider::MiniMax => {
+            if let Ok(parsed) = serde_json::from_value(value) {
+                state.minimax_model = parsed;
+            }
+        }
+    }
 }
 
 /// Enter the active project under the projects root: read the `.current`
@@ -455,6 +499,7 @@ fn start_web(cli: &CliArgs) -> Option<(web::WebSource, web::WebSink)> {
         auth_path,
         initial_password: std::env::var("CP_WEB_PASSWORD").ok(),
         projects_root: cli.projects_dir.clone(),
+        env_file: cli.env_file.clone(),
     };
     match cp_web_server::start(&config, events_tx) {
         Ok(handle) => {
@@ -523,10 +568,12 @@ fn headless_main(cli: &CliArgs) -> ExitCode {
         };
         drop(writeln!(io::stderr(), "[boot] project: {project}"));
     }
+    // Premier boot de ce workspace ? (avant que boot_phased ne crée l'état)
+    let fresh_workspace = !std::path::Path::new(".context-pilot").join("config.json").exists();
 
     // Boot with stderr progress lines instead of the boot screen.
     let mut last_done = usize::MAX;
-    let state = boot_phased(&mut |steps| {
+    let mut state = boot_phased(&mut |steps| {
         let done = steps.iter().filter(|step| step.done).count();
         if done != last_done {
             last_done = done;
@@ -536,6 +583,11 @@ fn headless_main(cli: &CliArgs) -> ExitCode {
         }
     });
     drop(writeln!(io::stderr(), "[boot] ready — headless"));
+
+    // Projet vierge : appliquer les défauts des nouveaux projets.
+    if fresh_workspace && let Some(projects_dir) = &cli.projects_dir {
+        apply_project_defaults(&mut state, projects_dir);
+    }
 
     let Some((mut web_source, mut web_sink)) = start_web(cli) else {
         return ExitCode::FAILURE;

@@ -4,7 +4,7 @@ import { create } from 'zustand'
 import type { ServerFrame, WebMessage, WebState } from './types'
 
 export type ConnState = 'login' | 'connecting' | 'online' | 'offline'
-export type Screen = 'projects' | 'shell'
+export type Screen = 'projects' | 'shell' | 'settings'
 
 interface NestorStore {
   conn: ConnState

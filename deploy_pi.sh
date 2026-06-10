@@ -78,7 +78,8 @@ ulimit -n 2048 2>/dev/null
 exec "$HOME/nestor/bin/cpilot" --headless \
     --web-bind "${NESTOR_BIND:-192.168.1.145:8787}" \
     --web-dist "$HOME/nestor/web-dist" \
-    --projects-dir "${NESTOR_PROJECTS:-$HOME/nestor/projects}" "$@"
+    --projects-dir "${NESTOR_PROJECTS:-$HOME/nestor/projects}" \
+    --env-file "$HOME/nestor/.env" "$@"
 EOF
 ssh "$PI_HOST" "chmod +x $PI_DIR/bin/nestor-tui $PI_DIR/bin/nestor-web"
 

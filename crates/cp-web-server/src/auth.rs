@@ -210,6 +210,45 @@ impl Store {
         )
     }
 
+    /// Change the web password after verifying the current one.
+    /// With `keep_only_token`, every other device token is revoked.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Throttled`], [`StoreError::Denied`] (wrong current
+    /// password), [`StoreError::Storage`].
+    pub fn change_password(
+        &self,
+        current: &str,
+        new_password: &str,
+        keep_only_token: Option<&str>,
+    ) -> Result<(), StoreError> {
+        // Même throttle que le login : la vérification du mdp actuel
+        // est une surface de brute-force identique.
+        {
+            let Ok(mut last) = self.last_attempt.lock() else { return Err(StoreError::Storage) };
+            if let Some(prev) = *last
+                && prev.elapsed() < LOGIN_THROTTLE
+            {
+                return Err(StoreError::Throttled);
+            }
+            *last = Some(Instant::now());
+        }
+        let Ok(mut inner) = self.inner.lock() else { return Err(StoreError::Storage) };
+        let parsed = PasswordHash::new(&inner.password_hash).map_err(|_e| StoreError::Storage)?;
+        Argon2::default().verify_password(current.as_bytes(), &parsed).map_err(|_e| StoreError::Denied)?;
+
+        let salt = SaltString::generate(&mut OsRng);
+        let hash =
+            Argon2::default().hash_password(new_password.as_bytes(), &salt).map_err(|_e| StoreError::Storage)?;
+        inner.password_hash = hash.to_string();
+        if let Some(token) = keep_only_token {
+            let keep = token_digest(token);
+            inner.devices.retain(|d| d.token_sha256 == keep);
+        }
+        self.persist(&inner)
+    }
+
     /// Revoke a device's token by device ID. Returns `true` if found.
     ///
     /// # Errors

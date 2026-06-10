@@ -31,6 +31,8 @@ struct Shared {
     next_conn: AtomicU64,
     /// Projects root (`None` = projects API disabled).
     projects_root: Option<std::path::PathBuf>,
+    /// `.env` file for the API-keys endpoints (`None` = disabled).
+    env_file: Option<std::path::PathBuf>,
 }
 
 /// Everything [`serve`] needs, bundled to stay under the argument limit.
@@ -47,12 +49,15 @@ pub(crate) struct ServeArgs {
     pub events: Sender<WebEvent>,
     /// Projects root (`--projects-dir`).
     pub projects_root: Option<std::path::PathBuf>,
+    /// `.env` file (`--env-file`).
+    pub env_file: Option<std::path::PathBuf>,
 }
 
 /// Run the axum server until the process exits.
 pub(crate) async fn serve(args: ServeArgs) {
-    let ServeArgs { listener, auth, dist_dir, frames, events, projects_root } = args;
-    let shared = Arc::new(Shared { auth, frames, events, next_conn: AtomicU64::new(1), projects_root });
+    let ServeArgs { listener, auth, dist_dir, frames, events, projects_root, env_file } = args;
+    let shared =
+        Arc::new(Shared { auth, frames, events, next_conn: AtomicU64::new(1), projects_root, env_file });
 
     let index = dist_dir.join("index.html");
     let spa = ServeDir::new(&dist_dir).fallback(ServeFile::new(index));
@@ -65,6 +70,14 @@ pub(crate) async fn serve(args: ServeArgs) {
         .route("/api/projects/switch", post(projects_switch))
         .route("/api/projects/archive", post(projects_archive))
         .route("/api/projects/delete", post(projects_delete))
+        .route("/api/projects/defaults", get(defaults_get).post(defaults_set))
+        .route("/api/system/info", get(system_info))
+        .route("/api/system/wifi", get(wifi_status))
+        .route("/api/system/wifi/connect", post(wifi_connect))
+        .route("/api/system/env", get(env_list).post(env_set))
+        .route("/api/system/restart", post(system_restart))
+        .route("/api/system/reboot", post(system_reboot))
+        .route("/api/auth/password", post(change_password))
         .route("/ws", any(ws_upgrade))
         .fallback_service(spa)
         .with_state(shared);
@@ -236,6 +249,182 @@ async fn projects_delete(
     match projects::delete(&root, &body.name, &body.confirm) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(err) => project_error_response(err),
+    }
+}
+
+// ─── Paramètres généraux ────────────────────────────────────────────────────
+
+/// `GET /api/system/info` — hostname, RAM, disque, température, uptime.
+async fn system_info(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> Response {
+    if let Err(code) = check_bearer(&shared, &headers) {
+        return code.into_response();
+    }
+    axum::Json(crate::system::info(shared.projects_root.as_deref(), env!("CARGO_PKG_VERSION"))).into_response()
+}
+
+/// `GET /api/system/wifi` — réseau actuel + scan.
+async fn wifi_status(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> Response {
+    if let Err(code) = check_bearer(&shared, &headers) {
+        return code.into_response();
+    }
+    match tokio::task::spawn_blocking(crate::system::wifi_status).await {
+        Ok(status) => axum::Json(status).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("join error: {e}")).into_response(),
+    }
+}
+
+/// Body of `POST /api/system/wifi/connect`.
+#[derive(Debug, Deserialize)]
+struct WifiConnectRequest {
+    /// Target network SSID.
+    ssid: String,
+    /// WPA passphrase (omitted for open networks or known connections).
+    #[serde(default)]
+    password: Option<String>,
+}
+
+/// `POST /api/system/wifi/connect` — nmcli connect (peut couper l'accès !).
+async fn wifi_connect(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    body: axum::Json<WifiConnectRequest>,
+) -> Response {
+    if let Err(code) = check_bearer(&shared, &headers) {
+        return code.into_response();
+    }
+    let WifiConnectRequest { ssid, password } = body.0;
+    let result =
+        tokio::task::spawn_blocking(move || crate::system::wifi_connect(&ssid, password.as_deref())).await;
+    match result {
+        Ok(Ok(())) => StatusCode::NO_CONTENT.into_response(),
+        Ok(Err(msg)) => (StatusCode::BAD_GATEWAY, msg).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("join error: {e}")).into_response(),
+    }
+}
+
+/// Auth + env-file-enabled guard.
+fn env_guard(shared: &Shared, headers: &HeaderMap) -> Result<std::path::PathBuf, Box<Response>> {
+    if let Err(code) = check_bearer(shared, headers) {
+        return Err(Box::new(code.into_response()));
+    }
+    shared
+        .env_file
+        .clone()
+        .ok_or_else(|| Box::new((StatusCode::NOT_IMPLEMENTED, "env file not configured (no --env-file)").into_response()))
+}
+
+/// `GET /api/system/env` — clés connues + présence, valeurs masquées.
+async fn env_list(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> Response {
+    let path = match env_guard(&shared, &headers) {
+        Ok(path) => path,
+        Err(resp) => return *resp,
+    };
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    axum::Json(crate::system::env_list(&path, home.as_deref())).into_response()
+}
+
+/// Body of `POST /api/system/env` (`value: null` = suppression).
+#[derive(Debug, Deserialize)]
+struct EnvSetRequest {
+    /// Env key name (`[A-Z][A-Z0-9_]*`).
+    key: String,
+    /// New value, or `null` to remove the key.
+    #[serde(default)]
+    value: Option<String>,
+}
+
+/// `POST /api/system/env` — upsert/suppression d'une clé (appliqué au restart).
+async fn env_set(State(shared): State<Arc<Shared>>, headers: HeaderMap, body: axum::Json<EnvSetRequest>) -> Response {
+    let path = match env_guard(&shared, &headers) {
+        Ok(path) => path,
+        Err(resp) => return *resp,
+    };
+    match crate::system::env_set(&path, &body.key, body.value.as_deref()) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
+    }
+}
+
+/// `GET /api/projects/defaults` — défauts des nouveaux projets.
+async fn defaults_get(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> Response {
+    let root = match projects_guard(&shared, &headers) {
+        Ok(root) => root,
+        Err(resp) => return *resp,
+    };
+    axum::Json(crate::system::defaults_read(&root)).into_response()
+}
+
+/// `POST /api/projects/defaults` — enregistre les défauts.
+async fn defaults_set(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    body: axum::Json<crate::system::ProjectDefaults>,
+) -> Response {
+    let root = match projects_guard(&shared, &headers) {
+        Ok(root) => root,
+        Err(resp) => return *resp,
+    };
+    match crate::system::defaults_write(&root, &body.0) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+    }
+}
+
+/// `POST /api/system/restart` — redémarre le service (relit le .env).
+async fn system_restart(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> Response {
+    if let Err(code) = check_bearer(&shared, &headers) {
+        return code.into_response();
+    }
+    crate::system::restart_service();
+    StatusCode::ACCEPTED.into_response()
+}
+
+/// `POST /api/system/reboot` — redémarre la Pi.
+async fn system_reboot(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> Response {
+    if let Err(code) = check_bearer(&shared, &headers) {
+        return code.into_response();
+    }
+    crate::system::reboot();
+    StatusCode::ACCEPTED.into_response()
+}
+
+/// Body of `POST /api/auth/password`.
+#[derive(Debug, Deserialize)]
+struct ChangePasswordRequest {
+    /// Current password (verified before any change).
+    current: String,
+    /// New password.
+    new_password: String,
+    /// Revoke every other device token.
+    #[serde(default)]
+    revoke_others: bool,
+}
+
+/// `POST /api/auth/password` — change le mot de passe web.
+async fn change_password(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    body: axum::Json<ChangePasswordRequest>,
+) -> Response {
+    // Le token appelant sert de « survivant » si on révoque les autres.
+    let token = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(ToString::to_string);
+    let Some(token) = token else { return StatusCode::UNAUTHORIZED.into_response() };
+    if shared.auth.verify_token(&token).is_err() {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    if body.new_password.len() < 8 {
+        return (StatusCode::BAD_REQUEST, "mot de passe trop court (8 min)").into_response();
+    }
+    let keep = body.revoke_others.then_some(token.as_str());
+    match shared.auth.change_password(&body.current, &body.new_password, keep) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(StoreError::Denied) => (StatusCode::FORBIDDEN, "mot de passe actuel incorrect").into_response(),
+        Err(StoreError::Throttled) => (StatusCode::TOO_MANY_REQUESTS, "retry in 1s").into_response(),
+        Err(StoreError::Storage) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
 
