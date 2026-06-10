@@ -65,7 +65,7 @@ impl App {
 
     /// Handle keyboard events when the @ autocomplete popup is active.
     /// Mutates `Suggestions` and state.input directly.
-    pub(super) fn handle_autocomplete_event(&mut self, event: &event::Event) {
+    pub(crate) fn handle_autocomplete_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
 
@@ -236,7 +236,7 @@ impl App {
 
     /// Handle keyboard events when a question form is active.
     /// Mutates the `PendingForm` directly in state.
-    pub(super) fn handle_question_form_event(&mut self, event: &event::Event) {
+    pub(crate) fn handle_question_form_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let event::Event::Key(key) = event else { return };
 
@@ -316,7 +316,7 @@ impl App {
     }
 
     /// Handle keyboard events when command palette is open
-    pub(super) fn handle_palette_event(&mut self, event: &event::Event) -> Option<Action> {
+    pub(crate) fn handle_palette_event(&mut self, event: &event::Event) -> Option<Action> {
         use crossterm::event::{KeyCode, KeyModifiers};
 
         let event::Event::Key(key) = event else {

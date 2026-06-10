@@ -185,14 +185,14 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Warn if file was not open in context (edit still succeeded via unique match)
     if !is_open {
-        let _r = writeln!(
+        _ = writeln!(
             display_msg,
             "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
         );
     }
 
     // Header line
-    let _r = writeln!(display_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
+    _ = writeln!(display_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
 
     // Add diff markers for UI rendering
     display_msg.push_str("```diff\n");
@@ -210,15 +210,15 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let mut llm_msg = String::new();
     if !is_open {
-        let _r = writeln!(
+        _ = writeln!(
             llm_msg,
             "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
         );
     }
-    let _r = writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
+    _ = writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
     // Sail ho! Tell the LLM its panel already has the fresh cargo aboard
     if let Some(ref pid) = panel_ref {
-        let _r = writeln!(
+        _ = writeln!(
             llm_msg,
             "Panel {pid} has been UPDATED and now shows the current file content — do NOT expect to see stale content there."
         );

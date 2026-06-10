@@ -4,6 +4,8 @@ pub(crate) mod actions;
 mod context;
 /// Keyboard/mouse event handling and routing.
 pub(crate) mod events;
+/// Frontend abstraction: `InputSource` / `OutputSink` traits + TUI impls.
+pub(crate) mod frontend;
 /// Panel trait bridge: rendering, context collection, registry lookup.
 pub(crate) mod panels;
 /// Centralized prompt assembly for all LLM providers.

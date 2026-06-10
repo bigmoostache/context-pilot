@@ -1,20 +1,15 @@
 use cp_base::state::data::model_helpers::ModelPricing as _;
 use std::io;
 use std::sync::mpsc::{Receiver, Sender};
-use std::time::Duration;
-
-use crossterm::event;
-use ratatui::prelude::{CrosstermBackend, Terminal};
 
 use crate::app::actions::{Action, ActionResult, apply_action};
-use crate::app::events::handle_event;
+use crate::app::frontend::{InputSource, OutputSink, PumpFlow};
 use crate::app::panels::now_ms;
 use crate::infra::api::{StreamEvent, start_streaming};
 use crate::infra::constants::{EVENT_POLL_MS, RENDER_THROTTLE_MS};
 use crate::state::Kind;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::{check_ownership, save_state};
-use crate::ui;
 
 use crate::app::App;
 use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
@@ -34,9 +29,14 @@ pub(crate) struct EventChannels<'ch> {
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Main event loop: processes input, stream events, tools, spine, and rendering.
+    ///
+    /// Generic over its frontends: `inputs` feed actions in (crossterm, web
+    /// commands), `outputs` present state (ratatui, WebSocket broadcast).
+    /// The first input source doubles as the loop's idle sleeper.
     pub(crate) fn run(
         &mut self,
-        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        inputs: &mut [&mut dyn InputSource],
+        outputs: &mut [&mut dyn OutputSink],
         ch: &EventChannels<'_>,
     ) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
@@ -64,91 +64,30 @@ impl App {
             let _fg = cp_base::flame!("loop");
 
             // === INPUT FIRST: Process user input with minimal latency ===
-            // Non-blocking check for input - handle immediately for responsive feel
-            if event::poll(Duration::ZERO)? {
-                let evt = event::read()?;
-
-                // Handle command palette events first if it's open
-                if self.command_palette.is_open {
-                    if let Some(action) = self.handle_palette_event(&evt) {
-                        self.handle_action(action, ch.tx);
-                    }
-                    self.state.flags.ui.dirty = true;
-
-                    // Render immediately after input for instant feedback
-                    if self.state.flags.ui.dirty {
-                        let _r = terminal.draw(|frame| {
-                            ui::render(frame, &mut self.state);
-                            self.command_palette.render(frame, &self.state);
-                        })?;
-                        self.state.flags.ui.dirty = false;
-                        self.last_render_ms = current_ms;
-                    }
-                    continue;
+            // Pump every source non-blockingly; handle immediately for responsive feel
+            let mut handled_input = false;
+            let mut quit_requested = false;
+            for src in inputs.iter_mut() {
+                match src.pump(self, ch)? {
+                    PumpFlow::Quit => quit_requested = true,
+                    PumpFlow::Handled => handled_input = true,
+                    PumpFlow::Idle => {}
                 }
+            }
+            if quit_requested {
+                // User quit — flush all pending writes and save final state synchronously
+                self.writer.flush();
+                save_state(&self.state);
+                break;
+            }
 
-                // Handle autocomplete events if popup is active
-                if let Some(ac) = self.state.get_ext::<cp_base::state::autocomplete::Suggestions>()
-                    && ac.active
-                {
-                    self.handle_autocomplete_event(&evt);
-                    self.state.flags.ui.dirty = true;
-
-                    // Render immediately
-                    if self.state.flags.ui.dirty {
-                        let _r = terminal.draw(|frame| {
-                            ui::render(frame, &mut self.state);
-                            self.command_palette.render(frame, &self.state);
-                        })?;
-                        self.state.flags.ui.dirty = false;
-                        self.last_render_ms = current_ms;
-                    }
-                    continue;
+            // Render immediately after input for instant feedback
+            if handled_input && self.state.flags.ui.dirty {
+                for sink in outputs.iter_mut() {
+                    sink.present(self)?;
                 }
-
-                // Handle question form events if form is active (mutates state directly)
-                if let Some(form) = self.state.get_ext::<cp_base::ui::question_form::PendingForm>()
-                    && !form.resolved
-                {
-                    self.handle_question_form_event(&evt);
-                    self.state.flags.ui.dirty = true;
-
-                    // Render immediately
-                    if self.state.flags.ui.dirty {
-                        let _r = terminal.draw(|frame| {
-                            ui::render(frame, &mut self.state);
-                            self.command_palette.render(frame, &self.state);
-                        })?;
-                        self.state.flags.ui.dirty = false;
-                        self.last_render_ms = current_ms;
-                    }
-                    continue;
-                }
-
-                let Some(action) = handle_event(&evt, &self.state) else {
-                    // User quit — flush all pending writes and save final state synchronously
-                    self.writer.flush();
-                    save_state(&self.state);
-                    break;
-                };
-
-                // Check for Ctrl+P to open palette
-                if matches!(action, Action::OpenCommandPalette) {
-                    self.command_palette.open(&self.state);
-                    self.state.flags.ui.dirty = true;
-                } else {
-                    self.handle_action(action, ch.tx);
-                }
-
-                // Render immediately after input for instant feedback
-                if self.state.flags.ui.dirty {
-                    let _r = terminal.draw(|frame| {
-                        ui::render(frame, &mut self.state);
-                        self.command_palette.render(frame, &self.state);
-                    })?;
-                    self.state.flags.ui.dirty = false;
-                    self.last_render_ms = current_ms;
-                }
+                self.state.flags.ui.dirty = false;
+                self.last_render_ms = current_ms;
             }
 
             // === BACKGROUND PROCESSING ===
@@ -217,10 +156,9 @@ impl App {
 
             // Render if dirty and enough time has passed (capped at ~28fps)
             if self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
-                let _r = terminal.draw(|frame| {
-                    ui::render(frame, &mut self.state);
-                    self.command_palette.render(frame, &self.state);
-                })?;
+                for sink in outputs.iter_mut() {
+                    sink.present(self)?;
+                }
                 self.state.flags.ui.dirty = false;
                 self.last_render_ms = current_ms;
             }
@@ -231,14 +169,18 @@ impl App {
             } else {
                 50 // 50ms when idle — still responsive for typing, much less CPU
             };
-            let _r = event::poll(Duration::from_millis(poll_ms))?;
+            // The primary input source doubles as the idle sleeper (crossterm
+            // poll for the TUI, channel recv_timeout for the web).
+            if let Some(primary) = inputs.first_mut() {
+                primary.wait(poll_ms);
+            }
         }
 
         Ok(())
     }
 
     /// Dispatch an `Action` through `apply_action` and handle the resulting side-effects.
-    fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
+    pub(crate) fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
         // Any action triggers a re-render
         self.state.flags.ui.dirty = true;
         match apply_action(&mut self.state, action) {

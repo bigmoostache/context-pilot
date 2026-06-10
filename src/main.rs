@@ -369,10 +369,13 @@ fn main() -> ExitCode {
     let (tx, rx) = mpsc::channel::<StreamEvent>();
     let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
 
-    // Create and run app
+    // Create and run app — the TUI is one InputSource/OutputSink pair;
+    // the web frontend (Nestor) is another pair over the same generic loop.
     let mut app = App::new(state, cache_tx, resume_stream);
     let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };
-    let run_result = app.run(&mut terminal, &ch);
+    let mut tui_input = app::frontend::TuiInput;
+    let mut tui_output = app::frontend::TuiOutput::new(terminal);
+    let run_result = app.run(&mut [&mut tui_input], &mut [&mut tui_output], &ch);
 
     // Cleanup
     let _r_raw_off = disable_raw_mode();
@@ -385,16 +388,17 @@ fn main() -> ExitCode {
     // Skipped when run.sh supervises (CP_RUN_SH=1) — the supervisor rebuilds via cargo run.
     // If exec fails, fall through to normal exit (run.sh catches it as before).
     #[cfg(unix)]
-    if app.state.flags.lifecycle.reload_pending && std::env::var_os("CP_RUN_SH").is_none() {
-        if let Ok(exe_path) = std::env::current_exe() {
-            use std::os::unix::process::CommandExt as _;
-            let mut args: Vec<String> = std::env::args().skip(1).collect();
-            if !args.iter().any(|a| a == "--resume-stream") {
-                args.push("--resume-stream".to_string());
-            }
-            // Replaces the current process — never returns on success
-            let _err = std::process::Command::new(exe_path).args(&args).exec();
+    if app.state.flags.lifecycle.reload_pending
+        && std::env::var_os("CP_RUN_SH").is_none()
+        && let Ok(exe_path) = std::env::current_exe()
+    {
+        use std::os::unix::process::CommandExt as _;
+        let mut restart_args: Vec<String> = std::env::args().skip(1).collect();
+        if !restart_args.iter().any(|a| a == "--resume-stream") {
+            restart_args.push("--resume-stream".to_string());
         }
+        // Replaces the current process — never returns on success
+        let _err = std::process::Command::new(exe_path).args(&restart_args).exec();
     }
 
     if let Err(e) = run_result {
