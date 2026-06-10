@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities"]
+members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-web-server", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities"]
 
 [workspace.package]
 version = "0.1.0"
@@ -665,7 +665,9 @@ mixed_read_write_in_expression = "forbid"
 module_inception = "forbid"
 module_name_repetitions = "forbid"
 modulo_arithmetic = "forbid"
-modulo_one = "forbid"
+# deny (not forbid): tokio::select! carries an internal allow(modulo_one)
+# that E0453-clashes with forbid. deny still errors on real violations.
+modulo_one = "deny"
 multi_assignments = "forbid"
 multiple_bound_locations = "forbid"
 multiple_crate_versions = "allow"
@@ -1057,6 +1059,7 @@ cp-render = { path = "crates/cp-render" }
 cp-mod-utilities.workspace = true
 log = "0.4"
 cp-mod-console = { path = "crates/cp-mod-console" }
+cp-web-server = { path = "crates/cp-web-server" }
 cp-mod-entities = { path = "crates/cp-mod-entities" }
 cp-mod-callback = { path = "crates/cp-mod-callback" }
 cp-mod-scratchpad = { path = "crates/cp-mod-scratchpad" }

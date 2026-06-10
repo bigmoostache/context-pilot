@@ -20,6 +20,8 @@ mod modules;
 mod state;
 /// Terminal UI: rendering, input, theme, sidebar.
 mod ui;
+/// Web frontend (Nestor): WebSource/WebSink + WebState builders.
+mod web;
 
 use std::io::{self, Write};
 use std::process::ExitCode;
@@ -216,39 +218,72 @@ use state::persistence::{
     boot_load_panels, load_state,
 };
 
-fn main() -> ExitCode {
-    /// Helper to mark a boot step as done, with bounds checking.
-    fn mark_step_done(steps: &mut [BootStep], idx: usize) {
-        if let Some(step) = steps.get_mut(idx) {
-            step.done = true;
+/// Helper to mark a boot step as done, with bounds checking.
+fn mark_step_done(steps: &mut [BootStep], idx: usize) {
+    if let Some(step) = steps.get_mut(idx) {
+        step.done = true;
+    }
+}
+
+/// Helper to set a boot step's detail, with bounds checking.
+fn set_step_detail(steps: &mut [BootStep], idx: usize, detail: String) {
+    if let Some(step) = steps.get_mut(idx) {
+        step.detail = Some(detail);
+    }
+}
+
+/// Parsed command-line arguments.
+struct CliArgs {
+    /// Auto-resume streaming after a reload.
+    resume_stream: bool,
+    /// Run without a terminal (Nestor mode) — requires `--web-bind`.
+    headless: bool,
+    /// Address for the web server (enables the web frontend in any mode).
+    web_bind: Option<std::net::SocketAddr>,
+    /// Allow binding `0.0.0.0` (explicitly opted in).
+    web_bind_any: bool,
+    /// Directory of the built SPA.
+    web_dist: std::path::PathBuf,
+}
+
+/// Parse command-line arguments (tiny by design — no clap dependency).
+fn parse_cli() -> CliArgs {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut cli = CliArgs {
+        resume_stream: false,
+        headless: false,
+        web_bind: None,
+        web_bind_any: false,
+        web_dist: std::path::PathBuf::from("web-dist"),
+    };
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--resume-stream" => cli.resume_stream = true,
+            "--headless" => cli.headless = true,
+            "--web-bind-any" => cli.web_bind_any = true,
+            "--web-bind" => cli.web_bind = iter.next().and_then(|v| v.parse().ok()),
+            "--web-dist" => {
+                if let Some(dir) = iter.next() {
+                    cli.web_dist = std::path::PathBuf::from(dir);
+                }
+            }
+            _ => {}
         }
     }
+    cli
+}
 
-    /// Helper to set a boot step's detail, with bounds checking.
-    fn set_step_detail(steps: &mut [BootStep], idx: usize, detail: String) {
-        if let Some(step) = steps.get_mut(idx) {
-            step.detail = Some(detail);
-        }
-    }
-
-    init_file_logger();
-    raise_fd_limit();
-    infra::flame::init();
-
-    // Parse CLI args
-    let args: Vec<String> = std::env::args().collect();
-    let resume_stream = args.iter().any(|a| a == "--resume-stream");
-
-    // Panic hook: restore terminal state and log the panic to disk.
-    // Without this, a panic leaves the terminal in raw mode + alternate screen,
-    // which corrupts the SSH session and the error is lost.
+/// Install the panic hook: restore the terminal (TUI mode only) and append
+/// the panic + backtrace to `.context-pilot/errors/panic.log`.
+fn install_panic_hook(restore_terminal: bool) {
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        let _r_raw = disable_raw_mode();
-        let _r_paste = io::stdout().execute(DisableBracketedPaste);
-        let _r_screen = io::stdout().execute(LeaveAlternateScreen);
-
-        // Write panic info to .context-pilot/errors/panic.log
+        if restore_terminal {
+            let _r_raw = disable_raw_mode();
+            let _r_paste = io::stdout().execute(DisableBracketedPaste);
+            let _r_screen = io::stdout().execute(LeaveAlternateScreen);
+        }
         let error_dir = std::path::Path::new(".context-pilot").join("errors");
         let _r_mkdir = std::fs::create_dir_all(&error_dir);
         let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
@@ -260,23 +295,16 @@ fn main() -> ExitCode {
             .append(true)
             .open(&log_path)
             .and_then(|mut f| f.write_all(msg.as_bytes()));
-
         default_hook(info);
     }));
+}
 
-    let Ok(()) = enable_raw_mode() else {
-        drop(writeln!(io::stderr(), "Fatal: failed to enable raw mode"));
-        return ExitCode::FAILURE;
-    };
-    let _r_enter = io::stdout().execute(EnterAlternateScreen);
-    let _r_paste_on = io::stdout().execute(EnableBracketedPaste);
-    let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
-        let _r_cleanup = disable_raw_mode();
-        drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));
-        return ExitCode::FAILURE;
-    };
+/// Progress callback invoked by [`boot_phased`] after every step change.
+type BootProgressFn<'cb> = &'cb mut dyn FnMut(&[BootStep]);
 
-    // ─── Phased boot with progress rendering ────────────────────────────
+/// Run the phased boot, invoking `on_step` after every progress change.
+/// The callback renders the boot screen (TUI) or logs to stderr (headless).
+fn boot_phased(on_step: BootProgressFn<'_>) -> state::State {
     let mut steps = vec![
         BootStep { label: "Loading config", detail: None, done: false },
         BootStep { label: "Loading panels", detail: None, done: false },
@@ -285,9 +313,7 @@ fn main() -> ExitCode {
         BootStep { label: "Initializing modules", detail: None, done: false },
         BootStep { label: "Preparing workspace", detail: None, done: false },
     ];
-
-    // Show initial boot screen immediately — banish the black void
-    render_boot_screen(&mut terminal, &steps);
+    on_step(&steps);
 
     // Detect new vs fresh-start format
     let new_format = std::path::Path::new(".context-pilot").join("config.json").exists();
@@ -297,96 +323,104 @@ fn main() -> ExitCode {
         let cfg = boot_load_config();
         let module_data = boot_extract_module_data(&cfg);
         mark_step_done(&mut steps, STEP_CONFIG);
-        render_boot_screen(&mut terminal, &steps);
+        on_step(&steps);
 
         // Phase 2: Build context from panel JSONs
         let panels = boot_load_panels(&cfg);
         set_step_detail(&mut steps, STEP_PANELS, format!("{} panels", panels.panel_count));
         mark_step_done(&mut steps, STEP_PANELS);
-        render_boot_screen(&mut terminal, &steps);
+        on_step(&steps);
 
         // Phase 3: Load conversation messages from YAML
         let msg_count = panels.message_uids.len();
         let messages = boot_load_messages(&panels.message_uids);
         set_step_detail(&mut steps, STEP_MESSAGES, format!("{msg_count} messages"));
         mark_step_done(&mut steps, STEP_MESSAGES);
-        render_boot_screen(&mut terminal, &steps);
+        on_step(&steps);
 
         // Phase 4: Assemble state (without module init)
         let mut assembled_state = boot_assemble_state(cfg, panels, messages);
         mark_step_done(&mut steps, STEP_ASSEMBLE);
-        render_boot_screen(&mut terminal, &steps);
+        on_step(&steps);
 
         // Phase 5: Initialize modules (with per-module progress)
         boot_init_modules(&mut assembled_state, &module_data, |module_name| {
             set_step_detail(&mut steps, STEP_MODULES, module_name.to_string());
-            render_boot_screen(&mut terminal, &steps);
+            on_step(&steps);
         });
         mark_step_done(&mut steps, STEP_MODULES);
         set_step_detail(&mut steps, STEP_WORKSPACE, "registering types".to_string());
-        render_boot_screen(&mut terminal, &steps);
+        on_step(&steps);
 
         assembled_state
     } else {
         // Fresh start — no files to load, just create default state
-        let s = load_state();
+        let fresh = load_state();
         mark_step_done(&mut steps, STEP_CONFIG);
         mark_step_done(&mut steps, STEP_PANELS);
         mark_step_done(&mut steps, STEP_MESSAGES);
         mark_step_done(&mut steps, STEP_ASSEMBLE);
         mark_step_done(&mut steps, STEP_MODULES);
-        render_boot_screen(&mut terminal, &steps);
-        s
+        on_step(&steps);
+        fresh
     };
 
-    // Phase 4 continued: Initialize modules
+    finalize_state(&mut state);
+    mark_step_done(&mut steps, STEP_WORKSPACE);
+    on_step(&steps);
+    state
+}
+
+/// Post-boot initialization shared by the TUI and headless paths.
+fn finalize_state(state: &mut state::State) {
     state.highlight_ir_fn = Some(ui::helpers::highlight_file_ir);
     modules::validate_dependencies(&state.active_modules);
     modules::init_registry();
 
     // Remove orphaned context elements whose module no longer exists
-    {
-        let known_types: std::collections::HashSet<String> = modules::all_modules()
-            .iter()
-            .flat_map(|m| {
-                let mut types: Vec<String> =
-                    m.dynamic_panel_types().into_iter().map(|ct| ct.as_str().to_string()).collect();
-                types.extend(m.fixed_panel_types().into_iter().map(|ct| ct.as_str().to_string()));
-                types.extend(m.context_type_metadata().into_iter().map(|meta| meta.context_type.to_string()));
-                types
-            })
-            .collect();
-        state.context.retain(|c| known_types.contains(c.context_type.as_str()));
+    let known_types: std::collections::HashSet<String> = modules::all_modules()
+        .iter()
+        .flat_map(|m| {
+            let mut types: Vec<String> = m.dynamic_panel_types().into_iter().map(|ct| ct.as_str().to_string()).collect();
+            types.extend(m.fixed_panel_types().into_iter().map(|ct| ct.as_str().to_string()));
+            types.extend(m.context_type_metadata().into_iter().map(|meta| meta.context_type.to_string()));
+            types
+        })
+        .collect();
+    state.context.retain(|c| known_types.contains(c.context_type.as_str()));
+
+    ensure_default_contexts(state);
+    ensure_default_agent(state);
+}
+
+/// Start the web server when `--web-bind` was given.
+/// Returns the web frontend pair, or `None` (with a logged error) on failure.
+fn start_web(cli: &CliArgs) -> Option<(web::WebSource, web::WebSink)> {
+    let bind = cli.web_bind?;
+    let (events_tx, events_rx) = mpsc::channel::<cp_web_server::protocol::WebEvent>();
+    let config = cp_web_server::WebServerConfig {
+        bind,
+        allow_any_bind: cli.web_bind_any,
+        dist_dir: cli.web_dist.clone(),
+        auth_path: std::path::Path::new(".context-pilot").join("web-auth.json"),
+        initial_password: std::env::var("CP_WEB_PASSWORD").ok(),
+    };
+    match cp_web_server::start(&config, events_tx) {
+        Ok(handle) => {
+            let sink_handle = handle.clone();
+            Some((web::WebSource::new(events_rx, handle), web::WebSink::new(sink_handle)))
+        }
+        Err(e) => {
+            drop(writeln!(io::stderr(), "Web server error: {e}"));
+            None
+        }
     }
+}
 
-    // Phase 6: Prepare workspace
-    ensure_default_contexts(&mut state);
-    ensure_default_agent(&mut state);
-    mark_step_done(&mut steps, STEP_WORKSPACE);
-    render_boot_screen(&mut terminal, &steps);
-
-    // Create channels
-    let (tx, rx) = mpsc::channel::<StreamEvent>();
-    let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
-
-    // Create and run app — the TUI is one InputSource/OutputSink pair;
-    // the web frontend (Nestor) is another pair over the same generic loop.
-    let mut app = App::new(state, cache_tx, resume_stream);
-    let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };
-    let mut tui_input = app::frontend::TuiInput;
-    let mut tui_output = app::frontend::TuiOutput::new(terminal);
-    let run_result = app.run(&mut [&mut tui_input], &mut [&mut tui_output], &ch);
-
-    // Cleanup
-    let _r_raw_off = disable_raw_mode();
-    let _r_paste_off = io::stdout().execute(DisableBracketedPaste);
-    let _r_leave = io::stdout().execute(LeaveAlternateScreen);
-    infra::flame::flush();
-
-    // Self-restart on reload — lets `cpilot` work without the run.sh supervisor loop.
-    // exec() replaces this process with a fresh instance (same binary, same env).
-    // Skipped when run.sh supervises (CP_RUN_SH=1) — the supervisor rebuilds via cargo run.
-    // If exec fails, fall through to normal exit (run.sh catches it as before).
+/// Self-restart on reload — lets `cpilot` work without the run.sh supervisor
+/// loop. `exec()` replaces this process with a fresh instance (same binary,
+/// same env). Skipped when run.sh supervises (`CP_RUN_SH=1`).
+fn exec_restart_if_pending(app: &App) {
     #[cfg(unix)]
     if app.state.flags.lifecycle.reload_pending
         && std::env::var_os("CP_RUN_SH").is_none()
@@ -400,10 +434,106 @@ fn main() -> ExitCode {
         // Replaces the current process — never returns on success
         let _err = std::process::Command::new(exe_path).args(&restart_args).exec();
     }
+}
+
+/// Headless entry point (Nestor): no terminal, web frontend only.
+fn headless_main(cli: &CliArgs) -> ExitCode {
+    install_panic_hook(false);
+
+    if cli.web_bind.is_none() {
+        drop(writeln!(io::stderr(), "Fatal: --headless requires --web-bind <ip:port>"));
+        return ExitCode::FAILURE;
+    }
+
+    // Boot with stderr progress lines instead of the boot screen.
+    let mut last_done = usize::MAX;
+    let state = boot_phased(&mut |steps| {
+        let done = steps.iter().filter(|step| step.done).count();
+        if done != last_done {
+            last_done = done;
+            if let Some(current) = steps.iter().find(|step| !step.done) {
+                drop(writeln!(io::stderr(), "[boot {}/{}] {}…", done, steps.len(), current.label));
+            }
+        }
+    });
+    drop(writeln!(io::stderr(), "[boot] ready — headless"));
+
+    let Some((mut web_source, mut web_sink)) = start_web(cli) else {
+        return ExitCode::FAILURE;
+    };
+
+    let (tx, rx) = mpsc::channel::<StreamEvent>();
+    let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
+    let mut app = App::new(state, cache_tx, cli.resume_stream);
+    let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };
+    let run_result = app.run(&mut [&mut web_source], &mut [&mut web_sink], &ch);
+
+    infra::flame::flush();
+    exec_restart_if_pending(&app);
 
     if let Err(e) = run_result {
         drop(writeln!(io::stderr(), "Fatal: {e}"));
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+/// TUI entry point — optionally with the web frontend alongside
+/// (same session, same loop: the browser and the terminal coexist).
+fn tui_main(cli: &CliArgs) -> ExitCode {
+    install_panic_hook(true);
+
+    let Ok(()) = enable_raw_mode() else {
+        drop(writeln!(io::stderr(), "Fatal: failed to enable raw mode"));
+        return ExitCode::FAILURE;
+    };
+    let _r_enter = io::stdout().execute(EnterAlternateScreen);
+    let _r_paste_on = io::stdout().execute(EnableBracketedPaste);
+    let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
+        let _r_cleanup = disable_raw_mode();
+        drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));
+        return ExitCode::FAILURE;
+    };
+
+    let state = boot_phased(&mut |steps| render_boot_screen(&mut terminal, steps));
+
+    let (tx, rx) = mpsc::channel::<StreamEvent>();
+    let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
+
+    // The TUI is one InputSource/OutputSink pair; the web frontend (when
+    // enabled) is another pair over the same generic loop.
+    let mut app = App::new(state, cache_tx, cli.resume_stream);
+    let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };
+    let mut tui_input = app::frontend::TuiInput;
+    let mut tui_output = app::frontend::TuiOutput::new(terminal);
+    let web_pair = start_web(cli);
+
+    let run_result = if let Some((mut web_source, mut web_sink)) = web_pair {
+        app.run(&mut [&mut tui_input, &mut web_source], &mut [&mut tui_output, &mut web_sink], &ch)
+    } else {
+        app.run(&mut [&mut tui_input], &mut [&mut tui_output], &ch)
+    };
+
+    // Cleanup
+    let _r_raw_off = disable_raw_mode();
+    let _r_paste_off = io::stdout().execute(DisableBracketedPaste);
+    let _r_leave = io::stdout().execute(LeaveAlternateScreen);
+    infra::flame::flush();
+
+    exec_restart_if_pending(&app);
+
+    if let Err(e) = run_result {
+        drop(writeln!(io::stderr(), "Fatal: {e}"));
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
+}
+
+fn main() -> ExitCode {
+    init_file_logger();
+    raise_fd_limit();
+    infra::flame::init();
+
+    let cli = parse_cli();
+    if cli.headless { headless_main(&cli) } else { tui_main(&cli) }
 }

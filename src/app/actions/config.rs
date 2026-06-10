@@ -118,6 +118,27 @@ pub(crate) fn handle_config_prev_theme(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
+/// Handle `ConfigSetTheme` — direct theme set (web-native counterpart of cycle).
+pub(crate) fn handle_config_set_theme(state: &mut State, theme: &str) -> ActionResult {
+    use crate::infra::config::THEME_ORDER;
+    if !THEME_ORDER.contains(&theme) {
+        return ActionResult::Nothing;
+    }
+    state.active_theme = theme.to_string();
+    crate::infra::config::set_active_theme(&state.active_theme);
+    state.flags.ui.dirty = true;
+    ActionResult::Save
+}
+
+/// Handle `ConfigSetContextBudget` — direct budget set, clamped to 10–100 %
+/// of the model context window (`None` = full window).
+pub(crate) fn handle_config_set_context_budget(state: &mut State, tokens: Option<usize>) -> ActionResult {
+    let max_budget = state.model_context_window();
+    state.context_budget = tokens.map(|t| t.clamp(budget_min(max_budget), max_budget));
+    state.flags.ui.dirty = true;
+    ActionResult::Save
+}
+
 /// Compute 5% step for budget adjustment.
 const fn budget_step(max_budget: usize) -> usize {
     time_arith::five_pct(max_budget)

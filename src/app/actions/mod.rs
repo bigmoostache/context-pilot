@@ -372,6 +372,32 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::ConfigNextTheme => config::handle_config_next_theme(state),
         Action::ConfigPrevTheme => config::handle_config_prev_theme(state),
 
+        // === Config direct setters (web-native) ===
+        Action::ConfigSetTheme(theme) => config::handle_config_set_theme(state, &theme),
+        Action::ConfigSetContextBudget(tokens) => config::handle_config_set_context_budget(state, tokens),
+        Action::ConfigSetCleaningThreshold(value) => {
+            state.cleaning_threshold = value.clamp(0.30, 0.95);
+            state.flags.ui.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSetCleaningTarget(value) => {
+            state.cleaning_target_proportion = value.clamp(0.30, 0.95);
+            state.flags.ui.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSetMaxCost(value) => {
+            let spine = cp_mod_spine::types::SpineState::get_mut(state);
+            spine.config.max_cost = value.filter(|v| *v > 0.0);
+            state.flags.ui.dirty = true;
+            ActionResult::Save
+        }
+        Action::ConfigSetThinkThreshold(value) => {
+            let ts = state.ext_mut::<crate::modules::questions::ThinkState>();
+            ts.reminder_threshold = i32::try_from(value).unwrap_or(-1).min(-1);
+            state.flags.ui.dirty = true;
+            ActionResult::Save
+        }
+
         Action::OpenCommandPalette => {
             // Handled in app.rs directly
             ActionResult::Nothing

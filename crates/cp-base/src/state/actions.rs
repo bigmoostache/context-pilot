@@ -138,6 +138,21 @@ pub enum Action {
     /// Make think reminder threshold more negative (less frequent reminders).
     ConfigThinkThresholdDown,
 
+    // === Config — direct setters (web-native: sliders/selects, not hotkeys) ===
+    /// Set the active theme by ID.
+    ConfigSetTheme(String),
+    /// Set the context budget in tokens (`None` = model's full window).
+    /// Clamped to 10–100 % of the model context window.
+    ConfigSetContextBudget(Option<usize>),
+    /// Set the auto-cleaning threshold (clamped 0.30–0.95).
+    ConfigSetCleaningThreshold(f32),
+    /// Set the cleaning target proportion (clamped 0.30–0.95).
+    ConfigSetCleaningTarget(f32),
+    /// Set the spine max-cost guard rail in USD (`None` = disabled).
+    ConfigSetMaxCost(Option<f64>),
+    /// Set the think reminder threshold (capped at −1).
+    ConfigSetThinkThreshold(i64),
+
     // === Config overlay — secondary model ===
     /// Select secondary (reverie) LLM provider.
     ConfigSelectSecondaryProvider(crate::config::llm_types::LlmProvider),
