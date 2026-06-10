@@ -196,8 +196,8 @@
   last_edited_ms: 0
 0dffd96eaa2fc1fa:
   path: src/llms/claude_code_v2/mod.rs
-  description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code (Keychain/credentials file) but with updated headers from CLI v2.1.170: 9 beta flags, billing header cc_version=2.1.170, user-agent claude-cli/2.1.170. Request body matches working V1 structure (standard fields only) — internal-only fields (diagnostics/output_config/context_management/thinking) rejected by public API. Model: claude-opus-4-8. Reuses helpers + parse_sse_stream from claude_code_api_key.'
-  last_edited_ms: 1781084621771
+  description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
+  last_edited_ms: 1781085484593
 0e3797b0710562ff:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
