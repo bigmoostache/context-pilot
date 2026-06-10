@@ -8,14 +8,11 @@
 mod db;
 /// SQL error enrichment: fuzzy suggestions and schema context.
 mod errors;
-/// SQL result formatting utilities (shared by tools and panels).
-mod format;
 /// Auto-capture DDL as numbered migration files + sequential replay for recovery.
 mod migrations;
-/// Fixed Entities panel — live schema, sample data, and empty-state guide.
-mod panel;
-/// Dynamic entity result panel — large query results, static + live refresh.
-mod result_panel;
+/// Panels + result formatting: fixed Entities panel, dynamic result panel, SQL formatting.
+mod panels;
+pub(crate) use panels::{format, panel, result_panel};
 /// Meilisearch sync: incremental dirty-tracked, delete-then-add per table.
 mod sync;
 /// SQL execution engine: classification, splitting, execution, error enrichment.

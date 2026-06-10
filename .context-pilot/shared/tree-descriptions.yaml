@@ -1406,6 +1406,10 @@
   path: src/ui/search_overlay/display.rs
   description: 'Display column builders for the search index overlay. Converts SearchIndexOverlay IR data into ratatui Line sequences for the two-column layout (left: server/database/index/extensions, right: splitter/embeddings/tasks/recomputed/recent). Centered bordered popup.'
   last_edited_ms: 0
+6192121729fa4dc7:
+  path: crates/cp-mod-entities/src/lib.rs
+  description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
+  last_edited_ms: 0
 61a14b9b495f26ae:
   path: Cargo.toml
   description: Workspace root. 22 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
@@ -2138,6 +2142,10 @@
   path: crates/cp-base/src/tools/mod.rs
   description: 'Tool system. ToolUse/ToolResult (display, tldr, preserves_tempo). ToolDefinition + ToolDefBuilder (schema in Rust, descriptions from YAML). ParamType recursive JSON Schema. build_api() generates LLM tool array. Sub-modules: pre_flight, async_exec.'
   last_edited_ms: 0
+9878265bf246df4c:
+  path: src/llms/cache/mod.rs
+  description: 'Module declarations: cache_engine, cache_optimizer, density.'
+  last_edited_ms: 0
 98ab1d3ab25330c0:
   path: yamls/prompts.yaml
   description: Panel display messages (header/timestamp/footer) + context threshold notification
@@ -2566,6 +2574,10 @@ b72e91359bc352c2:
   path: crates/cp-mod-brave/src/panel.rs
   description: Brave result panel. Static content persisted in metadata (META_CONTENT). Cache restore from metadata post-reload. Pagination support. BRAVE_PANEL_TYPE constant.
   last_edited_ms: 0
+b73b9d54f816cc9a:
+  path: docs/talk/index.html
+  description: 'Slide deck shell: sidebar nav, slide viewport (current/incoming), position indicator, persistent timer. Loads style.css + script.js.'
+  last_edited_ms: 1781088859669
 b761e786cbced48a:
   path: src/modules/conversation/markdown_ir.rs
   description: Thin re-export — delegates to cp_render::markdown::parse_line(). Backward compat for conversation renderer.
