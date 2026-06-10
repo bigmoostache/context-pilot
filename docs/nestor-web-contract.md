@@ -160,6 +160,26 @@ Mécanique côté cœur (`WebSink`, `OutputSink`) :
 
 ---
 
+## 2.bis Projets (workspaces)
+
+Niveau au-dessus de la session : chaque projet = un répertoire sous la racine
+`--projects-dir` (Pi : `~/nestor/projects/<nom>`) avec son propre `.context-pilot/`.
+Le cœur reste mono-session : il tourne dans le projet pointé par `<racine>/.current`.
+
+REST (Bearer token, 501 si `--projects-dir` absent) :
+
+| Endpoint | Effet |
+|---|---|
+| `GET /api/projects` | `{ projects: [{name, current, last_active_ms, has_git}], current }` |
+| `POST /api/projects` `{name, git_url?}` | crée (et clone) — la requête dure le temps du clone |
+| `POST /api/projects/switch` `{name}` | → `WebEvent::SwitchProject` : le cœur écrit le pointeur, diffuse `{"t":"bye","reason":"switch","project"}` puis exec-restart dans le nouveau workspace (~3 s, reconnexion auto du front) |
+| `POST /api/projects/archive` `{name}` | déplace vers `.archive/<nom>-<ts>` (refusé sur le projet actif) |
+| `POST /api/projects/delete` `{name, confirm}` | suppression définitive, `confirm` doit répéter le nom |
+
+Noms : `[A-Za-z0-9_-]{1,64}`. `meta.project` (WebState) porte le projet actif.
+Conséquence sécurité : l'auth (`web-auth.json`) est **globale** (`~/.context-pilot/`),
+pas par workspace — le token survit aux bascules.
+
 ## 3. Auth & réseau (décision n°4)
 
 - `POST /api/login { password, device_name }` → `{ token, device_id }`.

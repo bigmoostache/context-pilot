@@ -38,6 +38,7 @@ impl App {
             last_chat_drain_ms: 0,
             api_check_rx: None,
             resume_stream,
+            switch_pending: false,
             command_palette: CommandPalette::new(),
             wait_started_ms: 0,
             deferred_tool_sleep_until_ms: 0,

@@ -4,13 +4,20 @@ import { create } from 'zustand'
 import type { ServerFrame, WebMessage, WebState } from './types'
 
 export type ConnState = 'login' | 'connecting' | 'online' | 'offline'
+export type Screen = 'projects' | 'shell'
 
 interface NestorStore {
   conn: ConnState
   state: WebState | null
   lastError: string | null
+  /** Écran courant : sélecteur de projets ou session. */
+  screen: Screen
+  /** Projet cible pendant une bascule (overlay d'attente). */
+  switchingTo: string | null
   setConn: (conn: ConnState) => void
   setError: (message: string | null) => void
+  setScreen: (screen: Screen) => void
+  setSwitching: (name: string | null) => void
   applyFrame: (frame: ServerFrame) => void
   reset: () => void
 }
@@ -34,15 +41,31 @@ export const useNestor = create<NestorStore>((set) => ({
   conn: 'login',
   state: null,
   lastError: null,
+  screen: 'projects',
+  switchingTo: null,
   setConn: (conn) => set({ conn }),
   setError: (lastError) => set({ lastError }),
-  reset: () => set({ state: null, conn: 'login' }),
+  setScreen: (screen) => set({ screen }),
+  setSwitching: (switchingTo) => set({ switchingTo }),
+  reset: () => set({ state: null, conn: 'login', screen: 'projects', switchingTo: null }),
 
   applyFrame: (frame) =>
     set((store) => {
       switch (frame.t) {
-        case 'snapshot':
-          return { state: frame.state, conn: 'online' as const }
+        case 'snapshot': {
+          // Fin de bascule : le snapshot du nouveau projet est arrivé.
+          const arrived = frame.state.meta.project
+          const switching = store.switchingTo !== null && arrived === store.switchingTo
+          return {
+            state: frame.state,
+            conn: 'online' as const,
+            ...(switching ? { switchingTo: null, screen: 'shell' as const } : {}),
+          }
+        }
+        case 'bye':
+          // Le cœur redémarre (bascule de projet) — on garde l'état affiché,
+          // l'overlay d'attente prend le relais jusqu'au prochain snapshot.
+          return frame.reason === 'switch' && frame.project ? { switchingTo: frame.project } : {}
         case 'delta': {
           if (!store.state) return {}
           const next: WebState = { ...store.state }

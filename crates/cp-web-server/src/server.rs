@@ -16,6 +16,7 @@ use serde::Deserialize;
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::auth::{Store, StoreError};
+use crate::projects;
 use crate::protocol::{ClientMsg, LoginRequest, LoginResponse, WebEvent, WireFrame, error_frame};
 
 /// Shared state for all axum handlers.
@@ -28,6 +29,8 @@ struct Shared {
     events: Sender<WebEvent>,
     /// Monotonic connection ID allocator.
     next_conn: AtomicU64,
+    /// Projects root (`None` = projects API disabled).
+    projects_root: Option<std::path::PathBuf>,
 }
 
 /// Everything [`serve`] needs, bundled to stay under the argument limit.
@@ -42,12 +45,14 @@ pub(crate) struct ServeArgs {
     pub frames: tokio::sync::broadcast::Sender<WireFrame>,
     /// Inbound event channel to the core loop.
     pub events: Sender<WebEvent>,
+    /// Projects root (`--projects-dir`).
+    pub projects_root: Option<std::path::PathBuf>,
 }
 
 /// Run the axum server until the process exits.
 pub(crate) async fn serve(args: ServeArgs) {
-    let ServeArgs { listener, auth, dist_dir, frames, events } = args;
-    let shared = Arc::new(Shared { auth, frames, events, next_conn: AtomicU64::new(1) });
+    let ServeArgs { listener, auth, dist_dir, frames, events, projects_root } = args;
+    let shared = Arc::new(Shared { auth, frames, events, next_conn: AtomicU64::new(1), projects_root });
 
     let index = dist_dir.join("index.html");
     let spa = ServeDir::new(&dist_dir).fallback(ServeFile::new(index));
@@ -56,6 +61,10 @@ pub(crate) async fn serve(args: ServeArgs) {
         .route("/api/login", post(login))
         .route("/api/devices", get(list_devices))
         .route("/api/devices/revoke", post(revoke_device))
+        .route("/api/projects", get(projects_list).post(projects_create))
+        .route("/api/projects/switch", post(projects_switch))
+        .route("/api/projects/archive", post(projects_archive))
+        .route("/api/projects/delete", post(projects_delete))
         .route("/ws", any(ws_upgrade))
         .fallback_service(spa)
         .with_state(shared);
@@ -117,6 +126,116 @@ async fn revoke_device(
         Ok(true) => StatusCode::NO_CONTENT.into_response(),
         Ok(false) => StatusCode::NOT_FOUND.into_response(),
         Err(_e) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+// ─── Projects API ───────────────────────────────────────────────────────────
+
+/// Map a [`projects::ProjectError`] to an HTTP response.
+fn project_error_response(err: projects::ProjectError) -> Response {
+    use projects::ProjectError as PE;
+    match err {
+        PE::BadName => (StatusCode::BAD_REQUEST, "invalid project name").into_response(),
+        PE::NotFound => (StatusCode::NOT_FOUND, "project not found").into_response(),
+        PE::Exists => (StatusCode::CONFLICT, "project already exists").into_response(),
+        PE::IsCurrent => (StatusCode::CONFLICT, "project is currently active — switch first").into_response(),
+        PE::BadConfirm => (StatusCode::BAD_REQUEST, "confirmation does not match").into_response(),
+        PE::Io(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+    }
+}
+
+/// Auth + projects-enabled guard shared by all project handlers.
+fn projects_guard(shared: &Shared, headers: &HeaderMap) -> Result<std::path::PathBuf, Box<Response>> {
+    if let Err(code) = check_bearer(shared, headers) {
+        return Err(Box::new(code.into_response()));
+    }
+    shared.projects_root.clone().ok_or_else(|| {
+        Box::new((StatusCode::NOT_IMPLEMENTED, "projects disabled (no --projects-dir)").into_response())
+    })
+}
+
+/// `GET /api/projects` — registry listing + current project.
+async fn projects_list(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> Response {
+    let root = match projects_guard(&shared, &headers) {
+        Ok(root) => root,
+        Err(resp) => return *resp,
+    };
+    let current = projects::read_current(&root);
+    axum::Json(serde_json::json!({ "projects": projects::list(&root), "current": current })).into_response()
+}
+
+/// `POST /api/projects` — create (and optionally clone) a project.
+/// The clone runs on a blocking thread; the request returns when it's done.
+async fn projects_create(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    body: axum::Json<projects::CreateRequest>,
+) -> Response {
+    let root = match projects_guard(&shared, &headers) {
+        Ok(root) => root,
+        Err(resp) => return *resp,
+    };
+    let projects::CreateRequest { name, git_url } = body.0;
+    let result =
+        tokio::task::spawn_blocking(move || projects::create(&root, &name, git_url.as_deref())).await;
+    match result {
+        Ok(Ok(())) => StatusCode::CREATED.into_response(),
+        Ok(Err(err)) => project_error_response(err),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("join error: {e}")).into_response(),
+    }
+}
+
+/// `POST /api/projects/switch` — hand over to the core (pointer + restart).
+async fn projects_switch(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    body: axum::Json<projects::NameRequest>,
+) -> Response {
+    let root = match projects_guard(&shared, &headers) {
+        Ok(root) => root,
+        Err(resp) => return *resp,
+    };
+    if !projects::valid_name(&body.name) {
+        return project_error_response(projects::ProjectError::BadName);
+    }
+    if !root.join(&body.name).is_dir() {
+        return project_error_response(projects::ProjectError::NotFound);
+    }
+    if shared.events.send(WebEvent::SwitchProject { name: body.name.clone() }).is_err() {
+        return (StatusCode::SERVICE_UNAVAILABLE, "core loop unavailable").into_response();
+    }
+    StatusCode::ACCEPTED.into_response()
+}
+
+/// `POST /api/projects/archive` — move a project to `.archive/`.
+async fn projects_archive(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    body: axum::Json<projects::NameRequest>,
+) -> Response {
+    let root = match projects_guard(&shared, &headers) {
+        Ok(root) => root,
+        Err(resp) => return *resp,
+    };
+    match projects::archive(&root, &body.name) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => project_error_response(err),
+    }
+}
+
+/// `POST /api/projects/delete` — permanent removal, typed confirmation.
+async fn projects_delete(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    body: axum::Json<projects::DeleteRequest>,
+) -> Response {
+    let root = match projects_guard(&shared, &headers) {
+        Ok(root) => root,
+        Err(resp) => return *resp,
+    };
+    match projects::delete(&root, &body.name, &body.confirm) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => project_error_response(err),
     }
 }
 

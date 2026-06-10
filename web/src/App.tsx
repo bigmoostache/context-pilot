@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNestor } from '@/lib/store'
 import { connect, getToken } from '@/lib/ws'
 import { Login } from '@/components/Login'
+import { Projects } from '@/components/Projects'
 import { Sidebar } from '@/components/Sidebar'
 import { Chat } from '@/components/Chat'
 import { Composer } from '@/components/Composer'
@@ -15,6 +16,8 @@ import { IndexSheet } from '@/components/IndexSheet'
 export default function App() {
   const conn = useNestor((s) => s.conn)
   const hasState = useNestor((s) => s.state !== null)
+  const screen = useNestor((s) => s.screen)
+  const switchingTo = useNestor((s) => s.switchingTo)
   const [configOpen, setConfigOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [indexOpen, setIndexOpen] = useState(false)
@@ -42,6 +45,18 @@ export default function App() {
   }, [])
 
   if (conn === 'login') return <Login />
+
+  // Bascule de projet : le cœur redémarre dans le nouveau workspace.
+  if (switchingTo !== null) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2">
+        <p className="font-display text-3xl italic text-brass-300 animate-pulse">Cap sur « {switchingTo} »…</p>
+        <p className="text-sm text-parchment-700">Nestor change d’atelier, reconnexion automatique.</p>
+      </div>
+    )
+  }
+
+  if (screen === 'projects') return <Projects />
 
   if (!hasState) {
     return (

@@ -184,6 +184,12 @@ pub enum WebEvent {
         /// The new connection's ID.
         conn_id: u64,
     },
+    /// A client asked to switch the active project (workspace). The core
+    /// validates, persists the pointer and exec-restarts into it.
+    SwitchProject {
+        /// Target project name (directory under the projects root).
+        name: String,
+    },
 }
 
 /// A pre-serialized JSON frame pushed from the core to web clients.

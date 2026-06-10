@@ -1,17 +1,30 @@
 # Nestor — exploitation sur la Pi
 
-État au 10 juin 2026 : V1 déployée et vérifiée de bout en bout sur la Pi (`nestor`, 192.168.1.145).
+État au 11 juin 2026 : V1 + système de workspaces, déployés et vérifiés de bout en bout
+sur la Pi (`nestor`, 192.168.1.145).
 
 ## Accès
 
 - **Web** : http://192.168.1.145:8787 — mot de passe → token par appareil (révocable
   depuis Configuration → Appareils connectés). Le mot de passe initial vient de
   `CP_WEB_PASSWORD` dans `~/nestor/.env` (Pi) au premier démarrage ; ensuite il est
-  hashé (argon2id) dans `workspace/.context-pilot/web-auth.json`.
-- **TUI de secours** : `ssh -t huser@192.168.1.145 nestor/bin/nestor-tui` — prend
-  l'ownership de la session : le service headless s'arrête proprement (et ne redémarre
-  pas tout seul, `Restart=on-failure`). Au Ctrl+Q, relancer : `sudo systemctl start nestor`.
+  hashé (argon2id) dans `~/.context-pilot/web-auth.json` (global — survit aux
+  bascules de projet).
+- **TUI de secours** : `ssh -t huser@192.168.1.145 nestor/bin/nestor-tui [projet]` —
+  sans argument, entre dans le projet courant. Prend l'ownership de la session : le
+  service headless s'arrête proprement (et ne redémarre pas tout seul,
+  `Restart=on-failure`). Au Ctrl+Q, relancer : `sudo systemctl start nestor`.
 - **Même session** : la TUI et le web voient la même conversation, les mêmes panneaux.
+
+## Projets (workspaces)
+
+Après le login, le web ouvre le **sélecteur de projets**. Chaque projet =
+`~/nestor/projects/<nom>` avec sa propre session (conversation, todos, mémoire…).
+Créer = dossier vierge ou `git clone` d'une URL. Ouvrir un autre projet redémarre
+le cœur dedans (~3 s, reconnexion automatique). Archiver = déplacé dans
+`projects/.archive/` (récupérable en SSH) ; supprimer = définitif, confirmation
+par saisie du nom. Le projet actif est marqué « à bord » ; pointeur :
+`~/nestor/projects/.current`.
 
 ## Service
 

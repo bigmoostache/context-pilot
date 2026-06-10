@@ -131,7 +131,15 @@ export interface WebMeta {
   providers: ProviderEntry[]
   tools: ToolEntry[]
   workspace: string
+  project: string | null
   version: string
+}
+
+export interface ProjectInfo {
+  name: string
+  current: boolean
+  last_active_ms: number
+  has_git: boolean
 }
 
 export interface WebState {
@@ -160,7 +168,7 @@ export type ServerFrame =
   | { t: 'result'; req_id: string; data: unknown }
   | { t: 'error'; message: string }
   | { t: 'pong' }
-  | { t: 'bye'; reason: string }
+  | { t: 'bye'; reason: string; project?: string }
 
 // Commandes client → serveur (face entrante du contrat)
 export type WebCommand =

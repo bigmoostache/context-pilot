@@ -27,6 +27,19 @@ use crate::app::App;
 use crate::app::frontend::{InputSource, OutputSink, PumpFlow};
 use crate::app::run::lifecycle::EventChannels;
 
+/// Name of the active project (workspace system), set once at boot.
+static PROJECT_NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Record the active project name (read by the `meta` section).
+pub(crate) fn set_project_name(name: &str) {
+    let _r = PROJECT_NAME.set(name.to_string());
+}
+
+/// The active project name, if the workspace system is enabled.
+pub(crate) fn project_name() -> Option<&'static str> {
+    PROJECT_NAME.get().map(String::as_str)
+}
+
 /// Hash a JSON value's canonical string form.
 fn value_hash(value: &Value) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -44,12 +57,18 @@ pub(crate) struct WebSource {
     buffered: Option<WebEvent>,
     /// Outbound frames (snapshots and query results are sent from here).
     handle: WebHandle,
+    /// Projects root (`--projects-dir`) — needed to validate switches.
+    projects_dir: Option<std::path::PathBuf>,
 }
 
 impl WebSource {
     /// Create a web input source from the server's channels.
-    pub(crate) const fn new(events_rx: Receiver<WebEvent>, handle: WebHandle) -> Self {
-        Self { events_rx, buffered: None, handle }
+    pub(crate) const fn new(
+        events_rx: Receiver<WebEvent>,
+        handle: WebHandle,
+        projects_dir: Option<std::path::PathBuf>,
+    ) -> Self {
+        Self { events_rx, buffered: None, handle, projects_dir }
     }
 
     /// Dispatch one event into the app.
@@ -64,7 +83,29 @@ impl WebSource {
                 let snapshot = build::snapshot_json(&app.state);
                 self.handle.send(WireFrame::to_conn(conn_id, snapshot));
             }
+            WebEvent::SwitchProject { name } => self.switch_project(app, &name),
         }
+    }
+
+    /// Switch the active project: persist the pointer, warn the clients,
+    /// then let the existing reload path exec-restart into the new cwd.
+    fn switch_project(&self, app: &mut App, name: &str) {
+        let Some(root) = &self.projects_dir else { return };
+        if !cp_web_server::projects::valid_name(name) || !root.join(name).is_dir() {
+            self.handle.send(WireFrame::broadcast(
+                serde_json::json!({ "t": "error", "message": format!("projet inconnu : {name}") }).to_string(),
+            ));
+            return;
+        }
+        if let Err(e) = cp_web_server::projects::write_current(root, name) {
+            log::error!("[web] switch: cannot write pointer: {e:?}");
+            return;
+        }
+        self.handle.send(WireFrame::broadcast(
+            serde_json::json!({ "t": "bye", "reason": "switch", "project": name }).to_string(),
+        ));
+        app.switch_pending = true;
+        app.state.flags.lifecycle.reload_pending = true;
     }
 }
 

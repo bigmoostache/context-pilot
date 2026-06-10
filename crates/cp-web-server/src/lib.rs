@@ -16,6 +16,8 @@
 
 /// Password and token management.
 pub mod auth;
+/// Workspace registry (projects on disk).
+pub mod projects;
 /// Wire protocol types (commands, queries, frames).
 pub mod protocol;
 /// Axum routes and WebSocket plumbing.
@@ -41,6 +43,8 @@ pub struct WebServerConfig {
     /// Password used to initialize the auth file on first start
     /// (from `CP_WEB_PASSWORD`). Ignored when the file already exists.
     pub initial_password: Option<String>,
+    /// Projects root (`--projects-dir`). `None` disables the projects API.
+    pub projects_root: Option<PathBuf>,
 }
 
 /// Handle returned by [`start`]: the outbound frame channel.
@@ -119,7 +123,14 @@ pub fn start(config: &WebServerConfig, events_tx: Sender<WebEvent>) -> Result<We
         .build()
         .map_err(StartError::Runtime)?;
 
-    let args = server::ServeArgs { listener, auth, dist_dir: config.dist_dir.clone(), frames: frames_tx, events: events_tx };
+    let args = server::ServeArgs {
+        listener,
+        auth,
+        dist_dir: config.dist_dir.clone(),
+        frames: frames_tx,
+        events: events_tx,
+        projects_root: config.projects_root.clone(),
+    };
     drop(std::thread::Builder::new().name("cp-web-server".to_string()).spawn(move || {
         runtime.block_on(server::serve(args));
     }));

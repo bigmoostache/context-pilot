@@ -212,6 +212,7 @@ pub(crate) fn meta_value(state: &State) -> Value {
         "providers": providers_catalog(),
         "tools": tools,
         "workspace": workspace,
+        "project": super::project_name(),
         "version": env!("CARGO_PKG_VERSION"),
     })
 }

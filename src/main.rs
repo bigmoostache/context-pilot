@@ -244,6 +244,8 @@ struct CliArgs {
     web_bind_any: bool,
     /// Directory of the built SPA.
     web_dist: std::path::PathBuf,
+    /// Projects root: enables the workspace system (picker + switch).
+    projects_dir: Option<std::path::PathBuf>,
 }
 
 /// Parse command-line arguments (tiny by design — no clap dependency).
@@ -255,6 +257,7 @@ fn parse_cli() -> CliArgs {
         web_bind: None,
         web_bind_any: false,
         web_dist: std::path::PathBuf::from("web-dist"),
+        projects_dir: None,
     };
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -265,13 +268,54 @@ fn parse_cli() -> CliArgs {
             "--web-bind" => cli.web_bind = iter.next().and_then(|v| v.parse().ok()),
             "--web-dist" => {
                 if let Some(dir) = iter.next() {
-                    cli.web_dist = std::path::PathBuf::from(dir);
+                    // Absolu : le cwd change à chaque bascule de projet.
+                    let path = std::path::PathBuf::from(dir);
+                    cli.web_dist = path.canonicalize().unwrap_or(path);
                 }
+            }
+            "--projects-dir" => {
+                // Absolu obligatoire : exec() conserve le cwd de l'ancien
+                // projet, le chemin doit rester valable après bascule.
+                cli.projects_dir = iter
+                    .next()
+                    .map(std::path::PathBuf::from)
+                    .map(|dir| dir.canonicalize().unwrap_or(dir));
             }
             _ => {}
         }
     }
     cli
+}
+
+/// Enter the active project under the projects root: read the `.current`
+/// pointer (fall back to the most recent project, else create `scratch`),
+/// chdir into it, and record its name for the web `meta` section.
+/// Returns `None` when the workspace cannot be entered.
+fn enter_project(projects_dir: &std::path::Path) -> Option<String> {
+    use cp_web_server::projects;
+    if let Err(e) = std::fs::create_dir_all(projects_dir) {
+        drop(writeln!(io::stderr(), "Fatal: cannot create projects dir: {e}"));
+        return None;
+    }
+    let name = projects::read_current(projects_dir)
+        .filter(|n| projects_dir.join(n).is_dir())
+        .or_else(|| {
+            // Pas de pointeur valable : dernier projet actif, sinon « scratch ».
+            let fallback = projects::list(projects_dir)
+                .into_iter()
+                .next()
+                .map_or_else(|| "scratch".to_string(), |p| p.name);
+            std::fs::create_dir_all(projects_dir.join(&fallback)).ok()?;
+            projects::write_current(projects_dir, &fallback).ok()?;
+            Some(fallback)
+        })?;
+    let path = projects_dir.join(&name);
+    if let Err(e) = std::env::set_current_dir(&path) {
+        drop(writeln!(io::stderr(), "Fatal: cannot enter project '{name}': {e}"));
+        return None;
+    }
+    web::set_project_name(&name);
+    Some(name)
 }
 
 /// Install the panic hook: restore the terminal (TUI mode only) and append
@@ -398,17 +442,24 @@ fn finalize_state(state: &mut state::State) {
 fn start_web(cli: &CliArgs) -> Option<(web::WebSource, web::WebSink)> {
     let bind = cli.web_bind?;
     let (events_tx, events_rx) = mpsc::channel::<cp_web_server::protocol::WebEvent>();
+    // Auth globale ($HOME/.context-pilot/) : le token doit survivre aux
+    // bascules de projet — chaque workspace a son propre .context-pilot/.
+    let auth_path = std::env::var_os("HOME").map_or_else(
+        || std::path::Path::new(".context-pilot").join("web-auth.json"),
+        |home| std::path::Path::new(&home).join(".context-pilot").join("web-auth.json"),
+    );
     let config = cp_web_server::WebServerConfig {
         bind,
         allow_any_bind: cli.web_bind_any,
         dist_dir: cli.web_dist.clone(),
-        auth_path: std::path::Path::new(".context-pilot").join("web-auth.json"),
+        auth_path,
         initial_password: std::env::var("CP_WEB_PASSWORD").ok(),
+        projects_root: cli.projects_dir.clone(),
     };
     match cp_web_server::start(&config, events_tx) {
         Ok(handle) => {
             let sink_handle = handle.clone();
-            Some((web::WebSource::new(events_rx, handle), web::WebSink::new(sink_handle)))
+            Some((web::WebSource::new(events_rx, handle, cli.projects_dir.clone()), web::WebSink::new(sink_handle)))
         }
         Err(e) => {
             drop(writeln!(io::stderr(), "Web server error: {e}"));
@@ -420,16 +471,36 @@ fn start_web(cli: &CliArgs) -> Option<(web::WebSource, web::WebSink)> {
 /// Self-restart on reload — lets `cpilot` work without the run.sh supervisor
 /// loop. `exec()` replaces this process with a fresh instance (same binary,
 /// same env). Skipped when run.sh supervises (`CP_RUN_SH=1`).
-fn exec_restart_if_pending(app: &App) {
+///
+/// The arguments are rebuilt from the parsed CLI (not `std::env::args()`):
+/// after a project switch the cwd changes, so any relative path from the
+/// original invocation would resolve wrong — the parsed paths are absolute.
+fn exec_restart_if_pending(app: &App, cli: &CliArgs) {
     #[cfg(unix)]
     if app.state.flags.lifecycle.reload_pending
         && std::env::var_os("CP_RUN_SH").is_none()
         && let Ok(exe_path) = std::env::current_exe()
     {
         use std::os::unix::process::CommandExt as _;
-        let mut restart_args: Vec<String> = std::env::args().skip(1).collect();
-        if !restart_args.iter().any(|a| a == "--resume-stream") {
-            restart_args.push("--resume-stream".to_string());
+        // Une bascule de projet ouvre une autre session : ne pas reprendre
+        // le stream — c'est réservé aux reloads en place (system_reload).
+        let mut restart_args: Vec<String> =
+            if app.switch_pending { Vec::new() } else { vec!["--resume-stream".to_string()] };
+        if cli.headless {
+            restart_args.push("--headless".to_string());
+        }
+        if let Some(bind) = cli.web_bind {
+            restart_args.push("--web-bind".to_string());
+            restart_args.push(bind.to_string());
+        }
+        if cli.web_bind_any {
+            restart_args.push("--web-bind-any".to_string());
+        }
+        restart_args.push("--web-dist".to_string());
+        restart_args.push(cli.web_dist.display().to_string());
+        if let Some(projects_dir) = &cli.projects_dir {
+            restart_args.push("--projects-dir".to_string());
+            restart_args.push(projects_dir.display().to_string());
         }
         // Replaces the current process — never returns on success
         let _err = std::process::Command::new(exe_path).args(&restart_args).exec();
@@ -443,6 +514,14 @@ fn headless_main(cli: &CliArgs) -> ExitCode {
     if cli.web_bind.is_none() {
         drop(writeln!(io::stderr(), "Fatal: --headless requires --web-bind <ip:port>"));
         return ExitCode::FAILURE;
+    }
+
+    // Workspace system: enter the active project before any state I/O.
+    if let Some(projects_dir) = &cli.projects_dir {
+        let Some(project) = enter_project(projects_dir) else {
+            return ExitCode::FAILURE;
+        };
+        drop(writeln!(io::stderr(), "[boot] project: {project}"));
     }
 
     // Boot with stderr progress lines instead of the boot screen.
@@ -469,7 +548,7 @@ fn headless_main(cli: &CliArgs) -> ExitCode {
     let run_result = app.run(&mut [&mut web_source], &mut [&mut web_sink], &ch);
 
     infra::flame::flush();
-    exec_restart_if_pending(&app);
+    exec_restart_if_pending(&app, cli);
 
     if let Err(e) = run_result {
         drop(writeln!(io::stderr(), "Fatal: {e}"));
@@ -482,6 +561,13 @@ fn headless_main(cli: &CliArgs) -> ExitCode {
 /// (same session, same loop: the browser and the terminal coexist).
 fn tui_main(cli: &CliArgs) -> ExitCode {
     install_panic_hook(true);
+
+    // Workspace system (optionnel en TUI : nestor-tui peut aussi cd lui-même).
+    if let Some(projects_dir) = &cli.projects_dir
+        && enter_project(projects_dir).is_none()
+    {
+        return ExitCode::FAILURE;
+    }
 
     let Ok(()) = enable_raw_mode() else {
         drop(writeln!(io::stderr(), "Fatal: failed to enable raw mode"));
@@ -520,7 +606,7 @@ fn tui_main(cli: &CliArgs) -> ExitCode {
     let _r_leave = io::stdout().execute(LeaveAlternateScreen);
     infra::flame::flush();
 
-    exec_restart_if_pending(&app);
+    exec_restart_if_pending(&app, cli);
 
     if let Err(e) = run_result {
         drop(writeln!(io::stderr(), "Fatal: {e}"));

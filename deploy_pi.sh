@@ -53,9 +53,18 @@ ssh "$PI_HOST" "mv $PI_DIR/bin/cpilot.new $PI_DIR/bin/cpilot && mv $PI_DIR/bin/c
 echo "[3/4] Installing launchers..."
 ssh "$PI_HOST" "cat > $PI_DIR/bin/nestor-tui" <<'EOF'
 #!/bin/bash
-# nestor-tui — launch the Context Pilot TUI on the Pi (SSH fallback client).
+# nestor-tui [projet] — launch the Context Pilot TUI on the Pi (SSH fallback).
+# Without argument: enters the current project (the headless pointer).
 # The binary self-restarts via exec() on reload — no cargo supervisor needed.
-cd "${NESTOR_WORKSPACE:-$HOME/nestor/workspace}"
+PROJECTS="${NESTOR_PROJECTS:-$HOME/nestor/projects}"
+NAME="$1"
+if [ -n "$NAME" ]; then shift; else NAME="$(cat "$PROJECTS/.current" 2>/dev/null)"; fi
+if [ -z "$NAME" ] || [ ! -d "$PROJECTS/$NAME" ]; then
+    echo "Projets disponibles dans $PROJECTS :"
+    ls "$PROJECTS" 2>/dev/null | grep -v '^\.'
+    exit 1
+fi
+cd "$PROJECTS/$NAME"
 [ -f "$HOME/nestor/.env" ] && export $(grep -v '^#' "$HOME/nestor/.env" | xargs)
 ulimit -n 2048 2>/dev/null
 exec "$HOME/nestor/bin/cpilot" "$@"
@@ -63,10 +72,13 @@ EOF
 ssh "$PI_HOST" "cat > $PI_DIR/bin/nestor-web" <<'EOF'
 #!/bin/bash
 # nestor-web — launch Context Pilot headless with the web server (Nestor mode).
-cd "${NESTOR_WORKSPACE:-$HOME/nestor/workspace}"
+# The workspace system picks the active project under --projects-dir.
 [ -f "$HOME/nestor/.env" ] && export $(grep -v '^#' "$HOME/nestor/.env" | xargs)
 ulimit -n 2048 2>/dev/null
-exec "$HOME/nestor/bin/cpilot" --headless --web-bind "${NESTOR_BIND:-192.168.1.145:8787}" --web-dist "$HOME/nestor/web-dist" "$@"
+exec "$HOME/nestor/bin/cpilot" --headless \
+    --web-bind "${NESTOR_BIND:-192.168.1.145:8787}" \
+    --web-dist "$HOME/nestor/web-dist" \
+    --projects-dir "${NESTOR_PROJECTS:-$HOME/nestor/projects}" "$@"
 EOF
 ssh "$PI_HOST" "chmod +x $PI_DIR/bin/nestor-tui $PI_DIR/bin/nestor-web"
 

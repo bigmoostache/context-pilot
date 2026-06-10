@@ -79,6 +79,9 @@ pub(crate) struct App {
     pub api_check_rx: Option<Receiver<crate::llms::ApiCheckResult>>,
     /// Whether to auto-start streaming on first loop iteration
     pub resume_stream: bool,
+    /// Reload pending is a project switch (not a mid-stream reload):
+    /// the restart must NOT resume streaming in the new workspace.
+    pub switch_pending: bool,
     /// Command palette state
     pub command_palette: CommandPalette,
     /// Timestamp (ms) when `wait_for_panels` started (for timeout)

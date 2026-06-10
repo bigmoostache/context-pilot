@@ -1,4 +1,4 @@
-import { Anchor, Settings2, TerminalSquare } from 'lucide-react'
+import { Anchor, FolderOpen, Settings2, TerminalSquare } from 'lucide-react'
 import { useNestor } from '@/lib/store'
 import { send } from '@/lib/ws'
 import { cn, fmtTokens, panelIcon } from '@/lib/utils'
@@ -7,8 +7,9 @@ import type { WebPanel } from '@/lib/types'
 /** Rail gauche : jauge de contexte + liste des panneaux (la « salle des machines »). */
 export function Sidebar({ onOpenConfig }: { onOpenConfig: () => void }) {
   const state = useNestor((s) => s.state)
+  const setScreen = useNestor((s) => s.setScreen)
   if (!state) return null
-  const { status, panels } = state
+  const { status, panels, meta } = state
 
   // La conversation est traitée comme fixe : c'est le panneau central.
   const fixed = panels.filter((p) => p.is_fixed || p.kind === 'conversation')
@@ -31,6 +32,17 @@ export function Sidebar({ onOpenConfig }: { onOpenConfig: () => void }) {
             <Settings2 className="size-4" />
           </button>
         </div>
+        {meta.project && (
+          <button
+            onClick={() => setScreen('projects')}
+            title="Changer de projet"
+            className="mb-3 flex w-full items-center gap-1.5 rounded-md border border-coal-700 bg-coal-850 px-2 py-1.5 font-mono text-xs text-parchment-300 hover:border-brass-600/50 hover:text-brass-300 cursor-pointer"
+          >
+            <FolderOpen className="size-3.5 shrink-0" />
+            <span className="truncate">{meta.project}</span>
+            <span className="ml-auto text-[0.6rem] uppercase tracking-wider text-parchment-700">changer</span>
+          </button>
+        )}
         <ContextGauge
           used={status.context_used_tokens}
           budget={status.context_budget}

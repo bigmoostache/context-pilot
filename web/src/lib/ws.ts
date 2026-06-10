@@ -65,6 +65,17 @@ export function connect() {
   ws.onclose = async () => {
     if (socket !== ws) return
     socket = null
+    // Bascule de projet en cours : le process redémarre, on retente vite
+    // sans vérifier le token (l'API est down pendant ~2 s).
+    if (useNestor.getState().switchingTo !== null) {
+      useNestor.getState().setConn('connecting')
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null
+        connect()
+      }, 1000)
+      return
+    }
     // Token révoqué ? On vérifie via l'API ; sinon reconnexion avec backoff.
     const check = await fetch('/api/devices', { headers: { authorization: `Bearer ${token}` } }).catch(() => null)
     if (check && check.status === 401) {
@@ -119,4 +130,63 @@ export async function revokeDevice(deviceId: string) {
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ device_id: deviceId }),
   })
+}
+
+// ─── Projets (workspaces) ────────────────────────────────────────────────────
+
+function authHeaders(): Record<string, string> {
+  return { authorization: `Bearer ${getToken()}`, 'content-type': 'application/json' }
+}
+
+async function expectOk(res: Response): Promise<void> {
+  if (!res.ok) throw new Error((await res.text()) || `Erreur ${res.status}`)
+}
+
+export async function fetchProjects(): Promise<{ projects: import('./types').ProjectInfo[]; current: string | null }> {
+  const res = await fetch('/api/projects', { headers: authHeaders() })
+  await expectOk(res)
+  return res.json()
+}
+
+/** Crée un projet (clone git optionnel — la requête dure le temps du clone). */
+export async function createProject(name: string, gitUrl?: string): Promise<void> {
+  const res = await fetch('/api/projects', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ name, ...(gitUrl?.trim() ? { git_url: gitUrl.trim() } : {}) }),
+  })
+  await expectOk(res)
+}
+
+/** Demande la bascule ; l'overlay d'attente est armé tout de suite
+    (le cœur enverra aussi un « bye » avant de redémarrer). */
+export async function switchProject(name: string): Promise<void> {
+  useNestor.getState().setSwitching(name)
+  const res = await fetch('/api/projects/switch', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    useNestor.getState().setSwitching(null)
+    throw new Error((await res.text()) || `Erreur ${res.status}`)
+  }
+}
+
+export async function archiveProject(name: string): Promise<void> {
+  const res = await fetch('/api/projects/archive', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ name }),
+  })
+  await expectOk(res)
+}
+
+export async function deleteProject(name: string, confirm: string): Promise<void> {
+  const res = await fetch('/api/projects/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ name, confirm }),
+  })
+  await expectOk(res)
 }
