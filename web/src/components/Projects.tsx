@@ -66,7 +66,6 @@ export function Projects() {
           <Anchor className="size-6 text-brass-400" />
         </div>
         <h1 className="font-display text-4xl italic">Nestor</h1>
-        <p className="mt-1 text-sm text-parchment-500">Choisis un projet — chacun a son atelier sur la Pi.</p>
         <button
           onClick={() => setScreen('settings')}
           title="Paramètres généraux (WiFi, clés API, système)"
@@ -147,7 +146,14 @@ function ProjectCard({
         project.current ? 'border-brass-600/50 shadow-[0_0_30px_-12px] shadow-brass-500/40' : 'border-coal-700 hover:border-coal-600',
       )}
     >
-      <button onClick={onOpen} className="block w-full text-left cursor-pointer">
+      {/* Calque cliquable couvrant toute la carte (padding inclus). */}
+      <button
+        onClick={onOpen}
+        title={`Ouvrir ${project.name}`}
+        className="absolute inset-0 z-0 rounded-xl cursor-pointer"
+      />
+
+      <div className="pointer-events-none relative z-10">
         <div className="flex items-center gap-2">
           {project.has_git ? (
             <FolderGit2 className="size-4 text-tide-400" />
@@ -165,11 +171,11 @@ function ProjectCard({
           {project.has_git && <GitBranch className="size-3" />}
           <span>{project.last_active_ms ? `actif ${fmtAgo(project.last_active_ms)}` : 'jamais ouvert'}</span>
         </div>
-      </button>
+      </div>
 
       {/* Actions (apparaissent au survol ; jamais sur le projet actif) */}
       {!project.current && (
-        <div className="absolute right-2.5 top-2.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute right-2.5 top-2.5 z-20 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <button
             onClick={onArchive}
             title="Archiver (réversible en SSH)"

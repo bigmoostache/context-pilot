@@ -95,7 +95,10 @@ fn disk_root() -> (u64, u64) {
 #[must_use]
 pub fn wifi_status() -> Value {
     let ip = run("hostname", &["-I"]).split_whitespace().next().unwrap_or_default().to_string();
-    let list = run("nmcli", &["-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list"]);
+    // `--rescan yes` force NetworkManager à relancer un scan plutôt que de
+    // renvoyer le cache du précédent — sinon le bouton « Scanner » ne change rien.
+    let list =
+        run("nmcli", &["-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list", "--rescan", "yes"]);
     let mut networks: Vec<Value> = Vec::new();
     let mut current: Option<String> = None;
     let mut seen: Vec<String> = Vec::new();

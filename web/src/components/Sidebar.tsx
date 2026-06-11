@@ -20,10 +20,14 @@ export function Sidebar({ onOpenConfig }: { onOpenConfig: () => void }) {
       {/* En-tête : wordmark + jauge de contexte */}
       <div className="border-b border-coal-800 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <button
+            onClick={() => setScreen('projects')}
+            title="Retour à l'accueil"
+            className="flex items-center gap-2 rounded-md text-parchment-100 hover:text-brass-300 cursor-pointer"
+          >
             <Anchor className="size-4 text-brass-400" />
             <span className="font-display text-2xl italic leading-none">Nestor</span>
-          </div>
+          </button>
           <button
             onClick={onOpenConfig}
             title="Configuration (Ctrl+H)"
@@ -79,9 +83,14 @@ export function Sidebar({ onOpenConfig }: { onOpenConfig: () => void }) {
 }
 
 function PanelRow({ panel, delay }: { panel: WebPanel; delay: number }) {
+  const setPanelOpen = useNestor((s) => s.setPanelOpen)
   return (
     <button
-      onClick={() => send({ cmd: 'select_panel', id: panel.id })}
+      onClick={() => {
+        send({ cmd: 'select_panel', id: panel.id })
+        // Conversation = colonne repliée ; tout autre panneau la déplie.
+        setPanelOpen(panel.kind !== 'conversation')
+      }}
       style={{ animationDelay: `${Math.min(delay * 30, 400)}ms` }}
       className={cn(
         'group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm animate-rise cursor-pointer',

@@ -112,12 +112,17 @@ function WifiSection() {
   const [data, setData] = useState<{ ip: string; current: string | null; networks: WifiNetwork[] } | null>(null)
   const [target, setTarget] = useState<WifiNetwork | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [scanning, setScanning] = useState(false)
 
   async function refresh() {
+    setScanning(true)
+    setError(null)
     try {
       setData(await fetchWifi())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur')
+    } finally {
+      setScanning(false)
     }
   }
   useEffect(() => {
@@ -135,8 +140,9 @@ function WifiSection() {
               <span className="text-sm text-parchment-100">{data.current ?? 'Non connecté'}</span>
               <span className="ml-2 font-mono text-xs text-parchment-700">{data.ip}</span>
             </div>
-            <Button variant="ghost" size="sm" onClick={refresh}>
-              <RefreshCw className="size-3.5" /> Scanner
+            <Button variant="ghost" size="sm" onClick={refresh} disabled={scanning}>
+              <RefreshCw className={cn('size-3.5', scanning && 'animate-spin')} />
+              {scanning ? 'Scan…' : 'Scanner'}
             </Button>
           </div>
           <div className="space-y-1">

@@ -74,11 +74,11 @@ export default function App() {
     <div className="flex h-full flex-col">
       <div className="flex min-h-0 flex-1">
         <Sidebar onOpenConfig={() => setConfigOpen(true)} />
+        <PanelView />
         <main className="flex min-w-0 flex-1 flex-col">
           <Chat />
           <Composer />
         </main>
-        <PanelView />
       </div>
       <StatusBar />
 

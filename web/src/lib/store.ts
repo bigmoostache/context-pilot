@@ -12,11 +12,14 @@ interface NestorStore {
   lastError: string | null
   /** Écran courant : sélecteur de projets ou session. */
   screen: Screen
+  /** Colonne « écran » (panneau) ouverte ou repliée — état purement local. */
+  panelOpen: boolean
   /** Projet cible pendant une bascule (overlay d'attente). */
   switchingTo: string | null
   setConn: (conn: ConnState) => void
   setError: (message: string | null) => void
   setScreen: (screen: Screen) => void
+  setPanelOpen: (open: boolean) => void
   setSwitching: (name: string | null) => void
   applyFrame: (frame: ServerFrame) => void
   reset: () => void
@@ -42,10 +45,12 @@ export const useNestor = create<NestorStore>((set) => ({
   state: null,
   lastError: null,
   screen: 'projects',
+  panelOpen: true,
   switchingTo: null,
   setConn: (conn) => set({ conn }),
   setError: (lastError) => set({ lastError }),
   setScreen: (screen) => set({ screen }),
+  setPanelOpen: (panelOpen) => set({ panelOpen }),
   setSwitching: (switchingTo) => set({ switchingTo }),
   reset: () => set({ state: null, conn: 'login', screen: 'projects', switchingTo: null }),
 
@@ -69,9 +74,15 @@ export const useNestor = create<NestorStore>((set) => ({
         case 'delta': {
           if (!store.state) return {}
           const next: WebState = { ...store.state }
+          let panelOpen = store.panelOpen
           if (frame.status !== undefined) next.status = frame.status
           if (frame.panels !== undefined) next.panels = frame.panels
-          if (frame.active_panel !== undefined) next.active_panel = frame.active_panel
+          if (frame.active_panel !== undefined) {
+            next.active_panel = frame.active_panel
+            // Un panneau non-conversation devient actif (sélection, ou ouvert
+            // par l'agent) : on déplie la colonne pour le rendre visible.
+            if (frame.active_panel && frame.active_panel.kind !== 'conversation') panelOpen = true
+          }
           if (frame.question_form !== undefined) next.question_form = frame.question_form
           if (frame.input_draft !== undefined) next.input_draft = frame.input_draft
           if (frame.conversation_upsert) {
@@ -81,7 +92,7 @@ export const useNestor = create<NestorStore>((set) => ({
             const gone = new Set(frame.conversation_remove)
             next.conversation = next.conversation.filter((m) => !gone.has(m.id))
           }
-          return { state: next }
+          return { state: next, panelOpen }
         }
         case 'append': {
           if (!store.state) return {}

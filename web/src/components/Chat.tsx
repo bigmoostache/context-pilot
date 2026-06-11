@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ChevronRight, Hammer } from 'lucide-react'
 import { useNestor } from '@/lib/store'
 import { cn } from '@/lib/utils'
@@ -10,8 +10,43 @@ export function Chat() {
   const conversation = useNestor((s) => s.state?.conversation)
   const phase = useNestor((s) => s.state?.status.stream_phase ?? 'idle')
   const streamingTool = useNestor((s) => s.state?.status.streaming_tool ?? null)
+  const panelOpen = useNestor((s) => s.panelOpen)
+  const activePanel = useNestor((s) => s.state?.active_panel)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(true)
+
+  // Quand l'écran de droite est ouvert, le main rétrécit (poussé par le panneau).
+  // On garde le fil centré sur le VIEWPORT en lui donnant une marge gauche calculée
+  // — mais seulement si la colonne ne chevauche pas le panneau ; sinon on retombe
+  // sur le centrage par défaut (mx-auto, centré dans le main).
+  const panelVisible = panelOpen && !!activePanel && activePanel.kind !== 'conversation'
+  const [centerLeft, setCenterLeft] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    if (!panelVisible || !scroller) {
+      setCenterLeft(null)
+      return
+    }
+    function recompute() {
+      const el = scrollRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+      const col = Math.min(48 * rem, rect.width) // max-w-3xl = 48rem
+      const marginLeft = (window.innerWidth - col) / 2 - rect.left
+      // ≥ 0 : la colonne centrée-écran tient à droite du panneau → on l'applique.
+      setCenterLeft(marginLeft >= 0 ? marginLeft : null)
+    }
+    recompute()
+    const ro = new ResizeObserver(recompute)
+    ro.observe(scroller)
+    window.addEventListener('resize', recompute)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', recompute)
+    }
+  }, [panelVisible])
 
   const visible = useMemo(
     () => (conversation ?? []).filter((m) => m.status === 'full'),
@@ -32,7 +67,10 @@ export function Chat() {
 
   return (
     <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-3xl px-6 py-6">
+      <div
+        className={cn('max-w-3xl px-6 py-6', centerLeft !== null ? 'mr-auto' : 'mx-auto')}
+        style={centerLeft !== null ? { marginLeft: centerLeft } : undefined}
+      >
         {visible.length === 0 && (
           <div className="mt-24 text-center animate-rise">
             <p className="font-display text-3xl italic text-parchment-500">À l’écoute.</p>
