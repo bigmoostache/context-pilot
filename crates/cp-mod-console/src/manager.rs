@@ -161,16 +161,23 @@ pub fn find_or_create_server() -> Result<(), String> {
 
 /// Kill orphaned processes by asking the server for its session list and
 /// comparing against known session keys.
-pub fn kill_orphaned_processes<S: BuildHasher>(known_keys: &HashSet<String, S>) {
+///
+/// Ownership-scoped: only sessions whose key starts with `owned_prefix` are
+/// candidates for reaping. The console server is multi-tenant (console panels
+/// use `c_*`, the browser module uses `browser_*`) — each tenant must only
+/// reap its own namespace, otherwise one module's reload kills another
+/// module's live processes.
+pub fn kill_orphaned_processes<S: BuildHasher>(known_keys: &HashSet<String, S>, owned_prefix: &str) {
     let list = serde_json::json!({"cmd": "list"});
     if let Ok(resp) = server_request(&list)
         && let Some(sessions) = resp.get("sessions").and_then(|v| v.as_array())
     {
         for session in sessions {
             if let Some(key) = session.get("key").and_then(|v| v.as_str())
+                && key.starts_with(owned_prefix)
                 && !known_keys.contains(key)
             {
-                // Orphan — remove it from server (kills process)
+                // Orphan in our namespace — remove it from server (kills process)
                 let remove = serde_json::json!({"cmd": "remove", "key": key});
                 drop(server_request(&remove).ok());
             }

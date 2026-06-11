@@ -202,6 +202,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+0dabfd6514d8158b:
+  path: crates/cp-mod-browser/src/snapshot.rs
+  description: 'Page snapshot. SNAPSHOT_JS: in-page DOM walk over interactive els (a/button/input/select/textarea/[role]/[onclick]), cssPath (#id→[name]→nth-of-type), returns JSON.stringify(out) so CDP serializes by value. parse()→Vec<Eref> (e1,e2… infallible), render_erefs aligned text. 2 tests.'
+  last_edited_ms: 1781176543574
 0dffd96eaa2fc1fa:
   path: src/llms/claude_code_v2/mod.rs
   description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
@@ -282,6 +286,10 @@
   path: src/modules/conversation/panel.rs
   description: 'Conversation panel. Multi-level cache (full → per-message → input). Input hash includes selection anchor. Keybindings: Shift+Arrow selection, Ctrl/Alt+Arrow word jump, Ctrl+A select all, Ctrl+Backspace delete word. Enter send-on-empty-line logic.'
   last_edited_ms: 0
+12ac905fe9ebf969:
+  path: .context-pilot/shared/entities/schema.sql
+  description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
+  last_edited_ms: 0
 12dd2c9c1c27a124:
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
@@ -346,6 +354,10 @@
   path: crates/cp-mod-entities/src/sql/errors.rs
   description: 'SQL error enrichment: fuzzy suggestions (Levenshtein) + schema context for SQLite errors. enrich_error(). Moved from src/ into sql/ to keep folder ≤8 entries.'
   last_edited_ms: 1781122618120
+1680325fded06f38:
+  path: crates/cp-mod-entities/src/panels/mod.rs
+  description: 'Panels submodule hub: declares format (SQL result formatting), panel (fixed Entities panel), result_panel (dynamic query result panel).'
+  last_edited_ms: 0
 16896bc4c096fb84:
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
@@ -406,6 +418,10 @@
   path: crates/cp-mod-search/src/radar.rs
   description: Context Radar with flame!("radar_refresh") and flame!("radar_push_signal"). Adaptive log-count-based decay scoring, Meilisearch log queries via background thread. Recent logs (10) deterministic + semantic top 40.
   last_edited_ms: 0
+1a4dd6daf1392856:
+  path: crates/cp-mod-browser/src/client.rs
+  description: CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). goto/click/type_into/eval/extract/screenshot. snapshot_json parses JSON.stringify'd result (tab.evaluate doesn't set returnByValue so raw arrays come back value=None — must stringify in-page). truncate_utf8, INLINE_CAP_BYTES=8000.
+  last_edited_ms: 1781176543566
 1a9c506b9198eecb:
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
@@ -642,6 +658,10 @@
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
   last_edited_ms: 0
+2a7c1867225308bc:
+  path: crates/cp-mod-browser/src/lib.rs
+  description: BrowserModule trait impl. 9 tool defs, dynamic browser panel kind, save/load module data (ChromeMeta JSON + reconnect-on-reload + browser_ orphan cleanup), depends on console, non-core non-global. on_close_context kills Chrome (profile kept).
+  last_edited_ms: 1781176543598
 2ad0adde669b4af1:
   path: src/llms/oai_providers/openai_streaming.rs
   description: 'OAI SSE types: StreamResponse/StreamDelta, ToolCallAccumulator (index-based), normalize_stop_reason(), dump_request()'
@@ -709,6 +729,10 @@
 2da0868f1781fbf0:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
+  last_edited_ms: 0
+2dcafd8e27a5688e:
+  path: crates/cp-mod-console/src/manager.rs
+  description: TUI-side session handle. spawn()/reconnect()/kill()/send_input() via console server. FilePoller + StatusPoller background threads per session. Orphan cleanup on startup. server_request() short-lived UnixStream per call. Geometric backoff socket wait (25ms→500ms cap, 3s budget).
   last_edited_ms: 0
 2e174d5c4021ee64:
   path: src/infra/watcher.rs
@@ -818,6 +842,10 @@
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, cp-mod-utilities, serde_json.'
   last_edited_ms: 0
+35651a34e48d7503:
+  path: yamls/tools/browser.yaml
+  description: 'Browser tools YAML. 9 tools: browser_open (headless/url), goto, snapshot, click (ref/selector), type (ref/selector/text/submit), extract (selector/format), screenshot (full_page), eval (expression), close.'
+  last_edited_ms: 1781176543606
 35677b696705ccf6:
   path: crates/cp-console-server/src/cleanup.rs
   description: 'Process cleanup: reaper thread (30s grace), graceful shutdown (kill_all_sessions), signal handlers (SIGINT/SIGHUP), FD limit raising. Uses BTreeMap for ordered exit_times tracking.'
@@ -1086,6 +1114,10 @@
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
   last_edited_ms: 0
+48e5e607c3021540:
+  path: src/modules/mod.rs
+  description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
+  last_edited_ms: 0
 48f679baafd75d4d:
   path: crates/cp-mod-scratchpad/src/panel.rs
   description: 'ScratchpadPanel: cell preview (5 lines max), format_cells_for_context() for LLM, no cache needed'
@@ -1226,6 +1258,10 @@
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams structs. post_json() generic helper. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
   last_edited_ms: 1780560368755
+520defc9548b5479:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 5261dadde0c0c36c:
   path: crates/cp-mod-search/src/meili/api.rs
   description: Meilisearch HTTP API client. MeiliClient with index CRUD, document ops, search/multi_search, facet_distribution, stats. SearchParams for query building. pub struct for cross-module use (entities sync).
@@ -1366,6 +1402,10 @@
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
   last_edited_ms: 0
+5e32975a51744218:
+  path: Cargo.toml
+  description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation.
+  last_edited_ms: 0
 5e3b31db34f5f676:
   path: .github/checks/lint-config.chain
   description: 'Hash chain for protected lint configuration files. Each entry: prev_hash:content_hash:chain_hash. Verified by check-lint-config.sh. Currently 15 entries.'
@@ -1458,6 +1498,10 @@
   path: src/ui/ir/render_sidebar_stats.rs
   description: Sidebar cache stats renderer — token table (hit/miss/out per row), format_cost closure ($K tier for ≥1000), total cost line, uncached count. Consumes CacheStats IR data.
   last_edited_ms: 1780907685228
+62c1f5a7e432e2c6:
+  path: crates/cp-mod-browser/Cargo.toml
+  description: 'Browser module deps: cp-base, cp-render, cp-mod-console, headless_chrome, crossterm, serde, serde_json, log.'
+  last_edited_ms: 1781176543539
 62ca35371b6fa7c3:
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
@@ -1529,6 +1573,10 @@
 686e9ad19093e925:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
+  last_edited_ms: 0
+687b59bd2100852c:
+  path: crates/cp-mod-entities/src/panels/format.rs
+  description: SQL result formatting shared by tools + panels. query_to_markdown (200-row cap, 0-row enrichment hint), format_cell, format_markdown_table, extract_table_name (case-insensitive byte-safe FROM scan — no to_uppercase offset bug).
   last_edited_ms: 0
 68bb461714cf1222:
   path: src/ui/help/config_overlay.rs
@@ -1762,6 +1810,10 @@
   path: crates/cp-mod-git/src/tools.rs
   description: Git tool. Read-only → dynamic git_result panels. Mutating → async subprocess via spawn_async_tool. flame!("git_exec"). GIT_ASKPASS temp script for HTTPS auth. Cache invalidation via regex patterns.
   last_edited_ms: 0
+79854dec0d03cc0b:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch: open/goto/snapshot/click/type/extract/screenshot/eval/close. Lazy CDP reconnect via client(). note() records last_action + marks panel dirty. resolve() maps ref/selector. Inline results compact; large extracts→file under .context-pilot/browser/; screenshots→timestamped PNG.'
+  last_edited_ms: 1781176543582
 798735b569fad2fb:
   path: src/ui/help/mod.rs
   description: Re-exports CommandPalette, config_overlay module
@@ -2442,6 +2494,10 @@ ac4a7fbbfcf664e7:
   path: crates/cp-mod-brave/Cargo.toml
   description: 'Brave module deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml, reqwest.'
   last_edited_ms: 0
+ac56e9d904517bf6:
+  path: crates/cp-mod-browser/src/types.rs
+  description: 'BrowserState (meta/handle/client/erefs/snapshot_text/current_url+title), ChromeMeta (serializable: session_key/pid/ws_url/headless for reload reconnect), Eref (id/selector/role/label). BROWSER_KEY_PREFIX=browser_. resolve_selector maps e-ref→CSS.'
+  last_edited_ms: 1781176543550
 ac90dcb6c012815a:
   path: docs/intermediate-rendering.md
   description: 'IR architecture design doc. Motivation (decouple ratatui), full-frame snapshot, semantic styling, typed regions, serialize-ready. Type hierarchy: Frame/Sidebar/StatusBar/Conversation/Overlay/Block. Panel trait blocks() migration. TUI adapter. Big-bang migration strategy.'
@@ -2978,6 +3034,10 @@ d0eba81e4b56478a:
   path: crates/cp-mod-github/src/types.rs
   description: BranchPrInfo, GithubState (token + branch PR) with ext accessors, GithubResultRequest for cache refresh
   last_edited_ms: 0
+d14ef8de0c8f6358:
+  path: crates/cp-mod-console/src/lib.rs
+  description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
+  last_edited_ms: 0
 d165a994ae75f945:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
@@ -3002,6 +3062,10 @@ d29264e579275bb3:
   path: crates/cp-mod-utilities/src/time.rs
   description: Timestamp formatting/parsing. Hinnant civil_from_days, date +%z cached offset. RFC 3339, epoch conversions, local time. decompose_epoch_secs returns Local struct. Replaces chrono crate.
   last_edited_ms: 0
+d29bef84a5827478:
+  path: crates/cp-mod-browser/src/panel.rs
+  description: 'Browser panel: synchronous refresh() builds digest (Chrome mode/status/pid + last action) + paginated e-ref snapshot table. ensure_panel/remove_panel/mark_dirty. No background cache. Heavy snapshot state lives here, never inline.'
+  last_edited_ms: 1781176543590
 d2ad0203ee1c00b8:
   path: crates/cp-mod-queue/src/tools.rs
   description: Tool handlers for Queue_pause and Queue_undo with flame!("queue_pause") and flame!("queue_undo"). Queue_execute handled in pipeline.rs.
@@ -3454,6 +3518,10 @@ fb144d05c6aabf4c:
   path: crates/cp-mod-spine/src/engine.rs
   description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'
   last_edited_ms: 0
+fb8abc2a69995cfc:
+  path: crates/cp-mod-browser/src/lifecycle.rs
+  description: Chrome lifecycle (Channel A) via cp-console-server SessionHandle. find_chrome ($CP_CHROME override + candidate paths), spawn_chrome (--remote-debugging-port=0, profile dir, ws-URL discovery from stderr log via DevTools marker), reconnect_chrome, kill_chrome, cleanup_orphans (browser_ prefix scoped). extract_ws_url + 2 tests.
+  last_edited_ms: 1781176543558
 fbc4be5c5bea5e56:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.

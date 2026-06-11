@@ -1,0 +1,23 @@
+[package]
+name = "cp-mod-browser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Context Pilot module"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+cp-base.workspace = true
+cp-render.workspace = true
+cp-mod-console = { path = "../cp-mod-console" }
+headless_chrome.workspace = true
+crossterm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+log = "0.4"
+
+[lints]
+workspace = true

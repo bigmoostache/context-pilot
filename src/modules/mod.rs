@@ -21,6 +21,7 @@ static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../yamls/tools/core.yaml")));
 
 pub(crate) use cp_mod_brave::BraveModule;
+pub(crate) use cp_mod_browser::BrowserModule;
 pub(crate) use cp_mod_callback::CallbackModule;
 pub(crate) use cp_mod_console::ConsoleModule;
 pub(crate) use cp_mod_entities::EntitiesModule;
@@ -117,6 +118,7 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(GitModule),
         Box::new(GithubModule),
         Box::new(ConsoleModule),
+        Box::new(BrowserModule),
         Box::new(CallbackModule),
         Box::new(TodoModule),
         Box::new(MemoryModule),

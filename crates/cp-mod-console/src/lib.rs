@@ -20,6 +20,12 @@ pub mod types;
 /// Subdirectory under `STORE_DIR` for console log files.
 pub const CONSOLE_DIR: &str = "console";
 
+/// Key-prefix namespace for console-owned sessions (`c_1`, `c_2`, …).
+///
+/// Orphan cleanup is scoped to this prefix so other console-server tenants
+/// (e.g. the browser module's `browser_*` keys) are never reaped by console.
+pub const CONSOLE_KEY_PREFIX: &str = "c_";
+
 use std::collections::HashMap;
 use std::io::Write as _;
 
@@ -135,16 +141,18 @@ impl Module for ConsoleModule {
         };
 
         if sessions_map.is_empty() {
-            // No known sessions — kill any orphans on the server
-            manager::kill_orphaned_processes(&std::collections::HashSet::new());
+            // No known sessions — kill any orphans in our `c_*` namespace
+            manager::kill_orphaned_processes(&std::collections::HashSet::new(), CONSOLE_KEY_PREFIX);
             return;
         }
 
         // Collect known session keys for orphan cleanup
         let known_keys: std::collections::HashSet<String> = sessions_map.keys().cloned().collect();
 
-        // Kill any server-managed sessions that aren't in our saved state
-        manager::kill_orphaned_processes(&known_keys);
+        // Kill any server-managed sessions in our `c_*` namespace that aren't
+        // in our saved state (other tenants' sessions, e.g. `browser_*`, are
+        // left untouched — they reap their own namespace)
+        manager::kill_orphaned_processes(&known_keys, CONSOLE_KEY_PREFIX);
 
         // Phase 1: Reconnect sessions (no &mut State needed)
         let mut reconnected: Vec<(String, SessionHandle)> = Vec::new();

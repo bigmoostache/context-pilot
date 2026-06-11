@@ -1,0 +1,58 @@
+tools:
+  browser_open:
+    description: |
+      Launches Chrome (or reuses the running one) and opens the Browser panel. Chrome is managed by the console server and survives TUI reloads — authenticated sessions persist via a dedicated profile directory. Use headless=false to show a visible window. Optionally pass url to navigate immediately.
+    parameters:
+      headless: "Run Chrome headless (default: true). Headed shows a visible window."
+      url: "Optional URL to navigate to right after opening"
+
+  browser_goto:
+    description: |
+      Navigates the browser to a URL and waits for the page to load. Returns the resulting URL and title. Invalidates previous snapshot e-refs — take a new browser_snapshot before acting on elements.
+    parameters:
+      url: "Destination URL (e.g. 'https://example.com')"
+
+  browser_snapshot:
+    description: |
+      Captures the interactive elements of the current page (links, buttons, inputs...) and assigns each a stable short ref (e1, e2, ...). Returns a short digest inline; the full element table goes to the Browser panel. Then act on elements with browser_click/browser_type using ref. ALWAYS snapshot after navigation before clicking/typing by ref.
+    parameters: {}
+
+  browser_click:
+    description: |
+      Clicks an element. Address it by ref (from the latest browser_snapshot, e.g. 'e12' — preferred) or by CSS selector. Returns the resulting URL/title. If the click navigates, take a new snapshot before further element actions.
+    parameters:
+      ref: "Element ref from the latest snapshot (e.g. 'e12')"
+      selector: "CSS selector escape hatch (used when ref is not provided)"
+
+  browser_type:
+    description: |
+      Types text into an input/textarea. Address it by ref (preferred) or CSS selector. Set submit=true to press Enter afterwards (waits for any resulting navigation).
+    parameters:
+      ref: "Element ref from the latest snapshot (e.g. 'e3')"
+      selector: "CSS selector escape hatch (used when ref is not provided)"
+      text: "Text to type"
+      submit: "Press Enter after typing (default: false)"
+
+  browser_extract:
+    description: |
+      Extracts content from the current page as plain text (default) or HTML. Optionally scope to a CSS selector. Short results return inline; long results are written to a file and the path is returned.
+    parameters:
+      selector: "Optional CSS selector to scope the extraction"
+      format: "Output format: 'text' (default) or 'html'"
+
+  browser_screenshot:
+    description: |
+      Captures a PNG screenshot of the current viewport (or the full page) and writes it to disk. Returns the file path. Combine with the ocr tool to extract text from the image.
+    parameters:
+      full_page: "Capture the full scrollable page instead of the viewport (default: false)"
+
+  browser_eval:
+    description: |
+      Evaluates a JavaScript expression in the page and returns the JSON-serialized result (capped). Power tool — prefer browser_extract/browser_snapshot for routine reads.
+    parameters:
+      expression: "JavaScript expression to evaluate"
+
+  browser_close:
+    description: |
+      Closes the managed Chrome process and the Browser panel state. The persistent profile (cookies/logins) is kept on disk for the next browser_open.
+    parameters: {}
