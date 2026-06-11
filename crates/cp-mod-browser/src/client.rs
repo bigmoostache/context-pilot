@@ -103,11 +103,17 @@ impl Client {
     ///
     /// Returns `Err` when evaluation throws.
     pub fn eval(&self, expression: &str) -> Result<String, String> {
-        let obj = self.tab.evaluate(expression, false).map_err(|e| format!("Eval failed: {e}"))?;
-        let rendered = obj.value.map_or_else(
-            || obj.description.unwrap_or_else(|| "undefined".to_string()),
-            |v| serde_json::to_string_pretty(&v).unwrap_or_else(|_e| "<unserializable>".to_string()),
-        );
+        // CDP's `tab.evaluate` does not set `returnByValue`, so object/array
+        // results come back with `value=None` (only a className description
+        // like "Object"). Stringify in-page so the result returns by value as
+        // a JSON string, which we hand back verbatim.
+        let wrapped = format!("JSON.stringify({expression})");
+        let obj = self.tab.evaluate(&wrapped, false).map_err(|e| format!("Eval failed: {e}"))?;
+        let rendered = match obj.value {
+            Some(serde_json::Value::String(json)) => json,
+            Some(other) => other.to_string(),
+            None => obj.description.unwrap_or_else(|| "undefined".to_string()),
+        };
         Ok(truncate_utf8(&rendered, INLINE_CAP_BYTES).to_string())
     }
 

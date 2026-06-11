@@ -510,6 +510,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+20c6d8ab28a43615:
+  path: crates/cp-mod-browser/src/client.rs
+  description: CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). goto/click/type_into/eval/extract/screenshot. Both eval and snapshot_json wrap results in JSON.stringify in-page and parse the returned string — tab.evaluate doesn't set returnByValue, so non-primitives (object/array) come back value=None (description "Object"); stringify forces serialize-by-value. truncate_utf8, INLINE_CAP_BYTES=8000.
+  last_edited_ms: 1781177137079
 210d0c5c4f54a2fc:
   path: crates/cp-mod-search/src/tools.rs
   description: Search tool execution with flame!("search_exec"). Split keyword+semantic multi-search via MeiliClient. dedup_by_score() merges overlapping results. iso_to_ms() via cp_mod_utilities::time. File/log filters. Async via spawn_async_tool. DynPanel creation. Mandatory semantic_query param.
