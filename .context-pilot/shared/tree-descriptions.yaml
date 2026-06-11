@@ -1786,6 +1786,10 @@
   path: src/llms/cache/cache_optimizer.rs
   description: 'Exact two-level DP optimizer. Minimizes expected recompute cost. Phase 1: per-super-block split DP. Phase 2: knapsack across super-blocks. O(N²·K) time. Prefix sums for O(1) block_cost. Backtracks for positions.'
   last_edited_ms: 0
+7894227b715b2607:
+  path: .github/workflows/build.yml
+  description: 'Cross-platform build workflow. 4-target matrix: linux-x86_64 (native), linux-aarch64 (cross), macos-x86_64 (macos-13), macos-aarch64 (macos-latest). Pins Rust 1.95.0. Builds tui + cp-console-server. 30-day artifact retention.'
+  last_edited_ms: 1781177906972
 78cfc068e4c9b991:
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore, export API keys from .env to ~/.bashrc. Guards against running as root.'
@@ -1826,6 +1830,10 @@
   path: crates/cp-mod-ocr/src/client.rs
   description: 'Datalab OCR API client with flame!("ocr_convert"). Multipart file upload, exponential backoff polling, disk cache (~/.context-pilot/ocr-cache/) keyed by SHA-256 of file bytes + mode. OcrMode: Markdown/TextBoxes.'
   last_edited_ms: 0
+7c1a639c524f5893:
+  path: .github/workflows/release.yml
+  description: Release workflow (tag v* push). build-deb job runs on ubuntu-22.04 (glibc 2.35) so the linux-x86_64 bundle runs on debian:bookworm (glibc 2.36) TB task containers. Pins Rust 1.95.0. Builds .deb + context-pilot-linux-x86_64.tar.gz bundle (tui+cp-console-server+meilisearch v1.13.3). softprops/action-gh-release.
+  last_edited_ms: 1781177906994
 7c8d1c712f95c232:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -2078,6 +2086,10 @@
   path: src/llms/claude_code/stream.rs
   description: 'Placeholder: stream methods merged into mod.rs to avoid multiple_inherent_impl lint'
   last_edited_ms: 0
+8dd7aa4a50187768:
+  path: .github/workflows/rust.yml
+  description: 'CI: fmt + clippy -D warnings + build + test on ubuntu-latest. Pins Rust 1.95.0 (lint config forbids lints needing >=1.94). Triggers on push/PR to master.'
+  last_edited_ms: 1781177906985
 8dfe4ccc082be2d1:
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers for panel rendering. Align enum + TextCell + render_table_text() (plain-text for LLM context). Tree output parsing helpers (find_size_pattern, find_children_pattern). Sub-modules: question_form, render_cache.'
@@ -3078,6 +3090,10 @@ d3757733b7f060a3:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
   last_edited_ms: 0
+d39101658aefc73f:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: 'Harbor BaseInstalledAgent adapter. version() 0.2.1. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /tmp/...jsonl + ''|| true''. KNOWN BUG: populate_context_post_run reads /tmp trajectory host-side (container path, gone post-run) -> metadata empty; needs /logs/artifacts collection.'
+  last_edited_ms: 1781177907004
 d3a1971541577d59:
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (20 tool + 6 config YAML files) with #[expect(clippy::panic)].'
