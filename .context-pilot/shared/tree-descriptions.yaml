@@ -1010,6 +1010,10 @@
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
   last_edited_ms: 0
+3e9c0bc149f6d17e:
+  path: src/app/run/headless.rs
+  description: 'Headless mode (`tui --headless`). parse_args (--provider/--model/--trajectory/--max-cost/--max-messages/--instruction-file). apply_provider_model maps --model onto anthropic_model OR claude_code_v2_model. run_headless drives background_tick() until quiescence (2.5s settle) or guard rail; JSONL TrajectoryWriter. v0.2.8 DEADMAN WATCHDOG: spawn_deadman() runs a dedicated thread (immune to a wedged main loop) checking two atomic heartbeats from lifecycle.rs — LOOP_HEARTBEAT_MS (>30s stale=WEDGE) + LAST_PROGRESS_MS (>180s stale=HUNG STREAM, bumped on messages.len() growth). On trip: dump_deadman_diagnostic writes final/deadman_timeout to the trajectory + /proc/self per-thread state/wchan/syscall to errors/deadman.log, then terminate_wedged_process() -> ! (bounded RE-EXEC via CommandExt::exec() max 2 by CP_DEADMAN_REEXEC_COUNT, falls back to std::process::abort()). This is the FIRST guard immune to the headless main-loop wedge that made all 4 streaming-layer SSE watchdogs no-ops. disable_interactive_tools drops ask_user_question only.'
+  last_edited_ms: 1781221067925
 3ea42e434ffe36bb:
   path: crates/cp-mod-callback/Cargo.toml
   description: 'Callback module deps: cp-base, cp-render, cp-mod-console, crossterm, serde, serde_json, globset, sha2.'
@@ -1770,6 +1774,10 @@
   path: .github/checks/check-lint-config.sh
   description: Lint integrity hash chain checker. Verifies protected files (Cargo.toml lint config, clippy.toml, CI scripts) haven't been tampered with. --update flag to recompute chain (requires password).
   last_edited_ms: 0
+70f631a40fa23ed9:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop. background_tick() (terminal-free orchestration: stream/typewriter/cache/watchers/tools/spine/reverie/reload/ownership → TickStatus) shared by interactive run() AND headless loop. run() = input + background_tick + render. check_spine auto-continuation. Adaptive poll 8ms/50ms. v0.2.8: defines pub(crate) statics LOOP_HEARTBEAT_MS + LAST_PROGRESS_MS (AtomicU64); LOOP_HEARTBEAT_MS stored at the top of background_tick (deadman heartbeat proving each iteration started).'
+  last_edited_ms: 1781221067934
 711dd0d590e72088:
   path: crates/cp-mod-utilities/src/dirs.rs
   description: 'Platform dirs: home_dir() from $HOME, config_dir() macOS Library/Linux XDG. Replaces dirs crate.'

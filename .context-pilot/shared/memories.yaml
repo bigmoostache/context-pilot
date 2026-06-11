@@ -296,6 +296,28 @@
   - reverie
   - api
   last_edited_ms: 0
+58aad4aedbb99175:
+  tl_dr: 'v0.2.8 DEADMAN: gpt2 freeze root cause = headless main loop wedges after first stream launch (4 streaming guards no-op; retry runs on dead loop). Fix = dedicated-thread deadman, re-execs/aborts. Built, adapter 0.2.8, pending commit+tag+relaunch.'
+  contents: |-
+    ROOT CAUSE (found v0.2.7 forensics): main_worker.json/config.json/perf.log all froze at the stream-launch instant; main thread in clock_nanosleep; container Up but no trajectory progress; catch-all watchdog string IS in the binary yet errors/ stayed empty after 480s. => watchdog threads fire+send StreamEvent::Error fine, but NOBODY DRAINS it: process_stream_events runs INSIDE the wedged background_tick. So ALL FOUR streaming-layer guards (v0.2.4 idle-120s, v0.2.5 send-header-60s, v0.2.6 first-content-90s, v0.2.7 catch-all-100s) had ZERO field effect.
+
+    v0.2.8 FIX (src/app/run/headless.rs spawn_deadman + src/app/run/lifecycle.rs heartbeats):
+    - LOOP_HEARTBEAT_MS (AtomicU64): stored at top of background_tick + top of run_headless loop. >30s stale => WEDGE.
+    - LAST_PROGRESS_MS (AtomicU64): bumped when messages.len() grows. >180s stale => HUNG STREAM (live loop). Covers both failure modes.
+    - DEADMAN_POLL 5s; DEADMAN_TICK_STALL_MS 30_000; DEADMAN_NO_PROGRESS_MS 180_000.
+    - On trip: dump_deadman_diagnostic writes `final`/deadman_timeout to trajectory (Harbor scores cleanly, NO 900s wall) + /proc/self per-thread state/wchan/syscall to .context-pilot/errors/deadman.log (pinpoints wedge for v0.2.9).
+    - terminate_wedged_process() -> !: bounded in-place RE-EXEC via CommandExt::exec() (fresh attempt, resumes via --resume-stream, max 2 via CP_DEADMAN_REEXEC_COUNT env) -> falls back to std::process::abort() (SIGABRT; only whole-process terminator NOT on clippy disallowed-methods; std::process::exit doubly banned).
+    - Deadman closure + terminate fn are `-> !` to satisfy clippy::infinite_loop.
+
+    Status: rust-check PASSED, release build 7.77s, reloaded live, 4 deadman strings in binary. Adapter 0.2.7->0.2.8. PENDING: commit+push + tag v0.2.8 -> CI; relaunch gpt2 (X572).
+  importance: critical
+  labels:
+  - terminal-bench
+  - sse-freeze
+  - deadman
+  - v0.2.8
+  - headless
+  last_edited_ms: 1781221054372
 6cc818f12c0d231a:
   tl_dr: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
   importance: critical

@@ -31,6 +31,20 @@ pub(crate) struct EventChannels<'ch> {
     pub cache_rx: &'ch Receiver<CacheUpdate>,
 }
 
+/// Wall-clock timestamp (ms) stored at the top of every [`App::background_tick`].
+///
+/// A dedicated deadman thread (headless mode) reads this to detect a wedged main
+/// loop: if it stops advancing, no `background_tick` iteration is completing, so
+/// the stream-event drain / retry machinery is dead. Updated in BOTH interactive
+/// and headless modes (harmless, single relaxed store per tick).
+pub(crate) static LOOP_HEARTBEAT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Wall-clock timestamp (ms) of the last observed *task progress* (a new message
+/// finalized). The headless deadman trips if this stalls beyond its budget even
+/// when the loop itself keeps ticking — catching a stream that hangs producing no
+/// events while the on-loop guards fail to recover it.
+pub(crate) static LAST_PROGRESS_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// Outcome of one background-orchestration tick.
 pub(crate) enum TickStatus {
     /// Keep looping.
@@ -50,6 +64,9 @@ impl App {
     /// spine; reverie after main tools).
     pub(crate) fn background_tick(&mut self, ch: &EventChannels<'_>) -> TickStatus {
         let current_ms = now_ms();
+        // Deadman heartbeat: proves this iteration started. A headless watchdog
+        // thread trips if this stops advancing (main loop wedged).
+        LOOP_HEARTBEAT_MS.store(current_ms, std::sync::atomic::Ordering::Relaxed);
         super::streaming::process_stream_events(self, ch.rx);
         super::streaming::handle_retry(self, ch.tx);
         super::streaming::process_typewriter(self);
