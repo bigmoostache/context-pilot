@@ -13,7 +13,12 @@ permissions:
 
 jobs:
   build-deb:
-    runs-on: ubuntu-latest
+    # Build on ubuntu-22.04 (glibc 2.35) — NOT ubuntu-latest (glibc 2.39).
+    # The linux-x86_64 bundle must run inside Terminal-Bench task containers,
+    # which are debian:bookworm-based (glibc 2.36). A binary linked against a
+    # newer glibc fails at load time ("GLIBC_2.39 not found"). Building against
+    # the older 2.35 keeps the binary forward-compatible with any glibc >= 2.35.
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
 
