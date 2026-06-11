@@ -54,6 +54,9 @@ docs/slides/package.json
 docs/slides/slides.pdf
 **/.DS_Store
 
+# Harbor job artifacts (local run outputs, never commit)
+/jobs/
+
 # mitmproxy / API capture artifacts (huge, never commit)
 requests.log
 requests.flow
