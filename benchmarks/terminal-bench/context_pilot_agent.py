@@ -57,8 +57,20 @@ CP_HOME = "$HOME/.context-pilot"
 CP_BIN = f"{CP_HOME}/bin"
 CP_MEILI_BIN = f"{CP_HOME}/meilisearch/bin"
 
+# Harbor mounts /logs/agent in the container as a bind mount to the host-side
+# trial_dir/agent — exactly the path passed to the agent as self.logs_dir
+# (harbor trial.py: logs_dir=self.paths.agent_dir). Writing here means the
+# trajectory + stdout are persisted to the trial directory automatically (no
+# /logs/artifacts copy needed) and are readable host-side in
+# populate_context_post_run via self.logs_dir.
+CP_LOG_DIR = "/logs/agent"
 # Trajectory path inside the container (JSONL, one event per line).
-TRAJECTORY_PATH = "/tmp/context-pilot-trajectory.jsonl"
+TRAJECTORY_PATH = f"{CP_LOG_DIR}/context-pilot-trajectory.jsonl"
+# CP's captured stdout/stderr — invaluable for diagnosing instant-exit failures
+# (e.g. the GLIBC load error) where no trajectory is produced.
+STDOUT_LOG = f"{CP_LOG_DIR}/cp-stdout.log"
+# Filename of the trajectory as seen host-side, relative to self.logs_dir.
+TRAJECTORY_FILENAME = "context-pilot-trajectory.jsonl"
 
 
 class ContextPilotAgent(BaseInstalledAgent):
@@ -164,18 +176,34 @@ class ContextPilotAgent(BaseInstalledAgent):
         if max_messages:
             flags += ["--max-messages", shlex.quote(max_messages)]
 
-        # `|| true`: CP exits 2 on guard-rail stop and 1 on error. Those are
-        # legitimate "ran but didn't fully finish" outcomes — the verifier
+        # `set +e` + `tee`: CP exits 2 on guard-rail stop and 1 on error. Those
+        # are legitimate "ran but didn't fully finish" outcomes — the verifier
         # scores the filesystem regardless — so we must NOT let exec_as_agent's
-        # non-zero-exit handling raise and mark the trial as errored. The
-        # trajectory's final event records the true status.
-        command = f"{CP_BIN}/tui " + " ".join(flags) + " || true"
+        # non-zero-exit handling raise and mark the trial as errored. We capture
+        # CP's stdout+stderr into /logs/agent/cp-stdout.log (persisted to the
+        # trial dir) and record its true exit code there for diagnosis, then
+        # exit 0 so the trial proceeds to verification. The trajectory's final
+        # event records the true status.
+        cp_cmd = f"{CP_BIN}/tui " + " ".join(flags)
+        command = (
+            f"mkdir -p {CP_LOG_DIR}; "
+            "set +e; "
+            f"{cp_cmd} 2>&1 | tee {STDOUT_LOG}; "
+            'cp_exit="${PIPESTATUS[0]}"; '
+            f'echo "[cp-headless] tui exit=$cp_exit" >> {STDOUT_LOG}; '
+            "true"
+        )
 
         await self.exec_as_agent(environment, command=command, env=run_env)
 
     def populate_context_post_run(self, context: AgentContext) -> None:
-        """Parse the trajectory's `final` event into the AgentContext."""
-        traj = Path(TRAJECTORY_PATH)
+        """Parse the trajectory's `final` event into the AgentContext.
+
+        The trajectory is written inside the container to /logs/agent/, which
+        Harbor bind-mounts to the host-side trial agent dir == self.logs_dir.
+        We read it from there (NOT the container path, which is gone post-run).
+        """
+        traj = Path(self.logs_dir) / TRAJECTORY_FILENAME
         try:
             lines = traj.read_text(encoding="utf-8").splitlines()
         except OSError:
