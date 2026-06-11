@@ -2742,6 +2742,10 @@ bddf74016a26a659:
   path: src/llms/cache/cache_engine.rs
   description: Cache breakpoint engine. Hash chain (acc_hash = sha256(block + prev)). Tracks alive BPs via hash match. Places beacon at frontier+20. Runs DP optimizer for 3 additional BPs (4 total). 5-min TTL matching Anthropic.
   last_edited_ms: 0
+be06ad185e73872a:
+  path: src/app/run/headless.rs
+  description: 'Headless mode (`tui --headless "<instruction>"`). parse_args (--provider/--model/--trajectory/--max-cost/--max-messages/--max-duration-secs/--instruction-file). parse_provider maps CLI string -> LlmProvider (default ClaudeCodeApiKey, container-friendly env-only auth). apply_provider_model sets state.llm_provider + state.anthropic_model (Anthropic family); --model maps to ClaudeOpus45/ClaudeSonnet45/ClaudeHaiku45, default Sonnet 4.5. HeadlessOpts/HeadlessOutcome (exit 0 done / 1 error / 2 guard rail). TrajectoryWriter: JSONL incremental flush + [cp-headless] stdout mirror (start event records resolved model). run_headless drives background_tick() until quiescence (2.5s settle) or guard rail. inject_instruction = UserMessage spine notification; configure_headless_spine sets continue_until_todos_done + guard rails. disable_interactive_tools drops ask_user_question only.'
+  last_edited_ms: 1781169429912
 be5cb31393a75d26:
   path: crates/cp-base/src/panels.rs
   description: Panel trait + caching infra. hash_content uses FNV-1a via cp-mod-utilities. Freeze system. time_arith. paginate_content.

@@ -12,6 +12,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write as _;
 use std::time::{Duration, Instant};
 
+use cp_base::config::llm_types::{AnthropicModel, LlmProvider};
 use cp_base::state::context::estimate_tokens;
 use cp_mod_spine::types::{NotificationType, SpineState};
 
@@ -39,12 +40,35 @@ pub(crate) struct HeadlessOpts {
     pub instruction: String,
     /// Where the JSONL trajectory is written.
     pub trajectory_path: String,
+    /// LLM provider backend (default `ClaudeCodeApiKey` — env-only auth, no
+    /// Keychain, container-friendly).
+    pub provider: LlmProvider,
+    /// API model string (`None` = provider's container default). Applied to the
+    /// `AnthropicModel` family for the Anthropic-compatible providers.
+    pub model: Option<String>,
     /// Guard rail: max session cost in USD (`None` = disabled).
     pub max_cost: Option<f64>,
     /// Guard rail: max conversation messages (`None` = disabled).
     pub max_messages: Option<usize>,
     /// Guard rail: max autonomous duration in seconds (`None` = defer to harness).
     pub max_duration_secs: Option<u64>,
+}
+
+/// Parse a provider name (CLI string) into [`LlmProvider`]. Accepts both the
+/// `snake_case` and squashed serde spellings. Unknown values fall back to the
+/// container-friendly `ClaudeCodeApiKey`.
+fn parse_provider(s: &str) -> LlmProvider {
+    match s {
+        "anthropic" => LlmProvider::Anthropic,
+        "claude_code" | "claudecode" => LlmProvider::ClaudeCode,
+        "grok" => LlmProvider::Grok,
+        "groq" => LlmProvider::Groq,
+        "deepseek" => LlmProvider::DeepSeek,
+        "minimax" => LlmProvider::MiniMax,
+        "claude_code_v2" | "claudecodev2" => LlmProvider::ClaudeCodeV2,
+        // "claude_code_api_key" / "claudecodeapikey" / anything else.
+        _ => LlmProvider::ClaudeCodeApiKey,
+    }
 }
 
 /// Final outcome of a headless run, mapped to a process exit code by `main`.
@@ -62,15 +86,20 @@ pub(crate) enum HeadlessOutcome {
 /// Parse CLI args into [`HeadlessOpts`]. Returns `None` if `--headless` is absent.
 ///
 /// Flags: `--headless <instruction>` (or `--instruction-file <path>` for large
-/// inputs), `--trajectory <path>`, `--max-cost <usd>`, `--max-messages <n>`,
-/// `--max-duration-secs <n>`. The instruction may also be the bare positional
-/// arg following `--headless`.
+/// inputs), `--provider <name>` (default `claude_code_api_key`), `--model
+/// <api-name>` (default container Sonnet), `--trajectory <path>`, `--max-cost
+/// <usd>`, `--max-messages <n>`, `--max-duration-secs <n>`. The instruction may
+/// also be the bare positional arg following `--headless`.
 pub(crate) fn parse_args(args: &[String]) -> Option<HeadlessOpts> {
     let pos = args.iter().position(|a| a == "--headless")?;
 
     let mut instruction: Option<String> = None;
     let mut instruction_file: Option<String> = None;
     let mut trajectory_path = String::from(".context-pilot/trajectory.jsonl");
+    // Default to the env-only API-key provider so containers never touch the
+    // macOS Keychain or an OAuth credential file.
+    let mut provider = LlmProvider::ClaudeCodeApiKey;
+    let mut model: Option<String> = None;
     let mut max_cost = Some(DEFAULT_MAX_COST_USD);
     let mut max_messages = Some(DEFAULT_MAX_MESSAGES);
     let mut max_duration_secs: Option<u64> = None;
@@ -88,6 +117,16 @@ pub(crate) fn parse_args(args: &[String]) -> Option<HeadlessOpts> {
         match arg.as_str() {
             "--instruction-file" => {
                 instruction_file = args.get(i.saturating_add(1)).cloned();
+                i = i.saturating_add(1);
+            }
+            "--provider" => {
+                if let Some(v) = args.get(i.saturating_add(1)) {
+                    provider = parse_provider(v);
+                }
+                i = i.saturating_add(1);
+            }
+            "--model" => {
+                model = args.get(i.saturating_add(1)).cloned();
                 i = i.saturating_add(1);
             }
             "--trajectory" => {
@@ -123,6 +162,8 @@ pub(crate) fn parse_args(args: &[String]) -> Option<HeadlessOpts> {
     Some(HeadlessOpts {
         instruction: instruction.unwrap_or_default(),
         trajectory_path,
+        provider,
+        model,
         max_cost,
         max_messages,
         max_duration_secs,
@@ -230,6 +271,30 @@ fn now_unix_ms() -> u128 {
 
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
+    /// Apply the CLI-selected provider + model to state before streaming.
+    /// Container default: `ClaudeCodeApiKey` + Sonnet 4.5 (plain `ANTHROPIC_API_KEY`,
+    /// no Keychain/OAuth). The Anthropic-compatible providers all read
+    /// `state.anthropic_model`, so we map the `--model` string onto that enum.
+    fn apply_provider_model(&mut self, opts: &HeadlessOpts) {
+        self.state.llm_provider = opts.provider;
+        // Map the requested model onto the AnthropicModel enum (the model field
+        // used by Anthropic / ClaudeCode / ClaudeCodeApiKey). Unknown or absent
+        // → Sonnet 4.5, the container-friendly default that works with a plain
+        // API key. Non-Anthropic providers keep their own default model.
+        let is_anthropic_family = matches!(
+            opts.provider,
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey
+        );
+        if is_anthropic_family {
+            self.state.anthropic_model = match opts.model.as_deref() {
+                Some("claude-opus-4-6" | "claude-opus-4-5" | "opus") => AnthropicModel::ClaudeOpus45,
+                Some("claude-haiku-4-5" | "claude-haiku-4-5-20251001" | "haiku") => AnthropicModel::ClaudeHaiku45,
+                // "claude-sonnet-4-5" / "...-20250929" / "sonnet" / None → Sonnet 4.5.
+                _ => AnthropicModel::ClaudeSonnet45,
+            };
+        }
+    }
+
     /// Configure the spine for autonomous headless operation: persist-until-done
     /// with guard rails as the safety harness (D2/D3).
     fn configure_headless_spine(&mut self, opts: &HeadlessOpts) {
@@ -291,6 +356,8 @@ impl App {
     /// a guard rail (`GuardRail`), a reload request (`Reload`), or a fatal
     /// condition (Error). Writes the trajectory throughout.
     pub(crate) fn run_headless(&mut self, ch: &EventChannels<'_>, opts: &HeadlessOpts) -> HeadlessOutcome {
+        // Set provider + model first so the trajectory records the real model.
+        self.apply_provider_model(opts);
         let model = {
             use cp_base::state::data::model_helpers::ModelPricing as _;
             self.state.current_model()

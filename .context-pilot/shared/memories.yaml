@@ -402,7 +402,7 @@ bfd5725c88443a6a:
   - task
   last_edited_ms: 0
 bfff572081f9301e:
-  tl_dr: X520 headless mode COMPLETE + verified. `tui --headless "<instruction>"` boots terminal-free, drives shared background_tick() until quiescence or guard rail. Exit 0/1/2. JSONL trajectory. Smoke-tested clean.
+  tl_dr: X520+X521 headless COMPLETE + verified. `tui --headless` boots terminal-free, drives background_tick() until quiescence/guard rail. Exit 0/1/2. JSONL trajectory. --provider/--model flags; container default ClaudeCodeApiKey + Sonnet 4.5 (env-only). Smoke-tested.
   contents: |-
     Files: src/app/run/headless.rs (new ~360 lines), src/app/run/lifecycle.rs (background_tick extracted, returns TickStatus Continue/Reload/OwnershipLost), src/main.rs (run_headless_main branch before terminal setup), src/app/run/mod.rs (pub(crate) mod headless).
 
@@ -417,7 +417,7 @@ bfff572081f9301e:
   - headless
   - x520
   - complete
-  last_edited_ms: 1781169008008
+  last_edited_ms: 1781169441993
 ceac945d9376fcf2:
   tl_dr: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
   contents: |-
