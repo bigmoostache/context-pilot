@@ -1,5 +1,7 @@
 /// Constructor, state persistence helpers, autocomplete / question-form / palette input handlers.
 mod input;
+/// Headless mode: autonomous agent loop with no terminal rendering (`--headless`).
+pub(crate) mod headless;
 /// Main event loop (`App::run`) and spine check / auto-continuation.
 pub(crate) mod lifecycle;
 /// Reverie (context-optimizer sub-agent) stream lifecycle and tool dispatch.

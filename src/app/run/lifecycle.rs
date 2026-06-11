@@ -31,8 +31,86 @@ pub(crate) struct EventChannels<'ch> {
     pub cache_rx: &'ch Receiver<CacheUpdate>,
 }
 
+/// Outcome of one background-orchestration tick.
+pub(crate) enum TickStatus {
+    /// Keep looping.
+    Continue,
+    /// `system_reload` requested — state flushed, reload flag written. Caller exits.
+    Reload,
+    /// Another instance claimed ownership. Caller exits gracefully.
+    OwnershipLost,
+}
+
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
+    /// One iteration of terminal-free orchestration: stream events, typewriter,
+    /// cache/watchers, tool pipeline, spine auto-continuation, reverie, reload
+    /// and ownership checks. Called by BOTH the interactive loop (`run`) and
+    /// the headless loop — keep the call order intact (tools → finalize →
+    /// spine; reverie after main tools).
+    pub(crate) fn background_tick(&mut self, ch: &EventChannels<'_>) -> TickStatus {
+        let current_ms = now_ms();
+        super::streaming::process_stream_events(self, ch.rx);
+        super::streaming::handle_retry(self, ch.tx);
+        super::streaming::process_typewriter(self);
+        super::watchers::process_cache_updates(self, ch.cache_rx);
+        super::watchers::process_watcher_events(self);
+        // Check if we're waiting for panels and they're ready (non-blocking)
+        super::tools::checks::check_waiting_for_panels(self, ch.tx);
+        // Check if deferred sleep timer has expired (non-blocking)
+        super::tools::checks::check_deferred_sleep(self, ch.tx);
+        // Check if a question form has been resolved by the user
+        super::tools::checks::check_question_form(self, ch.tx);
+        // Check watchers (blocking sentinel replacement + async → spine notifications)
+        super::tools::cleanup::check_watchers(self, ch.tx);
+        // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
+        if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
+            self.last_gh_sync_ms = current_ms;
+            super::watchers::sync_gh_watches(self);
+        }
+        // Drain Matrix sync events periodically (every 2s) so chat notifications
+        // fire even while idle — without this, drain_sync_events() only runs
+        // inside prepare_stream_context() which never happens when idle.
+        if current_ms.saturating_sub(self.last_chat_drain_ms) >= 2_000 {
+            self.last_chat_drain_ms = current_ms;
+            crate::app::panels::refresh_all_panels(&mut self.state);
+        }
+        super::watchers::check_timer_based_deprecation(self);
+        super::tools::pipeline::handle_tool_execution(self, ch.tx);
+        super::streaming::finalize_stream(self);
+        self.check_spine(ch.tx);
+        super::streaming::process_api_check_results(self);
+
+        // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
+        // Check if a reverie needs to start streaming (state.reverie exists but no stream yet)
+        super::reverie::maybe_start_reverie_stream(self);
+        // Poll reverie stream events (text chunks, tool calls, done/error)
+        super::reverie::process_reverie_events(self);
+        // Execute pending reverie tool calls (after main tools — main AI has priority)
+        super::reverie::handle_reverie_tools(self);
+        // Check if reverie ended without calling Report (auto-relaunch guard rail)
+        super::reverie::check_reverie_end_turn(self);
+
+        // Check if TUI reload was requested (by system_reload tool)
+        if self.state.flags.lifecycle.reload_pending {
+            self.writer.flush();
+            save_state(&self.state);
+            // Write reload flag AFTER save_state — otherwise save_state
+            // overwrites config.json with reload_requested: false.
+            crate::infra::tools::write_reload_flag();
+            return TickStatus::Reload;
+        }
+
+        // Check ownership periodically (every 1 second)
+        if current_ms.saturating_sub(self.last_ownership_check_ms) >= 1000 {
+            self.last_ownership_check_ms = current_ms;
+            if !check_ownership() {
+                // Another instance took over - exit gracefully
+                return TickStatus::OwnershipLost;
+            }
+        }
+        TickStatus::Continue
+    }
     /// Main event loop: processes input, stream events, tools, spine, and rendering.
     pub(crate) fn run(
         &mut self,
@@ -151,65 +229,10 @@ impl App {
                 }
             }
 
-            // === BACKGROUND PROCESSING ===
-            super::streaming::process_stream_events(self, ch.rx);
-            super::streaming::handle_retry(self, ch.tx);
-            super::streaming::process_typewriter(self);
-            super::watchers::process_cache_updates(self, ch.cache_rx);
-            super::watchers::process_watcher_events(self);
-            // Check if we're waiting for panels and they're ready (non-blocking)
-            super::tools::checks::check_waiting_for_panels(self, ch.tx);
-            // Check if deferred sleep timer has expired (non-blocking)
-            super::tools::checks::check_deferred_sleep(self, ch.tx);
-            // Check if a question form has been resolved by the user
-            super::tools::checks::check_question_form(self, ch.tx);
-            // Check watchers (blocking sentinel replacement + async → spine notifications)
-            super::tools::cleanup::check_watchers(self, ch.tx);
-            // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
-            if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
-                self.last_gh_sync_ms = current_ms;
-                super::watchers::sync_gh_watches(self);
-            }
-            // Drain Matrix sync events periodically (every 2s) so chat notifications
-            // fire even while idle — without this, drain_sync_events() only runs
-            // inside prepare_stream_context() which never happens when idle.
-            if current_ms.saturating_sub(self.last_chat_drain_ms) >= 2_000 {
-                self.last_chat_drain_ms = current_ms;
-                crate::app::panels::refresh_all_panels(&mut self.state);
-            }
-            super::watchers::check_timer_based_deprecation(self);
-            super::tools::pipeline::handle_tool_execution(self, ch.tx);
-            super::streaming::finalize_stream(self);
-            self.check_spine(ch.tx);
-            super::streaming::process_api_check_results(self);
-
-            // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
-            // Check if a reverie needs to start streaming (state.reverie exists but no stream yet)
-            super::reverie::maybe_start_reverie_stream(self);
-            // Poll reverie stream events (text chunks, tool calls, done/error)
-            super::reverie::process_reverie_events(self);
-            // Execute pending reverie tool calls (after main tools — main AI has priority)
-            super::reverie::handle_reverie_tools(self);
-            // Check if reverie ended without calling Report (auto-relaunch guard rail)
-            super::reverie::check_reverie_end_turn(self);
-
-            // Check if TUI reload was requested (by system_reload tool)
-            if self.state.flags.lifecycle.reload_pending {
-                self.writer.flush();
-                save_state(&self.state);
-                // Write reload flag AFTER save_state — otherwise save_state
-                // overwrites config.json with reload_requested: false.
-                crate::infra::tools::write_reload_flag();
-                break;
-            }
-
-            // Check ownership periodically (every 1 second)
-            if current_ms.saturating_sub(self.last_ownership_check_ms) >= 1000 {
-                self.last_ownership_check_ms = current_ms;
-                if !check_ownership() {
-                    // Another instance took over - exit gracefully
-                    break;
-                }
+            // === BACKGROUND PROCESSING (shared with headless mode) ===
+            match self.background_tick(ch) {
+                TickStatus::Continue => {}
+                TickStatus::Reload | TickStatus::OwnershipLost => break,
             }
 
             // Update spinner animation if there's active loading/streaming

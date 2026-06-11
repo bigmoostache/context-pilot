@@ -386,6 +386,10 @@
   path: .gitignore
   description: Gitignore. Excludes target/, .context-pilot/* (with !shared/ negation), .claude/, test artifacts, slides build artifacts (node_modules, package files, PDF output).
   last_edited_ms: 0
+183e9eddefe35dd7:
+  path: benchmarks/terminal-bench/PLAN.md
+  description: 'Terminal-Bench 2.0 submission plan: benchmark facts, validation rules, submission process (CLOSED until ~end June 2026), architecture decisions (Sonnet 4.6, --headless flag, local Docker, bundled daemons), 7-step work plan.'
+  last_edited_ms: 0
 1859d4e0a272d9bb:
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers").
@@ -694,6 +698,10 @@
   path: src/ui/ir/render_sidebar.rs
   description: 'Sidebar ratatui renderer — render_sidebar_from_ir(). Normal mode: token bar box, fixed/dynamic entries with pagination, PR card, token stats. Collapsed mode: icon strip. Entry rendering: indicator+icon+shortcut+label+tokens. Token color gradient (grey→red).'
   last_edited_ms: 0
+2bb573fbf0335a2a:
+  path: src/app/run/mod.rs
+  description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
+  last_edited_ms: 0
 2bbde535b57f6e44:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -786,6 +794,10 @@
   path: crates/cp-mod-entities/src/sync.rs
   description: Meilisearch sync for entity data — incremental dirty-tracked, delete-then-add. ensure_index, sync_table, flush_sync, full_reindex. extract_affected_tables for SQL parsing.
   last_edited_ms: 1780592402521
+32374b5888f0ab17:
+  path: src/app/run/headless.rs
+  description: 'Headless mode (`tui --headless "<instruction>"`). parse_args (--trajectory/--max-cost/--max-messages/--max-duration-secs/--instruction-file), HeadlessOpts/HeadlessOutcome (exit 0 done / 1 error / 2 guard rail). TrajectoryWriter: JSONL incremental flush + [cp-headless] stdout mirror. run_headless drives background_tick() until quiescence (settle window 2.5s) or guard rail. inject_instruction creates UserMessage spine notification; configure_headless_spine sets continue_until_todos_done + guard rails. disable_interactive_tools drops ask_user_question only. is_quiescent checks stream/typewriter/tools/reverie/notifications.'
+  last_edited_ms: 1781168962857
 3279dfee597f2c60:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
@@ -1730,6 +1742,10 @@
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
   last_edited_ms: 0
+765a4ca847e2ae22:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop. background_tick() (terminal-free orchestration: stream/typewriter/cache/watchers/tools/spine/reverie/reload/ownership → TickStatus) shared by interactive run() AND headless loop. run() = input + background_tick + render. check_spine auto-continuation. Adaptive poll 8ms/50ms.'
+  last_edited_ms: 1781168970375
 76f92d62b3fa3c6b:
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
@@ -2798,6 +2814,10 @@ c420a45f730117d1:
   path: crates/cp-mod-entities/src/panel.rs
   description: Fixed Entities panel. Live schema + sample data context for LLM. Empty-state onboarding guide with quick-start SQL. IR blocks with Accent/Code/Muted styling. Migration count display. EntityResultPanel for large query results (dynamic, metadata-persisted). max_freezes=2.
   last_edited_ms: 1780606076247
+c474690c18e08496:
+  path: src/main.rs
+  description: 'Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit, flame init/flush, panic hook. run_headless_main(): branches on parse_args(--headless) BEFORE terminal setup — headless panic hook (no terminal restore), phased boot via boot_* with stdout progress, disable_interactive_tools, App::run_headless, exit codes 0/1/2, self-exec reload preserving --headless args. use openssl as _ for vendored cross-compile.'
+  last_edited_ms: 1781168970382
 c4829069423c1fe6:
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Dir-event-only invalidation. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete.'

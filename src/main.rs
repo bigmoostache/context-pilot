@@ -216,6 +216,100 @@ use state::persistence::{
     boot_load_panels, load_state,
 };
 
+/// Headless entry point: boot the app without a terminal, run the autonomous
+/// agent loop, and exit with a status code (0 done, 1 error, 2 guard rail).
+/// Re-execs on `system_reload` (preserving `--headless` args) like the
+/// interactive path.
+fn run_headless_main(args: &[String], opts: &app::run::headless::HeadlessOpts) -> ExitCode {
+    use app::run::headless::HeadlessOutcome;
+
+    // Headless panic hook: log to disk, no terminal restore (none was set up).
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let error_dir = std::path::Path::new(".context-pilot").join("errors");
+        let _r_mkdir = std::fs::create_dir_all(&error_dir);
+        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        let msg = format!("[{ts}] {info}\n\n{backtrace}\n\n---\n");
+        let _r_write = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(error_dir.join("panic.log"))
+            .and_then(|mut f| f.write_all(msg.as_bytes()));
+        default_hook(info);
+    }));
+
+    // Phased boot — same boot_* functions, plain stdout progress, no rendering.
+    let new_format = std::path::Path::new(".context-pilot").join("config.json").exists();
+    let mut state = if new_format {
+        let cfg = boot_load_config();
+        let module_data = boot_extract_module_data(&cfg);
+        let panels = boot_load_panels(&cfg);
+        let messages = boot_load_messages(&panels.message_uids);
+        let mut assembled = boot_assemble_state(cfg, panels, messages);
+        boot_init_modules(&mut assembled, &module_data, |name| {
+            let mut out = io::stdout();
+            let _w = writeln!(out, "[cp-headless] boot: {name}");
+            let _f = out.flush();
+        });
+        assembled
+    } else {
+        load_state()
+    };
+
+    // Common post-boot init (mirrors the interactive path).
+    state.highlight_ir_fn = Some(ui::helpers::highlight_file_ir);
+    modules::validate_dependencies(&state.active_modules);
+    modules::init_registry();
+    {
+        let known_types: std::collections::HashSet<String> = modules::all_modules()
+            .iter()
+            .flat_map(|m| {
+                let mut types: Vec<String> =
+                    m.dynamic_panel_types().into_iter().map(|ct| ct.as_str().to_string()).collect();
+                types.extend(m.fixed_panel_types().into_iter().map(|ct| ct.as_str().to_string()));
+                types.extend(m.context_type_metadata().into_iter().map(|meta| meta.context_type.to_string()));
+                types
+            })
+            .collect();
+        state.context.retain(|c| known_types.contains(c.context_type.as_str()));
+    }
+    ensure_default_contexts(&mut state);
+    ensure_default_agent(&mut state);
+
+    // Drop interactive-only tools (ask_user_question) that would hang the loop.
+    app::run::headless::disable_interactive_tools(&mut state);
+
+    // Channels + app, then drive the headless loop.
+    let resume_stream = args.iter().any(|a| a == "--resume-stream");
+    let (tx, rx) = mpsc::channel::<StreamEvent>();
+    let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
+    let mut app = App::new(state, cache_tx, resume_stream);
+    let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };
+    let outcome = app.run_headless(&ch, opts);
+    infra::flame::flush();
+
+    // Self-restart on reload — re-exec with the original args (incl. --headless).
+    #[cfg(unix)]
+    if matches!(outcome, HeadlessOutcome::Reload)
+        && std::env::var_os("CP_RUN_SH").is_none()
+        && let Ok(exe_path) = std::env::current_exe()
+    {
+        use std::os::unix::process::CommandExt as _;
+        let mut exec_args: Vec<String> = args.iter().skip(1).cloned().collect();
+        if !exec_args.iter().any(|a| a == "--resume-stream") {
+            exec_args.push("--resume-stream".to_string());
+        }
+        let _err = std::process::Command::new(exe_path).args(&exec_args).exec();
+    }
+
+    match outcome {
+        HeadlessOutcome::Done => ExitCode::SUCCESS,
+        HeadlessOutcome::GuardRail => ExitCode::from(2),
+        HeadlessOutcome::Reload | HeadlessOutcome::Error => ExitCode::FAILURE,
+    }
+}
+
 fn main() -> ExitCode {
     /// Helper to mark a boot step as done, with bounds checking.
     fn mark_step_done(steps: &mut [BootStep], idx: usize) {
@@ -238,6 +332,13 @@ fn main() -> ExitCode {
     // Parse CLI args
     let args: Vec<String> = std::env::args().collect();
     let resume_stream = args.iter().any(|a| a == "--resume-stream");
+
+    // Headless mode: autonomous agent loop, no terminal. Branches off before
+    // any terminal setup so stdout stays clean for trajectory/log capture.
+    if let Some(opts) = app::run::headless::parse_args(&args) {
+        return run_headless_main(&args, &opts);
+    }
+
 
     // Panic hook: restore terminal state and log the panic to disk.
     // Without this, a panic leaves the terminal in raw mode + alternate screen,

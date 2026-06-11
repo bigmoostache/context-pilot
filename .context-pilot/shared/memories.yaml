@@ -401,6 +401,23 @@ bfd5725c88443a6a:
   - audit
   - task
   last_edited_ms: 0
+bfff572081f9301e:
+  tl_dr: X520 headless mode COMPLETE + verified. `tui --headless "<instruction>"` boots terminal-free, drives shared background_tick() until quiescence or guard rail. Exit 0/1/2. JSONL trajectory. Smoke-tested clean.
+  contents: |-
+    Files: src/app/run/headless.rs (new ~360 lines), src/app/run/lifecycle.rs (background_tick extracted, returns TickStatus Continue/Reload/OwnershipLost), src/main.rs (run_headless_main branch before terminal setup), src/app/run/mod.rs (pub(crate) mod headless).
+
+    Behaviour: instruction injected as UserMessage spine notification -> check_spine -> apply_continuation -> start_streaming. Quiescence = stream idle + typewriter drained + no pending tools/done + no reverie + no deferred sleep + no unprocessed notifications, sustained 2.5s settle window. Guard rails: --max-cost $5, --max-messages 150 defaults; --max-duration-secs optional; --instruction-file fallback; --trajectory path (default .context-pilot/trajectory.jsonl). disable_interactive_tools drops ONLY ask_user_question; system_reload kept (self-exec re-execs with --headless intact). Trajectory flushed per-event + [cp-headless] stdout mirror.
+
+    Clippy notes: tool.enabled is a public field (enabled() is a consuming builder, no set_enabled). multiple_inherent_impl on App requires #[expect(...reason=...)] (registered pattern). No println! allowed -> writeln!(io::stdout()).
+
+    Default model in headless was claude-opus-4-6 (State default); provider/model selection for the container is X521's scope. macOS has no `timeout` -> use bg PID + sleep + kill for smoke tests.
+  importance: high
+  labels:
+  - terminal-bench
+  - headless
+  - x520
+  - complete
+  last_edited_ms: 1781169008008
 ceac945d9376fcf2:
   tl_dr: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
   contents: |-
