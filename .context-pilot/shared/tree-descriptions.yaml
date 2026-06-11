@@ -118,6 +118,10 @@
   path: yamls/tools/ocr.yaml
   description: 'OCR tool YAML. Single tool: ocr with path/mode/output params. Datalab Surya engine, markdown or text_boxes modes.'
   last_edited_ms: 0
+07d32218fdbd7178:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: 'Harbor BaseInstalledAgent adapter. version() 0.2.1. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /tmp/...jsonl + ''|| true''. KNOWN BUG: populate_context_post_run reads /tmp trajectory host-side (container path, gone post-run) -> metadata empty; needs /logs/artifacts collection.'
+  last_edited_ms: 0
 080052189c4e9b3a:
   path: src/app/reverie/streaming.rs
   description: 'start_reverie_stream(): ReverieContext prompt, build_reverie_seed() (agent instructions + directive + tool restrictions)'
@@ -1286,6 +1290,10 @@
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
   last_edited_ms: 1780497309373
+51e5f79a82075296:
+  path: src/llms/claude_code/mod.rs
+  description: 'Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. v0.2.4: do_stream''s SSE read loop uses the shared IdleTimeoutReader (claude_code_api_key::streaming) — idle-read watchdog aborts silent application-level holds → StreamRead → retry on fresh connection.'
+  last_edited_ms: 1781214811584
 520bd83b42d1d2d7:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams structs. post_json() generic helper. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
@@ -1358,6 +1366,10 @@
   path: crates/cp-mod-spine/src/types.rs
   description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom), NotificationStatus (Unprocessed/Blocked/Processed). SpineConfig: guard rail limits + runtime tracking. SpineState: create/mark/delete/unblock notifications. mark_all_unprocessed_as_processed() for continuation consumption.'
   last_edited_ms: 0
+569705a37d46befb:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: Harbor BaseInstalledAgent adapter. version() 0.2.4. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /logs/agent/...jsonl + tee + '|| true'. populate_context_post_run reads trajectory host-side via bind-mounted /logs/agent.
+  last_edited_ms: 1781214811602
 56be46c397fb36d5:
   path: .gitignore
   description: Git ignore rules
@@ -1726,6 +1738,10 @@
   path: src/modules/conversation/render_json.rs
   description: 'extract_json_fields(): serde-first + hand-parser fallback for incomplete streaming JSON key-value extraction'
   last_edited_ms: 0
+6ec4fa169b2f13d5:
+  path: src/llms/claude_code/debug.rs
+  description: 'Debug helper: dump_last_request (writes outgoing API request JSON to .context-pilot/last_requests/ for diagnosis). Stream-read error diagnostics removed in v0.2.4 — the inline read loop now uses the shared IdleTimeoutReader which formats its own verbose error.'
+  last_edited_ms: 1781214811575
 6eec1b12bd6cb8ce:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
@@ -1837,6 +1853,10 @@
 7833192280b10562:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
+  last_edited_ms: 0
+78390d47c9a272d5:
+  path: src/llms/claude_code_v2/mod.rs
+  description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
   last_edited_ms: 0
 784674dc12e9985d:
   path: crates/cp-base/src/panels.rs
@@ -2238,6 +2258,10 @@
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
   last_edited_ms: 0
+93adcdcf17e99f77:
+  path: src/llms/claude_code_api_key/streaming.rs
+  description: 'SSE parsing for Claude Code responses. v0.2.4: IdleTimeoutReader (pub(crate)) — spawns a reader thread owning the blocking Response, streams lines over mpsc; next_line() uses recv_timeout(IDLE_READ_TIMEOUT=120s) → idle/silent-hold returns Err(StreamRead) → retry. Fixes the SSE freeze TCP keepalive could not catch (peer alive but mute). parse_sse_stream uses it; shared by claude_code + claude_code_v2.'
+  last_edited_ms: 1781214811593
 9400c2d396c4f00a:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
@@ -2289,6 +2313,10 @@
 9671d603bc7cefc9:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
+  last_edited_ms: 0
+96a7e454a6e290b7:
+  path: src/llms/claude_code/mod.rs
+  description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
   last_edited_ms: 0
 9789ccbb64e37192:
   path: deploy_local.sh
@@ -2557,6 +2585,10 @@ aa0e06c92f399127:
 aa1d276af3cf459a:
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
+  last_edited_ms: 0
+aa40e0e02a689991:
+  path: src/llms/claude_code_api_key/mod.rs
+  description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
   last_edited_ms: 0
 aa4fb032325f6ff0:
   path: crates/cp-mod-brave/src/lib.rs

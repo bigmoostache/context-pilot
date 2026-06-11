@@ -12,7 +12,6 @@ mod stream_types;
 
 use std::env;
 use std::fs;
-use std::io::{BufRead as _, BufReader};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::mpsc::Sender;
@@ -22,6 +21,7 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::claude_code_api_key::streaming::IdleTimeoutReader;
 use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_VERSION, library};
@@ -334,7 +334,7 @@ impl ClaudeCodeClient {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let mut reader = BufReader::new(response);
+        let reader = IdleTimeoutReader::spawn(response);
         let mut input_tokens = 0;
         let mut output_tokens = 0;
         let mut cache_hit_tokens = 0;
@@ -346,25 +346,36 @@ impl ClaudeCodeClient {
         let mut last_lines: Vec<String> = Vec::new();
 
         loop {
-            let mut line = String::new();
-            match reader.read_line(&mut line) {
-                Ok(0) => break, // EOF
-                Ok(n) => {
-                    total_bytes = total_bytes.saturating_add(n);
+            // Idle-guarded read: a silent application-level hold beyond the idle
+            // timeout (server keeps the socket alive but sends no bytes — which
+            // TCP keepalive cannot detect) returns Err(StreamRead) here, which
+            // propagates → StreamEvent::Error → retry on a fresh connection.
+            let line = match reader.next_line() {
+                Ok(Some(l)) => {
+                    total_bytes = total_bytes.saturating_add(l.len());
                     line_count = line_count.saturating_add(1);
+                    l
                 }
+                Ok(None) => break, // EOF / reader gone
                 Err(e) => {
-                    let verbose = debug::build_stream_read_error(&debug::StreamErrorContext {
-                        err: &e,
-                        current_tool: current_tool.as_ref(),
-                        total_bytes,
-                        line_count,
-                        resp_headers: &resp_headers,
-                        last_lines: &last_lines,
-                    });
+                    let tool_ctx = match &current_tool {
+                        Some((id, name, partial)) => {
+                            format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
+                        }
+                        None => "No tool in progress".to_string(),
+                    };
+                    let recent =
+                        if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
+                    let verbose = format!(
+                        "{e}\n\
+                         Stream position: {total_bytes} bytes, {line_count} lines read\n\
+                         {tool_ctx}\n\
+                         Response headers:\n{resp_headers}\n\
+                         Last SSE lines:\n{recent}"
+                    );
                     return Err(LlmError::StreamRead(verbose));
                 }
-            }
+            };
             let line = line.trim_end_matches('\n').trim_end_matches('\r');
 
             if !line.starts_with("data: ") {

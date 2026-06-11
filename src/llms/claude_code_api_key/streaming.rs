@@ -1,7 +1,8 @@
 //! SSE stream parsing for Claude Code API responses.
 
 use std::io::{BufRead as _, BufReader};
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender};
+use std::time::Duration;
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -9,6 +10,83 @@ use serde_json::Value;
 use crate::infra::tools::ToolUse;
 use crate::llms::StreamEvent;
 use crate::llms::error::LlmError;
+
+/// Maximum time to wait for the next SSE byte before treating the stream as a
+/// silent application-level hold and aborting (→ retry on a fresh connection).
+///
+/// The Anthropic SSE stream is never legitimately silent this long: `ping`
+/// events + token/thinking deltas flow continuously, and even time-to-first-byte
+/// under load stays well under this. The pathological "silent-hold" (server
+/// accepts the request, keeps the TCP socket alive, but never sends a byte) lasts
+/// minutes — so 120s cleanly separates the two. A false trip self-heals via the
+/// existing retry path; `MAX_API_RETRIES` bounds repeats. This is the definitive
+/// fix for the freeze TCP keepalive could not catch (the peer is alive, just mute).
+const IDLE_READ_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Idle-guarded line reader for a blocking SSE response.
+///
+/// `reqwest`'s **blocking** `ClientBuilder` exposes no `read_timeout` (only the
+/// async builder does), so we cannot bound reads at the socket. Instead we move
+/// the `Response` onto a dedicated reader thread that pushes one line at a time
+/// over a channel, and the consumer waits with [`Receiver::recv_timeout`]. If no
+/// line arrives within [`IDLE_READ_TIMEOUT`], `next_line` returns a `StreamRead`
+/// error — bounding the hang instead of blocking forever.
+///
+/// Caveat: on a genuine silent-hold the reader thread stays parked on the dead
+/// socket until the process exits. In Terminal-Bench (one short-lived process per
+/// task) this is negligible; interactively a stall is rare. A future hardening
+/// could switch to the async client's real `read_timeout`.
+pub(crate) struct IdleTimeoutReader {
+    /// Channel of read results: `Ok(Some(line))` per line, `Ok(None)` on EOF,
+    /// `Err` on a read error. The sender lives on the reader thread.
+    rx: Receiver<std::io::Result<Option<String>>>,
+}
+
+impl IdleTimeoutReader {
+    /// Spawn the reader thread that owns `response` and streams its lines.
+    pub(crate) fn spawn(response: reqwest::blocking::Response) -> Self {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let _handle = std::thread::spawn(move || {
+            let mut reader = BufReader::new(response);
+            loop {
+                let mut line = String::new();
+                match reader.read_line(&mut line) {
+                    Ok(0) => {
+                        let _r = tx.send(Ok(None)); // EOF
+                        break;
+                    }
+                    Ok(_) => {
+                        if tx.send(Ok(Some(line))).is_err() {
+                            break; // consumer gone (timed out + abandoned)
+                        }
+                    }
+                    Err(e) => {
+                        let _r = tx.send(Err(e));
+                        break;
+                    }
+                }
+            }
+        });
+        Self { rx }
+    }
+
+    /// Wait for the next line, bounded by [`IDLE_READ_TIMEOUT`].
+    ///
+    /// Returns `Ok(Some(line))` for a line, `Ok(None)` for EOF/disconnect, and
+    /// `Err(LlmError::StreamRead)` for a read error or an idle timeout.
+    pub(crate) fn next_line(&self) -> Result<Option<String>, LlmError> {
+        match self.rx.recv_timeout(IDLE_READ_TIMEOUT) {
+            Ok(Ok(opt)) => Ok(opt),
+            Ok(Err(e)) => Err(LlmError::StreamRead(format!("SSE read error: {e}"))),
+            Err(RecvTimeoutError::Timeout) => Err(LlmError::StreamRead(format!(
+                "SSE stream idle for {}s with no data — aborting to retry on a fresh connection \
+                 (silent application-level hold)",
+                IDLE_READ_TIMEOUT.as_secs()
+            ))),
+            Err(RecvTimeoutError::Disconnected) => Ok(None),
+        }
+    }
+}
 
 /// Content block metadata from SSE stream events.
 #[derive(Debug, Deserialize)]
@@ -86,7 +164,7 @@ pub(crate) fn parse_sse_stream(
     resp_headers: &str,
     tx: &Sender<StreamEvent>,
 ) -> Result<SseStreamResult, LlmError> {
-    let mut reader = BufReader::new(response);
+    let reader = IdleTimeoutReader::spawn(response);
     let mut input_tokens = 0;
     let mut output_tokens = 0;
     let mut cache_hit_tokens = 0;
@@ -98,21 +176,16 @@ pub(crate) fn parse_sse_stream(
     let mut last_lines: Vec<String> = Vec::new();
 
     loop {
-        let mut line = String::new();
-        match reader.read_line(&mut line) {
-            Ok(0) => break,
-            Ok(n) => {
-                total_bytes = total_bytes.saturating_add(n);
+        // Idle-guarded read: an idle/silent-hold beyond IDLE_READ_TIMEOUT returns
+        // Err(StreamRead) here, which propagates → StreamEvent::Error → retry.
+        let line = match reader.next_line() {
+            Ok(Some(l)) => {
+                total_bytes = total_bytes.saturating_add(l.len());
                 line_count = line_count.saturating_add(1);
+                l
             }
+            Ok(None) => break, // EOF / reader gone
             Err(e) => {
-                let error_kind = format!("{:?}", e.kind());
-                let mut root_cause = String::new();
-                let mut source: Option<&dyn std::error::Error> = std::error::Error::source(&e);
-                while let Some(s) = source {
-                    root_cause = format!("{s}");
-                    source = std::error::Error::source(s);
-                }
                 let tool_ctx = match &current_tool {
                     Some((id, name, partial)) => {
                         format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
@@ -121,24 +194,15 @@ pub(crate) fn parse_sse_stream(
                 };
                 let recent = if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
                 let verbose = format!(
-                    "{}\n\
-                     Error kind: {} | Root cause: {}\n\
-                     Stream position: {} bytes, {} lines read\n\
-                     {}\n\
-                     Response headers:\n{}\n\
-                     Last SSE lines:\n{}",
-                    e,
-                    error_kind,
-                    if root_cause.is_empty() { "(none)".to_string() } else { root_cause },
-                    total_bytes,
-                    line_count,
-                    tool_ctx,
-                    resp_headers,
-                    recent
+                    "{e}\n\
+                     Stream position: {total_bytes} bytes, {line_count} lines read\n\
+                     {tool_ctx}\n\
+                     Response headers:\n{resp_headers}\n\
+                     Last SSE lines:\n{recent}"
                 );
                 return Err(LlmError::StreamRead(verbose));
             }
-        }
+        };
         let line = line.trim_end_matches('\n').trim_end_matches('\r');
 
         if !line.starts_with("data: ") {

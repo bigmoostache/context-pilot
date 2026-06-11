@@ -166,14 +166,19 @@
   - structure-check
   last_edited_ms: 0
 2fb69a4032fb9c9e:
-  tl_dr: 'Sequential 89-task TB run ACTIVE: jobs/2026-06-11__20-38-59, ONE harbor proc (-n1, Sonnet 4.6, v0.2.2). Console P17. DO NOT launch a duplicate; coucou is monitor-only now.'
-  contents: 'Sequential 89-task TB run LAUNCHED ~18:39 host time. Run dir: benchmarks/terminal-bench/jobs/2026-06-11__20-38-59/ (results.json appears as tasks complete). ONE harbor process PID 36558/36561, -n 1 strictly sequential (one container at a time), Sonnet 4.6 via claude_code_v2 provider, CP_MAX_COST=5.0, downloads v0.2.2 release binary (has the --model->claude_code_v2_model mapping fix). First task: gpt2-codegolf. Monitored via console panel P17 + heartbeat coucou (~15min). CRITICAL: when the older launch-coucou fires (~18:50), DO NOT launch a second harbor run — verify with `pgrep -fl ''harbor run''` / `docker ps`; if one is already running, treat the coucou as monitor-only (check results.json, update todos X528-X616, re-arm heartbeat).'
-  importance: high
+  tl_dr: 'OPERATING MODEL CHANGED: harbor auto-loop STOPPED. I am now the only loop — launch one task at a time. GATES per task: (1) Claude OAuth >=40% free; (2) SSE freeze fixed (v0.2.4 watchdog). No runs until both met.'
+  contents: |-
+    Sequential 89-task TB run LAUNCHED ~18:39 host time. Run dir: benchmarks/terminal-bench/jobs/2026-06-11__20-38-59/ (results.json appears as tasks complete). ONE harbor process, -n 1 strictly sequential (one container at a time), Sonnet 4.6 via claude_code_v2 provider, CP_MAX_COST=5.0, downloads the release binary. Monitored via console panel P17 + heartbeat coucou. CRITICAL: do NOT launch a second copy of the 89-task suite.
+
+    V0.2.3 STALL FIX (2026-06-11 ~19:42): all 3 claude_code* clients now bound dead SSE connections via TCP keepalive (connect_timeout 30s + tcp_keepalive 60s/15s/4). Commit 20947ca, adapter bump b525074, tag v0.2.3 pushed -> release CI building linux bundle -> releases/latest will serve fixed binary. The big run was launched on v0.2.2 (no fix); only NEW container installs after v0.2.3 publishes get the fix.
+
+    GPT2 RE-TEST: X572 unmarked -> pending. A coucou (~19:48) will verify v0.2.3 asset uploaded then launch a SINGLE-TASK -i gpt2-codegolf harbor run (downloads v0.2.3). Deliberate user-requested re-test, NOT a duplicate suite - runs as a 2nd brief container alongside the big run. On pass -> mark X572 done.
+  importance: critical
   labels:
   - terminal-bench
   - run
   - active
-  last_edited_ms: 1781203197203
+  last_edited_ms: 1781211875291
 3182e8c4a21fcc81:
   tl_dr: Secondary model selector with Tab key toggle implemented
   contents: |-
@@ -327,6 +332,33 @@
   - thinking
   - llm-provider
   last_edited_ms: 0
+76bca3b377df349e:
+  tl_dr: 'v0.2.4 SSE freeze fix DONE (built+reloaded): IdleTimeoutReader watchdog aborts silent app-level SSE holds → retry. Pending: commit+push + tag v0.2.4 → release CI.'
+  contents: |-
+    ## v0.2.4 SSE Freeze Fix
+
+    Root cause: app-level silent SSE hold — server accepts request (TCP-alive, keepalive ACK'd) but never sends the next SSE byte. BufReader::read_line blocks forever; TCP keepalive (v0.2.3) cannot detect it (peer alive, just mute). CP retry only fires on stream ERROR → never trips → rides the 900s wall → 0.0. PER-REQUEST (gpt2 req#1; write-compressor req#5).
+
+    Why not the obvious fix: reqwest 0.12.28 BLOCKING ClientBuilder has no .read_timeout() (async-only).
+
+    Fix (IdleTimeoutReader in src/llms/claude_code_api_key/streaming.rs, pub(crate)):
+    - spawn(Response): detached reader thread owns the Response, loops read_line, sends io::Result<Option<String>> per line over mpsc.
+    - next_line(): rx.recv_timeout(IDLE_READ_TIMEOUT=120s). Timeout → Err(StreamRead('idle')) → propagates → StreamEvent::Error → existing consumer retries on FRESH connection. Disconnected → Ok(None)=EOF.
+    - parse_sse_stream rewritten to use it (shared by claude_code_api_key + claude_code_v2 → v2 gets fix free).
+    - claude_code/mod.rs do_stream inline loop refactored to use it; dead build_stream_read_error + StreamErrorContext removed from claude_code/debug.rs.
+    - Kept .timeout(None) + connect_timeout(30s) + tcp_keepalive (defense in depth).
+
+    Caveat: a stalled connection's reader thread parks until process exit (TB tasks are short-lived → negligible).
+
+    Status: code compiles (rust-check passed), release built, TUI reloaded. REMAINING: git commit+push (with memories+tree-descs per M15) + tag v0.2.4 → release CI publishes context-pilot-linux-x86_64.tar.gz to releases/latest. Adapter version() bumped to 0.2.4.
+  importance: high
+  labels:
+  - llm-provider
+  - sse-freeze
+  - v0.2.4
+  - terminal-bench
+  - complete
+  last_edited_ms: 1781214826219
 77a6639f89352d52:
   tl_dr: 'Hardcoded prompt audit: user wants EVERY occurrence of LLM-facing text noted, no matter how minor. No ''clean enough'' dismissals. User decides what''s behavioral steering vs. not. Be exhaustive — if the LLM sees it, log it as a finding.'
   importance: critical
