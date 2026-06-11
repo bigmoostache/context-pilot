@@ -48,8 +48,15 @@ run on the reload path? This phase determines whether reload-mid-op is safe.
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H06-1 (suspected) | **S2** | reload mid-op → orphan tool_use → API-400 | _to confirm_ | flush pending async tool_uses as interrupted on reload |
+| H06-1 | ~~S2~~ → **S3** | On reload mid-browser-op: the assistant `tool_use` IS persisted to disk, but its result is the in-memory `BLOCKING_TOOL_SENTINEL` stashed in `pending_console_wait_tool_results` (`pipeline.rs:365`) — **never written as a `ToolResult` message** until the `ChannelWatcher` fires. Reload re-execs (`lifecycle.rs:197` → `writer.flush()`+`save_state`+re-exec `--resume-stream`) WITHOUT calling `flush_pending_tool_results_as_interrupted` (that runs only on Esc/StopStream, `lifecycle.rs:254`). So after reload the conversation has an **orphaned `tool_use`** (no paired result) + the runtime-only watcher is gone. | **CONFIRMED orphan, but REFUTED as API-400 — reclassified S3** — 2026-06-11 (source). | **NO 400**: `prompt_builder::build_tool_call_blocks` returns `None` (→ message skipped) for any `tool_use` lacking a matching following `tool_result` (`prompt_builder.rs:260`, doc-comment: "orphaned tool_uses excluded"). The symmetric guard at line 70 drops orphaned results. The unguarded `include_last_tool_uses` branch (line 110) only applies to non-`ToolCall` assistant messages, so the browser tool_use (a `ToolCall` msg) always takes the guarded path. **RESIDUAL S3**: the browser tool_use is silently DROPPED from the wire → the LLM loses all trace of the navigation/click intent; the actual CDP side-effect may have happened (possible silent loss or duplicate-on-resume). **LOW-PRI HARDENING** (not an S0/S1/S2 blocker): on the reload path, drain `pending_console_wait_tool_results` + scuttle the matching `ChannelWatcher` and emit a real "interrupted by reload" `tool_result`, so the model keeps situational awareness instead of the intent vanishing. |
 
 ## Exit criterion
 50 reloads-mid-op produce zero orphan tool_use and zero API-400; pending browser
 tool_uses are always paired (interrupted) on reload; no zombie Chrome.
+
+**Status (source):** zero API-400 is already MET by the `prompt_builder` orphan-
+exclusion guard — an unpaired browser tool_use is dropped from the wire, never
+sent. The remaining (S3) gap is *silent intent-loss*, not a crash: the reload
+path does not yet emit an "interrupted by reload" result, so the model loses the
+record of its pending action. Low-pri hardening tracked in H06-1; not a
+deployment blocker.
