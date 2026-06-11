@@ -43,6 +43,13 @@ fn client(state: &mut State) -> Result<&Client, String> {
     if bs.handle.as_ref().is_none_or(|h| h.get_status().is_terminal()) {
         return Err("No browser running — call browser_open first.".to_string());
     }
+    // The CDP transport self-closes on idle-timeout (open=false) while Chrome
+    // stays alive — a cached-but-dead client would then fail every call with
+    // "underlying connection is closed". Probe and drop it so the reconnect
+    // branch below re-attaches to the same still-listening ws_url.
+    if bs.client.as_ref().is_some_and(|c| !c.is_alive()) {
+        bs.client = None;
+    }
     if bs.client.is_none() {
         let ws = bs.meta.as_ref().map(|m| m.ws_url.clone()).ok_or_else(|| "No browser metadata".to_string())?;
         bs.client = Some(Client::connect(&ws)?);

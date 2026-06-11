@@ -1442,6 +1442,10 @@
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
   last_edited_ms: 0
+604fcb6fa12df1b7:
+  path: crates/cp-mod-browser/src/client.rs
+  description: CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). connect() adopts Chrome's own initial tab via adopt_initial_tab (poll register_missing_tabs+get_tabs, fall back to new_tab) so headed mode shows no stray 'New Tab'. is_alive() liveness-probes the transport (self-closes on idle while Chrome lives) so tools.rs can drop+reconnect. goto/click/type_into/eval/extract/screenshot. eval & snapshot_json wrap results in JSON.stringify in-page (tab.evaluate doesn't set returnByValue → non-primitives come back value=None). truncate_utf8, INLINE_CAP_BYTES=8000.
+  last_edited_ms: 1781180263286
 6065f2dfb7032e7b:
   path: src/app/context/detach.rs
   description: 'Splits old messages into frozen ConversationHistory panels. flame!("detach"). Turn-boundary detection. Min-messages/tokens constraints for chunk+tip. Freeze-aware: skips detach when queue active or tempo holding. Deletes detached messages from disk. Loop for multi-chunk detach.'
@@ -2346,6 +2350,10 @@
   path: yamls/tools/brave.yaml
   description: Brave Search tools YAML. brave_search (snippets, Tier 1) + brave_llm_context (deep content, Tier 2). Query params, freshness filters, goggles.
   last_edited_ms: 0
+a021b47529db7b41:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch: open/goto/snapshot/click/type/extract/screenshot/eval/close. client() lazily (re)connects CDP and drops a dead client first (is_alive() probe) so it reconnects to the same ws_url after idle self-close. note() records last_action + marks panel dirty. resolve() maps ref/selector. Inline results compact; large extracts→file under .context-pilot/browser/; screenshots→timestamped PNG.'
+  last_edited_ms: 1781180268878
 a0596fc66738d4aa:
   path: src/app/actions/history.rs
   description: Prompt history navigation and panel clipboard copy. PromptHistoryNav struct with lazy-load from JSONL. Safe indexing via .get(), saturating arithmetic. handle_history_prev/next (Ctrl+U/D), handle_copy_panel_content (Ctrl+C via pbcopy).
@@ -2794,6 +2802,10 @@ bf721ed9cc1a06a3:
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
   last_edited_ms: 0
+c019514fbfc58817:
+  path: yamls/tools/console.yaml
+  description: 'Console tools YAML: 5 tools (console_create/send_keys/wait/watch/easy_bash) with descriptions + params. Template for browser.yaml tool definitions.'
+  last_edited_ms: 1781179646597
 c07395815ca8865e:
   path: crates/cp-mod-firecrawl/Cargo.toml
   description: 'Firecrawl module deps: cp-base, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
@@ -3342,6 +3354,10 @@ ed8cdf66722e6f21:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. XAI_API_KEY auth.
   last_edited_ms: 1780565754901
+ed9506049f886288:
+  path: docs/design-browser-module.md
+  description: 'Browser module design doc (v1, console-server two-channel model). NOTE: superseded by scratchpad C18 v2 design (multi-browser + hierarchical refs b1-t3-e5). D1-D8 decision table, headless_chrome over chromiumoxide, snapshot→e-ref loop.'
+  last_edited_ms: 1781179646588
 eda799977218054d:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'

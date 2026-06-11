@@ -36,13 +36,18 @@ impl Client {
     /// Returns `Err` if the WebSocket handshake fails or no tab is available.
     pub fn connect(ws_url: &str) -> Result<Self, String> {
         let browser = Browser::connect(ws_url.to_string()).map_err(|e| format!("CDP connect failed: {e}"))?;
-        let existing = browser.get_tabs().lock().map_err(|_e| "Tab list poisoned".to_string())?.clone();
-        let tab = existing
-            .into_iter()
-            .next()
-            .map_or_else(|| browser.new_tab().map_err(|e| format!("Failed to open tab: {e}")), Ok)?;
+        let tab = adopt_initial_tab(&browser)?;
         let _t = tab.set_default_timeout(OP_TIMEOUT);
         Ok(Self { _browser: browser, tab })
+    }
+
+    /// Liveness probe: a cheap CDP round-trip. Returns `false` when the
+    /// underlying WebSocket transport has self-closed (idle-timeout flips it
+    /// shut permanently while Chrome itself stays alive), signalling the caller
+    /// to drop this dead client and reconnect to the same `ws_url`.
+    #[must_use]
+    pub fn is_alive(&self) -> bool {
+        self.tab.evaluate("1", false).is_ok()
     }
 
     /// Navigate to `url` and wait for the page to settle.
@@ -166,6 +171,27 @@ impl Client {
         };
         serde_json::from_str(&json).map_err(|e| format!("Snapshot JSON parse failed: {e}"))
     }
+}
+
+/// Adopt Chrome's own initial tab rather than spawning a duplicate.
+///
+/// Right after `Browser::connect` the crate's tab list is briefly empty —
+/// Chrome's initial "New Tab" target isn't registered yet. We poll
+/// `register_missing_tabs` + `get_tabs` for it, adopting the first tab that
+/// appears, and fall back to a fresh `new_tab` only if none ever shows up.
+/// Without this we'd `new_tab()` a SECOND tab and drive it, leaving the
+/// user's visible "New Tab" orphaned in headed mode.
+fn adopt_initial_tab(browser: &Browser) -> Result<Arc<Tab>, String> {
+    for _ in 0..50 {
+        browser.register_missing_tabs();
+        if let Ok(guard) = browser.get_tabs().lock()
+            && let Some(tab) = guard.first().cloned()
+        {
+            return Ok(tab);
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    browser.new_tab().map_err(|e| format!("Failed to acquire initial tab: {e}"))
 }
 
 /// Truncate to at most `max_bytes` without splitting a UTF-8 char.
