@@ -1398,6 +1398,10 @@
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
   last_edited_ms: 0
+5cf087801e917b1c:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: 'Harbor BaseInstalledAgent adapter. version() 0.2.1. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /tmp/...jsonl + ''|| true''. KNOWN BUG: populate_context_post_run reads /tmp trajectory host-side (container path, gone post-run) -> metadata empty; needs /logs/artifacts collection.'
+  last_edited_ms: 0
 5d6f0efeeb4eae79:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
@@ -1477,6 +1481,10 @@
 61bf78700b3d4a0d:
   path: crates/cp-mod-brave/src/api.rs
   description: Brave Search HTTP client. BraveClient with retry (3 attempts, 1s delay on 5xx). SearchParams + LLMContextParams structs. Rich callback fetching. Custom URL encoding. 10s request timeout.
+  last_edited_ms: 0
+62135d11bee75890:
+  path: .gitignore
+  description: Git ignore rules
   last_edited_ms: 0
 6243fb33364b1a75:
   path: src/llms/cache/cache_engine.rs
@@ -3261,6 +3269,10 @@ e511d6e0566f4f01:
 e6b9ad2949d17655:
   path: src/app/panels.rs
   description: Thin wrapper around cp_base::panels. get_panel() delegates to module system. FallbackPanel for orphaned contexts. refresh_all_panels() and collect_all_context() helpers.
+  last_edited_ms: 0
+e6c64feb78591e17:
+  path: .context-pilot/shared/entities/schema.sql
+  description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
 e6dc3d6c7954a439:
   path: crates/cp-render/src/frame.rs

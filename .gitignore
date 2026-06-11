@@ -56,6 +56,8 @@ docs/slides/slides.pdf
 
 # Harbor job artifacts (local run outputs, never commit)
 /jobs/
+# Terminal-Bench adapter run outputs (trajectories, verifier logs, result.json, etc.)
+benchmarks/terminal-bench/jobs/
 
 # mitmproxy / API capture artifacts (huge, never commit)
 requests.log

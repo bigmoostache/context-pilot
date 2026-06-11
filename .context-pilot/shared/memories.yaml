@@ -130,7 +130,7 @@
   importance: high
   last_edited_ms: 0
 2abaa3035bec794f:
-  tl_dr: X522 Harbor adapter COMPLETE — BaseInstalledAgent verified vs real Harbor source. End-to-end (X523/X524) + bundle artifact & Sonnet 4.6/4.5 label (X525/X526) deferred.
+  tl_dr: X522 Harbor adapter + X524 dry-run COMPLETE & PASSED end-to-end. Reward 1.0 on break-filter-js-from-html (mXSS). v0.2.1 glibc-fixed bundle + diagnosability fix validated. Ready for X525 official -k 5 run. X526 (submit) gated on HF window (~end June).
   contents: |-
     ## X522 — Harbor installed-agent adapter
 
@@ -156,8 +156,10 @@
   - terminal-bench
   - harbor
   - x522
+  - x524
   - complete
-  last_edited_ms: 1781169825003
+  - validated
+  last_edited_ms: 1781178945107
 2bfb816e017b246e:
   tl_dr: 'DOCUMENTATION PHASE: Ignore structure-check callback warnings about files >500 lines during doc additions. Lines will grow temporarily — that''s expected and acceptable.'
   importance: critical
