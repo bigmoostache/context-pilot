@@ -2694,6 +2694,10 @@ bbd55a6ff99edddc:
   path: crates/cp-mod-firecrawl/Cargo.toml
   description: 'Firecrawl module deps: cp-base, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
   last_edited_ms: 1780563847612
+bc1c81901c61317a:
+  path: benchmarks/terminal-bench/HEADLESS_DESIGN.md
+  description: 'Validated design for tui --headless (X520). D1: shared background_tick() extracted from lifecycle.rs run(). D2: quiescence detection + settle window, continue_until_todos_done ON headless-only. D3: guard rails --max-cost $5/--max-messages 150, exit 0/1/2. D4: disable ask_user_question only, system_reload kept (self-exec preserves args). D5-D9: typewriter drain, JSONL trajectory, CLI surface, terminal-free boot, reverie on.'
+  last_edited_ms: 1781167988532
 bc239ff9124d6fdf:
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers for panel rendering. Align enum + TextCell + render_table_text() (plain-text for LLM context). Tree output parsing helpers (find_size_pattern, find_children_pattern). Sub-modules: question_form, render_cache.'

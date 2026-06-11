@@ -62,7 +62,7 @@ Adapter lives in `benchmarks/terminal-bench/` (this repo).
 
 ## Work plan
 
-1. **Headless mode** (`--headless`) — instruction in, autonomous loop (auto-continuation until done / guard rails), no rendering, exit 0, trajectory written to a known path.
+1. **Headless mode** (`--headless`) — instruction in, autonomous loop (auto-continuation until done / guard rails), no rendering, exit 0, trajectory written to a known path. **Design validated → [HEADLESS_DESIGN.md](HEADLESS_DESIGN.md)**
 2. **Container-ready boot** — bare-Linux friendly: bundled daemons, env-only API keys, no Keychain, no global config.
 3. **Harbor adapter** — `context_pilot_agent.py` + install script.
 4. **Oracle sanity run** — validate Harbor + Docker locally.
