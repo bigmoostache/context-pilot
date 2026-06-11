@@ -178,6 +178,8 @@ pub struct StatusBar {
     pub queue: Option<QueueCard>,
     /// Think tool balance.
     pub think: Option<ThinkCard>,
+    /// OAuth usage percentage (5-hour and 7-day windows).
+    pub usage: Option<UsageCard>,
     /// Stop reason from last completion.
     pub stop_reason: Option<StopReason>,
     /// API retry count (0 = no retry in progress).
@@ -268,6 +270,15 @@ pub struct ThinkCard {
     /// Current consecutive think counter (positive = thinking streak,
     /// negative = tool streak without thinking).
     pub balance: i32,
+}
+
+/// OAuth usage percentage indicator.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct UsageCard {
+    /// 5-hour window utilization (0-100).
+    pub five_hour: u8,
+    /// 7-day window utilization (0-100).
+    pub seven_day: u8,
 }
 
 // ── Panel content ────────────────────────────────────────────────────

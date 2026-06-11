@@ -146,6 +146,16 @@ impl ClaudeCodeV2Client {
             LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into())
         })?;
 
+        // Refresh token if needed before making the API call
+        if let Some(mut creds) = super::claude_code::oauth::load_oauth_credentials()
+            && let Err(e) = super::claude_code::oauth::refresh_token_if_needed(&mut creds)
+        {
+            drop(std::io::Write::write_fmt(
+                &mut std::io::stderr(),
+                format_args!("Warning: token refresh failed: {e}\n"),
+            ));
+        }
+
         let client = Client::builder()
             .timeout(None)
             .build()

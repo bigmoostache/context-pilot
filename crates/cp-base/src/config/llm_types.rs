@@ -5,6 +5,28 @@
 
 use crate::tools::ToolUse;
 
+/// Usage window (5-hour, 7-day, etc.) from Claude Code OAuth usage API.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct UsageWindow {
+    /// Utilization percentage (0-100)
+    pub utilization: f64,
+    /// When this window resets (ISO 8601)
+    pub resets_at: String,
+}
+
+/// Usage API response structure from Claude Code OAuth.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct UsageResponse {
+    /// Five-hour usage window
+    pub five_hour: Option<UsageWindow>,
+    /// Seven-day usage window
+    pub seven_day: Option<UsageWindow>,
+    /// Seven-day Opus-specific window
+    pub seven_day_opus: Option<UsageWindow>,
+    /// Seven-day Sonnet-specific window
+    pub seven_day_sonnet: Option<UsageWindow>,
+}
+
 /// Events emitted by the LLM during streaming.
 #[derive(Debug)]
 pub enum StreamEvent {

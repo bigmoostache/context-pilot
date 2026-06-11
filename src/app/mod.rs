@@ -71,6 +71,8 @@ pub(crate) struct App {
     pub last_spinner_ms: u64,
     /// Last gh watcher sync time
     pub last_gh_sync_ms: u64,
+    /// Last OAuth usage fetch time
+    pub last_usage_fetch_ms: u64,
     /// Last Matrix sync drain time — for periodic idle-time event polling
     pub last_chat_drain_ms: u64,
     /// Channel for API check results

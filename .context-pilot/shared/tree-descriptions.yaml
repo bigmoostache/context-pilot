@@ -18,6 +18,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+023708eceb1f7978:
+  path: src/ui/ir/render_status_bar.rs
+  description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
+  last_edited_ms: 0
 02534f9eb511e493:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -602,6 +606,10 @@
   path: src/app/reverie/trigger.rs
   description: check_threshold_trigger() (auto-fire cleaner on token breach), start_manual_reverie() (per-agent guards)
   last_edited_ms: 0
+2682d4785eb333d5:
+  path: crates/cp-base/src/state/runtime.rs
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
+  last_edited_ms: 0
 26d72bccb4448f6b:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
@@ -649,6 +657,10 @@
 2985b2ce84faefe9:
   path: crates/cp-mod-files/src/tools/file.rs
   description: 'execute_open: accepts string or array for path param. flame!("file_open"). open_single_file: canonicalize, dedup, auto-expand tree folders. Background cache populates content.'
+  last_edited_ms: 0
+29e4638b3d13ca41:
+  path: src/llms/claude_code/mod.rs
+  description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
   last_edited_ms: 0
 2a76ebc68096b534:
   path: docs/talk/script.js
@@ -1414,6 +1426,10 @@
   path: crates/cp-mod-logs/src/tools.rs
   description: Log tool execution. flame!("log_create") and flame!("close_history"). push_log() helper. execute_log_create() creates entries from array. execute_close_conversation_history() processes panels array — per-panel logs (strings), timestamp from panel's last message, panel removal.
   last_edited_ms: 0
+5f00e3499bd78aa5:
+  path: .gitignore
+  description: Git ignore rules
+  last_edited_ms: 0
 5f3b4848b37bb4a1:
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine, checks chat rooms.
@@ -1433,6 +1449,10 @@
 5ff21e152d80133b:
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data.'
+  last_edited_ms: 0
+5ff2f2dc80e5d57d:
+  path: src/llms/claude_code_v2/mod.rs
+  description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
   last_edited_ms: 0
 600c2e87914b10ac:
   path: crates/cp-mod-callback/src/trigger.rs
@@ -2174,6 +2194,10 @@
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
   last_edited_ms: 0
+936b3d43cf87c8fe:
+  path: crates/cp-render/src/frame.rs
+  description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
+  last_edited_ms: 0
 9400c2d396c4f00a:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
@@ -2193,6 +2217,10 @@
 948c434731a78dc5:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
+  last_edited_ms: 0
+94d17f2b6c1369d4:
+  path: src/app/run/input.rs
+  description: App::new() constructor, save_state/message_async(), handle_autocomplete/question_form/palette events
   last_edited_ms: 0
 94f3d1b290438319:
   path: src/app/run/input.rs
@@ -2413,6 +2441,10 @@ a49023d03b3a5764:
 a54f6b11ea86d525:
   path: src/llms/claude_code/mod.rs
   description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
+  last_edited_ms: 0
+a55bff635bbc481e:
+  path: crates/cp-base/src/config/llm_types.rs
+  description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
   last_edited_ms: 0
 a57b1692e51fccb5:
   path: src/app/prompt_builder.rs
@@ -2866,6 +2898,10 @@ c55dd96275144452:
   path: docs/talk/style.css
   description: 'Slide deck global styles: CSS vars, transitions, dark/light slide themes, sidebar, timer'
   last_edited_ms: 1781078806857
+c5963f98f5b6c90a:
+  path: src/app/mod.rs
+  description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file/gh watchers, timers, PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt_builder, reverie, run.'
+  last_edited_ms: 0
 c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
@@ -3353,6 +3389,10 @@ ec35e41e73d1b8fc:
 ed11d32eca739db4:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
+  last_edited_ms: 0
+ed82dd397f3a5ae4:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop. background_tick() (terminal-free orchestration: stream/typewriter/cache/watchers/tools/spine/reverie/reload/ownership → TickStatus) shared by interactive run() AND headless loop. run() = input + background_tick + render. check_spine auto-continuation. Adaptive poll 8ms/50ms.'
   last_edited_ms: 0
 ed8cdf66722e6f21:
   path: src/llms/oai_providers/grok.rs

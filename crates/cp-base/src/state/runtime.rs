@@ -148,6 +148,10 @@ pub struct State {
     /// Last-tick output cost in USD (set per `StreamDone`).
     pub tick_cost_output_usd: f64,
 
+    /// Claude Code OAuth usage cache (`five_hour`, `seven_day` windows).
+    /// Refreshed every 180 seconds to stay within rate limits.
+    pub claude_usage_cache: Option<(crate::config::llm_types::UsageResponse, std::time::Instant)>,
+
     /// Result of the last API check
     pub api_check_result: Option<crate::config::llm_types::ApiCheckResult>,
     /// Current API retry count (reset on success)
@@ -269,6 +273,7 @@ impl Default for State {
             tick_cost_hit_usd: 0.0,
             tick_cost_miss_usd: 0.0,
             tick_cost_output_usd: 0.0,
+            claude_usage_cache: None,
             api_check_result: None,
             api_retry_count: 0,
             guard_rail_blocked: None,

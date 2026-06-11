@@ -7,6 +7,7 @@
 mod check_api;
 mod debug;
 mod message_format;
+pub(crate) mod oauth;
 mod stream_types;
 
 use std::env;
@@ -208,6 +209,16 @@ impl ClaudeCodeClient {
             .access_token
             .as_ref()
             .ok_or_else(|| LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into()))?;
+
+        // Refresh token if needed before making the API call
+        if let Some(mut creds) = oauth::load_oauth_credentials()
+            && let Err(e) = oauth::refresh_token_if_needed(&mut creds)
+        {
+            drop(std::io::Write::write_fmt(
+                &mut std::io::stderr(),
+                format_args!("Warning: token refresh failed: {e}\n"),
+            ));
+        }
 
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 

@@ -68,6 +68,32 @@ impl App {
             self.last_gh_sync_ms = current_ms;
             super::watchers::sync_gh_watches(self);
         }
+        // Refresh OAuth usage every 180 seconds for claude_code/claude_code_v2 providers
+        if current_ms.saturating_sub(self.last_usage_fetch_ms) >= 180_000 {
+            use cp_base::config::llm_types::LlmProvider;
+            if matches!(self.state.llm_provider, LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeV2) {
+                self.last_usage_fetch_ms = current_ms;
+                // Fetch usage asynchronously to avoid blocking the event loop
+                if let Some(mut creds) = crate::llms::claude_code::oauth::load_oauth_credentials() {
+                    // Refresh token if needed before fetching usage
+                    if crate::llms::claude_code::oauth::refresh_token_if_needed(&mut creds).is_ok() {
+                        match crate::llms::claude_code::oauth::fetch_usage(&creds.access_token) {
+                            Ok(usage) => {
+                                self.state.claude_usage_cache = Some((usage, std::time::Instant::now()));
+                                self.state.flags.ui.dirty = true;
+                            }
+                            Err(e) => {
+                                // Log error but don't crash - just keep showing stale data
+                                drop(io::Write::write_fmt(
+                                    &mut io::stderr(),
+                                    format_args!("Warning: OAuth usage fetch failed: {e}\n"),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
         // Drain Matrix sync events periodically (every 2s) so chat notifications
         // fire even while idle — without this, drain_sync_events() only runs
         // inside prepare_stream_context() which never happens when idle.

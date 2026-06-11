@@ -146,6 +146,23 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
         spans.push(Span::styled(" ", base_style));
     }
 
+    // === Usage card ===
+    if let Some(ref usage) = status.usage {
+        let max_pct = usage.five_hour.max(usage.seven_day);
+        let bg_color = if max_pct >= 80 {
+            theme::error()
+        } else if max_pct >= 50 {
+            theme::warning()
+        } else {
+            theme::success()
+        };
+        spans.push(Span::styled(
+            format!(" 📊 {}% / {}% ", usage.five_hour, usage.seven_day),
+            Style::default().fg(theme::bg_base()).bg(bg_color).bold(),
+        ));
+        spans.push(Span::styled(" ", base_style));
+    }
+
     // === Right-aligned char count ===
     let right_info =
         if status.input_char_count > 0 { format!("{} chars ", status.input_char_count) } else { String::new() };
@@ -205,6 +222,7 @@ pub(crate) fn build_status_bar(state: &State) -> StatusBar {
         reveries: build_reveries(state),
         queue: build_queue(state),
         think: build_think(state),
+        usage: build_usage(state),
         stop_reason: build_stop_reason(state),
         retry_count: state.api_retry_count.to_u8(),
         max_retries: crate::infra::constants::MAX_API_RETRIES.to_u8(),
@@ -357,3 +375,29 @@ fn build_think(state: &State) -> Option<ThinkCard> {
     }
     Some(ThinkCard { balance: ts.consecutive_count })
 }
+
+/// Build OAuth usage card (only for `claude_code`/`claude_code_v2` providers).
+fn build_usage(state: &State) -> Option<cp_render::frame::UsageCard> {
+    use cp_base::config::llm_types::LlmProvider;
+    use cp_base::cast::Safe as _;
+    
+    // Only show for OAuth providers
+    if !matches!(state.llm_provider, LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeV2) {
+        return None;
+    }
+    
+    // Check cache
+    let (usage, timestamp) = state.claude_usage_cache.as_ref()?;
+    
+    // Cache expired (>180s old)?
+    if timestamp.elapsed() > std::time::Duration::from_secs(180) {
+        return None;
+    }
+    
+    // Extract percentages (saturating cast to u8)
+    let five_hour = usage.five_hour.as_ref()?.utilization.to_u8();
+    let seven_day = usage.seven_day.as_ref()?.utilization.to_u8();
+    
+    Some(cp_render::frame::UsageCard { five_hour, seven_day })
+}
+
