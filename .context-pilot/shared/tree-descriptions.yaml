@@ -1494,6 +1494,10 @@
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
   last_edited_ms: 0
+612460467c327e0f:
+  path: src/llms/claude_code/oauth.rs
+  description: Claude Code OAuth helpers (shared by claude_code + claude_code_v2). Token refresh (console.anthropic.com/v1/oauth/token), credential load/save (macOS Keychain or ~/.claude/.credentials.json), is_token_expired (60s buffer), fetch_usage (api.anthropic.com/api/oauth/usage, reads body text then parses, 500-char snippet on parse error). Save/refresh errors routed to log_error (not stderr) to avoid TUI corruption.
+  last_edited_ms: 1781202350010
 612722dbfd4a8f10:
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
@@ -2878,6 +2882,10 @@ c20be1c967ed1030:
   path: crates/cp-mod-brave/src/tools.rs
   description: Brave tool dispatch with flame!("brave_search") and flame!("brave_llm_context"). Both async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER.
   last_edited_ms: 0
+c21aa29b217d8e39:
+  path: crates/cp-mod-spine/src/engine.rs
+  description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'
+  last_edited_ms: 0
 c2e8ce0b2cd68b7c:
   path: src/ui/ir/mod.rs
   description: IR-to-ratatui adapter. semantic_to_style (pub(crate)) + ir_span_to_ratatui (with reversed support). blocks_to_lines converts IR Block vec to ratatui Lines. Table/ProgressBar/Tree/KeyValue renderers. build_frame + build_active_panel frame assembly.
@@ -3270,6 +3278,10 @@ ddb10c875236eedb:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+ddbf44d230df9878:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: 'Harbor BaseInstalledAgent adapter. version() 0.2.1. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /tmp/...jsonl + ''|| true''. KNOWN BUG: populate_context_post_run reads /tmp trajectory host-side (container path, gone post-run) -> metadata empty; needs /logs/artifacts collection.'
+  last_edited_ms: 0
 def0ccd673154b9d:
   path: crates/cp-mod-todo/Cargo.toml
   description: 'Todo module deps: cp-base, cp-render, crossterm, serde, serde_json.'
@@ -3545,6 +3557,10 @@ f6930563c8606410:
 f7207867229d3d86:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'
+  last_edited_ms: 0
+f7249611a27f9e32:
+  path: crates/cp-mod-spine/src/engine.rs
+  description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'
   last_edited_ms: 0
 f74fa3be25ccf5fa:
   path: src/modules/conversation_history/mod.rs
