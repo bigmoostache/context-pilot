@@ -80,10 +80,31 @@ jobs:
 
         dpkg-deb --build "${PKG}"
 
+    # Bundle for the Terminal-Bench Harbor adapter (benchmarks/terminal-bench/
+    # context_pilot_agent.py). The adapter's install() downloads
+    # releases/latest/download/context-pilot-linux-x86_64.tar.gz and expects
+    # `tui`, `cp-console-server`, and `meilisearch` at the tarball root.
+    # Meilisearch is pinned to the same version as cp-mod-search's runtime
+    # downloader (crates/cp-mod-search/src/meili/download.rs) so the bundled
+    # binary is byte-identical to what CP would fetch itself.
+    - name: Build linux-x86_64 bundle
+      run: |
+        MEILI_VERSION="v1.13.3"
+        mkdir -p bundle
+        cp target/release/tui bundle/tui
+        cp target/release/cp-console-server bundle/cp-console-server
+        curl -fsSL \
+          "https://github.com/meilisearch/meilisearch/releases/download/${MEILI_VERSION}/meilisearch-linux-amd64" \
+          -o bundle/meilisearch
+        chmod 755 bundle/tui bundle/cp-console-server bundle/meilisearch
+        tar -czf context-pilot-linux-x86_64.tar.gz -C bundle tui cp-console-server meilisearch
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        files: cpilot_*_amd64.deb
+        files: |
+          cpilot_*_amd64.deb
+          context-pilot-linux-x86_64.tar.gz
         generate_release_notes: true
         draft: false
         prerelease: false
