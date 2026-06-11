@@ -1,10 +1,11 @@
 tools:
   browser_open:
     description: |
-      Launches Chrome (or reuses the running one) and opens the Browser panel. Chrome is managed by the console server and survives TUI reloads — authenticated sessions persist via a dedicated profile directory. Use headless=false to show a visible window. Optionally pass url to navigate immediately.
+      Launches Chrome (or reuses the running one) and opens the Browser panel. Chrome is managed by the console server and survives TUI reloads — authenticated sessions persist via a dedicated profile directory. Use headless=false to show a visible window. Optionally pass url to navigate immediately. Set use_real_profile=true to use the user's actual Chrome profile (logged-in sessions preserved) instead of an isolated profile.
     parameters:
       headless: "Run Chrome headless (default: true). Headed shows a visible window."
       url: "Optional URL to navigate to right after opening"
+      use_real_profile: "Use the user's real Chrome profile with existing cookies/logins (default: false). WARNING: Cannot be used if Chrome is already running with that profile."
 
   browser_goto:
     description: |

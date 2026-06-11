@@ -6,6 +6,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use headless_chrome::browser::tab::point::Point;
 use headless_chrome::protocol::cdp::Runtime;
 use headless_chrome::{Browser, Tab};
 
@@ -161,36 +162,54 @@ impl Client {
         self.tab.get_title().unwrap_or_default()
     }
 
-    /// Click the first element matching `selector` (via in-page JS).
+    /// Click the first element matching `selector` using CDP mouse events.
     ///
-    /// Uses `querySelector().click()` through the Runtime domain rather than
-    /// `wait_for_element` (DOM domain), which times out 20 s on elements that
-    /// provably exist and hangs on typos. A missing element errors instantly; a
-    /// malformed selector surfaces the real `SyntaxError`. A `disabled` element
-    /// is rejected — the browser swallows `.click()` on disabled controls, so
-    /// claiming success would be a lie (the handler never fires). After clicking
-    /// we settle the URL so click-triggered redirects report the true landing.
+    /// Uses proper CDP `Input.dispatchMouseEvent` to create trusted click events
+    /// that work for downloads and other security-sensitive actions (unlike
+    /// JavaScript `.click()` which Gmail/banks ignore). First finds the element
+    /// and gets its coordinates, then dispatches real mouse press/release events
+    /// at that point. A `disabled` element is rejected. Settles the URL after
+    /// clicking to report the true landing URL for click-triggered navigation.
     ///
     /// # Errors
     ///
-    /// Returns `Err` when the selector is invalid, matches no element, or the
-    /// matched element is disabled.
+    /// Returns `Err` when the selector is invalid, matches no element, the
+    /// element is disabled, or coordinates cannot be determined.
     pub fn click(&self, selector: &str) -> Result<(), String> {
         let before = self.tab.get_url();
+        
+        // Get element bounds and disabled state
         let js = format!(
-            "(() => {{ const el = document.querySelector({sel}); if (!el) return 'notfound'; \
-             if (el.disabled) return 'disabled'; \
-             el.scrollIntoView({{block:'center'}}); el.click(); return 'ok'; }})()",
+            "(() => {{ const el = document.querySelector({sel}); \
+             if (!el) return JSON.stringify({{error: 'notfound'}}); \
+             if (el.disabled) return JSON.stringify({{error: 'disabled'}}); \
+             el.scrollIntoView({{block:'center'}}); \
+             const rect = el.getBoundingClientRect(); \
+             return JSON.stringify({{x: rect.left + rect.width/2, y: rect.top + rect.height/2}}); }})()",
             sel = serde_json::Value::String(selector.to_string())
         );
-        match self.run_js(&js)?.as_str() {
-            Some("ok") => {
-                let _settled = self.settle_after_nav(&before);
-                Ok(())
-            }
-            Some("disabled") => Err(format!("Element '{selector}' is disabled — click had no effect")),
-            _ => Err(format!("Element '{selector}' not found")),
+        
+        let result = self.run_js(&js)?;
+        let data: serde_json::Value = serde_json::from_str(result.as_str().unwrap_or("{}"))
+            .map_err(|e| format!("Failed to parse element bounds: {e}"))?;
+        
+        if let Some(error) = data.get("error").and_then(|v| v.as_str()) {
+            return match error {
+                "notfound" => Err(format!("Element '{selector}' not found")),
+                "disabled" => Err(format!("Element '{selector}' is disabled — click had no effect")),
+                _ => Err(format!("Click failed: {error}")),
+            };
         }
+        
+        let x = data.get("x").and_then(serde_json::Value::as_f64).ok_or("Missing x coordinate")?;
+        let y = data.get("y").and_then(serde_json::Value::as_f64).ok_or("Missing y coordinate")?;
+        
+        // Use CDP mouse events for trusted clicks
+        let point = Point { x, y };
+        let _clicked = self.tab.click_point(point).map_err(|e| format!("Click failed: {e}"))?;
+        
+        let _settled = self.settle_after_nav(&before);
+        Ok(())
     }
 
     /// Type `text` into the element matching `selector`; optionally submit.

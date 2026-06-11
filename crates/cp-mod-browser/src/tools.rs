@@ -94,6 +94,7 @@ fn note(state: &mut State, action: String) {
 fn open(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let headless = tool.input.get("headless").and_then(serde_json::Value::as_bool).unwrap_or(true);
     let url = tool.input.get("url").and_then(|v| v.as_str()).map(ToString::to_string);
+    let use_real_profile = tool.input.get("use_real_profile").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
     let running = {
         let bs = BrowserState::get(state);
@@ -101,7 +102,7 @@ fn open(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     };
     if !running {
         let bs = BrowserState::get_mut(state);
-        let _ws = lifecycle::spawn_chrome(bs, headless)?;
+        let _ws = lifecycle::spawn_chrome(bs, headless, use_real_profile)?;
     }
     crate::panel::ensure_panel(state);
 
@@ -183,14 +184,8 @@ fn type_text(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let submit = tool.input.get("submit").and_then(serde_json::Value::as_bool).unwrap_or(false);
     let sel = resolve(tool, state)?;
     let msg = with_client(state, |c| {
-        c.type_into(&sel, &text, submit)?;
-        Ok(format!(
-            "Typed into '{}'{}. Now at {} — \"{}\"",
-            sel,
-            if submit { " + submit" } else { "" },
-            c.url(),
-            c.title()
-        ))
+        let outcome = c.type_into(&sel, &text, submit)?;
+        Ok(format!("{outcome}. Now at {} — \"{}\"", c.url(), c.title()))
     })?;
     note(state, msg.clone());
     Ok(msg)

@@ -58,6 +58,26 @@ fn profile_dir() -> PathBuf {
     if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
 }
 
+/// Get the user's real Chrome profile directory path.
+/// On macOS: ~/Library/Application Support/Google/Chrome
+/// On Linux: ~/.config/google-chrome
+fn real_chrome_profile_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").ok()?;
+        Some(PathBuf::from(home).join("Library/Application Support/Google/Chrome"))
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let home = std::env::var("HOME").ok()?;
+        Some(PathBuf::from(home).join(".config/google-chrome"))
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        None
+    }
+}
+
 /// Spawn Chrome via the console server and discover its `DevTools` WebSocket URL.
 /// On success, stores `meta` + `handle` in `bs` and returns the ws URL.
 ///
@@ -65,18 +85,33 @@ fn profile_dir() -> PathBuf {
 ///
 /// Returns `Err` if no Chrome binary is found, the daemon can't spawn it,
 /// or the `DevTools` URL doesn't appear in the log within the wait budget.
-pub fn spawn_chrome(bs: &mut BrowserState, headless: bool) -> Result<String, String> {
+pub fn spawn_chrome(bs: &mut BrowserState, headless: bool, use_real_profile: bool) -> Result<String, String> {
     let chrome = find_chrome()?;
-    let profile = profile_dir();
-    std::fs::create_dir_all(&profile).map_err(|e| format!("Failed to create profile dir: {e}"))?;
+    let profile = if use_real_profile {
+        real_chrome_profile_dir()
+            .ok_or_else(|| "Cannot determine real Chrome profile directory on this platform".to_string())?
+    } else {
+        let p = profile_dir();
+        std::fs::create_dir_all(&p).map_err(|e| format!("Failed to create profile dir: {e}"))?;
+        p
+    };
 
     let key = format!("{BROWSER_KEY_PREFIX}{}", bs.next_session_id);
     bs.next_session_id = bs.next_session_id.saturating_add(1);
 
     // --remote-debugging-port=0: Chrome picks a free port and prints the
     // full ws:// URL on stderr, which the daemon redirects into the log file.
+    //
+    // Anti-bot-detection flags:
+    // - --disable-blink-features=AutomationControlled: removes navigator.webdriver
+    // - --exclude-switches=enable-automation: hides automation extension
+    // - --disable-dev-shm-usage: prevents /dev/shm crashes (Linux)
     let mut command = format!(
-        "'{chrome}' --remote-debugging-port=0 --user-data-dir='{}' --no-first-run --no-default-browser-check",
+        "'{chrome}' --remote-debugging-port=0 --user-data-dir='{}' \
+         --no-first-run --no-default-browser-check \
+         --disable-blink-features=AutomationControlled \
+         --exclude-switches=enable-automation \
+         --disable-dev-shm-usage",
         profile.display()
     );
     if headless {

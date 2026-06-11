@@ -1286,6 +1286,10 @@
   path: src/llms/anthropic/mod.rs
   description: Direct Anthropic Messages API client. SSE stream parsing (content_block_start/delta/stop, message_delta/stop). x-api-key auth from ANTHROPIC_API_KEY. No cache breakpoints. timeout(None) for long streams.
   last_edited_ms: 0
+52e2fe38ac28b26c:
+  path: crates/cp-mod-browser/src/lifecycle.rs
+  description: Chrome lifecycle (Channel A) via cp-console-server SessionHandle. find_chrome ($CP_CHROME override + candidate paths), spawn_chrome (--remote-debugging-port=0, profile dir, ws-URL discovery from stderr log via DevTools marker), reconnect_chrome, kill_chrome, cleanup_orphans (browser_ prefix scoped). extract_ws_url + 2 tests.
+  last_edited_ms: 0
 530138d424d84afa:
   path: docs/search-module.md
   description: Search module documentation. Architecture diagram, component table, server lifecycle, index schemas (files+logs), file pipeline, search tool params, Ctrl+I overlay, log integration, tree-sitter languages.
@@ -1314,6 +1318,10 @@
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
   last_edited_ms: 0
+54d489e6996194e1:
+  path: crates/cp-mod-browser/src/client.rs
+  description: 'CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). connect() adopts Chrome''s own initial tab via adopt_initial_tab. is_alive() liveness-probes the transport (self-closes on idle) so tools.rs drops+reconnects. eval via two-pass returnByValue approach: Phase 1 returnByValue:false captures metadata, Phase 2 conditional returnByValue:true for plain objects/arrays — exotics (Date/RegExp/DOM/Symbol/function) use rich description field. click() uses CDP Input.dispatchMouseEvent via tab.click_point(Point{x,y}) at the element''s center — TRUSTED mouse events that work for downloads/security-gated actions (JS .click() produces untrusted events Gmail/banks ignore); reads element bounds + disabled state via JS first, rejects disabled. type via in-page JS (focus+value+dispatch+submit). settle_after_nav(url_before): two-phase URL settle (phase1 waits ~1.5s for nav to BEGIN, phase2 follows redirect chain). goto soft nav-wait. extract reads .value for form fields else innerText. truncate_utf8, INLINE_CAP_BYTES=8000.'
+  last_edited_ms: 1781199881762
 54ed34dba061f315:
   path: dummy.txt
   description: Throwaway test file
@@ -1706,6 +1714,10 @@
   path: crates/cp-mod-utilities/src/dirs.rs
   description: 'Platform dirs: home_dir() from $HOME, config_dir() macOS Library/Linux XDG. Replaces dirs crate.'
   last_edited_ms: 1780565428677
+71863f0551bc5f43:
+  path: yamls/tools/browser.yaml
+  description: 'Browser tools YAML. 9 tools: browser_open (headless/url), goto, snapshot, click (ref/selector), type (ref/selector/text/submit), extract (selector/format), screenshot (full_page), eval (expression), close.'
+  last_edited_ms: 0
 719c4d62303fbaae:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
@@ -2672,8 +2684,8 @@ b5605bee566a2c94:
   last_edited_ms: 0
 b5d89d9dac3b82b1:
   path: crates/cp-mod-browser/src/client.rs
-  description: 'CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). connect() adopts Chrome''s own initial tab via adopt_initial_tab. is_alive() liveness-probes the transport (self-closes on idle) so tools.rs drops+reconnects. eval via Runtime.Evaluate returnByValue:true+await_promise+user_gesture (run_js helper), rendering value|unserializable_value(NaN/Inf)|description|undefined; exceptions->format_exception (one line). click/type_into via in-page JS (querySelector().click() / focus+value+dispatch(input,change)+requestSubmit) — NOT flaky DOM-domain wait_for_element. settle_after_nav(url_before): two-phase URL settle (phase1 waits ~1.5s for nav to BEGIN, phase2 follows redirect chain to true landing) — fixes stale-URL-after-click. goto soft nav-wait (never propagates wait timeout). extract reads .value for form fields else innerText. truncate_utf8, INLINE_CAP_BYTES=8000. Known minor: get_url() lags for data: scheme URLs (pre-existing headless_chrome quirk).'
-  last_edited_ms: 0
+  description: 'CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). connect() adopts Chrome''s own initial tab via adopt_initial_tab. is_alive() liveness-probes the transport (self-closes on idle) so tools.rs drops+reconnects. eval via two-pass returnByValue approach (PR1.6): Phase 1 returnByValue:false captures metadata, Phase 2 conditional returnByValue:true for plain objects/arrays — exotics (Date/RegExp/DOM/Symbol/function) use rich description field. click/type via in-page JS (querySelector().click() / focus+value+dispatch+submit) — NOT flaky DOM-domain wait_for_element. settle_after_nav(url_before): two-phase URL settle (phase1 waits ~1.5s for nav to BEGIN, phase2 follows redirect chain). goto soft nav-wait. extract reads .value for form fields else innerText. truncate_utf8, INLINE_CAP_BYTES=8000.'
+  last_edited_ms: 1781197872237
 b5e5095cae7ebe03:
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table.'
@@ -3333,6 +3345,10 @@ e8c87aefe7be8bef:
 e92f540548fee6a0:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
+  last_edited_ms: 0
+ea0534f0fd243bff:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch: open/goto/snapshot/click/type/extract/screenshot/eval/close. client() lazily (re)connects CDP and drops a dead client first (is_alive() probe) so it reconnects to the same ws_url after idle self-close. note() records last_action + marks panel dirty. resolve() maps ref/selector. Inline results compact; large extracts→file under .context-pilot/browser/; screenshots→timestamped PNG.'
   last_edited_ms: 0
 ea3a1361f364015c:
   path: src/ui/ir/render_conversation.rs
