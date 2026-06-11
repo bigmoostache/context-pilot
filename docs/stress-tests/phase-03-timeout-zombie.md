@@ -57,8 +57,8 @@ returns. Consequences to confirm:
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H03-1 (suspected) | **S1** | op > 30s → next op blocks until zombie finishes | _to confirm_ | needs cancellation or op_lock try_lock |
-| H03-2 (suspected) | **S2** | zombie late-writes shared → stale state | _to confirm_ | needs op-epoch guard (see P11) |
+| H03-1 | **S2/S3** (was S1) | op > 30s: watcher fires timeout + self-removes (`watchers.rs::check_timeout` not re-added in `poll_all`); detached worker keeps running holding `op_lock` (`tools.rs::run_browser_op` `let _op = ctx.op_lock.lock()`). Next op's WORKER blocks on op_lock until zombie ends — **not a main-thread freeze** (block is on the spawned worker, UI stays live); the queued op may itself hit its own 30s timeout. | **CONFIRMED (source, reclassified)** — 2026-06-11. Not S1: main loop never blocks. | cooperative cancellation OR bounded op timeout < watcher timeout |
+| H03-2 | **S2** | zombie's late completion calls `note_nav`/`set_erefs` on `shared` (no epoch guard) → clobbers newer op's state. Zombie `tx.send` hits a dropped rx (watcher gone) → returns `Err`, **silently ignored, no panic** (`async_exec.rs` `let _r = tx.send`). | **CONFIRMED (source)** — see P11 H11-1. | op-epoch guard on shared writes (P11) |
 
 ## Exit criterion
 Either (a) prove zombies can't hold op_lock / clobber shared, or (b) ship a

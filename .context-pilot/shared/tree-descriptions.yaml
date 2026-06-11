@@ -1874,6 +1874,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+7a0da61499dc0d39:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch — OFF-MAIN-THREAD. Every slow CDP op (open-nav/goto/snapshot/click/type/extract/screenshot/eval) runs on a worker via spawn_async_tool (cp_base async_exec), so the TUI never freezes; result delivered through the ChannelWatcher pipeline like console/brave. run_browser_op gathers OpCtx (conn/op_lock/shared/ws_url Arcs) on the main thread, then the worker: locks op_lock (serialize), connect_shared (reuse/reconnect cached Client), catch_panic(op) (dead-Chrome panic→clean Err, never crash), writes shared (note_shared/note_nav), returns the LLM-facing string. resolve() reads e-refs from the shared lock on the main thread BEFORE spawning. Chrome PROCESS spawn (browser_open) + browser_close stay synchronous (one-shot, main-thread-owned). Large extracts→file; screenshots→timestamped PNG under .context-pilot/browser/.'
+  last_edited_ms: 0
 7b8f6edeaef20990:
   path: src/app/actions/streaming.rs
   description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'

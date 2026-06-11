@@ -206,45 +206,54 @@ fn take_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
     })
 }
 
-/// Resolve the `ref`/`selector` pair from tool input (reads shared e-refs).
-/// Done on the main thread before spawning the worker.
-fn resolve(tool: &ToolUse, state: &State) -> Result<String, String> {
-    let eref = tool.input.get("ref").and_then(|v| v.as_str());
-    let selector = tool.input.get("selector").and_then(|v| v.as_str());
+/// Resolve a `ref`/`selector` pair to a concrete CSS selector **inside the
+/// worker**, under `op_lock`.
+///
+/// This MUST run on the worker (not at main-thread dispatch). In a same-turn
+/// `snapshot`+`click`, the snapshot worker writes the fresh e-refs into `shared`
+/// while holding `op_lock`; because `op_lock` serializes workers in spawn order,
+/// resolving here — after this op acquires `op_lock` — sees the snapshot's
+/// e-refs. Resolving at dispatch instead read the *stale* pre-snapshot table and
+/// acted on the previous page's selector (the P14 premature-resolve bug).
+fn resolve_in_worker(
+    shared: &Arc<Mutex<SharedBrowser>>,
+    eref: Option<&str>,
+    selector: Option<&str>,
+) -> Result<String, String> {
     if eref.is_none() && selector.is_none() {
         return Err("Provide 'ref' (from browser_snapshot) or 'selector'".to_string());
     }
-    let shared = BrowserState::get(state).shared.lock().map_err(|_e| "browser state poisoned".to_string())?;
-    shared
-        .resolve_selector(eref, selector)
+    let s = shared.lock().map_err(|_e| "browser state poisoned".to_string())?;
+    s.resolve_selector(eref, selector)
         .ok_or_else(|| format!("Unknown ref '{}' — take a fresh browser_snapshot", eref.unwrap_or("?")))
 }
 
-/// `browser_click`: click by ref or selector.
+/// `browser_click`: click by ref or selector. The ref is resolved **inside the
+/// worker** under `op_lock` (P14 fix), so a same-turn `snapshot`+`click` acts on
+/// the snapshot's fresh e-refs rather than a stale pre-dispatch table.
 fn click(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let sel = match resolve(tool, state) {
-        Ok(s) => s,
-        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
-    };
+    let eref = tool.input.get("ref").and_then(|v| v.as_str()).map(ToString::to_string);
+    let selector = tool.input.get("selector").and_then(|v| v.as_str()).map(ToString::to_string);
     run_browser_op(state, tool, move |c, shared| {
+        let sel = resolve_in_worker(shared, eref.as_deref(), selector.as_deref())?;
         c.click(&sel)?;
         let (url, title) = note_nav(shared, c, &format!("click {sel}"));
         Ok(format!("Clicked '{sel}'. Now at {url} — \"{title}\""))
     })
 }
 
-/// `browser_type`: type into an element, optionally submit.
+/// `browser_type`: type into an element, optionally submit. The ref is resolved
+/// **inside the worker** under `op_lock` (P14 fix) — see `click`.
 fn type_text(tool: &ToolUse, state: &mut State) -> ToolResult {
     let text = match tool.input.get("text").and_then(|v| v.as_str()) {
         Some(t) => t.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'text' parameter".to_string(), true),
     };
     let submit = tool.input.get("submit").and_then(serde_json::Value::as_bool).unwrap_or(false);
-    let sel = match resolve(tool, state) {
-        Ok(s) => s,
-        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
-    };
+    let eref = tool.input.get("ref").and_then(|v| v.as_str()).map(ToString::to_string);
+    let selector = tool.input.get("selector").and_then(|v| v.as_str()).map(ToString::to_string);
     run_browser_op(state, tool, move |c, shared| {
+        let sel = resolve_in_worker(shared, eref.as_deref(), selector.as_deref())?;
         let outcome = c.type_into(&sel, &text, submit)?;
         let (url, title) = note_nav(shared, c, &outcome);
         Ok(format!("{outcome}. Now at {url} — \"{title}\""))

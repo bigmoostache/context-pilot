@@ -47,7 +47,7 @@ file. No pid/counter/uuid disambiguator.
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H15-1 (suspected) | **S2** | two same-ms artifact writes → silent overwrite, LLM gets wrong file | _to confirm_ | filename = `{now_ms}-{counter/uuid}-{kind}.png` |
+| H15-1 | **S2 (narrowed)** | `tools.rs::artifact_path` = `format!("capture_{}.{ext}", now_ms())` — millisecond timestamp, no pid/counter/uuid. Two writes in the same ms → silent `fs::write` clobber; the LLM gets a path whose bytes belong to the other op. **Likelihood reduced** vs the original "concurrent" claim: ALL ops (incl. the in-op `fs::write`) are serialized by `op_lock`, so two artifact writes can't truly overlap — but two fast serialized ops can still both land in the same millisecond. | **CONFIRMED (source, narrowed)** — 2026-06-11. Real but lower-probability due to op_lock serialization. | filename = `capture_{now_ms}_{atomic_counter}.{ext}` (or pid+counter / uuid). Cheap, eliminates it entirely. |
 
 ## Exit criterion
 No two concurrent artifact writes can collide (unique filenames proven over a

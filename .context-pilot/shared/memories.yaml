@@ -433,6 +433,16 @@ bfd5725c88443a6a:
   - audit
   - task
   last_edited_ms: 0
+c1d06d597fb10a5e:
+  tl_dr: 'BROWSER STRESS TEST: fix bugs AU FIL DE L''EAU — fix each confirmed failure inline as found, NOT batched at end.'
+  contents: 'User mandate (2026-06-11): during the browser async stress test, solve bugs au fil de l''eau. After each confirmed S0/S1/S2 finding: implement the fix IMMEDIATELY (build → reload → verify → commit on branch browser), then continue stress-testing the next phase. Do NOT accumulate findings and batch-fix at the end. Confirmed deployment blockers awaiting fix: P14 premature resolve (S2, move resolve() inside worker under op_lock), P08 close re-freeze (S1, non-blocking try_lock teardown), P11/P03 zombie clobber (S2, per-op epoch guard on shared writes), P15 artifact collision (S2, atomic counter in filename).'
+  importance: critical
+  labels:
+  - workflow
+  - browser
+  - stress-test
+  - user-preference
+  last_edited_ms: 1781206707737
 c8dbe654e1262fd7:
   tl_dr: Browser CDP ops now run OFF-MAIN-THREAD via spawn_async_tool (branch browser) — TUI no longer freezes. Verified live. Details in contents.
   contents: |-

@@ -48,7 +48,7 @@ hang). `close`'s `conn.lock()` then blocks the main loop. `clear_session` uses
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H08-1 (suspected) | **S1** | close while worker holds conn mid-connect → main thread freezes | _to confirm_ | make close async, or `try_lock` + deferred teardown |
+| H08-1 | **S1** | `tools.rs::close` runs synchronously on the main thread → `lifecycle::kill_chrome` → `BrowserState::clear_session` (`types.rs`) does a **blocking** `self.conn.lock()` (`if let Ok(mut slot) = self.conn.lock()` — the `if let Ok` guards POISON, not contention; `.lock()` still blocks on a held lock). A worker in `connect_shared` holds `conn` across `Client::connect` / `is_alive` (CDP round-trip, up to the 8s op timeout, unbounded if Chrome is hung) → the main loop blocks for that window. **The exact freeze the refactor removed, reachable via close during a worker's connect window.** | **CONFIRMED (source)** — 2026-06-11. | make `close` async (spawn teardown), OR `conn.try_lock()` + deferred/abandon-on-contention teardown; never block the main loop on `conn`. |
 
 ## Exit criterion
 `browser_close` never blocks the main loop > 50ms regardless of in-flight ops;

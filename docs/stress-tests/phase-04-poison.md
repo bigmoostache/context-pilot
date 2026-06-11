@@ -48,7 +48,7 @@ without reload.** `op_lock` is *not* poisoned (catch_panic boundary is inside it
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H04-1 (suspected) | **S1** | panic while holding conn → permanent poison, browser dead until reload | _to confirm_ | use `lock().unwrap_or_else(PoisonError::into_inner)` everywhere |
+| H04-1 | **S1** (claimed) | — | **REFUTED (source)** — 2026-06-11. Poison is NOT reachable in current code: every panic-prone `headless_chrome` call held under the `conn` slot lock (`Client::connect`, `is_alive`) is itself `catch_panic`-wrapped **below** the lock guard (`client.rs`), so the unwind is caught before it crosses `connect_shared`'s `slot` guard → no poison. The slot guard only spans catch_panic-protected calls + infallible ops (`Arc::clone`, `*slot = …`). | LOW-PRIORITY HARDENING: still convert `conn.lock()` to `unwrap_or_else(PoisonError::into_inner)` so a future refactor that moves `catch_panic` above the lock can't brick the browser. Document the invariant ("catch_panic MUST stay nested below the conn lock"). |
 
 ## Exit criterion
 Either prove poison is unreachable, or convert all `conn`/`shared` lock sites to

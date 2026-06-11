@@ -47,7 +47,7 @@ page. Last-writer-wins with no ordering = silent corruption.
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H11-1 (suspected) | **S2** | timed-out op's late write clobbers newer shared state → wrong-page action | _to confirm_ | per-op epoch: stamp at dispatch, drop writes whose epoch != current |
+| H11-1 | **S2** | `SharedBrowser` (`types.rs`) carries **no generation/epoch token** — `set_erefs`/`note_nav` just overwrite `erefs`/`eref_selectors`/`url`/`title`/`last_action`. A timed-out/abandoned worker (P03 H03-1: detached, never cancelled) finishes later and writes its (now-stale) results into `shared`, clobbering whatever a newer op wrote. A subsequent click-by-ref then resolves against the wrong page's e-refs. Last-writer-wins with no op ordering on `shared`. | **CONFIRMED (source)** — 2026-06-11. | per-op epoch: stamp an `op_id`/generation at dispatch (carried into the worker); `note_nav`/`set_erefs` no-op if `epoch != current`. |
 
 ## Exit criterion
 A late/zombie worker can never mutate `shared` for a superseded op (epoch guard),

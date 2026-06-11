@@ -49,7 +49,7 @@ or a stale-page ref. The synchronous version guaranteed snapshot completed first
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H14-1 (suspected) | **S2** | same-turn snapshot+click → click resolves before snapshot writes erefs → Unknown ref | _to confirm_ | resolve refs inside the worker under op_lock, OR make same-turn browser tools await prior result |
+| H14-1 | **S2** | LIVE repro: goto fresh page (data: button+input), then same-turn `snapshot`+`click(e1)`. Before fix → `click` resolved `e1` against the PREVIOUS page's stale eref map (`body > div > p > a`) → `Element ... not found`. `resolve()` ran on the MAIN thread at dispatch, before the snapshot worker wrote `shared`. | **CONFIRMED LIVE then FIXED+VERIFIED** — 2026-06-11. | **FIXED** (`tools.rs`): added `resolve_in_worker(shared, eref, selector)` — ref resolution moved INSIDE the worker closure, under `op_lock`. Because `op_lock` serializes workers in spawn order, the snapshot worker writes fresh erefs before the click worker resolves. Removed the main-thread `resolve()`. Verified: same-turn `snapshot`+`click(e1)` now → `Clicked '#b1'` (the fresh page's button). |
 
 ## Exit criterion
 A same-turn `snapshot`+`click` always acts on the snapshot's e-refs (resolve moved
