@@ -790,6 +790,10 @@
   path: crates/cp-base/src/config/global.rs
   description: 'Global config at ~/.config/context-pilot/config.json. API key resolution cascade: env var → config file. KEY_ENV_MAP for canonical names. store_api_key/resolve_api_key/env_var_for_key.'
   last_edited_ms: 1780565428671
+3013e6c7f970f138:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: Harbor BaseInstalledAgent adapter. version() 0.2.4. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /logs/agent/...jsonl + tee + '|| true'. populate_context_post_run reads trajectory host-side via bind-mounted /logs/agent.
+  last_edited_ms: 0
 305eae7b157d07fc:
   path: crates/cp-mod-callback/src/firing.rs
   description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. fire_async/blocking_callbacks() for batch dispatch. flame!("cb_fire"), flame!("cb_fire_async"), flame!("cb_fire_blocking"). CallbackWatcher: exit 0→success_message, exit 7→silent, exit !=0→deferred panel, timeout→deferred panel.'
@@ -1234,6 +1238,10 @@
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
   last_edited_ms: 0
+4df89062cb1c55f2:
+  path: src/llms/mod.rs
+  description: 'LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() = v0.2.7 CATCH-ALL TTFB watchdog: spawns relay thread (inner_tx→tx, flips got_event on first event, drops stragglers when aborted) + watchdog thread (sleep STREAM_TTFB_TIMEOUT=100s; if !got_event → inject StreamEvent::Error → retry on fresh conn) + worker thread (assemble_prompt + client.stream). Fires regardless of WHERE do_stream blocks — the outer net for the 3 inner streaming.rs guards that never fired in field. api_messages_to_cc_json() places cache breakpoints. SSE error logging.'
+  last_edited_ms: 1781219352644
 4e1229fe305d43b4:
   path: crates/cp-mod-search/src/meili/download.rs
   description: Meilisearch binary download. Pinned v1.13.3. Platform detection (macOS/Linux, amd64/aarch64). GitHub releases download to ~/.context-pilot/meilisearch/bin/. Skips if already present. 5-min timeout.
@@ -2954,6 +2962,10 @@ c338519b09352739:
   path: crates/cp-mod-files/src/lib.rs
   description: 'Files module. Core/global. 3 tools: Open, Edit, Write. Pre-flight: queue auto-activate, old_string match against both disk and virtual (post-queue) content via build_virtual_content(). 4-way matrix: disk✓/virtual✓→OK, disk✓/virtual✗→ERROR, disk✗/virtual✓→OK, disk✗/virtual✗→ERROR.'
   last_edited_ms: 0
+c3692806702451d9:
+  path: src/llms/claude_code/oauth.rs
+  description: 'Claude Code OAuth helpers (shared by claude_code + claude_code_v2). v0.2.7: oauth_http_client() = blocking Client w/ connect_timeout(10s)+timeout(30s), replacing Client::new() in refresh_token_if_needed + fetch_usage — these run SYNC on the main loop thread (background_tick 180s) AND in do_stream, were latent freeze bombs. Token refresh (console.anthropic.com/v1/oauth/token), credential load/save (macOS Keychain or ~/.claude/.credentials.json), is_token_expired (60s buffer), fetch_usage (api.anthropic.com/api/oauth/usage). Save/refresh errors routed to log_error (not stderr) to avoid TUI corruption.'
+  last_edited_ms: 1781219352653
 c38efa785cbc3000:
   path: crates/cp-mod-brave/src/types.rs
   description: 'Brave API serde types: BraveSearchResponse (web/rich results), LLMContextResponse (grounding items)'

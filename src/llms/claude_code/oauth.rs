@@ -6,7 +6,7 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use cp_base::cast::Safe as _;
@@ -15,6 +15,23 @@ use crate::llms::error::LlmError;
 
 /// OAuth client ID for Claude Code (from captured traffic)
 const OAUTH_CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+
+/// Build a timeout-bounded blocking client for the OAuth request/response calls
+/// (token refresh + usage). These are NOT streaming — a bounded total timeout is
+/// correct and prevents a silent application-level hold from freezing the caller.
+///
+/// Critical: `refresh_token_if_needed` and `fetch_usage` are invoked **on the
+/// main headless/UI loop thread** (`background_tick` usage poll) and inside
+/// `do_stream` (token refresh). A timeout-less `Client::new()` here means a mute
+/// server can wedge the entire event loop with no watchdog covering it. 10s
+/// connect + 30s total aborts such holds (they normally complete in <2s).
+fn oauth_http_client() -> reqwest::blocking::Client {
+    reqwest::blocking::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
+        .build()
+        .unwrap_or_else(|_| reqwest::blocking::Client::new())
+}
 
 /// Token refresh endpoint
 const TOKEN_REFRESH_ENDPOINT: &str = "https://console.anthropic.com/v1/oauth/token";
@@ -195,7 +212,7 @@ pub(crate) fn refresh_token_if_needed(creds: &mut OAuthCredentials) -> Result<()
         return Ok(()); // Still valid
     }
     
-    let client = reqwest::blocking::Client::new();
+    let client = oauth_http_client();
     let response = client
         .post(TOKEN_REFRESH_ENDPOINT)
         .header("Content-Type", "application/json")
@@ -242,7 +259,7 @@ pub(crate) fn refresh_token_if_needed(creds: &mut OAuthCredentials) -> Result<()
 /// Returns 5-hour and 7-day utilization percentages. Requires valid OAuth token.
 /// Rate limit: safe at 180-second intervals with correct User-Agent.
 pub(crate) fn fetch_usage(access_token: &str) -> Result<cp_base::config::llm_types::UsageResponse, LlmError> {
-    let client = reqwest::blocking::Client::new();
+    let client = oauth_http_client();
     let response = client
         .get(USAGE_ENDPOINT)
         .header("Authorization", format!("Bearer {access_token}"))

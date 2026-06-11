@@ -122,9 +122,78 @@ pub(crate) struct StreamParams {
     pub cache_engine_json: Option<String>,
 }
 
+/// Maximum time a stream attempt may produce **zero** events before the
+/// `start_streaming` watchdog forces a `StreamEvent::Error` (→ retry on a fresh
+/// connection).
+///
+/// This is the **catch-all** backstop, deliberately placed OUTSIDE the provider's
+/// `do_stream` so it fires regardless of *where* a silent hold occurs — the
+/// `.send()` headers wait, the SSE body read, a TLS/DNS stall, an OAuth refresh,
+/// or any unguarded blocking call the three in-provider watchdogs
+/// (`send_with_header_timeout` 60s, `FIRST_CONTENT_TIMEOUT` 90s,
+/// `IdleTimeoutReader` 120s) cannot see. Observed in the field: a cold-start
+/// stream froze for minutes producing **no** events while every in-provider guard
+/// silently failed to fire. A pure wall-clock timer on time-to-first-event cannot
+/// be evaded by any internal block. A healthy stream emits its first event
+/// (usage / first delta) within seconds even under model queueing, and a
+/// legitimately long stream has already emitted events (disarming the watchdog),
+/// so this never cuts a real response.
+const STREAM_TTFB_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(100);
+
 /// Start streaming with the specified provider and model
 pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
     let client = get_client(params.provider);
+
+    // ── Catch-all time-to-first-event watchdog ──
+    // The provider writes events into `inner_tx`; a relay forwards them to the
+    // real `tx`, flipping `got_event` on the first one. A watchdog thread injects
+    // a StreamError if no event arrives within STREAM_TTFB_TIMEOUT. This sits
+    // entirely outside the provider, so it catches ANY internal silent hold.
+    let (inner_tx, inner_rx) = std::sync::mpsc::channel::<StreamEvent>();
+    let got_event = Arc::new(AtomicBool::new(false));
+    let aborted = Arc::new(AtomicBool::new(false));
+
+    // Watchdog tx clone made first so the relay can consume the original `tx`
+    // by move (avoids a redundant final clone / needless-pass-by-value lint).
+    let watchdog_tx = tx.clone();
+
+    // Relay: inner_rx → tx, marking first event; drops events once aborted so a
+    // late-waking stuck stream can't interleave with the post-retry stream.
+    {
+        let got_event = Arc::clone(&got_event);
+        let aborted = Arc::clone(&aborted);
+        let _relay = std::thread::spawn(move || {
+            while let Ok(evt) = inner_rx.recv() {
+                got_event.store(true, Ordering::Relaxed);
+                if aborted.load(Ordering::Relaxed) {
+                    continue; // watchdog already forced a retry; discard stragglers
+                }
+                if tx.send(evt).is_err() {
+                    break; // consumer gone
+                }
+            }
+        });
+    }
+
+    // Watchdog: force a retry if the stream produced nothing in time.
+    {
+        let got_event = Arc::clone(&got_event);
+        let aborted = Arc::clone(&aborted);
+        let _watchdog = std::thread::spawn(move || {
+            std::thread::sleep(STREAM_TTFB_TIMEOUT);
+            if !got_event.load(Ordering::Relaxed) {
+                aborted.store(true, Ordering::Relaxed);
+                let _r = watchdog_tx.send(StreamEvent::Error(format!(
+                    "stream produced no event within {}s (start_streaming catch-all watchdog) — \
+                     aborting to retry on a fresh connection (silent hold no in-provider guard caught)",
+                    STREAM_TTFB_TIMEOUT.as_secs()
+                )));
+            }
+        });
+    }
 
     let _r = std::thread::spawn(move || {
         // Assemble the prompt (panels + seed + conversation → api_messages)
@@ -154,8 +223,8 @@ pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
             cache_engine_json: params.cache_engine_json,
         };
 
-        if let Err(e) = client.stream(request, tx.clone()) {
-            let _r = tx.send(StreamEvent::Error(e.to_string()));
+        if let Err(e) = client.stream(request, inner_tx.clone()) {
+            let _r = inner_tx.send(StreamEvent::Error(e.to_string()));
         }
     });
 }
