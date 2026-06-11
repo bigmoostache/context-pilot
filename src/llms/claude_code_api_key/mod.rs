@@ -230,10 +230,14 @@ impl LlmClient for ClaudeCodeApiKeyClient {
 
         dump_last_request(&request.worker_id, &api_request);
 
-        let response =
+        // .send() is guarded by send_with_header_timeout: a silent hold before
+        // the response headers (TCP-alive but server mute) aborts → retry rather
+        // than hanging forever. The body-read IdleTimeoutReader only arms after
+        // .send() returns Ok, so the headers phase needs its own guard.
+        let request_builder =
             apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key.expose_secret(), "text/event-stream")
-                .json(&api_request)
-                .send()?;
+                .json(&api_request);
+        let response = streaming::send_with_header_timeout(request_builder)?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

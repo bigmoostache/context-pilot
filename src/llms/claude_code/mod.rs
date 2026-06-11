@@ -300,7 +300,11 @@ impl ClaudeCodeClient {
         // Always dump last request for debugging (overwritten each call)
         debug::dump_last_request(&request.worker_id, &api_request);
 
-        let response = client
+        // .send() is guarded by send_with_header_timeout: a silent hold before
+        // the response headers (TCP-alive but server mute) aborts → retry rather
+        // than hanging forever. The body-read IdleTimeoutReader only arms after
+        // .send() returns Ok, so the headers phase needs its own guard.
+        let request_builder = client
             .post(CLAUDE_CODE_ENDPOINT)
             .header("accept", "text/event-stream")
             .header("authorization", format!("Bearer {}", access_token.expose_secret()))
@@ -317,8 +321,8 @@ impl ClaudeCodeClient {
             .header("x-stainless-retry-count", "0")
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
-            .json(&api_request)
-            .send()?;
+            .json(&api_request);
+        let response = super::claude_code_api_key::streaming::send_with_header_timeout(request_builder)?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

@@ -23,6 +23,50 @@ use crate::llms::error::LlmError;
 /// fix for the freeze TCP keepalive could not catch (the peer is alive, just mute).
 const IDLE_READ_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// Maximum time to wait for the HTTP **response headers** (i.e. for the blocking
+/// `.send()` call to return) before treating the request as a silent hold and
+/// aborting (→ retry on a fresh connection).
+///
+/// `connect_timeout` only bounds the TCP handshake; once connected, reqwest's
+/// blocking `.send()` blocks awaiting the response status line + headers with no
+/// timeout of its own (we deliberately set `.timeout(None)` so legit long streams
+/// are never cut). The pathological silent-hold can occur HERE — the server
+/// accepts the connection, keeps it TCP-alive, but never sends the response head.
+/// [`IdleTimeoutReader`] only guards the body read that happens *after* `.send()`
+/// returns, so this phase needs its own guard. 60s comfortably exceeds a normal
+/// time-to-first-header (a few seconds, even under model queueing — the first SSE
+/// *byte* may lag but headers do not) while aborting long before the agent wall.
+const SEND_HEADER_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Run a blocking `.send()` under a response-header timeout.
+///
+/// Moves the fully-configured `builder` onto a detached thread that performs the
+/// blocking send, and waits up to [`SEND_HEADER_TIMEOUT`] for the response head.
+/// On timeout, returns `StreamRead` so the request aborts and retries on a fresh
+/// connection instead of riding the agent wall. Same leak caveat as
+/// [`IdleTimeoutReader`]: a timed-out send thread parks on the dead socket until
+/// the process exits (negligible for short-lived Terminal-Bench tasks).
+pub(crate) fn send_with_header_timeout(
+    builder: reqwest::blocking::RequestBuilder,
+) -> Result<reqwest::blocking::Response, LlmError> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let _handle = std::thread::spawn(move || {
+        let _r = tx.send(builder.send());
+    });
+    match rx.recv_timeout(SEND_HEADER_TIMEOUT) {
+        Ok(Ok(response)) => Ok(response),
+        Ok(Err(e)) => Err(LlmError::Network(e.to_string())),
+        Err(RecvTimeoutError::Timeout) => Err(LlmError::StreamRead(format!(
+            "no response headers within {}s — aborting to retry on a fresh connection \
+             (silent application-level hold before response head)",
+            SEND_HEADER_TIMEOUT.as_secs()
+        ))),
+        Err(RecvTimeoutError::Disconnected) => {
+            Err(LlmError::Network("send thread disconnected before responding".to_string()))
+        }
+    }
+}
+
 /// Idle-guarded line reader for a blocking SSE response.
 ///
 /// `reqwest`'s **blocking** `ClientBuilder` exposes no `read_timeout` (only the

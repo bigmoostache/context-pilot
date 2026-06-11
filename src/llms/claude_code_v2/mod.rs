@@ -253,8 +253,13 @@ impl ClaudeCodeV2Client {
         // Debug dump
         helpers::dump_last_request(&request.worker_id, &api_request);
 
-        // Build and send request with V2 headers
-        let response = client
+        // Build and send request with V2 headers.
+        // .send() is guarded by send_with_header_timeout so a silent
+        // application-level hold before the response headers (connection
+        // established, TCP-alive, but server mute) aborts → retry instead of
+        // hanging forever (connect_timeout only covers the TCP handshake; the
+        // body-read IdleTimeoutReader only arms after .send() returns Ok).
+        let request_builder = client
             .post(ENDPOINT)
             .header("accept", "text/event-stream")
             .header(
@@ -275,8 +280,8 @@ impl ClaudeCodeV2Client {
             .header("x-stainless-runtime", "node")
             .header("x-stainless-runtime-version", "v24.3.0")
             .header("x-stainless-timeout", "600")
-            .json(&api_request)
-            .send()?;
+            .json(&api_request);
+        let response = streaming::send_with_header_timeout(request_builder)?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

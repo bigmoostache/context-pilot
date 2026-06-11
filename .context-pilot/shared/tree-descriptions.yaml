@@ -834,6 +834,10 @@
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: Firecrawl result panel. Same pattern as brave panel — static content in metadata, cache restore post-reload, pagination. FIRECRAWL_PANEL_TYPE constant.
   last_edited_ms: 0
+3363587c9bf3fb7c:
+  path: src/llms/claude_code_api_key/mod.rs
+  description: 'Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access. v0.2.5: stream() binds the request builder then calls streaming::send_with_header_timeout (guards .send() response-headers phase) before parse_sse_stream (IdleTimeoutReader body guard).'
+  last_edited_ms: 1781216198062
 336dfff56acc39c5:
   path: docs/talk/slides/3-2.html
   description: 'Slide: Self-Improving Loop with stats pills and feedback SVG'
@@ -1030,6 +1034,10 @@
   path: crates/cp-mod-search/src/meili/overlay.rs
   description: Ctrl+I overlay data provider. Fetches live Meilisearch stats + process stats (CPU%/RAM via /proc or ps). read_process_stats(pid) platform-specific. CPU% from tick deltas cached in MeiliLiveStats. 2s refresh cache. Builds SearchOverlayInfo.
   last_edited_ms: 0
+4043e89b1e2efce3:
+  path: src/llms/claude_code/mod.rs
+  description: 'Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. v0.2.5: do_stream binds the request builder then calls claude_code_api_key::streaming::send_with_header_timeout (guards .send() headers phase) + uses IdleTimeoutReader for the body loop — both abort silent application-level holds → StreamRead → retry.'
+  last_edited_ms: 1781216191954
 4049f7287a475d2f:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -1950,6 +1958,10 @@
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
   last_edited_ms: 0
+7efd78ada9209aab:
+  path: src/llms/claude_code_api_key/streaming.rs
+  description: 'SSE parsing for Claude Code responses. TWO watchdogs (both thread+recv_timeout, since reqwest blocking lacks read/header timeouts): (1) send_with_header_timeout (pub(crate), SEND_HEADER_TIMEOUT=60s) guards the .send() RESPONSE-HEADERS wait — v0.2.5 fix for the silent hold the body-read watchdog missed; (2) IdleTimeoutReader (pub(crate), IDLE_READ_TIMEOUT=120s) guards the SSE BODY read loop — v0.2.4. Both → Err(StreamRead) → retry on fresh connection. parse_sse_stream uses IdleTimeoutReader; shared by claude_code + claude_code_v2.'
+  last_edited_ms: 1781216191945
 7f3ef5ae7601d1ab:
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
@@ -2730,6 +2742,10 @@ b43754bbbc122964:
   path: crates/cp-mod-console/src/ring_buffer.rs
   description: 'RingBuffer: fixed-capacity circular buffer for console output lines'
   last_edited_ms: 0
+b46449270dd4fee1:
+  path: src/llms/claude_code_v2/mod.rs
+  description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure. Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6. v0.2.5: do_stream uses send_with_header_timeout (.send() headers guard) + parse_sse_stream (IdleTimeoutReader body guard), both from claude_code_api_key.'
+  last_edited_ms: 1781216191962
 b4690dffe1679682:
   path: src/modules/conversation_history/panel.rs
   description: 'ConversationHistoryPanel: frozen message chunks, render_message_blocks() with role icons, write-once (no refresh/cache)'

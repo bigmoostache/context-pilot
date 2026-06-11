@@ -166,19 +166,31 @@
   - structure-check
   last_edited_ms: 0
 2fb69a4032fb9c9e:
-  tl_dr: 'OPERATING MODEL CHANGED: harbor auto-loop STOPPED. I am now the only loop — launch one task at a time. GATES per task: (1) Claude OAuth >=40% free; (2) SSE freeze fixed (v0.2.4 watchdog). No runs until both met.'
+  tl_dr: 'OPERATING MODEL: harbor auto-loop STOPPED. I am the only loop — launch ONE task at a time, monitor to completion. GATES per task: (1) Claude OAuth >=40% free; (2) SSE freeze fixed (v0.2.4 watchdog, now LIVE). CORRECTED launch syntax in contents.'
   contents: |-
-    Sequential 89-task TB run LAUNCHED ~18:39 host time. Run dir: benchmarks/terminal-bench/jobs/2026-06-11__20-38-59/ (results.json appears as tasks complete). ONE harbor process, -n 1 strictly sequential (one container at a time), Sonnet 4.6 via claude_code_v2 provider, CP_MAX_COST=5.0, downloads the release binary. Monitored via console panel P17 + heartbeat coucou. CRITICAL: do NOT launch a second copy of the 89-task suite.
+    Single-task harbor launch (CORRECTED 2026-06-11 ~22:03 — old file-path/--task-id syntax is BROKEN on current harbor):
 
-    V0.2.3 STALL FIX (2026-06-11 ~19:42): all 3 claude_code* clients now bound dead SSE connections via TCP keepalive (connect_timeout 30s + tcp_keepalive 60s/15s/4). Commit 20947ca, adapter bump b525074, tag v0.2.3 pushed -> release CI building linux bundle -> releases/latest will serve fixed binary. The big run was launched on v0.2.2 (no fix); only NEW container installs after v0.2.3 publishes get the fix.
+    Run FROM benchmarks/terminal-bench (cwd), with PYTHONPATH including it so importlib can find the adapter module:
 
-    GPT2 RE-TEST: X572 unmarked -> pending. A coucou (~19:48) will verify v0.2.3 asset uploaded then launch a SINGLE-TASK -i gpt2-codegolf harbor run (downloads v0.2.3). Deliberate user-requested re-test, NOT a duplicate suite - runs as a 2nd brief container alongside the big run. On pass -> mark X572 done.
+    bash -lc 'CREDS=$(security find-generic-password -s "Claude Code-credentials" -w); export CLAUDE_CREDENTIALS_JSON="$CREDS"; export CP_PROVIDER=claude_code_v2; export CP_MAX_COST=5.0; export PYTHONPATH="$PWD:$PYTHONPATH"; ~/.harbor-venv/bin/harbor run -d terminal-bench@2.0 --agent-import-path context_pilot_agent:ContextPilotAgent -m anthropic/claude-sonnet-4-6 -k 1 -n 1 -i <TASK-NAME> 2>&1'
+
+    KEY FLAG FIXES:
+    - Task selector = -i / --include-task-name <bare-name> (e.g. gpt2-codegolf). NOT --task-id (no such option). -t/--task wants an org/name PACKAGE ref, not a dataset task.
+    - --agent-import-path = DOTTED module:Class (context_pilot_agent:ContextPilotAgent), module importable via PYTHONPATH. Current harbor passes the pre-colon part to importlib.import_module, so a 'path/to/file.py:Class' string fails 'No module named'.
+    - cwd = benchmarks/terminal-bench — jobs/ output lands there (matches prior job dirs).
+    - -n 1 strictly sequential (one container). -k 1 = one attempt per trial.
+
+    Results live at jobs/<ts>/<task>__<id>/verifier/reward.txt + result.json; trajectory at <task>/agent/context-pilot-trajectory.jsonl.
+
+    v0.2.4 SSE freeze fix is LIVE (releases/latest → v0.2.4, linux bundle HTTP 200). Adapter downloads it per container install.
+
+    CURRENT RUN: gpt2-codegolf (X572) relaunched ~22:03 on v0.2.4 / Sonnet 4.6 / claude_code_v2, container gpt2-codegolf__utdgsz9. Validates the watchdog on the canonical freeze victim (0.0 twice). opio-rag-* containers = user's OTHER project, NEVER touch.
   importance: critical
   labels:
   - terminal-bench
   - run
   - active
-  last_edited_ms: 1781211875291
+  last_edited_ms: 1781215471168
 3182e8c4a21fcc81:
   tl_dr: Secondary model selector with Tab key toggle implemented
   contents: |-
@@ -333,24 +345,21 @@
   - llm-provider
   last_edited_ms: 0
 76bca3b377df349e:
-  tl_dr: 'v0.2.4 SSE freeze fix DONE (built+reloaded): IdleTimeoutReader watchdog aborts silent app-level SSE holds → retry. Pending: commit+push + tag v0.2.4 → release CI.'
+  tl_dr: 'v0.2.5 SSE freeze fix DONE+built+reloaded: send_with_header_timeout (thread+recv_timeout, SEND_HEADER_TIMEOUT=60s) guards the .send() response-headers phase that v0.2.4''s body-read IdleTimeoutReader missed. Pending: commit+push+tag v0.2.5 -> release CI.'
   contents: |-
-    ## v0.2.4 SSE Freeze Fix
+    ## SSE Freeze Fix — v0.2.4 + v0.2.5
 
-    Root cause: app-level silent SSE hold — server accepts request (TCP-alive, keepalive ACK'd) but never sends the next SSE byte. BufReader::read_line blocks forever; TCP keepalive (v0.2.3) cannot detect it (peer alive, just mute). CP retry only fires on stream ERROR → never trips → rides the 900s wall → 0.0. PER-REQUEST (gpt2 req#1; write-compressor req#5).
+    ### v0.2.4 (body-read watchdog) — INSUFFICIENT ALONE
+    IdleTimeoutReader (reader-thread + recv_timeout, IDLE_READ_TIMEOUT=120s) in src/llms/claude_code_api_key/streaming.rs guards the SSE BODY read loop. Aborts silent app-level holds AFTER response headers arrive. Shared by all 3 claude_code* clients.
 
-    Why not the obvious fix: reqwest 0.12.28 BLOCKING ClientBuilder has no .read_timeout() (async-only).
+    ### v0.2.5 (send-header watchdog) — THE MISSING PIECE
+    DEFINITIVE root cause (gpt2 re-run on v0.2.4, job 00-03-22): froze AGAIN at 'start' 7min. Evidence: container Up 8min, tui Sl 0.7% CPU, EXACTLY 1 established conn to :443, NO sse_errors.log, watchdog never fired. The silent hold is in the RESPONSE-HEADERS wait inside reqwest blocking .send() — connect_timeout covers only TCP connect; once connected .send() blocks awaiting headers with NO timeout (.timeout(None)). IdleTimeoutReader only arms AFTER send() returns Ok, so that phase was unguarded -> infinite hang -> 900s wall -> 0.0.
 
-    Fix (IdleTimeoutReader in src/llms/claude_code_api_key/streaming.rs, pub(crate)):
-    - spawn(Response): detached reader thread owns the Response, loops read_line, sends io::Result<Option<String>> per line over mpsc.
-    - next_line(): rx.recv_timeout(IDLE_READ_TIMEOUT=120s). Timeout → Err(StreamRead('idle')) → propagates → StreamEvent::Error → existing consumer retries on FRESH connection. Disconnected → Ok(None)=EOF.
-    - parse_sse_stream rewritten to use it (shared by claude_code_api_key + claude_code_v2 → v2 gets fix free).
-    - claude_code/mod.rs do_stream inline loop refactored to use it; dead build_stream_read_error + StreamErrorContext removed from claude_code/debug.rs.
-    - Kept .timeout(None) + connect_timeout(30s) + tcp_keepalive (defense in depth).
+    FIX: pub(crate) fn send_with_header_timeout(builder) in claude_code_api_key/streaming.rs. Spawns a detached thread running builder.send(), waits rx.recv_timeout(SEND_HEADER_TIMEOUT=60s). Timeout -> Err(StreamRead) -> StreamEvent::Error -> existing fresh-connection retry. Ok(Err)->Network; Disconnected->Network. Same leak caveat as IdleTimeoutReader (timed-out send thread parks until process exit; negligible for short-lived TB tasks).
 
-    Caveat: a stalled connection's reader thread parks until process exit (TB tasks are short-lived → negligible).
+    Wired at ALL 3 streaming call sites: claude_code/mod.rs, claude_code_api_key/mod.rs, claude_code_v2/mod.rs — each binds the request builder then `let response = ...::send_with_header_timeout(request_builder)?;` replacing the inline `.send()?`.
 
-    Status: code compiles (rust-check passed), release built, TUI reloaded. REMAINING: git commit+push (with memories+tree-descs per M15) + tag v0.2.4 → release CI publishes context-pilot-linux-x86_64.tar.gz to releases/latest. Adapter version() bumped to 0.2.4.
+    Status: rust-check passed, cargo build --release 6.78s, TUI reloaded (live). Adapter version() bumped 0.2.4->0.2.5. REMAINING: git commit+push (with memories+tree-descs per M15) + tag v0.2.5 -> release CI publishes context-pilot-linux-x86_64.tar.gz to releases/latest.
   importance: high
   labels:
   - llm-provider
@@ -358,7 +367,7 @@
   - v0.2.4
   - terminal-bench
   - complete
-  last_edited_ms: 1781214826219
+  last_edited_ms: 1781216178348
 77a6639f89352d52:
   tl_dr: 'Hardcoded prompt audit: user wants EVERY occurrence of LLM-facing text noted, no matter how minor. No ''clean enough'' dismissals. User decides what''s behavioral steering vs. not. Be exhaustive — if the LLM sees it, log it as a finding.'
   importance: critical
