@@ -46,13 +46,18 @@ fn build_content(state: &State) -> String {
     let status = bs.handle.as_ref().map_or_else(|| "?".to_string(), |h| h.get_status().label());
     let mode = if meta.headless { "headless" } else { "headed" };
     let mut out = format!("Chrome [{mode}] — status: {status} (pid {})\n", meta.pid);
-    if !bs.last_action.is_empty() {
-        let _w = writeln!(out, "Last action: {}", bs.last_action);
+    // Runtime data is worker-written behind the shared lock.
+    let Ok(shared) = bs.shared.lock() else {
+        out.push_str("\n(browser state momentarily locked)\n");
+        return out;
+    };
+    if !shared.last_action.is_empty() {
+        let _w = writeln!(out, "Last action: {}", shared.last_action);
     }
-    if bs.snapshot_text.is_empty() {
+    if shared.snapshot_text.is_empty() {
         out.push_str("\nNo snapshot yet — call browser_snapshot to enumerate interactive elements.\n");
     } else {
-        let _w = write!(out, "\nInteractive elements ({} e-refs):\n{}", bs.erefs.len(), bs.snapshot_text);
+        let _w = write!(out, "\nInteractive elements ({} e-refs):\n{}", shared.erefs.len(), shared.snapshot_text);
     }
     out
 }

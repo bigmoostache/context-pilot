@@ -161,10 +161,8 @@ pub fn kill_chrome(bs: &mut BrowserState) {
         handle.kill();
     }
     bs.meta = None;
-    bs.client = None;
-    bs.erefs.clear();
-    bs.eref_selectors.clear();
-    bs.snapshot_text.clear();
+    // Drop the cached CDP connection + worker-written runtime data.
+    bs.clear_session();
 }
 
 /// Reap orphaned `browser_*` daemon sessions that aren't in `known`.

@@ -433,6 +433,37 @@ bfd5725c88443a6a:
   - audit
   - task
   last_edited_ms: 0
+c8dbe654e1262fd7:
+  tl_dr: Browser CDP ops now run OFF-MAIN-THREAD via spawn_async_tool (branch browser) — TUI no longer freezes. Verified live. Details in contents.
+  contents: |-
+    ## Browser async architecture (off-main-thread CDP)
+
+    **Problem solved:** browser tools previously ran synchronously on the main event loop — each CDP op froze the TUI for seconds.
+
+    **Design (reuses existing async machinery):**
+    - `Client` (headless_chrome Browser + Arc<Tab>) is **Send+Sync** → can be moved into a worker. No actor thread needed.
+    - Every slow CDP op runs via `spawn_async_tool` (cp_base::tools::async_exec) on a worker thread; result delivered through the ChannelWatcher pipeline (same path as console/brave/firecrawl). Returns BLOCKING_TOOL_SENTINEL, watcher replaces it.
+    - `BrowserState` (types.rs):
+      - `meta`/`handle`: main-thread-owned (Chrome process lifecycle + persistence/save-load).
+      - `conn: ConnSlot = Arc<Mutex<Option<Arc<Client>>>>` — shared cached CDP connection.
+      - `shared: Arc<Mutex<SharedBrowser>>` — worker-written runtime data (erefs, eref_selectors, snapshot_text, last_action, url, title). SharedBrowser owns set_erefs + resolve_selector.
+      - `op_lock: Arc<Mutex<()>>` — serializes CDP ops on the single transport.
+      - `clear_session()` drops conn + resets shared (called by kill_chrome).
+    - `client::connect_shared(conn, ws_url)` — worker-side reuse-or-reconnect: locks slot, returns cached live Client (is_alive probe) else connects+caches.
+    - `tools.rs run_browser_op`: gathers OpCtx (conn/op_lock/shared/ws_url Arcs) on main thread, then spawn_async_tool worker: lock op_lock → catch_panic(connect_shared + op) → write shared → return content. `resolve()` reads e-refs from shared lock on MAIN thread before spawning (click/type by ref). Chrome PROCESS spawn (browser_open) + browser_close stay synchronous (one-shot).
+    - panel.rs build_content reads from the shared lock.
+
+    **Status:** rust-check green, built release, live-tested no-freeze (open→goto→snapshot→click e1→iana redirect). Committed/pushed on branch 'browser'.
+
+    **Gotcha that wasted time:** the live TUI was running from /Users/guillaume/context-pilot (old checkout, exec()'d by reload via current_exe), while all work is in /Users/guillaume/context-pilot-2. system_reload re-execs current_exe — so a -2 rebuild never ran until the user manually relaunched from -2.
+  importance: high
+  labels:
+  - browser
+  - architecture
+  - async
+  - off-main-thread
+  - complete
+  last_edited_ms: 1781203345310
 ceac945d9376fcf2:
   tl_dr: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
   contents: |-

@@ -1102,6 +1102,10 @@
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
   last_edited_ms: 0
+4579d88335aa95fe:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch — OFF-MAIN-THREAD. Every slow CDP op (open-nav/goto/snapshot/click/type/extract/screenshot/eval) runs on a worker via spawn_async_tool (cp_base async_exec), so the TUI never freezes; result delivered through the ChannelWatcher pipeline like console/brave. run_browser_op gathers OpCtx (conn/op_lock/shared/ws_url Arcs) on the main thread, then the worker: locks op_lock (serialize), connect_shared (reuse/reconnect cached Client), catch_panic(op) (dead-Chrome panic→clean Err, never crash), writes shared (note_shared/note_nav), returns the LLM-facing string. resolve() reads e-refs from the shared lock on the main thread BEFORE spawning. Chrome PROCESS spawn (browser_open) + browser_close stay synchronous (one-shot, main-thread-owned). Large extracts→file; screenshots→timestamped PNG under .context-pilot/browser/.'
+  last_edited_ms: 1781203314268
 45f26bd593f5eb21:
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
@@ -1558,6 +1562,10 @@
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 0
+6440dacfafb4eb87:
+  path: crates/cp-mod-browser/src/panel.rs
+  description: 'Browser panel: synchronous refresh() builds digest (Chrome mode/status/pid + last action) + paginated e-ref snapshot table. build_content reads runtime data from the worker-written shared lock (Arc<Mutex<SharedBrowser>>). ensure_panel/remove_panel/mark_dirty. No background cache. Heavy snapshot state lives here, never inline.'
+  last_edited_ms: 1781203314286
 6524c8708421c935:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -2118,6 +2126,10 @@
   path: crates/cp-mod-search/src/meili/mod.rs
   description: 'Meilisearch sub-module hub: bootstrap, client, download, overlay, server, tasks.'
   last_edited_ms: 0
+8d27feae602aae6d:
+  path: crates/cp-mod-browser/src/lifecycle.rs
+  description: Chrome lifecycle (Channel A) via cp-console-server SessionHandle. find_chrome ($CP_CHROME override + candidate paths), spawn_chrome (--remote-debugging-port=0, profile dir, ws-URL discovery from stderr log via DevTools marker), reconnect_chrome, kill_chrome (now calls bs.clear_session() to drop the shared CDP conn + runtime data), cleanup_orphans (browser_ prefix scoped). extract_ws_url + 2 tests.
+  last_edited_ms: 1781203314295
 8d8c762e3a909931:
   path: website/docs/context.html
   description: 'Docs: context management guide'
@@ -2882,6 +2894,10 @@ c420a45f730117d1:
   path: crates/cp-mod-entities/src/panel.rs
   description: Fixed Entities panel. Live schema + sample data context for LLM. Empty-state onboarding guide with quick-start SQL. IR blocks with Accent/Code/Muted styling. Migration count display. EntityResultPanel for large query results (dynamic, metadata-persisted). max_freezes=2.
   last_edited_ms: 1780606076247
+c45287f8912e3673:
+  path: crates/cp-mod-browser/src/types.rs
+  description: 'BrowserState + ChromeMeta + Eref + SharedBrowser. THREADING: meta/handle stay main-thread-owned (Chrome process lifecycle/persistence); CDP work is off-main-thread so the shared pieces are behind Arc: conn: ConnSlot = Arc<Mutex<Option<Arc<Client>>>> (cached CDP connection a worker reuses-or-reconnects under the slot lock), shared: Arc<Mutex<SharedBrowser>> (worker-written runtime data: erefs/eref_selectors/snapshot_text/last_action/url/title), op_lock: Arc<Mutex<()>> (serializes CDP ops on the single transport). SharedBrowser owns set_erefs + resolve_selector (e-ref→CSS). clear_session() drops conn + resets shared. ChromeMeta serializable (session_key/pid/ws_url/headless) for reload reconnect. BROWSER_KEY_PREFIX=browser_.'
+  last_edited_ms: 1781203314259
 c4829069423c1fe6:
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Dir-event-only invalidation. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete.'
@@ -3474,6 +3490,10 @@ f324d67733a4d09a:
   path: crates/cp-mod-callback/src/firing.rs
   description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. fire_async/blocking_callbacks() for batch dispatch. flame!("cb_fire"), flame!("cb_fire_async"), flame!("cb_fire_blocking"). CallbackWatcher: exit 0→success_message, exit 7→silent, exit !=0→deferred panel, timeout→deferred panel.'
   last_edited_ms: 0
+f35577df50198eeb:
+  path: crates/cp-mod-browser/src/client.rs
+  description: 'CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). Client is Send+Sync — enables off-main-thread use (worker holds Arc<Client>). connect_shared(conn_slot, ws_url): worker-side reuse-or-reconnect — locks the ConnSlot, returns cached live Client (is_alive probe) else connects+caches. CRASH GUARD: catch_panic() wraps connect/is_alive/every op — headless_chrome register_missing_tabs().unwrap() panics on a closed connection (would abort the whole TUI); catch_panic catch_unwinds into a clean Err AND swaps in a quiet log-only panic hook so the global terminal-tearing hook never fires. connect() adopts Chrome''s own initial tab (adopt_initial_tab). is_alive() liveness-probes the idle-self-closing transport. eval two-pass returnByValue (exotics use .description). click via CDP Input.dispatchMouseEvent (tab.click_point) — TRUSTED events for downloads/security-gated UIs. type via in-page JS focus+value+dispatch+submit. settle_after_nav two-phase URL settle. extract reads .value for form fields else innerText. INLINE_CAP_BYTES=8000.'
+  last_edited_ms: 1781203314277
 f379d2a878f22b32:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, cp-mod-utilities, serde_json, secrecy.'

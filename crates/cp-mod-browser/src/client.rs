@@ -63,6 +63,31 @@ fn log_panic_quietly(info: &std::panic::PanicHookInfo<'_>) {
         .and_then(|mut f| std::io::Write::write_all(&mut f, msg.as_bytes()));
 }
 
+/// Reuse the cached CDP connection or (re)connect, caching the result.
+///
+/// Runs entirely on a **worker thread** (see `tools::run_browser_op`): it locks
+/// the shared `ConnSlot`, returns the cached `Client` when it's still alive
+/// (cheap liveness probe — the transport self-closes on idle while Chrome lives),
+/// and otherwise connects fresh to `ws_url` and stores it back so the next call
+/// reuses it. Keeping connection lifecycle here — off the main thread, behind the
+/// slot lock — is what lets every CDP op run without freezing the TUI.
+///
+/// # Errors
+///
+/// Returns `Err` if the slot mutex is poisoned or the CDP handshake fails.
+pub(crate) fn connect_shared(conn: &crate::types::ConnSlot, ws_url: &str) -> Result<Arc<Client>, String> {
+    let mut slot = conn.lock().map_err(|_e| "browser connection slot poisoned".to_string())?;
+    if let Some(existing) = slot.as_ref()
+        && existing.is_alive()
+    {
+        return Ok(Arc::clone(existing));
+    }
+    let client = Arc::new(Client::connect(ws_url)?);
+    *slot = Some(Arc::clone(&client));
+    drop(slot);
+    Ok(client)
+}
+
 /// Live CDP connection to a running Chrome.
 pub struct Client {
     /// Browser-level CDP connection (kept alive for the client's lifetime).

@@ -1,6 +1,20 @@
 //! State types for the browser module: `BrowserState`, `ChromeMeta`, e-refs.
+//!
+//! Threading model (off-main-thread CDP): every browser tool's slow CDP work
+//! runs on a worker thread via `spawn_async_tool` so the TUI event loop never
+//! freezes. The pieces the worker needs are therefore behind `Arc`:
+//! - `conn`: the cached CDP `Client`, in an `Arc<Mutex<Option<…>>>` slot the
+//!   worker locks to reuse-or-reconnect (so the connection persists across calls
+//!   without the main thread ever touching it).
+//! - `shared`: worker-written runtime data (snapshot e-refs, last action, url,
+//!   title) the main-thread panel/overview read back under a short lock.
+//! - `op_lock`: serializes CDP ops so two workers never interleave on the one
+//!   transport.
+//! Chrome *process* lifecycle (`meta`/`handle`) stays main-thread-owned — it's a
+//! one-shot spawn and lives on the persistence/save-load path.
 
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use cp_base::state::runtime::State;
 use cp_mod_console::manager::SessionHandle;
@@ -45,15 +59,19 @@ pub struct Eref {
     pub label: String,
 }
 
-/// Module-owned runtime state, stored in `State.module_data`.
+/// Shared, lockable slot holding the cached CDP connection.
+///
+/// Lives behind an `Arc<Mutex<…>>` so a worker thread can reuse-or-reconnect the
+/// `Client` and persist it for the next call, all without the main thread.
+pub type ConnSlot = Arc<Mutex<Option<Arc<crate::client::Client>>>>;
+
+/// Worker-written runtime data, read back by the main-thread panel/overview.
+///
+/// Guarded by a `Mutex` inside `BrowserState.shared`. The worker is the sole
+/// writer (ops are serialized by `op_lock`); the main thread only ever takes a
+/// brief read lock to render the digest or resolve an e-ref → selector.
 #[derive(Debug, Default)]
-pub struct BrowserState {
-    /// Metadata for the managed Chrome process (None = no browser running).
-    pub meta: Option<ChromeMeta>,
-    /// Console-server handle for the Chrome process (status / kill).
-    pub handle: Option<SessionHandle>,
-    /// Live CDP connection — rebuilt lazily on first use, never serialized.
-    pub client: Option<crate::client::Client>,
+pub struct SharedBrowser {
     /// e-ref table from the latest snapshot.
     pub erefs: Vec<Eref>,
     /// Quick lookup: e-ref id → CSS selector.
@@ -63,9 +81,42 @@ pub struct BrowserState {
     /// Human-readable description of the last action + outcome.
     pub last_action: String,
     /// URL of the current page (digest line in the panel).
-    pub current_url: String,
+    pub url: String,
     /// Title of the current page (digest line in the panel).
-    pub current_title: String,
+    pub title: String,
+}
+
+impl SharedBrowser {
+    /// Replace the e-ref table from a fresh snapshot.
+    pub fn set_erefs(&mut self, erefs: Vec<Eref>) {
+        self.eref_selectors = erefs.iter().map(|e| (e.id.clone(), e.selector.clone())).collect();
+        self.erefs = erefs;
+    }
+
+    /// Resolve a tool `ref`/`selector` pair to a concrete CSS selector.
+    /// e-refs (e.g. `e12`) take precedence; raw selectors pass through.
+    #[must_use]
+    pub fn resolve_selector(&self, eref: Option<&str>, selector: Option<&str>) -> Option<String> {
+        eref.map_or_else(|| selector.map(ToString::to_string), |r| self.eref_selectors.get(r).cloned())
+    }
+}
+
+/// Module-owned runtime state, stored in `State.module_data`.
+#[derive(Debug, Default)]
+pub struct BrowserState {
+    /// Metadata for the managed Chrome process (None = no browser running).
+    /// Main-thread-owned (persistence path).
+    pub meta: Option<ChromeMeta>,
+    /// Console-server handle for the Chrome process (status / kill).
+    /// Main-thread-owned (persistence path).
+    pub handle: Option<SessionHandle>,
+    /// Cached CDP connection — rebuilt lazily on a worker thread, never serialized.
+    pub conn: ConnSlot,
+    /// Worker-written runtime data (e-refs, last action, url, title).
+    pub shared: Arc<Mutex<SharedBrowser>>,
+    /// Serializes CDP ops so concurrent workers never interleave on the one
+    /// transport. A worker holds this for the duration of its op.
+    pub op_lock: Arc<Mutex<()>>,
     /// Monotonic counter for generating unique session keys.
     pub next_session_id: usize,
 }
@@ -96,19 +147,21 @@ impl BrowserState {
         state.ext_mut::<Self>()
     }
 
-    /// Replace the e-ref table from a fresh snapshot.
-    pub fn set_erefs(&mut self, erefs: Vec<Eref>) {
-        self.eref_selectors = erefs.iter().map(|e| (e.id.clone(), e.selector.clone())).collect();
-        self.erefs = erefs;
+    /// Whether the managed Chrome process is alive.
+    #[must_use]
+    pub fn is_running(&self) -> bool {
+        self.handle.as_ref().is_some_and(|h| !h.get_status().is_terminal())
     }
 
-    /// Resolve a tool `ref`/`selector` pair to a concrete CSS selector.
-    /// e-refs (e.g. `e12`) take precedence; raw selectors pass through.
-    #[must_use]
-    pub fn resolve_selector(&self, eref: Option<&str>, selector: Option<&str>) -> Option<String> {
-        eref.map_or_else(
-            || selector.map(ToString::to_string),
-            |r| self.eref_selectors.get(r).cloned(),
-        )
+    /// Drop the cached CDP connection and clear worker-written runtime data.
+    /// Called on `browser_close`/kill — the Chrome process is torn down
+    /// separately by `lifecycle::kill_chrome`.
+    pub fn clear_session(&self) {
+        if let Ok(mut slot) = self.conn.lock() {
+            *slot = None;
+        }
+        if let Ok(mut s) = self.shared.lock() {
+            *s = SharedBrowser::default();
+        }
     }
 }
