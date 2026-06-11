@@ -38,6 +38,21 @@ const IDLE_READ_TIMEOUT: Duration = Duration::from_secs(120);
 /// *byte* may lag but headers do not) while aborting long before the agent wall.
 const SEND_HEADER_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Maximum time from the start of body parsing until the **first content byte**
+/// (text delta or tool-use block) before aborting (→ retry on a fresh connection).
+///
+/// [`IdleTimeoutReader`] resets its idle timer on *every* SSE line — including
+/// Anthropic's periodic `ping`/empty keepalive events. A pathological stream can
+/// therefore connect, return 200 + headers, then dribble keepalive pings forever
+/// while never emitting a single content delta: the idle guard sees "activity"
+/// each ping and never fires, the send-header guard already passed, and the
+/// request hangs until the agent wall. This is the keepalive-dribble freeze mode
+/// the first two watchdogs miss. A healthy stream produces its first token within
+/// a few seconds (even under model queueing), so 90s cleanly separates the two
+/// while never cutting a legitimately long stream (which, by definition, has
+/// already produced content and tripped `got_content`).
+const FIRST_CONTENT_TIMEOUT: Duration = Duration::from_secs(90);
+
 /// Run a blocking `.send()` under a response-header timeout.
 ///
 /// Moves the fully-configured `builder` onto a detached thread that performs the
@@ -49,21 +64,86 @@ const SEND_HEADER_TIMEOUT: Duration = Duration::from_secs(60);
 pub(crate) fn send_with_header_timeout(
     builder: reqwest::blocking::RequestBuilder,
 ) -> Result<reqwest::blocking::Response, LlmError> {
+    send_with_header_timeout_dur(builder, SEND_HEADER_TIMEOUT)
+}
+
+/// [`send_with_header_timeout`] with an injectable timeout — enables fast,
+/// deterministic tests (black-hole listener + sub-second `timeout`) without
+/// waiting the production [`SEND_HEADER_TIMEOUT`].
+fn send_with_header_timeout_dur(
+    builder: reqwest::blocking::RequestBuilder,
+    timeout: Duration,
+) -> Result<reqwest::blocking::Response, LlmError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let _handle = std::thread::spawn(move || {
         let _r = tx.send(builder.send());
     });
-    match rx.recv_timeout(SEND_HEADER_TIMEOUT) {
+    match rx.recv_timeout(timeout) {
         Ok(Ok(response)) => Ok(response),
         Ok(Err(e)) => Err(LlmError::Network(e.to_string())),
         Err(RecvTimeoutError::Timeout) => Err(LlmError::StreamRead(format!(
             "no response headers within {}s — aborting to retry on a fresh connection \
              (silent application-level hold before response head)",
-            SEND_HEADER_TIMEOUT.as_secs()
+            timeout.as_secs()
         ))),
         Err(RecvTimeoutError::Disconnected) => {
             Err(LlmError::Network("send thread disconnected before responding".to_string()))
         }
+    }
+}
+
+#[cfg(test)]
+mod send_guard_tests {
+    use super::{LlmError, send_with_header_timeout_dur};
+    use std::io::Read as _;
+    use std::net::TcpListener;
+    use std::time::{Duration, Instant};
+
+    /// A server that accepts the TCP connection then never sends a response head
+    /// must trip the header-timeout guard (→ `StreamRead`) within the budget,
+    /// NOT hang forever. This reproduces the production silent-hold deterministically.
+    #[test]
+    fn black_hole_send_trips_header_timeout() {
+        // Black-hole listener: accept connections, read nothing meaningful, never reply.
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind black-hole listener");
+        let addr = listener.local_addr().expect("local addr");
+        let _accept = std::thread::spawn(move || {
+            // Hold accepted sockets open and silent for the test's lifetime.
+            let mut held = Vec::new();
+            while let Ok((mut stream, _)) = listener.accept() {
+                // Drain a little so the client's write completes, then go mute.
+                let mut buf = [0_u8; 1024];
+                let _r = stream.read(&mut buf);
+                held.push(stream);
+                if held.len() > 8 {
+                    break;
+                }
+            }
+        });
+
+        let client = reqwest::blocking::Client::builder()
+            .timeout(None)
+            .connect_timeout(Duration::from_secs(5))
+            .build()
+            .expect("build client");
+        let builder = client.get(format!("http://{addr}/"));
+
+        let budget = Duration::from_millis(600);
+        let start = Instant::now();
+        let result = send_with_header_timeout_dur(builder, budget);
+        let elapsed = start.elapsed();
+
+        match result {
+            Err(LlmError::StreamRead(msg)) => {
+                assert!(msg.contains("no response headers within"), "unexpected msg: {msg}");
+            }
+            other => panic!("expected StreamRead timeout, got: {other:?}"),
+        }
+        // Must abort promptly after the budget, not ride a long/infinite wait.
+        assert!(
+            elapsed < budget + Duration::from_secs(2),
+            "guard fired too late: {elapsed:?} (budget {budget:?})"
+        );
     }
 }
 
@@ -218,8 +298,23 @@ pub(crate) fn parse_sse_stream(
     let mut total_bytes: usize = 0;
     let mut line_count: usize = 0;
     let mut last_lines: Vec<String> = Vec::new();
+    // First-content watchdog: abort if no content delta / tool block arrives within
+    // FIRST_CONTENT_TIMEOUT, even if keepalive pings keep the idle guard happy.
+    let stream_start = std::time::Instant::now();
+    let mut got_content = false;
 
     loop {
+        // First-content watchdog: if no content has arrived within the budget,
+        // abort → StreamRead → retry on a fresh connection. Catches the
+        // keepalive-dribble freeze the idle guard cannot (pings reset idle).
+        if !got_content && stream_start.elapsed() > FIRST_CONTENT_TIMEOUT {
+            return Err(LlmError::StreamRead(format!(
+                "no content within {}s of stream start despite an open connection — \
+                 aborting to retry on a fresh connection (keepalive-dribble hold). \
+                 {line_count} lines / {total_bytes} bytes seen.",
+                FIRST_CONTENT_TIMEOUT.as_secs()
+            )));
+        }
         // Idle-guarded read: an idle/silent-hold beyond IDLE_READ_TIMEOUT returns
         // Err(StreamRead) here, which propagates → StreamEvent::Error → retry.
         let line = match reader.next_line() {
@@ -269,6 +364,7 @@ pub(crate) fn parse_sse_stream(
                     if let Some(block) = event.content_block
                         && block.block_type.as_deref() == Some("tool_use")
                     {
+                        got_content = true;
                         let name = block.name.unwrap_or_default();
                         let _r = tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: String::new() });
                         current_tool = Some((block.id.unwrap_or_default(), name, String::new()));
@@ -279,6 +375,7 @@ pub(crate) fn parse_sse_stream(
                         match delta.delta_type.as_deref() {
                             Some("text_delta") => {
                                 if let Some(text) = delta.text {
+                                    got_content = true;
                                     let _r = tx.send(StreamEvent::Chunk(text));
                                 }
                             }

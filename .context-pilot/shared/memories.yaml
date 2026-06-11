@@ -345,7 +345,7 @@
   - llm-provider
   last_edited_ms: 0
 76bca3b377df349e:
-  tl_dr: 'v0.2.5 SSE freeze fix DONE+built+reloaded: send_with_header_timeout (thread+recv_timeout, SEND_HEADER_TIMEOUT=60s) guards the .send() response-headers phase that v0.2.4''s body-read IdleTimeoutReader missed. Pending: commit+push+tag v0.2.5 -> release CI.'
+  tl_dr: 'v0.2.6 SSE freeze: THREE layered watchdogs — send-header(60s), first-content(90s NEW), idle-read(120s) — in claude_code_api_key/streaming.rs. Black-hole unit test PROVES send guard fires (0.68s). Pending commit+tag v0.2.6.'
   contents: |-
     ## SSE Freeze Fix — v0.2.4 + v0.2.5
 
@@ -367,7 +367,7 @@
   - v0.2.4
   - terminal-bench
   - complete
-  last_edited_ms: 1781216178348
+  last_edited_ms: 1781217698211
 77a6639f89352d52:
   tl_dr: 'Hardcoded prompt audit: user wants EVERY occurrence of LLM-facing text noted, no matter how minor. No ''clean enough'' dismissals. User decides what''s behavioral steering vs. not. Be exhaustive — if the LLM sees it, log it as a finding.'
   importance: critical
