@@ -2,28 +2,37 @@
 
 Run with:
     harbor run -d terminal-bench@2.0 \
-        --agent-import-path benchmarks.terminal-bench.context_pilot_agent:ContextPilotAgent \
+        --agent-import-path benchmarks/terminal-bench/context_pilot_agent.py:ContextPilotAgent \
         -m anthropic/claude-sonnet-4-6 -k 5
 
 Context Pilot runs headless inside the task container via `tui --headless`
 (see HEADLESS_DESIGN.md). The adapter:
   - install():   downloads the CP release bundle (tui + cp-console-server +
                  meilisearch) and lays the binaries out where CP's runtime
-                 discovery expects them.
-  - run():       executes `tui --headless <instruction>` with the env-only
-                 claude_code_api_key provider, writing a JSONL trajectory.
+                 discovery expects them. If CLAUDE_CREDENTIALS_JSON is set it
+                 also writes ~/.claude/.credentials.json so the OAuth providers
+                 (claude_code / claude_code_v2) can authenticate without the
+                 macOS Keychain.
+  - run():       executes `tui --headless <instruction>` with the provider
+                 selected by CP_PROVIDER (default: claude_code_api_key for
+                 submission; set to claude_code_v2 for OAuth-based local tests).
   - populate_context_post_run(): parses the trajectory's final event into the
                  Harbor AgentContext (tokens + cost).
 
-MODEL NOTE: the leaderboard model is `anthropic/claude-sonnet-4-6`, but Sonnet
-4.6 is only reachable through CP's OAuth (ClaudeCodeV2) provider. With a plain
-ANTHROPIC_API_KEY in the container, CP's `claude_code_api_key` provider tops out
-at Sonnet 4.5, so an unrecognised `--model` (e.g. claude-sonnet-4-6) degrades
-gracefully to Sonnet 4.5. Resolve before final submission (X525/X526): either
-switch the container to OAuth for true 4.6, or label the run as Sonnet 4.5.
+PROVIDER / MODEL NOTES:
+  Submission:  CP_PROVIDER=claude_code_api_key  ANTHROPIC_API_KEY=<key>
+               → Sonnet 4.5 (API-key provider tops out here)
+  Local test:  CP_PROVIDER=claude_code_v2  CLAUDE_CREDENTIALS_JSON=<json>
+               → Sonnet 4.6 via OAuth (same model as leaderboard metadata)
+
+ENV VAR OVERRIDES (for local dev / CI):
+  CP_BUNDLE_URL           - override the tarball download URL
+  CP_PROVIDER             - override the LLM provider (default: claude_code_api_key)
+  CLAUDE_CREDENTIALS_JSON - full ~/.claude/.credentials.json JSON blob for OAuth
 """
 
 import json
+import os as _os
 import shlex
 from pathlib import Path
 
@@ -33,10 +42,12 @@ from harbor.models.agent.context import AgentContext
 
 # Release bundle URL (linux-x86_64 build from CI). Must contain, at the tarball
 # root: `tui`, `cp-console-server`, and `meilisearch` (all executable).
+# Override via CP_BUNDLE_URL env var for local testing without a real release.
 # TODO(X525): pin a release tag instead of `latest`.
-BUNDLE_URL = (
+BUNDLE_URL = _os.environ.get(
+    "CP_BUNDLE_URL",
     "https://github.com/bigmoostache/context-pilot/releases/latest/download/"
-    "context-pilot-linux-x86_64.tar.gz"
+    "context-pilot-linux-x86_64.tar.gz",
 )
 
 # CP runtime layout (see crates/cp-mod-console manager.rs + cp-mod-search meili
@@ -91,6 +102,20 @@ class ContextPilotAgent(BaseInstalledAgent):
                 "fi"
             ),
         )
+        # If OAuth credentials are provided, write them to the standard
+        # credentials file so CP's claude_code / claude_code_v2 providers can
+        # authenticate without the macOS Keychain.
+        creds_json = self._get_env("CLAUDE_CREDENTIALS_JSON")
+        if creds_json:
+            escaped = shlex.quote(creds_json)
+            await self.exec_as_agent(
+                environment,
+                command=(
+                    "mkdir -p ~/.claude && "
+                    f"echo {escaped} > ~/.claude/.credentials.json && "
+                    "chmod 600 ~/.claude/.credentials.json"
+                ),
+            )
 
     def _resolve_model(self) -> str:
         """CP `--model` value derived from Harbor's `-m provider/model`.
@@ -110,8 +135,11 @@ class ContextPilotAgent(BaseInstalledAgent):
     ) -> None:
         model = self._resolve_model()
 
-        # Pass the API key through explicitly (Harbor also merges it into env,
-        # but being explicit avoids relying on inheritance details).
+        # Provider selection — defaults to the env-only API-key provider for
+        # submission. Override with CP_PROVIDER=claude_code_v2 for OAuth tests.
+        provider = self._get_env("CP_PROVIDER") or "claude_code_api_key"
+
+        # Pass auth credentials through explicitly.
         run_env: dict[str, str] = {}
         api_key = self._get_env("ANTHROPIC_API_KEY")
         if api_key:
@@ -123,7 +151,7 @@ class ContextPilotAgent(BaseInstalledAgent):
             "--headless",
             shlex.quote(instruction),
             "--provider",
-            "claude_code_api_key",  # env-only auth, no Keychain/OAuth
+            provider,
             "--model",
             shlex.quote(model),
             "--trajectory",
