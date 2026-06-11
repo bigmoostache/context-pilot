@@ -284,6 +284,14 @@ impl ClaudeCodeV2Client {
         let (input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason) =
             streaming::parse_sse_stream(response, &resp_headers, tx)?;
 
+        // Detect empty response (likely API error, rate limit, or content filter)
+        if output_tokens == 0 {
+            return Err(LlmError::Api {
+                status: 200,
+                body: "Empty API response (0 output tokens) - possible rate limit, content filter, or transient API error".to_string(),
+            });
+        }
+
         let _r = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,

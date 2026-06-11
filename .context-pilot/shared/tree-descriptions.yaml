@@ -502,6 +502,10 @@
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
   last_edited_ms: 0
+1fc82fe5eebe94d2:
+  path: src/llms/claude_code/mod.rs
+  description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
+  last_edited_ms: 0
 1fcbbf2e6262fce9:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints.'
@@ -970,6 +974,10 @@
   path: benchmarks/terminal-bench/context_pilot_agent.py
   description: Harbor BaseInstalledAgent adapter for Context Pilot. install() downloads the CP linux-x86_64 bundle and lays out tui+cp-console-server (next-to-exe) + meilisearch (~/.context-pilot/meilisearch/bin). run() = tui --headless <instr> --provider claude_code_api_key --model <resolved-from-self.model_name> --trajectory + '|| true' (CP exit 2/1 are valid). _resolve_model strips anthropic/ prefix. populate_context_post_run parses JSONL trajectory final event -> context.cost_usd + n_output_tokens + metadata{status,messages,assistant_turns,duration_secs}. Verified against real Harbor source.
   last_edited_ms: 1781169810387
+3d2b5112cfccee17:
+  path: src/app/run/headless.rs
+  description: 'Headless mode (`tui --headless "<instruction>"`). parse_args (--provider/--model/--trajectory/--max-cost/--max-messages/--max-duration-secs/--instruction-file). parse_provider maps CLI string -> LlmProvider (default ClaudeCodeApiKey, container-friendly env-only auth). apply_provider_model sets state.llm_provider + state.anthropic_model (Anthropic family); --model maps to ClaudeOpus45/ClaudeSonnet45/ClaudeHaiku45, default Sonnet 4.5. HeadlessOpts/HeadlessOutcome (exit 0 done / 1 error / 2 guard rail). TrajectoryWriter: JSONL incremental flush + [cp-headless] stdout mirror (start event records resolved model). run_headless drives background_tick() until quiescence (2.5s settle) or guard rail. inject_instruction = UserMessage spine notification; configure_headless_spine sets continue_until_todos_done + guard rails. disable_interactive_tools drops ask_user_question only.'
+  last_edited_ms: 0
 3db99c7fa34b728d:
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
@@ -1541,6 +1549,10 @@
 6418d8f702b9149f:
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
+  last_edited_ms: 0
+643893fa19f21eaf:
+  path: src/llms/claude_code_v2/mod.rs
+  description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
   last_edited_ms: 0
 6524c8708421c935:
   path: crates/cp-base/src/state/actions.rs
@@ -3389,6 +3401,10 @@ ec35e41e73d1b8fc:
 ed11d32eca739db4:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
+  last_edited_ms: 0
+ed503f0514ce2590:
+  path: src/llms/claude_code_api_key/mod.rs
+  description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
   last_edited_ms: 0
 ed82dd397f3a5ae4:
   path: src/app/run/lifecycle.rs

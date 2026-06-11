@@ -455,6 +455,14 @@ impl ClaudeCodeClient {
             }
         }
 
+        // Detect empty response (likely API error, rate limit, or content filter)
+        if output_tokens == 0 {
+            return Err(LlmError::Api {
+                status: 200,
+                body: "Empty API response (0 output tokens) - possible rate limit, content filter, or transient API error".to_string(),
+            });
+        }
+
         let _r = tx.send(StreamEvent::Done {
             input_tokens,
             output_tokens,

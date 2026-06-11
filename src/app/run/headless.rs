@@ -29,6 +29,31 @@ const SETTLE_WINDOW: Duration = Duration::from_millis(2500);
 /// Poll interval between background ticks (matches the interactive streaming poll).
 const TICK_SLEEP: Duration = Duration::from_millis(8);
 
+/// Autonomous task-solving guidance prepended to headless instructions.
+/// Encourages systematic planning via todos and proactive use of callbacks.
+const HEADLESS_GUIDANCE: &str = "\
+🤖 **Autonomous Mode Instructions**
+
+To maximize your success on this task:
+
+1. **Create a roadmap**: Use `todo_create` to break down the task into clear steps
+2. **Track progress**: Mark todos done as you complete them - this helps the system know you're making progress
+3. **Enable callbacks**: Use `Callback_upsert` to auto-run relevant checks (e.g., tests, linters) on file changes
+4. **Think before acting**: Use the `Think` tool to plan your approach and reason through complex problems
+5. **Work systematically**: Complete todos in order, don't jump around randomly
+
+Available callbacks you can enable:
+- `rust-check`: Auto-runs cargo check + clippy on Rust file edits (already available)
+- Create custom callbacks for your specific task (e.g., run tests, validate output)
+
+Begin by analyzing the task below, creating a todo list, then execute step by step.
+
+---
+
+**Your Task:**
+
+";
+
 /// Default per-task guard rails (see D3). CLI-overridable.
 const DEFAULT_MAX_COST_USD: f64 = 5.0;
 /// Default max conversation messages before the guard rail blocks.
@@ -311,14 +336,17 @@ impl App {
     /// `UserMessage` spine notification — the same trigger the interactive
     /// `InputSubmit` handler uses, so `check_spine` launches the stream.
     fn inject_instruction(&mut self, instruction: &str) {
-        let tokens = estimate_tokens(instruction);
+        // Prepend autonomous guidance to encourage systematic task completion
+        let enhanced_instruction = format!("{HEADLESS_GUIDANCE}{instruction}");
+        
+        let tokens = estimate_tokens(&enhanced_instruction);
         let user_id = format!("U{}", self.state.next_user_id);
         let msg_uid = format!("UID_{}_U", self.state.global_next_uid);
         self.state.next_user_id = self.state.next_user_id.saturating_add(1);
         self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
 
-        let preview: String = instruction.chars().take(80).collect();
-        let msg = Message::new_user(user_id.clone(), msg_uid, instruction.to_string(), tokens);
+        let preview: String = enhanced_instruction.chars().take(80).collect();
+        let msg = Message::new_user(user_id.clone(), msg_uid, enhanced_instruction, tokens);
         crate::state::persistence::save_message(&msg);
 
         if let Some(ctx) = self.state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
