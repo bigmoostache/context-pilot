@@ -262,6 +262,10 @@
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
   last_edited_ms: 0
+112c8aacff7c911b:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch: open/goto/snapshot/click/type/extract/screenshot/eval/close. client() lazily (re)connects CDP and drops a dead client first (is_alive() probe) so it reconnects to the same ws_url after idle self-close. note() records last_action + marks panel dirty. resolve() maps ref/selector. Inline results compact; large extracts→file under .context-pilot/browser/; screenshots→timestamped PNG.'
+  last_edited_ms: 0
 114cba4e3d81254f:
   path: src/infra/config.rs
   description: 'Re-exports: active_theme/set_active_theme, LIBRARY/PROMPTS/THEME_ORDER/normalize_icon from cp_base::config'
@@ -370,6 +374,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 0
+16dc822af6df21ab:
+  path: crates/cp-mod-browser/src/client.rs
+  description: 'CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). connect() adopts Chrome''s own initial tab via adopt_initial_tab. is_alive() liveness-probes the transport (self-closes on idle) so tools.rs drops+reconnects. eval via Runtime.Evaluate returnByValue:true+await_promise+user_gesture (run_js helper), rendering value|unserializable_value(NaN/Inf)|description|undefined; exceptions->format_exception (one line). click/type_into via in-page JS (querySelector().click() / focus+value+dispatch(input,change)+requestSubmit) — NOT flaky DOM-domain wait_for_element. settle_after_nav(url_before): two-phase URL settle (phase1 waits ~1.5s for nav to BEGIN, phase2 follows redirect chain to true landing) — fixes stale-URL-after-click. goto soft nav-wait (never propagates wait timeout). extract reads .value for form fields else innerText. truncate_utf8, INLINE_CAP_BYTES=8000. Known minor: get_url() lags for data: scheme URLs (pre-existing headless_chrome quirk).'
+  last_edited_ms: 1781185411612
 1742d19afe63d2ac:
   path: src/app/run/tools/checks.rs
   description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer, question form resolution. Each resumes streaming pipeline when condition met.'
@@ -3245,6 +3253,10 @@ e2c579843c4364f1:
 e31c48c5949be594:
   path: crates/cp-console-server/src/protocol.rs
   description: JSON-line protocol types. Request (cmd/key/command/cwd/input/log_path). Response (ok/error/pid/status/exit_code/sessions). interpret_escapes() for \n/\t/\xHH.
+  last_edited_ms: 0
+e3ee6c7bbd32edce:
+  path: crates/cp-mod-browser/src/client.rs
+  description: CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). connect() adopts Chrome's own initial tab via adopt_initial_tab (poll register_missing_tabs+get_tabs, fall back to new_tab) so headed mode shows no stray 'New Tab'. is_alive() liveness-probes the transport (self-closes on idle while Chrome lives) so tools.rs can drop+reconnect. goto/click/type_into/eval/extract/screenshot. eval & snapshot_json wrap results in JSON.stringify in-page (tab.evaluate doesn't set returnByValue → non-primitives come back value=None). truncate_utf8, INLINE_CAP_BYTES=8000.
   last_edited_ms: 0
 e42b947f77dc2bb4:
   path: crates/cp-mod-spine/src/engine.rs

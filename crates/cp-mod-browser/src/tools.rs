@@ -4,8 +4,6 @@
 //! Inline results stay compact; heavy state goes to the Browser panel
 //! (see `panel`).
 
-use std::fmt::Write as _;
-
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -57,6 +55,34 @@ fn client(state: &mut State) -> Result<&Client, String> {
     bs.client.as_ref().ok_or_else(|| "CDP client unavailable".to_string())
 }
 
+/// True when an error indicates the CDP transport self-closed mid-call.
+fn is_conn_closed(err: &str) -> bool {
+    let e = err.to_ascii_lowercase();
+    e.contains("connection is closed") || e.contains("connection closed") || e.contains("websocket")
+}
+
+/// Run a CDP op with one automatic reconnect-and-retry on a mid-call closure.
+///
+/// `client()` only liveness-probes at entry, so a transport that dies DURING a
+/// long op still hard-fails that call with "underlying connection is closed".
+/// Here we catch exactly that, drop the dead client, reconnect to the same
+/// `ws_url`, and retry once — so the user never eats the closed-connection
+/// error that PR1's start-of-call probe couldn't cover.
+///
+/// # Errors
+///
+/// Propagates the op's error (after one retry) or a reconnect failure.
+fn with_client<T>(state: &mut State, op: impl Fn(&Client) -> Result<T, String>) -> Result<T, String> {
+    let first = op(client(state)?);
+    match first {
+        Err(e) if is_conn_closed(&e) => {
+            BrowserState::get_mut(state).client = None;
+            op(client(state)?)
+        }
+        other => other,
+    }
+}
+
 /// Record the last action and refresh the panel digest.
 fn note(state: &mut State, action: String) {
     let bs = BrowserState::get_mut(state);
@@ -80,14 +106,26 @@ fn open(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     crate::panel::ensure_panel(state);
 
     let mut msg = if running {
-        "Browser already running — reusing it.".to_string()
+        let actual_headless = BrowserState::get(state).meta.as_ref().is_some_and(|m| m.headless);
+        if actual_headless == headless {
+            "Browser already running — reusing it.".to_string()
+        } else {
+            format!(
+                "Browser already running — reusing it (note: it is {}, the requested headless={} was ignored; \
+                 close it first to change mode).",
+                if actual_headless { "headless" } else { "headed" },
+                headless
+            )
+        }
     } else {
         format!("Chrome launched ({}).", if headless { "headless" } else { "headed" })
     };
     if let Some(u) = url {
-        let c = client(state)?;
-        c.goto(&u)?;
-        let _w = write!(msg, " Now at {} — \"{}\"", c.url(), c.title());
+        let nav = with_client(state, |c| {
+            c.goto(&u)?;
+            Ok(format!(" Now at {} — \"{}\"", c.url(), c.title()))
+        })?;
+        msg.push_str(&nav);
     }
     note(state, msg.clone());
     Ok(msg)
@@ -96,19 +134,17 @@ fn open(tool: &ToolUse, state: &mut State) -> Result<String, String> {
 /// `browser_goto`: navigate and report URL + title.
 fn goto(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let url = tool.input.get("url").and_then(|v| v.as_str()).ok_or("Missing required 'url' parameter")?.to_string();
-    let c = client(state)?;
-    c.goto(&url)?;
-    let msg = format!("Now at {} — \"{}\". e-refs are stale: snapshot before clicking.", c.url(), c.title());
+    let msg = with_client(state, |c| {
+        c.goto(&url)?;
+        Ok(format!("Now at {} — \"{}\". e-refs are stale: snapshot before clicking.", c.url(), c.title()))
+    })?;
     note(state, msg.clone());
     Ok(msg)
 }
 
 /// `browser_snapshot`: enumerate interactive elements, digest inline.
 fn take_snapshot(state: &mut State) -> Result<String, String> {
-    let (value, url, title) = {
-        let c = client(state)?;
-        (c.snapshot_json()?, c.url(), c.title())
-    };
+    let (value, url, title) = with_client(state, |c| Ok((c.snapshot_json()?, c.url(), c.title())))?;
     let erefs = snapshot::parse(&value);
     let digest = format!("Snapshot of {} — \"{}\": {} interactive elements (see Browser panel)", url, title, erefs.len());
     let bs = BrowserState::get_mut(state);
@@ -133,9 +169,10 @@ fn resolve(tool: &ToolUse, state: &State) -> Result<String, String> {
 /// `browser_click`: click by ref or selector.
 fn click(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let sel = resolve(tool, state)?;
-    let c = client(state)?;
-    c.click(&sel)?;
-    let msg = format!("Clicked '{}'. Now at {} — \"{}\"", sel, c.url(), c.title());
+    let msg = with_client(state, |c| {
+        c.click(&sel)?;
+        Ok(format!("Clicked '{}'. Now at {} — \"{}\"", sel, c.url(), c.title()))
+    })?;
     note(state, msg.clone());
     Ok(msg)
 }
@@ -145,15 +182,16 @@ fn type_text(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let text = tool.input.get("text").and_then(|v| v.as_str()).ok_or("Missing required 'text' parameter")?.to_string();
     let submit = tool.input.get("submit").and_then(serde_json::Value::as_bool).unwrap_or(false);
     let sel = resolve(tool, state)?;
-    let c = client(state)?;
-    c.type_into(&sel, &text, submit)?;
-    let msg = format!(
-        "Typed into '{}'{}. Now at {} — \"{}\"",
-        sel,
-        if submit { " + Enter" } else { "" },
-        c.url(),
-        c.title()
-    );
+    let msg = with_client(state, |c| {
+        c.type_into(&sel, &text, submit)?;
+        Ok(format!(
+            "Typed into '{}'{}. Now at {} — \"{}\"",
+            sel,
+            if submit { " + submit" } else { "" },
+            c.url(),
+            c.title()
+        ))
+    })?;
     note(state, msg.clone());
     Ok(msg)
 }
@@ -162,8 +200,7 @@ fn type_text(tool: &ToolUse, state: &mut State) -> Result<String, String> {
 fn extract(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let selector = tool.input.get("selector").and_then(|v| v.as_str()).map(ToString::to_string);
     let html = tool.input.get("format").and_then(|v| v.as_str()) == Some("html");
-    let c = client(state)?;
-    let content = c.extract(selector.as_deref(), html)?;
+    let content = with_client(state, |c| c.extract(selector.as_deref(), html))?;
     if content.len() <= EXTRACT_INLINE_MAX {
         return Ok(content);
     }
@@ -180,8 +217,7 @@ fn extract(tool: &ToolUse, state: &mut State) -> Result<String, String> {
 /// `browser_screenshot`: capture PNG to disk.
 fn screenshot(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let full_page = tool.input.get("full_page").and_then(serde_json::Value::as_bool).unwrap_or(false);
-    let c = client(state)?;
-    let png = c.screenshot(full_page)?;
+    let png = with_client(state, |c| c.screenshot(full_page))?;
     let path = artifact_path("png")?;
     std::fs::write(&path, &png).map_err(|e| format!("Failed to write screenshot: {e}"))?;
     let msg = format!("Screenshot saved to {} ({} bytes). Use the ocr tool to extract text.", path, png.len());
@@ -197,8 +233,7 @@ fn eval(tool: &ToolUse, state: &mut State) -> Result<String, String> {
         .and_then(|v| v.as_str())
         .ok_or("Missing required 'expression' parameter")?
         .to_string();
-    let c = client(state)?;
-    c.eval(&expr)
+    with_client(state, |c| c.eval(&expr))
 }
 
 /// `browser_close`: kill Chrome, keep the profile for next time.
