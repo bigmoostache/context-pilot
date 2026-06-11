@@ -46,8 +46,15 @@ queued) → N live threads. Combined with P03 zombies, threads can accumulate.
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H05-1 (suspected) | **S3** | N queued ops → N parked threads on op_lock | _to confirm_ | bounded pool, or reject/queue at dispatch |
+| H05-1 | **S3 (bounded)** | `spawn_async_tool_cancellable` (`async_exec.rs`) does `std::thread::Builder::new().name("async-tool-{name}").spawn(...)` — **one unpooled OS thread per call, no pool, no cap.** The browser worker's first act is `let _op = ctx.op_lock.lock()` (`tools.rs:194`), which BLOCKS while another worker holds it. Confirmed at source that the pipeline batch-loop (`pipeline.rs` `for tool … tool_results.push`) executes **every** tool in a turn (no short-circuit on the first sentinel) before `has_console_wait` defers — so a single assistant turn with N browser tool_uses spawns **N threads near-simultaneously, N−1 parked on `op_lock`** (each ~2 MB stack) until they serialize through. | **CONFIRMED (source + live), reclassified S3 bounded** — 2026-06-11. Live: idle tui = ~16 threads, **0** `async-tool-*` at rest → workers terminate after their op, **no leak at rest** (X660/X661). | **NO INLINE FIX (S3, not an S0/S1/S2 blocker per M55).** Pile-up is BOUNDED, not unbounded: (1) per-turn burst ≤ the # of browser tool_uses the LLM emits (rarely >10 → ~20 MB transient); (2) the sentinel-defer turn structure gates arrival — the turn WAITS on the watchers before the next turn dispatches, so threads drain (op_lock released one-by-one) faster than new turns arrive; (3) FDs do NOT grow per-op — `connect_shared` reuses the one cached WebSocket; (4) thread-spawn failure at the OS limit returns a synchronous `is_error` `ToolResult` (graceful, no crash — X665/X669); (5) workers always terminate (ops bounded by client `OP_TIMEOUT`/settle). **Residual risk:** combined with a P03 zombie holding `op_lock` for its full 30s, new ops park behind it — the same throughput-stall already tracked as P03 H03-1. The cheap real mitigation is the P03 fix (bounded op timeout < watcher timeout), NOT a worker pool (which would only move parking from "OS thread on op_lock" to "task in queue" — marginal, given op_lock already serializes). Bounded-pool = optional future hardening (X677). |
 
 ## Exit criterion
 Thread/FD/mem return to baseline after any burst; no unbounded growth; a
 documented ceiling and (if needed) a bounded-pool mitigation.
+
+**Status (source + live):** MET for normal operation. Threads drain to baseline
+at rest (live: 0 `async-tool-*` idle); per-turn burst is bounded by the # of
+browser tool_uses; FDs don't grow per-op (conn reused); spawn-failure is
+graceful. The only pile-up vector is a P03 zombie holding `op_lock` (tracked
+there as S3). No worker pool needed today; documented as optional future
+hardening (X677). Not a deployment blocker.
