@@ -70,12 +70,41 @@ pub fn spawn_async_tool<F>(
 where
     F: FnOnce() -> ToolOutput + Send + 'static,
 {
+    spawn_async_tool_cancellable(state, tool, timeout_secs, move |_cancel| work())
+}
+
+/// Like [`spawn_async_tool`], but the `work` closure receives a cooperative
+/// cancellation flag.
+///
+/// The flag is flipped `true` if the tool exceeds `timeout_secs` (the
+/// [`ChannelWatcher`] fires its timeout and the conversation moves on). A
+/// still-running worker should poll the flag and **skip mutating any shared
+/// state** once set — otherwise a slow/abandoned op finishing late would clobber
+/// state belonging to a newer op (the browser P11/P03 zombie-write race). The
+/// flag does **not** interrupt blocking I/O already in progress; it only lets the
+/// worker avoid stale side effects on the way out.
+///
+/// # Arguments
+///
+/// * `work` — Closure receiving the `Arc<AtomicBool>` cancel flag; performs the
+///   blocking I/O and returns a [`ToolOutput`].
+pub fn spawn_async_tool_cancellable<F>(
+    state: &mut crate::state::runtime::State,
+    tool: &ToolUse,
+    timeout_secs: u64,
+    work: F,
+) -> ToolResult
+where
+    F: FnOnce(std::sync::Arc<std::sync::atomic::AtomicBool>) -> ToolOutput + Send + 'static,
+{
     let (tx, rx) = mpsc::channel();
     let tool_use_id = tool.id.clone();
     let tool_name_clone = tool.name.clone();
+    let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let worker_cancel = std::sync::Arc::clone(&cancel);
 
     let handle = std::thread::Builder::new().name(format!("async-tool-{}", tool.name)).spawn(move || {
-        let output = work();
+        let output = work(worker_cancel);
         // Encode error status in the description prefix since WatcherResult
         // cannot carry an is_error bool (struct_excessive_bools is forbid-level).
         let description =
@@ -109,7 +138,13 @@ where
     }
 
     let description = format!("⏳ {}", tool.name);
-    let watcher = ChannelWatcher::new(&description, &tool.id, rx, timeout_secs.saturating_mul(1000));
+    let watcher = ChannelWatcher::new(crate::state::watchers::ChannelWatcherInit {
+        description,
+        tool_use_id: tool.id.clone(),
+        rx,
+        timeout_ms: timeout_secs.saturating_mul(1000),
+        cancel_on_timeout: Some(cancel),
+    });
     WatcherRegistry::get_mut(state).register(Box::new(watcher));
 
     ToolResult {

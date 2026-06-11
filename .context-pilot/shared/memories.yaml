@@ -435,14 +435,23 @@ bfd5725c88443a6a:
   last_edited_ms: 0
 c1d06d597fb10a5e:
   tl_dr: 'BROWSER STRESS TEST: fix bugs AU FIL DE L''EAU — fix each confirmed failure inline as found, NOT batched at end.'
-  contents: 'User mandate (2026-06-11): during the browser async stress test, solve bugs au fil de l''eau. After each confirmed S0/S1/S2 finding: implement the fix IMMEDIATELY (build → reload → verify → commit on branch browser), then continue stress-testing the next phase. Do NOT accumulate findings and batch-fix at the end. Confirmed deployment blockers awaiting fix: P14 premature resolve (S2, move resolve() inside worker under op_lock), P08 close re-freeze (S1, non-blocking try_lock teardown), P11/P03 zombie clobber (S2, per-op epoch guard on shared writes), P15 artifact collision (S2, atomic counter in filename).'
+  contents: |-
+    User mandate (2026-06-11): during the browser async stress test, solve bugs au fil de l'eau. After each confirmed S0/S1/S2 finding: implement the fix IMMEDIATELY (build → reload → verify → commit on branch browser), then continue stress-testing the next phase. Do NOT accumulate findings and batch-fix at the end.
+
+    FIXED SO FAR (all on branch browser, verified live):
+    - P14 premature resolve (S2) — commit 252b4d8 — resolve_in_worker→OpSink::resolve under op_lock.
+    - P08 close re-freeze (S1) — commit f74db0b — clear_session try_lock.
+    - P15 artifact collision (S2) — commit 0d700b6 — ARTIFACT_SEQ AtomicU64 in filename.
+    - P11/P03 zombie stale-write clobber (S2) — timeout-tied cooperative cancellation: cp-base spawn_async_tool_cancellable + ChannelWatcher.check_timeout flips Arc<AtomicBool>; browser OpSink gates note_shared/note_nav/write_snapshot on cancel. Preserves P14 (flag only set on THIS op's timeout). Verified same-turn snapshot+click(e1)→Clicked #b1 title clicked-b1. COMMIT PENDING.
+
+    RESIDUAL OPEN (low-pri, not S0/S1/S2 blockers): P03 H03-1 — a timed-out zombie still HOLDS op_lock until its blocking CDP I/O returns (cooperative cancel can't interrupt in-flight I/O); residual S3 throughput-stall of subsequent workers. Fix options: bounded op timeout < watcher timeout, or worker-pool cap.
   importance: critical
   labels:
   - workflow
   - browser
   - stress-test
   - user-preference
-  last_edited_ms: 1781206707737
+  last_edited_ms: 1781208507377
 c8dbe654e1262fd7:
   tl_dr: Browser CDP ops now run OFF-MAIN-THREAD via spawn_async_tool (branch browser) — TUI no longer freezes. Verified live. Details in contents.
   contents: |-

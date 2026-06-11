@@ -15,7 +15,7 @@
 use std::sync::{Arc, Mutex};
 
 use cp_base::state::runtime::State;
-use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
+use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool_cancellable};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::client::{Client, INLINE_CAP_BYTES, connect_shared, truncate_utf8};
@@ -76,53 +76,132 @@ fn op_ctx(state: &State) -> Result<OpCtx, String> {
     })
 }
 
+/// Record the last action into shared runtime data from the **main thread**.
+///
+/// Used by the synchronous `browser_open` no-URL path (no worker, no timeout
+/// flag), so this write is unconditional — unlike [`OpSink::note_shared`].
+fn note_shared_main(shared: &Arc<Mutex<SharedBrowser>>, action: &str) {
+    if let Ok(mut s) = shared.lock() {
+        s.last_action = action.to_string();
+    }
+}
+
+/// Worker-side handle for writing runtime data into `shared`, gated by this
+/// op's cooperative-cancellation flag.
+///
+/// Every `shared` mutation goes through an `OpSink` so a **timed-out (zombie)**
+/// worker — one that exceeded `OP_TIMEOUT_SECS`, after which the watcher already
+/// fired the timeout result and the conversation moved on — can no longer clobber
+/// the state of a newer op (the P11/P03 stale-write race). The flag is THIS op's
+/// own flag: it flips `true` only when THIS worker times out, so a normal op (and
+/// a same-turn pending op, P14) writes freely while only the abandoned zombie's
+/// late writes are suppressed. Reads (`resolve`) are never gated — they can't
+/// corrupt state.
+struct OpSink {
+    /// Worker-written runtime data (e-refs, last action, url, title).
+    shared: Arc<Mutex<SharedBrowser>>,
+    /// This op's timeout flag — `true` once the watcher abandoned this worker.
+    cancel: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl OpSink {
+    /// Whether this worker has been abandoned (timed out) — skip `shared` writes.
+    fn cancelled(&self) -> bool {
+        self.cancel.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Record the last action — skipped if this worker timed out.
+    fn note_shared(&self, action: &str) {
+        if self.cancelled() {
+            return;
+        }
+        if let Ok(mut s) = self.shared.lock() {
+            s.last_action = action.to_string();
+        }
+    }
+
+    /// Record url/title/last-action — write skipped if this worker timed out.
+    /// The `(url, title)` pair is still returned for the LLM-facing result.
+    fn note_nav(&self, client: &Client, action: &str) -> (String, String) {
+        let (url, title) = (client.url(), client.title());
+        if self.cancelled() {
+            return (url, title);
+        }
+        if let Ok(mut s) = self.shared.lock() {
+            s.url.clone_from(&url);
+            s.title.clone_from(&title);
+            s.last_action = action.to_string();
+        }
+        (url, title)
+    }
+
+    /// Write a fresh snapshot's e-refs + digest — skipped if this worker timed out.
+    /// `page` is the `(url, title)` pair the snapshot was taken on.
+    fn write_snapshot(&self, erefs: Vec<crate::types::Eref>, page: (String, String), digest: &str) {
+        if self.cancelled() {
+            return;
+        }
+        if let Ok(mut s) = self.shared.lock() {
+            s.snapshot_text = snapshot::render_erefs(&erefs);
+            s.set_erefs(erefs);
+            s.url = page.0;
+            s.title = page.1;
+            s.last_action = digest.to_string();
+        }
+    }
+
+    /// Resolve a `ref`/`selector` pair to a concrete CSS selector under `op_lock`.
+    ///
+    /// A READ of `shared` (never a clobber), so it is **not** cancel-gated: in a
+    /// same-turn `snapshot`+`click`, the snapshot worker writes fresh e-refs while
+    /// holding `op_lock`; because `op_lock` serializes workers in spawn order,
+    /// resolving here — after this op acquires `op_lock` — sees the snapshot's
+    /// e-refs. Resolving at dispatch instead read the *stale* pre-snapshot table
+    /// (the P14 premature-resolve bug).
+    fn resolve(&self, eref: Option<&str>, selector: Option<&str>) -> Result<String, String> {
+        if eref.is_none() && selector.is_none() {
+            return Err("Provide 'ref' (from browser_snapshot) or 'selector'".to_string());
+        }
+        let s = self.shared.lock().map_err(|_e| "browser state poisoned".to_string())?;
+        s.resolve_selector(eref, selector)
+            .ok_or_else(|| format!("Unknown ref '{}' — take a fresh browser_snapshot", eref.unwrap_or("?")))
+    }
+}
+
 /// Run a CDP op on a worker thread and deliver the result asynchronously.
 ///
-/// `op` receives the connected [`Client`] and a handle to the shared runtime
-/// data (to write e-refs / url / title), and returns the LLM-facing string. It
-/// runs under the op-lock (serialized) and inside `catch_panic` (a dead-Chrome
-/// panic becomes a clean error, never a crash — see `client::catch_panic`).
+/// `op` receives the connected [`Client`] and an [`OpSink`] (to write e-refs /
+/// url / title, gated by this op's timeout flag), and returns the LLM-facing
+/// string. It runs under the op-lock (serialized) and inside `catch_panic` (a
+/// dead-Chrome panic becomes a clean error, never a crash — see
+/// `client::catch_panic`).
+///
+/// Uses `spawn_async_tool_cancellable` so a timed-out (abandoned) worker stops
+/// writing `shared` — preventing the P11/P03 zombie stale-write clobber.
 ///
 /// The closure must be `Send + 'static`; `op` and `OpCtx` satisfy that
 /// (`Client` is `Send + Sync`, the rest are `Arc`/`String`).
 fn run_browser_op<F>(state: &mut State, tool: &ToolUse, op: F) -> ToolResult
 where
-    F: FnOnce(&Client, &Arc<Mutex<SharedBrowser>>) -> Result<String, String> + Send + 'static,
+    F: FnOnce(&Client, &OpSink) -> Result<String, String> + Send + 'static,
 {
     let ctx = match op_ctx(state) {
         Ok(c) => c,
         Err(e) => return ToolResult::new(tool.id.clone(), e, true),
     };
-    spawn_async_tool(state, tool, OP_TIMEOUT_SECS, move || {
+    spawn_async_tool_cancellable(state, tool, OP_TIMEOUT_SECS, move |cancel| {
         // Serialize CDP ops: one worker on the single transport at a time.
         let _op = ctx.op_lock.lock();
+        let sink = OpSink { shared: Arc::clone(&ctx.shared), cancel };
         let result = crate::client::catch_panic("op", || {
             let client = connect_shared(&ctx.conn, &ctx.ws_url)?;
-            op(&client, &ctx.shared)
+            op(&client, &sink)
         });
         match result {
             Ok(content) => ToolOutput { content, is_error: false, create_panel: None, preserves_tempo: false },
             Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
         }
     })
-}
-
-/// Record the last action into shared runtime data (worker side).
-fn note_shared(shared: &Arc<Mutex<SharedBrowser>>, action: &str) {
-    if let Ok(mut s) = shared.lock() {
-        s.last_action = action.to_string();
-    }
-}
-
-/// Record url/title/last-action into shared runtime data (worker side).
-fn note_nav(shared: &Arc<Mutex<SharedBrowser>>, client: &Client, action: &str) -> (String, String) {
-    let (url, title) = (client.url(), client.title());
-    if let Ok(mut s) = shared.lock() {
-        s.url.clone_from(&url);
-        s.title.clone_from(&title);
-        s.last_action = action.to_string();
-    }
-    (url, title)
 }
 
 /// `browser_open`: launch or reuse Chrome (process spawn is a deliberate one-shot
@@ -161,13 +240,13 @@ fn open(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // No URL given: report the launch note synchronously (no CDP work).
     let Some(u) = nav_url else {
-        note_shared(&BrowserState::get(state).shared, &base);
+        note_shared_main(&BrowserState::get(state).shared, &base);
         return ToolResult::new(tool.id.clone(), base, false);
     };
     // Navigate on the worker thread; prepend the launch note to the result.
-    run_browser_op(state, tool, move |c, shared| {
+    run_browser_op(state, tool, move |c, sink| {
         c.goto(&u)?;
-        let (landed, title) = note_nav(shared, c, &format!("open + goto {u}"));
+        let (landed, title) = sink.note_nav(c, &format!("open + goto {u}"));
         Ok(format!("{base} Now at {landed} — \"{title}\""))
     })
 }
@@ -178,16 +257,16 @@ fn goto(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(u) => u.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'url' parameter".to_string(), true),
     };
-    run_browser_op(state, tool, move |c, shared| {
+    run_browser_op(state, tool, move |c, sink| {
         c.goto(&url)?;
-        let (url, title) = note_nav(shared, c, &format!("goto {url}"));
+        let (url, title) = sink.note_nav(c, &format!("goto {url}"));
         Ok(format!("Now at {url} — \"{title}\". e-refs are stale: snapshot before clicking."))
     })
 }
 
 /// `browser_snapshot`: enumerate interactive elements, digest inline.
 fn take_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
-    run_browser_op(state, tool, |c, shared| {
+    run_browser_op(state, tool, |c, sink| {
         let value = c.snapshot_json()?;
         let (url, title) = (c.url(), c.title());
         let erefs = snapshot::parse(&value);
@@ -195,37 +274,9 @@ fn take_snapshot(tool: &ToolUse, state: &mut State) -> ToolResult {
             "Snapshot of {url} — \"{title}\": {} interactive elements (see Browser panel)",
             erefs.len()
         );
-        if let Ok(mut s) = shared.lock() {
-            s.snapshot_text = snapshot::render_erefs(&erefs);
-            s.set_erefs(erefs);
-            s.url = url;
-            s.title = title;
-            s.last_action.clone_from(&digest);
-        }
+        sink.write_snapshot(erefs, (url, title), &digest);
         Ok(digest)
     })
-}
-
-/// Resolve a `ref`/`selector` pair to a concrete CSS selector **inside the
-/// worker**, under `op_lock`.
-///
-/// This MUST run on the worker (not at main-thread dispatch). In a same-turn
-/// `snapshot`+`click`, the snapshot worker writes the fresh e-refs into `shared`
-/// while holding `op_lock`; because `op_lock` serializes workers in spawn order,
-/// resolving here — after this op acquires `op_lock` — sees the snapshot's
-/// e-refs. Resolving at dispatch instead read the *stale* pre-snapshot table and
-/// acted on the previous page's selector (the P14 premature-resolve bug).
-fn resolve_in_worker(
-    shared: &Arc<Mutex<SharedBrowser>>,
-    eref: Option<&str>,
-    selector: Option<&str>,
-) -> Result<String, String> {
-    if eref.is_none() && selector.is_none() {
-        return Err("Provide 'ref' (from browser_snapshot) or 'selector'".to_string());
-    }
-    let s = shared.lock().map_err(|_e| "browser state poisoned".to_string())?;
-    s.resolve_selector(eref, selector)
-        .ok_or_else(|| format!("Unknown ref '{}' — take a fresh browser_snapshot", eref.unwrap_or("?")))
 }
 
 /// `browser_click`: click by ref or selector. The ref is resolved **inside the
@@ -234,10 +285,10 @@ fn resolve_in_worker(
 fn click(tool: &ToolUse, state: &mut State) -> ToolResult {
     let eref = tool.input.get("ref").and_then(|v| v.as_str()).map(ToString::to_string);
     let selector = tool.input.get("selector").and_then(|v| v.as_str()).map(ToString::to_string);
-    run_browser_op(state, tool, move |c, shared| {
-        let sel = resolve_in_worker(shared, eref.as_deref(), selector.as_deref())?;
+    run_browser_op(state, tool, move |c, sink| {
+        let sel = sink.resolve(eref.as_deref(), selector.as_deref())?;
         c.click(&sel)?;
-        let (url, title) = note_nav(shared, c, &format!("click {sel}"));
+        let (url, title) = sink.note_nav(c, &format!("click {sel}"));
         Ok(format!("Clicked '{sel}'. Now at {url} — \"{title}\""))
     })
 }
@@ -252,10 +303,10 @@ fn type_text(tool: &ToolUse, state: &mut State) -> ToolResult {
     let submit = tool.input.get("submit").and_then(serde_json::Value::as_bool).unwrap_or(false);
     let eref = tool.input.get("ref").and_then(|v| v.as_str()).map(ToString::to_string);
     let selector = tool.input.get("selector").and_then(|v| v.as_str()).map(ToString::to_string);
-    run_browser_op(state, tool, move |c, shared| {
-        let sel = resolve_in_worker(shared, eref.as_deref(), selector.as_deref())?;
+    run_browser_op(state, tool, move |c, sink| {
+        let sel = sink.resolve(eref.as_deref(), selector.as_deref())?;
         let outcome = c.type_into(&sel, &text, submit)?;
-        let (url, title) = note_nav(shared, c, &outcome);
+        let (url, title) = sink.note_nav(c, &outcome);
         Ok(format!("{outcome}. Now at {url} — \"{title}\""))
     })
 }
@@ -264,9 +315,9 @@ fn type_text(tool: &ToolUse, state: &mut State) -> ToolResult {
 fn extract(tool: &ToolUse, state: &mut State) -> ToolResult {
     let selector = tool.input.get("selector").and_then(|v| v.as_str()).map(ToString::to_string);
     let html = tool.input.get("format").and_then(|v| v.as_str()) == Some("html");
-    run_browser_op(state, tool, move |c, shared| {
+    run_browser_op(state, tool, move |c, sink| {
         let content = c.extract(selector.as_deref(), html)?;
-        note_shared(shared, "extract");
+        sink.note_shared("extract");
         if content.len() <= EXTRACT_INLINE_MAX {
             return Ok(content);
         }
@@ -284,11 +335,11 @@ fn extract(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// `browser_screenshot`: capture PNG to disk.
 fn screenshot(tool: &ToolUse, state: &mut State) -> ToolResult {
     let full_page = tool.input.get("full_page").and_then(serde_json::Value::as_bool).unwrap_or(false);
-    run_browser_op(state, tool, move |c, shared| {
+    run_browser_op(state, tool, move |c, sink| {
         let png = c.screenshot(full_page)?;
         let path = artifact_path("png")?;
         std::fs::write(&path, &png).map_err(|e| format!("Failed to write screenshot: {e}"))?;
-        note_shared(shared, "screenshot");
+        sink.note_shared("screenshot");
         Ok(format!("Screenshot saved to {} ({} bytes). Use the ocr tool to extract text.", path, png.len()))
     })
 }
@@ -299,9 +350,9 @@ fn eval(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(e) => e.to_string(),
         None => return ToolResult::new(tool.id.clone(), "Missing required 'expression' parameter".to_string(), true),
     };
-    run_browser_op(state, tool, move |c, shared| {
+    run_browser_op(state, tool, move |c, sink| {
         let out = c.eval(&expr)?;
-        note_shared(shared, "eval");
+        sink.note_shared("eval");
         Ok(out)
     })
 }

@@ -305,6 +305,13 @@ pub struct ChannelWatcher {
     registered_at_ms: u64,
     /// Absolute deadline in ms. Returns a timeout error after this point.
     deadline_ms: u64,
+    /// Cooperative-cancellation flag flipped `true` when the deadline passes.
+    ///
+    /// The worker thread holds a clone and checks it before mutating any shared
+    /// state, so a timed-out (abandoned) worker that keeps running can no longer
+    /// clobber state belonging to a newer op (the browser P11/P03 zombie-write
+    /// race). `None` for watchers whose tools don't opt into cancellation.
+    cancel_on_timeout: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl std::fmt::Debug for ChannelWatcher {
@@ -319,24 +326,47 @@ impl std::fmt::Debug for ChannelWatcher {
     }
 }
 
+/// Construction parameters for [`ChannelWatcher::new`].
+///
+/// Bundled into a struct so the constructor stays within the argument-count
+/// lint budget while still threading the cooperative-cancellation flag.
+pub struct ChannelWatcherInit {
+    /// Shown in the Spine panel watchers list.
+    pub description: String,
+    /// Matches the sentinel `ToolResult` for replacement; derives the watcher ID.
+    pub tool_use_id: String,
+    /// Receiving end of the channel from the worker thread.
+    pub rx: Receiver<WatcherResult>,
+    /// How long to wait before returning a timeout error.
+    pub timeout_ms: u64,
+    /// Optional flag set `true` on timeout so a still-running (abandoned) worker
+    /// can cooperatively skip its stale writes.
+    pub cancel_on_timeout: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+}
+
+impl std::fmt::Debug for ChannelWatcherInit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChannelWatcherInit")
+            .field("description", &self.description)
+            .field("tool_use_id", &self.tool_use_id)
+            .field("timeout_ms", &self.timeout_ms)
+            .finish_non_exhaustive()
+    }
+}
+
 impl ChannelWatcher {
-    /// Create a new channel watcher.
-    ///
-    /// * `description` — Shown in the Spine panel watchers list.
-    /// * `tool_use_id` — Matches the sentinel `ToolResult` for replacement.
-    ///   Also used to derive the watcher ID.
-    /// * `rx` — Receiving end of the channel from the worker thread.
-    /// * `timeout_ms` — How long to wait before returning a timeout error.
+    /// Create a new channel watcher from its [`ChannelWatcherInit`] parameters.
     #[must_use]
-    pub fn new(description: &str, tool_use_id: &str, rx: Receiver<WatcherResult>, timeout_ms: u64) -> Self {
+    pub fn new(init: ChannelWatcherInit) -> Self {
         let now = crate::panels::now_ms();
         Self {
-            id: format!("async_tool_{tool_use_id}"),
-            desc: description.to_string(),
-            tuid: tool_use_id.to_string(),
-            rx: Mutex::new(rx),
+            id: format!("async_tool_{}", init.tool_use_id),
+            desc: init.description,
+            tuid: init.tool_use_id,
+            rx: Mutex::new(init.rx),
             registered_at_ms: now,
-            deadline_ms: now.saturating_add(timeout_ms),
+            deadline_ms: now.saturating_add(init.timeout_ms),
+            cancel_on_timeout: init.cancel_on_timeout,
         }
     }
 }
@@ -391,6 +421,10 @@ impl Watcher for ChannelWatcher {
 
     fn check_timeout(&self) -> Option<WatcherResult> {
         (crate::panels::now_ms() >= self.deadline_ms).then(|| {
+            // Signal the (still-running) worker to abandon its stale writes.
+            if let Some(flag) = &self.cancel_on_timeout {
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
             let elapsed_secs =
                 crate::panels::time_arith::ms_to_secs(self.deadline_ms.saturating_sub(self.registered_at_ms));
             WatcherResult {

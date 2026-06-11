@@ -1134,6 +1134,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+4829155d482dff60:
+  path: crates/cp-base/src/state/watchers.rs
+  description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'
+  last_edited_ms: 0
 486df436aa0dfe78:
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
@@ -1169,6 +1173,10 @@
 49f43f5e9718e31f:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated list of allowed #[expect]/#[allow] annotations (10 entries). Every occurrence in the codebase MUST have an entry here. Fields: path, match, reason, strategy.'
+  last_edited_ms: 0
+4a9ee21631df5e54:
+  path: crates/cp-base/src/tools/async_exec.rs
+  description: Async tool execution — spawn_async_tool() runs blocking I/O on worker thread. ToolOutput struct (content, is_error, create_panel, preserves_tempo). BLOCKING_TOOL_SENTINEL constant. ChannelWatcher registration. Error encoding via ASYNC_ERROR_PREFIX in description.
   last_edited_ms: 0
 4ace13d6319be7ac:
   path: crates/cp-mod-console/src/manager.rs
@@ -1621,6 +1629,10 @@
 687b59bd2100852c:
   path: crates/cp-mod-entities/src/panels/format.rs
   description: SQL result formatting shared by tools + panels. query_to_markdown (200-row cap, 0-row enrichment hint), format_cell, format_markdown_table, extract_table_name (case-insensitive byte-safe FROM scan — no to_uppercase offset bug).
+  last_edited_ms: 0
+68a59114c254d8f0:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch — OFF-MAIN-THREAD. Every slow CDP op (open-nav/goto/snapshot/click/type/extract/screenshot/eval) runs on a worker via spawn_async_tool (cp_base async_exec), so the TUI never freezes; result delivered through the ChannelWatcher pipeline like console/brave. run_browser_op gathers OpCtx (conn/op_lock/shared/ws_url Arcs) on the main thread, then the worker: locks op_lock (serialize), connect_shared (reuse/reconnect cached Client), catch_panic(op) (dead-Chrome panic→clean Err, never crash), writes shared (note_shared/note_nav), returns the LLM-facing string. resolve() reads e-refs from the shared lock on the main thread BEFORE spawning. Chrome PROCESS spawn (browser_open) + browser_close stay synchronous (one-shot, main-thread-owned). Large extracts→file; screenshots→timestamped PNG under .context-pilot/browser/.'
   last_edited_ms: 0
 68bb461714cf1222:
   path: src/ui/help/config_overlay.rs
@@ -2305,6 +2317,10 @@
 9a2da07aae0bb6d6:
   path: src/modules/overview/tools/manage_tools.rs
   description: 'tool_manage execute: enable/disable tools, MANAGE_TOOLS_ID + panel_goto_page protection, partial success'
+  last_edited_ms: 0
+9a3f44402caff28d:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch — OFF-MAIN-THREAD. Every slow CDP op (open-nav/goto/snapshot/click/type/extract/screenshot/eval) runs on a worker via spawn_async_tool (cp_base async_exec), so the TUI never freezes; result delivered through the ChannelWatcher pipeline like console/brave. run_browser_op gathers OpCtx (conn/op_lock/shared/ws_url Arcs) on the main thread, then the worker: locks op_lock (serialize), connect_shared (reuse/reconnect cached Client), catch_panic(op) (dead-Chrome panic→clean Err, never crash), writes shared (note_shared/note_nav), returns the LLM-facing string. resolve() reads e-refs from the shared lock on the main thread BEFORE spawning. Chrome PROCESS spawn (browser_open) + browser_close stay synchronous (one-shot, main-thread-owned). Large extracts→file; screenshots→timestamped PNG under .context-pilot/browser/.'
   last_edited_ms: 0
 9a61a00374a7164b:
   path: src/state/mod.rs
@@ -3125,6 +3141,10 @@ d1a7efa0007771ee:
 d1d5cdf656994f6b:
   path: src/llms/oai_providers/groq.rs
   description: Groq client. OpenAI-compatible with built-in tools (browser_search, code_interpreter) for GPT-OSS models. GROQ_API_KEY auth.
+  last_edited_ms: 0
+d1dc9b1e80bfd4f3:
+  path: crates/cp-mod-browser/src/types.rs
+  description: 'BrowserState + ChromeMeta + Eref + SharedBrowser. THREADING: meta/handle stay main-thread-owned (Chrome process lifecycle/persistence); CDP work is off-main-thread so the shared pieces are behind Arc: conn: ConnSlot = Arc<Mutex<Option<Arc<Client>>>> (cached CDP connection a worker reuses-or-reconnects under the slot lock), shared: Arc<Mutex<SharedBrowser>> (worker-written runtime data: erefs/eref_selectors/snapshot_text/last_action/url/title), op_lock: Arc<Mutex<()>> (serializes CDP ops on the single transport). SharedBrowser owns set_erefs + resolve_selector (e-ref→CSS). clear_session() drops conn + resets shared. ChromeMeta serializable (session_key/pid/ws_url/headless) for reload reconnect. BROWSER_KEY_PREFIX=browser_.'
   last_edited_ms: 0
 d1dd4051e2c729cb:
   path: README.md

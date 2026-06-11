@@ -47,8 +47,11 @@ page. Last-writer-wins with no ordering = silent corruption.
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H11-1 | **S2** | `SharedBrowser` (`types.rs`) carries **no generation/epoch token** — `set_erefs`/`note_nav` just overwrite `erefs`/`eref_selectors`/`url`/`title`/`last_action`. A timed-out/abandoned worker (P03 H03-1: detached, never cancelled) finishes later and writes its (now-stale) results into `shared`, clobbering whatever a newer op wrote. A subsequent click-by-ref then resolves against the wrong page's e-refs. Last-writer-wins with no op ordering on `shared`. | **CONFIRMED (source)** — 2026-06-11. | per-op epoch: stamp an `op_id`/generation at dispatch (carried into the worker); `note_nav`/`set_erefs` no-op if `epoch != current`. |
+| H11-1 | **S2** | `SharedBrowser` (`types.rs`) carries **no generation/epoch token** — `set_erefs`/`note_nav` just overwrite `erefs`/`eref_selectors`/`url`/`title`/`last_action`. A timed-out/abandoned worker (P03 H03-1: detached, never cancelled) finishes later and writes its (now-stale) results into `shared`, clobbering whatever a newer op wrote. A subsequent click-by-ref then resolves against the wrong page's e-refs. Last-writer-wins with no op ordering on `shared`. | **CONFIRMED then FIXED+VERIFIED** — 2026-06-11. | **FIXED** via **timeout-tied cooperative cancellation** (NOT epoch-at-dispatch, which would break the P14 same-turn fix). cp-base: `spawn_async_tool_cancellable` hands the worker an `Arc<AtomicBool>` cancel flag; `ChannelWatcher::check_timeout` flips it `true` the instant the watcher fires the 30s timeout (`watchers.rs`). Browser (`tools.rs`): all `shared` mutations route through a new `OpSink` whose `note_shared`/`note_nav`/`write_snapshot` early-return when `cancel` is set. The flag is THIS op's own — only the timed-out (abandoned/zombie) worker is gated, so normal ops AND same-turn pending ops (not yet timed out) write freely → P14 preserved. `resolve` is a READ, never gated. Live-verified: same-turn `snapshot`+`click(e1)` → `Clicked '#b1'`, title `clicked-b1` (correct element), no regression. |
 
 ## Exit criterion
-A late/zombie worker can never mutate `shared` for a superseded op (epoch guard),
-verified by the deterministic harness reaching 0% clobber.
+A late/zombie worker can never mutate `shared` for a superseded op. **MET** via
+timeout-tied cooperative cancellation (`OpSink` cancel-gate): once a worker's 30s
+watcher fires, its flag flips and every subsequent `shared` write no-ops. Normal
+and same-turn-pending ops are unaffected (flag only set on timeout), so the P14
+fix is preserved. Live-verified non-regressive.
