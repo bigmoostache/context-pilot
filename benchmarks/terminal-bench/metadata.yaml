@@ -1,0 +1,13 @@
+# Draft metadata.yaml for the Terminal-Bench 2.0 leaderboard submission.
+# Goes into: submissions/terminal-bench/2.0/context-pilot__claude-sonnet-4-6/
+# (HF repo: harborframework/terminal-bench-2-leaderboard — reopens ~end of June 2026)
+
+agent_url: https://github.com/bigmoostache/context-pilot
+agent_display_name: "Context Pilot"
+agent_org_display_name: "Context Pilot"
+
+models:
+  - model_name: claude-sonnet-4-6
+    model_provider: anthropic
+    model_display_name: "Claude Sonnet 4.6"
+    model_org_display_name: "Anthropic"
