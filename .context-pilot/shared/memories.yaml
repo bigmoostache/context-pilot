@@ -137,6 +137,27 @@
   tl_dr: 'Context Pilot env vars: ANTHROPIC_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY, GITHUB_TOKEN (core). Optional LLM providers and chat bridge tokens. Loaded via dotenvy from .env, fallback to global config.'
   importance: high
   last_edited_ms: 0
+25e8151afb29481e:
+  tl_dr: 'Browser PR1.5 COMPLETE on branch ''browser'': all 8 stress-test bugs fixed + verified live. BUG#8 (stale URL after click-redirect) fixed via two-phase settle_after_nav.'
+  contents: |-
+    All 8 stress-test bugs fixed + verified live on branch 'browser'.
+
+    Cluster A (eval): Runtime.evaluate returnByValue:true replaces JSON.stringify wrap -> statements (let/if/for), NaN, Infinity, clean thrown-error one-liners all work. Bare-function eval still returns {} = accepted limitation.
+
+    Cluster B (DOM-domain flakiness): click/type via in-page JS querySelector, not wait_for_element (no 20s hangs); goto soft nav-wait (never propagates wait timeout); BUG#8 stale-URL-after-redirect fixed via two-phase settle_after_nav(url_before) -- phase1 waits ~1.5s for nav to BEGIN, phase2 follows redirect chain to true landing. Verified: example.com Learn-more click -> reports www.iana.org/help/example-domains (location.href agrees); non-nav injected-button click returns correct unchanged URL, no error/hang, handler fires.
+
+    Cluster C (type focus): JS .focus() not el.click() (no accidental nav).
+    Cluster D (reconnect): tools.rs with_client retry-once-on-closed wrapper.
+    Cluster E (extract): reads .value for form fields else innerText.
+
+    Known minor (NOT in original 8): headless_chrome get_url() lags for data: scheme URLs -> goto to a data: URL can report a stale URL. Pre-existing (old settle_url had it too), edge-case, out of PR1.5 scope.
+  importance: high
+  labels:
+  - browser
+  - pr1.5
+  - complete
+  - bugfix
+  last_edited_ms: 1781185436153
 2bfb816e017b246e:
   tl_dr: 'DOCUMENTATION PHASE: Ignore structure-check callback warnings about files >500 lines during doc additions. Lines will grow temporarily — that''s expected and acceptable.'
   importance: critical
