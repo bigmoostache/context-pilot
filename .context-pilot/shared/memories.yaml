@@ -165,6 +165,15 @@
   - documentation
   - structure-check
   last_edited_ms: 0
+2fb69a4032fb9c9e:
+  tl_dr: 'Sequential 89-task TB run ACTIVE: jobs/2026-06-11__20-38-59, ONE harbor proc (-n1, Sonnet 4.6, v0.2.2). Console P17. DO NOT launch a duplicate; coucou is monitor-only now.'
+  contents: 'Sequential 89-task TB run LAUNCHED ~18:39 host time. Run dir: benchmarks/terminal-bench/jobs/2026-06-11__20-38-59/ (results.json appears as tasks complete). ONE harbor process PID 36558/36561, -n 1 strictly sequential (one container at a time), Sonnet 4.6 via claude_code_v2 provider, CP_MAX_COST=5.0, downloads v0.2.2 release binary (has the --model->claude_code_v2_model mapping fix). First task: gpt2-codegolf. Monitored via console panel P17 + heartbeat coucou (~15min). CRITICAL: when the older launch-coucou fires (~18:50), DO NOT launch a second harbor run — verify with `pgrep -fl ''harbor run''` / `docker ps`; if one is already running, treat the coucou as monitor-only (check results.json, update todos X528-X616, re-arm heartbeat).'
+  importance: high
+  labels:
+  - terminal-bench
+  - run
+  - active
+  last_edited_ms: 1781203197203
 3182e8c4a21fcc81:
   tl_dr: Secondary model selector with Tab key toggle implemented
   contents: |-

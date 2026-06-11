@@ -1066,6 +1066,10 @@
   path: crates/cp-mod-utilities/src/dirs.rs
   description: 'Platform dirs: home_dir() from $HOME, config_dir() macOS Library/Linux XDG. Replaces dirs crate.'
   last_edited_ms: 0
+41c63a565961a344:
+  path: crates/cp-mod-spine/src/engine.rs
+  description: 'Spine engine — check_spine() evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped hard stop, (3) error backoff, (4) no-unprocessed check, (5) COUCOU GUARD: while a coucou watcher has a future fire_at_ms, stay Idle UNLESS a UserMessage is waiting (coucou re-registers from persistence across reloads, fires on time). (6) double-synthetic guard, (7) guard rails. build_continuation_from_notifications: a waiting UserMessage takes the transparent path (Relaunch / user_message_during_stream) instead of bundling Custom nudges. apply_continuation() creates synthetic messages.'
+  last_edited_ms: 1781203079965
 41f125de4ae98a1f:
   path: dummy.txt
   description: Throwaway test file
@@ -1566,6 +1570,10 @@
   path: src/llms/claude_code_v2/mod.rs
   description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
   last_edited_ms: 0
+6509eb2901e1cce3:
+  path: src/llms/claude_code_v2/mod.rs
+  description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
+  last_edited_ms: 0
 6524c8708421c935:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -1650,6 +1658,10 @@
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 1780612872558
+6b3d78dde064a8e2:
+  path: src/llms/claude_code/mod.rs
+  description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
+  last_edited_ms: 0
 6b8cbba6ac975bcc:
   path: crates/cp-base/src/ui/question_form.rs
   description: 'PendingForm state machine: Question/QuestionOption/QuestionAnswer, cursor nav, single/multi-select, submit/dismiss'
@@ -3421,6 +3433,10 @@ ec28737efa4930e9:
 ec35e41e73d1b8fc:
   path: crates/cp-mod-tree/src/panel.rs
   description: Tree panel. Background cache system for directory tree rendering. TreeCacheRequest data payload. Pagination. refresh_stale_from_yaml() call in apply_cache_update triggers second rebuild if descriptions changed.
+  last_edited_ms: 0
+ecf92d25818684f3:
+  path: src/llms/claude_code_api_key/mod.rs
+  description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
   last_edited_ms: 0
 ed11d32eca739db4:
   path: src/app/run/reverie.rs

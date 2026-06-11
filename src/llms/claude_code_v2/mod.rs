@@ -155,8 +155,21 @@ impl ClaudeCodeV2Client {
             let _p = crate::state::persistence::log_error(&format!("OAuth: token refresh failed: {e}"));
         }
 
+        // No total timeout (a legit long stream must not be cut), but bound a
+        // DEAD connection at the OS level. connect_timeout caps the handshake;
+        // TCP keepalive detects a silently-vanished peer: after 60s idle the
+        // kernel probes every 15s, 4 failed probes tear the socket down (~120s)
+        // → read errors → StreamRead → retry, instead of hanging forever until
+        // the agent-timeout wall. A healthy stream keeps bytes flowing (pings +
+        // token/thinking deltas) so it never idles long enough to probe.
+        // (This is the gpt2-codegolf hang fix; reqwest's blocking ClientBuilder
+        // has no read/idle timeout, so keepalive is the correct dead-peer guard.)
         let client = Client::builder()
             .timeout(None)
+            .connect_timeout(std::time::Duration::from_secs(30))
+            .tcp_keepalive(std::time::Duration::from_secs(60))
+            .tcp_keepalive_interval(std::time::Duration::from_secs(15))
+            .tcp_keepalive_retries(4)
             .build()
             .map_err(|e| LlmError::Network(e.to_string()))?;
 
