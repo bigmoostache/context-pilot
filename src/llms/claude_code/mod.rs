@@ -214,10 +214,9 @@ impl ClaudeCodeClient {
         if let Some(mut creds) = oauth::load_oauth_credentials()
             && let Err(e) = oauth::refresh_token_if_needed(&mut creds)
         {
-            drop(std::io::Write::write_fmt(
-                &mut std::io::stderr(),
-                format_args!("Warning: token refresh failed: {e}\n"),
-            ));
+            // Log to file (NOT stderr — stderr writes corrupt the TUI's
+            // alternate screen). Non-fatal: the existing token may still be valid.
+            let _p = crate::state::persistence::log_error(&format!("OAuth: token refresh failed: {e}"));
         }
 
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;

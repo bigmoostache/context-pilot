@@ -142,15 +142,12 @@
     - claude_code.py reference: reads self.model_name (Harbor -m 'anthropic/claude-sonnet-4-6'), strips provider via split('/')[-1]; sets context.cost_usd/n_*_tokens from final metrics. _resolve_model() mirrors this.
 
     ### Trajectory alignment (headless.rs TrajectoryWriter):
-    final event emits {status, messages, output_tokens, total_cost_usd, duration_secs}. Adapter reads exactly those — sets cost_usd + n_output_tokens, leaves n_input_tokens/n_cache_tokens None (not emitted). No fiction.
+    final event emits {status, messages, output_tokens, total_cost_usd, duration_secs}. Adapter reads exactly those.
 
-    ### Exit-code tolerance: '|| true' appended so guard-rail stop (exit 2)/error (exit 1) does NOT raise in exec_as_agent and mark the trial errored. Verifier scores the filesystem; trajectory records true status.
+    ### Exit-code tolerance: '|| true' so guard-rail(2)/error(1) does NOT raise + mark trial errored.
 
-    ### Deferred (out of adapter scope):
-    - Release bundle context-pilot-linux-x86_64.tar.gz (tui+cp-console-server+meilisearch); BUNDLE_URL pins 'latest' -> pin a tag at X525.
-    - End-to-end needs Harbor + Docker -> X523/X524.
-    - MODEL DISCREPANCY (captain decision): metadata.yaml claims claude-sonnet-4-6 but claude_code_api_key + plain ANTHROPIC_API_KEY tops at 4.5; --model 4.6 degrades to 4.5. Resolve X525/X526: OAuth (ClaudeCodeV2) for true 4.6, or relabel as 4.5.
-    - OPTIONAL: enrich headless trajectory final event with input/cache tokens (Rust, deferred).
+    ### ⚠️ MODEL-MAPPING BUG (confirmed 2026-06-11, batch 2 run 19-49-28):
+    apply_provider_model in headless.rs only maps --model onto state.anthropic_model for the ANTHROPIC FAMILY (Anthropic|ClaudeCode|ClaudeCodeApiKey). When CP_PROVIDER=claude_code_v2, --model claude-sonnet-4-6 is IGNORED -> falls back to ClaudeCodeV2Model::default() = ClaudeOpus48. So batch 2 ACTUALLY RAN OPUS 4.8, not Sonnet 4.6. Captain decision: let batch 2 finish on Opus; for FUTURE runs use v2 provider + Sonnet 4.6 -> MUST FIX apply_provider_model to map --model onto state.claude_code_v2_model (claude-sonnet-4-6/sonnet->ClaudeSonnet46, claude-opus-4-8/opus->ClaudeOpus48, claude-fable-5/fable->ClaudeFable5).
   importance: high
   labels:
   - terminal-bench
@@ -159,7 +156,7 @@
   - x524
   - complete
   - validated
-  last_edited_ms: 1781178945107
+  last_edited_ms: 1781200864312
 2bfb816e017b246e:
   tl_dr: 'DOCUMENTATION PHASE: Ignore structure-check callback warnings about files >500 lines during doc additions. Lines will grow temporarily — that''s expected and acceptable.'
   importance: critical

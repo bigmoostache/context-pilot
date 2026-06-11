@@ -338,6 +338,10 @@
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+1577607d1073184f:
+  path: src/app/run/headless.rs
+  description: 'Headless mode (`tui --headless "<instruction>"`). parse_args (--provider/--model/--trajectory/--max-cost/--max-messages/--max-duration-secs/--instruction-file). parse_provider maps CLI string -> LlmProvider (default ClaudeCodeApiKey, container-friendly env-only auth). apply_provider_model sets state.llm_provider + state.anthropic_model (Anthropic family); --model maps to ClaudeOpus45/ClaudeSonnet45/ClaudeHaiku45, default Sonnet 4.5. HeadlessOpts/HeadlessOutcome (exit 0 done / 1 error / 2 guard rail). TrajectoryWriter: JSONL incremental flush + [cp-headless] stdout mirror (start event records resolved model). run_headless drives background_tick() until quiescence (2.5s settle) or guard rail. inject_instruction = UserMessage spine notification; configure_headless_spine sets continue_until_todos_done + guard rails. disable_interactive_tools drops ask_user_question only.'
+  last_edited_ms: 0
 157ba8411ad995a2:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
@@ -1378,6 +1382,10 @@
   path: crates/cp-mod-chat/src/server.rs
   description: Global Tuwunel homeserver lifecycle. PID/socket/config file management. UDS HTTP helpers (get/post/put). pre_start_daemon() for parallel boot. ensure_daemon_running() + start_server(state). Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 0
+58fb43932856d26d:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop. background_tick() (terminal-free orchestration: stream/typewriter/cache/watchers/tools/spine/reverie/reload/ownership → TickStatus) shared by interactive run() AND headless loop. run() = input + background_tick + render. check_spine auto-continuation. Adaptive poll 8ms/50ms.'
+  last_edited_ms: 0
 596939421089399b:
   path: src/llms/oai_providers/mod.rs
   description: 'Module declarations: deepseek, grok, groq, openai_compat, openai_streaming.'
@@ -1597,6 +1605,10 @@
 67d1a0664de7d433:
   path: .github/checks/check-file-lengths.sh
   description: File length check script (max 500 lines)
+  last_edited_ms: 0
+67ddf53e8bde3a68:
+  path: src/llms/claude_code_v2/mod.rs
+  description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
   last_edited_ms: 0
 680ee984a94b15c6:
   path: docs/talk/slides/2-0.html
@@ -3622,6 +3634,10 @@ fceb53aa84039016:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 1780568982802
+fd3b3838b5ea7f55:
+  path: src/llms/claude_code/mod.rs
+  description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
+  last_edited_ms: 0
 fd604dcc85d708e3:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.

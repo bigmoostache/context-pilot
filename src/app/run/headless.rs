@@ -12,7 +12,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write as _;
 use std::time::{Duration, Instant};
 
-use cp_base::config::llm_types::{AnthropicModel, LlmProvider};
+use cp_base::config::llm_types::{AnthropicModel, ClaudeCodeV2Model, LlmProvider};
 use cp_base::state::context::estimate_tokens;
 use cp_mod_spine::types::{NotificationType, SpineState};
 
@@ -316,6 +316,16 @@ impl App {
                 Some("claude-haiku-4-5" | "claude-haiku-4-5-20251001" | "haiku") => AnthropicModel::ClaudeHaiku45,
                 // "claude-sonnet-4-5" / "...-20250929" / "sonnet" / None → Sonnet 4.5.
                 _ => AnthropicModel::ClaudeSonnet45,
+            };
+        } else if matches!(opts.provider, LlmProvider::ClaudeCodeV2) {
+            // V2 (OAuth) is the only family exposing Sonnet 4.6 — map the
+            // `--model` string onto state.claude_code_v2_model. Unknown/absent →
+            // Sonnet 4.6 (the leaderboard-submission default).
+            self.state.claude_code_v2_model = match opts.model.as_deref() {
+                Some("claude-opus-4-8" | "opus") => ClaudeCodeV2Model::ClaudeOpus48,
+                Some("claude-fable-5" | "fable") => ClaudeCodeV2Model::ClaudeFable5,
+                // "claude-sonnet-4-6" / "sonnet" / None → Sonnet 4.6.
+                _ => ClaudeCodeV2Model::ClaudeSonnet46,
             };
         }
     }

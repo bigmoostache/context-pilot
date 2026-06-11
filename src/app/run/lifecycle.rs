@@ -83,10 +83,10 @@ impl App {
                                 self.state.flags.ui.dirty = true;
                             }
                             Err(e) => {
-                                // Log error but don't crash - just keep showing stale data
-                                drop(io::Write::write_fmt(
-                                    &mut io::stderr(),
-                                    format_args!("Warning: OAuth usage fetch failed: {e}\n"),
+                                // Log to file (NOT stderr — stderr writes corrupt the TUI's
+                                // alternate screen). Keep showing stale data, don't crash.
+                                let _p = crate::state::persistence::log_error(&format!(
+                                    "OAuth usage fetch failed: {e}"
                                 ));
                             }
                         }

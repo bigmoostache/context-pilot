@@ -128,10 +128,10 @@ pub(crate) fn save_oauth_credentials(creds: &OAuthCredentials) -> Result<(), Box
     if cfg!(target_os = "macos") {
         // Try to update Keychain first
         if let Err(e) = save_to_keychain(creds) {
-            // Log warning but fall back to file (non-fatal)
-            drop(std::io::Write::write_fmt(
-                &mut std::io::stderr(),
-                format_args!("Warning: failed to update Keychain, falling back to file: {e}\n"),
+            // Log to file (NOT stderr — stderr writes corrupt the TUI's
+            // alternate screen). Non-fatal: fall back to a credentials file.
+            let _p = crate::state::persistence::log_error(&format!(
+                "OAuth: failed to update Keychain, falling back to file: {e}"
             ));
             save_to_file(creds)?;
         }
@@ -227,10 +227,10 @@ pub(crate) fn refresh_token_if_needed(creds: &mut OAuthCredentials) -> Result<()
     
     // Save back to storage
     if let Err(e) = save_oauth_credentials(creds) {
-        // Log warning but don't fail (non-fatal)
-        drop(std::io::Write::write_fmt(
-            &mut std::io::stderr(),
-            format_args!("Warning: refreshed token but failed to save: {e}\n"),
+        // Log to file (NOT stderr — stderr writes corrupt the TUI's
+        // alternate screen). Non-fatal: the refreshed token still works in-memory.
+        let _p = crate::state::persistence::log_error(&format!(
+            "OAuth: refreshed token but failed to save: {e}"
         ));
     }
     
@@ -260,9 +260,14 @@ pub(crate) fn fetch_usage(access_token: &str) -> Result<cp_base::config::llm_typ
             body: format!("Usage API: {body}"),
         });
     }
-    
-    response
-        .json()
-        .map_err(|e| LlmError::Network(format!("Failed to parse usage response: {e}")))
+
+    // Read the body text first so we can surface WHAT the endpoint returned when
+    // parsing fails (e.g. a different plan tier on a freshly-logged-in account
+    // returns an unexpected shape). The raw body is logged to file for diagnosis.
+    let body = response.text().map_err(|e| LlmError::Network(format!("Usage read failed: {e}")))?;
+    serde_json::from_str::<cp_base::config::llm_types::UsageResponse>(&body).map_err(|e| {
+        let snippet: String = body.chars().take(500).collect();
+        LlmError::Network(format!("Failed to parse usage response: {e} — body: {snippet}"))
+    })
 }
 

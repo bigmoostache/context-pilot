@@ -83,7 +83,7 @@ class ContextPilotAgent(BaseInstalledAgent):
     def version(self) -> str | None:
         # tui has no --version flag, so report a static version rather than
         # overriding get_version_command() with a call that would fail.
-        return "0.2.1"  # TODO(X525): sync with the pinned release tag.
+        return "0.2.2"  # TODO(X525): sync with the pinned release tag.
 
     async def install(self, environment: BaseEnvironment) -> None:
         # System deps needed only to fetch + unpack the bundle.
