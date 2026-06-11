@@ -954,6 +954,10 @@
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
   last_edited_ms: 0
+3cec4f0f8ef14f5e:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: Harbor BaseInstalledAgent adapter for Context Pilot. install() downloads the CP linux-x86_64 bundle and lays out tui+cp-console-server (next-to-exe) + meilisearch (~/.context-pilot/meilisearch/bin). run() = tui --headless <instr> --provider claude_code_api_key --model <resolved-from-self.model_name> --trajectory + '|| true' (CP exit 2/1 are valid). _resolve_model strips anthropic/ prefix. populate_context_post_run parses JSONL trajectory final event -> context.cost_usd + n_output_tokens + metadata{status,messages,assistant_turns,duration_secs}. Verified against real Harbor source.
+  last_edited_ms: 1781169810387
 3db99c7fa34b728d:
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
