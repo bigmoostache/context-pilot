@@ -166,89 +166,155 @@ impl Client {
     /// Uses `querySelector().click()` through the Runtime domain rather than
     /// `wait_for_element` (DOM domain), which times out 20 s on elements that
     /// provably exist and hangs on typos. A missing element errors instantly; a
-    /// malformed selector surfaces the real `SyntaxError`. After clicking we
-    /// settle the URL so click-triggered redirects report the true landing URL.
+    /// malformed selector surfaces the real `SyntaxError`. A `disabled` element
+    /// is rejected — the browser swallows `.click()` on disabled controls, so
+    /// claiming success would be a lie (the handler never fires). After clicking
+    /// we settle the URL so click-triggered redirects report the true landing.
     ///
     /// # Errors
     ///
-    /// Returns `Err` when the selector is invalid or matches no element.
+    /// Returns `Err` when the selector is invalid, matches no element, or the
+    /// matched element is disabled.
     pub fn click(&self, selector: &str) -> Result<(), String> {
         let before = self.tab.get_url();
         let js = format!(
-            "(() => {{ const el = document.querySelector({sel}); if (!el) return false; \
-             el.scrollIntoView({{block:'center'}}); el.click(); return true; }})()",
+            "(() => {{ const el = document.querySelector({sel}); if (!el) return 'notfound'; \
+             if (el.disabled) return 'disabled'; \
+             el.scrollIntoView({{block:'center'}}); el.click(); return 'ok'; }})()",
             sel = serde_json::Value::String(selector.to_string())
         );
-        let found = self.run_js(&js)?;
-        if found != serde_json::Value::Bool(true) {
-            return Err(format!("Element '{selector}' not found"));
+        match self.run_js(&js)?.as_str() {
+            Some("ok") => {
+                let _settled = self.settle_after_nav(&before);
+                Ok(())
+            }
+            Some("disabled") => Err(format!("Element '{selector}' is disabled — click had no effect")),
+            _ => Err(format!("Element '{selector}' not found")),
         }
-        let _settled = self.settle_after_nav(&before);
-        Ok(())
     }
 
     /// Type `text` into the element matching `selector`; optionally submit.
     ///
     /// Focuses via JS `.focus()` (NOT `el.click()`, which on a link/button
     /// navigates and silently loses the text), sets `.value`, and dispatches
-    /// `input`+`change` so framework-controlled fields react. `submit` calls
-    /// `form.requestSubmit()` (falling back to a synthetic Enter) so the page's
-    /// submit handlers run. Settles the URL afterwards for any navigation.
+    /// `input`+`change` so framework-controlled fields react. Honesty guards
+    /// added in PR1.6: a `disabled`/`readOnly` field is rejected (JS `.value`
+    /// would otherwise bypass the lock and falsely "succeed"); `contenteditable`
+    /// elements (no `.value`) are filled via `textContent` instead of being
+    /// wrongly refused; and after setting `.value` we read it back — if the
+    /// field transformed/rejected the input (e.g. `<input type=number>` clearing
+    /// `"abc"`), we report the *actual* landed value instead of a false success.
+    /// `submit` calls `form.requestSubmit()` (falling back to a synthetic Enter)
+    /// so the page's submit handlers run. Settles the URL afterwards for any
+    /// navigation.
     ///
     /// # Errors
     ///
-    /// Returns `Err` when the selector is invalid, matches nothing, or the
-    /// element is not a text field.
-    pub fn type_into(&self, selector: &str, text: &str, submit: bool) -> Result<(), String> {
+    /// Returns `Err` when the selector is invalid, matches nothing, the element
+    /// is disabled/read-only, or it is not a text field.
+    pub fn type_into(&self, selector: &str, text: &str, submit: bool) -> Result<String, String> {
         let before = self.tab.get_url();
         let js = format!(
             "(() => {{ const el = document.querySelector({sel}); if (!el) return 'notfound'; \
-             if (!('value' in el)) return 'nottypeable'; el.focus(); \
-             try {{ el.value = {txt}; }} catch (e) {{ return 'nottypeable'; }} \
+             if (el.disabled) return 'disabled'; if (el.readOnly) return 'readonly'; \
+             if (!('value' in el)) {{ if (el.isContentEditable) {{ el.focus(); el.textContent = {txt}; \
+               el.dispatchEvent(new Event('input', {{bubbles:true}})); return 'ok'; }} return 'nottypeable'; }} \
+             el.focus(); try {{ el.value = {txt}; }} catch (e) {{ return 'nottypeable'; }} \
              el.dispatchEvent(new Event('input', {{bubbles:true}})); \
              el.dispatchEvent(new Event('change', {{bubbles:true}})); \
+             const actual = el.value; \
              if ({do_submit}) {{ const f = el.form || el.closest('form'); \
                if (f && f.requestSubmit) f.requestSubmit(); \
                else if (f) f.submit(); \
                else el.dispatchEvent(new KeyboardEvent('keydown', {{key:'Enter',bubbles:true}})); }} \
-             return 'ok'; }})()",
+             return actual === {txt} ? 'ok' : ('mismatch:' + actual); }})()",
             sel = serde_json::Value::String(selector.to_string()),
             txt = serde_json::Value::String(text.to_string()),
             do_submit = if submit { "true" } else { "false" }
         );
-        match self.run_js(&js)?.as_str() {
-            Some("ok") => {
+        let outcome = self.run_js(&js)?;
+        let code = outcome.as_str().unwrap_or("");
+        if let Some(actual) = code.strip_prefix("mismatch:") {
+            if submit {
+                let _settled = self.settle_after_nav(&before);
+            }
+            return Ok(format!(
+                "Typed into '{selector}', but the field now reads \"{actual}\" — the input was \
+                 transformed or rejected by the element (e.g. a number field clearing non-numeric text)."
+            ));
+        }
+        match code {
+            "ok" => {
                 if submit {
                     let _settled = self.settle_after_nav(&before);
                 }
-                Ok(())
+                Ok(format!("Typed into '{selector}'{}", if submit { " + submit" } else { "" }))
             }
-            Some("notfound") => Err(format!("Element '{selector}' not found")),
-            Some("nottypeable") => {
-                Err(format!("Element '{selector}' is not a text field (no value property)"))
-            }
+            "notfound" => Err(format!("Element '{selector}' not found")),
+            "disabled" => Err(format!("Element '{selector}' is disabled — cannot type into it")),
+            "readonly" => Err(format!("Element '{selector}' is read-only — cannot type into it")),
+            "nottypeable" => Err(format!("Element '{selector}' is not a text field (no value property)")),
             _ => Err(format!("Typing into '{selector}' failed")),
         }
     }
 
     /// Evaluate a JS expression in the page; returns the JSON-serialized value.
     ///
-    /// Uses `Runtime.evaluate` with `returnByValue:true` directly (not the old
-    /// `JSON.stringify(<expr>)` wrap, which turned every statement — `throw`,
-    /// `if`, `let`, `for` — into a misleading `SyntaxError` and silently dropped
-    /// functions/`NaN`/`Infinity`). Now: objects/arrays come back by value,
-    /// `NaN`/`Infinity` via `unserializableValue`, functions via their source
-    /// description, and real runtime/syntax errors surface as a clean message.
+    /// Two-pass approach: call with `returnByValue:false` first to preserve type
+    /// metadata (subtype for Date/RegExp/DOM/Error, description). Exotics and
+    /// functions use their rich `description` field directly. Plain objects/arrays
+    /// (where description is generic "Object"/"Array(3)") trigger a second call
+    /// with `returnByValue:true` to capture actual JSON. Primitives/unserializable
+    /// values (NaN/Infinity/BigInt) render from the first call's value field.
     ///
     /// # Errors
     ///
     /// Returns `Err` when the expression throws (the real JS error).
     pub fn eval(&self, expression: &str) -> Result<String, String> {
-        let ret = self
-            .tab
+        // Phase 1: returnByValue:false preserves type metadata
+        let ret = self.evaluate_call(expression, false)?;
+        if let Some(exc) = ret.exception_details {
+            return Err(format_exception(&exc));
+        }
+        let ro = &ret.result;
+
+        // Decide if we need a second call for actual data
+        let is_exotic = ro.subtype.as_ref().is_some_and(|s| {
+            !matches!(s, Runtime::RemoteObjectSubtype::Array | Runtime::RemoteObjectSubtype::Null)
+        }) || matches!(ro.Type, Runtime::RemoteObjectType::Function);
+
+        let rendered = if is_exotic {
+            // Exotic: use description (Date/RegExp/function/DOM)
+            render_remote_object(ro)
+        } else {
+            // Plain object/array (or primitive): get actual data with returnByValue:true
+            match self.evaluate_call(expression, true) {
+                Ok(ret2) => {
+                    if let Some(exc) = ret2.exception_details {
+                        return Err(format_exception(&exc));
+                    }
+                    render_remote_object(&ret2.result)
+                }
+                Err(_) => render_remote_object(ro), // Fallback to metadata if retry fails
+            }
+        };
+
+        if rendered.len() > INLINE_CAP_BYTES {
+            return Ok(format!("{}…(truncated)", truncate_utf8(&rendered, INLINE_CAP_BYTES)));
+        }
+        Ok(rendered)
+    }
+
+    /// Run one `Runtime.evaluate` call, optionally serializing the result by value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` carrying the raw CDP error when the call itself fails.
+    fn evaluate_call(&self, expression: &str, by_value: bool) -> Result<Runtime::EvaluateReturnObject, String> {
+        self.tab
             .call_method(Runtime::Evaluate {
                 expression: expression.to_string(),
-                return_by_value: Some(true),
+                return_by_value: Some(by_value),
                 await_promise: Some(true),
                 user_gesture: Some(true),
                 generate_preview: Some(false),
@@ -264,24 +330,7 @@ impl Client {
                 unique_context_id: None,
                 serialization_options: None,
             })
-            .map_err(|e| format!("Eval failed: {e}"))?;
-        if let Some(exc) = ret.exception_details {
-            return Err(format_exception(&exc));
-        }
-        let ro = ret.result;
-        let rendered = if let Some(v) = ro.value {
-            serde_json::to_string(&v).unwrap_or_else(|_e| v.to_string())
-        } else if let Some(u) = ro.unserializable_value {
-            u
-        } else if let Some(d) = ro.description {
-            d
-        } else {
-            "undefined".to_string()
-        };
-        if rendered.len() > INLINE_CAP_BYTES {
-            return Ok(format!("{}…(truncated)", truncate_utf8(&rendered, INLINE_CAP_BYTES)));
-        }
-        Ok(rendered)
+            .map_err(|e| format!("Eval failed: {e}"))
     }
 
     /// Extract page (or `selector`-scoped) content as plain text or HTML.
@@ -361,6 +410,36 @@ fn format_exception(exc: &Runtime::ExceptionDetails) -> String {
         .as_ref()
         .and_then(|e| e.description.as_ref())
         .map_or_else(|| exc.text.clone(), |d| d.lines().next().unwrap_or(d).to_string())
+}
+
+/// Render a `Runtime.evaluate` result into a user-facing string.
+///
+/// `returnByValue:true` is great for plain data (objects/arrays/primitives come
+/// back as real JSON) but collapses every *exotic* object — `Date`, `RegExp`,
+/// DOM nodes, `Error`, `Map`/`Set`, functions — to an empty `{}` (no enumerable
+/// own-properties). For those we prefer the CDP `description` (`"/ab+c/gi"`,
+/// `"Thu Jan 01 1970…"`, `"function foo() {…}"`). The discriminator is cheap:
+/// keep `value` only when there's no subtype, or the subtype is `Array`/`Null`
+/// (whose `value` IS the real data); any other subtype — or `type:function` —
+/// means the `value` is a useless `{}`, so we use `description`.
+fn render_remote_object(ro: &Runtime::RemoteObject) -> String {
+    let exotic_subtype = ro
+        .subtype
+        .as_ref()
+        .is_some_and(|s| !matches!(s, Runtime::RemoteObjectSubtype::Array | Runtime::RemoteObjectSubtype::Null));
+    let is_function = matches!(ro.Type, Runtime::RemoteObjectType::Function);
+    if (exotic_subtype || is_function)
+        && let Some(d) = ro.description.as_ref()
+    {
+        return d.clone();
+    }
+    if let Some(v) = ro.value.as_ref() {
+        return serde_json::to_string(v).unwrap_or_else(|_e| v.to_string());
+    }
+    if let Some(u) = ro.unserializable_value.as_ref() {
+        return u.clone();
+    }
+    ro.description.clone().unwrap_or_else(|| "undefined".to_string())
 }
 
 /// Adopt Chrome's own initial tab rather than spawning a duplicate.

@@ -254,6 +254,10 @@
   path: crates/cp-mod-queue/src/lib.rs
   description: 'Queue module. 3 tools: pause/execute/undo. Fixed QUEUE panel. Not core. QueueState: active, queued_calls, next_index. Trap state (trap_active/panel_ids/optional_ids) persisted in save/load. Queue_execute handled in pipeline.rs (needs dispatch). Reverie-allowed.'
   last_edited_ms: 0
+11088cc93b9fb319:
+  path: crates/cp-mod-browser/src/client.rs
+  description: 'CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). connect() adopts Chrome''s own initial tab via adopt_initial_tab. is_alive() liveness-probes the transport (self-closes on idle) so tools.rs drops+reconnects. eval via Runtime.Evaluate returnByValue:true+await_promise+user_gesture (run_js helper), rendering value|unserializable_value(NaN/Inf)|description|undefined; exceptions->format_exception (one line). click/type_into via in-page JS (querySelector().click() / focus+value+dispatch(input,change)+requestSubmit) — NOT flaky DOM-domain wait_for_element. settle_after_nav(url_before): two-phase URL settle (phase1 waits ~1.5s for nav to BEGIN, phase2 follows redirect chain to true landing) — fixes stale-URL-after-click. goto soft nav-wait (never propagates wait timeout). extract reads .value for form fields else innerText. truncate_utf8, INLINE_CAP_BYTES=8000. Known minor: get_url() lags for data: scheme URLs (pre-existing headless_chrome quirk).'
+  last_edited_ms: 0
 111109570cbe01e9:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 3 parallel threads. Loads .env files (project + global).'
@@ -1514,6 +1518,10 @@
   path: src/ui/ir/render_sidebar_stats.rs
   description: Sidebar cache stats renderer — token table (hit/miss/out per row), format_cost closure ($K tier for ≥1000), total cost line, uncached count. Consumes CacheStats IR data.
   last_edited_ms: 1780907685228
+628541a64d274d4a:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch: open/goto/snapshot/click/type/extract/screenshot/eval/close. client() lazily (re)connects CDP and drops a dead client first (is_alive() probe) so it reconnects to the same ws_url after idle self-close. note() records last_action + marks panel dirty. resolve() maps ref/selector. Inline results compact; large extracts→file under .context-pilot/browser/; screenshots→timestamped PNG.'
+  last_edited_ms: 0
 62c1f5a7e432e2c6:
   path: crates/cp-mod-browser/Cargo.toml
   description: 'Browser module deps: cp-base, cp-render, cp-mod-console, headless_chrome, crossterm, serde, serde_json, log.'
@@ -2662,6 +2670,10 @@ b5605bee566a2c94:
   path: .github/workflows/build.yml
   description: 'Cross-platform build workflow. 4-target matrix: linux-x86_64 (native), linux-aarch64 (cross), macos-x86_64 (macos-13), macos-aarch64 (macos-latest). Pins Rust 1.93.0. Builds tui + cp-console-server. 30-day artifact retention.'
   last_edited_ms: 0
+b5d89d9dac3b82b1:
+  path: crates/cp-mod-browser/src/client.rs
+  description: 'CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). connect() adopts Chrome''s own initial tab via adopt_initial_tab. is_alive() liveness-probes the transport (self-closes on idle) so tools.rs drops+reconnects. eval via Runtime.Evaluate returnByValue:true+await_promise+user_gesture (run_js helper), rendering value|unserializable_value(NaN/Inf)|description|undefined; exceptions->format_exception (one line). click/type_into via in-page JS (querySelector().click() / focus+value+dispatch(input,change)+requestSubmit) — NOT flaky DOM-domain wait_for_element. settle_after_nav(url_before): two-phase URL settle (phase1 waits ~1.5s for nav to BEGIN, phase2 follows redirect chain to true landing) — fixes stale-URL-after-click. goto soft nav-wait (never propagates wait timeout). extract reads .value for form fields else innerText. truncate_utf8, INLINE_CAP_BYTES=8000. Known minor: get_url() lags for data: scheme URLs (pre-existing headless_chrome quirk).'
+  last_edited_ms: 0
 b5e5095cae7ebe03:
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table.'
@@ -3393,6 +3405,10 @@ f03a92cce423e618:
 f07180e69f10e6ed:
   path: crates/cp-mod-scratchpad/src/tools.rs
   description: 'Scratchpad tools with flame!("scratch_create"), flame!("scratch_edit"), flame!("scratch_wipe"). Cell CRUD. Wipe: empty array = all, otherwise by ID.'
+  last_edited_ms: 0
+f07dfad5e8523f21:
+  path: crates/cp-mod-browser/src/client.rs
+  description: 'CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). connect() adopts Chrome''s own initial tab via adopt_initial_tab. is_alive() liveness-probes the transport (self-closes on idle) so tools.rs drops+reconnects. eval via Runtime.Evaluate returnByValue:true+await_promise+user_gesture (run_js helper), rendering value|unserializable_value(NaN/Inf)|description|undefined; exceptions->format_exception (one line). click/type_into via in-page JS (querySelector().click() / focus+value+dispatch(input,change)+requestSubmit) — NOT flaky DOM-domain wait_for_element. settle_after_nav(url_before): two-phase URL settle (phase1 waits ~1.5s for nav to BEGIN, phase2 follows redirect chain to true landing) — fixes stale-URL-after-click. goto soft nav-wait (never propagates wait timeout). extract reads .value for form fields else innerText. truncate_utf8, INLINE_CAP_BYTES=8000. Known minor: get_url() lags for data: scheme URLs (pre-existing headless_chrome quirk).'
   last_edited_ms: 0
 f156d809f3ca7d6c:
   path: crates/cp-mod-ocr/Cargo.toml
