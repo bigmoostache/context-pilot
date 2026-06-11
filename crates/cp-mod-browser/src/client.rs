@@ -19,6 +19,50 @@ const SETTLE_POLLS: u32 = 20;
 /// Cap on inline extraction / eval results returned to the conversation.
 pub const INLINE_CAP_BYTES: usize = 8_000;
 
+/// Run a closure that calls into `headless_chrome`, turning a PANIC into an `Err`.
+///
+/// `headless_chrome` 1.0.21 unwraps internally on a closed transport — e.g.
+/// `register_missing_tabs` does `targets.unwrap()` (browser/mod.rs:305). Such a
+/// panic on Context Pilot's single main thread would abort the WHOLE process.
+/// We catch it here and return a clean recoverable error so the TUI survives a
+/// dead Chrome connection. `AssertUnwindSafe` is sound: on panic we discard the
+/// closure's captured state and surface an error — we never observe a
+/// half-mutated value.
+///
+/// CRITICAL: the process-global panic hook (set in `main.rs`) tears the terminal
+/// down — `disable_raw_mode` + `LeaveAlternateScreen` — on EVERY panic, including
+/// ones we catch. So a recovered browser panic would still corrupt the live TUI.
+/// We therefore swap in a quiet, log-only hook for the duration of the guarded
+/// call and restore the previous hook afterwards. Browser ops run synchronously
+/// on the main thread, so this swap window can't race a concurrent main-thread
+/// panic; a rare background-thread panic in the window only loses terminal
+/// teardown for that one panic — an acceptable trade for never trashing the TUI
+/// on the (common) recoverable browser panic.
+pub(crate) fn catch_panic<T>(label: &str, f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(log_panic_quietly));
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    std::panic::set_hook(prev);
+    caught.unwrap_or_else(|_| {
+        Err(format!("browser connection lost ({label}) — Chrome or the tab closed. Reopen with browser_open."))
+    })
+}
+
+/// Append a panic to `.context-pilot/errors/panic.log` WITHOUT touching the
+/// terminal — used by `catch_panic` for recoverable `headless_chrome` panics so
+/// the live TUI's raw-mode/alternate-screen state is left intact.
+fn log_panic_quietly(info: &std::panic::PanicHookInfo<'_>) {
+    let dir = std::path::Path::new(".context-pilot").join("errors");
+    let _mk = std::fs::create_dir_all(&dir);
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let msg = format!("[{ts}] (browser, recovered) {info}\n---\n");
+    let _w = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("panic.log"))
+        .and_then(|mut f| std::io::Write::write_all(&mut f, msg.as_bytes()));
+}
+
 /// Live CDP connection to a running Chrome.
 pub struct Client {
     /// Browser-level CDP connection (kept alive for the client's lifetime).
@@ -40,10 +84,12 @@ impl Client {
     ///
     /// Returns `Err` if the WebSocket handshake fails or no tab is available.
     pub fn connect(ws_url: &str) -> Result<Self, String> {
-        let browser = Browser::connect(ws_url.to_string()).map_err(|e| format!("CDP connect failed: {e}"))?;
-        let tab = adopt_initial_tab(&browser)?;
-        let _t = tab.set_default_timeout(OP_TIMEOUT);
-        Ok(Self { _browser: browser, tab })
+        catch_panic("connect", || {
+            let browser = Browser::connect(ws_url.to_string()).map_err(|e| format!("CDP connect failed: {e}"))?;
+            let tab = adopt_initial_tab(&browser)?;
+            let _t = tab.set_default_timeout(OP_TIMEOUT);
+            Ok(Self { _browser: browser, tab })
+        })
     }
 
     /// Liveness probe: a cheap CDP round-trip. Returns `false` when the
@@ -52,7 +98,7 @@ impl Client {
     /// to drop this dead client and reconnect to the same `ws_url`.
     #[must_use]
     pub fn is_alive(&self) -> bool {
-        self.tab.evaluate("1", false).is_ok()
+        catch_panic("is_alive", || Ok(self.tab.evaluate("1", false).is_ok())).unwrap_or(false)
     }
 
     /// Run a JS expression with `returnByValue` and surface thrown errors.

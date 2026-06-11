@@ -138,26 +138,29 @@
   importance: high
   last_edited_ms: 0
 25e8151afb29481e:
-  tl_dr: 'Browser PR1.5 COMPLETE on branch ''browser'': all 8 stress-test bugs fixed + verified live. BUG#8 (stale URL after click-redirect) fixed via two-phase settle_after_nav.'
+  tl_dr: 'Browser CRASH FIX: headless_chrome calls wrapped in client::catch_panic — catches register_missing_tabs().unwrap() panic + quiet log-only hook so the terminal-tearing hook never fires. Dead Chrome returns clean Err, no TUI abort. Details in contents.'
   contents: |-
-    All 8 stress-test bugs fixed + verified live on branch 'browser'.
+    ## Browser module — current state (branch 'browser', commit 5886ef7)
 
-    Cluster A (eval): Runtime.evaluate returnByValue:true replaces JSON.stringify wrap -> statements (let/if/for), NaN, Infinity, clean thrown-error one-liners all work. Bare-function eval still returns {} = accepted limitation.
+    ### CDP TRUSTED CLICK (latest fix, 5886ef7)
+    click() dispatches real Input.dispatchMouseEvent via tab.click_point(Point{x,y}) at element center, NOT JS querySelector().click(). JS .click() produces UNTRUSTED events Gmail/banks/security-gated UIs ignore — file downloads silently no-op'd. CDP mouse events are trusted and fire the real handler. Flow: read bounds + disabled via JS → reject disabled → click by coordinate → settle_after_nav. VERIFIED LIVE: all 3 Gmail .docx attachments downloaded via automated browser_click.
+    Same commit: anti-bot flags (--disable-blink-features=AutomationControlled, --exclude-switches=enable-automation, --disable-dev-shm-usage) + use_real_profile on browser_open.
 
-    Cluster B (DOM-domain flakiness): click/type via in-page JS querySelector, not wait_for_element (no 20s hangs); goto soft nav-wait (never propagates wait timeout); BUG#8 stale-URL-after-redirect fixed via two-phase settle_after_nav(url_before) -- phase1 waits ~1.5s for nav to BEGIN, phase2 follows redirect chain to true landing. Verified: example.com Learn-more click -> reports www.iana.org/help/example-domains (location.href agrees); non-nav injected-button click returns correct unchanged URL, no error/hang, handler fires.
+    ### PR1.5 — 8 stress-test bugs
+    A eval via Runtime.evaluate returnByValue. B click/type via JS querySelector; BUG#8 stale-URL via two-phase settle_after_nav. C JS .focus(). D with_client retry-on-closed. E extract reads .value.
 
-    Cluster C (type focus): JS .focus() not el.click() (no accidental nav).
-    Cluster D (reconnect): tools.rs with_client retry-once-on-closed wrapper.
-    Cluster E (extract): reads .value for form fields else innerText.
+    ### PR1.6 — eval exotic rendering
+    Two-pass returnByValue; exotics use .description.
 
-    Known minor (NOT in original 8): headless_chrome get_url() lags for data: scheme URLs -> goto to a data: URL can report a stale URL. Pre-existing (old settle_url had it too), edge-case, out of PR1.5 scope.
+    ### Known limit
+    per-instance profiles = no cookie sharing across browser instances.
   importance: high
   labels:
   - browser
   - pr1.5
   - complete
   - bugfix
-  last_edited_ms: 1781185436153
+  last_edited_ms: 1781201117699
 2bfb816e017b246e:
   tl_dr: 'DOCUMENTATION PHASE: Ignore structure-check callback warnings about files >500 lines during doc additions. Lines will grow temporarily — that''s expected and acceptable.'
   importance: critical

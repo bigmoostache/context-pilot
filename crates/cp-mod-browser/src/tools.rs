@@ -73,14 +73,23 @@ fn is_conn_closed(err: &str) -> bool {
 ///
 /// Propagates the op's error (after one retry) or a reconnect failure.
 fn with_client<T>(state: &mut State, op: impl Fn(&Client) -> Result<T, String>) -> Result<T, String> {
-    let first = op(client(state)?);
+    let first = run_guarded(client(state)?, &op);
     match first {
         Err(e) if is_conn_closed(&e) => {
             BrowserState::get_mut(state).client = None;
-            op(client(state)?)
+            run_guarded(client(state)?, &op)
         }
         other => other,
     }
+}
+
+/// Run one CDP op, converting a `headless_chrome` internal panic (it `.unwrap()`s
+/// on a closed transport — see `client::catch_panic`) into a recoverable `Err`.
+/// Delegates to `catch_panic` so the global terminal-tearing panic hook is
+/// suppressed for the duration — a dead Chrome connection can neither abort
+/// Context Pilot's main thread nor corrupt its live terminal.
+fn run_guarded<T>(c: &Client, op: &impl Fn(&Client) -> Result<T, String>) -> Result<T, String> {
+    crate::client::catch_panic("op", || op(c))
 }
 
 /// Record the last action and refresh the panel digest.

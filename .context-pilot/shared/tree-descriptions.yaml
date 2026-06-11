@@ -682,6 +682,10 @@
   path: src/llms/oai_providers/openai_streaming.rs
   description: 'OAI SSE types: StreamResponse/StreamDelta, ToolCallAccumulator (index-based), normalize_stop_reason(), dump_request()'
   last_edited_ms: 0
+2ad623772e0af136:
+  path: crates/cp-mod-browser/src/client.rs
+  description: 'CDP client (Channel B) wrapping headless_chrome Browser::connect(ws_url). CRASH GUARD: catch_panic() wraps connect/is_alive/every op — headless_chrome''s register_missing_tabs().unwrap() panics on a closed connection, which on CP''s single main thread would abort the WHOLE TUI; catch_panic catch_unwinds it into a clean Err AND swaps in a quiet log-only panic hook for the duration so the global terminal-tearing hook (main.rs) never fires on a recovered browser panic. connect() adopts Chrome''s own initial tab via adopt_initial_tab. is_alive() liveness-probes the transport (self-closes on idle) so tools.rs drops+reconnects. eval via two-pass returnByValue: Phase 1 returnByValue:false captures metadata, Phase 2 conditional returnByValue:true for plain objects/arrays — exotics (Date/RegExp/DOM/Symbol/function) use rich description. click() uses CDP Input.dispatchMouseEvent via tab.click_point(Point{x,y}) at element center — TRUSTED mouse events that work for downloads/security-gated actions (JS .click() is ignored by Gmail/banks); reads element bounds + disabled state via JS first, rejects disabled. type via in-page JS (focus+value+dispatch+submit). settle_after_nav(url_before): two-phase URL settle. goto soft nav-wait. extract reads .value for form fields else innerText. truncate_utf8, INLINE_CAP_BYTES=8000.'
+  last_edited_ms: 1781201130865
 2ae8cd38761db8c8:
   path: docs/notifications.md
   description: Spine notification system
@@ -2494,6 +2498,10 @@ a90395fd4627a456:
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. pub(crate) mod crawl. Nested object params (location). Simple dispatch pattern.'
   last_edited_ms: 1780563343165
+a908b662940de6cc:
+  path: crates/cp-mod-browser/src/tools.rs
+  description: 'Tool dispatch: open/goto/snapshot/click/type/extract/screenshot/eval/close. client() lazily (re)connects CDP and drops a dead client first (is_alive() probe) so it reconnects to the same ws_url after idle self-close. with_client wraps each op in run_guarded → client::catch_panic so a headless_chrome internal panic on a dead connection becomes a recoverable Err (never aborts the TUI), then retries once on is_conn_closed. note() records last_action + marks panel dirty. resolve() maps ref/selector. Inline results compact; large extracts→file under .context-pilot/browser/; screenshots→timestamped PNG.'
+  last_edited_ms: 1781201130873
 a91032af6edb5c3b:
   path: test_file_to_describe.txt
   description: Version B of the test file
