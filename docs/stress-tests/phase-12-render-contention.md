@@ -47,8 +47,15 @@ half-old/half-new state if fields are written non-atomically.
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| _none yet_ | | | | |
+| H12-1 | **none (PASS)** | Audited `panel.rs`. The render **hot path** does NOT lock `shared`: `Panel::blocks()` reads `ctx.cached_content.clone()` (a pre-rendered `String`); `build_content` (the only `shared.lock()` site) runs in `Panel::refresh()` — **main-thread, occasional** (on `mark_dirty`/refresh cycle), `needs_cache()=false`. So the ~28fps render loop never touches `shared` at all. | **PROVEN SAFE (source)** — 2026-06-11. | **NO FIX NEEDED.** Even on the refresh path, `build_content` holds `shared` only for a memcpy-class critical section (read `last_action`/`erefs.len()`/`snapshot_text`, format into `out`) — no I/O under the lock; bounded by the snapshot size (~200 erefs ≈ a few KB) ≪ 16 ms. Worker writes (`OpSink::write_snapshot`) set snapshot_text+erefs+url+title+last_action under a **single** `shared.lock()` acquisition, and `build_content` reads under a single acquisition → reads are atomic w.r.t. the mutex, **no torn read** (X807/X817 pass). No lock convoy: render reads cached, only refresh + workers touch `shared`, workers serialized by `op_lock`. |
+| H12-2 | **S4 (cosmetic)** | `build_content`'s `let Ok(shared) = bs.shared.lock() else { "(browser state momentarily locked)" }` placeholder fires only on **poison**, not contention — a blocking `.lock()` waits on contention, it never returns `Err`. The "momentarily locked" wording implies a contention fallback it doesn't actually provide. | **NOTED (source)** — 2026-06-11. | Harmless: the brief, bounded hold means contention-wait is sub-frame anyway. Optional: reword to "(browser state unavailable)" or switch to `try_lock` for a true momentary-skip. Not a blocker. |
 
 ## Exit criterion
 Render-thread `shared` lock-wait < 16ms always; no torn reads (snapshot written
 atomically / cloned under one lock); panel never blocks the render loop.
+
+**Status (source):** MET — exceeded. The render hot path (`blocks()`) reads
+`cached_content` and never locks `shared`, so render-thread lock-wait is **zero**.
+`shared` writes are atomic under one mutex acquisition → no torn reads. Only the
+occasional main-thread `refresh()` and the op_lock-serialized workers touch
+`shared`, each for a bounded memcpy-class hold. PASS.

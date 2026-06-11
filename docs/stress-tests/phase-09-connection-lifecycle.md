@@ -47,8 +47,16 @@ can stampede the reconnect; `is_alive()` against a hung Chrome blocks while hold
 ## Findings
 | ID | Severity | Repro | Status | Fix / Issue |
 |----|----------|-------|--------|-------------|
-| H09-1 (suspected) | **S1/S3** | is_alive() on hung Chrome blocks holding conn → cascades to close-freeze | _to confirm_ | bounded is_alive timeout |
+| H09-1 (suspected) | ~~S1~~ → **S3** | is_alive() on hung Chrome blocks holding conn → cascades to close-freeze | **CONFIRMED but RECLASSIFIED S1→S3 (source)** — 2026-06-11. `is_alive()` (`client.rs`) = `tab.evaluate("1", false)` — a CDP round-trip — and `connect_shared` calls it **while holding the `conn` slot lock**. BUT: (1) connect_shared runs only on the **worker thread** (inside `run_browser_op`, under `op_lock`); the **main thread never calls it** — the only main-thread conn-toucher is `clear_session` via **`try_lock`** (P08 fix), which can't block. So a hung `is_alive` blocks the *worker*, not the main loop — **no UI freeze**. (2) It's **bounded**: `Client::connect` sets `tab.set_default_timeout(OP_TIMEOUT=8s)`, so `evaluate` fails (→ `false`) within ~8s and connect_shared reconnects; the worker's 30s watcher also bounds it. So it degrades to the **same throughput-stall already tracked as P03 H03-1** (a worker holding `op_lock` stalls subsequent workers), not a new freeze. | **NO NEW FIX** — subsumed by P03 H03-1 residual (bounded op timeout < watcher timeout). The conn-hold itself is benign (P10 H10-2): conn is a lock leaf, inter-worker conn contention is impossible because op_lock serializes workers (only one in connect_shared at a time). |
+| H09-2 | **none (PASS)** | Exactly-one reconnect under concurrent first-ops (X749/X751/X756). | **PROVEN (source)** — 2026-06-11. | Two first-ops can't both see `conn=None`: `op_lock` serializes workers, so only ONE worker is ever in `connect_shared` at a time. The first connects + caches into the slot; the second (after op_lock releases) finds the cached `Arc<Client>`, `is_alive()`→true, and **reuses** it. No thundering-herd reconnect, no double-connect. Stale old `Arc<Client>` is dropped when the slot is overwritten on a miss-path reconnect. |
 
 ## Exit criterion
 Exactly-one reconnect under concurrent first-ops; `is_alive` bounded so a hung
 Chrome never blocks the lock indefinitely; cache correctness over 1000 cycles.
+
+**Status (source):** core invariants MET. Exactly-one reconnect is guaranteed by
+`op_lock` serializing workers (only one in `connect_shared`). `is_alive` is
+bounded by the tab's 8s default timeout (and the 30s watcher), so a hung Chrome
+never blocks indefinitely — and it blocks only the worker, never the main loop.
+The residual worker-side throughput-stall is the P03 H03-1 item. The 1000-cycle
+soak (X755) and live SIGSTOP matrix (X753) remain as optional live confirmation.
