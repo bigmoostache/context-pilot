@@ -322,10 +322,24 @@ fn close(tool: &ToolUse, state: &mut State) -> ToolResult {
     )
 }
 
-/// Timestamped artifact path under `.context-pilot/browser/`.
+/// Process-global monotonic counter disambiguating artifact filenames.
+///
+/// `now_ms()` alone collides when two ops land in the same millisecond (two
+/// serialized-but-fast screenshots, or screenshot+extract): `fs::write` would
+/// silently overwrite, handing the LLM a path whose bytes belong to the other
+/// op (P15 H15-1). Appending a per-process atomic counter makes every artifact
+/// name unique regardless of timestamp granularity.
+static ARTIFACT_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Unique artifact path under `.context-pilot/browser/`.
+///
+/// Filename is `capture_{now_ms}_{seq}.{ext}` — the millisecond timestamp keeps
+/// names human-sortable while the monotonic `seq` guarantees uniqueness even for
+/// same-millisecond writes (eliminates the P15 collision/clobber entirely).
 fn artifact_path(ext: &str) -> Result<String, String> {
     let dir = std::path::PathBuf::from(cp_base::config::constants::STORE_DIR).join("browser");
     std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create artifact dir: {e}"))?;
-    let name = format!("capture_{}.{ext}", cp_base::panels::now_ms());
+    let seq = ARTIFACT_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let name = format!("capture_{}_{seq}.{ext}", cp_base::panels::now_ms());
     Ok(dir.join(name).to_string_lossy().to_string())
 }
