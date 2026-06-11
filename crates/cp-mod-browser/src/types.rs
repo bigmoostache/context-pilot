@@ -156,11 +156,25 @@ impl BrowserState {
     /// Drop the cached CDP connection and clear worker-written runtime data.
     /// Called on `browser_close`/kill — the Chrome process is torn down
     /// separately by `lifecycle::kill_chrome`.
+    ///
+    /// NON-BLOCKING (P08 re-freeze fix): uses `try_lock`, never a blocking
+    /// `lock()`. `browser_close` runs synchronously on the main thread; a worker
+    /// can be inside `connect_shared` holding `conn` across `Client::connect` /
+    /// `is_alive` (a CDP round-trip — seconds, unbounded if Chrome is hung). A
+    /// blocking `conn.lock()` here would stall the main event loop for that whole
+    /// window — re-introducing the exact freeze the off-main-thread refactor
+    /// removed. If `conn` is contended we simply abandon the drop: this is safe
+    /// because `kill_chrome` is killing the Chrome process anyway, so the worker's
+    /// in-flight op fails out and releases `conn` shortly, and the now-stale
+    /// `Arc<Client>` is transparently replaced on the next op's `connect_shared`
+    /// (`is_alive` → false → reconnect). `shared` is only ever held briefly, but
+    /// we `try_lock` it too for symmetry. (`try_lock` skips on BOTH contention and
+    /// poison — both are fine to skip here.)
     pub fn clear_session(&self) {
-        if let Ok(mut slot) = self.conn.lock() {
+        if let Ok(mut slot) = self.conn.try_lock() {
             *slot = None;
         }
-        if let Ok(mut s) = self.shared.lock() {
+        if let Ok(mut s) = self.shared.try_lock() {
             *s = SharedBrowser::default();
         }
     }
