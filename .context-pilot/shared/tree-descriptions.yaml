@@ -754,6 +754,10 @@
   path: .github/workflows/release.yml
   description: 'Release workflow: builds .deb on tag push (ubuntu-latest, amd64 only). Creates GitHub Release with softprops/action-gh-release.'
   last_edited_ms: 0
+2d3f7990bf9229ad:
+  path: src/llms/claude_code_api_key/streaming.rs
+  description: 'SSE parsing for Claude Code responses. THREE thread+recv_timeout watchdogs (reqwest blocking lacks read/header timeouts), each → Err(StreamRead) → retry on fresh connection: (1) send_with_header_timeout (pub(crate), 60s) guards the .send() RESPONSE-HEADERS wait [v0.2.5]; refactored to send_with_header_timeout_dur(builder, Duration) + black-hole unit test (send_guard_tests, PROVES it fires in 0.68s). (2) FIRST_CONTENT_TIMEOUT (90s, local to parse_sse_stream) aborts if no content delta/tool block arrives despite open connection — catches keepalive-ping-dribble the idle guard misses [v0.2.6]. (3) IdleTimeoutReader (pub(crate), 120s) guards the SSE BODY read loop [v0.2.4]. parse_sse_stream uses (2)+(3); shared by claude_code + claude_code_v2.'
+  last_edited_ms: 0
 2da0868f1781fbf0:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
@@ -3070,6 +3074,10 @@ c80cf4a36c945d80:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
   last_edited_ms: 0
+c837f6d0d9fcbcf3:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: Harbor BaseInstalledAgent adapter. version() 0.2.8. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /logs/agent/...jsonl + tee + 'true' (exit-tolerant). populate_context_post_run reads trajectory host-side via bind-mounted /logs/agent, parses final event for cost/tokens/status.
+  last_edited_ms: 1781222313769
 c83e02c82f575734:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'

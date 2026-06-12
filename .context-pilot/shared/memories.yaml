@@ -465,6 +465,27 @@
   - documentation
   - style
   last_edited_ms: 0
+9a2449142b04169a:
+  tl_dr: v0.2.9 STREAM_COMPLETION_TIMEOUT (90s) in parse_sse_stream — in-process retry for the dribble-never-finalizes hang. Built on v0.2.8 deadman (fired 3x on gpt2, re-exec recovered but hang RECURS→reward 0). v0.2.8 proved loop ALIVE (HUNG, not WEDGE).
+  contents: |-
+    DECISIVE FORENSICS (gpt2 v0.2.8, job 2026-06-12__01-45-13, container gpt2-codegolf__wmvtesx-main-1):
+
+    1. DEADMAN FIRED via the HUNG path, NOT the WEDGE path: trajectory `final` event = {status:deadman_timeout, reason:'no task progress for 184764ms (limit 180000ms) — stream hung / not recovered'}. Since LAST_PROGRESS_MS(180s) fired and LOOP_HEARTBEAT_MS(30s WEDGE) did NOT, the headless MAIN LOOP WAS ALIVE AND TICKING the whole time. => the v0.2.4-v0.2.7 'main loop wedged' conclusion was WRONG (frozen state files were idle-consistent, as feared). The loop drains rx fine; the STREAM hangs producing a non-finalizing trickle and no message ever completes.
+
+    2. /proc thread dump (deadman.log) PINPOINTS it: tid 226 state=R (running) syscall=63 (read) on fd 0x12=18 — a thread actively read()ing the SSE socket, pulling a dribble (keepalive pings or slow deltas) that never emits message_stop/Done. This DISARMS all 4 SSE guards: catch-all(got_event) + first-content(got_content) flip on the first event; idle(120s) resets on each delta/ping; send-header only covers pre-headers. NONE cover 'stream started, dribbles, never finalizes a message'.
+
+    3. RE-EXEC WORKED: terminate_wedged_process re-exec'd in place — PID 218 now runs with --resume-stream + CP_DEADMAN_REEXEC_COUNT=1 (confirmed via /proc/218/environ), 2 prompt_ticks, fresh last_request 23:50:46. exec() preserved PID so harbor's shell pipeline still waits on it. The 900s hang is now a 184s catch + fresh-connection retry. (Earlier 'no DEADMAN env' via docker exec env was a false signal — it read a fresh shell's env, not tui's.)
+
+    NET: v0.2.8 works exactly as designed. Remaining risk: 184s detection is slow + re-exec budget=2, so a DETERMINISTIC hang burns ~3x184s before abort. v0.2.9 TARGET: add STREAM_COMPLETION_TIMEOUT inside parse_sse_stream — a wall-clock timer from stream start that fires if no message_stop/Done within ~60-90s REGARDLESS of intervening deltas/pings -> StreamRead -> in-process retry (MAX_API_RETRIES, no re-exec needed) -> catches the dribble mode FAST and cheap. Deadman stays as ultimate backstop. STATUS: watching the v0.2.8 2nd attempt — if it progresses past 'start' on the fresh connection, gpt2 may PASS this run.
+  importance: critical
+  labels:
+  - terminal-bench
+  - sse-freeze
+  - deadman
+  - v0.2.8
+  - breakthrough
+  - root-cause
+  last_edited_ms: 1781222795876
 a8b1054e0a11c2fe:
   tl_dr: 'Cache engine v2: gap-decomposition DP replaces greedy. F(Ω'')=ΣT[pₖ]×gap. DP per gap O(k×|gap|²) + enumerate across ≤5 gaps. In cache_engine.rs.'
   importance: high

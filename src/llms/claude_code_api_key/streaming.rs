@@ -53,6 +53,28 @@ const SEND_HEADER_TIMEOUT: Duration = Duration::from_secs(60);
 /// already produced content and tripped `got_content`).
 const FIRST_CONTENT_TIMEOUT: Duration = Duration::from_secs(90);
 
+/// Maximum total wall-clock time for a single assistant message to **finalize**
+/// (reach `message_stop` / `[DONE]`) before aborting (→ retry on a fresh
+/// connection). [v0.2.9]
+///
+/// This is the guard the previous four could not be: it bounds the *whole*
+/// message, not first-byte or inter-byte idleness. The field-proven failure mode
+/// (gpt2-codegolf, deadman forensics) is a stream that emits a few real deltas —
+/// flipping `got_content` and resetting [`IdleTimeoutReader`] on each delta/ping —
+/// then dribbles forever without ever emitting `message_stop`. None of
+/// `send_with_header_timeout` (pre-headers), [`FIRST_CONTENT_TIMEOUT`] (disarmed
+/// by the first delta), nor [`IdleTimeoutReader`] (reset by each delta) can catch
+/// "started, never finalizes". Only the process-level deadman did — at 184s, then
+/// via an expensive re-exec. This timer catches the same hang *in-process* and
+/// fast: a `StreamRead` here flows through the existing `StreamEvent::Error` →
+/// bounded `MAX_API_RETRIES` retry on a fresh connection, no re-exec, no 184s wait.
+///
+/// 90s is deliberately generous: a single Anthropic assistant turn finalizes in
+/// seconds-to-low-tens-of-seconds even with long output + many tool blocks, so
+/// this never cuts a legitimately progressing message — only one that has stalled
+/// mid-stream. The deadman remains the ultimate backstop for true main-loop wedges.
+const STREAM_COMPLETION_TIMEOUT: Duration = Duration::from_secs(90);
+
 /// Run a blocking `.send()` under a response-header timeout.
 ///
 /// Moves the fully-configured `builder` onto a detached thread that performs the
@@ -304,6 +326,19 @@ pub(crate) fn parse_sse_stream(
     let mut got_content = false;
 
     loop {
+        // Whole-message completion watchdog [v0.2.9]: if this message has not
+        // finalized (message_stop / [DONE]) within STREAM_COMPLETION_TIMEOUT,
+        // abort → StreamRead → in-process retry on a fresh connection. Catches the
+        // "started, dribbles deltas/pings, never finalizes" hang that disarms
+        // every per-byte guard (got_content + idle reset on each delta).
+        if stream_start.elapsed() > STREAM_COMPLETION_TIMEOUT {
+            return Err(LlmError::StreamRead(format!(
+                "message did not finalize within {}s of stream start despite an open connection — \
+                 aborting to retry on a fresh connection (stream stalled mid-message, never reached \
+                 message_stop). {line_count} lines / {total_bytes} bytes seen, got_content={got_content}.",
+                STREAM_COMPLETION_TIMEOUT.as_secs()
+            )));
+        }
         // First-content watchdog: if no content has arrived within the budget,
         // abort → StreamRead → retry on a fresh connection. Catches the
         // keepalive-dribble freeze the idle guard cannot (pings reset idle).
