@@ -59,6 +59,9 @@ docs/slides/slides.pdf
 # Terminal-Bench adapter run outputs (trajectories, verifier logs, result.json, etc.)
 benchmarks/terminal-bench/jobs/
 
+# Local sandbox for replaying terminal-bench tasks (never commit)
+/sandbox/
+
 # mitmproxy / API capture artifacts (huge, never commit)
 requests.log
 requests.flow

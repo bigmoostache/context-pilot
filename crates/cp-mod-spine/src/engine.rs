@@ -72,15 +72,22 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     // notification (with its fire time now in the past) that drives the
     // continuation at the intended moment, so it is never self-blocked.
     //
-    // The ONLY exception is a waiting user message: a human turn must always be
-    // answered promptly. Everything else (todo-remaining, reload-resume,
-    // watcher results, context-threshold) defers to the coucou — after a
-    // reload the coucou re-registers from persistence and still fires on time,
-    // so nothing is stranded.
+    // Exceptions that must always break through:
+    // - `UserMessage`: a human turn must be answered promptly.
+    // - Watcher-originated Custom notifications (source starts with "console_"
+    //   or "gh_"): these are real async results (process exit, pattern match,
+    //   GitHub events) that the agent is actively waiting for. Deferring them
+    //   until the coucou fires defeats the purpose of the async watcher and
+    //   leaves runs unattended. Periodic nudges ("todos_remaining",
+    //   "think_reminder") still defer — they are not time-critical.
     if has_pending_coucou(state) {
-        let has_user_message =
-            SpineState::unprocessed_notifications(state).iter().any(|n| n.kind == NotificationType::UserMessage);
-        if !has_user_message {
+        let unprocessed = SpineState::unprocessed_notifications(state);
+        let has_user_message = unprocessed.iter().any(|n| n.kind == NotificationType::UserMessage);
+        let has_watcher_result = unprocessed.iter().any(|n| {
+            n.kind == NotificationType::Custom
+                && (n.source.starts_with("console_") || n.source.starts_with("gh_"))
+        });
+        if !has_user_message && !has_watcher_result {
             return SpineDecision::Idle;
         }
     }

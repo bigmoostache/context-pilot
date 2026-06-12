@@ -34,6 +34,10 @@
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
   last_edited_ms: 0
+0344ad6cf78f2e7f:
+  path: .gitignore
+  description: Git ignore rules. Excludes target/, .env, .context-pilot/*, jobs/, benchmarks/terminal-bench/jobs/, sandbox/, mitmproxy artifacts.
+  last_edited_ms: 1781254433482
 03a944323757e175:
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. ConsoleGuardrails: git/gh only. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
@@ -566,6 +570,10 @@
   path: crates/cp-mod-logs/src/tools.rs
   description: Log tool execution. flame!("log_create") and flame!("close_history"). push_log() helper. execute_log_create() creates entries from array. execute_close_conversation_history() processes panels array — per-panel logs (strings), timestamp from panel's last message, panel removal.
   last_edited_ms: 0
+230ecb61ad4e134c:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: Harbor BaseInstalledAgent adapter. version() 0.2.10. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /logs/agent/...jsonl + tee + 'true' (exit-tolerant). populate_context_post_run reads trajectory host-side via bind-mounted /logs/agent, parses final event for cost/tokens/status.
+  last_edited_ms: 1781241761096
 23fd2fd437b74750:
   path: docs/prompt-building.md
   description: How context/prompts are assembled for LLM calls
@@ -926,6 +934,10 @@
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
   last_edited_ms: 0
+3874011eb459f11a:
+  path: sandbox/tasks/inputs/password-recovery/instruction_local.md
+  description: Adapted task instruction for local CP headless run — paths relative (./varsea, ./recovered_passwords.txt) instead of /app/.
+  last_edited_ms: 1781254433464
 387f3b11754928d1:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
@@ -1150,6 +1162,10 @@
   path: crates/cp-mod-callback/src/tools.rs
   description: Callback tool dispatch with flame!("cb_dispatch"). Routes upsert/toggle/open_editor/close_editor. Delegates upsert to tools_upsert.rs.
   last_edited_ms: 1780497937352
+47106d7a54b45477:
+  path: .context-pilot/shared/entities/schema.sql
+  description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
+  last_edited_ms: 0
 4751cc31255d89ce:
   path: chain.sh
   description: Hash chain update/verify script (password-protected)
@@ -2162,6 +2178,10 @@
   path: crates/cp-mod-utilities/Cargo.toml
   description: Zero external deps. Workspace lints.
   last_edited_ms: 1780565428682
+8a376d83f645fd07:
+  path: crates/cp-mod-spine/src/engine.rs
+  description: 'Spine engine — check_spine() evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped hard stop, (3) error backoff, (4) no-unprocessed check, (5) COUCOU GUARD: while a coucou watcher has a future fire_at_ms, stay Idle UNLESS a UserMessage is waiting (coucou re-registers from persistence across reloads, fires on time). (6) double-synthetic guard, (7) guard rails. build_continuation_from_notifications: a waiting UserMessage takes the transparent path (Relaunch / user_message_during_stream) instead of bundling Custom nudges. apply_continuation() creates synthetic messages.'
+  last_edited_ms: 0
 8a4b9e5a6f7f45d2:
   path: benchmarks/terminal-bench/context_pilot_agent.py
   description: Harbor BaseInstalledAgent adapter. version() 0.2.8. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /logs/agent/...jsonl + tee + 'true' (exit-tolerant). populate_context_post_run reads trajectory host-side via bind-mounted /logs/agent, parses final event for cost/tokens/status.
@@ -2430,6 +2450,10 @@
   path: crates/cp-mod-memory/src/lib.rs
   description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'
   last_edited_ms: 0
+9dce5d5edffb3286:
+  path: sandbox/tasks/inputs/password-recovery/README.md
+  description: 'Sandbox README: task structure, how to launch CP headless locally, solution hint in spoiler.'
+  last_edited_ms: 1781254433473
 9dcfc8d8a49f3b58:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -3450,6 +3474,10 @@ e511d6e0566f4f01:
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'
   last_edited_ms: 0
+e58d790b691b31c4:
+  path: .context-pilot/commands/sumup.md
+  description: '/sumup command. Summarizes terminal-bench runs as markdown tables (Task | Description | Run Id | Reward | N_turns) for TWO batches: yesterday''s 2026-06-11__21-48-44 (v0.2.3) + tonight''s v0.2.10 validation (2026-06-12__08-42-41 onward). Reads fresh from job dirs: reward.txt + assistant-event count from trajectory. Per-batch tally + combined grand total.'
+  last_edited_ms: 1781247164874
 e6b9ad2949d17655:
   path: src/app/panels.rs
   description: Thin wrapper around cp_base::panels. get_panel() delegates to module system. FallbackPanel for orphaned contexts. refresh_all_panels() and collect_all_context() helpers.
