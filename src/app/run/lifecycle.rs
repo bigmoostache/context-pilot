@@ -39,10 +39,13 @@ pub(crate) struct EventChannels<'ch> {
 /// and headless modes (harmless, single relaxed store per tick).
 pub(crate) static LOOP_HEARTBEAT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-/// Wall-clock timestamp (ms) of the last observed *task progress* (a new message
-/// finalized). The headless deadman trips if this stalls beyond its budget even
-/// when the loop itself keeps ticking — catching a stream that hangs producing no
-/// events while the on-loop guards fail to recover it.
+/// Wall-clock timestamp (ms) of the last observed *forward activity*: a finalized
+/// message OR (v0.2.10) any received `StreamEvent` / retry launch. The headless
+/// deadman's HUNG detector trips only if this stalls beyond its budget while the
+/// loop keeps ticking — catching a stream that produces *no events at all* while
+/// the on-loop guards fail to recover it. Bumping on stream activity (not just
+/// message finalization) keeps the deadman from preempting v0.2.9's in-process
+/// retries, which dribble-then-retry without ever finalizing a message.
 pub(crate) static LAST_PROGRESS_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Outcome of one background-orchestration tick.

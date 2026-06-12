@@ -18,6 +18,18 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
         if !app.state.flags.stream.phase.is_streaming() {
             continue;
         }
+        // v0.2.10: any stream event = live activity. Bump the headless deadman's
+        // progress heartbeat so its HUNG detector (LAST_PROGRESS_MS, 180s) does NOT
+        // preempt v0.2.9's in-process retries — a dribbling stream emits a few
+        // chunks then stalls, v0.2.9 aborts it at 90s (a StreamEvent::Error, itself
+        // an event here) and retries on a fresh connection without finalizing a
+        // message. Previously LAST_PROGRESS only bumped on messages.len() growth, so
+        // ~2 non-finalizing 90s attempts (180s) tripped the deadman and re-exec'd
+        // before v0.2.9's 4-retry budget could complete. The deadman now trips only
+        // on TRUE silence (zero events for 180s) or a wedged loop (LOOP_HEARTBEAT_MS,
+        // 30s) — never while the stream layer is actively cycling connections.
+        crate::app::run::lifecycle::LAST_PROGRESS_MS
+            .store(crate::app::panels::now_ms(), std::sync::atomic::Ordering::Relaxed);
         app.state.flags.ui.dirty = true;
         match evt {
             StreamEvent::Chunk(text) => {
@@ -108,6 +120,10 @@ pub(super) fn handle_retry(app: &mut App, tx: &Sender<StreamEvent>) {
     if let Some(_error) = app.pending_retry_error.take() {
         // Still streaming, retry the request
         if app.state.flags.stream.phase.is_streaming() {
+            // v0.2.10: launching a retry is active recovery, not a hang — bump the
+            // deadman progress heartbeat so it never preempts an in-flight retry.
+            crate::app::run::lifecycle::LAST_PROGRESS_MS
+                .store(crate::app::panels::now_ms(), std::sync::atomic::Ordering::Relaxed);
             // Clear any partial assistant message content before retrying
             if let Some(msg) = app.state.messages.last_mut()
                 && msg.role == "assistant"

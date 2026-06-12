@@ -822,6 +822,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+31da0d131669cd65:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop. background_tick() (terminal-free orchestration: stream/typewriter/cache/watchers/tools/spine/reverie/reload/ownership → TickStatus) shared by interactive run() AND headless loop. run() = input + background_tick + render. check_spine auto-continuation. Adaptive poll 8ms/50ms. v0.2.8: defines pub(crate) statics LOOP_HEARTBEAT_MS + LAST_PROGRESS_MS (AtomicU64); LOOP_HEARTBEAT_MS stored at the top of background_tick (deadman heartbeat proving each iteration started).'
+  last_edited_ms: 0
 320a91c0259e5b70:
   path: crates/cp-mod-entities/src/sync.rs
   description: Meilisearch sync for entity data — incremental dirty-tracked, delete-then-add. ensure_index, sync_table, flush_sync, full_reindex. extract_affected_tables for SQL parsing.
@@ -2158,6 +2162,10 @@
   path: crates/cp-mod-utilities/Cargo.toml
   description: Zero external deps. Workspace lints.
   last_edited_ms: 1780565428682
+8a4b9e5a6f7f45d2:
+  path: benchmarks/terminal-bench/context_pilot_agent.py
+  description: Harbor BaseInstalledAgent adapter. version() 0.2.8. install() downloads CP linux bundle (releases/latest), lays out tui+cp-console-server next-to-exe + meilisearch; writes ~/.claude/.credentials.json from CLAUDE_CREDENTIALS_JSON for OAuth. run() = tui --headless <instr> --provider $CP_PROVIDER (default claude_code_api_key) --model <resolved> --trajectory /logs/agent/...jsonl + tee + 'true' (exit-tolerant). populate_context_post_run reads trajectory host-side via bind-mounted /logs/agent, parses final event for cost/tokens/status.
+  last_edited_ms: 0
 8a7f4b5f33e805fb:
   path: crates/cp-mod-search/src/tools.rs
   description: Search tool execution with flame!("search_exec"). Split keyword+semantic multi-search via MeiliClient. dedup_by_score() merges overlapping results. File/log filters. Async via spawn_async_tool. DynPanel creation. Mandatory semantic_query param.
@@ -3022,6 +3030,10 @@ c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
   last_edited_ms: 0
+c5fcc6a10db873d4:
+  path: src/app/run/headless.rs
+  description: 'Headless mode (`tui --headless`). parse_args (--provider/--model/--trajectory/--max-cost/--max-messages/--instruction-file). apply_provider_model maps --model onto anthropic_model OR claude_code_v2_model. run_headless drives background_tick() until quiescence (2.5s settle) or guard rail; JSONL TrajectoryWriter. v0.2.8 DEADMAN WATCHDOG: spawn_deadman() runs a dedicated thread (immune to a wedged main loop) checking two atomic heartbeats from lifecycle.rs — LOOP_HEARTBEAT_MS (>30s stale=WEDGE) + LAST_PROGRESS_MS (>180s stale=HUNG STREAM, bumped on messages.len() growth). On trip: dump_deadman_diagnostic writes final/deadman_timeout to the trajectory + /proc/self per-thread state/wchan/syscall to errors/deadman.log, then terminate_wedged_process() -> ! (bounded RE-EXEC via CommandExt::exec() max 2 by CP_DEADMAN_REEXEC_COUNT, falls back to std::process::abort()). This is the FIRST guard immune to the headless main-loop wedge that made all 4 streaming-layer SSE watchdogs no-ops. disable_interactive_tools drops ask_user_question only.'
+  last_edited_ms: 0
 c60e173425c891fe:
   path: crates/cp-mod-callback/src/types.rs
   description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, active_set, editor_open).
@@ -3137,6 +3149,10 @@ cbeaa3dfd0701f21:
 cc1484c01885f429:
   path: yamls/themes.yaml
   description: '6 themes (dnd/modern/futuristic/forest/sea/space). Each: message icons, context icons (including entities: 🗃️), status/todo icons, 16 RGB colors.'
+  last_edited_ms: 0
+cc1e24d64118833d:
+  path: src/app/run/streaming.rs
+  description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
   last_edited_ms: 0
 cc2661e537823cc1:
   path: crates/cp-base/src/state/autocomplete.rs

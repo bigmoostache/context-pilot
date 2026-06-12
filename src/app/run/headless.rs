@@ -40,12 +40,15 @@ const TICK_SLEEP: Duration = Duration::from_millis(8);
 /// on a dedicated thread is the only guard immune to a wedged main loop.
 const DEADMAN_TICK_STALL_MS: u64 = 30_000;
 
-/// Deadman: max time with no *task progress* (no new finalized message) before the
-/// watchdog force-exits, even if the loop keeps ticking. Catches a stream that
-/// hangs producing no events while the loop drains an empty channel forever. Set
-/// generously (3 min) so a legitimately long single LLM/tool step never trips it,
-/// but well under the harness wall (~900s) so a true hang fails fast with a
-/// diagnostic instead of burning the whole budget.
+/// Deadman: max time with no *stream activity* (no received `StreamEvent`, no
+/// finalized message, no retry launch) before the watchdog force-exits, even if
+/// the loop keeps ticking. Catches a stream that produces zero events while the
+/// loop drains an empty channel forever. v0.2.10: [`LAST_PROGRESS_MS`] is bumped
+/// on any stream event / retry — so this no longer preempts v0.2.9's in-process
+/// retries (which dribble then retry for up to 4×90s without finalizing a
+/// message); it now fires only on TRUE silence. Set generously (3 min) so a
+/// legitimately long single step never trips it, but well under the harness wall
+/// (~900s) so a true hang fails fast with a diagnostic instead of burning budget.
 const DEADMAN_NO_PROGRESS_MS: u64 = 180_000;
 
 /// Deadman: poll cadence of the watchdog thread.
@@ -462,9 +465,11 @@ impl App {
                 }
             }
 
-            // Bump the progress heartbeat whenever a message is finalized — the
-            // deadman uses this to distinguish a hung-but-live loop from a healthy
-            // one. (LOOP_HEARTBEAT_MS is bumped at the top of background_tick.)
+            // Bump the progress heartbeat when a message is finalized. This is one
+            // of several progress signals — v0.2.10 also bumps LAST_PROGRESS_MS on
+            // any received StreamEvent / retry launch (in run/streaming.rs), so the
+            // deadman tolerates v0.2.9's dribble-then-retry cycling and trips only on
+            // true silence. (LOOP_HEARTBEAT_MS is bumped at the top of background_tick.)
             let msg_count = self.state.messages.len();
             if msg_count != prev_msg_count {
                 prev_msg_count = msg_count;
