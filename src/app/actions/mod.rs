@@ -465,6 +465,32 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }
+        Action::ThreadSelectNext => {
+            let len = cp_mod_threads::types::ThreadsState::get(state).threads.len();
+            if len > 0 {
+                let focus = cp_mod_threads::types::FocusState::get_mut(state);
+                focus.selected_thread_idx = if focus.selected_thread_idx >= len.saturating_sub(1) {
+                    0
+                } else {
+                    focus.selected_thread_idx.saturating_add(1)
+                };
+                state.flags.ui.dirty = true;
+            }
+            ActionResult::Nothing
+        }
+        Action::ThreadSelectPrev => {
+            let len = cp_mod_threads::types::ThreadsState::get(state).threads.len();
+            if len > 0 {
+                let focus = cp_mod_threads::types::FocusState::get_mut(state);
+                focus.selected_thread_idx = if focus.selected_thread_idx == 0 {
+                    len.saturating_sub(1)
+                } else {
+                    focus.selected_thread_idx.saturating_sub(1)
+                };
+                state.flags.ui.dirty = true;
+            }
+            ActionResult::Nothing
+        }
         Action::None => ActionResult::Nothing,
     }
 }

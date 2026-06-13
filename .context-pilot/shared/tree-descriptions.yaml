@@ -1666,6 +1666,10 @@
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
   last_edited_ms: 0
+6afe0e875956a37f:
+  path: src/app/events.rs
+  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
+  last_edited_ms: 0
 6b337c67d5dc532a:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation.
@@ -2514,6 +2518,10 @@ a4282b39d6c4fdb9:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
   last_edited_ms: 0
+a43a679f6a0b0d68:
+  path: crates/cp-base/src/state/actions.rs
+  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
+  last_edited_ms: 0
 a49023d03b3a5764:
   path: src/ui/perf/overlay.rs
   description: Performance overlay adapter — renders PerfOverlay IR to ratatui. Consumes pre-built IR snapshot (FPS, CPU/RAM, FDs/rlimit, Meili stats, budget bars, sparkline, op table). Uses semantic_to_style() for all styling. No direct State access.
@@ -2549,6 +2557,10 @@ a6c691fbfe4d7d3b:
 a6e931ee84d698fc:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
+  last_edited_ms: 0
+a6f9367d3075fc36:
+  path: src/app/actions/mod.rs
+  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
 a782ecbead9d4209:
   path: src/llms/anthropic/mod.rs

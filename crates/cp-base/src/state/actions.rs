@@ -168,6 +168,10 @@ pub enum Action {
 
     /// Cycle view mode (Normal → Collapsed → Hidden → Threads → Normal).
     CycleViewMode,
+    /// Navigate to next thread in Threads view (↓ / Tab).
+    ThreadSelectNext,
+    /// Navigate to previous thread in Threads view (↑ / Shift+Tab).
+    ThreadSelectPrev,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

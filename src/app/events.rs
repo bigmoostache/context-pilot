@@ -109,6 +109,40 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 return Some(Action::StopStreaming);
             }
 
+            // Threads view: intercept navigation keys before panel/scroll handling
+            if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+                let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+                match key.code {
+                    KeyCode::Down | KeyCode::Tab if !shift => return Some(Action::ThreadSelectNext),
+                    KeyCode::Up | KeyCode::BackTab => return Some(Action::ThreadSelectPrev),
+                    KeyCode::Esc => return Some(Action::CycleViewMode),
+                    KeyCode::Backspace
+                    | KeyCode::Enter
+                    | KeyCode::Left
+                    | KeyCode::Right
+                    | KeyCode::Down
+                    | KeyCode::Home
+                    | KeyCode::End
+                    | KeyCode::PageUp
+                    | KeyCode::PageDown
+                    | KeyCode::Tab
+                    | KeyCode::Delete
+                    | KeyCode::Insert
+                    | KeyCode::F(_)
+                    | KeyCode::Char(_)
+                    | KeyCode::Null
+                    | KeyCode::CapsLock
+                    | KeyCode::ScrollLock
+                    | KeyCode::NumLock
+                    | KeyCode::PrintScreen
+                    | KeyCode::Pause
+                    | KeyCode::Menu
+                    | KeyCode::KeypadBegin
+                    | KeyCode::Media(_)
+                    | KeyCode::Modifier(_) => {} // fall through to normal handling
+                }
+            }
+
             // F12 toggles performance monitor
             if key.code == KeyCode::F(12) {
                 return Some(Action::TogglePerfMonitor);
