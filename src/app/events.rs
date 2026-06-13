@@ -112,25 +112,35 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             // Threads view: intercept navigation keys before panel/scroll handling
             if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
                 let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+                let creating = cp_mod_threads::types::FocusState::get(state).creating_thread;
                 match key.code {
-                    KeyCode::Down | KeyCode::Tab if !shift => return Some(Action::ThreadSelectNext),
-                    KeyCode::Up | KeyCode::BackTab => return Some(Action::ThreadSelectPrev),
-                    KeyCode::Esc => return Some(Action::CycleViewMode),
+                    // During thread creation: Esc cancels, everything else falls through to input
+                    KeyCode::Esc if creating => return Some(Action::ThreadCreateCancel),
+                    // Normal threads view navigation
+                    KeyCode::Down | KeyCode::Tab if !shift && !creating => {
+                        return Some(Action::ThreadSelectNext);
+                    }
+                    KeyCode::Up | KeyCode::BackTab if !creating => return Some(Action::ThreadSelectPrev),
+                    KeyCode::Char('n') if !creating && !ctrl => return Some(Action::ThreadCreateStart),
+                    KeyCode::Esc if !creating => return Some(Action::CycleViewMode),
                     KeyCode::Backspace
                     | KeyCode::Enter
                     | KeyCode::Left
                     | KeyCode::Right
+                    | KeyCode::Up
                     | KeyCode::Down
                     | KeyCode::Home
                     | KeyCode::End
                     | KeyCode::PageUp
                     | KeyCode::PageDown
                     | KeyCode::Tab
+                    | KeyCode::BackTab
                     | KeyCode::Delete
                     | KeyCode::Insert
                     | KeyCode::F(_)
                     | KeyCode::Char(_)
                     | KeyCode::Null
+                    | KeyCode::Esc
                     | KeyCode::CapsLock
                     | KeyCode::ScrollLock
                     | KeyCode::NumLock

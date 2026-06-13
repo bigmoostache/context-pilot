@@ -152,6 +152,10 @@ pub struct FocusState {
     /// Used for navigation (Tab/Shift+Tab) and message area display.
     #[serde(default)]
     pub selected_thread_idx: usize,
+    /// When true, the input field is being used to name a new thread.
+    /// Set by pressing 'n' in Threads view, cleared on Enter or Esc.
+    #[serde(default)]
+    pub creating_thread: bool,
 }
 
 impl Default for FocusState {
@@ -169,6 +173,7 @@ impl FocusState {
             dangling_remaining: 0,
             escalation_level: 0,
             selected_thread_idx: 0,
+            creating_thread: false,
         }
     }
 

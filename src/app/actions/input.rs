@@ -142,7 +142,15 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
 /// Routes the user's text to the currently selected thread as a
 /// `ThreadMessage(User)`, sets the thread to `MyTurn`, and creates
 /// a spine notification so the AI picks up the new message.
+///
+/// When `creating_thread` is active, creates a new thread with the
+/// input text as the thread name instead.
 fn handle_thread_input_submit(state: &mut State) -> ActionResult {
+    // Thread creation mode: input text becomes the new thread name
+    if FocusState::get(state).creating_thread {
+        return handle_thread_create(state);
+    }
+
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
     let content = replace_commands(&state.input, &commands);
     let content = expand_paste_sentinels(&content, &state.paste_buffers);
@@ -200,6 +208,46 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     for module in all_modules() {
         module.on_user_message(state);
     }
+
+    ActionResult::Save
+}
+
+/// Create a new thread from the input text (used as thread name).
+///
+/// Called when `creating_thread` is active and the user presses Enter.
+/// Generates a unique thread ID, creates an empty `TheirTurn` thread,
+/// selects it, and clears creation mode.
+fn handle_thread_create(state: &mut State) -> ActionResult {
+    let name = state.input.trim().to_string();
+
+    // Clear input + creation mode regardless of outcome
+    state.input.clear();
+    state.input_cursor = 0;
+    state.input_selection_anchor = None;
+    FocusState::get_mut(state).creating_thread = false;
+
+    if name.is_empty() {
+        return ActionResult::Nothing;
+    }
+
+    // Generate thread ID and create the thread
+    let threads_state = ThreadsState::get_mut(state);
+    let id = format!("T{}", threads_state.next_id);
+    threads_state.next_id = threads_state.next_id.saturating_add(1);
+
+    let thread = cp_mod_threads::types::Thread {
+        id,
+        name,
+        status: ThreadStatus::TheirTurn,
+        messages: vec![],
+        created_at: crate::app::panels::now_ms(),
+    };
+    threads_state.threads.push(thread);
+
+    // Select the newly created thread (last in list)
+    let new_idx = ThreadsState::get(state).threads.len().saturating_sub(1);
+    FocusState::get_mut(state).selected_thread_idx = new_idx;
+    state.flags.ui.dirty = true;
 
     ActionResult::Save
 }

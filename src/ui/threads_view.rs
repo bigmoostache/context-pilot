@@ -21,7 +21,7 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
     let threads_state = ThreadsState::get(state);
     let focus_state = FocusState::get(state);
 
-    if threads_state.threads.is_empty() {
+    if threads_state.threads.is_empty() && !focus_state.creating_thread {
         render_empty_state(frame, area);
         return;
     }
@@ -122,7 +122,9 @@ fn render_thread_list(frame: &mut Frame<'_>, ts: &ThreadsState, selected: usize,
             lines.push(Line::from(""));
         }
         lines.push(Line::from(vec![
-            Span::styled(" Ctrl+V", Style::default().fg(theme::accent())),
+            Span::styled(" n", Style::default().fg(theme::accent())),
+            Span::styled(" new  ", Style::default().fg(theme::text_muted())),
+            Span::styled("Ctrl+V", Style::default().fg(theme::accent())),
             Span::styled(" view", Style::default().fg(theme::text_muted())),
         ]));
     }

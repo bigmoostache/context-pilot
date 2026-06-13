@@ -172,6 +172,10 @@ pub enum Action {
     ThreadSelectNext,
     /// Navigate to previous thread in Threads view (↑ / Shift+Tab).
     ThreadSelectPrev,
+    /// Start creating a new thread — switches input to thread-naming mode.
+    ThreadCreateStart,
+    /// Cancel thread creation — clears naming mode without creating.
+    ThreadCreateCancel,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

@@ -491,6 +491,24 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             }
             ActionResult::Nothing
         }
+        Action::ThreadCreateStart => {
+            let focus = cp_mod_threads::types::FocusState::get_mut(state);
+            focus.creating_thread = true;
+            state.input.clear();
+            state.input_cursor = 0;
+            state.input_selection_anchor = None;
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ThreadCreateCancel => {
+            let focus = cp_mod_threads::types::FocusState::get_mut(state);
+            focus.creating_thread = false;
+            state.input.clear();
+            state.input_cursor = 0;
+            state.input_selection_anchor = None;
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
         Action::None => ActionResult::Nothing,
     }
 }
