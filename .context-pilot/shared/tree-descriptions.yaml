@@ -298,6 +298,10 @@
   path: crates/cp-mod-search/src/meili/overlay.rs
   description: Ctrl+I overlay data provider. Fetches live Meilisearch stats + process stats (CPU%/RAM via /proc or ps). read_process_stats(pid) platform-specific. CPU% from tick deltas cached in MeiliLiveStats. 2s refresh cache. Builds SearchOverlayInfo.
   last_edited_ms: 0
+13706884de9b94f9:
+  path: crates/cp-base/src/state/data/model_helpers.rs
+  description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
+  last_edited_ms: 0
 138edfd0bce25793:
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: 'Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"), flame!("firecrawl_crawl"). All async via spawn_async_tool. Crawl: start job + poll loop (5s interval, 60 max polls, 310s timeout) + write_crawl_output to disk.'
@@ -466,6 +470,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+1e66564fd8bb96d1:
+  path: yamls/tools/search.yaml
+  description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
+  last_edited_ms: 0
 1e836ec4e394617a:
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
@@ -533,6 +541,10 @@
 227369efc7058e7b:
   path: crates/cp-base/src/tools/async_exec.rs
   description: Async tool execution — spawn_async_tool() runs blocking I/O on worker thread. ToolOutput struct (content, is_error, create_panel, preserves_tempo). BLOCKING_TOOL_SENTINEL constant. ChannelWatcher registration. Error encoding via ASYNC_ERROR_PREFIX in description.
+  last_edited_ms: 0
+228e44baea044fe4:
+  path: .github/checks/check-folder-sizes.sh
+  description: Folder size check script (max 8 entries)
   last_edited_ms: 0
 22b269fd4df74fd9:
   path: Cargo.toml
@@ -1710,6 +1722,10 @@
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
   last_edited_ms: 1780648757744
+75937e297fbe1cce:
+  path: src/app/actions/input.rs
+  description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
+  last_edited_ms: 0
 75b59f8061f1ae4e:
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks.'
@@ -1797,6 +1813,10 @@
 7bd1f6579c1dc0f7:
   path: crates/cp-mod-ocr/src/client.rs
   description: 'Datalab OCR API client with flame!("ocr_convert"). Multipart file upload, exponential backoff polling, disk cache (~/.context-pilot/ocr-cache/) keyed by SHA-256 of file bytes + mode. OcrMode: Markdown/TextBoxes.'
+  last_edited_ms: 0
+7bfc443fcd290a77:
+  path: crates/cp-base/src/state/runtime.rs
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
 7c8d1c712f95c232:
   path: src/modules/mod.rs
@@ -2122,6 +2142,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+924745f383db86e2:
+  path: crates/cp-mod-search/src/lib.rs
+  description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
+  last_edited_ms: 0
 926b621e0ccce87d:
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, ignore, cp-mod-utilities.'
@@ -2142,6 +2166,10 @@
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
   last_edited_ms: 1780498269752
+94561e4c272a40bd:
+  path: src/modules/overview/mod.rs
+  description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data.'
+  last_edited_ms: 0
 94661b7c6351fd23:
   path: crates/cp-mod-firecrawl/src/types.rs
   description: Firecrawl response types. ScrapeResponse/Data/Metadata, SearchResponse/SearchResult (polymorphic data field), MapResponse/MapLink, CrawlStartResponse/CrawlStatusResponse/CrawlPageData. All Serialize+Deserialize.
@@ -2849,6 +2877,10 @@ c6851a14a7a1ecb2:
 c699ff50b290652f:
   path: .github/workflows/pages.yml
   description: 'CI: GitHub Pages deployment for website'
+  last_edited_ms: 0
+c6e75c6dd4531284:
+  path: src/app/actions/streaming.rs
+  description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'
   last_edited_ms: 0
 c72db20f11261c9f:
   path: src/ui/help/config_overlay/budget_bars.rs

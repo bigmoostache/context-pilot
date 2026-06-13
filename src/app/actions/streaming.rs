@@ -85,7 +85,8 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
     // spend stable when the user switches models afterwards.
     let cost = StreamCost {
         hit: token_cost(usage.cache_hit, state.cache_hit_price_per_mtok()),
-        miss: token_cost(usage.cache_miss, state.cache_miss_price_per_mtok()),
+        miss: token_cost(event.cache_miss, state.cache_miss_price_per_mtok())
+            + token_cost(event.input_tokens, state.input_price_per_mtok()),
         output: token_cost(usage.output, state.output_price_per_mtok()),
     };
     apply_token_usage(state, &usage, &cost);

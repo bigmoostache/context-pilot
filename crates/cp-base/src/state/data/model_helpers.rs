@@ -22,6 +22,8 @@ pub trait ModelPricing {
     fn effective_context_budget(&self) -> usize;
     /// Cache-hit input price per million tokens.
     fn cache_hit_price_per_mtok(&self) -> f32;
+    /// Base (uncached) input price per million tokens.
+    fn input_price_per_mtok(&self) -> f32;
     /// Cache-miss input price per million tokens.
     fn cache_miss_price_per_mtok(&self) -> f32;
     /// Output price per million tokens.
@@ -97,6 +99,19 @@ impl ModelPricing for State {
             LlmProvider::DeepSeek => self.deepseek_model.cache_hit_price_per_mtok(),
             LlmProvider::MiniMax => self.minimax_model.cache_hit_price_per_mtok(),
             LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.cache_hit_price_per_mtok(),
+        }
+    }
+
+    fn input_price_per_mtok(&self) -> f32 {
+        match self.llm_provider {
+            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+                self.anthropic_model.input_price_per_mtok()
+            }
+            LlmProvider::Grok => self.grok_model.input_price_per_mtok(),
+            LlmProvider::Groq => self.groq_model.input_price_per_mtok(),
+            LlmProvider::DeepSeek => self.deepseek_model.input_price_per_mtok(),
+            LlmProvider::MiniMax => self.minimax_model.input_price_per_mtok(),
+            LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.input_price_per_mtok(),
         }
     }
 

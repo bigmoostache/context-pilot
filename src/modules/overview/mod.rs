@@ -81,6 +81,9 @@ impl Module for OverviewModule {
             "cache_hit_tokens": state.cache_hit_tokens,
             "cache_miss_tokens": state.cache_miss_tokens,
             "total_output_tokens": state.total_output_tokens,
+            "cost_hit_usd": state.cost_hit_usd,
+            "cost_miss_usd": state.cost_miss_usd,
+            "cost_output_usd": state.cost_output_usd,
             "disabled_tools": state.tools.iter().filter(|t| !t.enabled).map(|t| &t.id).collect::<Vec<_>>(),
         })
     }
@@ -169,6 +172,15 @@ impl Module for OverviewModule {
         }
         if let Some(v) = data.get("total_output_tokens").and_then(serde_json::Value::as_u64) {
             state.total_output_tokens = v.to_usize();
+        }
+        if let Some(v) = data.get("cost_hit_usd").and_then(serde_json::Value::as_f64) {
+            state.cost_hit_usd = v;
+        }
+        if let Some(v) = data.get("cost_miss_usd").and_then(serde_json::Value::as_f64) {
+            state.cost_miss_usd = v;
+        }
+        if let Some(v) = data.get("cost_output_usd").and_then(serde_json::Value::as_f64) {
+            state.cost_output_usd = v;
         }
         if let Some(arr) = data.get("disabled_tools").and_then(|v| v.as_array()) {
             let disabled: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();

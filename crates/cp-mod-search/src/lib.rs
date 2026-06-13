@@ -163,6 +163,7 @@ impl Module for SearchModule {
                 .short_desc("Search across project files and logs using full-text search")
                 .category("Search")
                 .param("query", ParamType::String, true)
+                .param("semantic_query", ParamType::String, true)
                 .param_enum("scope", &["all", "project", "logs", "entities"], false)
                 .param("path_prefix", ParamType::String, false)
                 .param("extension", ParamType::String, false)
@@ -171,7 +172,6 @@ impl Module for SearchModule {
                 .param("to_date", ParamType::String, false)
                 .param("limit", ParamType::Integer, false)
                 .param("semantic_ratio", ParamType::Number, false)
-                .param("semantic_query", ParamType::String, false)
                 .param("hide_contents", ParamType::Boolean, false)
                 .build(),
         ]

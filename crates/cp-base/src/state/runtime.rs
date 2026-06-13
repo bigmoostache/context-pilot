@@ -414,6 +414,9 @@ impl State {
         self.tick_cache_miss_tokens = 0;
         self.tick_output_tokens = 0;
         self.tick_uncached_input_tokens = 0;
+        self.tick_cost_hit_usd = 0.0;
+        self.tick_cost_miss_usd = 0.0;
+        self.tick_cost_output_usd = 0.0;
     }
 }
 
