@@ -1,7 +1,7 @@
 //! Sidebar IR adapter — renders [`Sidebar`] to ratatui widgets.
 //!
-//! Replaces `ui::sidebar::full` and `ui::sidebar::collapsed` by consuming
-//! the pre-built IR snapshot instead of reading application state directly.
+//! Consumes the pre-built IR snapshot instead of reading application
+//! state directly.
 
 use cp_render::frame::{Sidebar, SidebarEntry, SidebarMode, TokenBar, TokenStats};
 use ratatui::prelude::{Constraint, Direction, Frame, Layout, Line, Rect, Span, Style};
@@ -37,7 +37,6 @@ pub(super) fn padded(spans: Vec<Span<'static>>) -> Line<'static> {
 pub(crate) fn render_sidebar_from_ir(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
     match sidebar.mode {
         SidebarMode::Normal => render_normal(frame, sidebar, area),
-        SidebarMode::Collapsed => render_collapsed(frame, sidebar, area),
         SidebarMode::Hidden => {}
     }
 }
@@ -164,7 +163,7 @@ fn render_normal_entry(lines: &mut Vec<Line<'static>>, entry: &SidebarEntry, cw:
     ]));
 }
 
-// ── Collapsed sidebar ────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────
 
 /// Color for token count based on magnitude.
 ///
@@ -185,86 +184,6 @@ fn token_count_color(tokens: u32) -> ratatui::style::Color {
     } else {
         theme::text_muted()
     }
-}
-
-/// Render the collapsed sidebar (icon + badge strip).
-fn render_collapsed(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
-    let _guard = crate::profile!("ir::sidebar_collapsed");
-    let base_style = Style::default().bg(theme::bg_base());
-
-    let token_area_height = 5u16;
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(token_area_height)])
-        .split(area);
-    debug_assert!(layout.len() >= 2, "collapsed sidebar layout must have at least 2 chunks");
-
-    let mut lines: Vec<Line<'_>> = Vec::new();
-    lines.push(Line::from(""));
-
-    let (fixed_entries, dynamic_entries): (Vec<_>, Vec<_>) = sidebar.entries.iter().partition(|e| e.fixed);
-
-    for entry in &fixed_entries {
-        render_collapsed_entry(&mut lines, entry, base_style);
-    }
-
-    if !dynamic_entries.is_empty() {
-        lines.push(Line::from(vec![Span::styled(" ──────────", Style::default().fg(theme::border_muted()))]));
-        for entry in &dynamic_entries {
-            render_collapsed_entry(&mut lines, entry, base_style);
-        }
-    }
-
-    let paragraph = Paragraph::new(lines).style(base_style);
-    let Some(&panel_area) = layout.first() else { return };
-    frame.render_widget(paragraph, panel_area);
-
-    // Token summary at bottom
-    if let Some(ref tb) = sidebar.token_bar {
-        let token_lines = vec![
-            Line::from(""),
-            Line::from(vec![Span::styled(
-                format_number(tb.used.to_usize()),
-                Style::default().fg(theme::text()).bold(),
-            )]),
-            Line::from(vec![Span::styled(
-                format_number(tb.threshold.to_usize()),
-                Style::default().fg(theme::warning()),
-            )]),
-            Line::from(vec![Span::styled(format_number(tb.budget.to_usize()), Style::default().fg(theme::accent()))]),
-        ];
-        let token_paragraph = Paragraph::new(token_lines).style(base_style);
-        let Some(&token_area) = layout.get(1) else { return };
-        frame.render_widget(token_paragraph, token_area);
-    }
-}
-
-/// Render a single collapsed entry line: arrow + icon + badge + tokens.
-fn render_collapsed_entry(lines: &mut Vec<Line<'static>>, entry: &SidebarEntry, _base_style: Style) {
-    let arrow = if entry.active { "▸" } else { " " };
-    let arrow_color = if entry.active { theme::accent() } else { theme::bg_base() };
-    let icon_color = if entry.active { theme::accent() } else { theme::text_muted() };
-
-    let label = entry.badge.as_deref().map_or_else(
-        || {
-            if entry.fixed {
-                "   ".to_string()
-            } else {
-                format!("{:>3}", entry.id.strip_prefix('P').unwrap_or(&entry.id))
-            }
-        },
-        |b| format!("{b:>3}"),
-    );
-    let label_color = if entry.active { theme::accent() } else { theme::text_muted() };
-    let tokens = format_number(entry.tokens.to_usize());
-    let tokens_color = token_count_color(entry.tokens);
-
-    lines.push(Line::from(vec![
-        Span::styled(arrow, Style::default().fg(arrow_color)),
-        Span::styled(entry.icon.clone(), Style::default().fg(icon_color)),
-        Span::styled(label, Style::default().fg(label_color)),
-        Span::styled(format!("{tokens:>5}"), Style::default().fg(tokens_color)),
-    ]));
 }
 
 // ── Token bar ────────────────────────────────────────────────────────

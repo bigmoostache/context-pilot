@@ -1406,6 +1406,10 @@
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
   last_edited_ms: 0
+54eaa3cfe9a5ebbb:
+  path: src/ui/ir/sidebar.rs
+  description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
+  last_edited_ms: 0
 54ed34dba061f315:
   path: dummy.txt
   description: Throwaway test file
@@ -1417,6 +1421,10 @@
 5566a80725542188:
   path: website/docs/getting-started.html
   description: 'Docs: getting started guide'
+  last_edited_ms: 0
+5585340c0b7b6aa1:
+  path: src/ui/mod.rs
+  description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). All overlays consume IR data.
   last_edited_ms: 0
 558cc22a0711808e:
   path: test_file_to_describe.txt
@@ -2394,6 +2402,10 @@
   path: crates/cp-render/src/conversation.rs
   description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm (with cursor/typing_other/other_text), Autocomplete (with dir_prefix/total_matches/input_visual_lines), PerfOverlay (with open_fds/fd_limit_soft/fd_semantic), ConfigOverlay, PaletteOverlay, SearchIndexOverlay. All serializable.'
   last_edited_ms: 0
+965292c5106e02e5:
+  path: crates/cp-render/src/frame.rs
+  description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
+  last_edited_ms: 0
 9671d603bc7cefc9:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
@@ -3202,6 +3214,10 @@ cbb71fe5106157bc:
   path: crates/cp-mod-logs/src/types.rs
   description: 'Log entry types. LogEntry: id, timestamp_ms, datetime, content, importance (no tags). LogsState: logs Vec + next_log_id counter. ms_to_iso() helper.'
   last_edited_ms: 0
+cbbef4219a1d03ee:
+  path: src/ui/ir/render_sidebar.rs
+  description: 'Sidebar ratatui renderer — render_sidebar_from_ir(). Normal mode: token bar box, fixed/dynamic entries with pagination, PR card, token stats. Collapsed mode: icon strip. Entry rendering: indicator+icon+shortcut+label+tokens. Token color gradient (grey→red).'
+  last_edited_ms: 0
 cbeaa3dfd0701f21:
   path: src/llms/mod.rs
   description: LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging.
@@ -3861,6 +3877,10 @@ fdc71c3c93143d63:
 fe00926a7e481bb0:
   path: crates/cp-mod-callback/src/firing.rs
   description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. fire_async/blocking_callbacks() for batch dispatch. flame!("cb_fire"), flame!("cb_fire_async"), flame!("cb_fire_blocking"). CallbackWatcher: exit 0→success_message, exit 7→silent, exit !=0→deferred panel, timeout→deferred panel.'
+  last_edited_ms: 0
+fe0d39e543dc112c:
+  path: crates/cp-base/src/state/data/config.rs
+  description: SidebarMode, Shared (config.json), WorkerState (per-worker), PanelData (panel persistence) — all serde structs
   last_edited_ms: 0
 fe442c943f4c8e63:
   path: docs/talk/slides/0-1.html

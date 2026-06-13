@@ -107,11 +107,6 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &
     }
 
     let sw = state.view_mode.width();
-    if sw == 0 {
-        // Hidden mode — no sidebar at all
-        render_main_content(frame, state, area, ir_frame);
-        return;
-    }
 
     // Body layout: sidebar + main content
     let body_layout = Layout::default()
