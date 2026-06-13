@@ -87,13 +87,24 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     for (i, thread) in ts.threads.iter().enumerate() {
         let is_selected = i == selected;
 
+        // Unread detection: messages exist beyond what user last saw
+        let last_read = focus.last_read_count.get(&thread.id).copied().unwrap_or(0);
+        let has_unread = thread.messages.len() > last_read;
+
         // Indicator + thread name
-        let indicator = if is_selected { "▸ " } else { "  " };
+        let indicator = if is_selected {
+            "▸ "
+        } else if has_unread {
+            "● "
+        } else {
+            "  "
+        };
+        let indicator_color = if has_unread && !is_selected { theme::warning() } else { theme::accent() };
         let name_color = if is_selected { theme::accent() } else { theme::text() };
         let name = truncate_str(&thread.name, inner.width.saturating_sub(4).into());
 
         lines.push(Line::from(vec![
-            Span::styled(indicator, Style::default().fg(theme::accent())),
+            Span::styled(indicator, Style::default().fg(indicator_color)),
             Span::styled(name, Style::default().fg(name_color)),
         ]));
 

@@ -160,6 +160,11 @@ pub struct FocusState {
     /// Set by pressing 'a' in Threads view, cleared on 'y' (confirm) or any other key.
     #[serde(default)]
     pub confirming_archive: bool,
+    /// Per-thread last-read message count, keyed by thread ID.
+    /// Used for unread indicators — a thread is "unread" when
+    /// `messages.len() > last_read_count[thread_id]`.
+    #[serde(default)]
+    pub last_read_count: std::collections::BTreeMap<String, usize>,
 }
 
 impl Default for FocusState {
@@ -179,6 +184,7 @@ impl FocusState {
             selected_thread_idx: 0,
             creating_thread: false,
             confirming_archive: false,
+            last_read_count: std::collections::BTreeMap::new(),
         }
     }
 
@@ -199,5 +205,18 @@ impl FocusState {
     /// Panics if `FocusState` was never inserted into state.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.ext_mut::<Self>()
+    }
+
+    /// Mark the currently selected thread as fully read.
+    /// Updates `last_read_count` to the thread's current message count.
+    pub fn mark_selected_read(state: &mut State) {
+        let threads = ThreadsState::get(state);
+        let focus = Self::get(state);
+        let idx = focus.selected_thread_idx.min(threads.threads.len().saturating_sub(1));
+        if let Some(thread) = threads.threads.get(idx) {
+            let tid = thread.id.clone();
+            let count = thread.messages.len();
+            let _prev = Self::get_mut(state).last_read_count.insert(tid, count);
+        }
     }
 }

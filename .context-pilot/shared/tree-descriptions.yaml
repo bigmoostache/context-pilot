@@ -1290,6 +1290,10 @@
   path: src/app/reverie/tools.rs
   description: 'Reverie tools: build_tool_restrictions_text(), Report (queue guard), optimize_context (agent selection), dispatch_reverie_tool()'
   last_edited_ms: 0
+4f6d57370d56e43b:
+  path: src/app/actions/mod.rs
+  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
+  last_edited_ms: 0
 4f837a4a42f4f2e8:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
@@ -2597,6 +2601,10 @@ a7b95447dd5bdb0b:
 a8142bff182324b2:
   path: src/modules/questions/ask_question.rs
   description: 'ask_user_question execute: parse/validate questions array, create PendingForm, __QUESTION_PENDING__ placeholder'
+  last_edited_ms: 0
+a83fd0afdd04e258:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
 a886f7300cfb14d0:
   path: crates/cp-mod-spine/src/lib.rs

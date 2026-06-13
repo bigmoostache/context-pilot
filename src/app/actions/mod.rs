@@ -474,6 +474,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 } else {
                     focus.selected_thread_idx.saturating_add(1)
                 };
+                cp_mod_threads::types::FocusState::mark_selected_read(state);
                 state.flags.ui.dirty = true;
             }
             ActionResult::Nothing
@@ -487,6 +488,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 } else {
                     focus.selected_thread_idx.saturating_sub(1)
                 };
+                cp_mod_threads::types::FocusState::mark_selected_read(state);
                 state.flags.ui.dirty = true;
             }
             ActionResult::Nothing
