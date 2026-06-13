@@ -126,12 +126,35 @@ impl Module for ThreadsModule {
     }
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
-        match tool.name.as_str() {
+        let mut pf = Verdict::new();
+        let tool_name = tool.name.as_str();
+
+        // === Focus enforcement (all tools) ===
+        // Exempt tools: Think (reasoning), Read (how you claim focus).
+        let is_focus_exempt = matches!(tool_name, "Think" | "Read");
+        let ts = ThreadsState::get(state);
+        let fs = FocusState::get(state);
+
+        // Only enforce when MY_TURN threads exist and AI is unfocused.
+        if ts.has_my_turn_threads() && fs.focused_thread_id.is_none() {
+            if fs.dangling_remaining > 0 {
+                // Dangling phase — warn but allow.
+                pf.warnings.push(format!(
+                    "\u{26a0}\u{fe0f} Dangling phase: {} tool call(s) remaining \
+                     before you must focus on a thread",
+                    fs.dangling_remaining
+                ));
+            } else if !is_focus_exempt {
+                // Dangling expired, not exempt — BLOCK.
+                pf.errors.push(escalation_message(fs.escalation_level));
+            }
+        }
+
+        // === Tool-specific checks ===
+        match tool_name {
             "Send" => {
-                let mut pf = Verdict::new();
                 // Validate thread_id exists
                 if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str()) {
-                    let ts = ThreadsState::get(state);
                     if let Some(thread) = ts.threads.iter().find(|t| t.id == tid) {
                         // Prevent Send to a thread already in THEIR_TURN
                         if thread.status == ThreadStatus::TheirTurn {
@@ -150,16 +173,13 @@ impl Module for ThreadsModule {
                 if !has_markdown && !has_file && !has_questions {
                     pf.errors.push("Send requires at least one of: markdown, file_path, questions".to_string());
                 }
-                Some(pf)
             }
             "Read" => {
-                let mut pf = Verdict::new();
                 // Validate thread_id exists
-                if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str()) {
-                    let ts = ThreadsState::get(state);
-                    if !ts.threads.iter().any(|t| t.id == tid) {
-                        pf.errors.push(format!("Thread '{tid}' not found"));
-                    }
+                if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str())
+                    && !ts.threads.iter().any(|t| t.id == tid)
+                {
+                    pf.errors.push(format!("Thread '{tid}' not found"));
                 }
                 // Validate count is positive
                 if let Some(count) = tool.input.get("count").and_then(serde_json::Value::as_i64)
@@ -167,9 +187,14 @@ impl Module for ThreadsModule {
                 {
                     pf.errors.push("count must be a positive integer".to_string());
                 }
-                Some(pf)
             }
-            _ => None,
+            _ => {}
+        }
+
+        if pf.errors.is_empty() && pf.warnings.is_empty() {
+            None
+        } else {
+            Some(pf)
         }
     }
 
@@ -235,7 +260,25 @@ impl Module for ThreadsModule {
     fn on_user_message(&self, _state: &mut State) {}
     fn on_stream_stop(&self, _state: &mut State) {}
     fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
-    fn on_tool_complete(&self, _tool_name: &str, _state: &mut State) {}
+    fn on_tool_complete(&self, tool_name: &str, state: &mut State) {
+        // Tools exempt from dangling countdown.
+        let is_countdown_exempt = matches!(tool_name, "Think" | "Queue_execute");
+
+        let has_my_turn = ThreadsState::get(state).has_my_turn_threads();
+        let fs = FocusState::get_mut(state);
+
+        // Dangling countdown: decrement on each non-exempt tool call.
+        if fs.dangling_remaining > 0 && !is_countdown_exempt {
+            fs.dangling_remaining = fs.dangling_remaining.saturating_sub(1);
+        }
+
+        // Escalation: bump when dangling expired, unfocused, and MY_TURN exists.
+        // This fires on exempt tools (Think) that complete while the AI
+        // still hasn't focused — driving the escalation level up.
+        if fs.dangling_remaining <= 0 && fs.focused_thread_id.is_none() && has_my_turn {
+            fs.escalation_level = fs.escalation_level.saturating_add(1);
+        }
+    }
     fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
         vec![]
     }
@@ -249,5 +292,23 @@ impl Module for ThreadsModule {
     }
     fn watcher_immediate_refresh(&self) -> bool {
         true
+    }
+}
+
+/// Returns the focus-enforcement message for the given escalation level.
+///
+/// - 0–5: polite reminder
+/// - 6–15: firm instruction
+/// - 16–29: aggressive demand
+/// - 30+: nuclear (with level number)
+fn escalation_message(level: u32) -> String {
+    match level {
+        0..=5 => "🧵 Please focus on an available thread using Read.".to_string(),
+        6..=15 => "🧵 You MUST focus on a thread. Use Read(thread_id) now.".to_string(),
+        16..=29 => "🧵 STOP. Focus on a thread immediately. Use Read(thread_id).".to_string(),
+        _ => format!(
+            "🧵 FOCUS. ON. A. THREAD. NOW. Read(thread_id). \
+             (escalation level {level})"
+        ),
     }
 }

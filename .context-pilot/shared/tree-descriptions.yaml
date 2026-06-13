@@ -190,6 +190,10 @@
   path: docs/talk/slides/3-1.html
   description: 'Slide: WOWs Showcase — 7 domain slider (Medicine/Chemistry/Hardware/Maths/Finance/Education/Misc)'
   last_edited_ms: 1781078806848
+0b4883b6bad3068a:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
+  last_edited_ms: 1781354640761
 0b9103ee30634685:
   path: docs/logs.md
   description: Logging system design
