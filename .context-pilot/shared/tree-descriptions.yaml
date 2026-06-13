@@ -3546,6 +3546,10 @@ d897c147d141bc42:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+d8f43c4c8cae6abd:
+  path: src/ui/threads_view.rs
+  description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
+  last_edited_ms: 0
 d9bdcd97a1132a47:
   path: src/state/persistence/save.rs
   description: 'Save operations: flame!("save_batch") + flame!("save_state"). build_save_batch() serializes config/worker/panels/messages/logs into WriteBatch. save_state() blocking sync persist. check_ownership(). log_error() to disk.'
@@ -3669,6 +3673,10 @@ e493d21e31f3e450:
 e511d6e0566f4f01:
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'
+  last_edited_ms: 0
+e610e21de8868286:
+  path: src/app/actions/mod.rs
+  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
   last_edited_ms: 0
 e6b9ad2949d17655:
   path: src/app/panels.rs

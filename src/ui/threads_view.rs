@@ -554,12 +554,25 @@ pub(crate) fn maybe_activate_thread_question(state: &mut State) {
         } else {
             // Need to initialize — find last assistant message with questions
             let clear = focus.active_question.is_some(); // clear if for different thread
-            let json = thread
+            // Find the last assistant message with questions, then check if
+            // a user message exists after it (meaning it was already answered).
+            let last_q_idx = thread
                 .messages
                 .iter()
+                .enumerate()
                 .rev()
-                .find(|m| m.author == ThreadAuthor::Assistant && m.question.is_some())
-                .and_then(|m| m.question.clone());
+                .find(|(_, m)| m.author == ThreadAuthor::Assistant && m.question.is_some())
+                .map(|(i, _)| i);
+            let json = last_q_idx.and_then(|qi| {
+                let already_answered = thread.messages.get(qi.saturating_add(1)..)
+                    .is_some_and(|tail| tail.iter().any(|m| m.author == ThreadAuthor::User));
+                if already_answered {
+                    None
+                } else {
+                    let m = thread.messages.get(qi)?;
+                    m.question.clone()
+                }
+            });
             json.map_or((clear, None), |j| (clear, Some((thread.id.clone(), j))))
         }
     }; // all shared borrows dropped
