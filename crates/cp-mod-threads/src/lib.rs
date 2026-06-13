@@ -14,7 +14,7 @@ pub mod tools;
 /// Thread state types: `Thread`, `ThreadMessage`, `ThreadsState`, `FocusState`.
 pub mod types;
 
-use types::{FocusState, ThreadStatus, ThreadsState};
+use types::{FocusState, ThreadsState};
 
 use serde_json::json;
 
@@ -154,17 +154,10 @@ impl Module for ThreadsModule {
         match tool_name {
             "Send" => {
                 // Validate thread_id exists
-                if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str()) {
-                    if let Some(thread) = ts.threads.iter().find(|t| t.id == tid) {
-                        // Prevent Send to a thread already in THEIR_TURN
-                        if thread.status == ThreadStatus::TheirTurn {
-                            pf.errors.push(format!(
-                                "Thread '{tid}' is already THEIR_TURN — wait for user input"
-                            ));
-                        }
-                    } else {
-                        pf.errors.push(format!("Thread '{tid}' not found"));
-                    }
+                if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str())
+                    && !ts.threads.iter().any(|t| t.id == tid)
+                {
+                    pf.errors.push(format!("Thread '{tid}' not found"));
                 }
                 // Require at least one content param
                 let has_markdown = tool.input.get("markdown").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());

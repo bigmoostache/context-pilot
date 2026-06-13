@@ -3578,6 +3578,10 @@ e6fb6a3d0303b523:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
   last_edited_ms: 0
+e749a095816c4807:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
+  last_edited_ms: 0
 e764dee9fb758b38:
   path: crates/cp-mod-entities/src/types.rs
   description: EntitiesState (db_path, dump_path, migrations_dir, schema_cache), SchemaCache, TableInfo, ColumnInfo, ForeignKeyInfo. get/get_mut helpers for State TypeMap access.
