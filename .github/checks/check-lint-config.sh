@@ -121,6 +121,44 @@ content_hash() {
   compute_protected_content | sha256sum | cut -d' ' -f1
 }
 
+# Collect git diffs for all protected files since the last chain commit
+# and append them below the new chain entry as a human-readable record.
+append_protected_diffs() {
+  local entry_seq="$1"
+
+  # Find the commit where the chain file was last modified.
+  local base_commit
+  base_commit=$(git -C "$ROOT" log -1 --format=%H -- "$CHAIN_FILE" 2>/dev/null || echo "")
+  if [ -z "$base_commit" ]; then
+    # Chain file not yet committed — diff against HEAD.
+    base_commit="HEAD"
+  fi
+
+  # Collect diffs for each protected file listed in the manifest.
+  local diff_output=""
+  local current_path=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    local trimmed="${line#"${line%%[![:space:]]*}"}"
+    [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
+    if [[ "$trimmed" =~ ^-\ path:\ (.+)$ ]]; then
+      current_path="${BASH_REMATCH[1]}"
+      local fdiff
+      fdiff=$(git -C "$ROOT" diff "$base_commit" -- "$current_path" 2>/dev/null || true)
+      if [ -n "$fdiff" ]; then
+        diff_output+="$fdiff"$'\n'
+      fi
+    fi
+  done < "$MANIFEST"
+
+  if [ -n "$diff_output" ]; then
+    {
+      echo "# --- Diff for entry #${entry_seq} ---"
+      printf '%s' "$diff_output"
+      echo "# --- End entry #${entry_seq} ---"
+    } >> "$CHAIN_FILE"
+  fi
+}
+
 compute_chain_hash() {
   local seq="$1" prev="$2" ch="$3" password="$4"
   printf '%s:%s:%s:%s' "$seq" "$prev" "$ch" "$password" | sha256sum | cut -d' ' -f1
@@ -144,7 +182,9 @@ if [ "${1:-}" = "--history" ]; then
     exit 0
   fi
   echo "=== Protected Files Chain ==="
-  while IFS=: read -r seq prev ch chain; do
+  while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+    [[ "$raw_line" =~ ^[0-9]+: ]] || continue
+    IFS=: read -r seq prev ch chain <<< "$raw_line"
     echo "  #$seq  content=${ch:0:12}…  chain=${chain:0:12}…  prev=${prev:0:12}…"
   done < "$CHAIN_FILE"
   exit 0
@@ -174,7 +214,7 @@ if [ "${1:-}" = "--update" ]; then
     exit 0
   fi
 
-  last_line=$(tail -n 1 "$CHAIN_FILE")
+  last_line=$(grep -E '^[0-9]+:' "$CHAIN_FILE" | tail -n 1)
   IFS=: read -r last_seq last_prev last_ch last_chain <<< "$last_line"
 
   # Verify password against the last chain entry.
@@ -193,6 +233,10 @@ if [ "${1:-}" = "--update" ]; then
   prev="$last_chain"
   chain=$(compute_chain_hash "$seq" "$prev" "$ch" "$password")
   echo "${seq}:${prev}:${ch}:${chain}" >> "$CHAIN_FILE"
+
+  # Append diff of protected files since the last chain update.
+  append_protected_diffs "$seq"
+
   echo "Appended entry #$seq to chain ✓"
   exit 0
 fi
@@ -207,7 +251,10 @@ fi
 # Verify chain link integrity.
 prev_chain="GENESIS"
 entry_count=0
-while IFS=: read -r seq prev ch chain; do
+while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+  # Skip non-entry lines (diffs, comments, blank lines)
+  [[ "$raw_line" =~ ^[0-9]+: ]] || continue
+  IFS=: read -r seq prev ch chain <<< "$raw_line"
   entry_count=$((entry_count + 1))
   if [ "$prev" != "$prev_chain" ]; then
     echo "::error::Chain broken at entry #$seq: prev=$prev expected=$prev_chain"
@@ -224,7 +271,7 @@ if [ "$entry_count" -eq 0 ]; then
 fi
 
 # Verify current content matches the latest entry.
-last_line=$(tail -n 1 "$CHAIN_FILE")
+last_line=$(grep -E '^[0-9]+:' "$CHAIN_FILE" | tail -n 1)
 IFS=: read -r last_seq last_prev last_ch last_chain <<< "$last_line"
 current_ch=$(content_hash)
 
