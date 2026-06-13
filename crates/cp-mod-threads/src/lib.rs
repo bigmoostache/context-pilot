@@ -10,7 +10,7 @@
 /// Panel rendering for the thread list.
 mod panel;
 /// Tool execution handlers: `Send` and `Read`.
-mod tools;
+pub mod tools;
 /// Thread state types: `Thread`, `ThreadMessage`, `ThreadsState`, `FocusState`.
 pub mod types;
 

@@ -91,7 +91,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 ///
 /// Returns the last *k* messages formatted with author, timestamp, and content.
 /// `MY_TURN` threads get focus set; `THEIR_TURN` threads are peek-only.
-pub(crate) fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
+pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     let tid = tool.input.get("thread_id")
         .and_then(serde_json::Value::as_str)
         .unwrap_or("");

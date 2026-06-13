@@ -18,6 +18,8 @@ use crate::ui;
 
 use crate::app::App;
 use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
+use cp_base::state::data::message::{MsgKind, MsgStatus, ToolResultRecord, ToolUseRecord};
+use cp_base::tools::ToolUse;
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
 use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
@@ -318,6 +320,11 @@ impl App {
                 self.state.guard_rail_blocked = None;
                 let should_stream = apply_continuation(&mut self.state, action);
                 if should_stream {
+                    // Auto-Read: if unfocused with a MY_TURN thread, inject a
+                    // synthetic Read tool call so the AI starts with focus set
+                    // and thread content visible — saves a full round-trip.
+                    self.maybe_inject_auto_read();
+
                     self.typewriter.reset();
                     self.pending_tools.clear();
                     let ctx = prepare_stream_context(&mut self.state, false, None);
@@ -370,6 +377,108 @@ impl App {
         }
         self.last_spinner_ms = now;
         self.state.flags.ui.dirty = true;
+    }
+
+    /// Inject a synthetic `Read` tool call when auto-continuation fires
+    /// for a thread notification while the AI is unfocused.
+    ///
+    /// The Read is 100% deterministic in this scenario — the AI would
+    /// always call it anyway. Injecting it saves a full round-trip:
+    /// the AI starts streaming with focus already set and thread content
+    /// visible, so it can immediately `Send` its response.
+    ///
+    /// Modifies the message list by popping the empty streaming-target
+    /// assistant message, inserting the Read `tool_use` + `tool_result` pair,
+    /// then pushing a new empty assistant for streaming.
+    fn maybe_inject_auto_read(&mut self) {
+        // Only inject when unfocused + a MY_TURN thread exists.
+        let fs = FocusState::get(&self.state);
+        if fs.focused_thread_id.is_some() {
+            return;
+        }
+
+        let ts = ThreadsState::get(&self.state);
+        let Some(my_turn) = ts.threads.iter().find(|t| t.status == ThreadStatus::MyTurn) else {
+            return;
+        };
+        let tid = my_turn.id.clone();
+
+        // Pop the empty assistant (streaming target) — we'll push a fresh
+        // one after the injected Read messages.
+        let Some(streaming_target) = self.state.messages.pop() else {
+            return;
+        };
+
+        // Build a synthetic ToolUse for Read.
+        let tool_use_id = format!("auto_read_{tid}");
+        let input = serde_json::json!({
+            "thread_id": tid,
+            "intent": "Focus on thread",
+            "verb": "Reading",
+        });
+
+        let tool_use = ToolUse {
+            id: tool_use_id.clone(),
+            name: "Read".into(),
+            input: input.clone(),
+        };
+
+        // Execute Read — this sets focus and returns formatted messages.
+        let result = cp_mod_threads::tools::execute_read(&tool_use, &mut self.state);
+
+        // Create assistant message carrying the tool_use record.
+        let tool_call_msg = crate::state::Message {
+            id: format!("T{}", self.state.next_tool_id),
+            uid: Some(format!("UID_{}_T", self.state.global_next_uid)),
+            role: "assistant".into(),
+            content: String::new(),
+            msg_type: MsgKind::ToolCall,
+            status: MsgStatus::Full,
+            tool_uses: vec![ToolUseRecord {
+                id: tool_use_id.clone(),
+                name: "Read".into(),
+                input,
+            }],
+            tool_results: vec![],
+            input_tokens: 0,
+            content_token_count: 0,
+            timestamp_ms: now_ms(),
+        };
+        self.state.next_tool_id = self.state.next_tool_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
+
+        // Create tool_result message (user role).
+        let result_msg = crate::state::Message {
+            id: format!("R{}", self.state.next_result_id),
+            uid: Some(format!("UID_{}_R", self.state.global_next_uid)),
+            role: "user".into(),
+            content: String::new(),
+            msg_type: MsgKind::ToolResult,
+            status: MsgStatus::Full,
+            tool_uses: vec![],
+            tool_results: vec![ToolResultRecord {
+                tool_use_id,
+                content: result.content,
+                display: None,
+                tldr: None,
+                is_error: result.is_error,
+                tool_name: "Read".into(),
+            }],
+            input_tokens: 0,
+            content_token_count: 0,
+            timestamp_ms: now_ms(),
+        };
+        self.state.next_result_id = self.state.next_result_id.saturating_add(1);
+        self.state.global_next_uid = self.state.global_next_uid.saturating_add(1);
+
+        // Persist both injected messages.
+        self.save_message_async(&tool_call_msg);
+        self.save_message_async(&result_msg);
+
+        // Push: tool_call → tool_result → streaming target.
+        self.state.messages.push(tool_call_msg);
+        self.state.messages.push(result_msg);
+        self.state.messages.push(streaming_target);
     }
 
     /// Notify when idle and a thread has `MY_TURN` status.
