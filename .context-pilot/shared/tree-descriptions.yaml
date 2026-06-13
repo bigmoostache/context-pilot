@@ -102,6 +102,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+07058a01cc85c3f4:
+  path: .context-pilot/shared/entities/schema.sql
+  description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
+  last_edited_ms: 0
 078746d33a727ad6:
   path: crates/cp-mod-git/src/result_panel.rs
   description: 'GitResultPanel: auto-refreshing read-only command output, timeout execution, diff-aware syntax coloring'
@@ -346,6 +350,10 @@
   path: crates/cp-mod-entities/src/sql/errors.rs
   description: 'SQL error enrichment: fuzzy suggestions (Levenshtein) + schema context for SQLite errors. enrich_error(). Moved from src/ into sql/ to keep folder ≤8 entries.'
   last_edited_ms: 1781122618120
+1680325fded06f38:
+  path: crates/cp-mod-entities/src/panels/mod.rs
+  description: 'Panels submodule hub: declares format (SQL result formatting), panel (fixed Entities panel), result_panel (dynamic query result panel).'
+  last_edited_ms: 0
 16896bc4c096fb84:
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
@@ -857,6 +865,10 @@
 386116b9b854c8ac:
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
+  last_edited_ms: 0
+3874011eb459f11a:
+  path: sandbox/tasks/inputs/password-recovery/instruction_local.md
+  description: Adapted task instruction for local CP headless run — paths relative (./varsea, ./recovered_passwords.txt) instead of /app/.
   last_edited_ms: 0
 387f3b11754928d1:
   path: crates/cp-mod-entities/src/lib.rs
@@ -1530,6 +1542,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+687b59bd2100852c:
+  path: crates/cp-mod-entities/src/panels/format.rs
+  description: SQL result formatting shared by tools + panels. query_to_markdown (200-row cap, 0-row enrichment hint), format_cell, format_markdown_table, extract_table_name (case-insensitive byte-safe FROM scan — no to_uppercase offset bug).
+  last_edited_ms: 0
 68bb461714cf1222:
   path: src/ui/help/config_overlay.rs
   description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access.
@@ -1809,6 +1825,10 @@
 7dacd6443c44c4ff:
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
+  last_edited_ms: 0
+7e4c8030e41ab258:
+  path: src/app/context/mod.rs
+  description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
   last_edited_ms: 0
 7f3ef5ae7601d1ab:
   path: crates/cp-mod-callback/src/storage.rs
@@ -2229,6 +2249,10 @@
 9d5d447760f0d688:
   path: crates/cp-mod-memory/src/lib.rs
   description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'
+  last_edited_ms: 0
+9dce5d5edffb3286:
+  path: sandbox/tasks/inputs/password-recovery/README.md
+  description: 'Sandbox README: task structure, how to launch CP headless locally, solution hint in spoiler.'
   last_edited_ms: 0
 9dcfc8d8a49f3b58:
   path: increment.txt
@@ -3330,6 +3354,10 @@ f2750957712b6508:
   path: src/ui/help/config_overlay/budget_bars.rs
   description: Budget bars adapter for config overlay. Renders ConfigBudgetBar IR entries as filled/empty block bars with semantic colors. 24-cell bar width.
   last_edited_ms: 0
+f2cd95dba878f52e:
+  path: .gitignore
+  description: Git ignore rules
+  last_edited_ms: 1781339979560
 f31d99c922963fdd:
   path: yamls/themes.yaml
   description: '6 themes (dnd/modern/futuristic/forest/sea/space). Each: message icons, context icons (including entities: 🗃️), status/todo icons, 16 RGB colors.'

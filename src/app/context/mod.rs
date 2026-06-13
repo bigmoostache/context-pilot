@@ -411,6 +411,32 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
 
         // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
         let id = format!("P{}", pos.saturating_add(1));
+
+        // Evict any dynamic panel squatting on this fixed panel's ID.
+        // This happens when a module is activated after dynamic panels already
+        // claimed the slot (e.g., module was inactive at boot → slot looked free
+        // → `next_available_context_id` assigned it to a dynamic panel → module
+        // activated later → collision). Two panels sharing one ID breaks the
+        // freeze system, cost tracking, and cache prefix matching.
+        let squatter_new_id = state
+            .context
+            .iter()
+            .any(|c| c.id == id && c.context_type != d.context_type)
+            .then(|| state.next_available_context_id());
+        if let Some(new_id) = squatter_new_id
+            && let Some(squatter) =
+                state.context.iter_mut().find(|c| c.id == id && c.context_type != d.context_type)
+        {
+            log::warn!(
+                "Evicting panel '{}' (type={}) from ID {} → {new_id} to make room for fixed panel '{}'",
+                squatter.name,
+                squatter.context_type,
+                id,
+                d.display_name,
+            );
+            squatter.id = new_id;
+        }
+
         let insert_pos = pos.saturating_add(1).min(state.context.len()); // +1 to account for Conversation at index 0
         let elem = modules::make_default_entry(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
         state.context.insert(insert_pos, elem);
