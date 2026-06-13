@@ -78,11 +78,13 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         fs.notified_my_turn_id = None;
     }
 
-    ToolResult::new(
+    let mut result = ToolResult::new(
         tool.id.clone(),
         format!("Sent to {tid} \"{thread_name}\": {msg_preview}"),
         false,
-    )
+    );
+    result.preserves_tempo = true;
+    result
 }
 
 /// Read messages from a thread. Sets focus if the thread is `MY_TURN`.
@@ -158,7 +160,11 @@ pub(crate) fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     // THEIR_TURN → peek only, no focus change.
 
-    ToolResult::new(tool.id.clone(), formatted, false)
+    // Preserve tempo for inline results — if a dynamic panel path is added
+    // later for large thread histories, only the inline path should preserve.
+    let mut result = ToolResult::new(tool.id.clone(), formatted, false);
+    result.preserves_tempo = true;
+    result
 }
 
 /// Format an age duration from two epoch-ms timestamps as a human-readable

@@ -1882,6 +1882,10 @@
   path: src/infra/constants.rs
   description: API/layout/loop/persistence constants + theme color accessors (from YAML themes) + card design tokens (card_text, card_agent_bg, card_reverie_bg, card_queue_bg, card_think_bg) + icons + prompts.
   last_edited_ms: 0
+750e1c62623435fe:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
+  last_edited_ms: 0
 753bc3b64810d965:
   path: src/modules/overview/tools/panel_goto_page.rs
   description: 'panel_goto_page: navigate paginated panels, range validation, recomputes token_count per page'
