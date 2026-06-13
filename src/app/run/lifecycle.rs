@@ -387,6 +387,11 @@ impl App {
     /// the AI starts streaming with focus already set and thread content
     /// visible, so it can immediately `Send` its response.
     ///
+    /// Thread selection priority:
+    /// 1. Extract thread IDs from the synthetic message (notification content)
+    ///    and pick the first one that's still `MY_TURN`.
+    /// 2. Fall back to any `MY_TURN` thread if no notification thread ID matches.
+    ///
     /// Modifies the message list by popping the empty streaming-target
     /// assistant message, inserting the Read `tool_use` + `tool_result` pair,
     /// then pushing a new empty assistant for streaming.
@@ -397,11 +402,35 @@ impl App {
             return;
         }
 
+        // Extract thread IDs from the synthetic message that triggered this
+        // continuation. The synthetic is the second-to-last message (before
+        // the empty assistant streaming target pushed by `apply_continuation`).
+        let candidate_ids: Vec<String> = self
+            .state
+            .messages
+            .len()
+            .checked_sub(2)
+            .and_then(|idx| self.state.messages.get(idx))
+            .filter(|m| m.role == "user" && m.content.starts_with("/* Auto-continuation:"))
+            .map(|m| extract_thread_ids(&m.content))
+            .unwrap_or_default();
+
         let ts = ThreadsState::get(&self.state);
-        let Some(my_turn) = ts.threads.iter().find(|t| t.status == ThreadStatus::MyTurn) else {
+
+        // Prefer the thread the notification is about; fall back to any MY_TURN.
+        let my_turn = candidate_ids
+            .iter()
+            .find_map(|tid| {
+                ts.threads
+                    .iter()
+                    .find(|t| t.id == *tid && t.status == ThreadStatus::MyTurn)
+            })
+            .or_else(|| ts.threads.iter().find(|t| t.status == ThreadStatus::MyTurn));
+
+        let Some(thread) = my_turn else {
             return;
         };
-        let tid = my_turn.id.clone();
+        let tid = thread.id.clone();
 
         // Pop the empty assistant (streaming target) — we'll push a fresh
         // one after the injected Read messages.
@@ -531,4 +560,32 @@ impl App {
             content,
         );
     }
+}
+
+/// Extract thread IDs from notification content embedded in a synthetic message.
+///
+/// Looks for `thread_id="T..."` patterns (produced by thread input routing
+/// and `check_my_turn_threads`). Returns all matches in order so the caller
+/// can pick the first one that's still `MY_TURN`.
+fn extract_thread_ids(content: &str) -> Vec<String> {
+    let marker = "thread_id=\"";
+    let mut ids = Vec::new();
+    let mut search_from: usize = 0;
+    while let Some(pos) = content.get(search_from..).and_then(|s| s.find(marker)) {
+        let Some(start) = search_from
+            .checked_add(pos)
+            .and_then(|v| v.checked_add(marker.len()))
+        else {
+            break;
+        };
+        if let Some(end_offset) = content.get(start..).and_then(|s| s.find('"')) {
+            if let Some(id_str) = start.checked_add(end_offset).and_then(|end| content.get(start..end)) {
+                ids.push(id_str.to_string());
+            }
+            search_from = start.saturating_add(end_offset).saturating_add(1);
+        } else {
+            break;
+        }
+    }
+    ids
 }

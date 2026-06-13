@@ -68,11 +68,17 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         perf::render_perf_overlay_from_ir(frame, area, perf_overlay);
     }
 
-    // Render autocomplete popup if active (via IR overlays)
+    // Render autocomplete popup if active (via IR overlays).
+    // In Threads mode the input lives inside the right pane (past the thread
+    // list), so offset by THREAD_LIST_WIDTH instead of the sidebar width.
     {
-        let sw = state.view_mode.width();
-        let content_x = area.x.saturating_add(sw);
-        let content_width = area.width.saturating_sub(sw);
+        let offset = if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+            threads_view::THREAD_LIST_WIDTH
+        } else {
+            state.view_mode.width()
+        };
+        let content_x = area.x.saturating_add(offset);
+        let content_width = area.width.saturating_sub(offset);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
         let content_area = Rect::new(content_x, area.y, content_width, content_height);
         ir::render_conversation::render_autocomplete_if_active(frame, content_area, &ir_frame.overlays);
