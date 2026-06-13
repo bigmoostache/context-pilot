@@ -395,8 +395,18 @@ impl App {
         let tname = thread.name.clone();
 
         // Debounce: already notified about this exact thread.
+        // Re-fire only when the previous notification was consumed (processed)
+        // but the AI still hasn't addressed the thread — creating a persistent
+        // nudge loop until the thread is actually handled.
         if FocusState::get(&self.state).notified_my_turn_id.as_deref() == Some(&tid) {
-            return;
+            let has_unprocessed = SpineState::get(&self.state)
+                .notifications
+                .iter()
+                .any(|n| !n.is_processed() && n.source == "my_turn_thread");
+            if has_unprocessed {
+                return; // Previous nudge still pending — don't spam
+            }
+            // Previous nudge consumed but thread still MY_TURN — clear debounce to re-fire
         }
 
         FocusState::get_mut(&mut self.state).notified_my_turn_id = Some(tid.clone());
