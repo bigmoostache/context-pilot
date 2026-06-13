@@ -21,13 +21,10 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
     let threads_state = ThreadsState::get(state);
     let focus_state = FocusState::get(state);
 
-    if threads_state.threads.is_empty() && !focus_state.creating_thread {
-        render_empty_state(frame, area);
-        return;
-    }
-
-    // Clamp selected index
-    let selected_idx = focus_state.selected_thread_idx.min(threads_state.threads.len().saturating_sub(1));
+    // Clamp selected index — allow one past end for virtual "New Thread" entry
+    let total_entries = threads_state.threads.len().saturating_add(1);
+    let selected_idx = focus_state.selected_thread_idx.min(total_entries.saturating_sub(1));
+    let on_virtual_new = selected_idx >= threads_state.threads.len();
 
     // Two-pane layout: thread list | message area
     if area.width > THREAD_LIST_WIDTH.saturating_add(20) {
@@ -38,40 +35,23 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
 
         let (Some(&list_area), Some(&msg_area)) = (layout.first(), layout.get(1)) else { return };
         render_thread_list(frame, state, list_area);
-        render_message_area(frame, threads_state, selected_idx, msg_area);
+        if on_virtual_new {
+            render_new_thread_prompt(frame, state, msg_area);
+        } else {
+            render_message_area(frame, threads_state, selected_idx, msg_area);
+        }
     } else {
         // Narrow terminal — show thread list only
         render_thread_list(frame, state, area);
     }
 }
 
-/// Render the "no threads" empty state with a helpful message.
-fn render_empty_state(frame: &mut Frame<'_>, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme::border_muted()))
-        .title(Span::styled(" Threads ", Style::default().fg(theme::accent())));
-
-    let text = vec![
-        Line::from(""),
-        Line::from(Span::styled("No threads yet.", Style::default().fg(theme::text_muted()))),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("Press ", Style::default().fg(theme::text_muted())),
-            Span::styled("Ctrl+V", Style::default().fg(theme::accent())),
-            Span::styled(" to return to panel view.", Style::default().fg(theme::text_muted())),
-        ]),
-    ];
-
-    let paragraph = Paragraph::new(text).block(block).alignment(ratatui::layout::Alignment::Center);
-    frame.render_widget(paragraph, area);
-}
-
-/// Render the left-pane thread list with selection indicator.
+/// Render the left-pane thread list with selection indicator and virtual "New Thread" entry.
 fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let ts = ThreadsState::get(state);
     let focus = FocusState::get(state);
-    let selected = focus.selected_thread_idx.min(ts.threads.len().saturating_sub(1));
+    let total_entries = ts.threads.len().saturating_add(1); // +1 for virtual entry
+    let selected = focus.selected_thread_idx.min(total_entries.saturating_sub(1));
     let confirming = focus.confirming_archive;
     let block = Block::default()
         .borders(Borders::RIGHT)
@@ -123,10 +103,17 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         ]));
 
         // Separator between threads
-        if i < ts.threads.len().saturating_sub(1) {
-            lines.push(Line::from(""));
-        }
+        lines.push(Line::from(""));
     }
+
+    // Virtual "New Thread" entry — always at the bottom of the list
+    let on_virtual = selected >= ts.threads.len();
+    let new_indicator = if on_virtual { "▸ " } else { "  " };
+    let new_color = if on_virtual { theme::accent() } else { theme::text_muted() };
+    lines.push(Line::from(vec![
+        Span::styled(new_indicator, Style::default().fg(new_color)),
+        Span::styled("+ New Thread", Style::default().fg(new_color)),
+    ]));
 
     // Help hints at the bottom
     let help_y = inner.height.saturating_sub(1);
@@ -144,15 +131,53 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
             ]));
         } else {
             lines.push(Line::from(vec![
-                Span::styled(" n", Style::default().fg(theme::accent())),
-                Span::styled(" new  ", Style::default().fg(theme::text_muted())),
-                Span::styled("a", Style::default().fg(theme::accent())),
+                Span::styled(" a", Style::default().fg(theme::accent())),
                 Span::styled(" del  ", Style::default().fg(theme::text_muted())),
                 Span::styled("Ctrl+V", Style::default().fg(theme::accent())),
-                Span::styled(" view", Style::default().fg(theme::text_muted())),
+                Span::styled(" back", Style::default().fg(theme::text_muted())),
             ]));
         }
     }
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+/// Render the right pane when the virtual "New Thread" entry is selected.
+///
+/// Shows a prompt inviting the user to type a thread name in the input area.
+fn render_new_thread_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::border_muted()))
+        .title(Span::styled(" New Thread ", Style::default().fg(theme::accent())))
+        .style(Style::default().bg(theme::bg_base()));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let input_preview = if state.input.is_empty() {
+        "…".to_string()
+    } else {
+        state.input.clone()
+    };
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "Type a name for the new thread below,",
+            Style::default().fg(theme::text_muted()),
+        )),
+        Line::from(Span::styled(
+            "then press Enter to create it.",
+            Style::default().fg(theme::text_muted()),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ➜ ", Style::default().fg(theme::accent())),
+            Span::styled(input_preview, Style::default().fg(theme::text())),
+        ]),
+    ];
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);

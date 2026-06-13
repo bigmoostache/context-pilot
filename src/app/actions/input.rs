@@ -146,8 +146,10 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
 /// When `creating_thread` is active, creates a new thread with the
 /// input text as the thread name instead.
 fn handle_thread_input_submit(state: &mut State) -> ActionResult {
-    // Thread creation mode: input text becomes the new thread name
-    if FocusState::get(state).creating_thread {
+    // Virtual "New Thread" entry: selected past the end of real threads
+    let selected_idx = FocusState::get(state).selected_thread_idx;
+    let thread_count = ThreadsState::get(state).threads.len();
+    if selected_idx >= thread_count {
         return handle_thread_create(state);
     }
 
@@ -166,7 +168,6 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     record_prompt_history(&content);
 
     // Find the selected thread
-    let selected_idx = FocusState::get(state).selected_thread_idx;
     let threads_state = ThreadsState::get_mut(state);
 
     let Some(thread) = threads_state.threads.get_mut(selected_idx) else {
@@ -186,22 +187,26 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     thread.messages.push(msg);
     thread.status = ThreadStatus::MyTurn;
 
-    // Build content preview for the notification
-    let content_preview = if content.len() > 80 {
+    // Build notification content: message preview + thread name + Read invitation
+    let thread_id = thread.id.clone();
+    let msg_preview = if content.len() > 120 {
         format!(
-            "[Thread \"{thread_name}\"] {}...",
-            content.get(..content.floor_char_boundary(80)).unwrap_or("")
+            "{}...",
+            content.get(..content.floor_char_boundary(120)).unwrap_or("")
         )
     } else {
-        format!("[Thread \"{thread_name}\"] {content}")
+        content
     };
+    let notification_content = format!(
+        "New message in thread \"{thread_name}\" ({thread_id}): {msg_preview}\nUse Read(thread_id=\"{thread_id}\") to see the conversation.",
+    );
 
     // Create a UserMessage notification — triggers AI streaming
     let _r = SpineState::create_notification(
         state,
         NotificationType::UserMessage,
         "thread_input".to_string(),
-        content_preview,
+        notification_content,
     );
 
     // Notify all modules
@@ -214,17 +219,16 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
 
 /// Create a new thread from the input text (used as thread name).
 ///
-/// Called when `creating_thread` is active and the user presses Enter.
-/// Generates a unique thread ID, creates an empty `TheirTurn` thread,
-/// selects it, and clears creation mode.
+/// Called when the virtual "New Thread" entry is selected and the user
+/// presses Enter. Generates a unique thread ID, creates an empty
+/// `TheirTurn` thread, and selects it.
 fn handle_thread_create(state: &mut State) -> ActionResult {
     let name = state.input.trim().to_string();
 
-    // Clear input + creation mode regardless of outcome
+    // Clear input regardless of outcome
     state.input.clear();
     state.input_cursor = 0;
     state.input_selection_anchor = None;
-    FocusState::get_mut(state).creating_thread = false;
 
     if name.is_empty() {
         return ActionResult::Nothing;
