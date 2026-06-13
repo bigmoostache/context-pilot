@@ -165,6 +165,11 @@ pub struct FocusState {
     /// `messages.len() > last_read_count[thread_id]`.
     #[serde(default)]
     pub last_read_count: std::collections::BTreeMap<String, usize>,
+    /// Thread ID for which we last sent an idle+`MY_TURN` notification.
+    /// Used for debouncing — prevents spamming the same notification
+    /// every tick. Cleared when the thread transitions to `THEIR_TURN`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notified_my_turn_id: Option<String>,
 }
 
 impl Default for FocusState {
@@ -185,6 +190,7 @@ impl FocusState {
             creating_thread: false,
             confirming_archive: false,
             last_read_count: std::collections::BTreeMap::new(),
+            notified_my_turn_id: None,
         }
     }
 

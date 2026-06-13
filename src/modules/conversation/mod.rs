@@ -9,7 +9,7 @@ pub(crate) mod refresh;
 /// IR-based message renderer emitting `Vec<Block>` instead of ratatui lines.
 pub(crate) mod render_blocks;
 /// IR-based input area renderer emitting `Vec<Block>`.
-mod render_input_blocks;
+pub(crate) mod render_input_blocks;
 /// Best-effort JSON field extraction for streaming tool call display.
 mod render_json;
 

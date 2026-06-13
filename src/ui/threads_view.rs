@@ -1,17 +1,20 @@
 //! Threads view — dedicated TUI layout when `ViewMode::Threads` is active.
 //!
 //! Renders a two-pane layout: thread list (left) + message area (right).
+//! Messages render identically to the main conversation panel (user/AI only).
 //! Completely replaces the standard sidebar + panel view.
 
 use ratatui::Frame;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState};
 
-use crate::state::State;
+use crate::modules::conversation::render_blocks::{MessageBlockOpts, render_message_blocks};
+use crate::modules::conversation::render_input_blocks::{InputBlockCtx, render_input_blocks};
+use crate::state::{Message, MsgKind, MsgStatus, State};
 use crate::ui::theme;
 use cp_base::cast::Safe as _;
-use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
+use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
 
 /// Width of the thread list pane in columns.
 const THREAD_LIST_WIDTH: u16 = 28;
@@ -38,7 +41,7 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
         if on_virtual_new {
             render_new_thread_prompt(frame, state, msg_area);
         } else {
-            render_message_area(frame, threads_state, selected_idx, msg_area);
+            render_message_area_with_input(frame, state, selected_idx, msg_area);
         }
     } else {
         // Narrow terminal — show thread list only
@@ -183,8 +186,18 @@ fn render_new_thread_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
     frame.render_widget(paragraph, inner);
 }
 
-/// Render the right-pane message area for the selected thread.
-fn render_message_area(frame: &mut Frame<'_>, ts: &ThreadsState, selected: usize, area: Rect) {
+/// Render the right-pane message area with input box for the selected thread.
+///
+/// Messages render identically to the main conversation panel: same icons,
+/// markdown rendering, and styling. Only user and assistant messages appear
+/// (threads never contain tool calls or tool results).
+fn render_message_area_with_input(
+    frame: &mut Frame<'_>,
+    state: &State,
+    selected: usize,
+    area: Rect,
+) {
+    let ts = ThreadsState::get(state);
     let Some(thread) = ts.threads.get(selected) else {
         return;
     };
@@ -203,71 +216,171 @@ fn render_message_area(frame: &mut Frame<'_>, ts: &ThreadsState, selected: usize
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme::border_muted()))
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(theme::border()))
         .title(title)
-        .style(Style::default().bg(theme::bg_base()));
+        .style(Style::default().bg(theme::bg_surface()));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    if thread.messages.is_empty() {
-        let empty = Paragraph::new(Span::styled(
-            "No messages in this thread.",
-            Style::default().fg(theme::text_muted()),
-        ));
-        frame.render_widget(empty, inner);
+    // Calculate input area height based on input content
+    let input_height = calculate_input_height(state, inner.width);
+    let messages_height = inner.height.saturating_sub(input_height);
+
+    if messages_height == 0 {
         return;
     }
 
-    // Build message lines
-    let mut lines: Vec<Line<'_>> = Vec::new();
+    // Split inner area: messages on top, input at bottom
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(messages_height), Constraint::Length(input_height)])
+        .split(inner);
 
-    for msg in &thread.messages {
-        // Author + timestamp header
-        let author_label = msg.author.to_string();
-        let author_color = match msg.author {
-            cp_mod_threads::types::ThreadAuthor::User => theme::accent(),
-            cp_mod_threads::types::ThreadAuthor::Assistant => theme::assistant(),
-        };
-        let time = format_time_ms(msg.timestamp);
+    let (Some(&msg_area), Some(&input_area)) = (layout.first(), layout.get(1)) else { return };
 
-        lines.push(Line::from(vec![
-            Span::styled(format!("[{author_label}"), Style::default().fg(author_color)),
-            Span::styled(format!(" {time}]"), Style::default().fg(theme::text_muted())),
-        ]));
+    render_thread_messages(frame, thread, msg_area);
+    render_thread_input(frame, state, input_area);
+}
 
-        // Content
-        if let Some(content) = &msg.content {
-            for line in content.lines() {
-                lines.push(Line::from(Span::styled(
-                    line.to_string(),
-                    Style::default().fg(theme::text()),
-                )));
-            }
-        }
-
-        // File path reference
-        if let Some(path) = &msg.file_path {
-            lines.push(Line::from(Span::styled(
-                format!("📎 {path}"),
-                Style::default().fg(theme::accent_dim()),
-            )));
-        }
-
-        // Question indicator
-        if msg.question.is_some() {
-            lines.push(Line::from(Span::styled(
-                "❓ Question attached",
-                Style::default().fg(theme::warning()),
-            )));
-        }
-
-        // Blank line between messages
-        lines.push(Line::from(""));
+/// Render thread messages using the same IR renderer as the main conversation.
+fn render_thread_messages(
+    frame: &mut Frame<'_>,
+    thread: &cp_mod_threads::types::Thread,
+    area: Rect,
+) {
+    if thread.messages.is_empty() {
+        let empty = Paragraph::new(Span::styled(
+            "No messages yet. Type below to start the conversation.",
+            Style::default().fg(theme::text_muted()),
+        ));
+        frame.render_widget(empty, area);
+        return;
     }
 
-    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, inner);
+    let opts = MessageBlockOpts {
+        viewport_width: area.width,
+        is_streaming: false,
+        dev_mode: false,
+    };
+
+    // Convert ThreadMessages to Message structs and render via conversation IR
+    let mut all_blocks: Vec<cp_render::Block> = Vec::new();
+    for msg in &thread.messages {
+        let conv_msg = thread_message_to_message(msg);
+        let msg_blocks = render_message_blocks(&conv_msg, &opts);
+        all_blocks.extend(msg_blocks);
+    }
+
+    let lines = crate::ui::ir::blocks_to_lines(&all_blocks);
+
+    // Scroll: auto-scroll to bottom
+    let content_height = lines.len();
+    let viewport_height = area.height.to_usize();
+    let max_scroll = content_height.saturating_sub(viewport_height);
+    let scroll_offset = max_scroll; // Always at bottom for now
+
+    let paragraph = Paragraph::new(lines).scroll((scroll_offset.to_u16(), 0));
+    frame.render_widget(paragraph, area);
+
+    // Scrollbar
+    if content_height > viewport_height {
+        let scrollbar = Scrollbar::default()
+            .orientation(ScrollbarOrientation::VerticalRight)
+            .style(Style::default().fg(theme::bg_elevated()))
+            .thumb_style(Style::default().fg(theme::accent_dim()));
+        let mut scrollbar_state = ScrollbarState::new(max_scroll).position(scroll_offset);
+        frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
+    }
+}
+
+/// Render the input area at the bottom of the thread message area.
+fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
+    // Separator line at the top of the input area
+    let sep_area = Rect { height: 1, ..area };
+    let sep = Paragraph::new(Line::from(Span::styled(
+        "─".repeat(area.width.into()),
+        Style::default().fg(theme::border_muted()),
+    )));
+    frame.render_widget(sep, sep_area);
+
+    // Input content below separator
+    let input_area = Rect {
+        y: area.y.saturating_add(1),
+        height: area.height.saturating_sub(1),
+        ..area
+    };
+
+    let command_ids: Vec<String> =
+        cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command)
+            .iter()
+            .map(|p| p.id.clone())
+            .collect();
+
+    let ctx = InputBlockCtx {
+        command_ids: &command_ids,
+        paste_buffers: &state.paste_buffers,
+        paste_buffer_labels: &state.paste_buffer_labels,
+        viewport_width: input_area.width,
+    };
+
+    let input_blocks = render_input_blocks(
+        &state.input,
+        state.input_cursor,
+        state.input_selection_anchor,
+        &ctx,
+    );
+
+    let lines = crate::ui::ir::blocks_to_lines(&input_blocks);
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, input_area);
+}
+
+/// Convert a `ThreadMessage` to a `Message` for rendering via the conversation IR.
+fn thread_message_to_message(msg: &cp_mod_threads::types::ThreadMessage) -> Message {
+    let role = match msg.author {
+        ThreadAuthor::User => "user",
+        ThreadAuthor::Assistant => "assistant",
+    };
+    Message {
+        id: String::new(),
+        uid: None,
+        role: role.to_owned(),
+        content: msg.content.clone().unwrap_or_default(),
+        msg_type: MsgKind::TextMessage,
+        status: MsgStatus::Full,
+        tool_uses: vec![],
+        tool_results: vec![],
+        input_tokens: 0,
+        content_token_count: 0,
+        timestamp_ms: msg.timestamp,
+    }
+}
+
+/// Calculate input area height based on current input content.
+fn calculate_input_height(state: &State, width: u16) -> u16 {
+    if state.input.is_empty() {
+        // Separator (1) + one line for empty input prompt
+        return 3;
+    }
+    let line_count = state.input.lines().count().max(1);
+    // Account for wrapping
+    let wrap_width = (width as usize).saturating_sub(10).max(20);
+    let wrapped_lines: usize = state
+        .input
+        .lines()
+        .map(|l| {
+            if l.is_empty() {
+                1
+            } else {
+                l.len().div_ceil(wrap_width).max(1)
+            }
+        })
+        .sum();
+    let total = wrapped_lines.max(line_count);
+    // Separator (1) + content + hint line (1), capped at 10 lines
+    (total.saturating_add(3)).min(10).to_u16()
 }
 
 /// Truncate a string to `max_len` characters, appending "…" if truncated.
@@ -279,11 +392,4 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         result.push('…');
         result
     }
-}
-
-/// Format a millisecond timestamp as HH:MM.
-fn format_time_ms(ms: u64) -> String {
-    let secs = cp_base::panels::time_arith::ms_to_secs(ms);
-    let (hours, minutes, _seconds) = cp_base::panels::time_arith::secs_to_hms(secs);
-    format!("{hours:02}:{minutes:02}")
 }

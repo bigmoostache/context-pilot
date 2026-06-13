@@ -20,6 +20,7 @@ use crate::app::App;
 use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
+use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
 
 /// Bundles the I/O channels polled by the main event loop.
 pub(crate) struct EventChannels<'ch> {
@@ -181,6 +182,7 @@ impl App {
             super::tools::pipeline::handle_tool_execution(self, ch.tx);
             super::streaming::finalize_stream(self);
             self.check_spine(ch.tx);
+            self.check_my_turn_threads();
             super::streaming::process_api_check_results(self);
 
             // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
@@ -368,5 +370,46 @@ impl App {
         }
         self.last_spinner_ms = now;
         self.state.flags.ui.dirty = true;
+    }
+
+    /// Notify when idle and a thread has `MY_TURN` status.
+    ///
+    /// Debounced via `FocusState::notified_my_turn_id` — fires once per
+    /// thread transition to `MY_TURN`, cleared when the AI sends a reply
+    /// (which sets `THEIR_TURN`).
+    fn check_my_turn_threads(&mut self) {
+        if self.state.flags.stream.phase.is_streaming() {
+            return;
+        }
+
+        let threads = ThreadsState::get(&self.state);
+        let my_turn = threads.threads.iter().find(|t| t.status == ThreadStatus::MyTurn);
+
+        let Some(thread) = my_turn else {
+            // No MY_TURN threads — clear debounce.
+            FocusState::get_mut(&mut self.state).notified_my_turn_id = None;
+            return;
+        };
+
+        let tid = thread.id.clone();
+        let tname = thread.name.clone();
+
+        // Debounce: already notified about this exact thread.
+        if FocusState::get(&self.state).notified_my_turn_id.as_deref() == Some(&tid) {
+            return;
+        }
+
+        FocusState::get_mut(&mut self.state).notified_my_turn_id = Some(tid.clone());
+
+        let content = format!(
+            "Thread \"{tname}\" ({tid}) is MY_TURN — it has user input awaiting your response.\n\
+             Use Read(thread_id=\"{tid}\") to see the conversation and respond.",
+        );
+        let _r = SpineState::create_notification(
+            &mut self.state,
+            NotificationType::Custom,
+            "my_turn_thread".to_string(),
+            content,
+        );
     }
 }

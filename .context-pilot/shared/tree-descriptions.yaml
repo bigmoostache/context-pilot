@@ -170,6 +170,10 @@
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, ≤5 rows inline+tempo, >5 rows entity_result panel+no tempo. 200-row cap. RETURNING support.
   last_edited_ms: 1780606076253
+0a11f97b7c738ae2:
+  path: src/modules/conversation/mod.rs
+  description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
+  last_edited_ms: 0
 0a18dae90799c09c:
   path: crates/cp-mod-scratchpad/Cargo.toml
   description: 'Scratchpad module deps: cp-base, cp-render, crossterm, serde, serde_json.'
@@ -793,6 +797,10 @@
 2c7719bfaa7c0bf3:
   path: .github/workflows/release.yml
   description: 'Release workflow: builds .deb on tag push (ubuntu-latest, amd64 only). Creates GitHub Release with softprops/action-gh-release.'
+  last_edited_ms: 0
+2d8795d69497a439:
+  path: src/app/actions/input.rs
+  description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
 2da0868f1781fbf0:
   path: src/app/run/reverie.rs
@@ -1658,6 +1666,10 @@
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers").
   last_edited_ms: 0
+672a62d585033f7d:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
+  last_edited_ms: 0
 674c52379f221917:
   path: crates/cp-mod-utilities/src/lib.rs
   description: '4 modules: hash, time, dirs, secret. Lightweight replacements for external deps.'
@@ -1841,6 +1853,10 @@
 748a7108feb47f4e:
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. pub(crate) mod crawl. Nested object params (location). Simple dispatch pattern.'
+  last_edited_ms: 0
+74ca866d078e2418:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
 74f62085801a5568:
   path: src/infra/constants.rs
@@ -2350,6 +2366,10 @@
   path: crates/cp-mod-github/src/classify/mod.rs
   description: 'gh command classification: ReadOnly/Mutating, static tables (7 groups + 50 actions), binary_search, `gh api` method-aware'
   last_edited_ms: 0
+9557ff70b0d90a25:
+  path: src/modules/conversation/render_input_blocks.rs
+  description: IR input area renderer. Cursor + paste placeholder expansion + command highlighting + selection highlighting (via apply_selection_to_spans with reversed spans). InputBlockCtx context, expand_paste_sentinels mapping, command hints.
+  last_edited_ms: 0
 9567f58da9cf921d:
   path: src/infra/mod.rs
   description: 'Re-exports: api, config, constants, flame (inline re-export of cp_base::flame init/flush), gh_watcher, profiler, tools, watcher. Infrastructure layer between app and core crates.'
@@ -2858,6 +2878,10 @@ b6162eed9f57263f:
   path: crates/cp-mod-files/src/tools/mod.rs
   description: 'Tool submodule routing: diff, edit_file, file, write'
   last_edited_ms: 1780648757766
+b6256b5251aeb829:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
+  last_edited_ms: 0
 b689ff54e81da946:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
@@ -3737,6 +3761,10 @@ f8162028a837bf57:
 f84a283c2aabf485:
   path: crates/cp-mod-files/src/tools/file.rs
   description: 'execute_open: accepts string or array for path param. flame!("file_open"). open_single_file: canonicalize, dedup, auto-expand tree folders. Background cache populates content.'
+  last_edited_ms: 0
+f892ce5853334499:
+  path: src/ui/threads_view.rs
+  description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
   last_edited_ms: 0
 f8eeeec12b309794:
   path: crates/cp-mod-search/src/meili/mod.rs

@@ -201,10 +201,11 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
         "New message in thread \"{thread_name}\" ({thread_id}): {msg_preview}\nUse Read(thread_id=\"{thread_id}\") to see the conversation.",
     );
 
-    // Create a UserMessage notification — triggers AI streaming
+    // Create a Custom notification — informational only, does NOT trigger main conversation streaming.
+    // The spine idle+MY_TURN detection will prompt the AI to attend to the thread.
     let _r = SpineState::create_notification(
         state,
-        NotificationType::UserMessage,
+        NotificationType::Custom,
         "thread_input".to_string(),
         notification_content,
     );
