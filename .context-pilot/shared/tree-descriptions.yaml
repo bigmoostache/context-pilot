@@ -250,6 +250,10 @@
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
   last_edited_ms: 0
+0ef246ccea6e71ab:
+  path: src/ui/threads_view.rs
+  description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
+  last_edited_ms: 0
 0f634f7e152669ab:
   path: crates/cp-mod-brave/Cargo.toml
   description: 'Brave module deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml, reqwest.'
@@ -1358,6 +1362,10 @@
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
   last_edited_ms: 1780497309373
+51f4a0f6e82fbf3d:
+  path: src/app/events.rs
+  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
+  last_edited_ms: 0
 520bd83b42d1d2d7:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams structs. post_json() generic helper. 30s timeout. Bearer auth. Rate limit + forbidden error handling.

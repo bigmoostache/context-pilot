@@ -17,6 +17,12 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
 
             // Global Ctrl shortcuts (always handled first)
             if ctrl {
+                // Threads view overrides: Ctrl+A → archive (instead of global select-all)
+                if state.view_mode == cp_base::state::data::config::ViewMode::Threads
+                    && key.code == KeyCode::Char('a')
+                {
+                    return Some(Action::ThreadArchiveStart);
+                }
                 match key.code {
                     KeyCode::Char('q') => return None, // Quit
                     KeyCode::Char('l') => return Some(Action::ClearConversation),
@@ -122,7 +128,6 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                         return Some(Action::ThreadSelectNext);
                     }
                     KeyCode::Up | KeyCode::BackTab => return Some(Action::ThreadSelectPrev),
-                    KeyCode::Char('a') if !ctrl => return Some(Action::ThreadArchiveStart),
                     KeyCode::Esc => return Some(Action::CycleViewMode),
                     KeyCode::Backspace
                     | KeyCode::Enter

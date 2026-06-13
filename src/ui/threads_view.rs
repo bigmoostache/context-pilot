@@ -134,7 +134,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
             ]));
         } else {
             lines.push(Line::from(vec![
-                Span::styled(" a", Style::default().fg(theme::accent())),
+                Span::styled(" Ctrl+A", Style::default().fg(theme::accent())),
                 Span::styled(" del  ", Style::default().fg(theme::text_muted())),
                 Span::styled("Ctrl+V", Style::default().fg(theme::accent())),
                 Span::styled(" back", Style::default().fg(theme::text_muted())),
