@@ -36,6 +36,7 @@ pub(crate) use cp_mod_queue::QueueModule;
 pub(crate) use cp_mod_scratchpad::ScratchpadModule;
 pub(crate) use cp_mod_search::SearchModule;
 pub(crate) use cp_mod_spine::SpineModule;
+pub(crate) use cp_mod_threads::ThreadsModule;
 pub(crate) use cp_mod_todo::TodoModule;
 pub(crate) use cp_mod_tree::TreeModule;
 
@@ -122,6 +123,7 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(MemoryModule),
         Box::new(OcrModule),
         Box::new(ScratchpadModule),
+        Box::new(ThreadsModule),
         Box::new(SpineModule),
         Box::new(LogsModule),
         Box::new(BraveModule),

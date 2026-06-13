@@ -146,6 +146,8 @@ impl Kind {
     pub const ENTITIES: &str = "entities";
     /// Entity SQL query result panel (dynamic, for large results).
     pub const ENTITY_RESULT: &str = "entity_result";
+    /// Threads panel (parallel discussion topics).
+    pub const THREADS: &str = "threads";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
     #[must_use]

@@ -6,6 +6,10 @@
   path: crates/cp-mod-search/src/meili/overlay.rs
   description: Ctrl+I overlay data provider. Fetches live Meilisearch stats + process stats (CPU%/RAM via /proc or ps). read_process_stats(pid) platform-specific. CPU% from tick deltas cached in MeiliLiveStats. 2s refresh cache. Builds SearchOverlayInfo.
   last_edited_ms: 0
+00ad99051e6fa6e3:
+  path: src/modules/mod.rs
+  description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
+  last_edited_ms: 0
 010229990e2e592f:
   path: src/llms/claude_code/stream_types.rs
   description: 'SSE stream types: StreamContentBlock, StreamDelta, StreamMessage, StreamUsage deserialization structs'
@@ -722,6 +726,10 @@
   path: README.md
   description: 'Project manifesto + flame graph telemetry docs. Philosophy: compiler-as-reviewer, 961 lints, hash chain trust, structure constraints, boss hunt, self-hosting loop. Flame section: ./run.sh --telemetry, inferno-flamegraph, ~60 spans coverage map.'
   last_edited_ms: 0
+2c4f2339c0cb3db9:
+  path: Cargo.toml
+  description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation.
+  last_edited_ms: 0
 2c546dbd1fd335cd:
   path: .github/ISSUE_TEMPLATE/feature_request.md
   description: Feature request issue template
@@ -970,6 +978,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+3e4206dfcbc3f1ea:
+  path: yamls/tools/scratchpad.yaml
+  description: 'Scratchpad tools YAML. 3 tools: scratchpad_create_cell, scratchpad_edit_cell, scratchpad_wipe.'
+  last_edited_ms: 1781353959589
 3e684ead94cd0fcf:
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
@@ -1041,6 +1053,10 @@
 419610fd4f3ebe45:
   path: crates/cp-mod-utilities/src/dirs.rs
   description: 'Platform dirs: home_dir() from $HOME, config_dir() macOS Library/Linux XDG. Replaces dirs crate.'
+  last_edited_ms: 0
+41d11948e4a50679:
+  path: docs/threads.md
+  description: 'Design doc for threads feature: parallel discussion/work topics. Core model, tools (Send/Read/Ask), coucou integration (recurrent scheduling), fixed panel, Ctrl+V threads view. Status: brainstorm.'
   last_edited_ms: 0
 41f125de4ae98a1f:
   path: dummy.txt
@@ -1214,6 +1230,10 @@
   path: src/app/reverie/tools.rs
   description: 'Reverie tools: build_tool_restrictions_text(), Report (queue guard), optimize_context (agent selection), dispatch_reverie_tool()'
   last_edited_ms: 0
+4f837a4a42f4f2e8:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
+  last_edited_ms: 1781354328652
 4f9b6f05552aa603:
   path: crates/cp-mod-todo/src/lib.rs
   description: 'Todo module. 3 tools: create/update/move. Fixed TODO panel (fixed_order=0, top priority). Nested object params with parent_id nesting. overview shows X/Y done. Drives spine auto-continuation.'
@@ -1890,6 +1910,10 @@
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
   last_edited_ms: 0
+80c19c2cf49274b0:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
+  last_edited_ms: 1781354328636
 80d5cefd79765ed5:
   path: docs/genai-france-vibe.md
   description: GenAI France 2026 conference analysis — lineup, vibe, talk positioning, title naming patterns.
@@ -2054,6 +2078,10 @@
   path: yamls/tools/memory.yaml
   description: Memory tools YAML. memory_create (content, contents, importance, labels) + memory_update (id, content, contents, importance, labels, delete).
   last_edited_ms: 1780582405270
+8adf9f8544d4d161:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
+  last_edited_ms: 1781354328660
 8aee7b0277feb419:
   path: crates/cp-mod-queue/Cargo.toml
   description: 'Queue module deps: cp-base, cp-render, crossterm, serde, serde_json.'
@@ -2542,6 +2570,10 @@ ad2e04f6dd571a0f:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
   last_edited_ms: 0
+ad5869c90767ae4f:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 ad68ded86b688df6:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
@@ -2786,6 +2818,10 @@ be5cb31393a75d26:
   path: crates/cp-base/src/panels.rs
   description: Panel trait + caching infra. hash_content uses FNV-1a via cp-mod-utilities. Freeze system. time_arith. paginate_content.
   last_edited_ms: 0
+be777a91ba2ba95b:
+  path: crates/cp-mod-threads/Cargo.toml
+  description: 'Threads module deps: cp-base, cp-render, crossterm, serde, serde_json.'
+  last_edited_ms: 1781354328627
 becb5cb633a92422:
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() matches files against glob patterns — all callbacks always active. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
@@ -3214,6 +3250,10 @@ dc669315644ebb28:
   path: crates/cp-mod-git/src/types.rs
   description: GitChangeType, GitFileChange, GitState (branch/changes/diff_base) with ext/ext_mut, GitResultRequest
   last_edited_ms: 0
+dcb9ef498a7d8eef:
+  path: crates/cp-mod-threads/src/panel.rs
+  description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
+  last_edited_ms: 1781354328644
 ddb10c875236eedb:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -3386,6 +3426,10 @@ f07180e69f10e6ed:
   path: crates/cp-mod-scratchpad/src/tools.rs
   description: 'Scratchpad tools with flame!("scratch_create"), flame!("scratch_edit"), flame!("scratch_wipe"). Cell CRUD. Wipe: empty array = all, otherwise by ID.'
   last_edited_ms: 0
+f0b31ec1e8039bea:
+  path: yamls/tools/threads.yaml
+  description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
+  last_edited_ms: 1781354328668
 f156d809f3ca7d6c:
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, cp-mod-utilities, log.'
@@ -3577,6 +3621,10 @@ fceb53aa84039016:
 fd604dcc85d708e3:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
+  last_edited_ms: 0
+fdaa66e8d4bf19c1:
+  path: crates/cp-base/src/state/context.rs
+  description: 'Kind registry + Entry type. TypeMeta, init_context_type_registry, fixed_panel_order. Kind string-backed context type with well-known constants (ENTITIES, ENTITY_RESULT, etc). Entry struct: id/uid/context_type/name/token_count/metadata + cache/freeze fields. estimate_tokens, make_default_entry.'
   last_edited_ms: 0
 fdbfb8603d4061fd:
   path: src/state/persistence/writer.rs
