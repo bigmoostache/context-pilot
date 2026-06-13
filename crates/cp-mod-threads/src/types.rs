@@ -156,6 +156,10 @@ pub struct FocusState {
     /// Set by pressing 'n' in Threads view, cleared on Enter or Esc.
     #[serde(default)]
     pub creating_thread: bool,
+    /// When true, the user is confirming thread archive/deletion.
+    /// Set by pressing 'a' in Threads view, cleared on 'y' (confirm) or any other key.
+    #[serde(default)]
+    pub confirming_archive: bool,
 }
 
 impl Default for FocusState {
@@ -174,6 +178,7 @@ impl FocusState {
             escalation_level: 0,
             selected_thread_idx: 0,
             creating_thread: false,
+            confirming_archive: false,
         }
     }
 

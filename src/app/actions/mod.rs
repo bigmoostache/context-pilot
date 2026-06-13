@@ -509,6 +509,39 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }
+        Action::ThreadArchiveStart => {
+            let has_threads = !cp_mod_threads::types::ThreadsState::get(state).threads.is_empty();
+            if has_threads {
+                cp_mod_threads::types::FocusState::get_mut(state).confirming_archive = true;
+                state.flags.ui.dirty = true;
+            }
+            ActionResult::Nothing
+        }
+        Action::ThreadArchiveConfirm => {
+            let focus = cp_mod_threads::types::FocusState::get_mut(state);
+            focus.confirming_archive = false;
+            let selected_idx = focus.selected_thread_idx;
+
+            let threads_state = cp_mod_threads::types::ThreadsState::get_mut(state);
+            if selected_idx < threads_state.threads.len() {
+                let _removed = threads_state.threads.remove(selected_idx);
+            }
+            // Adjust selection index
+            let len = cp_mod_threads::types::ThreadsState::get(state).threads.len();
+            let focus_after = cp_mod_threads::types::FocusState::get_mut(state);
+            if len == 0 {
+                focus_after.selected_thread_idx = 0;
+            } else if focus_after.selected_thread_idx >= len {
+                focus_after.selected_thread_idx = len.saturating_sub(1);
+            }
+            state.flags.ui.dirty = true;
+            ActionResult::Save
+        }
+        Action::ThreadArchiveCancel => {
+            cp_mod_threads::types::FocusState::get_mut(state).confirming_archive = false;
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
         Action::None => ActionResult::Nothing,
     }
 }

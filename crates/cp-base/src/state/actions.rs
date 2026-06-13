@@ -176,6 +176,12 @@ pub enum Action {
     ThreadCreateStart,
     /// Cancel thread creation — clears naming mode without creating.
     ThreadCreateCancel,
+    /// Start archiving (deleting) the selected thread — shows confirmation.
+    ThreadArchiveStart,
+    /// Confirm thread archive — removes the selected thread.
+    ThreadArchiveConfirm,
+    /// Cancel thread archive — dismisses the confirmation.
+    ThreadArchiveCancel,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

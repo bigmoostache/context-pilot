@@ -37,11 +37,11 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
             .split(area);
 
         let (Some(&list_area), Some(&msg_area)) = (layout.first(), layout.get(1)) else { return };
-        render_thread_list(frame, threads_state, selected_idx, list_area);
+        render_thread_list(frame, state, list_area);
         render_message_area(frame, threads_state, selected_idx, msg_area);
     } else {
         // Narrow terminal — show thread list only
-        render_thread_list(frame, threads_state, selected_idx, area);
+        render_thread_list(frame, state, area);
     }
 }
 
@@ -68,7 +68,11 @@ fn render_empty_state(frame: &mut Frame<'_>, area: Rect) {
 }
 
 /// Render the left-pane thread list with selection indicator.
-fn render_thread_list(frame: &mut Frame<'_>, ts: &ThreadsState, selected: usize, area: Rect) {
+fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
+    let ts = ThreadsState::get(state);
+    let focus = FocusState::get(state);
+    let selected = focus.selected_thread_idx.min(ts.threads.len().saturating_sub(1));
+    let confirming = focus.confirming_archive;
     let block = Block::default()
         .borders(Borders::RIGHT)
         .border_style(Style::default().fg(theme::border_muted()))
@@ -121,12 +125,22 @@ fn render_thread_list(frame: &mut Frame<'_>, ts: &ThreadsState, selected: usize,
         for _ in 0..needed {
             lines.push(Line::from(""));
         }
-        lines.push(Line::from(vec![
-            Span::styled(" n", Style::default().fg(theme::accent())),
-            Span::styled(" new  ", Style::default().fg(theme::text_muted())),
-            Span::styled("Ctrl+V", Style::default().fg(theme::accent())),
-            Span::styled(" view", Style::default().fg(theme::text_muted())),
-        ]));
+        if confirming {
+            lines.push(Line::from(vec![
+                Span::styled(" Archive? ", Style::default().fg(theme::warning())),
+                Span::styled("y", Style::default().fg(theme::accent())),
+                Span::styled("/any to cancel", Style::default().fg(theme::text_muted())),
+            ]));
+        } else {
+            lines.push(Line::from(vec![
+                Span::styled(" n", Style::default().fg(theme::accent())),
+                Span::styled(" new  ", Style::default().fg(theme::text_muted())),
+                Span::styled("a", Style::default().fg(theme::accent())),
+                Span::styled(" del  ", Style::default().fg(theme::text_muted())),
+                Span::styled("Ctrl+V", Style::default().fg(theme::accent())),
+                Span::styled(" view", Style::default().fg(theme::text_muted())),
+            ]));
+        }
     }
 
     let paragraph = Paragraph::new(lines);

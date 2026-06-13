@@ -113,15 +113,20 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
                 let shift = key.modifiers.contains(KeyModifiers::SHIFT);
                 let creating = cp_mod_threads::types::FocusState::get(state).creating_thread;
+                let confirming = cp_mod_threads::types::FocusState::get(state).confirming_archive;
                 match key.code {
                     // During thread creation: Esc cancels, everything else falls through to input
                     KeyCode::Esc if creating => return Some(Action::ThreadCreateCancel),
+                    // During archive confirmation: y confirms, any other key cancels
+                    KeyCode::Char('y') if confirming => return Some(Action::ThreadArchiveConfirm),
+                    _ if confirming => return Some(Action::ThreadArchiveCancel),
                     // Normal threads view navigation
                     KeyCode::Down | KeyCode::Tab if !shift && !creating => {
                         return Some(Action::ThreadSelectNext);
                     }
                     KeyCode::Up | KeyCode::BackTab if !creating => return Some(Action::ThreadSelectPrev),
                     KeyCode::Char('n') if !creating && !ctrl => return Some(Action::ThreadCreateStart),
+                    KeyCode::Char('a') if !creating && !ctrl => return Some(Action::ThreadArchiveStart),
                     KeyCode::Esc if !creating => return Some(Action::CycleViewMode),
                     KeyCode::Backspace
                     | KeyCode::Enter
