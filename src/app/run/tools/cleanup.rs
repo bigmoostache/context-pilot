@@ -424,12 +424,6 @@ pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
     if let Some(results) = app.pending_console_wait_tool_results.take() {
         all_pending.extend(results);
     }
-    if let Some(results) = app.pending_question_tool_results.take() {
-        all_pending.extend(results);
-    }
-
-    // Also clean up the question form state if it was pending
-    drop(app.state.module_data.remove(&std::any::TypeId::of::<cp_base::ui::question_form::PendingForm>()));
 
     // Clear any accumulated blocking results from partial callback completions
     app.accumulated_blocking_results.clear();

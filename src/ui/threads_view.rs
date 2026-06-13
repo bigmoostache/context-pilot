@@ -18,7 +18,9 @@ use crate::modules::conversation::render_input_blocks::{InputBlockCtx, render_in
 use crate::state::{Message, MsgKind, MsgStatus, State};
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
-use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
+use cp_mod_threads::types::{
+    FocusState, ThreadAuthor, ThreadQuestionForm, ThreadStatus, ThreadsState,
+};
 
 /// Width of the thread list pane in columns.
 pub(crate) const THREAD_LIST_WIDTH: u16 = 28;
@@ -81,6 +83,40 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // ── Build IR blocks ──────────────────────────────────────────────
     let mut ir_blocks: Vec<IrBlock> = Vec::new();
 
+    // Track which line indices belong to the selected entry for bg highlight
+    let mut selected_line_start: Option<usize> = None;
+    let mut selected_line_end: Option<usize> = None;
+
+    // Virtual "+ New Thread" entry — rendered first, 2-line format like real threads
+    let on_virtual = selected >= ts.threads.len();
+    let new_sem = if on_virtual {
+        Semantic::Accent
+    } else {
+        Semantic::Muted
+    };
+    if on_virtual {
+        selected_line_start = Some(ir_blocks.len());
+    }
+    // Line 1: indicator + dot + typed name (or placeholder)
+    let new_name = if on_virtual && !state.input.is_empty() {
+        truncate_str(&state.input, inner.width.saturating_sub(6).into())
+    } else {
+        "New Thread".to_owned()
+    };
+    ir_blocks.push(IrBlock::Line(vec![
+        S::styled("  ".to_owned(), new_sem),
+        S::styled("● ".to_owned(), new_sem),
+        S::styled(new_name, new_sem),
+    ]));
+    // Line 2: badge
+    ir_blocks.push(IrBlock::Line(vec![
+        S::new("  ".to_owned()),
+        S::styled("[NEW THREAD]".to_owned(), new_sem),
+    ]));
+    if on_virtual {
+        selected_line_end = Some(ir_blocks.len());
+    }
+
     for (i, thread) in ts.threads.iter().enumerate() {
         let is_selected = i == selected;
 
@@ -103,32 +139,29 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
             }
         };
 
-        // Line 1: indicator + status dot + thread name
-        let indicator = if is_selected {
-            "▸ "
-        } else if has_unread {
+        // Unread indicator (only when not selected)
+        let indicator = if has_unread && !is_selected {
             "● "
         } else {
             "  "
         };
-        let indicator_sem = if has_unread && !is_selected {
+        let indicator_sem = if has_unread {
             Semantic::Warning
         } else {
-            Semantic::Accent
+            Semantic::Default
         };
         let name = truncate_str(&thread.name, inner.width.saturating_sub(6).into());
 
-        let mut line1 = vec![
+        if is_selected {
+            selected_line_start = Some(ir_blocks.len());
+        }
+
+        // Line 1: indicator + status dot + thread name
+        ir_blocks.push(IrBlock::Line(vec![
             S::styled(indicator.to_owned(), indicator_sem),
             S::styled("● ".to_owned(), status_sem),
             S::new(name),
-        ];
-        if is_selected {
-            for span in &mut line1 {
-                span.reversed = true;
-            }
-        }
-        ir_blocks.push(IrBlock::Line(line1));
+        ]));
 
         // Line 2: status badge + message count
         let (badge, badge_sem) = if is_focused {
@@ -145,28 +178,10 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
             S::muted(format!("  {} msg", thread.messages.len())),
         ]));
 
-        // Empty line between threads
-        ir_blocks.push(IrBlock::Empty);
-    }
-
-    // Virtual "+ New Thread" entry
-    let on_virtual = selected >= ts.threads.len();
-    let new_sem = if on_virtual {
-        Semantic::Accent
-    } else {
-        Semantic::Muted
-    };
-    let new_indicator = if on_virtual { "▸ " } else { "  " };
-    let mut new_spans = vec![
-        S::styled(new_indicator.to_owned(), new_sem),
-        S::styled("+ New Thread".to_owned(), new_sem),
-    ];
-    if on_virtual {
-        for span in &mut new_spans {
-            span.reversed = true;
+        if is_selected {
+            selected_line_end = Some(ir_blocks.len());
         }
     }
-    ir_blocks.push(IrBlock::Line(new_spans));
 
     // Pad to push help hints to the bottom
     let content_lines = ir_blocks.len();
@@ -194,7 +209,24 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     }
 
     // Convert IR → ratatui and render
-    let lines = ir::blocks_to_lines(&ir_blocks);
+    let mut lines = ir::blocks_to_lines(&ir_blocks);
+
+    // Apply bg highlight to the selected entry's lines (layout chrome)
+    if let (Some(start), Some(end)) = (selected_line_start, selected_line_end) {
+        let full_width = inner.width.to_usize();
+        for line in lines.get_mut(start..end).into_iter().flatten() {
+            line.style = line.style.bg(theme::bg_surface());
+            // Pad with spaces so bg covers the full sidebar width
+            let current_width: usize = line.spans.iter().map(ratatui::text::Span::width).sum();
+            if current_width < full_width {
+                line.spans.push(ratatui::text::Span::styled(
+                    " ".repeat(full_width.saturating_sub(current_width)),
+                    Style::default().bg(theme::bg_surface()),
+                ));
+            }
+        }
+    }
+
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
 }
@@ -289,8 +321,8 @@ fn render_message_area_with_input(
     let inner = border.inner(area);
     frame.render_widget(border, area);
 
-    // Calculate input area height based on input content
-    let input_height = calculate_input_height(state, inner.width);
+    // Calculate input area height based on input content (capped at 50% of area)
+    let input_height = calculate_input_height(state, inner.width, inner.height);
     let messages_height = inner.height.saturating_sub(input_height);
 
     if messages_height == 0 {
@@ -312,6 +344,20 @@ fn render_message_area_with_input(
 
     render_thread_messages(frame, state, thread, msg_area);
     render_thread_input(frame, state, input_area);
+
+    // Question form overlay — rendered OVER the input area if active
+    if let Some(question_form_ir) = build_thread_question_form_ir(state) {
+        let form_height =
+            crate::ui::help::input::calculate_question_form_height(&question_form_ir);
+        let form_y = inner.y.saturating_add(inner.height.saturating_sub(form_height));
+        let form_area = Rect {
+            x: inner.x,
+            y: form_y,
+            width: inner.width,
+            height: form_height.min(inner.height),
+        };
+        crate::ui::help::input::render_question_form(frame, &question_form_ir, form_area);
+    }
 }
 
 /// Render thread messages using the conversation IR renderer.
@@ -445,7 +491,10 @@ fn thread_message_to_message(msg: &cp_mod_threads::types::ThreadMessage) -> Mess
 }
 
 /// Calculate input area height based on current input content.
-fn calculate_input_height(state: &State, width: u16) -> u16 {
+///
+/// Caps at 50% of the available height so messages remain visible.
+fn calculate_input_height(state: &State, width: u16, available_height: u16) -> u16 {
+    let max_input = available_height.saturating_div(2).max(3);
     if state.input.is_empty() {
         // Separator (1) + one line for empty input prompt
         return 3;
@@ -465,8 +514,102 @@ fn calculate_input_height(state: &State, width: u16) -> u16 {
         })
         .sum();
     let total = wrapped_lines.max(line_count);
-    // Separator (1) + content + hint line (1), capped at 10 lines
-    (total.saturating_add(3)).min(10).to_u16()
+    // Separator (1) + content + hint line (1), capped at 50% of available height
+    (total.saturating_add(3)).min(max_input.into()).to_u16()
+}
+
+/// Detect pending questions in the selected thread and initialize the
+/// active question form in `FocusState` if needed.
+///
+/// Called from `render_body()` before rendering the threads view, while
+/// state is still `&mut`. Lazy initialization: parses questions from the
+/// last assistant message only when the form hasn't been opened yet.
+pub(crate) fn maybe_activate_thread_question(state: &mut State) {
+    // Phase 1: gather data with shared borrows only
+    let (should_clear, init_data) = {
+        let ts = ThreadsState::get(state);
+        let focus = FocusState::get(state);
+        let selected = focus
+            .selected_thread_idx
+            .min(ts.threads.len().saturating_sub(1));
+
+        let Some(thread) = ts.threads.get(selected) else {
+            return;
+        };
+
+        if thread.status != ThreadStatus::TheirTurn {
+            // Thread not waiting for user — clear stale form if it belongs to this thread
+            let clear = focus
+                .active_question
+                .as_ref()
+                .is_some_and(|aq| aq.thread_id == thread.id);
+            (clear, None)
+        } else if focus
+            .active_question
+            .as_ref()
+            .is_some_and(|aq| aq.thread_id == thread.id)
+        {
+            // Already have an active question for this thread
+            (false, None)
+        } else {
+            // Need to initialize — find last assistant message with questions
+            let clear = focus.active_question.is_some(); // clear if for different thread
+            let json = thread
+                .messages
+                .iter()
+                .rev()
+                .find(|m| m.author == ThreadAuthor::Assistant && m.question.is_some())
+                .and_then(|m| m.question.clone());
+            json.map_or((clear, None), |j| (clear, Some((thread.id.clone(), j))))
+        }
+    }; // all shared borrows dropped
+
+    // Phase 2: mutate state
+    if should_clear {
+        FocusState::get_mut(state).active_question = None;
+    }
+    if let Some((thread_id, json)) = init_data
+        && let Some(form) = ThreadQuestionForm::from_json(&thread_id, &json)
+    {
+        FocusState::get_mut(state).active_question = Some(form);
+    }
+}
+
+/// Build a [`QuestionForm`] IR snapshot from the active thread question form.
+///
+/// Returns `None` if no active question form exists.
+fn build_thread_question_form_ir(
+    state: &State,
+) -> Option<cp_render::conversation::QuestionForm> {
+    let focus = FocusState::get(state);
+    let form = focus.active_question.as_ref()?;
+
+    let questions = form
+        .questions
+        .iter()
+        .map(|q| cp_render::conversation::Question {
+            header: q.header.clone(),
+            text: q.text.clone(),
+            options: q
+                .options
+                .iter()
+                .map(|o| cp_render::conversation::QuestionOption {
+                    label: o.label.clone(),
+                    description: o.description.clone(),
+                })
+                .collect(),
+            multi_select: q.multi_select,
+            cursor: q.cursor,
+            selected: q.selected.clone(),
+            typing_other: q.typing_other,
+            other_text: q.other_text.clone(),
+        })
+        .collect();
+
+    Some(cp_render::conversation::QuestionForm {
+        questions,
+        focused_index: form.focused_index,
+    })
 }
 
 /// Truncate a string to `max_len` characters, appending "…" if truncated.

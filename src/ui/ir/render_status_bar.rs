@@ -222,7 +222,6 @@ pub(crate) fn build_status_bar(state: &State) -> StatusBar {
 
 /// The primary status badge (STREAMING / TOOLING / READY / BLOCKED / etc.).
 fn build_badge(state: &State) -> Badge {
-    let has_question_form = state.get_ext::<cp_base::ui::question_form::PendingForm>().is_some();
     let has_timed_watcher = {
         use cp_base::state::watchers::WatcherRegistry;
         state
@@ -239,8 +238,6 @@ fn build_badge(state: &State) -> Badge {
         Badge { label: "STREAMING".into(), semantic: Semantic::Success }
     } else if state.flags.stream.phase.is_streaming() && state.flags.stream.phase.is_tooling() {
         Badge { label: "TOOLING".into(), semantic: Semantic::Info }
-    } else if has_question_form {
-        Badge { label: "QUESTIONING".into(), semantic: Semantic::Warning }
     } else if has_timed_watcher {
         Badge { label: "WAITING".into(), semantic: Semantic::AccentDim }
     } else {

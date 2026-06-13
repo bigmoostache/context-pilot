@@ -182,6 +182,24 @@ pub enum Action {
     ThreadArchiveConfirm,
     /// Cancel thread archive — dismisses the confirmation.
     ThreadArchiveCancel,
+    /// Move cursor up in thread question form.
+    ThreadQuestionUp,
+    /// Move cursor down in thread question form.
+    ThreadQuestionDown,
+    /// Navigate to previous question in thread question form.
+    ThreadQuestionLeft,
+    /// Navigate to next question in thread question form.
+    ThreadQuestionRight,
+    /// Toggle selection on current option in thread question form.
+    ThreadQuestionToggle,
+    /// Handle Enter in thread question form (select + advance or submit).
+    ThreadQuestionEnter,
+    /// Dismiss thread question form without answering.
+    ThreadQuestionDismiss,
+    /// Type a character in the "Other" text field of thread question form.
+    ThreadQuestionChar(char),
+    /// Backspace in the "Other" text field of thread question form.
+    ThreadQuestionBackspace,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

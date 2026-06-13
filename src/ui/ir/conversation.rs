@@ -6,7 +6,7 @@
 
 use cp_render::conversation::{
     Autocomplete, AutocompleteEntry, Conversation, HistorySection, InputArea, Message as IrMessage, Overlay,
-    PerfBudgetBar, PerfMeiliStats, PerfOp, PerfOverlay, QuestionForm, StreamingTool, ToolResultPreview, ToolUsePreview,
+    PerfBudgetBar, PerfMeiliStats, PerfOp, PerfOverlay, StreamingTool, ToolResultPreview, ToolUsePreview,
 };
 use cp_render::{Block, Semantic};
 
@@ -158,13 +158,6 @@ fn build_input(state: &State) -> InputArea {
 pub(crate) fn build_overlays(state: &State) -> Vec<Overlay> {
     let mut overlays = Vec::new();
 
-    // Question form overlay
-    if let Some(form) = state.get_ext::<cp_base::ui::question_form::PendingForm>()
-        && !form.resolved
-    {
-        overlays.push(Overlay::QuestionForm(build_question_form(form)));
-    }
-
     // Autocomplete overlay
     if let Some(ac) = state.get_ext::<cp_base::state::autocomplete::Suggestions>()
         && ac.active
@@ -188,37 +181,6 @@ pub(crate) fn build_overlays(state: &State) -> Vec<Overlay> {
     }
 
     overlays
-}
-
-/// Build question form from pending form state.
-fn build_question_form(form: &cp_base::ui::question_form::PendingForm) -> QuestionForm {
-    let questions = form
-        .questions
-        .iter()
-        .enumerate()
-        .map(|(i, q)| {
-            let answer = form.answers.get(i);
-            cp_render::conversation::Question {
-                header: q.header.clone(),
-                text: q.text.clone(),
-                options: q
-                    .options
-                    .iter()
-                    .map(|o| cp_render::conversation::QuestionOption {
-                        label: o.label.clone(),
-                        description: o.description.clone(),
-                    })
-                    .collect(),
-                multi_select: q.multi_select,
-                cursor: answer.map_or(0, |a| a.cursor),
-                selected: answer.map(|a| a.selected.clone()).unwrap_or_default(),
-                typing_other: answer.is_some_and(|a| a.typing_other),
-                other_text: answer.map(|a| a.other_text.clone()).unwrap_or_default(),
-            }
-        })
-        .collect();
-
-    QuestionForm { questions, focused_index: form.current_question }
 }
 
 /// Build autocomplete from suggestions state.

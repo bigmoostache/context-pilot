@@ -554,6 +554,106 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }
+        Action::ThreadQuestionUp => {
+            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
+                aq.cursor_up();
+            }
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ThreadQuestionDown => {
+            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
+                aq.cursor_down();
+            }
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ThreadQuestionLeft => {
+            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
+                aq.prev_question();
+            }
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ThreadQuestionRight => {
+            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
+                aq.next_question();
+            }
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ThreadQuestionToggle => {
+            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
+                aq.toggle_selection();
+            }
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ThreadQuestionEnter => {
+            // Check if this is the final submit (last question + all answered after enter)
+            let should_submit = {
+                let focus = cp_mod_threads::types::FocusState::get_mut(state);
+                focus.active_question.as_mut().is_some_and(|aq| {
+                    aq.handle_enter();
+                    // After handle_enter: if we're on the last question and all are answered, submit
+                    aq.is_last_question() && aq.all_answered()
+                })
+            };
+            if should_submit {
+                // Extract answer YAML and thread_id, then clear the form
+                let (thread_id, yaml) = {
+                    let focus = cp_mod_threads::types::FocusState::get_mut(state);
+                    let aq = focus.active_question.take();
+                    aq.map_or_else(|| (String::new(), String::new()), |form| {
+                        (form.thread_id.clone(), form.format_answers_yaml())
+                    })
+                };
+                if !thread_id.is_empty() {
+                    // Create answer message + set MY_TURN
+                    let ts = cp_mod_threads::types::ThreadsState::get_mut(state);
+                    if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
+                        thread.messages.push(cp_mod_threads::types::ThreadMessage {
+                            author: cp_mod_threads::types::ThreadAuthor::User,
+                            content: Some(yaml),
+                            file_path: None,
+                            question: None,
+                            timestamp: crate::app::panels::now_ms(),
+                        });
+                        thread.status = cp_mod_threads::types::ThreadStatus::MyTurn;
+                    }
+                    // Fire spine notification so AI picks up the answer
+                    let _id = cp_mod_spine::types::SpineState::create_notification(
+                        state,
+                        cp_mod_spine::types::NotificationType::Custom,
+                        "Thread Question Answered".into(),
+                        format!(
+                            "User answered questions in thread \"{thread_id}\". Use Read(thread_id=\"{thread_id}\") to see the answers."
+                        ),
+                    );
+                }
+            }
+            state.flags.ui.dirty = true;
+            ActionResult::Save
+        }
+        Action::ThreadQuestionDismiss => {
+            cp_mod_threads::types::FocusState::get_mut(state).active_question = None;
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ThreadQuestionChar(c) => {
+            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
+                aq.type_char(c);
+            }
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::ThreadQuestionBackspace => {
+            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
+                aq.backspace();
+            }
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
         Action::None => ActionResult::Nothing,
     }
 }

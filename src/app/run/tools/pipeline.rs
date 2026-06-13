@@ -100,10 +100,6 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     if app.state.flags.lifecycle.waiting_for_panels || app.deferred_tool_sleeping {
         return;
     }
-    // Don't process tools while a question form is pending user response
-    if app.state.get_ext::<cp_base::ui::question_form::PendingForm>().is_some() {
-        return;
-    }
     let _guard = crate::profile!("app::tool_exec");
     let _fg = cp_base::flame!("tool_pipeline");
 
@@ -230,19 +226,6 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     // After Close_conversation_history, augment result with remaining panel count.
     if tools.iter().any(|t| t.name == "Close_conversation_history") {
         super::queue_flush::augment_remaining_history_panels(&app.state, &tools, &mut tool_results);
-    }
-
-    // Check if any tool triggered a question form (blocking)
-    let has_pending_question = tool_results.iter().any(|r| r.content == "__QUESTION_PENDING__");
-    if has_pending_question {
-        // Don't create result message or continue streaming yet.
-        // The form is active — when user submits/dismisses, check_question_form()
-        // will replace the placeholder and resume the pipeline.
-        // Store the pending tool results for later resolution.
-        app.pending_question_tool_results = Some(tool_results);
-        app.save_state_async();
-        crate::infra::profiler::log_tool_time(&tool_names, pipeline_start.elapsed());
-        return;
     }
 
     // === LOGS → MEILISEARCH SYNC ===

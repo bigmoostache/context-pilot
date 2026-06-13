@@ -4,8 +4,6 @@ pub(crate) use crate::infra::constants::chars;
 pub(crate) mod help;
 /// Shared UI helper functions: truncation, formatting, syntax highlighting.
 pub(crate) mod helpers;
-/// Status bar, question form, and autocomplete popup rendering (in help/).
-use help::input;
 /// IR-to-ratatui adapter: converts semantic blocks to terminal widgets.
 pub(crate) mod ir;
 /// Markdown parsing and table rendering utilities.
@@ -108,6 +106,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
 fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
     // Threads mode: completely different layout (no sidebar, no panels)
     if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+        threads_view::maybe_activate_thread_question(state);
         threads_view::render_threads_view(frame, state, area);
         return;
     }
@@ -131,42 +130,8 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &
     render_main_content(frame, state, content_area, ir_frame);
 }
 
-/// Render the main content area, splitting for question form if active.
+/// Render the main content area.
 fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
-    // Check if question form is active via IR overlays
-    if let Some(form_height) = ir::render_conversation::render_question_form_if_active(&ir_frame.overlays) {
-        // Split: content panel on top, question form at bottom
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(3),              // Content panel (shrinks)
-                Constraint::Length(form_height), // Question form
-            ])
-            .split(area);
-
-        let (Some(&panel_area), Some(&raw_form_area)) = (layout.first(), layout.get(1)) else {
-            debug_assert!(false, "question form layout must have at least 2 chunks");
-            return;
-        };
-        render_content_panel(frame, state, panel_area, ir_frame);
-        // Indent form by 1 col to avoid overlapping sidebar border
-        let form_area = Rect {
-            x: raw_form_area.x.saturating_add(1),
-            width: raw_form_area.width.saturating_sub(1),
-            ..raw_form_area
-        };
-        // Find the QuestionForm IR data from overlays for rendering
-        if let Some(form) = ir_frame
-            .overlays
-            .iter()
-            .find_map(|o| if let cp_render::conversation::Overlay::QuestionForm(ref f) = *o { Some(f) } else { None })
-        {
-            input::render_question_form(frame, form, form_area);
-        }
-        return;
-    }
-
-    // Normal rendering — no separate input box, panels handle their own
     render_content_panel(frame, state, area, ir_frame);
 }
 

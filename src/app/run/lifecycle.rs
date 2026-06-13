@@ -109,25 +109,6 @@ impl App {
                     continue;
                 }
 
-                // Handle question form events if form is active (mutates state directly)
-                if let Some(form) = self.state.get_ext::<cp_base::ui::question_form::PendingForm>()
-                    && !form.resolved
-                {
-                    self.handle_question_form_event(&evt);
-                    self.state.flags.ui.dirty = true;
-
-                    // Render immediately
-                    if self.state.flags.ui.dirty {
-                        let _r = terminal.draw(|frame| {
-                            ui::render(frame, &mut self.state);
-                            self.command_palette.render(frame, &self.state);
-                        })?;
-                        self.state.flags.ui.dirty = false;
-                        self.last_render_ms = current_ms;
-                    }
-                    continue;
-                }
-
                 let Some(action) = handle_event(&evt, &self.state) else {
                     // User quit — flush all pending writes and save final state synchronously
                     self.writer.flush();
@@ -164,8 +145,6 @@ impl App {
             super::tools::checks::check_waiting_for_panels(self, ch.tx);
             // Check if deferred sleep timer has expired (non-blocking)
             super::tools::checks::check_deferred_sleep(self, ch.tx);
-            // Check if a question form has been resolved by the user
-            super::tools::checks::check_question_form(self, ch.tx);
             // Check watchers (blocking sentinel replacement + async → spine notifications)
             super::tools::cleanup::check_watchers(self, ch.tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)

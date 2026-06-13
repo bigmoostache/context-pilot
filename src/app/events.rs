@@ -117,6 +117,48 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
 
             // Threads view: intercept navigation keys before panel/scroll handling
             if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+                // Thread question form captures ALL input when active
+                if let Some(aq) = cp_mod_threads::types::FocusState::get(state).active_question.as_ref() {
+                    let typing_other = aq
+                        .questions
+                        .get(aq.focused_index)
+                        .is_some_and(|q| q.typing_other);
+                    return Some(match key.code {
+                        KeyCode::Esc => Action::ThreadQuestionDismiss,
+                        KeyCode::Up => Action::ThreadQuestionUp,
+                        KeyCode::Down => Action::ThreadQuestionDown,
+                        KeyCode::Left if !typing_other => Action::ThreadQuestionLeft,
+                        KeyCode::Right if !typing_other => Action::ThreadQuestionRight,
+                        KeyCode::Enter => Action::ThreadQuestionEnter,
+                        KeyCode::Char(' ') if !typing_other => Action::ThreadQuestionToggle,
+                        KeyCode::Backspace if typing_other => Action::ThreadQuestionBackspace,
+                        KeyCode::Char(c) if typing_other => Action::ThreadQuestionChar(c),
+                        KeyCode::Backspace
+                        | KeyCode::Left
+                        | KeyCode::Right
+                        | KeyCode::Home
+                        | KeyCode::End
+                        | KeyCode::PageUp
+                        | KeyCode::PageDown
+                        | KeyCode::Tab
+                        | KeyCode::BackTab
+                        | KeyCode::Delete
+                        | KeyCode::Insert
+                        | KeyCode::F(_)
+                        | KeyCode::Char(_)
+                        | KeyCode::Null
+                        | KeyCode::CapsLock
+                        | KeyCode::ScrollLock
+                        | KeyCode::NumLock
+                        | KeyCode::PrintScreen
+                        | KeyCode::Pause
+                        | KeyCode::Menu
+                        | KeyCode::KeypadBegin
+                        | KeyCode::Media(_)
+                        | KeyCode::Modifier(_) => Action::None,
+                    });
+                }
+
                 let shift = key.modifiers.contains(KeyModifiers::SHIFT);
                 let confirming = cp_mod_threads::types::FocusState::get(state).confirming_archive;
                 match key.code {
