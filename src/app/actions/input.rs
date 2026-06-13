@@ -3,6 +3,7 @@ use crate::state::persistence::{delete_message, save_message};
 use crate::state::{Kind, Message, State, estimate_tokens};
 use cp_mod_prompt::types::PromptItem;
 use cp_mod_spine::types::{NotificationType, SpineState};
+use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
 
 use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};
@@ -22,6 +23,11 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
         state.input.clear();
         state.input_cursor = 0;
         return ActionResult::Nothing;
+    }
+
+    // Threads view: route input to the selected thread instead of conversation
+    if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+        return handle_thread_input_submit(state);
     }
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
@@ -129,6 +135,73 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
         user_id.to_string(),
         content_preview.to_string(),
     );
+}
+
+/// Handle input submission when `ViewMode::Threads` is active.
+///
+/// Routes the user's text to the currently selected thread as a
+/// `ThreadMessage(User)`, sets the thread to `MyTurn`, and creates
+/// a spine notification so the AI picks up the new message.
+fn handle_thread_input_submit(state: &mut State) -> ActionResult {
+    let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
+    let content = replace_commands(&state.input, &commands);
+    let content = expand_paste_sentinels(&content, &state.paste_buffers);
+
+    // Clear input state
+    state.input.clear();
+    state.input_cursor = 0;
+    state.input_selection_anchor = None;
+    state.paste_buffers.clear();
+    state.paste_buffer_labels.clear();
+
+    // Record to persistent prompt history
+    record_prompt_history(&content);
+
+    // Find the selected thread
+    let selected_idx = FocusState::get(state).selected_thread_idx;
+    let threads_state = ThreadsState::get_mut(state);
+
+    let Some(thread) = threads_state.threads.get_mut(selected_idx) else {
+        return ActionResult::Nothing;
+    };
+
+    let thread_name = thread.name.clone();
+
+    // Create a user message in the thread
+    let msg = ThreadMessage {
+        author: ThreadAuthor::User,
+        content: Some(content.clone()),
+        file_path: None,
+        question: None,
+        timestamp: crate::app::panels::now_ms(),
+    };
+    thread.messages.push(msg);
+    thread.status = ThreadStatus::MyTurn;
+
+    // Build content preview for the notification
+    let content_preview = if content.len() > 80 {
+        format!(
+            "[Thread \"{thread_name}\"] {}...",
+            content.get(..content.floor_char_boundary(80)).unwrap_or("")
+        )
+    } else {
+        format!("[Thread \"{thread_name}\"] {content}")
+    };
+
+    // Create a UserMessage notification — triggers AI streaming
+    let _r = SpineState::create_notification(
+        state,
+        NotificationType::UserMessage,
+        "thread_input".to_string(),
+        content_preview,
+    );
+
+    // Notify all modules
+    for module in all_modules() {
+        module.on_user_message(state);
+    }
+
+    ActionResult::Save
 }
 
 /// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.
