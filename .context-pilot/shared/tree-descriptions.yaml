@@ -1082,6 +1082,10 @@
   path: yamls/tools/scratchpad.yaml
   description: 'Scratchpad tools YAML. 3 tools: scratchpad_create_cell, scratchpad_edit_cell, scratchpad_wipe.'
   last_edited_ms: 1781353959589
+3e57cf7450f47ec0:
+  path: src/ui/threads_view.rs
+  description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
+  last_edited_ms: 0
 3e684ead94cd0fcf:
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'

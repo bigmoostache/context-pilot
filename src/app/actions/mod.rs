@@ -612,15 +612,6 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                     // Create answer message + set MY_TURN
                     let ts = cp_mod_threads::types::ThreadsState::get_mut(state);
                     if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
-                        // Clear questions from the source message so form doesn't re-appear
-                        for msg in thread.messages.iter_mut().rev() {
-                            if msg.author == cp_mod_threads::types::ThreadAuthor::Assistant
-                                && msg.question.is_some()
-                            {
-                                msg.question = None;
-                                break;
-                            }
-                        }
                         thread.messages.push(cp_mod_threads::types::ThreadMessage {
                             author: cp_mod_threads::types::ThreadAuthor::User,
                             content: Some(yaml),
