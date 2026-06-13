@@ -123,16 +123,17 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     // During archive confirmation: y confirms, any other key cancels
                     KeyCode::Char('y') if confirming => return Some(Action::ThreadArchiveConfirm),
                     _ if confirming => return Some(Action::ThreadArchiveCancel),
-                    // Thread sidebar navigation
-                    KeyCode::Down | KeyCode::Tab if !shift => {
+                    // Thread sidebar navigation (Tab/Shift+Tab only — Up/Down scroll messages)
+                    KeyCode::Tab if !shift => {
                         return Some(Action::ThreadSelectNext);
                     }
-                    KeyCode::Up | KeyCode::BackTab => return Some(Action::ThreadSelectPrev),
+                    KeyCode::BackTab => return Some(Action::ThreadSelectPrev),
                     KeyCode::Esc => return Some(Action::CycleViewMode),
                     KeyCode::Backspace
                     | KeyCode::Enter
                     | KeyCode::Left
                     | KeyCode::Right
+                    | KeyCode::Up
                     | KeyCode::Down
                     | KeyCode::Home
                     | KeyCode::End

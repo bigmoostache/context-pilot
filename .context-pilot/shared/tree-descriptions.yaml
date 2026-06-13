@@ -34,6 +34,10 @@
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
   last_edited_ms: 0
+03710ad5b23fd8f3:
+  path: src/app/events.rs
+  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
+  last_edited_ms: 1781378041144
 03a944323757e175:
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. ConsoleGuardrails: git/gh only. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
@@ -1498,6 +1502,10 @@
   path: crates/cp-mod-chat/src/server.rs
   description: Global Tuwunel homeserver lifecycle. PID/socket/config file management. UDS HTTP helpers (get/post/put). pre_start_daemon() for parallel boot. ensure_daemon_running() + start_server(state). Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 0
+59586f088a534ae1:
+  path: src/app/actions/mod.rs
+  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
+  last_edited_ms: 1781378041135
 596939421089399b:
   path: src/llms/oai_providers/mod.rs
   description: 'Module declarations: deepseek, grok, groq, openai_compat, openai_streaming.'
@@ -2450,6 +2458,10 @@
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
   last_edited_ms: 1780565428716
+97e600789e19c98b:
+  path: src/ui/threads_view.rs
+  description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
+  last_edited_ms: 1781378041153
 9811d0176f85265b:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.

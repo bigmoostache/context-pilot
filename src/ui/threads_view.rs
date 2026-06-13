@@ -310,7 +310,7 @@ fn render_message_area_with_input(
         return;
     };
 
-    render_thread_messages(frame, thread, msg_area);
+    render_thread_messages(frame, state, thread, msg_area);
     render_thread_input(frame, state, input_area);
 }
 
@@ -320,6 +320,7 @@ fn render_message_area_with_input(
 /// (same IR path as the main conversation), converts via `blocks_to_lines()`.
 fn render_thread_messages(
     frame: &mut Frame<'_>,
+    state: &State,
     thread: &cp_mod_threads::types::Thread,
     area: Rect,
 ) {
@@ -349,11 +350,17 @@ fn render_thread_messages(
 
     let lines = ir::blocks_to_lines(&all_blocks);
 
-    // Scroll: auto-scroll to bottom
+    // Scroll: use global scroll_offset; pin to bottom when user hasn't scrolled
     let content_height = lines.len();
     let viewport_height = area.height.to_usize();
     let max_scroll = content_height.saturating_sub(viewport_height);
-    let scroll_offset = max_scroll; // Always at bottom
+    let scroll_offset = if state.flags.stream.user_scrolled {
+        // User manually scrolled — respect their position, clamped
+        (state.scroll_offset.to_usize()).min(max_scroll)
+    } else {
+        // Auto-scroll to bottom
+        max_scroll
+    };
 
     let paragraph = Paragraph::new(lines).scroll((scroll_offset.to_u16(), 0));
     frame.render_widget(paragraph, area);

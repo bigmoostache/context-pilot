@@ -465,38 +465,44 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }
-        Action::ThreadSelectNext => {
-            let thread_count = cp_mod_threads::types::ThreadsState::get(state).threads.len();
-            let total = thread_count.saturating_add(1); // +1 for virtual "New Thread" entry
-            let focus = cp_mod_threads::types::FocusState::get_mut(state);
-            focus.selected_thread_idx = if focus.selected_thread_idx >= total.saturating_sub(1) {
-                0
-            } else {
-                focus.selected_thread_idx.saturating_add(1)
-            };
-            // Mark as read only when on a real thread
-            if focus.selected_thread_idx < thread_count {
-                cp_mod_threads::types::FocusState::mark_selected_read(state);
+            Action::ThreadSelectNext => {
+                let thread_count = cp_mod_threads::types::ThreadsState::get(state).threads.len();
+                let total = thread_count.saturating_add(1); // +1 for virtual "New Thread" entry
+                let focus = cp_mod_threads::types::FocusState::get_mut(state);
+                focus.selected_thread_idx = if focus.selected_thread_idx >= total.saturating_sub(1) {
+                    0
+                } else {
+                    focus.selected_thread_idx.saturating_add(1)
+                };
+                // Mark as read only when on a real thread
+                if focus.selected_thread_idx < thread_count {
+                    cp_mod_threads::types::FocusState::mark_selected_read(state);
+                }
+                // Reset scroll so the new thread starts at bottom
+                state.scroll_offset = 0.0;
+                state.flags.stream.user_scrolled = false;
+                state.flags.ui.dirty = true;
+                ActionResult::Nothing
             }
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadSelectPrev => {
-            let thread_count = cp_mod_threads::types::ThreadsState::get(state).threads.len();
-            let total = thread_count.saturating_add(1); // +1 for virtual "New Thread" entry
-            let focus = cp_mod_threads::types::FocusState::get_mut(state);
-            focus.selected_thread_idx = if focus.selected_thread_idx == 0 {
-                total.saturating_sub(1)
-            } else {
-                focus.selected_thread_idx.saturating_sub(1)
-            };
-            // Mark as read only when on a real thread
-            if focus.selected_thread_idx < thread_count {
-                cp_mod_threads::types::FocusState::mark_selected_read(state);
+            Action::ThreadSelectPrev => {
+                let thread_count = cp_mod_threads::types::ThreadsState::get(state).threads.len();
+                let total = thread_count.saturating_add(1); // +1 for virtual "New Thread" entry
+                let focus = cp_mod_threads::types::FocusState::get_mut(state);
+                focus.selected_thread_idx = if focus.selected_thread_idx == 0 {
+                    total.saturating_sub(1)
+                } else {
+                    focus.selected_thread_idx.saturating_sub(1)
+                };
+                // Mark as read only when on a real thread
+                if focus.selected_thread_idx < thread_count {
+                    cp_mod_threads::types::FocusState::mark_selected_read(state);
+                }
+                // Reset scroll so the new thread starts at bottom
+                state.scroll_offset = 0.0;
+                state.flags.stream.user_scrolled = false;
+                state.flags.ui.dirty = true;
+                ActionResult::Nothing
             }
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
         Action::ThreadCreateStart => {
             let focus = cp_mod_threads::types::FocusState::get_mut(state);
             focus.creating_thread = true;
