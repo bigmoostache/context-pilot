@@ -7,12 +7,12 @@ use cp_render::conversation::{Autocomplete, QuestionForm};
 use ratatui::prelude::{Frame, Line, Rect, Span, Style};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 
-use super::theme;
+use crate::ui::theme;
 
 use cp_base::cast::Safe as _;
 
 /// Calculate the height needed for the question form.
-pub(super) fn calculate_question_form_height(form: &QuestionForm) -> u16 {
+pub(crate) fn calculate_question_form_height(form: &QuestionForm) -> u16 {
     let Some(q) = form.questions.get(form.focused_index) else { return 6 };
     // Header line + question text + blank + options (including Other) + blank + nav hint
     let option_lines = q.options.len().to_u16().saturating_add(1); // +1 for "Other"
@@ -22,7 +22,7 @@ pub(super) fn calculate_question_form_height(form: &QuestionForm) -> u16 {
 }
 
 /// Render the question form at the bottom of the screen.
-pub(super) fn render_question_form(frame: &mut Frame<'_>, form: &QuestionForm, area: Rect) {
+pub(crate) fn render_question_form(frame: &mut Frame<'_>, form: &QuestionForm, area: Rect) {
     let Some(q) = form.questions.get(form.focused_index) else { return };
     let other_idx = q.options.len();
 
@@ -156,14 +156,14 @@ pub(super) fn render_question_form(frame: &mut Frame<'_>, form: &QuestionForm, a
 }
 
 /// Calculate the height needed for the autocomplete popup.
-pub(super) fn calculate_autocomplete_height(ac: &Autocomplete) -> u16 {
+pub(crate) fn calculate_autocomplete_height(ac: &Autocomplete) -> u16 {
     let visible = ac.entries.len().to_u16();
     // matches + border chrome (2)
     (visible.saturating_add(2)).clamp(4, 12)
 }
 
 /// Render the @ autocomplete popup above the input area (bottom of content panel, growing upward).
-pub(super) fn render_autocomplete_popup(frame: &mut Frame<'_>, ac: &Autocomplete, area: Rect) {
+pub(crate) fn render_autocomplete_popup(frame: &mut Frame<'_>, ac: &Autocomplete, area: Rect) {
     let popup_width = 60u16.min(area.width.saturating_sub(2));
     let popup_height = calculate_autocomplete_height(ac);
 

@@ -1,11 +1,11 @@
 /// Character constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::chars;
-/// Help subsystem: config overlay and command palette.
+/// Help subsystem: config overlay, command palette, input overlays.
 pub(crate) mod help;
 /// Shared UI helper functions: truncation, formatting, syntax highlighting.
 pub(crate) mod helpers;
-/// Status bar, question form, and autocomplete popup rendering.
-mod input;
+/// Status bar, question form, and autocomplete popup rendering (in help/).
+use help::input;
 /// IR-to-ratatui adapter: converts semantic blocks to terminal widgets.
 pub(crate) mod ir;
 /// Markdown parsing and table rendering utilities.
@@ -14,6 +14,8 @@ pub(crate) mod markdown;
 pub(crate) mod perf;
 /// Meilisearch indexing status overlay (Ctrl+I).
 pub(crate) mod search_overlay;
+/// Threads view: dedicated layout for thread management.
+mod threads_view;
 /// Theme color constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::theme;
 /// Typewriter animation buffer re-exported from helpers.
@@ -95,8 +97,15 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     PERF.frame_end();
 }
 
-/// Render the body area: sidebar (if visible) and main content panel.
+/// Render the body area: sidebar (if visible) and main content panel,
+/// or the threads view when `ViewMode::Threads` is active.
 fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
+    // Threads mode: completely different layout (no sidebar, no panels)
+    if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+        threads_view::render_threads_view(frame, state, area);
+        return;
+    }
+
     let sw = state.view_mode.width();
     if sw == 0 {
         // Hidden mode — no sidebar at all

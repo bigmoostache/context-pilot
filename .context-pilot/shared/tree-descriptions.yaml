@@ -250,6 +250,10 @@
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
   last_edited_ms: 0
+102b9d5effa06b4e:
+  path: crates/cp-base/src/state/actions.rs
+  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
+  last_edited_ms: 0
 10376e0490f231c6:
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
@@ -290,6 +294,10 @@
   path: docs/talk/slides/1-0.html
   description: 'Sub-TOC: WHYs section — left numeral, right slide list'
   last_edited_ms: 1781078806892
+1220e72b9135b659:
+  path: src/ui/ir/sidebar.rs
+  description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
+  last_edited_ms: 0
 123157596598d710:
   path: crates/cp-mod-prompt/src/seed.rs
   description: 'Seed data: ensure_default_agent() load/merge/sort, get_active_agent_content() resolve active system prompt'
@@ -325,6 +333,10 @@
 141e5aae8168208a:
   path: yamls/tools/firecrawl.yaml
   description: 'Firecrawl tools YAML. 4 tools: firecrawl_scrape (single URL), firecrawl_search (search+scrape), firecrawl_map (URL discovery), firecrawl_crawl (recursive crawl to file).'
+  last_edited_ms: 0
+142664f7aa9e515f:
+  path: crates/cp-base/src/state/data/config.rs
+  description: SidebarMode, Shared (config.json), WorkerState (per-worker), PanelData (panel persistence) — all serde structs
   last_edited_ms: 0
 1446786ab370bc6c:
   path: docs/talk/slides/2-1.html
@@ -689,6 +701,10 @@
 2a7b1dc03b363288:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
+  last_edited_ms: 0
+2a975cfaa1864f6d:
+  path: src/ui/mod.rs
+  description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). All overlays consume IR data.
   last_edited_ms: 0
 2ad0adde669b4af1:
   path: src/llms/oai_providers/openai_streaming.rs
@@ -1058,6 +1074,10 @@
   path: crates/cp-mod-brave/src/lib.rs
   description: 'Brave Search module. 2 tools: brave_search (snippets), brave_llm_context (deep extracted content). Dynamic brave_result panels. No state. Global, non-core.'
   last_edited_ms: 0
+4096b6b974af5a9c:
+  path: src/ui/help/mod.rs
+  description: Re-exports CommandPalette, config_overlay module
+  last_edited_ms: 0
 40d78bef84f55ac4:
   path: src/infra/mod.rs
   description: 'Re-exports: api, config, constants, flame (inline re-export of cp_base::flame init/flush), gh_watcher, profiler, tools, watcher. Infrastructure layer between app and core crates.'
@@ -1218,6 +1238,10 @@
   path: docs/talk/slides/0-0.html
   description: 'Slide: Main TOC — 3-column layout with cross-section nav'
   last_edited_ms: 1781078806830
+4d0bda775edc462d:
+  path: src/app/actions/mod.rs
+  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
+  last_edited_ms: 0
 4d457b7ceca9acae:
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
@@ -1338,6 +1362,10 @@
   path: dummy.txt
   description: Throwaway test file
   last_edited_ms: 0
+5539010f7f990664:
+  path: src/state/persistence/save.rs
+  description: 'Save operations: flame!("save_batch") + flame!("save_state"). build_save_batch() serializes config/worker/panels/messages/logs into WriteBatch. save_state() blocking sync persist. check_ownership(). log_error() to disk.'
+  last_edited_ms: 0
 5566a80725542188:
   path: website/docs/getting-started.html
   description: 'Docs: getting started guide'
@@ -1358,6 +1386,10 @@
   path: crates/cp-mod-entities/src/result_panel.rs
   description: Dynamic entity result panel — large query results, static + live refresh. LivePanelMeta struct, create_result_panel, create_live_result_panel (merged via create_panel_inner), refresh_live_query with hash-based change detection. 2s cache refresh interval. EntityResultPanel Panel impl.
   last_edited_ms: 1780608591320
+5633ea9e489fe24b:
+  path: crates/cp-base/src/state/runtime.rs
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
+  last_edited_ms: 0
 563e6951986b9876:
   path: crates/cp-mod-search/src/meili/download.rs
   description: Meilisearch binary download. Pinned v1.13.3. Platform detection (macOS/Linux, amd64/aarch64). GitHub releases download to ~/.context-pilot/meilisearch/bin/. Skips if already present. 5-min timeout.
@@ -1718,6 +1750,10 @@
   path: crates/cp-mod-utilities/src/dirs.rs
   description: 'Platform dirs: home_dir() from $HOME, config_dir() macOS Library/Linux XDG. Replaces dirs crate.'
   last_edited_ms: 1780565428677
+718d9f6f398a7051:
+  path: src/ui/ir/render_conversation.rs
+  description: 'IR-controlled chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached(). Question form + autocomplete overlay rendering via IR data.'
+  last_edited_ms: 0
 719c4d62303fbaae:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
@@ -1861,6 +1897,10 @@
 79e7b42ddd57a46c:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
+7a1883a352d5da1a:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
 7b8f6edeaef20990:
   path: src/app/actions/streaming.rs
@@ -2385,6 +2425,10 @@
 9efd30caaa25c138:
   path: CHANGELOG.md
   description: Release changelog
+  last_edited_ms: 0
+9f146f41165c2753:
+  path: src/app/events.rs
+  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
 9f4a2e56b8f9925a:
   path: clippy.toml
@@ -3405,6 +3449,10 @@ eb4a82f92e502208:
 ebcb3608c38e0892:
   path: .github/checks/check-lint-exceptions.sh
   description: 'Lint exception registry enforcement: orphan + ambiguity + stowaway detection'
+  last_edited_ms: 0
+ebd0e564032505d5:
+  path: src/state/persistence/mod.rs
+  description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
   last_edited_ms: 0
 ebdf6e51ce9dc683:
   path: crates/cp-mod-git/src/tools.rs

@@ -148,6 +148,10 @@ pub struct FocusState {
     /// Escalation severity counter. Increments after dangling phase expires
     /// if the AI still hasn't focused on a thread.
     pub escalation_level: u32,
+    /// Index of the currently selected thread in the TUI threads view.
+    /// Used for navigation (Tab/Shift+Tab) and message area display.
+    #[serde(default)]
+    pub selected_thread_idx: usize,
 }
 
 impl Default for FocusState {
@@ -164,6 +168,7 @@ impl FocusState {
             focused_thread_id: None,
             dangling_remaining: 0,
             escalation_level: 0,
+            selected_thread_idx: 0,
         }
     }
 

@@ -108,7 +108,7 @@ pub(crate) fn render_question_form_if_active(overlays: &[cp_render::conversation
     let form = overlays
         .iter()
         .find_map(|o| if let cp_render::conversation::Overlay::QuestionForm(ref f) = *o { Some(f) } else { None })?;
-    let height = super::super::input::calculate_question_form_height(form);
+    let height = super::super::help::input::calculate_question_form_height(form);
     Some(height)
 }
 
@@ -124,7 +124,7 @@ pub(crate) fn render_autocomplete_if_active(
     else {
         return;
     };
-    super::super::input::render_autocomplete_popup(frame, ac, content_area);
+    super::super::help::input::render_autocomplete_popup(frame, ac, content_area);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
