@@ -27,17 +27,25 @@ pub(crate) struct CoucouData {
     pub registered_at_ms: u64,
     /// When the notification should fire (ms since epoch).
     pub fire_at_ms: u64,
+    /// Optional thread ID — scopes the notification to a thread.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_id: Option<String>,
 }
 
 impl CoucouData {
     /// Convert into a live `CoucouWatcher` and register in `WatcherRegistry`.
     pub(crate) fn into_watcher(self) -> CoucouWatcher {
-        let desc = format!("🔔 Coucou: \"{}\"", self.message);
+        let desc = if let Some(tid) = &self.thread_id {
+            format!("🔔 Coucou (thread {tid}): \"{}\"", self.message)
+        } else {
+            format!("🔔 Coucou: \"{}\"", self.message)
+        };
         CoucouWatcher {
             watcher_id: self.watcher_id,
             message: self.message,
             registered_at_ms: self.registered_at_ms,
             fire_at_ms: self.fire_at_ms,
+            thread_id: self.thread_id,
             desc,
         }
     }
@@ -57,6 +65,7 @@ pub(crate) fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
                 message: w.message()?.to_string(),
                 registered_at_ms: w.registered_ms(),
                 fire_at_ms: w.fire_at_ms()?,
+                thread_id: w.thread_id().map(str::to_string),
             })
         })
         .collect()
@@ -158,6 +167,8 @@ pub(crate) struct CoucouWatcher {
     pub registered_at_ms: u64,
     /// When the notification should fire (ms since epoch).
     pub fire_at_ms: u64,
+    /// Optional thread ID — scopes the notification to a thread.
+    pub thread_id: Option<String>,
     /// Human-readable description.
     pub desc: String,
 }
@@ -193,16 +204,22 @@ impl Watcher for CoucouWatcher {
 
     fn check(&self, _state: &State) -> Option<WatcherResult> {
         let now = now_ms();
-        (now >= self.fire_at_ms).then(|| WatcherResult {
-            description: format!("⏰ Coucou! {}", self.message),
-            panel_id: None,
-            tool_use_id: None,
-            close_panel: false,
-            create_panel: None,
-            create_dyn_panel: None,
-            processed_already: false,
-            kill_session: None,
-            preserves_tempo: false,
+        (now >= self.fire_at_ms).then(|| {
+            let desc = self.thread_id.as_ref().map_or_else(
+                || format!("⏰ Coucou! {}", self.message),
+                |tid| format!("⏰ Coucou (thread {tid})! {}", self.message),
+            );
+            WatcherResult {
+                description: desc,
+                panel_id: None,
+                tool_use_id: None,
+                close_panel: false,
+                create_panel: None,
+                create_dyn_panel: None,
+                processed_already: false,
+                kill_session: None,
+                preserves_tempo: false,
+            }
         })
     }
 
@@ -226,6 +243,10 @@ impl Watcher for CoucouWatcher {
     fn message(&self) -> Option<&str> {
         Some(&self.message)
     }
+
+    fn thread_id(&self) -> Option<&str> {
+        self.thread_id.as_deref()
+    }
 }
 
 // ============================================================
@@ -235,8 +256,19 @@ impl Watcher for CoucouWatcher {
 /// Monotonic counter for generating unique coucou watcher IDs.
 static COUCOU_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
-/// Execute the coucou tool — schedule a notification.
+/// Execute the coucou tool — schedule a notification or cancel an existing one.
 pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
+    // === Cancel path ===
+    if let Some(cancel_id) = tool.input.get("cancel_id").and_then(|v| v.as_str()) {
+        let removed = WatcherRegistry::get_mut(state).remove_by_id(cancel_id);
+        return if removed {
+            ToolResult::new(tool.id.clone(), format!("Cancelled coucou '{cancel_id}'"), false)
+        } else {
+            ToolResult::new(tool.id.clone(), format!("Coucou '{cancel_id}' not found"), true)
+        };
+    }
+
+    // === Schedule path ===
     let Some(mode) = tool.input.get("mode").and_then(|v| v.as_str()) else {
         return ToolResult::new(
             tool.id.clone(),
@@ -251,6 +283,8 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
             return ToolResult::new(tool.id.clone(), "Missing required 'message' parameter.".to_string(), true);
         }
     };
+
+    let thread_id = tool.input.get("thread_id").and_then(|v| v.as_str()).map(String::from);
 
     let now = now_ms();
     let fire_at_ms: u64;
@@ -310,11 +344,25 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let counter = COUCOU_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let watcher_id = format!("coucou_{counter}");
-    let desc = format!("🔔 Coucou {delay_desc}: \"{message}\"");
+    let desc = thread_id.as_ref().map_or_else(
+        || format!("🔔 Coucou {delay_desc}: \"{message}\""),
+        |tid| format!("🔔 Coucou {delay_desc} (thread {tid}): \"{message}\""),
+    );
 
-    let watcher = CoucouWatcher { watcher_id, message: message.clone(), registered_at_ms: now, fire_at_ms, desc };
+    let watcher = CoucouWatcher {
+        watcher_id: watcher_id.clone(),
+        message: message.clone(),
+        registered_at_ms: now,
+        fire_at_ms,
+        thread_id,
+        desc,
+    };
 
     WatcherRegistry::get_mut(state).register(Box::new(watcher));
 
-    ToolResult::new(tool.id.clone(), format!("Coucou scheduled {delay_desc}!\nMessage: \"{message}\""), false)
+    ToolResult::new(
+        tool.id.clone(),
+        format!("Coucou scheduled {delay_desc}!\nMessage: \"{message}\"\nID: {watcher_id}"),
+        false,
+    )
 }

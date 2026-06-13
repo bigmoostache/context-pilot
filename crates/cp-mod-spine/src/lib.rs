@@ -219,6 +219,8 @@ impl Module for SpineModule {
                 .param("message", ParamType::String, true)
                 .param("delay", ParamType::String, false)
                 .param("datetime", ParamType::String, false)
+                .param("thread_id", ParamType::String, false)
+                .param("cancel_id", ParamType::String, false)
                 .build(),
         ]
     }

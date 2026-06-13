@@ -308,4 +308,8 @@ impl Watcher for OcrWatcher {
     fn message(&self) -> Option<&str> {
         None
     }
+
+    fn thread_id(&self) -> Option<&str> {
+        None
+    }
 }

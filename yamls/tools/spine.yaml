@@ -25,3 +25,5 @@ tools:
       message: "Message to deliver when the notification fires"
       delay: "Delay before firing (timer mode only). Examples: '30s', '5m', '1h30m', '2h15m30s'"
       datetime: "When to fire (datetime mode only). Format: YYYY-MM-DDTHH:MM:SS (local time)"
+      thread_id: "Optional thread ID to scope this notification to a specific thread"
+      cancel_id: "Cancel an existing coucou by its watcher ID (e.g. 'coucou_0'). When set, mode/message/delay/datetime are ignored."

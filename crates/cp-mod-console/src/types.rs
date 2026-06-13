@@ -350,4 +350,8 @@ impl Watcher for ConsoleWatcher {
     fn message(&self) -> Option<&str> {
         None
     }
+
+    fn thread_id(&self) -> Option<&str> {
+        None
+    }
 }
