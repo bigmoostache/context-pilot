@@ -15,11 +15,8 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
         return result;
     }
 
-    // Phase 0.25: Compulsory tool metadata — intent and verb required on every call
+    // Phase 0.25: Tool metadata — intent and verb are advisory (warnings, not errors)
     validate_tool_metadata(tool, &mut result);
-    if result.has_errors() {
-        return result;
-    }
 
     // Phase 0.5: Duplicate Close_conversation_history detection
     // If another queued item already targets the same panel, reject early.
@@ -165,31 +162,32 @@ const fn json_type_name(val: &serde_json::Value) -> &'static str {
     }
 }
 
-/// Validate compulsory `intent` and `verb` metadata on every tool call.
-/// Produces blocking errors — the tool will NOT execute if these are missing or invalid.
+/// Validate `intent` and `verb` metadata on tool calls.
+/// Produces non-blocking warnings — the tool executes regardless, but the LLM
+/// sees feedback about missing or malformed metadata.
 fn validate_tool_metadata(tool: &ToolUse, result: &mut Verdict) {
     let intent = tool.input.get("intent").and_then(serde_json::Value::as_str);
     let verb = tool.input.get("verb").and_then(serde_json::Value::as_str);
 
     match intent {
-        None => result.errors.push(format!(
-            "Missing required parameter: 'intent'. Provide a 1-10 word reason for calling {}.",
+        None => result.warnings.push(format!(
+            "Missing parameter: 'intent'. Provide a 1-10 word reason for calling {}.",
             tool.name,
         )),
-        Some(s) if s.trim().is_empty() => result.errors.push("Parameter 'intent' is empty.".to_string()),
+        Some(s) if s.trim().is_empty() => result.warnings.push("Parameter 'intent' is empty.".to_string()),
         Some(s) if s.split_whitespace().count() > 10 => {
-            result.errors.push("Parameter 'intent' exceeds 10 words — keep it concise.".to_string());
+            result.warnings.push("Parameter 'intent' exceeds 10 words — keep it concise.".to_string());
         }
         Some(_) => {}
     }
 
     match verb {
         None => result
-            .errors
-            .push(format!("Missing required parameter: 'verb'. Provide a single -ING action word for {}.", tool.name,)),
-        Some(s) if s.trim().is_empty() => result.errors.push("Parameter 'verb' is empty.".to_string()),
+            .warnings
+            .push(format!("Missing parameter: 'verb'. Provide a single -ING action word for {}.", tool.name,)),
+        Some(s) if s.trim().is_empty() => result.warnings.push("Parameter 'verb' is empty.".to_string()),
         Some(s) if s.split_whitespace().count() != 1 => {
-            result.errors.push("Parameter 'verb' must be exactly 1 word.".to_string());
+            result.warnings.push("Parameter 'verb' must be exactly 1 word.".to_string());
         }
         Some(_) => {}
     }
