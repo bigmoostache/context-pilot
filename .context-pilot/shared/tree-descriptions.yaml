@@ -1902,6 +1902,10 @@
   path: crates/cp-console-server/Cargo.toml
   description: 'Console server deps: serde, serde_json, nix (process), signal-hook, rlimit.'
   last_edited_ms: 1780563847604
+816db0d29bf86cfc:
+  path: .github/checks/check-lint-config.sh
+  description: 'Lint integrity hash chain checker. Verifies protected files haven''t been tampered with. --update appends new entry + git diffs of changed protected files. Readers skip non-entry lines via ^[0-9]+: guard. Password required for --update.'
+  last_edited_ms: 1781347849835
 81a162f1e0d9a52e:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
@@ -2550,6 +2554,10 @@ af14c600c0042c99:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+af3dcb89932c06f9:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
+  last_edited_ms: 1781347849843
 af638eaf96a0207c:
   path: crates/cp-mod-git/src/classify.rs
   description: ReadOnly/Mutating classification, shell arg parsing with quote handling, operator blocking, subcommand-aware classify_git()

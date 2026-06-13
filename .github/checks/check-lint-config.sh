@@ -8,10 +8,11 @@
 # Where chain_hash = SHA-256(seq + prev_chain_hash + content_hash + password)
 #
 # Usage:
-#   .github/checks/check-lint-config.sh            # verify (CI)
-#   .github/checks/check-lint-config.sh --update    # append new entry (needs password)
-#   .github/checks/check-lint-config.sh --history   # show the chain log
-#   .github/checks/check-lint-config.sh --show      # show what's being protected
+#   .github/checks/check-lint-config.sh                # verify (CI)
+#   .github/checks/check-lint-config.sh --update        # append new entry (needs password)
+#   .github/checks/check-lint-config.sh --deep-verify   # verify + reverse-walk diffs
+#   .github/checks/check-lint-config.sh --history       # show the chain log
+#   .github/checks/check-lint-config.sh --show          # show what's being protected
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -187,6 +188,120 @@ if [ "${1:-}" = "--history" ]; then
     IFS=: read -r seq prev ch chain <<< "$raw_line"
     echo "  #$seq  content=${ch:0:12}…  chain=${chain:0:12}…  prev=${prev:0:12}…"
   done < "$CHAIN_FILE"
+  exit 0
+fi
+
+# --- Deep verify mode: reverse-walk diffs to verify historical content hashes ---
+if [ "${1:-}" = "--deep-verify" ]; then
+  if [ ! -f "$CHAIN_FILE" ]; then
+    echo "FAIL: No chain file found." >&2
+    exit 1
+  fi
+
+  # Phase 1: Run normal chain link verification.
+  prev_chain="GENESIS"
+  entry_count=0
+  declare -a entry_seqs=() entry_content_hashes=()
+  while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+    [[ "$raw_line" =~ ^[0-9]+: ]] || continue
+    IFS=: read -r seq prev ch chain <<< "$raw_line"
+    entry_count=$((entry_count + 1))
+    entry_seqs+=("$seq")
+    entry_content_hashes+=("$ch")
+    if [ "$prev" != "$prev_chain" ]; then
+      echo "FAIL: Chain broken at entry #$seq." >&2
+      exit 1
+    fi
+    prev_chain="$chain"
+  done < "$CHAIN_FILE"
+
+  if [ "$entry_count" -eq 0 ]; then
+    echo "FAIL: Chain file is empty." >&2
+    exit 1
+  fi
+
+  # Verify current content matches latest entry.
+  current_ch=$(content_hash)
+  last_idx=$((${#entry_seqs[@]} - 1))
+  if [ "$current_ch" != "${entry_content_hashes[$last_idx]}" ]; then
+    echo "FAIL: Current content doesn't match latest entry #${entry_seqs[$last_idx]}." >&2
+    exit 1
+  fi
+  echo "Chain link verification passed ($entry_count entries). ✓"
+
+  # Phase 2: Reverse content walk using embedded diffs.
+  # Copy all protected files to a temp directory.
+  DEEP_TEMP=$(mktemp -d)
+  cleanup_deep() { rm -rf "$DEEP_TEMP"; }
+  trap cleanup_deep EXIT
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    local_trimmed="${line#"${line%%[![:space:]]*}"}"
+    [[ -z "$local_trimmed" || "$local_trimmed" == \#* ]] && continue
+    if [[ "$local_trimmed" =~ ^-\ path:\ (.+)$ ]]; then
+      fpath="${BASH_REMATCH[1]}"
+      mkdir -p "$DEEP_TEMP/$(dirname "$fpath")"
+      cp "$ROOT/$fpath" "$DEEP_TEMP/$fpath" 2>/dev/null || true
+    fi
+  done < "$MANIFEST"
+
+  ORIG_ROOT="$ROOT"
+  verified_back=0
+
+  echo "Reverse content walk:"
+  for ((i=last_idx; i>=0; i--)); do
+    seq="${entry_seqs[$i]}"
+    expected="${entry_content_hashes[$i]}"
+
+    # Compute hash using temp dir files.
+    ROOT="$DEEP_TEMP"
+    actual=$(content_hash)
+    ROOT="$ORIG_ROOT"
+
+    if [ "$actual" != "$expected" ]; then
+      echo "  Entry #$seq: ✗ MISMATCH"
+      echo "    Expected: $expected" >&2
+      echo "    Got:      $actual" >&2
+      echo "FAIL: Deep verification failed at entry #$seq." >&2
+      exit 1
+    fi
+    echo "  Entry #$seq: ✓"
+    verified_back=$((verified_back + 1))
+
+    # Extract diff block for this entry (to reverse into previous state).
+    diff_file="$DEEP_TEMP/.diff_$seq.patch"
+    rm -f "$diff_file"
+    extracting=0
+    while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+      if [[ "$raw_line" == "# --- Diff for entry #${seq} ---" ]]; then
+        extracting=1
+        continue
+      fi
+      if [[ "$raw_line" == "# --- End entry #${seq} ---" ]]; then
+        extracting=0
+        continue
+      fi
+      if [ "$extracting" -eq 1 ]; then
+        printf '%s\n' "$raw_line" >> "$diff_file"
+      fi
+    done < "$CHAIN_FILE"
+
+    if [ ! -f "$diff_file" ] || [ ! -s "$diff_file" ]; then
+      # No diff for this entry — can't reverse further.
+      if [ "$i" -gt 0 ]; then
+        echo "  (no diff data before entry #$seq — stopping reverse walk)"
+      fi
+      break
+    fi
+
+    # Apply patch in reverse to reconstruct previous state.
+    if ! patch -R -p1 -s -d "$DEEP_TEMP" < "$diff_file" 2>/dev/null; then
+      echo "FAIL: Could not reverse-apply diff for entry #$seq." >&2
+      exit 1
+    fi
+  done
+
+  echo "Deep verification passed ($verified_back entries verified by content). ✓"
   exit 0
 fi
 
