@@ -67,7 +67,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         selected_context: state.selected_context,
         draft_input: state.input.clone(),
         draft_cursor: state.input_cursor,
-        sidebar_mode: state.sidebar_mode,
+        view_mode: state.view_mode,
         modules: global_modules,
     };
     if let Ok(json) = serde_json::to_string_pretty(&shared_config) {

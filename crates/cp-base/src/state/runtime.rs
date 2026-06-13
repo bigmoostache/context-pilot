@@ -2,7 +2,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use super::context::{Entry, Kind};
-use super::data::config::SidebarMode;
+use super::data::config::ViewMode;
 use super::data::message::Message;
 use super::flags::{ConfigOverlay, HighlightIrFn, StatusBools, StreamPhase, StreamingTool, UiState};
 use crate::config::llm_types::LlmProvider;
@@ -89,8 +89,8 @@ pub struct State {
     pub secondary_minimax_model: crate::config::llm_types::MiniMaxModel,
     /// Secondary Claude Code V2 model variant.
     pub secondary_claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model,
-    /// Sidebar display mode: Normal (full), Collapsed (icons only), Hidden
-    pub sidebar_mode: SidebarMode,
+    /// View mode: Normal (full sidebar), Collapsed (icons), Hidden, Threads
+    pub view_mode: ViewMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
     pub reveries: HashMap<String, super::reverie::Session>,
@@ -244,7 +244,7 @@ impl Default for State {
             secondary_deepseek_model: crate::config::llm_types::DeepSeekModel::default(),
             secondary_minimax_model: crate::config::llm_types::MiniMaxModel::default(),
             secondary_claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model::default(),
-            sidebar_mode: SidebarMode::Normal,
+            view_mode: ViewMode::Normal,
             reveries: HashMap::new(),
             cache_hit_tokens: 0,
             cache_miss_tokens: 0,

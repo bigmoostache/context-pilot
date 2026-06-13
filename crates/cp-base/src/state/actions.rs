@@ -166,8 +166,8 @@ pub enum Action {
     /// Jump to first dynamic panel on the previous page (Shift+Left).
     PageDynamicPrev,
 
-    /// Cycle sidebar display mode (Full → Collapsed → Hidden).
-    CycleSidebarMode,
+    /// Cycle view mode (Normal → Collapsed → Hidden → Threads → Normal).
+    CycleViewMode,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

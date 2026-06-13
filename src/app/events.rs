@@ -23,7 +23,7 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     KeyCode::Char('n') => return Some(Action::NewContext),
                     KeyCode::Char('h') => return Some(Action::ToggleConfigView),
                     KeyCode::Char('i') => return Some(Action::ToggleIndexOverlay),
-                    KeyCode::Char('v') => return Some(Action::CycleSidebarMode),
+                    KeyCode::Char('v') => return Some(Action::CycleViewMode),
                     KeyCode::Char('o') => return Some(Action::ResetSessionCosts),
                     KeyCode::Char('p') => return Some(Action::OpenCommandPalette),
                     KeyCode::Char('u') => return Some(Action::HistoryPrev),

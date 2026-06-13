@@ -68,7 +68,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
 
     // Render autocomplete popup if active (via IR overlays)
     {
-        let sw = state.sidebar_mode.width();
+        let sw = state.view_mode.width();
         let content_x = area.x.saturating_add(sw);
         let content_width = area.width.saturating_sub(sw);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
@@ -97,7 +97,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
 
 /// Render the body area: sidebar (if visible) and main content panel.
 fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
-    let sw = state.sidebar_mode.width();
+    let sw = state.view_mode.width();
     if sw == 0 {
         // Hidden mode — no sidebar at all
         render_main_content(frame, state, area, ir_frame);
