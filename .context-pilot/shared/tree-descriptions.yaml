@@ -102,6 +102,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+07058a01cc85c3f4:
+  path: .context-pilot/shared/entities/schema.sql
+  description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
+  last_edited_ms: 0
 078746d33a727ad6:
   path: crates/cp-mod-git/src/result_panel.rs
   description: 'GitResultPanel: auto-refreshing read-only command output, timeout execution, diff-aware syntax coloring'

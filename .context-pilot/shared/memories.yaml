@@ -250,6 +250,45 @@
   - reverie
   - api
   last_edited_ms: 0
+5623177cb0b0ed7d:
+  tl_dr: 'MULTI-WORKER (subworkers branch): N equal workers in one Rust loop. Decisions + arch in contents.'
+  contents: |-
+    ## Multi-Worker (subworkers) — Locked Decisions (8 rulings, 2026-06-13)
+
+    1. **Concurrency**: background (non-focused) workers KEEP RUNNING (stream + execute tools). True concurrency, single main loop. Focused vs background differ ONLY in rendering + input routing; switching does NOT pause the previous worker.
+    2. **Model/theme**: BOTH SHARED across all workers.
+    3. **Identity**: worker_id = SHORT random id (8 hex), used as state filename. display_name = free-text label. (Not slug, not full UUID.)
+    4. **Cost**: per-worker token/cost counters keyed by worker_id; NET-NEW persistence in WorkerState.
+    5. **BG autonomy = FULL**: unfocused workers execute ALL tools freely incl shared mutations + file edits. User owns collisions.
+    6. **BG visibility = STATUS-BAR aggregate by STATE (no push notifications)**. Buckets: WORKING = {streaming, tooling, waiting}; NEEDS-ATTENTION = {idle, asked-question, blocked, errored}. Badge counts BACKGROUND workers. User's words: 'status bar shows count per type: working (streaming, tooling, waiting), requires attention (idle, asked question)'.
+    7. **Guard rails = PER-WORKER ONLY** (no global ceiling; N workers can collectively overspend, accepted).
+    8. **Reverie = ALL workers may auto-reverie, with a GLOBAL concurrent cap** (REVERIE_GLOBAL_CAP).
+    9. **Max workers = soft cap 8** (create blocked beyond, with message).
+    10. **Delete = CONFIRM in overlay** (nukes conversation/panels/scratch). Delete-last → fresh empty worker. Deleting mid-stream aborts that worker's stream.
+    11. **File collisions = NON-ISSUE** (tools serialize on single main loop → concurrent edits = sequential edits, normal Edit/Write last-write-wins). NO warning/lock.
+
+    ## Shared vs per-worker (is_global grep, authoritative)
+    - SHARED (is_global=true): files, firecrawl, tree, memory, brave, logs, entities, callback, prompt, ocr, conversation, conversation_history, overview, questions (14).
+    - PER-WORKER (is_global=false): queue, git, spine, scratchpad, todo, console, github, search (8).
+    - Messages already per-worker via WorkerState.important_panel_uids.
+
+    ## Proposed defaults (pending veto, in design doc)
+    - Route B for Phase 3 shared state; shared-route ONLY real-in-memory modules (memory/logs/tree/callback-defs/prompt-lib); entities(SQLite)/search(Meili) keep cheap per-worker caches on shared backing store.
+    - Watchers = UNION across all workers (refcounted); forced by full bg autonomy.
+    - global_next_uid → promote to first-class Shared field (drop overview-module hack); seeded from max on migration.
+    - Phase 3 fairness = round-robin: each worker advances pipeline one step per tick.
+    - Ctrl+S overlay: ↑↓ nav, Enter switch, n new (inline name prompt), d delete (confirm), Esc close.
+    - SCHEMA_VERSION 1→2 + migration adopts main_worker as worker #1.
+
+    ## Branch: subworkers (off master). Doc: docs/design-subworkers.md. Phasing: 1+2 definitive, 3 specified-flagged, 4 deferred-with-user (logs).
+  importance: critical
+  labels:
+  - subworkers
+  - multi-worker
+  - architecture
+  - design
+  - active
+  last_edited_ms: 1781339320501
 6cc818f12c0d231a:
   tl_dr: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
   importance: critical

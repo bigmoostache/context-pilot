@@ -60,3 +60,8 @@ requests.flow
 **/requests.log
 **/requests.flow
 /tmp/cc-capture/
+
+# Harbor / terminal-bench run outputs (huge, never commit)
+/jobs/
+benchmarks/terminal-bench/jobs/
+sandbox/
