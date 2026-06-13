@@ -654,6 +654,10 @@
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
   last_edited_ms: 0
+2660bb88e1117b5e:
+  path: yamls/tools/spine.yaml
+  description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
+  last_edited_ms: 0
 266650666b192075:
   path: src/app/reverie/trigger.rs
   description: check_threshold_trigger() (auto-fire cleaner on token breach), start_manual_reverie() (per-agent guards)
@@ -1146,6 +1150,10 @@
   path: crates/cp-mod-search/Cargo.toml
   description: 'Search module deps: cp-base, cp-mod-logs, cp-render, crossterm, serde, serde_json, cp-mod-utilities, reqwest, notify, tree-sitter (9 langs), chrono, serde_yaml, log.'
   last_edited_ms: 1780565428724
+44920171b54ee28f:
+  path: crates/cp-mod-console/src/types.rs
+  description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
+  last_edited_ms: 0
 44abd93c87775339:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints.'
@@ -2058,6 +2066,10 @@
   path: src/llms/claude_code_api_key/helpers.rs
   description: 'CC API-key helpers: constants (endpoint/headers), map_model_name(), inject_system_reminder(), apply_claude_code_headers()'
   last_edited_ms: 0
+856d2552e5fd5d0a:
+  path: src/ui/threads_view.rs
+  description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
+  last_edited_ms: 1781357664014
 85d3de8465114706:
   path: crates/cp-render/src/lib.rs
   description: 'IR rendering crate. Semantic styling (not RGB). Block enum: Line/Empty/Header/Table/ProgressBar/Tree/Separator/KeyValue. Span with semantic+bold/italic/dimmed/reversed+optional RGB. pub mod markdown for shared parsing. Serializable for future web frontend.'
@@ -2197,6 +2209,10 @@
 8c0867d815410d9d:
   path: docs/console-server.md
   description: Console server protocol and process management
+  last_edited_ms: 0
+8c5cfd3d9d60c8da:
+  path: crates/cp-base/src/state/watchers.rs
+  description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'
   last_edited_ms: 0
 8c8b9d4645917223:
   path: crates/cp-mod-search/src/meili/mod.rs
@@ -3030,6 +3046,10 @@ c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
   last_edited_ms: 0
+c60d6120ad422e36:
+  path: crates/cp-mod-ocr/src/tools.rs
+  description: OCR tool dispatch. flame!("ocr_exec"). Validates params, spawns background thread for Datalab API, registers OcrWatcher (non-blocking). Returns immediately with spine notification on completion.
+  last_edited_ms: 0
 c60e173425c891fe:
   path: crates/cp-mod-callback/src/types.rs
   description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, active_set, editor_open).
@@ -3314,6 +3334,10 @@ d794e0ca2d6b10ae:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
   last_edited_ms: 1780609410314
+d7aae73f71c307bc:
+  path: crates/cp-mod-spine/src/panel.rs
+  description: 'Spine panel UI. Notifications rendered as Block::Table (ID/Time/Type/Content columns) with 60-char content truncation. Sections: Unprocessed, Blocked, Recent Processed. Config as KeyValue. Active Watchers list. Context: text format for LLM.'
+  last_edited_ms: 0
 d8359ab8b810ded8:
   path: crates/cp-mod-spine/src/panel.rs
   description: 'Spine panel UI. Notifications rendered as Block::Table (ID/Time/Type/Content columns) with 60-char content truncation. Sections: Unprocessed, Blocked, Recent Processed. Config as KeyValue. Active Watchers list. Context: text format for LLM.'
@@ -3378,6 +3402,10 @@ dcb9ef498a7d8eef:
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
   last_edited_ms: 1781354328644
+dd9b73ad084ae862:
+  path: src/app/actions/navigation.rs
+  description: 'Context panel navigation: select_context (next/prev by numeric ID) and page_dynamic (page jump through dynamic panels, DYNAMIC_PAGE_SIZE=10).'
+  last_edited_ms: 1781357664005
 ddb10c875236eedb:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -3545,6 +3573,10 @@ ee05b4f7b117952c:
 ee59b893f856d59f:
   path: docs/web_module_design.md
   description: Brave + Firecrawl web module design
+  last_edited_ms: 0
+eea64e117a25ef2b:
+  path: crates/cp-mod-spine/src/coucou.rs
+  description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
   last_edited_ms: 0
 eeb8ddd22c31de65:
   path: crates/cp-base/src/state/watchers.rs
@@ -3769,6 +3801,10 @@ fdbfb8603d4061fd:
 fdc71c3c93143d63:
   path: crates/cp-mod-utilities/src/secret.rs
   description: Redacted newtype — Debug/Display print [REDACTED]. expose_secret() for access. Replaces secrecy crate.
+  last_edited_ms: 0
+fe00926a7e481bb0:
+  path: crates/cp-mod-callback/src/firing.rs
+  description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. fire_async/blocking_callbacks() for batch dispatch. flame!("cb_fire"), flame!("cb_fire_async"), flame!("cb_fire_blocking"). CallbackWatcher: exit 0→success_message, exit 7→silent, exit !=0→deferred panel, timeout→deferred panel.'
   last_edited_ms: 0
 fe442c943f4c8e63:
   path: docs/talk/slides/0-1.html

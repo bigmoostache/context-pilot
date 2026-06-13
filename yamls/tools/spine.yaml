@@ -26,4 +26,6 @@ tools:
       delay: "Delay before firing (timer mode only). Examples: '30s', '5m', '1h30m', '2h15m30s'"
       datetime: "When to fire (datetime mode only). Format: YYYY-MM-DDTHH:MM:SS (local time)"
       thread_id: "Optional thread ID to scope this notification to a specific thread"
+      recurrence: "Repeat schedule: 'once' (default, fires once), 'hourly', 'daily', 'weekly', or 'custom' (requires interval param)"
+      interval: "Custom repeat interval (only with recurrence='custom'). Examples: '30m', '2h', '1d', '12h'"
       cancel_id: "Cancel an existing coucou by its watcher ID (e.g. 'coucou_0'). When set, mode/message/delay/datetime are ignored."

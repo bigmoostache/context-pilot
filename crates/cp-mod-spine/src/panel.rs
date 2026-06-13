@@ -77,7 +77,13 @@ impl SpinePanel {
                 for w in watchers {
                     let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
                     let mode = if w.is_blocking() { "blocking" } else { "async" };
-                    let _r4 = writeln!(output, "[{}] {} ({}, {}s ago)", w.id(), w.description(), mode, age_s);
+                    let recurrence = if w.interval_ms() > 0 {
+                        w.recurrence_label().map_or_else(|| " recurrent".to_string(), |l| format!(" {l}"))
+                    } else {
+                        String::new()
+                    };
+                    let _r4 =
+                        writeln!(output, "[{}] {} ({}{}, {}s ago)", w.id(), w.description(), mode, recurrence, age_s);
                 }
             }
         }
@@ -208,9 +214,16 @@ impl Panel for SpinePanel {
                     let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
                     let (mode_icon, mode_sem) =
                         if w.is_blocking() { ("⏳", Semantic::Warning) } else { ("👁", Semantic::Code) };
+                    let recurrence_span = if w.interval_ms() > 0 {
+                        let label = w.recurrence_label().unwrap_or("recurrent");
+                        format!(" [{label}]")
+                    } else {
+                        String::new()
+                    };
                     blocks.push(Block::Line(vec![
                         S::styled(format!("  {mode_icon} "), mode_sem),
                         S::new(w.description().to_string()),
+                        S::styled(recurrence_span, Semantic::Accent),
                         S::muted(format!(" ({age_s}s)")),
                     ]));
                 }

@@ -30,22 +30,34 @@ pub(crate) struct CoucouData {
     /// Optional thread ID — scopes the notification to a thread.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_id: Option<String>,
+    /// Repeat interval in milliseconds. 0 = one-shot (no recurrence).
+    #[serde(default)]
+    pub interval_ms: u64,
+    /// Human-readable recurrence label (e.g. "hourly", "daily", "every 30m").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recurrence_label: Option<String>,
 }
 
 impl CoucouData {
     /// Convert into a live `CoucouWatcher` and register in `WatcherRegistry`.
     pub(crate) fn into_watcher(self) -> CoucouWatcher {
+        let recurrence_suffix = self
+            .recurrence_label
+            .as_deref()
+            .map_or(String::new(), |r| format!(" [{r}]"));
         let desc = if let Some(tid) = &self.thread_id {
-            format!("🔔 Coucou (thread {tid}): \"{}\"", self.message)
+            format!("🔔 Coucou (thread {tid}): \"{}\"{recurrence_suffix}", self.message)
         } else {
-            format!("🔔 Coucou: \"{}\"", self.message)
+            format!("🔔 Coucou: \"{}\"{recurrence_suffix}", self.message)
         };
         CoucouWatcher {
             watcher_id: self.watcher_id,
             message: self.message,
             registered_at_ms: self.registered_at_ms,
-            fire_at_ms: self.fire_at_ms,
+            fire_at_ms: std::sync::atomic::AtomicU64::new(self.fire_at_ms),
             thread_id: self.thread_id,
+            interval_ms: self.interval_ms,
+            recurrence_label: self.recurrence_label,
             desc,
         }
     }
@@ -66,6 +78,8 @@ pub(crate) fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
                 registered_at_ms: w.registered_ms(),
                 fire_at_ms: w.fire_at_ms()?,
                 thread_id: w.thread_id().map(str::to_string),
+                interval_ms: w.interval_ms(),
+                recurrence_label: w.recurrence_label().map(str::to_string),
             })
         })
         .collect()
@@ -158,6 +172,8 @@ fn format_duration(ms: u64) -> String {
 // ============================================================
 
 /// A watcher that fires a notification at a specific time.
+/// Recurrent coucous use `AtomicU64` for `fire_at_ms` so the poll
+/// method can bump the next occurrence via interior mutability.
 pub(crate) struct CoucouWatcher {
     /// Unique watcher ID.
     pub watcher_id: String,
@@ -165,10 +181,15 @@ pub(crate) struct CoucouWatcher {
     pub message: String,
     /// When this watcher was registered (ms since epoch).
     pub registered_at_ms: u64,
-    /// When the notification should fire (ms since epoch).
-    pub fire_at_ms: u64,
+    /// When the notification should next fire (ms since epoch).
+    /// Atomic for interior mutability — recurrent watchers bump this on fire.
+    pub fire_at_ms: std::sync::atomic::AtomicU64,
     /// Optional thread ID — scopes the notification to a thread.
     pub thread_id: Option<String>,
+    /// Repeat interval in ms. 0 = one-shot, >0 = recurrent.
+    pub interval_ms: u64,
+    /// Human-readable recurrence label for display.
+    pub recurrence_label: Option<String>,
     /// Human-readable description.
     pub desc: String,
 }
@@ -179,7 +200,7 @@ impl Watcher for CoucouWatcher {
     }
 
     fn is_persistent(&self) -> bool {
-        false
+        self.interval_ms > 0
     }
 
     fn suicide(&self, _state: &State) -> bool {
@@ -203,8 +224,15 @@ impl Watcher for CoucouWatcher {
     }
 
     fn check(&self, _state: &State) -> Option<WatcherResult> {
+        let current_fire = self.fire_at_ms.load(std::sync::atomic::Ordering::Relaxed);
         let now = now_ms();
-        (now >= self.fire_at_ms).then(|| {
+        (now >= current_fire).then(|| {
+            // Recurrent: bump fire_at_ms to next occurrence
+            if self.interval_ms > 0 {
+                self.fire_at_ms
+                    .store(now.saturating_add(self.interval_ms), std::sync::atomic::Ordering::Relaxed);
+            }
+
             let desc = self.thread_id.as_ref().map_or_else(
                 || format!("⏰ Coucou! {}", self.message),
                 |tid| format!("⏰ Coucou (thread {tid})! {}", self.message),
@@ -237,7 +265,7 @@ impl Watcher for CoucouWatcher {
     }
 
     fn fire_at_ms(&self) -> Option<u64> {
-        Some(self.fire_at_ms)
+        Some(self.fire_at_ms.load(std::sync::atomic::Ordering::Relaxed))
     }
 
     fn message(&self) -> Option<&str> {
@@ -246,6 +274,14 @@ impl Watcher for CoucouWatcher {
 
     fn thread_id(&self) -> Option<&str> {
         self.thread_id.as_deref()
+    }
+
+    fn interval_ms(&self) -> u64 {
+        self.interval_ms
+    }
+
+    fn recurrence_label(&self) -> Option<&str> {
+        self.recurrence_label.as_deref()
     }
 }
 
@@ -285,6 +321,43 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let thread_id = tool.input.get("thread_id").and_then(|v| v.as_str()).map(String::from);
+
+    // Parse recurrence
+    let recurrence_str = tool.input.get("recurrence").and_then(|v| v.as_str()).unwrap_or("once");
+    let (interval_ms, recurrence_label): (u64, Option<String>) = match recurrence_str {
+        "once" => (0, None),
+        "hourly" => (3_600_000, Some("hourly".to_string())),
+        "daily" => (86_400_000, Some("daily".to_string())),
+        "weekly" => (604_800_000, Some("weekly".to_string())),
+        "custom" => {
+            let Some(interval_str) = tool.input.get("interval").and_then(|v| v.as_str()) else {
+                return ToolResult::new(
+                    tool.id.clone(),
+                    "Missing 'interval' parameter for custom recurrence. Examples: '30m', '2h', '1d'".to_string(),
+                    true,
+                );
+            };
+            match parse_duration_ms(interval_str) {
+                Ok(ms) => (ms, Some(format!("every {}", format_duration(ms)))),
+                Err(e) => {
+                    return ToolResult::new(
+                        tool.id.clone(),
+                        format!("Invalid interval '{interval_str}': {e}"),
+                        true,
+                    );
+                }
+            }
+        }
+        _ => {
+            return ToolResult::new(
+                tool.id.clone(),
+                format!(
+                    "Unknown recurrence '{recurrence_str}'. Use 'once', 'hourly', 'daily', 'weekly', or 'custom'."
+                ),
+                true,
+            );
+        }
+    };
 
     let now = now_ms();
     let fire_at_ms: u64;
@@ -344,25 +417,34 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let counter = COUCOU_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let watcher_id = format!("coucou_{counter}");
+    let recurrence_suffix = recurrence_label.as_deref().map_or(String::new(), |r| format!(" [{r}]"));
     let desc = thread_id.as_ref().map_or_else(
-        || format!("🔔 Coucou {delay_desc}: \"{message}\""),
-        |tid| format!("🔔 Coucou {delay_desc} (thread {tid}): \"{message}\""),
+        || format!("🔔 Coucou {delay_desc}: \"{message}\"{recurrence_suffix}"),
+        |tid| format!("🔔 Coucou {delay_desc} (thread {tid}): \"{message}\"{recurrence_suffix}"),
     );
 
     let watcher = CoucouWatcher {
         watcher_id: watcher_id.clone(),
         message: message.clone(),
         registered_at_ms: now,
-        fire_at_ms,
+        fire_at_ms: std::sync::atomic::AtomicU64::new(fire_at_ms),
         thread_id,
+        interval_ms,
+        recurrence_label,
         desc,
     };
 
     WatcherRegistry::get_mut(state).register(Box::new(watcher));
 
+    let recurrence_info = if interval_ms > 0 {
+        format!("\nRecurrence: {}", recurrence_suffix.trim())
+    } else {
+        String::new()
+    };
+
     ToolResult::new(
         tool.id.clone(),
-        format!("Coucou scheduled {delay_desc}!\nMessage: \"{message}\"\nID: {watcher_id}"),
+        format!("Coucou scheduled {delay_desc}!\nMessage: \"{message}\"\nID: {watcher_id}{recurrence_info}"),
         false,
     )
 }

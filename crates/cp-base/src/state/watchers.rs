@@ -167,6 +167,18 @@ pub trait Watcher: Send + Sync {
     fn thread_id(&self) -> Option<&str> {
         None
     }
+
+    /// Repeat interval in ms for recurrent watchers (0 = one-shot).
+    /// Used for persistence across reloads.
+    fn interval_ms(&self) -> u64 {
+        0
+    }
+
+    /// Human-readable recurrence label (e.g. "hourly", "every 30m").
+    /// Used for persistence and display.
+    fn recurrence_label(&self) -> Option<&str> {
+        None
+    }
 }
 
 /// Registry holding active watchers. Stored in State via `TypeMap`.
@@ -449,6 +461,14 @@ impl Watcher for ChannelWatcher {
     }
 
     fn thread_id(&self) -> Option<&str> {
+        None
+    }
+
+    fn interval_ms(&self) -> u64 {
+        0
+    }
+
+    fn recurrence_label(&self) -> Option<&str> {
         None
     }
 }
