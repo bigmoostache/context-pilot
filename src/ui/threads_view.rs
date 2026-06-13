@@ -74,6 +74,17 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let last_read = focus.last_read_count.get(&thread.id).copied().unwrap_or(0);
         let has_unread = thread.messages.len() > last_read;
 
+        // Status color: blue = LLM focused, orange = LLM's turn, green = user's turn
+        let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
+        let status_color = if is_focused {
+            theme::accent() // blue — LLM is focused on this thread
+        } else {
+            match thread.status {
+                ThreadStatus::MyTurn => theme::orange(), // orange — LLM's turn
+                ThreadStatus::TheirTurn => theme::success(), // green — user's turn
+            }
+        };
+
         // Indicator + thread name
         let indicator = if is_selected {
             "▸ "
@@ -84,17 +95,22 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         };
         let indicator_color = if has_unread && !is_selected { theme::warning() } else { theme::accent() };
         let name_color = if is_selected { theme::accent() } else { theme::text() };
-        let name = truncate_str(&thread.name, inner.width.saturating_sub(4).into());
+        let name = truncate_str(&thread.name, inner.width.saturating_sub(6).into());
 
         lines.push(Line::from(vec![
             Span::styled(indicator, Style::default().fg(indicator_color)),
+            Span::styled("● ", Style::default().fg(status_color)),
             Span::styled(name, Style::default().fg(name_color)),
         ]));
 
         // Status badge
-        let (badge, badge_color) = match thread.status {
-            ThreadStatus::MyTurn => ("[MY_TURN]", theme::accent()),
-            ThreadStatus::TheirTurn => ("[THEIR_TURN]", theme::text_muted()),
+        let (badge, badge_color) = if is_focused {
+            ("[FOCUSED]", theme::accent())
+        } else {
+            match thread.status {
+                ThreadStatus::MyTurn => ("[MY_TURN]", theme::orange()),
+                ThreadStatus::TheirTurn => ("[THEIR_TURN]", theme::success()),
+            }
         };
         lines.push(Line::from(vec![
             Span::raw("  "),
@@ -202,10 +218,16 @@ fn render_message_area_with_input(
         return;
     };
 
-    // Title: thread name + status
-    let (status_label, status_color) = match thread.status {
-        ThreadStatus::MyTurn => (" [MY_TURN]", theme::accent()),
-        ThreadStatus::TheirTurn => (" [THEIR_TURN]", theme::text_muted()),
+    // Title: thread name + status (colored consistently with thread list)
+    let focus = FocusState::get(state);
+    let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
+    let (status_label, status_color) = if is_focused {
+        (" [FOCUSED]", theme::accent())
+    } else {
+        match thread.status {
+            ThreadStatus::MyTurn => (" [MY_TURN]", theme::orange()),
+            ThreadStatus::TheirTurn => (" [THEIR_TURN]", theme::success()),
+        }
     };
 
     let title = Line::from(vec![
