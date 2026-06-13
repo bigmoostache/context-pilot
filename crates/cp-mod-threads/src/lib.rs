@@ -137,7 +137,7 @@ impl Module for ThreadsModule {
 
         // Only enforce when MY_TURN threads exist and AI is unfocused.
         if ts.has_my_turn_threads() && fs.focused_thread_id.is_none() {
-            if fs.dangling_remaining > 0 {
+            if fs.dangling_remaining > 0 && !is_focus_exempt {
                 // Dangling phase — warn but allow.
                 pf.warnings.push(format!(
                     "\u{26a0}\u{fe0f} Dangling phase: {} tool call(s) remaining \
