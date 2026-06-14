@@ -2510,6 +2510,10 @@
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
+94a5320bb61a1ca6:
+  path: src/app/actions/threads.rs
+  description: 'Thread action handlers. Dispatches Thread* action variants (select/create/archive/question navigation). Question form: cursor movement, toggle selection, Enter submit (YAML answers → ThreadMessage → MY_TURN + spine notification), dismiss, char/backspace for Other field.'
+  last_edited_ms: 1781447392508
 94f3d1b290438319:
   path: src/app/run/input.rs
   description: App::new() constructor, save_state/message_async(), handle_autocomplete/question_form/palette events
@@ -2742,6 +2746,10 @@ a139f333bbc083aa:
   path: .github/checks/clippy_lints_list.md
   description: Expected clippy lints list for comparison
   last_edited_ms: 0
+a174523ddee08620:
+  path: src/ui/threads_view/messages.rs
+  description: 'Thread message area: right pane of Threads view. Message display (reuses conversation IR renderer), input area with separator, question form overlay. thread_message_to_message() conversion. format_questions_markdown() for embedded questions. calculate_input_height() with 50% cap.'
+  last_edited_ms: 1781447392469
 a184b233199279b2:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -3030,6 +3038,10 @@ b3ff665a662b885f:
   path: CONTRIBUTING.md
   description: Contributing guidelines
   last_edited_ms: 0
+b41e9edd57e06bd2:
+  path: src/ui/threads_view/mod.rs
+  description: Threads view layout + thread list rendering. Two-pane layout (thread list | messages). Virtual '+ New Thread' entry. IR pipeline for list items (status dots, unread indicators, selection highlight). maybe_activate_thread_question() lazy question form init. truncate_str helper.
+  last_edited_ms: 1781447392429
 b43754bbbc122964:
   path: crates/cp-mod-console/src/ring_buffer.rs
   description: 'RingBuffer: fixed-capacity circular buffer for console output lines'
