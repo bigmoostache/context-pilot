@@ -4,6 +4,7 @@
 
 use std::path::Path;
 
+use cp_base::cast::Safe;
 use rusqlite::Connection;
 
 use crate::types::{ColumnInfo, ForeignKeyInfo, SchemaCache, TableInfo};
@@ -139,11 +140,7 @@ fn table_fks(conn: &Connection, table: &str) -> Vec<ForeignKeyInfo> {
 /// Row count via `SELECT COUNT(*)`.
 fn table_row_count(conn: &Connection, table: &str) -> u64 {
     let sql = format!("SELECT COUNT(*) FROM \"{table}\"");
-    conn.query_row(&sql, [], |row| row.get::<_, i64>(0)).map_or(0, |n| {
-        #[expect(clippy::cast_sign_loss, reason = "COUNT(*) is always non-negative")]
-        let count = n as u64;
-        count
-    })
+    conn.query_row(&sql, [], |row| row.get::<_, i64>(0)).map_or(0, Safe::to_u64)
 }
 
 // =============================================================================

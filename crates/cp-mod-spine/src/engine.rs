@@ -70,9 +70,10 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     // Once the assistant has responded (stream completed), it's safe to inject
     // a new synthetic message for the next notification.
     {
-        let synthetic_pos = state.messages.iter().rposition(|m| {
-            m.role == "user" && m.msg_type != cp_base::state::data::message::MsgKind::ToolResult
-        });
+        let synthetic_pos = state
+            .messages
+            .iter()
+            .rposition(|m| m.role == "user" && m.msg_type != cp_base::state::data::message::MsgKind::ToolResult);
         if let Some(pos) = synthetic_pos
             && let Some(msg) = state.messages.get(pos)
         {
@@ -85,9 +86,9 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
                 // message — not just as the very last message. With auto-Read
                 // injection or tool pipelines, the last message may be a tool_result
                 // or an empty assistant, even though the AI did respond earlier.
-                let assistant_responded = state.messages.get(pos..)
-                    .is_some_and(|slice| slice.iter()
-                        .any(|m| m.role == "assistant" && (!m.content.is_empty() || !m.tool_uses.is_empty())));
+                let assistant_responded = state.messages.get(pos..).is_some_and(|slice| {
+                    slice.iter().any(|m| m.role == "assistant" && (!m.content.is_empty() || !m.tool_uses.is_empty()))
+                });
                 if !assistant_responded {
                     return SpineDecision::Idle;
                 }

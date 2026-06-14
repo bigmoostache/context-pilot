@@ -144,7 +144,9 @@ pub struct ThreadQuestionForm {
 
 /// Truncate a string to at most `max` characters, appending "…" if truncated.
 fn cap_str(s: &str, max: usize) -> String {
-    if s.chars().count() <= max { return s.to_owned(); }
+    if s.chars().count() <= max {
+        return s.to_owned();
+    }
     let mut r: String = s.chars().take(max).collect();
     r.push('…');
     r
@@ -169,15 +171,27 @@ impl ThreadQuestionForm {
                 let header = cap_str(q.get("header")?.as_str()?, 50);
                 let text = cap_str(q.get("question")?.as_str()?, 2_000);
                 let multi_select = q.get("multiSelect").and_then(serde_json::Value::as_bool).unwrap_or(false);
-                let options = q.get("options")?.as_array()?.iter().take(100).filter_map(|o| {
-                    Some(ThreadQuestionOption {
-                        label: cap_str(o.get("label")?.as_str()?, 200),
-                        description: cap_str(o.get("description")?.as_str()?, 2_000),
+                let options = q
+                    .get("options")?
+                    .as_array()?
+                    .iter()
+                    .take(100)
+                    .filter_map(|o| {
+                        Some(ThreadQuestionOption {
+                            label: cap_str(o.get("label")?.as_str()?, 200),
+                            description: cap_str(o.get("description")?.as_str()?, 2_000),
+                        })
                     })
-                }).collect();
+                    .collect();
                 Some(ThreadQuestion {
-                    header, text, options, multi_select,
-                    cursor: 0, selected: Vec::new(), typing_other: false, other_text: String::new(),
+                    header,
+                    text,
+                    options,
+                    multi_select,
+                    cursor: 0,
+                    selected: Vec::new(),
+                    typing_other: false,
+                    other_text: String::new(),
                 })
             })
             .collect();
@@ -320,18 +334,16 @@ impl ThreadQuestionForm {
         let mut lines = Vec::new();
         for q in &self.questions {
             lines.push(format!("{}:", q.header));
-            let selected_labels: Vec<&str> = q
-                .selected
-                .iter()
-                .filter_map(|&idx| q.options.get(idx).map(|o| o.label.as_str()))
-                .collect();
+            let selected_labels: Vec<&str> =
+                q.selected.iter().filter_map(|&idx| q.options.get(idx).map(|o| o.label.as_str())).collect();
             if !selected_labels.is_empty() {
                 for label in &selected_labels {
                     lines.push(format!("  - {label}"));
                 }
             }
             if q.typing_other && !q.other_text.is_empty() {
-                let escaped = q.other_text.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r");
+                let escaped =
+                    q.other_text.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r");
                 lines.push(format!("  other: \"{escaped}\""));
             }
             if selected_labels.is_empty() && (!q.typing_other || q.other_text.is_empty()) {

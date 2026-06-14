@@ -172,7 +172,8 @@ impl Module for ThreadsModule {
                 // Require at least one content param
                 let has_markdown = tool.input.get("markdown").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
                 let has_file = tool.input.get("file_path").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
-                let has_questions = tool.input.get("questions").and_then(|v| v.as_array()).is_some_and(|a| !a.is_empty());
+                let has_questions =
+                    tool.input.get("questions").and_then(|v| v.as_array()).is_some_and(|a| !a.is_empty());
                 if !has_markdown && !has_file && !has_questions {
                     pf.errors.push("Send requires at least one of: markdown, file_path, questions".to_string());
                 }
@@ -188,11 +189,7 @@ impl Module for ThreadsModule {
             _ => {}
         }
 
-        if pf.errors.is_empty() && pf.warnings.is_empty() {
-            None
-        } else {
-            Some(pf)
-        }
+        if pf.errors.is_empty() && pf.warnings.is_empty() { None } else { Some(pf) }
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {

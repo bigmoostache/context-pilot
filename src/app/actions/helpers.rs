@@ -4,8 +4,8 @@ use regex::Regex;
 
 use crate::state::{Entry, Kind, State};
 
-use super::config;
 use super::ActionResult;
+use super::config;
 
 /// Switch to a target panel, saving the outgoing panel's scroll state and restoring
 /// the incoming panel's scroll state. This preserves scroll position across TAB switches.

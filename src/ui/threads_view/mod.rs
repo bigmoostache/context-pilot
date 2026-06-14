@@ -20,9 +20,7 @@ use cp_render::{Block as IrBlock, Semantic, Span as S};
 use crate::state::State;
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
-use cp_mod_threads::types::{
-    FocusState, ThreadAuthor, ThreadQuestionForm, ThreadStatus, ThreadsState,
-};
+use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadQuestionForm, ThreadStatus, ThreadsState};
 
 /// Width of the thread list pane in columns.
 pub(crate) const THREAD_LIST_WIDTH: u16 = 28;
@@ -34,9 +32,7 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
 
     // Clamp selected index — allow one past end for virtual "New Thread" entry
     let total_entries = threads_state.threads.len().saturating_add(1);
-    let selected_idx = focus_state
-        .selected_thread_idx
-        .min(total_entries.saturating_sub(1));
+    let selected_idx = focus_state.selected_thread_idx.min(total_entries.saturating_sub(1));
     let on_virtual_new = selected_idx >= threads_state.threads.len();
 
     // Two-pane layout: thread list | message area
@@ -69,9 +65,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let ts = ThreadsState::get(state);
     let focus = FocusState::get(state);
     let total_entries = ts.threads.len().saturating_add(1); // +1 for virtual entry
-    let selected = focus
-        .selected_thread_idx
-        .min(total_entries.saturating_sub(1));
+    let selected = focus.selected_thread_idx.min(total_entries.saturating_sub(1));
     let confirming = focus.confirming_archive;
 
     // Layout chrome: border on right side
@@ -91,11 +85,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
     // Virtual "+ New Thread" entry — rendered first, 2-line format like real threads
     let on_virtual = selected >= ts.threads.len();
-    let new_sem = if on_virtual {
-        Semantic::Accent
-    } else {
-        Semantic::Muted
-    };
+    let new_sem = if on_virtual { Semantic::Accent } else { Semantic::Muted };
     if on_virtual {
         selected_line_start = Some(ir_blocks.len());
     }
@@ -111,10 +101,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         S::styled(new_name, new_sem),
     ]));
     // Line 2: badge
-    ir_blocks.push(IrBlock::Line(vec![
-        S::new("  ".to_owned()),
-        S::styled("[NEW THREAD]".to_owned(), new_sem),
-    ]));
+    ir_blocks.push(IrBlock::Line(vec![S::new("  ".to_owned()), S::styled("[NEW THREAD]".to_owned(), new_sem)]));
     if on_virtual {
         selected_line_end = Some(ir_blocks.len());
     }
@@ -123,11 +110,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let is_selected = i == selected;
 
         // Unread detection: messages beyond last-read count
-        let last_read = focus
-            .last_read_count
-            .get(&thread.id)
-            .copied()
-            .unwrap_or(0);
+        let last_read = focus.last_read_count.get(&thread.id).copied().unwrap_or(0);
         let has_unread = thread.messages.len() > last_read;
 
         // Semantic for status: accent=focused, warning=MY_TURN, success=THEIR_TURN
@@ -142,16 +125,8 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         };
 
         // Unread indicator (only when not selected)
-        let indicator = if has_unread && !is_selected {
-            "● "
-        } else {
-            "  "
-        };
-        let indicator_sem = if has_unread {
-            Semantic::Warning
-        } else {
-            Semantic::Default
-        };
+        let indicator = if has_unread && !is_selected { "● " } else { "  " };
+        let indicator_sem = if has_unread { Semantic::Warning } else { Semantic::Default };
         let name = truncate_str(&thread.name, inner.width.saturating_sub(6).into());
 
         if is_selected {
@@ -241,34 +216,20 @@ fn render_new_thread_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let border = RBlock::default()
         .borders(Borders::ALL)
         .border_style(ir::semantic_to_style(Semantic::Border))
-        .title(ratatui::text::Span::styled(
-            " New Thread ",
-            ir::semantic_to_style(Semantic::Accent),
-        ))
+        .title(ratatui::text::Span::styled(" New Thread ", ir::semantic_to_style(Semantic::Accent)))
         .style(Style::default().bg(theme::bg_base()));
 
     let inner = border.inner(area);
     frame.render_widget(border, area);
 
-    let input_preview = if state.input.is_empty() {
-        "…".to_owned()
-    } else {
-        state.input.clone()
-    };
+    let input_preview = if state.input.is_empty() { "…".to_owned() } else { state.input.clone() };
 
     let ir_blocks = vec![
         IrBlock::Empty,
-        IrBlock::Line(vec![S::muted(
-            "Type a name for the new thread below,".to_owned(),
-        )]),
-        IrBlock::Line(vec![S::muted(
-            "then press Enter to create it.".to_owned(),
-        )]),
+        IrBlock::Line(vec![S::muted("Type a name for the new thread below,".to_owned())]),
+        IrBlock::Line(vec![S::muted("then press Enter to create it.".to_owned())]),
         IrBlock::Empty,
-        IrBlock::Line(vec![
-            S::accent("  ➜ ".to_owned()),
-            S::new(input_preview),
-        ]),
+        IrBlock::Line(vec![S::accent("  ➜ ".to_owned()), S::new(input_preview)]),
     ];
 
     let lines = ir::blocks_to_lines(&ir_blocks);
@@ -287,9 +248,7 @@ pub(crate) fn maybe_activate_thread_question(state: &mut State) {
     let (should_clear, init_data) = {
         let ts = ThreadsState::get(state);
         let focus = FocusState::get(state);
-        let selected = focus
-            .selected_thread_idx
-            .min(ts.threads.len().saturating_sub(1));
+        let selected = focus.selected_thread_idx.min(ts.threads.len().saturating_sub(1));
 
         let Some(thread) = ts.threads.get(selected) else {
             return;
@@ -297,16 +256,9 @@ pub(crate) fn maybe_activate_thread_question(state: &mut State) {
 
         if thread.status != ThreadStatus::TheirTurn {
             // Thread not waiting for user — clear stale form if it belongs to this thread
-            let clear = focus
-                .active_question
-                .as_ref()
-                .is_some_and(|aq| aq.thread_id == thread.id);
+            let clear = focus.active_question.as_ref().is_some_and(|aq| aq.thread_id == thread.id);
             (clear, None)
-        } else if focus
-            .active_question
-            .as_ref()
-            .is_some_and(|aq| aq.thread_id == thread.id)
-        {
+        } else if focus.active_question.as_ref().is_some_and(|aq| aq.thread_id == thread.id) {
             // Already have an active question for this thread
             (false, None)
         } else {
@@ -322,7 +274,9 @@ pub(crate) fn maybe_activate_thread_question(state: &mut State) {
                 .find(|(_, m)| m.author == ThreadAuthor::Assistant && m.question.is_some())
                 .map(|(i, _)| i);
             let json = last_q_idx.and_then(|qi| {
-                let already_answered = thread.messages.get(qi.saturating_add(1)..)
+                let already_answered = thread
+                    .messages
+                    .get(qi.saturating_add(1)..)
                     .is_some_and(|tail| tail.iter().any(|m| m.author == ThreadAuthor::User));
                 if already_answered {
                     None

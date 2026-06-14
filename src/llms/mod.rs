@@ -25,9 +25,7 @@ use crate::infra::tools::ToolResult;
 use crate::state::Message;
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
-pub(crate) use cp_base::config::llm_types::{
-    ApiCheckResult, LlmProvider, ModelInfo, StreamEvent,
-};
+pub(crate) use cp_base::config::llm_types::{ApiCheckResult, LlmProvider, ModelInfo, StreamEvent};
 pub(crate) use cp_base::config::models::{
     AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel,
 };

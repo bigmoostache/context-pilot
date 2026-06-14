@@ -354,6 +354,4 @@ impl App {
         self.last_spinner_ms = now;
         self.state.flags.ui.dirty = true;
     }
-
 }
-

@@ -1,9 +1,9 @@
-/// Question form and autocomplete popup overlay rendering.
-pub(crate) mod input;
 /// Palette command definitions and fuzzy matching.
 mod commands;
 /// Configuration overlay (Ctrl+H) rendering.
 pub(crate) mod config_overlay;
+/// Question form and autocomplete popup overlay rendering.
+pub(crate) mod input;
 /// Command palette (Ctrl+P) state and rendering.
 mod palette;
 

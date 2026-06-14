@@ -5,9 +5,7 @@
 
 use ratatui::Frame;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect, Style};
-use ratatui::widgets::{
-    Block as RBlock, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
-};
+use ratatui::widgets::{Block as RBlock, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState};
 
 use cp_render::{Block as IrBlock, Semantic, Span as S};
 
@@ -23,12 +21,7 @@ use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState
 /// Messages and input render through the IR pipeline (same `render_message_blocks`
 /// and `render_input_blocks` as the main conversation). Border title uses
 /// `semantic_to_style` for color mapping.
-pub(super) fn render_message_area_with_input(
-    frame: &mut Frame<'_>,
-    state: &State,
-    selected: usize,
-    area: Rect,
-) {
+pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &State, selected: usize, area: Rect) {
     let ts = ThreadsState::get(state);
     let Some(thread) = ts.threads.get(selected) else {
         return;
@@ -47,10 +40,7 @@ pub(super) fn render_message_area_with_input(
     };
 
     let title = ratatui::text::Line::from(vec![
-        ratatui::text::Span::styled(
-            format!(" {} ", thread.name),
-            ir::semantic_to_style(Semantic::Default),
-        ),
+        ratatui::text::Span::styled(format!(" {} ", thread.name), ir::semantic_to_style(Semantic::Default)),
         ratatui::text::Span::styled(status_label, ir::semantic_to_style(status_sem)),
         ratatui::text::Span::raw(" "),
     ]);
@@ -76,10 +66,7 @@ pub(super) fn render_message_area_with_input(
     // Split inner area: messages on top, input at bottom
     let layout = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(messages_height),
-            Constraint::Length(input_height),
-        ])
+        .constraints([Constraint::Length(messages_height), Constraint::Length(input_height)])
         .split(inner);
 
     let (Some(&msg_area), Some(&input_area)) = (layout.first(), layout.get(1)) else {
@@ -91,15 +78,9 @@ pub(super) fn render_message_area_with_input(
 
     // Question form overlay — rendered OVER the input area if active
     if let Some(question_form_ir) = build_thread_question_form_ir(state) {
-        let form_height =
-            crate::ui::help::input::calculate_question_form_height(&question_form_ir);
+        let form_height = crate::ui::help::input::calculate_question_form_height(&question_form_ir);
         let form_y = inner.y.saturating_add(inner.height.saturating_sub(form_height));
-        let form_area = Rect {
-            x: inner.x,
-            y: form_y,
-            width: inner.width,
-            height: form_height.min(inner.height),
-        };
+        let form_area = Rect { x: inner.x, y: form_y, width: inner.width, height: form_height.min(inner.height) };
         crate::ui::help::input::render_question_form(frame, &question_form_ir, form_area);
     }
 }
@@ -108,27 +89,17 @@ pub(super) fn render_message_area_with_input(
 ///
 /// Converts `ThreadMessage` → `Message`, feeds to `render_message_blocks()`
 /// (same IR path as the main conversation), converts via `blocks_to_lines()`.
-fn render_thread_messages(
-    frame: &mut Frame<'_>,
-    state: &State,
-    thread: &cp_mod_threads::types::Thread,
-    area: Rect,
-) {
+fn render_thread_messages(frame: &mut Frame<'_>, state: &State, thread: &cp_mod_threads::types::Thread, area: Rect) {
     if thread.messages.is_empty() {
-        let ir_blocks = vec![IrBlock::Line(vec![S::muted(
-            "No messages yet. Type below to start the conversation.".to_owned(),
-        )])];
+        let ir_blocks =
+            vec![IrBlock::Line(vec![S::muted("No messages yet. Type below to start the conversation.".to_owned())])];
         let lines = ir::blocks_to_lines(&ir_blocks);
         let paragraph = Paragraph::new(lines);
         frame.render_widget(paragraph, area);
         return;
     }
 
-    let opts = MessageBlockOpts {
-        viewport_width: area.width,
-        is_streaming: false,
-        dev_mode: false,
-    };
+    let opts = MessageBlockOpts { viewport_width: area.width, is_streaming: false, dev_mode: false };
 
     // Convert ThreadMessages → Messages → IR blocks → ratatui Lines
     let mut all_blocks: Vec<cp_render::Block> = Vec::new();
@@ -172,27 +143,18 @@ fn render_thread_messages(
 fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Separator line via IR (border-colored, dimmed)
     let sep_area = Rect { height: 1, ..area };
-    let sep_blocks = vec![IrBlock::Line(vec![S::styled(
-        "─".repeat(area.width.into()),
-        Semantic::Border,
-    )
-    .dim()])];
+    let sep_blocks = vec![IrBlock::Line(vec![S::styled("─".repeat(area.width.into()), Semantic::Border).dim()])];
     let sep_lines = ir::blocks_to_lines(&sep_blocks);
     let sep = Paragraph::new(sep_lines);
     frame.render_widget(sep, sep_area);
 
     // Input content below separator — via IR pipeline
-    let input_area = Rect {
-        y: area.y.saturating_add(1),
-        height: area.height.saturating_sub(1),
-        ..area
-    };
+    let input_area = Rect { y: area.y.saturating_add(1), height: area.height.saturating_sub(1), ..area };
 
-    let command_ids: Vec<String> =
-        cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command)
-            .iter()
-            .map(|p| p.id.clone())
-            .collect();
+    let command_ids: Vec<String> = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command)
+        .iter()
+        .map(|p| p.id.clone())
+        .collect();
 
     let ctx = InputBlockCtx {
         command_ids: &command_ids,
@@ -201,12 +163,7 @@ fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
         viewport_width: input_area.width,
     };
 
-    let input_blocks = render_input_blocks(
-        &state.input,
-        state.input_cursor,
-        state.input_selection_anchor,
-        &ctx,
-    );
+    let input_blocks = render_input_blocks(&state.input, state.input_cursor, state.input_selection_anchor, &ctx);
 
     let lines = ir::blocks_to_lines(&input_blocks);
     let paragraph = Paragraph::new(lines);
@@ -289,17 +246,8 @@ fn calculate_input_height(state: &State, width: u16, available_height: u16) -> u
     let line_count = state.input.lines().count().max(1);
     // Account for wrapping
     let wrap_width = (width as usize).saturating_sub(10).max(20);
-    let wrapped_lines: usize = state
-        .input
-        .lines()
-        .map(|l| {
-            if l.is_empty() {
-                1
-            } else {
-                l.len().div_ceil(wrap_width).max(1)
-            }
-        })
-        .sum();
+    let wrapped_lines: usize =
+        state.input.lines().map(|l| if l.is_empty() { 1 } else { l.len().div_ceil(wrap_width).max(1) }).sum();
     let total = wrapped_lines.max(line_count);
     // Separator (1) + content + hint line (1), capped at 50% of available height
     (total.saturating_add(3)).min(max_input.into()).to_u16()
@@ -308,9 +256,7 @@ fn calculate_input_height(state: &State, width: u16, available_height: u16) -> u
 /// Build a [`QuestionForm`] IR snapshot from the active thread question form.
 ///
 /// Returns `None` if no active question form exists.
-fn build_thread_question_form_ir(
-    state: &State,
-) -> Option<cp_render::conversation::QuestionForm> {
+fn build_thread_question_form_ir(state: &State) -> Option<cp_render::conversation::QuestionForm> {
     let focus = FocusState::get(state);
     let form = focus.active_question.as_ref()?;
 
@@ -336,8 +282,5 @@ fn build_thread_question_form_ir(
         })
         .collect();
 
-    Some(cp_render::conversation::QuestionForm {
-        questions,
-        focused_index: form.focused_index,
-    })
+    Some(cp_render::conversation::QuestionForm { questions, focused_index: form.focused_index })
 }

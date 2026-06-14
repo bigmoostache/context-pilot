@@ -18,8 +18,7 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             // Global Ctrl shortcuts (always handled first)
             if ctrl {
                 // Threads view overrides: Ctrl+A → archive (instead of global select-all)
-                if state.view_mode == cp_base::state::data::config::ViewMode::Threads
-                    && key.code == KeyCode::Char('a')
+                if state.view_mode == cp_base::state::data::config::ViewMode::Threads && key.code == KeyCode::Char('a')
                 {
                     return Some(Action::ThreadArchiveStart);
                 }
@@ -119,10 +118,7 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
                 // Thread question form captures ALL input when active
                 if let Some(aq) = cp_mod_threads::types::FocusState::get(state).active_question.as_ref() {
-                    let typing_other = aq
-                        .questions
-                        .get(aq.focused_index)
-                        .is_some_and(|q| q.typing_other);
+                    let typing_other = aq.questions.get(aq.focused_index).is_some_and(|q| q.typing_other);
                     return Some(match key.code {
                         KeyCode::Esc => Action::ThreadQuestionDismiss,
                         KeyCode::Up => Action::ThreadQuestionUp,
@@ -221,7 +217,9 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             // regardless of which panel was selected — the threads view always has
             // an active input area that needs character/cursor/submit handling.
             if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-                if let Some(ctx) = state.context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION) {
+                if let Some(ctx) =
+                    state.context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)
+                {
                     let panel = get_panel(&ctx.context_type);
                     if let Some(action) = panel.handle_key(key, state) {
                         return Some(action);

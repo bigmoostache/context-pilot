@@ -25,21 +25,13 @@ impl Panel for ThreadsPanel {
         let ts = ThreadsState::get(state);
 
         if ts.panel_content.is_empty() {
-            return vec![
-                Block::Line(vec![S::muted("  (empty — AI must call Read to populate)".into())]),
-            ];
+            return vec![Block::Line(vec![S::muted("  (empty — AI must call Read to populate)".into())])];
         }
 
         // Render the same panel_content the LLM sees, line by line
         ts.panel_content
             .lines()
-            .map(|line| {
-                if line.is_empty() {
-                    Block::Empty
-                } else {
-                    Block::Line(vec![S::new(format!("  {line}"))])
-                }
-            })
+            .map(|line| if line.is_empty() { Block::Empty } else { Block::Line(vec![S::new(format!("  {line}"))]) })
             .collect()
     }
 
@@ -79,10 +71,7 @@ impl Panel for ThreadsPanel {
     fn needs_cache(&self) -> bool {
         false
     }
-    fn refresh_cache(
-        &self,
-        _request: cp_base::panels::CacheRequest,
-    ) -> Option<cp_base::panels::CacheUpdate> {
+    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
         None
     }
     fn build_cache_request(

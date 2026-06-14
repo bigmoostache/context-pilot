@@ -52,11 +52,7 @@ pub(super) fn maybe_inject_auto_read(app: &mut App) {
     // Prefer the thread the notification is about; fall back to any MY_TURN.
     let my_turn = candidate_ids
         .iter()
-        .find_map(|tid| {
-            ts.threads
-                .iter()
-                .find(|t| t.id == *tid && t.status == ThreadStatus::MyTurn)
-        })
+        .find_map(|tid| ts.threads.iter().find(|t| t.id == *tid && t.status == ThreadStatus::MyTurn))
         .or_else(|| ts.threads.iter().find(|t| t.status == ThreadStatus::MyTurn));
 
     let Some(thread) = my_turn else {
@@ -78,11 +74,7 @@ pub(super) fn maybe_inject_auto_read(app: &mut App) {
         "verb": "Reading",
     });
 
-    let tool_use = ToolUse {
-        id: tool_use_id.clone(),
-        name: "Read".into(),
-        input: input.clone(),
-    };
+    let tool_use = ToolUse { id: tool_use_id.clone(), name: "Read".into(), input: input.clone() };
 
     // Execute Read — this sets focus and returns formatted messages.
     let result = cp_mod_threads::tools::execute_read(&tool_use, &mut app.state);
@@ -95,11 +87,7 @@ pub(super) fn maybe_inject_auto_read(app: &mut App) {
         content: String::new(),
         msg_type: MsgKind::ToolCall,
         status: MsgStatus::Full,
-        tool_uses: vec![ToolUseRecord {
-            id: tool_use_id.clone(),
-            name: "Read".into(),
-            input,
-        }],
+        tool_uses: vec![ToolUseRecord { id: tool_use_id.clone(), name: "Read".into(), input }],
         tool_results: vec![],
         input_tokens: 0,
         content_token_count: 0,
@@ -169,10 +157,8 @@ pub(super) fn check_my_turn_threads(app: &mut App) {
     // but the AI still hasn't addressed the thread — creating a persistent
     // nudge loop until the thread is actually handled.
     if FocusState::get(&app.state).notified_my_turn_id.as_deref() == Some(&tid) {
-        let has_unprocessed = SpineState::get(&app.state)
-            .notifications
-            .iter()
-            .any(|n| !n.is_processed() && n.source == "my_turn_thread");
+        let has_unprocessed =
+            SpineState::get(&app.state).notifications.iter().any(|n| !n.is_processed() && n.source == "my_turn_thread");
         if has_unprocessed {
             return; // Previous nudge still pending — don't spam
         }
@@ -203,10 +189,7 @@ fn extract_thread_ids(content: &str) -> Vec<String> {
     let mut ids = Vec::new();
     let mut search_from: usize = 0;
     while let Some(pos) = content.get(search_from..).and_then(|s| s.find(marker)) {
-        let Some(start) = search_from
-            .checked_add(pos)
-            .and_then(|v| v.checked_add(marker.len()))
-        else {
+        let Some(start) = search_from.checked_add(pos).and_then(|v| v.checked_add(marker.len())) else {
             break;
         };
         if let Some(end_offset) = content.get(start..).and_then(|s| s.find('"')) {

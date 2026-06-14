@@ -440,15 +440,22 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }
-            Action::ThreadSelectNext | Action::ThreadSelectPrev
-            | Action::ThreadCreateStart | Action::ThreadCreateCancel
-            | Action::ThreadArchiveStart | Action::ThreadArchiveConfirm
-            | Action::ThreadArchiveCancel | Action::ThreadQuestionUp
-            | Action::ThreadQuestionDown | Action::ThreadQuestionLeft
-            | Action::ThreadQuestionRight | Action::ThreadQuestionToggle
-            | Action::ThreadQuestionEnter | Action::ThreadQuestionDismiss
-            | Action::ThreadQuestionBackspace => threads::dispatch(state, &action),
-            Action::ThreadQuestionChar(c) => threads::question_char(state, c),
+        Action::ThreadSelectNext
+        | Action::ThreadSelectPrev
+        | Action::ThreadCreateStart
+        | Action::ThreadCreateCancel
+        | Action::ThreadArchiveStart
+        | Action::ThreadArchiveConfirm
+        | Action::ThreadArchiveCancel
+        | Action::ThreadQuestionUp
+        | Action::ThreadQuestionDown
+        | Action::ThreadQuestionLeft
+        | Action::ThreadQuestionRight
+        | Action::ThreadQuestionToggle
+        | Action::ThreadQuestionEnter
+        | Action::ThreadQuestionDismiss
+        | Action::ThreadQuestionBackspace => threads::dispatch(state, &action),
+        Action::ThreadQuestionChar(c) => threads::question_char(state, c),
         Action::None => ActionResult::Nothing,
     }
 }

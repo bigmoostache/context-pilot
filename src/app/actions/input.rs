@@ -191,10 +191,7 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     // Build notification content: message preview + thread name + Read invitation
     let thread_id = thread.id.clone();
     let msg_preview = if content.len() > 120 {
-        format!(
-            "{}...",
-            content.get(..content.floor_char_boundary(120)).unwrap_or("")
-        )
+        format!("{}...", content.get(..content.floor_char_boundary(120)).unwrap_or(""))
     } else {
         content
     };
@@ -241,9 +238,7 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
 
     // Cap thread name length
     let name = if name.len() > MAX_THREAD_NAME_LEN {
-        name.get(..name.floor_char_boundary(MAX_THREAD_NAME_LEN))
-            .unwrap_or(&name)
-            .to_string()
+        name.get(..name.floor_char_boundary(MAX_THREAD_NAME_LEN)).unwrap_or(&name).to_string()
     } else {
         name
     };

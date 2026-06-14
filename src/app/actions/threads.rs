@@ -31,28 +31,61 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
         Action::ThreadQuestionBackspace => question_backspace(state),
         // Exhaustive: all non-Thread variants — dispatch is only called for Thread* actions
         // from the central match in mod.rs, so these arms are unreachable.
-        Action::InputChar(_) | Action::InsertText(_) | Action::PasteText(_)
-        | Action::InputBackspace | Action::InputDelete | Action::InputSubmit
-        | Action::CursorWordLeft | Action::CursorWordRight | Action::DeleteWordLeft
-        | Action::RemoveListItem | Action::CursorHome | Action::CursorEnd
-        | Action::CursorLeft | Action::CursorRight | Action::CursorLeftSelect
-        | Action::CursorRightSelect | Action::CursorWordLeftSelect
-        | Action::CursorWordRightSelect | Action::CursorHomeSelect
-        | Action::CursorEndSelect | Action::SelectAll | Action::HistoryPrev
-        | Action::HistoryNext | Action::CopyPanelContent | Action::ClearConversation
-        | Action::NewContext | Action::SelectNextContext | Action::SelectPrevContext
-        | Action::AppendChars(_) | Action::StreamDone { .. } | Action::StreamError(_)
-        | Action::ScrollUp(_) | Action::ScrollDown(_) | Action::StopStreaming
-        | Action::TmuxSendKeys { .. } | Action::TogglePerfMonitor
-        | Action::ToggleConfigView | Action::ToggleIndexOverlay | Action::CopyIndexOverlay
-        | Action::ConfigSelectProvider(_) | Action::ConfigSelectAnthropicModel(_)
-        | Action::ConfigSelectGrokModel(_) | Action::ConfigSelectGroqModel(_)
-        | Action::ConfigSelectDeepSeekModel(_) | Action::ConfigSelectMiniMaxModel(_)
-        | Action::ConfigSelectClaudeCodeV2Model(_) | Action::ConfigSelectNextBar
-        | Action::ConfigSelectPrevBar | Action::ConfigIncreaseSelectedBar
-        | Action::ConfigDecreaseSelectedBar | Action::ConfigNextTheme
-        | Action::ConfigPrevTheme | Action::ConfigToggleAutoContinue
-        | Action::ConfigThinkThresholdUp | Action::ConfigThinkThresholdDown
+        Action::InputChar(_)
+        | Action::InsertText(_)
+        | Action::PasteText(_)
+        | Action::InputBackspace
+        | Action::InputDelete
+        | Action::InputSubmit
+        | Action::CursorWordLeft
+        | Action::CursorWordRight
+        | Action::DeleteWordLeft
+        | Action::RemoveListItem
+        | Action::CursorHome
+        | Action::CursorEnd
+        | Action::CursorLeft
+        | Action::CursorRight
+        | Action::CursorLeftSelect
+        | Action::CursorRightSelect
+        | Action::CursorWordLeftSelect
+        | Action::CursorWordRightSelect
+        | Action::CursorHomeSelect
+        | Action::CursorEndSelect
+        | Action::SelectAll
+        | Action::HistoryPrev
+        | Action::HistoryNext
+        | Action::CopyPanelContent
+        | Action::ClearConversation
+        | Action::NewContext
+        | Action::SelectNextContext
+        | Action::SelectPrevContext
+        | Action::AppendChars(_)
+        | Action::StreamDone { .. }
+        | Action::StreamError(_)
+        | Action::ScrollUp(_)
+        | Action::ScrollDown(_)
+        | Action::StopStreaming
+        | Action::TmuxSendKeys { .. }
+        | Action::TogglePerfMonitor
+        | Action::ToggleConfigView
+        | Action::ToggleIndexOverlay
+        | Action::CopyIndexOverlay
+        | Action::ConfigSelectProvider(_)
+        | Action::ConfigSelectAnthropicModel(_)
+        | Action::ConfigSelectGrokModel(_)
+        | Action::ConfigSelectGroqModel(_)
+        | Action::ConfigSelectDeepSeekModel(_)
+        | Action::ConfigSelectMiniMaxModel(_)
+        | Action::ConfigSelectClaudeCodeV2Model(_)
+        | Action::ConfigSelectNextBar
+        | Action::ConfigSelectPrevBar
+        | Action::ConfigIncreaseSelectedBar
+        | Action::ConfigDecreaseSelectedBar
+        | Action::ConfigNextTheme
+        | Action::ConfigPrevTheme
+        | Action::ConfigToggleAutoContinue
+        | Action::ConfigThinkThresholdUp
+        | Action::ConfigThinkThresholdDown
         | Action::ConfigSelectSecondaryProvider(_)
         | Action::ConfigSelectSecondaryAnthropicModel(_)
         | Action::ConfigSelectSecondaryGrokModel(_)
@@ -60,11 +93,16 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
         | Action::ConfigSelectSecondaryDeepSeekModel(_)
         | Action::ConfigSelectSecondaryMiniMaxModel(_)
         | Action::ConfigSelectSecondaryClaudeCodeV2Model(_)
-        | Action::ConfigToggleReverie | Action::ConfigToggleSecondaryMode
-        | Action::PageDynamicNext | Action::PageDynamicPrev | Action::CycleViewMode
-        | Action::ThreadQuestionChar(_) | Action::OpenCommandPalette
-        | Action::ResetSessionCosts | Action::SelectContextById(_) | Action::None
-            => ActionResult::Nothing,
+        | Action::ConfigToggleReverie
+        | Action::ConfigToggleSecondaryMode
+        | Action::PageDynamicNext
+        | Action::PageDynamicPrev
+        | Action::CycleViewMode
+        | Action::ThreadQuestionChar(_)
+        | Action::OpenCommandPalette
+        | Action::ResetSessionCosts
+        | Action::SelectContextById(_)
+        | Action::None => ActionResult::Nothing,
     }
 }
 
@@ -148,10 +186,7 @@ fn archive_confirm(state: &mut State) -> ActionResult {
     let selected_idx = focus.selected_thread_idx;
 
     // Capture the archived thread's ID for focus cleanup.
-    let archived_id = ThreadsState::get(state)
-        .threads
-        .get(selected_idx)
-        .map(|t| t.id.clone());
+    let archived_id = ThreadsState::get(state).threads.get(selected_idx).map(|t| t.id.clone());
 
     let threads_state = ThreadsState::get_mut(state);
     if selected_idx < threads_state.threads.len() {

@@ -7,8 +7,8 @@ use std::fmt::Write as _;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use cp_base::cast::Safe as _;
-use cp_base::tools::{ToolResult, ToolUse};
 use cp_base::state::runtime::State;
+use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
 
@@ -24,35 +24,29 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     /// Maximum number of questions stored in a single message.
     const MAX_STORED_QUESTIONS: usize = 50;
 
-    let tid = tool.input.get("thread_id")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("");
+    let tid = tool.input.get("thread_id").and_then(serde_json::Value::as_str).unwrap_or("");
 
-    let markdown = tool.input.get("markdown")
-        .and_then(serde_json::Value::as_str)
-        .map(|s| if s.len() > MAX_CONTENT_BYTES {
+    let markdown = tool.input.get("markdown").and_then(serde_json::Value::as_str).map(|s| {
+        if s.len() > MAX_CONTENT_BYTES {
             s.get(..s.floor_char_boundary(MAX_CONTENT_BYTES)).unwrap_or(s).to_string()
         } else {
             s.to_string()
-        });
-    let file_path = tool.input.get("file_path")
-        .and_then(serde_json::Value::as_str)
-        .map(|s| if s.len() > MAX_FILE_PATH_BYTES {
+        }
+    });
+    let file_path = tool.input.get("file_path").and_then(serde_json::Value::as_str).map(|s| {
+        if s.len() > MAX_FILE_PATH_BYTES {
             s.get(..s.floor_char_boundary(MAX_FILE_PATH_BYTES)).unwrap_or(s).to_string()
         } else {
             s.to_string()
-        });
-    let question = tool.input.get("questions")
-        .and_then(serde_json::Value::as_array)
-        .filter(|a| !a.is_empty())
-        .map(|a| {
+        }
+    });
+    let question =
+        tool.input.get("questions").and_then(serde_json::Value::as_array).filter(|a| !a.is_empty()).map(|a| {
             let capped: Vec<serde_json::Value> = a.iter().take(MAX_STORED_QUESTIONS).cloned().collect();
             serde_json::Value::Array(capped)
         });
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_millis().to_u64());
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
 
     let msg = ThreadMessage {
         author: ThreadAuthor::Assistant,
@@ -70,12 +64,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         let name = thread.map_or_else(|| tid.to_string(), |t| t.name.clone());
         let preview = msg.content.as_deref().unwrap_or("[attachment]");
         let truncated = if preview.len() > 80 {
-            format!(
-                "{}...",
-                preview
-                    .get(..preview.floor_char_boundary(77))
-                    .unwrap_or("")
-            )
+            format!("{}...", preview.get(..preview.floor_char_boundary(77)).unwrap_or(""))
         } else {
             preview.to_string()
         };
@@ -101,11 +90,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         fs.notified_my_turn_id = None;
     }
 
-    let mut result = ToolResult::new(
-        tool.id.clone(),
-        format!("Sent to {tid} \"{thread_name}\": {msg_preview}"),
-        false,
-    );
+    let mut result = ToolResult::new(tool.id.clone(), format!("Sent to {tid} \"{thread_name}\": {msg_preview}"), false);
     result.preserves_tempo = true;
     result
 }
@@ -116,13 +101,9 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// panel content (thread list + focused conversation), and returns a
 /// lightweight summary pointing to the panel.
 pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let tid = tool.input.get("thread_id")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("");
+    let tid = tool.input.get("thread_id").and_then(serde_json::Value::as_str).unwrap_or("");
 
-    let now_ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_millis().to_u64());
+    let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
 
     // --- Phase 1: Collect unacknowledged summary across ALL threads (before marking) ---
     let ts = ThreadsState::get(state);
@@ -156,10 +137,7 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
         .map(|m| {
             let content = m.content.as_deref().unwrap_or("[no text]");
             let preview = if content.len() > 60 {
-                format!(
-                    "{}…",
-                    content.get(..content.floor_char_boundary(57)).unwrap_or("")
-                )
+                format!("{}…", content.get(..content.floor_char_boundary(57)).unwrap_or(""))
             } else {
                 content.to_string()
             };
@@ -242,7 +220,9 @@ fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String 
 
     // Focused thread's conversation (last MAX_PANEL_MESSAGES messages)
     if let Some(thread) = ts.threads.iter().find(|t| t.id == focused_tid) {
-        _ = writeln!(output, "\n=== {tid} \"{name}\" [{status}] — Full Conversation ===",
+        _ = writeln!(
+            output,
+            "\n=== {tid} \"{name}\" [{status}] — Full Conversation ===",
             tid = thread.id,
             name = thread.name,
             status = thread.status,

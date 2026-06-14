@@ -113,11 +113,7 @@ impl ClaudeCodeV2Client {
         let home = env::var("HOME").ok()?;
         let home_path = PathBuf::from(&home);
         let creds_path = home_path.join(".claude").join(".credentials.json");
-        let path = if creds_path.exists() {
-            creds_path
-        } else {
-            home_path.join(".claude").join("credentials.json")
-        };
+        let path = if creds_path.exists() { creds_path } else { home_path.join(".claude").join("credentials.json") };
         let content = fs::read_to_string(&path).ok()?;
         Self::parse_credentials(&content)
     }
@@ -125,11 +121,7 @@ impl ClaudeCodeV2Client {
     /// Parse credentials JSON and return access token if not expired.
     fn parse_credentials(content: &str) -> Option<Redacted> {
         let creds: CredentialsFile = serde_json::from_str(content).ok()?;
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()?
-            .as_millis()
-            .to_u64();
+        let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis().to_u64();
         if now_ms > creds.claude_ai_oauth.expires_at {
             return None;
         }
@@ -137,45 +129,30 @@ impl ClaudeCodeV2Client {
     }
 
     /// Execute a streaming request with the V2 request format.
-    pub(crate) fn do_stream(
-        &self,
-        request: &LlmRequest,
-        tx: &Sender<StreamEvent>,
-    ) -> Result<(), LlmError> {
-        let access_token = self.access_token.as_ref().ok_or_else(|| {
-            LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into())
-        })?;
+    pub(crate) fn do_stream(&self, request: &LlmRequest, tx: &Sender<StreamEvent>) -> Result<(), LlmError> {
+        let access_token = self
+            .access_token
+            .as_ref()
+            .ok_or_else(|| LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into()))?;
 
-        let client = Client::builder()
-            .timeout(None)
-            .build()
-            .map_err(|e| LlmError::Network(e.to_string()))?;
+        let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
         // System prompt
-        let system_text = request
-            .system_prompt
-            .as_ref()
-            .map_or_else(|| library::default_agent_content().to_string(), Clone::clone);
+        let system_text =
+            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_string(), Clone::clone);
 
         // Convert pre-assembled API messages to JSON with cache breakpoints
-        let super::CcJsonResult {
-            mut json_messages,
-            bp_hashes,
-            alive_count,
-            alive_positions_permille,
-        } = if request.api_messages.is_empty() {
-            super::CcJsonResult {
-                json_messages: Vec::new(),
-                bp_hashes: Vec::new(),
-                alive_count: 0,
-                alive_positions_permille: Vec::new(),
-            }
-        } else {
-            super::api_messages_to_cc_json(
-                &request.api_messages,
-                request.cache_engine_json.as_deref(),
-            )
-        };
+        let super::CcJsonResult { mut json_messages, bp_hashes, alive_count, alive_positions_permille } =
+            if request.api_messages.is_empty() {
+                super::CcJsonResult {
+                    json_messages: Vec::new(),
+                    bp_hashes: Vec::new(),
+                    alive_count: 0,
+                    alive_positions_permille: Vec::new(),
+                }
+            } else {
+                super::api_messages_to_cc_json(&request.api_messages, request.cache_engine_json.as_deref())
+            };
 
         // Cleaner mode extra context
         if let Some(ref context) = request.extra_context {
@@ -235,10 +212,7 @@ impl ClaudeCodeV2Client {
         let response = client
             .post(ENDPOINT)
             .header("accept", "text/event-stream")
-            .header(
-                "authorization",
-                format!("Bearer {}", access_token.expose_secret()),
-            )
+            .header("authorization", format!("Bearer {}", access_token.expose_secret()))
             .header("anthropic-version", API_VERSION)
             .header("anthropic-beta", BETA_HEADER)
             .header("anthropic-dangerous-direct-browser-access", "true")
@@ -296,9 +270,7 @@ impl ClaudeCodeV2Client {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some(
-                        "OAuth token not found or expired".to_string(),
-                    ),
+                    error: Some("OAuth token not found or expired".to_string()),
                 };
             }
         };
@@ -326,20 +298,10 @@ impl ClaudeCodeV2Client {
             .header("content-type", "application/json")
             .json(&auth_body)
             .send();
-        let auth_ok = auth_result
-            .as_ref()
-            .is_ok_and(|r| r.status().is_success());
+        let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
         if !auth_ok {
-            let error = auth_result
-                .err()
-                .map(|e| e.to_string())
-                .or_else(|| Some("Auth failed".to_string()));
-            return ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error,
-            };
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
         // Test 2: Streaming
@@ -358,9 +320,7 @@ impl ClaudeCodeV2Client {
             .header("content-type", "application/json")
             .json(&stream_body)
             .send();
-        let streaming_ok = stream_result
-            .as_ref()
-            .is_ok_and(|r| r.status().is_success());
+        let streaming_ok = stream_result.as_ref().is_ok_and(|r| r.status().is_success());
 
         // Test 3: Tool calling
         let tools_body = serde_json::json!({
@@ -379,16 +339,9 @@ impl ClaudeCodeV2Client {
             .header("content-type", "application/json")
             .json(&tools_body)
             .send();
-        let tools_ok = tools_result
-            .as_ref()
-            .is_ok_and(|r| r.status().is_success());
+        let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
 
-        ApiCheckResult {
-            auth_ok,
-            streaming_ok,
-            tools_ok,
-            error: None,
-        }
+        ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
     }
 }
 
@@ -399,11 +352,7 @@ impl Default for ClaudeCodeV2Client {
 }
 
 impl LlmClient for ClaudeCodeV2Client {
-    fn stream(
-        &self,
-        request: LlmRequest,
-        tx: Sender<StreamEvent>,
-    ) -> Result<(), LlmError> {
+    fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         self.do_stream(&request, &tx)
     }
 

@@ -41,10 +41,7 @@ pub(crate) struct CoucouData {
 impl CoucouData {
     /// Convert into a live `CoucouWatcher` and register in `WatcherRegistry`.
     pub(crate) fn into_watcher(self) -> CoucouWatcher {
-        let recurrence_suffix = self
-            .recurrence_label
-            .as_deref()
-            .map_or(String::new(), |r| format!(" [{r}]"));
+        let recurrence_suffix = self.recurrence_label.as_deref().map_or(String::new(), |r| format!(" [{r}]"));
         let desc = if let Some(tid) = &self.thread_id {
             format!("🔔 Coucou (thread {tid}): \"{}\"{recurrence_suffix}", self.message)
         } else {
@@ -229,8 +226,7 @@ impl Watcher for CoucouWatcher {
         (now >= current_fire).then(|| {
             // Recurrent: bump fire_at_ms to next occurrence
             if self.interval_ms > 0 {
-                self.fire_at_ms
-                    .store(now.saturating_add(self.interval_ms), std::sync::atomic::Ordering::Relaxed);
+                self.fire_at_ms.store(now.saturating_add(self.interval_ms), std::sync::atomic::Ordering::Relaxed);
             }
 
             let desc = self.thread_id.as_ref().map_or_else(
@@ -351,20 +347,14 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
                 Ok(ms) => (ms, Some(format!("every {}", format_duration(ms)))),
                 Err(e) => {
-                    return ToolResult::new(
-                        tool.id.clone(),
-                        format!("Invalid interval '{interval_str}': {e}"),
-                        true,
-                    );
+                    return ToolResult::new(tool.id.clone(), format!("Invalid interval '{interval_str}': {e}"), true);
                 }
             }
         }
         _ => {
             return ToolResult::new(
                 tool.id.clone(),
-                format!(
-                    "Unknown recurrence '{recurrence_str}'. Use 'once', 'hourly', 'daily', 'weekly', or 'custom'."
-                ),
+                format!("Unknown recurrence '{recurrence_str}'. Use 'once', 'hourly', 'daily', 'weekly', or 'custom'."),
                 true,
             );
         }
@@ -447,11 +437,8 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     WatcherRegistry::get_mut(state).register(Box::new(watcher));
 
-    let recurrence_info = if interval_ms > 0 {
-        format!("\nRecurrence: {}", recurrence_suffix.trim())
-    } else {
-        String::new()
-    };
+    let recurrence_info =
+        if interval_ms > 0 { format!("\nRecurrence: {}", recurrence_suffix.trim()) } else { String::new() };
 
     ToolResult::new(
         tool.id.clone(),
