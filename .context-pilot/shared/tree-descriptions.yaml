@@ -1570,6 +1570,10 @@
   path: src/ui/perf/mod.rs
   description: 'In-memory perf system. LazyLock PerfMetrics: per-op AtomicU64 stats + RingBuffer<u64> samples, frame times, CPU/RAM, open FDs + rlimit. Platform-specific read_proc_stat(): Linux /proc/self/stat, macOS via ps command, fallback None. snapshot() for overlay. F12 toggle.'
   last_edited_ms: 0
+57fdb7681aee0e7e:
+  path: crates/cp-mod-spine/src/lib.rs
+  description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
+  last_edited_ms: 0
 581ea00f4be2d58b:
   path: crates/cp-mod-chat/src/server.rs
   description: Global Tuwunel homeserver lifecycle. PID/socket/config file management. UDS HTTP helpers (get/post/put). pre_start_daemon() for parallel boot. ensure_daemon_running() + start_server(state). Geometric backoff health polling (50ms→500ms cap, 15s budget).
@@ -2404,8 +2408,8 @@
   last_edited_ms: 0
 8cbf00556bd55559:
   path: src/app/actions/threads.rs
-  description: 'Thread action handlers. Dispatches Thread* action variants (select/create/archive/question navigation). Question form: cursor movement, toggle selection, Enter submit (YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification), dismiss, char/backspace for Other field.'
-  last_edited_ms: 0
+  description: 'Thread action handlers. Archive cleanup: clears focused_thread_id + last_read_count + notified_my_turn_id for archived thread. Question form: YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification.'
+  last_edited_ms: 1781450046462
 8d8c762e3a909931:
   path: website/docs/context.html
   description: 'Docs: context management guide'
@@ -2424,8 +2428,8 @@
   last_edited_ms: 1780565754897
 8e3aa9e17c25144e:
   path: crates/cp-mod-threads/src/tools.rs
-  description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
-  last_edited_ms: 0
+  description: 'Thread tool handlers. execute_send: MAX_CONTENT_BYTES=100K, MAX_FILE_PATH_BYTES=1K, MAX_STORED_QUESTIONS=50 caps. execute_read: single-pass unack count+previews via inspect(). build_panel_content: MAX_PANEL_MESSAGES=50 cap. format_age helper.'
+  last_edited_ms: 1781450046422
 8e412fa8d76c7beb:
   path: docs/ted-talk.md
   description: Full talk script — 25min, 16 slides, speaker notes, Q&A reserve. 'Rebuilding my own Claude Code — The Whys, the Hows and the Wows'.
@@ -2904,8 +2908,8 @@ aa1d276af3cf459a:
   last_edited_ms: 0
 aa4a6502419c0853:
   path: src/app/actions/mod.rs
-  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation, threads. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread actions extracted to threads.rs.'
-  last_edited_ms: 0
+  description: Central action dispatch (Elm/Redux-style). CycleViewMode resets scroll_offset + user_scrolled. Thread actions extracted to threads.rs.
+  last_edited_ms: 1781450046498
 aa4fb032325f6ff0:
   path: crates/cp-mod-brave/src/lib.rs
   description: 'Brave Search module. 2 tools: brave_search (snippets), brave_llm_context (deep extracted content). Dynamic brave_result panels. No state. Global, non-core.'
@@ -3264,8 +3268,8 @@ bf721ed9cc1a06a3:
   last_edited_ms: 0
 c036e5d93c04e6ba:
   path: crates/cp-mod-threads/src/types.rs
-  description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadQuestionForm (from_json with MAX_QUESTIONS=50/MAX_OPTIONS=100 caps, YAML-escaped other_text), ThreadsState + FocusState with TypeMap accessors.'
-  last_edited_ms: 0
+  description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread, ThreadQuestionForm (from_json with 50q x 100opt caps + field-length caps via cap_str, YAML-escaped other_text with \r), ThreadsState + FocusState with TypeMap accessors.'
+  last_edited_ms: 1781450046378
 c07395815ca8865e:
   path: crates/cp-mod-firecrawl/Cargo.toml
   description: 'Firecrawl module deps: cp-base, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
@@ -3941,6 +3945,10 @@ eea64e117a25ef2b:
 eeb8ddd22c31de65:
   path: crates/cp-base/src/state/watchers.rs
   description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'
+  last_edited_ms: 0
+ef88c139f0bdac2b:
+  path: yamls/tools/threads.yaml
+  description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
   last_edited_ms: 0
 f03a92cce423e618:
   path: src/modules/overview/mod.rs

@@ -215,10 +215,15 @@ impl Module for SpineModule {
             ToolDefinition::from_yaml("coucou", t)
                 .short_desc("Schedule a reminder notification")
                 .category("Spine")
-                .param("mode", ParamType::String, true)
-                .param("message", ParamType::String, true)
+                // `mode`/`message` are required for the schedule path but NOT the
+                // cancel path (cancel_id only). Declared optional; runtime
+                // validation in execute_coucou enforces them when scheduling.
+                .param("mode", ParamType::String, false)
+                .param("message", ParamType::String, false)
                 .param("delay", ParamType::String, false)
                 .param("datetime", ParamType::String, false)
+                .param("recurrence", ParamType::String, false)
+                .param("interval", ParamType::String, false)
                 .param("thread_id", ParamType::String, false)
                 .param("cancel_id", ParamType::String, false)
                 .build(),
