@@ -1,13 +1,15 @@
 folder-sizes:
   name: folder-sizes
-  description: Check that no source directory exceeds 8 entries (CI gate)
+  description: Check that no source directory exceeds 8 entries and no .rs file exceeds 500 lines
   pattern: '*.rs'
   blocking: true
   timeout_secs: 10
-  success_message: Folder sizes OK ✓
+  success_message: Structure checks OK ✓
   is_global: true
-  script_content: bash .github/checks/check-folder-sizes.sh
-  last_edited_ms: 0
+  script_content: |-
+    bash .github/checks/check-folder-sizes.sh
+    bash .github/checks/check-file-lengths.sh
+  last_edited_ms: 1781444438820
 lint-integrity:
   name: lint-integrity
   description: Verify lint config hash chain integrity (protected files unchanged)

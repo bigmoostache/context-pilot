@@ -30,7 +30,7 @@ pub(crate) struct InputBlockCtx<'ctx> {
 
 /// Render input area to IR blocks.
 #[expect(clippy::too_many_lines, reason = "rendering pipeline with selection logic")]
-pub(super) fn render_input_blocks(
+pub(crate) fn render_input_blocks(
     raw_input: &str,
     raw_cursor: usize,
     raw_anchor: Option<usize>,

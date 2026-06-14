@@ -397,7 +397,7 @@ use std::path::Path;
 
 #[cfg(test)]
 mod tests {
-    use super::{execute_dml, Connection};
+    use super::{Connection, execute_dml};
 
     fn conn() -> Connection {
         let c = Connection::open_in_memory().expect("open in-memory db");
@@ -426,8 +426,7 @@ mod tests {
     #[test]
     fn single_dml_then_select() {
         let c = conn();
-        let out = execute_dml(&c, "INSERT INTO t(a,b) VALUES ('z','w'); SELECT b FROM t;")
-            .expect("should succeed");
+        let out = execute_dml(&c, "INSERT INTO t(a,b) VALUES ('z','w'); SELECT b FROM t;").expect("should succeed");
         assert!(out.contains("| w |"), "got: {out}");
     }
 
@@ -435,8 +434,8 @@ mod tests {
     #[test]
     fn returning_still_formats_table() {
         let c = conn();
-        let out = execute_dml(&c, "INSERT INTO t(a,b) VALUES ('r','s') RETURNING a, b;")
-            .expect("returning should succeed");
+        let out =
+            execute_dml(&c, "INSERT INTO t(a,b) VALUES ('r','s') RETURNING a, b;").expect("returning should succeed");
         assert!(out.contains("| r | s |"), "got: {out}");
     }
 
@@ -445,11 +444,8 @@ mod tests {
     #[test]
     fn comment_semicolon_plus_trailing_select() {
         let c = conn();
-        let out = execute_dml(
-            &c,
-            "INSERT INTO t(a,b) VALUES ('m','n'); -- note; with ; semicolons\nSELECT a FROM t;",
-        )
-        .expect("should succeed");
+        let out = execute_dml(&c, "INSERT INTO t(a,b) VALUES ('m','n'); -- note; with ; semicolons\nSELECT a FROM t;")
+            .expect("should succeed");
         assert!(out.contains("| m |"), "got: {out}");
     }
 }

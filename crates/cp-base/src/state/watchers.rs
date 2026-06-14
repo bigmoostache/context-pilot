@@ -161,6 +161,24 @@ pub trait Watcher: Send + Sync {
     fn message(&self) -> Option<&str> {
         None
     }
+
+    /// Optional thread ID this watcher is scoped to (for coucou thread integration).
+    /// Used for persistence across reloads.
+    fn thread_id(&self) -> Option<&str> {
+        None
+    }
+
+    /// Repeat interval in ms for recurrent watchers (0 = one-shot).
+    /// Used for persistence across reloads.
+    fn interval_ms(&self) -> u64 {
+        0
+    }
+
+    /// Human-readable recurrence label (e.g. "hourly", "every 30m").
+    /// Used for persistence and display.
+    fn recurrence_label(&self) -> Option<&str> {
+        None
+    }
 }
 
 /// Registry holding active watchers. Stored in State via `TypeMap`.
@@ -262,6 +280,13 @@ impl WatcherRegistry {
     /// Remove all watchers with the given source tag.
     pub fn remove_by_tag(&mut self, tag: &str) {
         self.watchers.retain(|w| w.source_tag() != tag);
+    }
+
+    /// Remove a watcher by its ID. Returns `true` if found and removed.
+    pub fn remove_by_id(&mut self, id: &str) -> bool {
+        let before = self.watchers.len();
+        self.watchers.retain(|w| w.id() != id);
+        self.watchers.len() < before
     }
 
     /// Get from State via `TypeMap`.
@@ -432,6 +457,18 @@ impl Watcher for ChannelWatcher {
     }
 
     fn message(&self) -> Option<&str> {
+        None
+    }
+
+    fn thread_id(&self) -> Option<&str> {
+        None
+    }
+
+    fn interval_ms(&self) -> u64 {
+        0
+    }
+
+    fn recurrence_label(&self) -> Option<&str> {
         None
     }
 }

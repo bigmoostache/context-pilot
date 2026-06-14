@@ -70,23 +70,25 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     // Once the assistant has responded (stream completed), it's safe to inject
     // a new synthetic message for the next notification.
     {
-        let last_non_error_user = state
+        let synthetic_pos = state
             .messages
             .iter()
-            .rev()
-            .find(|m| m.role == "user" && m.msg_type != cp_base::state::data::message::MsgKind::ToolResult);
-        if let Some(msg) = last_non_error_user {
+            .rposition(|m| m.role == "user" && m.msg_type != cp_base::state::data::message::MsgKind::ToolResult);
+        if let Some(pos) = synthetic_pos
+            && let Some(msg) = state.messages.get(pos)
+        {
             let content = msg.content.trim();
             let is_synthetic = content.starts_with("/* Auto-continuation:")
                 || content == INJECTIONS.spine.continue_msg.trim()
                 || content == INJECTIONS.spine.reload_complete.trim();
             if is_synthetic {
-                // Check if the assistant has responded after this synthetic message.
-                // If the last message (any role) is still this user message or another
-                // user message, the LLM hasn't processed it yet — block.
-                let last_msg = state.messages.last();
-                let assistant_responded = last_msg
-                    .is_some_and(|m| m.role == "assistant" && (!m.content.is_empty() || !m.tool_uses.is_empty()));
+                // Check if the assistant has responded ANYWHERE after the synthetic
+                // message — not just as the very last message. With auto-Read
+                // injection or tool pipelines, the last message may be a tool_result
+                // or an empty assistant, even though the AI did respond earlier.
+                let assistant_responded = state.messages.get(pos..).is_some_and(|slice| {
+                    slice.iter().any(|m| m.role == "assistant" && (!m.content.is_empty() || !m.tool_uses.is_empty()))
+                });
                 if !assistant_responded {
                     return SpineDecision::Idle;
                 }

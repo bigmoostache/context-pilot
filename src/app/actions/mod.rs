@@ -16,16 +16,16 @@ pub(crate) mod helpers;
 mod history;
 /// Input submission and conversation clearing.
 pub(crate) mod input;
-/// Context panel navigation (next/prev, page jumping).
-mod navigation;
 /// Stream append/done/error handling.
 pub(crate) mod streaming;
+/// Thread action handlers (Thread* variants).
+mod threads;
 
 // Re-export helpers for external use
 pub(crate) use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern, switch_to_panel};
 
 use crate::infra::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
-use crate::state::{Entry, Kind, State, StreamPhase};
+use crate::state::{Kind, State, StreamPhase};
 
 // Re-export Action/ActionResult from cp-base (shared with module crates)
 pub(crate) use cp_base::state::actions::{Action, ActionResult};
@@ -188,49 +188,21 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ClearConversation => input::handle_clear_conversation(state),
 
-        Action::NewContext => {
-            let context_id = state.next_available_context_id();
-            state.context.push(Entry {
-                id: context_id,
-                uid: None,
-                context_type: Kind::new(Kind::CONVERSATION),
-                name: format!("Conv {}", state.context.len()),
-                token_count: 0,
-                metadata: std::collections::HashMap::new(),
-                cached_content: None,
-                history_messages: None,
-                cache_deprecated: false,
-                cache_in_flight: false,
-                last_refresh_ms: crate::app::panels::now_ms(),
-                content_hash: None,
-                source_hash: None,
-                current_page: 0,
-                total_pages: 1,
-                full_token_count: 0,
-                scroll_state: cp_base::state::context::ScrollState::default(),
-                panel_cache_hit: false,
-                panel_total_cost: 0.0,
-                freeze_count: 0,
-                total_freezes: 0,
-                total_cache_misses: 0,
-                emitted: cp_base::state::context::EmittedState::default(),
-            });
-            ActionResult::Save
-        }
+        Action::NewContext => helpers::create_new_context(state),
         Action::SelectNextContext => {
-            navigation::select_context(state, true);
+            helpers::select_context(state, true);
             ActionResult::Nothing
         }
         Action::SelectPrevContext => {
-            navigation::select_context(state, false);
+            helpers::select_context(state, false);
             ActionResult::Nothing
         }
         Action::PageDynamicNext => {
-            navigation::page_dynamic(state, true);
+            helpers::page_dynamic(state, true);
             ActionResult::Nothing
         }
         Action::PageDynamicPrev => {
-            navigation::page_dynamic(state, false);
+            helpers::page_dynamic(state, false);
             ActionResult::Nothing
         }
 
@@ -460,11 +432,30 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }
-        Action::CycleSidebarMode => {
-            state.sidebar_mode = state.sidebar_mode.next();
+        Action::CycleViewMode => {
+            state.view_mode = state.view_mode.next();
+            // Reset scroll to avoid stale position from previous view.
+            state.scroll_offset = 0.0;
+            state.flags.stream.user_scrolled = false;
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }
+        Action::ThreadSelectNext
+        | Action::ThreadSelectPrev
+        | Action::ThreadCreateStart
+        | Action::ThreadCreateCancel
+        | Action::ThreadArchiveStart
+        | Action::ThreadArchiveConfirm
+        | Action::ThreadArchiveCancel
+        | Action::ThreadQuestionUp
+        | Action::ThreadQuestionDown
+        | Action::ThreadQuestionLeft
+        | Action::ThreadQuestionRight
+        | Action::ThreadQuestionToggle
+        | Action::ThreadQuestionEnter
+        | Action::ThreadQuestionDismiss
+        | Action::ThreadQuestionBackspace => threads::dispatch(state, &action),
+        Action::ThreadQuestionChar(c) => threads::question_char(state, c),
         Action::None => ActionResult::Nothing,
     }
 }

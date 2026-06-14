@@ -91,8 +91,6 @@ pub(crate) struct App {
     /// for timer-based panels (Tmux, Git, `GitResult`, `GithubResult`, Glob, Grep).
     /// Separate from `Entry.last_refresh_ms` which tracks actual content changes.
     pub last_poll_ms: std::collections::HashMap<String, u64>,
-    /// Pending tool results when a question form is blocking (`ask_user_question`)
-    pub pending_question_tool_results: Option<Vec<ToolResult>>,
     /// Pending tool results when a console blocking wait is active
     pub pending_console_wait_tool_results: Option<Vec<ToolResult>>,
     /// Accumulated blocking watcher results — collects partial results until ALL blocking watchers complete

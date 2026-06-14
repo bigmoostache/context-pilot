@@ -34,9 +34,7 @@ pub struct Frame {
 pub enum SidebarMode {
     /// Full sidebar with entries, token bar, help hints.
     Normal,
-    /// Collapsed to a narrow icon strip.
-    Collapsed,
-    /// Completely hidden.
+    /// Completely hidden (used in Threads view).
     Hidden,
 }
 

@@ -424,8 +424,7 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
             .any(|c| c.id == id && c.context_type != d.context_type)
             .then(|| state.next_available_context_id());
         if let Some(new_id) = squatter_new_id
-            && let Some(squatter) =
-                state.context.iter_mut().find(|c| c.id == id && c.context_type != d.context_type)
+            && let Some(squatter) = state.context.iter_mut().find(|c| c.id == id && c.context_type != d.context_type)
         {
             log::warn!(
                 "Evicting panel '{}' (type={}) from ID {} → {new_id} to make room for fixed panel '{}'",

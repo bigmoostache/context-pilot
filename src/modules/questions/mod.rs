@@ -1,25 +1,19 @@
-/// Tool implementation for interactive question forms.
-mod ask_question;
 /// Tool implementation for the `Think` reasoning tool.
 mod think;
 pub(crate) use think::ThinkState;
 
 use crate::app::panels::Panel;
-use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolTexts};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{Kind, State};
 
 use super::Module;
 
-/// Lazily parsed tool text definitions for question tools.
-static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
-    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/questions.yaml")));
-
 /// Lazily parsed tool text definitions for core tools (used by `Think`).
 static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/core.yaml")));
 
-/// Module that provides interactive user question forms.
+/// Module that provides the Think reasoning tool.
 pub(crate) struct QuestionsModule;
 
 impl Module for QuestionsModule {
@@ -44,39 +38,8 @@ impl Module for QuestionsModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        let t = &*TOOL_TEXTS;
         let core_t = &*CORE_TOOL_TEXTS;
         vec![
-            ToolDefinition::from_yaml("ask_user_question", t)
-                .short_desc("Ask user multiple-choice questions")
-                .category("Context")
-                .param_array(
-                    "questions",
-                    ParamType::Object(vec![
-                        ToolParam::new("question", ParamType::String)
-                            .desc("The complete question text. Should be clear, specific, and end with ?")
-                            .required(),
-                        ToolParam::new("header", ParamType::String)
-                            .desc("Very short label (max 12 chars). E.g. \"Auth method\", \"Library\"")
-                            .required(),
-                        ToolParam::new(
-                            "options",
-                            ParamType::Array(Box::new(ParamType::Object(vec![
-                                ToolParam::new("label", ParamType::String).desc("Display text (1-5 words)").required(),
-                                ToolParam::new("description", ParamType::String)
-                                    .desc("Explanation of what this option means")
-                                    .required(),
-                            ]))),
-                        )
-                        .desc("2-4 available choices. An \"Other\" free-text option is appended automatically.")
-                        .required(),
-                        ToolParam::new("multiSelect", ParamType::Boolean)
-                            .desc("If true, user can select multiple options")
-                            .required(),
-                    ]),
-                    true,
-                )
-                .build(),
             ToolDefinition::from_yaml("Think", core_t)
                 .short_desc("Record a structured reasoning step")
                 .category("Context")
@@ -88,7 +51,6 @@ impl Module for QuestionsModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "ask_user_question" => Some(ask_question::execute(tool, state)),
             "Think" => Some(think::execute(tool, state)),
             _ => None,
         }

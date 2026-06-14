@@ -17,13 +17,18 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
 
             // Global Ctrl shortcuts (always handled first)
             if ctrl {
+                // Threads view overrides: Ctrl+A → archive (instead of global select-all)
+                if state.view_mode == cp_base::state::data::config::ViewMode::Threads && key.code == KeyCode::Char('a')
+                {
+                    return Some(Action::ThreadArchiveStart);
+                }
                 match key.code {
                     KeyCode::Char('q') => return None, // Quit
                     KeyCode::Char('l') => return Some(Action::ClearConversation),
                     KeyCode::Char('n') => return Some(Action::NewContext),
                     KeyCode::Char('h') => return Some(Action::ToggleConfigView),
                     KeyCode::Char('i') => return Some(Action::ToggleIndexOverlay),
-                    KeyCode::Char('v') => return Some(Action::CycleSidebarMode),
+                    KeyCode::Char('v') => return Some(Action::CycleViewMode),
                     KeyCode::Char('o') => return Some(Action::ResetSessionCosts),
                     KeyCode::Char('p') => return Some(Action::OpenCommandPalette),
                     KeyCode::Char('u') => return Some(Action::HistoryPrev),
@@ -109,6 +114,87 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 return Some(Action::StopStreaming);
             }
 
+            // Threads view: intercept navigation keys before panel/scroll handling
+            if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+                // Thread question form captures ALL input when active
+                if let Some(aq) = cp_mod_threads::types::FocusState::get(state).active_question.as_ref() {
+                    let typing_other = aq.questions.get(aq.focused_index).is_some_and(|q| q.typing_other);
+                    return Some(match key.code {
+                        KeyCode::Esc => Action::ThreadQuestionDismiss,
+                        KeyCode::Up => Action::ThreadQuestionUp,
+                        KeyCode::Down => Action::ThreadQuestionDown,
+                        KeyCode::Left if !typing_other => Action::ThreadQuestionLeft,
+                        KeyCode::Right if !typing_other => Action::ThreadQuestionRight,
+                        KeyCode::Enter => Action::ThreadQuestionEnter,
+                        KeyCode::Char(' ') if !typing_other => Action::ThreadQuestionToggle,
+                        KeyCode::Backspace if typing_other => Action::ThreadQuestionBackspace,
+                        KeyCode::Char(c) if typing_other => Action::ThreadQuestionChar(c),
+                        KeyCode::Backspace
+                        | KeyCode::Left
+                        | KeyCode::Right
+                        | KeyCode::Home
+                        | KeyCode::End
+                        | KeyCode::PageUp
+                        | KeyCode::PageDown
+                        | KeyCode::Tab
+                        | KeyCode::BackTab
+                        | KeyCode::Delete
+                        | KeyCode::Insert
+                        | KeyCode::F(_)
+                        | KeyCode::Char(_)
+                        | KeyCode::Null
+                        | KeyCode::CapsLock
+                        | KeyCode::ScrollLock
+                        | KeyCode::NumLock
+                        | KeyCode::PrintScreen
+                        | KeyCode::Pause
+                        | KeyCode::Menu
+                        | KeyCode::KeypadBegin
+                        | KeyCode::Media(_)
+                        | KeyCode::Modifier(_) => Action::None,
+                    });
+                }
+
+                let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+                let confirming = cp_mod_threads::types::FocusState::get(state).confirming_archive;
+                match key.code {
+                    // During archive confirmation: y confirms, any other key cancels
+                    KeyCode::Char('y') if confirming => return Some(Action::ThreadArchiveConfirm),
+                    _ if confirming => return Some(Action::ThreadArchiveCancel),
+                    // Thread sidebar navigation (Tab/Shift+Tab only — Up/Down scroll messages)
+                    KeyCode::Tab if !shift => {
+                        return Some(Action::ThreadSelectNext);
+                    }
+                    KeyCode::BackTab => return Some(Action::ThreadSelectPrev),
+                    KeyCode::Esc => return Some(Action::CycleViewMode),
+                    KeyCode::Backspace
+                    | KeyCode::Enter
+                    | KeyCode::Left
+                    | KeyCode::Right
+                    | KeyCode::Up
+                    | KeyCode::Down
+                    | KeyCode::Home
+                    | KeyCode::End
+                    | KeyCode::PageUp
+                    | KeyCode::PageDown
+                    | KeyCode::Tab
+                    | KeyCode::Delete
+                    | KeyCode::Insert
+                    | KeyCode::F(_)
+                    | KeyCode::Char(_)
+                    | KeyCode::Null
+                    | KeyCode::CapsLock
+                    | KeyCode::ScrollLock
+                    | KeyCode::NumLock
+                    | KeyCode::PrintScreen
+                    | KeyCode::Pause
+                    | KeyCode::Menu
+                    | KeyCode::KeypadBegin
+                    | KeyCode::Media(_)
+                    | KeyCode::Modifier(_) => {} // fall through to normal handling
+                }
+            }
+
             // F12 toggles performance monitor
             if key.code == KeyCode::F(12) {
                 return Some(Action::TogglePerfMonitor);
@@ -126,8 +212,20 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 return Some(Action::InputSubmit);
             }
 
-            // Let the current panel handle the key first
-            if let Some(ctx) = state.context.get(state.selected_context) {
+            // Let the current panel handle the key first.
+            // In Threads view, always use the conversation panel for input routing
+            // regardless of which panel was selected — the threads view always has
+            // an active input area that needs character/cursor/submit handling.
+            if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+                if let Some(ctx) =
+                    state.context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)
+                {
+                    let panel = get_panel(&ctx.context_type);
+                    if let Some(action) = panel.handle_key(key, state) {
+                        return Some(action);
+                    }
+                }
+            } else if let Some(ctx) = state.context.get(state.selected_context) {
                 let panel = get_panel(&ctx.context_type);
                 if let Some(action) = panel.handle_key(key, state) {
                     return Some(action);

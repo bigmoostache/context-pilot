@@ -1,7 +1,7 @@
 //! Sidebar IR builders — assemble [`Sidebar`] from application state.
 //!
-//! Extracts the data logic from `ui::sidebar::full` and `ui::sidebar::collapsed`
-//! into pure functions returning IR types. No ratatui, no Frame.
+//! Extracts the sidebar data logic into pure functions returning IR types.
+//! No ratatui, no Frame.
 
 use cp_base::state::data::model_helpers::ModelPricing as _;
 use cp_render::frame::{HelpHint, PrCard, Sidebar, SidebarEntry, SidebarMode, TokenBar, TokenRow, TokenStats};
@@ -40,10 +40,9 @@ fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String> {
 /// Build the sidebar region from application state.
 #[must_use]
 pub(crate) fn build_sidebar(state: &State) -> Sidebar {
-    let mode = match state.sidebar_mode {
-        cp_base::state::data::config::SidebarMode::Normal => SidebarMode::Normal,
-        cp_base::state::data::config::SidebarMode::Collapsed => SidebarMode::Collapsed,
-        cp_base::state::data::config::SidebarMode::Hidden => SidebarMode::Hidden,
+    let mode = match state.view_mode {
+        cp_base::state::data::config::ViewMode::Normal => SidebarMode::Normal,
+        cp_base::state::data::config::ViewMode::Threads => SidebarMode::Hidden,
     };
 
     if matches!(mode, SidebarMode::Hidden) {
@@ -57,7 +56,7 @@ pub(crate) fn build_sidebar(state: &State) -> Sidebar {
         };
     }
 
-    let entries = build_entries(state, matches!(mode, SidebarMode::Collapsed));
+    let entries = build_entries(state);
     let token_bar = Some(build_token_bar(state));
     let token_stats = build_token_stats(state);
     let pr_card = build_pr_card(state);
@@ -69,7 +68,7 @@ pub(crate) fn build_sidebar(state: &State) -> Sidebar {
 // ── Entries ──────────────────────────────────────────────────────────
 
 /// Build the context element entries list for the sidebar.
-fn build_entries(state: &State, collapsed: bool) -> Vec<SidebarEntry> {
+fn build_entries(state: &State) -> Vec<SidebarEntry> {
     // Sort by panel ID numerically
     let mut sorted_indices: Vec<usize> = (0..state.context.len()).collect();
     sorted_indices.sort_by(|&a, &b| {
@@ -138,9 +137,7 @@ fn build_entries(state: &State, collapsed: bool) -> Vec<SidebarEntry> {
             ctx.id.clone()
         };
 
-        let label = if collapsed {
-            String::new()
-        } else {
+        let label = {
             let name = crate::ui::helpers::truncate_string(&ctx.name, 18);
             if is_loading { format!("{name} {spin}", spin = spinner()) } else { name }
         };

@@ -5,8 +5,6 @@
 
 use unicode_width::UnicodeWidthStr;
 
-/// Interactive question form types (ask_user_question tool).
-pub mod question_form;
 /// Render cache types for conversation panel performance.
 pub mod render_cache;
 

@@ -172,10 +172,6 @@ pub(super) fn finalize_stream(app: &mut App) {
     if app.state.flags.lifecycle.waiting_for_panels || app.deferred_tool_sleeping {
         return;
     }
-    // Don't finalize while a question form is pending user response
-    if app.pending_question_tool_results.is_some() {
-        return;
-    }
     // Don't finalize while a console blocking wait is pending
     if app.pending_console_wait_tool_results.is_some() {
         return;

@@ -1,7 +1,7 @@
 //! Context Pilot — AI-powered TUI coding assistant.
 //!
 //! Entry point: sets up the terminal, loads state, initializes modules,
-//! and runs the main event loop.  Also handles `typst-compile` and
+//! and runs the main event loop. Also handles `typst-compile` and
 //! `typst-recompile-watched` subcommands for callback scripts.
 
 // Force vendored OpenSSL for cross-compilation (activates openssl-sys/vendored).

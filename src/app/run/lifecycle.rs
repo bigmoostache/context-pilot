@@ -106,25 +106,6 @@ impl App {
                     continue;
                 }
 
-                // Handle question form events if form is active (mutates state directly)
-                if let Some(form) = self.state.get_ext::<cp_base::ui::question_form::PendingForm>()
-                    && !form.resolved
-                {
-                    self.handle_question_form_event(&evt);
-                    self.state.flags.ui.dirty = true;
-
-                    // Render immediately
-                    if self.state.flags.ui.dirty {
-                        let _r = terminal.draw(|frame| {
-                            ui::render(frame, &mut self.state);
-                            self.command_palette.render(frame, &self.state);
-                        })?;
-                        self.state.flags.ui.dirty = false;
-                        self.last_render_ms = current_ms;
-                    }
-                    continue;
-                }
-
                 let Some(action) = handle_event(&evt, &self.state) else {
                     // User quit — flush all pending writes and save final state synchronously
                     self.writer.flush();
@@ -161,8 +142,6 @@ impl App {
             super::tools::checks::check_waiting_for_panels(self, ch.tx);
             // Check if deferred sleep timer has expired (non-blocking)
             super::tools::checks::check_deferred_sleep(self, ch.tx);
-            // Check if a question form has been resolved by the user
-            super::tools::checks::check_question_form(self, ch.tx);
             // Check watchers (blocking sentinel replacement + async → spine notifications)
             super::tools::cleanup::check_watchers(self, ch.tx);
             // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
@@ -181,6 +160,7 @@ impl App {
             super::tools::pipeline::handle_tool_execution(self, ch.tx);
             super::streaming::finalize_stream(self);
             self.check_spine(ch.tx);
+            super::threads::check_my_turn_threads(self);
             super::streaming::process_api_check_results(self);
 
             // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
@@ -316,6 +296,11 @@ impl App {
                 self.state.guard_rail_blocked = None;
                 let should_stream = apply_continuation(&mut self.state, action);
                 if should_stream {
+                    // Auto-Read: if unfocused with a MY_TURN thread, inject a
+                    // synthetic Read tool call so the AI starts with focus set
+                    // and thread content visible — saves a full round-trip.
+                    super::threads::maybe_inject_auto_read(self);
+
                     self.typewriter.reset();
                     self.pending_tools.clear();
                     let ctx = prepare_stream_context(&mut self.state, false, None);

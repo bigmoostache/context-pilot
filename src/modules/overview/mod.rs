@@ -10,6 +10,8 @@ mod tools;
 mod tools_blocks;
 /// Panel for tools/configuration display.
 mod tools_panel;
+/// Tool result visualizers for core tools.
+mod visualizers;
 
 use serde_json::json;
 
@@ -393,10 +395,10 @@ impl Module for OverviewModule {
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
-            ("Close_panel", visualize_core_output),
-            ("tool_manage", visualize_core_output),
-            ("system_reload", visualize_core_output),
-            ("panel_goto_page", visualize_core_output),
+            ("Close_panel", visualizers::visualize_core_output),
+            ("tool_manage", visualizers::visualize_core_output),
+            ("system_reload", visualizers::visualize_core_output),
+            ("panel_goto_page", visualizers::visualize_core_output),
         ]
     }
 
@@ -470,39 +472,4 @@ pub(crate) fn has_pending_tree_describe(state: &State, rel_path: &str) -> bool {
                     })
                 })
         })
-}
-
-/// Visualizer for core tool results.
-/// Colors closed panel names, highlights enabled/disabled tool status, and shows module activation state changes.
-fn visualize_core_output(content: &str, width: usize) -> Vec<cp_render::Block> {
-    use cp_render::{Block, Semantic, Span};
-
-    content
-        .lines()
-        .map(|line| {
-            if line.is_empty() {
-                return Block::empty();
-            }
-            let semantic = if line.starts_with("Error:") {
-                Semantic::Error
-            } else if line.starts_with("Closed") || line.contains("enabled") {
-                Semantic::Success
-            } else if line.contains("disabled") {
-                Semantic::Warning
-            } else if line.contains("Reloading")
-                || line.contains("TUI")
-                || (line.starts_with('P') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()))
-            {
-                Semantic::Info
-            } else {
-                Semantic::Default
-            };
-            let display = if line.len() > width {
-                format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
-            } else {
-                line.to_string()
-            };
-            Block::Line(vec![Span::styled(display, semantic)])
-        })
-        .collect()
 }

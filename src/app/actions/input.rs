@@ -3,6 +3,7 @@ use crate::state::persistence::{delete_message, save_message};
 use crate::state::{Kind, Message, State, estimate_tokens};
 use cp_mod_prompt::types::PromptItem;
 use cp_mod_spine::types::{NotificationType, SpineState};
+use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
 
 use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};
@@ -22,6 +23,11 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
         state.input.clear();
         state.input_cursor = 0;
         return ActionResult::Nothing;
+    }
+
+    // Threads view: route input to the selected thread instead of conversation
+    if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+        return handle_thread_input_submit(state);
     }
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
@@ -129,6 +135,134 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
         user_id.to_string(),
         content_preview.to_string(),
     );
+}
+
+/// Handle input submission when `ViewMode::Threads` is active.
+///
+/// Routes the user's text to the currently selected thread as a
+/// `ThreadMessage(User)`, sets the thread to `MyTurn`, and creates
+/// a spine notification so the AI picks up the new message.
+///
+/// When `creating_thread` is active, creates a new thread with the
+/// input text as the thread name instead.
+fn handle_thread_input_submit(state: &mut State) -> ActionResult {
+    // Virtual "New Thread" entry: selected past the end of real threads
+    let selected_idx = FocusState::get(state).selected_thread_idx;
+    let thread_count = ThreadsState::get(state).threads.len();
+    if selected_idx >= thread_count {
+        return handle_thread_create(state);
+    }
+
+    let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
+    let content = replace_commands(&state.input, &commands);
+    let content = expand_paste_sentinels(&content, &state.paste_buffers);
+
+    // Clear input state
+    state.input.clear();
+    state.input_cursor = 0;
+    state.input_selection_anchor = None;
+    state.paste_buffers.clear();
+    state.paste_buffer_labels.clear();
+
+    // Record to persistent prompt history
+    record_prompt_history(&content);
+
+    // Find the selected thread
+    let threads_state = ThreadsState::get_mut(state);
+
+    let Some(thread) = threads_state.threads.get_mut(selected_idx) else {
+        return ActionResult::Nothing;
+    };
+
+    let thread_name = thread.name.clone();
+
+    // Create a user message in the thread
+    let msg = ThreadMessage {
+        author: ThreadAuthor::User,
+        content: Some(content.clone()),
+        file_path: None,
+        question: None,
+        timestamp: crate::app::panels::now_ms(),
+        acknowledged: false,
+    };
+    thread.messages.push(msg);
+    thread.status = ThreadStatus::MyTurn;
+
+    // Build notification content: message preview + thread name + Read invitation
+    let thread_id = thread.id.clone();
+    let msg_preview = if content.len() > 120 {
+        format!("{}...", content.get(..content.floor_char_boundary(120)).unwrap_or(""))
+    } else {
+        content
+    };
+    let notification_content = format!(
+        "New message in thread \"{thread_name}\" ({thread_id}): {msg_preview}\nUse Read(thread_id=\"{thread_id}\") to see the conversation.",
+    );
+
+    // Create a Custom notification — informational only, does NOT trigger main conversation streaming.
+    // The spine idle+MY_TURN detection will prompt the AI to attend to the thread.
+    let _r = SpineState::create_notification(
+        state,
+        NotificationType::Custom,
+        "thread_input".to_string(),
+        notification_content,
+    );
+
+    // Notify all modules
+    for module in all_modules() {
+        module.on_user_message(state);
+    }
+
+    ActionResult::Save
+}
+
+/// Create a new thread from the input text (used as thread name).
+///
+/// Called when the virtual "New Thread" entry is selected and the user
+/// presses Enter. Generates a unique thread ID, creates an empty
+/// `TheirTurn` thread, and selects it.
+fn handle_thread_create(state: &mut State) -> ActionResult {
+    /// Maximum thread name length to prevent state bloat.
+    const MAX_THREAD_NAME_LEN: usize = 200;
+
+    let name = state.input.trim().to_string();
+
+    // Clear input regardless of outcome
+    state.input.clear();
+    state.input_cursor = 0;
+    state.input_selection_anchor = None;
+
+    if name.is_empty() {
+        return ActionResult::Nothing;
+    }
+
+    // Cap thread name length
+    let name = if name.len() > MAX_THREAD_NAME_LEN {
+        name.get(..name.floor_char_boundary(MAX_THREAD_NAME_LEN)).unwrap_or(&name).to_string()
+    } else {
+        name
+    };
+
+    // Generate thread ID and create the thread
+    let threads_state = ThreadsState::get_mut(state);
+    let id = format!("T{}", threads_state.next_id);
+    threads_state.next_id = threads_state.next_id.saturating_add(1);
+
+    let thread = cp_mod_threads::types::Thread {
+        id,
+        name,
+        status: ThreadStatus::TheirTurn,
+        messages: vec![],
+        created_at: crate::app::panels::now_ms(),
+    };
+    threads_state.threads.push(thread);
+
+    // Select the newly created thread (last in list)
+    let new_idx = ThreadsState::get(state).threads.len().saturating_sub(1);
+    FocusState::get_mut(state).selected_thread_idx = new_idx;
+    state.flags.ui.dirty = true;
+
+    ActionResult::Save
 }
 
 /// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.

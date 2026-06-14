@@ -1,11 +1,9 @@
 /// Character constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::chars;
-/// Help subsystem: config overlay and command palette.
+/// Help subsystem: config overlay, command palette, input overlays.
 pub(crate) mod help;
 /// Shared UI helper functions: truncation, formatting, syntax highlighting.
 pub(crate) mod helpers;
-/// Status bar, question form, and autocomplete popup rendering.
-mod input;
 /// IR-to-ratatui adapter: converts semantic blocks to terminal widgets.
 pub(crate) mod ir;
 /// Markdown parsing and table rendering utilities.
@@ -14,6 +12,8 @@ pub(crate) mod markdown;
 pub(crate) mod perf;
 /// Meilisearch indexing status overlay (Ctrl+I).
 pub(crate) mod search_overlay;
+/// Threads view: dedicated layout for thread management.
+mod threads_view;
 /// Theme color constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::theme;
 /// Typewriter animation buffer re-exported from helpers.
@@ -66,11 +66,17 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         perf::render_perf_overlay_from_ir(frame, area, perf_overlay);
     }
 
-    // Render autocomplete popup if active (via IR overlays)
+    // Render autocomplete popup if active (via IR overlays).
+    // In Threads mode the input lives inside the right pane (past the thread
+    // list), so offset by THREAD_LIST_WIDTH instead of the sidebar width.
     {
-        let sw = state.sidebar_mode.width();
-        let content_x = area.x.saturating_add(sw);
-        let content_width = area.width.saturating_sub(sw);
+        let offset = if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+            threads_view::THREAD_LIST_WIDTH
+        } else {
+            state.view_mode.width()
+        };
+        let content_x = area.x.saturating_add(offset);
+        let content_width = area.width.saturating_sub(offset);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
         let content_area = Rect::new(content_x, area.y, content_width, content_height);
         ir::render_conversation::render_autocomplete_if_active(frame, content_area, &ir_frame.overlays);
@@ -95,14 +101,17 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     PERF.frame_end();
 }
 
-/// Render the body area: sidebar (if visible) and main content panel.
+/// Render the body area: sidebar (if visible) and main content panel,
+/// or the threads view when `ViewMode::Threads` is active.
 fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
-    let sw = state.sidebar_mode.width();
-    if sw == 0 {
-        // Hidden mode — no sidebar at all
-        render_main_content(frame, state, area, ir_frame);
+    // Threads mode: completely different layout (no sidebar, no panels)
+    if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+        threads_view::maybe_activate_thread_question(state);
+        threads_view::render_threads_view(frame, state, area);
         return;
     }
+
+    let sw = state.view_mode.width();
 
     // Body layout: sidebar + main content
     let body_layout = Layout::default()
@@ -121,42 +130,8 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &
     render_main_content(frame, state, content_area, ir_frame);
 }
 
-/// Render the main content area, splitting for question form if active.
+/// Render the main content area.
 fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
-    // Check if question form is active via IR overlays
-    if let Some(form_height) = ir::render_conversation::render_question_form_if_active(&ir_frame.overlays) {
-        // Split: content panel on top, question form at bottom
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(3),              // Content panel (shrinks)
-                Constraint::Length(form_height), // Question form
-            ])
-            .split(area);
-
-        let (Some(&panel_area), Some(&raw_form_area)) = (layout.first(), layout.get(1)) else {
-            debug_assert!(false, "question form layout must have at least 2 chunks");
-            return;
-        };
-        render_content_panel(frame, state, panel_area, ir_frame);
-        // Indent form by 1 col to avoid overlapping sidebar border
-        let form_area = Rect {
-            x: raw_form_area.x.saturating_add(1),
-            width: raw_form_area.width.saturating_sub(1),
-            ..raw_form_area
-        };
-        // Find the QuestionForm IR data from overlays for rendering
-        if let Some(form) = ir_frame
-            .overlays
-            .iter()
-            .find_map(|o| if let cp_render::conversation::Overlay::QuestionForm(ref f) = *o { Some(f) } else { None })
-        {
-            input::render_question_form(frame, form, form_area);
-        }
-        return;
-    }
-
-    // Normal rendering — no separate input box, panels handle their own
     render_content_panel(frame, state, area, ir_frame);
 }
 

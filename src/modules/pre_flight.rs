@@ -170,10 +170,9 @@ fn validate_tool_metadata(tool: &ToolUse, result: &mut Verdict) {
     let verb = tool.input.get("verb").and_then(serde_json::Value::as_str);
 
     match intent {
-        None => result.warnings.push(format!(
-            "Missing parameter: 'intent'. Provide a 1-10 word reason for calling {}.",
-            tool.name,
-        )),
+        None => result
+            .warnings
+            .push(format!("Missing parameter: 'intent'. Provide a 1-10 word reason for calling {}.", tool.name,)),
         Some(s) if s.trim().is_empty() => result.warnings.push("Parameter 'intent' is empty.".to_string()),
         Some(s) if s.split_whitespace().count() > 10 => {
             result.warnings.push("Parameter 'intent' exceeds 10 words — keep it concise.".to_string());

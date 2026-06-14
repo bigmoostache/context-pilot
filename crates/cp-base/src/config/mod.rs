@@ -408,6 +408,8 @@ pub mod constants;
 pub mod global;
 /// LLM provider/model type definitions and capabilities.
 pub mod llm_types;
+/// Per-provider model enums (Anthropic, Grok, Groq, DeepSeek, MiniMax, Claude Code V2).
+pub mod models;
 /// Unified YAML synchronizer for cross-branch persistent state.
 pub mod yaml_sync;
 

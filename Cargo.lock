@@ -444,6 +444,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-mod-threads"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "cp-render",
+ "crossterm",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cp-mod-todo"
 version = "0.1.0"
 dependencies = [
@@ -2963,6 +2974,7 @@ dependencies = [
  "cp-mod-scratchpad",
  "cp-mod-search",
  "cp-mod-spine",
+ "cp-mod-threads",
  "cp-mod-todo",
  "cp-mod-tree",
  "cp-mod-utilities",

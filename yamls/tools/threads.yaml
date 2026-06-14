@@ -1,0 +1,23 @@
+tools:
+  Send:
+    description: |
+      Posts a message to a thread. The AI uses this to respond to thread messages.
+      At least one of markdown, file_path, or questions must be provided.
+      After sending, the thread becomes THEIR_TURN (waiting for the user) and
+      focus is cleared, starting a dangling phase of 5 tool calls before the AI
+      must focus on another MY_TURN thread.
+    parameters:
+      thread_id: "Thread ID to post to (e.g., 'T1')"
+      markdown: "Markdown text content for the message"
+      file_path: "File path to attach as a reference"
+      questions: "Array of question objects to embed in the message (Phase 7)"
+
+  Read:
+    description: |
+      Reads a thread and sets focus. If the thread is MY_TURN,
+      reading it sets focus — the AI is now working on this thread. If the
+      thread is THEIR_TURN, it's a peek (no focus change).
+      Marks all messages as acknowledged and populates the Threads panel with
+      the thread's recent conversation (most recent messages).
+    parameters:
+      thread_id: "Thread ID to read (e.g., 'T1')"

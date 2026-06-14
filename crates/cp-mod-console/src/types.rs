@@ -350,4 +350,16 @@ impl Watcher for ConsoleWatcher {
     fn message(&self) -> Option<&str> {
         None
     }
+
+    fn thread_id(&self) -> Option<&str> {
+        None
+    }
+
+    fn interval_ms(&self) -> u64 {
+        0
+    }
+
+    fn recurrence_label(&self) -> Option<&str> {
+        None
+    }
 }

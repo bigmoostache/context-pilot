@@ -8,37 +8,45 @@ use crate::state::context::Kind;
 // Sidebar Mode
 // =============================================================================
 
-/// Controls sidebar display: full, collapsed (icons only), or hidden.
+/// Controls the current view mode.
+///
+/// `Normal` shows the standard panel view (sidebar + content panel).
+/// `Threads` replaces the entire layout with a dedicated threads view.
+/// Ctrl+V toggles between them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum SidebarMode {
+pub enum ViewMode {
+    /// Threads view: dedicated layout for thread management (no panels).
+    Threads,
     #[default]
+    #[serde(other)]
     /// Full sidebar with panel names and details.
     Normal,
-    /// Icons-only sidebar (narrow).
-    Collapsed,
-    /// Sidebar completely hidden.
-    Hidden,
 }
 
-impl SidebarMode {
-    /// Cycle to the next mode: Normal → Collapsed → Hidden → Normal
+impl ViewMode {
+    /// Toggle between Normal and Threads.
     #[must_use]
     pub const fn next(self) -> Self {
         match self {
-            Self::Normal => Self::Collapsed,
-            Self::Collapsed => Self::Hidden,
-            Self::Hidden => Self::Normal,
+            Self::Normal => Self::Threads,
+            Self::Threads => Self::Normal,
         }
     }
 
-    /// Width in columns for this sidebar mode
+    /// Width in columns for the sidebar in this mode.
+    /// Returns 0 for Threads (sidebar is not rendered).
     #[must_use]
     pub const fn width(self) -> u16 {
         match self {
             Self::Normal => 36,
-            Self::Collapsed => 14,
-            Self::Hidden => 0,
+            Self::Threads => 0,
         }
+    }
+
+    /// Whether this mode shows the standard panel view (sidebar + content panel).
+    #[must_use]
+    pub const fn is_panel_view(self) -> bool {
+        matches!(self, Self::Normal)
     }
 }
 
@@ -76,10 +84,9 @@ pub struct Shared {
     /// Cursor position in draft input
     #[serde(default)]
     pub draft_cursor: usize,
-    /// Sidebar display mode (Normal/Collapsed/Hidden)
-    /// Sidebar display mode (Normal/Collapsed/Hidden)
-    #[serde(default)]
-    pub sidebar_mode: SidebarMode,
+    /// View mode (Normal/Threads)
+    #[serde(default, alias = "sidebar_mode")]
+    pub view_mode: ViewMode,
 
     // === Module data (keyed by module ID) ===
     /// Per-module persistent data, keyed by module ID string.
@@ -97,7 +104,7 @@ impl Default for Shared {
             selected_context: 0,
             draft_input: String::new(),
             draft_cursor: 0,
-            sidebar_mode: SidebarMode::default(),
+            view_mode: ViewMode::default(),
             modules: HashMap::new(),
         }
     }

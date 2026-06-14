@@ -178,7 +178,7 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
         next_result_id: cfg.worker.next_result_id,
         input: cfg.shared.draft_input,
         input_cursor: cfg.shared.draft_cursor,
-        sidebar_mode: cfg.shared.sidebar_mode,
+        view_mode: cfg.shared.view_mode,
         active_theme: cfg.shared.active_theme,
         cache_engine_json,
         ..State::default()

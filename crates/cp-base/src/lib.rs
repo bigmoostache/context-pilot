@@ -227,7 +227,6 @@ mod tests {
             ("memory", include_str!("../../../yamls/tools/memory.yaml")),
             ("ocr", include_str!("../../../yamls/tools/ocr.yaml")),
             ("prompt", include_str!("../../../yamls/tools/prompt.yaml")),
-            ("questions", include_str!("../../../yamls/tools/questions.yaml")),
             ("queue", include_str!("../../../yamls/tools/queue.yaml")),
             ("reverie", include_str!("../../../yamls/tools/reverie.yaml")),
             ("scratchpad", include_str!("../../../yamls/tools/scratchpad.yaml")),

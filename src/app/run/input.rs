@@ -44,7 +44,6 @@ impl App {
             deferred_tool_sleeping: false,
             writer: crate::state::persistence::PersistenceWriter::new(),
             last_poll_ms: std::collections::HashMap::new(),
-            pending_question_tool_results: None,
             pending_console_wait_tool_results: None,
             accumulated_blocking_results: Vec::new(),
             reverie_streams: std::collections::HashMap::new(),
@@ -221,87 +220,6 @@ impl App {
             | KeyCode::Delete
             | KeyCode::Insert
             | KeyCode::F(_)
-            | KeyCode::Null
-            | KeyCode::CapsLock
-            | KeyCode::ScrollLock
-            | KeyCode::NumLock
-            | KeyCode::PrintScreen
-            | KeyCode::Pause
-            | KeyCode::Menu
-            | KeyCode::KeypadBegin
-            | KeyCode::Media(_)
-            | KeyCode::Modifier(_) => {}
-        }
-    }
-
-    /// Handle keyboard events when a question form is active.
-    /// Mutates the `PendingForm` directly in state.
-    pub(super) fn handle_question_form_event(&mut self, event: &event::Event) {
-        use crossterm::event::{KeyCode, KeyModifiers};
-        let event::Event::Key(key) = event else { return };
-
-        let Some(form) = self.state.get_ext_mut::<cp_base::ui::question_form::PendingForm>() else { return };
-
-        // Check if currently typing in "Other" field
-        let Some(current_answer) = form.answers.get(form.current_question) else { return };
-        let typing_other = current_answer.typing_other;
-
-        match key.code {
-            KeyCode::Esc => {
-                form.dismiss();
-            }
-            KeyCode::Up if !typing_other => {
-                form.cursor_up();
-            }
-            KeyCode::Down if !typing_other => {
-                form.cursor_down();
-            }
-            KeyCode::Left => {
-                form.prev_question();
-            }
-            KeyCode::Right => {
-                form.next_question();
-            }
-            KeyCode::Enter => {
-                form.handle_enter();
-            }
-            KeyCode::Char(' ') if !typing_other && form.is_multi_select() => {
-                form.toggle_selection();
-            }
-            KeyCode::Char(' ') if !typing_other => {
-                // Single-select: space selects and advances
-                form.toggle_selection();
-            }
-            // When on "Other": arrow keys navigate away, typing goes to text field
-            KeyCode::Up if typing_other => {
-                form.cursor_up();
-            }
-            KeyCode::Down if typing_other => {
-                form.cursor_down();
-            }
-            KeyCode::Backspace if typing_other => {
-                form.backspace();
-            }
-            KeyCode::Char(c) if typing_other => {
-                // Don't capture ctrl+key combos
-                if !key.modifiers.contains(KeyModifiers::CONTROL) {
-                    form.type_char(c);
-                }
-            }
-            // Remaining keys do nothing in the question form
-            KeyCode::Backspace
-            | KeyCode::Up
-            | KeyCode::Down
-            | KeyCode::Home
-            | KeyCode::End
-            | KeyCode::PageUp
-            | KeyCode::PageDown
-            | KeyCode::Tab
-            | KeyCode::BackTab
-            | KeyCode::Delete
-            | KeyCode::Insert
-            | KeyCode::F(_)
-            | KeyCode::Char(_)
             | KeyCode::Null
             | KeyCode::CapsLock
             | KeyCode::ScrollLock
