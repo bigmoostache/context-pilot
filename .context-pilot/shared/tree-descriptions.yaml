@@ -94,6 +94,10 @@
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+0523c03ac2f60ceb:
+  path: ui/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
+  last_edited_ms: 1781459201150
 053accd087ac049f:
   path: crates/cp-mod-firecrawl/src/crawl.rs
   description: Recursive site crawling — firecrawl_crawl tool. flame!("firecrawl_crawl"). Start async crawl job + poll loop (5s interval, 60 max polls, 310s timeout). write_crawl_output writes combined markdown to disk. No panel created.
@@ -350,6 +354,10 @@
   path: src/modules/conversation/panel.rs
   description: 'Conversation panel. Multi-level cache (full → per-message → input). Input hash includes selection anchor. Keybindings: Shift+Arrow selection, Ctrl/Alt+Arrow word jump, Ctrl+A select all, Ctrl+Backspace delete word. Enter send-on-empty-line logic.'
   last_edited_ms: 0
+12630d3a418a21eb:
+  path: ui/src/index.css
+  description: 'Phosphor Cockpit theme: warm near-black base, amber phosphor signal (primary), cyan interactive accent, instrument red/green. IBM Plex Mono/Sans, hairline borders, grain+scanline atmosphere, utility classes (glow-signal, etch, label, rise, fill-sweep).'
+  last_edited_ms: 1781458541231
 12dd2c9c1c27a124:
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
@@ -626,6 +634,10 @@
   path: crates/cp-mod-chat/src/client/download.rs
   description: Tuwunel binary download. Pinned version, GitHub release download + zstd decompress. 24h failure caching via .download-failed marker to avoid wasted HTTP roundtrips on boot.
   last_edited_ms: 0
+21464531b4bef014:
+  path: ui/src/components/shell/RightInspector.tsx
+  description: Right inspector with Stats/Threads/Spine tabs (shadcn Tabs + ScrollArea).
+  last_edited_ms: 1781458541317
 215ef55c47b8eef7:
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
@@ -658,6 +670,10 @@
   path: crates/cp-mod-logs/src/tools.rs
   description: Log tool execution. flame!("log_create") and flame!("close_history"). push_log() helper. execute_log_create() creates entries from array. execute_close_conversation_history() processes panels array — per-panel logs (strings), timestamp from panel's last message, panel removal.
   last_edited_ms: 0
+23152c68c4aaf519:
+  path: ui/src/lib/mock.ts
+  description: 'Mock session data approximating a live CP session: panels, tokenBudget, cacheStats, messages, threads, spine, stats, status.'
+  last_edited_ms: 1781458541260
 239c5b0d44871557:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
@@ -1630,6 +1646,10 @@
   path: .github/checks/clippy_compare.py
   description: Compares clippy lint defaults (from clippy_lints_list.md) against Cargo.toml overrides. Outputs clippy_compared_list.md — hides forbid-level lints, shows remaining with emoji indicators.
   last_edited_ms: 1780610393056
+5b1f65a3aab36b28:
+  path: ui/src/App.tsx
+  description: App shell with view state (threads|cockpit, default threads). TopBar switcher toggles between ThreadsView (3-pane chat) and cockpit (LeftRail+Conversation+RightInspector). StatusBar always shown.
+  last_edited_ms: 1781459201198
 5b5752cbddffee21:
   path: docs/ROADMAP.md
   description: 'Public roadmap: v0.2 (providers/context/DX), v0.3 (multi-agent/IDE/knowledge), long-term (plugins/collab)'
@@ -1786,6 +1806,10 @@
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 0
+650a0ba5c8a439e2:
+  path: ui/src/components/threads/ThreadDetailRail.tsx
+  description: 'Right rail: thread metadata (status badge, agent, message count, created, last activity, id) + ''Open agent cockpit'' bridge to the panel-centered view.'
+  last_edited_ms: 1781459201160
 6524c8708421c935:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -1954,6 +1978,10 @@
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
   last_edited_ms: 0
+6f1eddff8d2c7256:
+  path: ui/src/lib/panelMeta.ts
+  description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
+  last_edited_ms: 1781458541269
 6fd3adfcd1ec6cc1:
   path: src/ui/search_overlay/text.rs
   description: Plain-text export of Ctrl+I overlay for clipboard copy. Includes process CPU%/RAM stats for Meilisearch.
@@ -1978,6 +2006,10 @@
   path: crates/cp-mod-memory/src/tools.rs
   description: Memory tools with flame!("memory_create") and flame!("memory_update"). tl_dr validation (80 token cap). Importance/labels. Batch create/update/delete.
   last_edited_ms: 0
+720fa85431264f37:
+  path: ui/src/lib/types.ts
+  description: 'Maquette domain types: ContextPanel, ChatMessage/ToolCall, Thread (summary), SpineNotif, StatRow, StatusModel, PanelKind. Thread-view types: ViewMode, ThreadQuestion, ThreadMsg, ThreadDetail (full conversation log).'
+  last_edited_ms: 1781459201208
 724b961e89a4a1d9:
   path: crates/cp-mod-callback/src/types.rs
   description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, editor_open). No active_set — all callbacks always active.
@@ -2066,6 +2098,10 @@
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
   last_edited_ms: 0
+764dd5b60b60efd6:
+  path: ui/src/components/panels/TokenBar.tsx
+  description: Signature CP token meter — hairline phosphor fill bar with load-gradient color + glow + mount sweep animation.
+  last_edited_ms: 1781458541289
 76f92d62b3fa3c6b:
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
@@ -2078,6 +2114,10 @@
   path: src/llms/oai_providers/deepseek.rs
   description: DeepSeek client. OpenAI-compatible with reasoning_content for deepseek-reasoner. DsMessage wrapper. Cache hit/miss tokens. DEEPSEEK_API_KEY auth.
   last_edited_ms: 1780565754904
+77a9accbb6cbac98:
+  path: ui/src/components/threads/ThreadList.tsx
+  description: 'Left rail: grouped thread sidebar (''Needs you''=MY_TURN / ''In progress''=THEIR_TURN). Each row: status dot, name, last-msg preview, time, unread badge, selection bar. + New Thread button, search box.'
+  last_edited_ms: 1781459201140
 782b15ad724cdaf8:
   path: .github/workflows/codeql.yml
   description: 'CI: CodeQL security analysis'
@@ -2194,6 +2234,10 @@
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
   last_edited_ms: 0
+7dc597d8de2ded1b:
+  path: ui/src/lib/types.ts
+  description: 'Maquette domain types: ContextPanel, ChatMessage/ToolCall, Thread, SpineNotif, StatRow, StatusModel, PanelKind union.'
+  last_edited_ms: 1781458541250
 7e4c8030e41ab258:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
@@ -2254,6 +2298,10 @@
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
   last_edited_ms: 0
+81c771a7fc9e5ac0:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'Cockpit header strip: app mark, view switcher (Threads/Cockpit segmented control), project breadcrumb, branch chip, global cost, status dot.'
+  last_edited_ms: 1781459201189
 82202025734699ca:
   path: src/modules/conversation_history/mod.rs
   description: 'Conversation history module. Core/global. Dynamic panels for frozen history chunks. on_close_context redirects to Close_conversation_history tool. Sub-modules: panel, trap.'
@@ -2294,6 +2342,10 @@
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
   last_edited_ms: 1781357664014
+856ea5b4e684d6c1:
+  path: ui/src/components/shell/LeftRail.tsx
+  description: 'Context navigator: token-budget meter, scrollable panel list (icon+name+token-bar+freeze/miss), cache economics footer (hit/miss/out + cost).'
+  last_edited_ms: 1781458541308
 85d3de8465114706:
   path: crates/cp-render/src/lib.rs
   description: 'IR rendering crate. Semantic styling (not RGB). Block enum: Line/Empty/Header/Table/ProgressBar/Tree/Separator/KeyValue. Span with semantic+bold/italic/dimmed/reversed+optional RGB. pub mod markdown for shared parsing. Serializable for future web frontend.'
@@ -2306,6 +2358,10 @@
   path: crates/cp-mod-github/src/panel.rs
   description: 'GithubResultPanel: cached gh command output, 120s refresh, token redaction, tab-delimited PR/issue table rendering'
   last_edited_ms: 0
+86569b93b2a5f549:
+  path: ui/src/App.tsx
+  description: 'Cockpit shell: TopBar / (LeftRail + Conversation + RightInspector) / StatusBar flex layout.'
+  last_edited_ms: 1781458541241
 871bb8b9be861acd:
   path: crates/cp-console-server/src/cleanup.rs
   description: 'Process cleanup: reaper thread (30s grace), graceful shutdown (kill_all_sessions), signal handlers (SIGINT/SIGHUP), FD limit raising. Uses BTreeMap for ordered exit_times tracking.'
@@ -2386,6 +2442,10 @@
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
   last_edited_ms: 0
+89a7d83931ced392:
+  path: ui/src/lib/mock.ts
+  description: 'Mock session data: panels, tokenBudget, cacheStats, messages, threads (summary), spine, stats, status, threadDetails (5 full thread conversations incl embedded question + tool calls).'
+  last_edited_ms: 1781459201218
 89b296f1fc78b73f:
   path: src/state/persistence/panel.rs
   description: 'Panel persistence (panels/{uid}.json): load_panel(uid) → Option<PanelData>'
@@ -2510,6 +2570,10 @@
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+90a2a7ed22882e65:
+  path: ui/src/components/conversation/InputBar.tsx
+  description: 'Mock input bar: blinking caret, key hints (send/cycle-view/file). Non-functional (design only).'
+  last_edited_ms: 1781458541355
 90f4eb3e30593ec0:
   path: src/llms/claude_code_v2/mod.rs
   description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
@@ -2826,6 +2890,10 @@ a139f333bbc083aa:
   path: .github/checks/clippy_lints_list.md
   description: Expected clippy lints list for comparison
   last_edited_ms: 0
+a143d9f2b8e6e551:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'Cockpit header strip: app mark, path breadcrumb, branch chip, global cost, status dot.'
+  last_edited_ms: 1781458541298
 a174523ddee08620:
   path: src/ui/threads_view/messages.rs
   description: 'Thread message area: right pane of Threads view. Message display (reuses conversation IR renderer), input area with separator, question form overlay. thread_message_to_message() conversion. format_questions_markdown() for embedded questions. calculate_input_height() with 50% cap.'
@@ -2902,6 +2970,10 @@ a5e9c30f4b25aabc:
   path: crates/cp-render/src/markdown.rs
   description: Shared markdown→IR parser. to_blocks() (fenced code blocks, headers, bullets, inline). parse_line() (single line). parse_inline() (bold, code, links). Used by skill panels + conversation renderer.
   last_edited_ms: 0
+a61f9b3e3a51d9b2:
+  path: ui/src/components/threads/QuestionForm.tsx
+  description: 'Embedded thread question form (CP signature): single/multi-select options with interactive pick state, allowOther field, submit button. Cyan-accented, decorative but stateful.'
+  last_edited_ms: 1781459201179
 a6c691fbfe4d7d3b:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. Declares sql/ + panels/ submodules with re-exports. Depends on search.
@@ -3082,6 +3154,10 @@ b15c976b1b6f7804:
   path: src/llms/claude_code/debug.rs
   description: 'Debug helpers: dump_last_request (writes API request JSON to disk) + StreamErrorContext/build_stream_read_error (verbose stream failure diagnostics).'
   last_edited_ms: 0
+b1981e09477550a2:
+  path: ui/src/components/threads/ThreadsView.tsx
+  description: 'Threads view assembler: 3-pane layout (ThreadList | ThreadConversation | ThreadDetailRail), holds selectedId state, onOpenCockpit bridges to panel view.'
+  last_edited_ms: 1781459201130
 b1cafb4647761a69:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
@@ -3278,6 +3354,10 @@ bc2adb7e342ab710:
   path: run.sh
   description: Supervisor script. Builds tui + cp-console-server upfront, then loops cargo run --release with reload detection via config.json. --telemetry flag sets CP_FLAMEGRAPH=1. ulimit -n 2048. Loads .env. --resume-stream on reload.
   last_edited_ms: 0
+bc6c0b44ae58604e:
+  path: ui/src/components/shell/StatusBar.tsx
+  description: 'Bottom status bar: phase badge (READY/STREAMING/TOOLING/BLOCKED), agent/skill chips, git/queue/think, reverie/auto, cost.'
+  last_edited_ms: 1781458541327
 bccd6076aebcf1e7:
   path: crates/cp-mod-memory/src/tools.rs
   description: Memory tools with flame!("memory_create") and flame!("memory_update"). tl_dr validation (80 token cap). Importance/labels. Batch create/update/delete.
@@ -3710,6 +3790,10 @@ d3c7b08de985c75a:
   path: crates/cp-mod-github/src/tools.rs
   description: GitHub CLI tool. Read-only → dynamic github_result panels. Mutating → async subprocess via spawn_async_tool. flame!("gh_exec"). Token redaction. Cache invalidation of affected panels. GIT_PROMPT_DISABLED.
   last_edited_ms: 0
+d45b12e52c9d6ca6:
+  path: ui/src/components/conversation/Conversation.tsx
+  description: 'Center conversation surface: header strip (msg counts, streaming indicator), scrollable message list, input bar.'
+  last_edited_ms: 1781458541336
 d486285ed7025782:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
@@ -3910,6 +3994,10 @@ e511d6e0566f4f01:
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'
   last_edited_ms: 0
+e56f8813070bbbb5:
+  path: ui/src/components/conversation/Message.tsx
+  description: 'Message renderer: UserMessage (right-aligned bubble), AssistantMessage (signal-badged prose + streaming caret), ToolMessage (collapsible tool card w/ params + result).'
+  last_edited_ms: 1781458541346
 e610e21de8868286:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
@@ -4154,6 +4242,10 @@ f5e668bba86256b3:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
   last_edited_ms: 0
+f5ea978699a78842:
+  path: ui/src/components/threads/ThreadComposer.tsx
+  description: 'Thread input composer. MY_TURN: active prompt w/ attach + send + key hints. THEIR_TURN: subdued ''agent is working'' spinner state. Design-only.'
+  last_edited_ms: 1781459201169
 f62063a3417a112a:
   path: crates/cp-base/src/config/behavioral.rs
   description: 'Extracted injection types: RedirectInjections (conversation_history_close redirect) + TrapInjections (history_cleanup_triggered, history_cleanup_blocked). Moved from config/mod.rs for line-count limit.'
@@ -4262,6 +4354,10 @@ fc4be9dd868a81ef:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. XAI_API_KEY auth.
   last_edited_ms: 0
+fcc26df09619a38a:
+  path: ui/src/lib/inline.tsx
+  description: Minimal inline renderer for **bold**, `code`, line breaks — typesets assistant/user prose without a markdown dep.
+  last_edited_ms: 1781458541279
 fceb53aa84039016:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.

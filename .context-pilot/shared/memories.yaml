@@ -486,6 +486,31 @@
   tl_dr: 'Queue module design: fixed panel, 5 tools, pipeline intercept, shared queue (reverie + main), reverie auto-activates queue on start, Report blocks if unflushed, Queue_empty on reverie destroy/timeout.'
   importance: high
   last_edited_ms: 0
+83d3f9f01cc82a78:
+  tl_dr: 'CP frontend maquette in ui/ on branch ''maquette'' (pushed). Design-only React/TS/Vite/Tailwind-v4/shadcn, mock data, ''Phosphor Cockpit'' theme. TWO views (cockpit + thread-centered chat) toggled via TopBar. Dev: cd ui && pnpm run dev (:5173).'
+  contents: |-
+    ## Context Pilot Frontend Maquette
+
+    Design-only reimagining of the TUI as a GUI. Branch 'maquette', pushed (095487d, 44 files).
+
+    **Stack**: Vite 8 + React 19 + TS 6 + Tailwind v4 (@tailwindcss/vite) + shadcn (base-ui). Mock data only, NO backend.
+
+    **Aesthetic 'Phosphor Cockpit'**: flight-instrument-at-night. Warm near-black base, amber phosphor signal (primary), cyan interactive accent, instrument red/green. IBM Plex Mono everywhere + Plex Sans prose. 1px hairline borders, tight radii, grain+scanline atmosphere, phosphor glow on active. Theme in src/index.css.
+
+    **Layout**: TopBar (mark/breadcrumb/branch/cost) | LeftRail (token-budget meter + panel navigator w/ per-panel token bars+freeze/miss + cache economics) + center Conversation (user/assistant/tool messages + streaming caret + input bar) + RightInspector (Stats/Threads/Spine tabs) | StatusBar (phase badge, agent/skills/git/queue/think/reverie/cost).
+
+    **Files**: lib/{types,mock,panelMeta,inline}, components/panels/TokenBar, components/shell/{TopBar,LeftRail,RightInspector,StatusBar}, components/conversation/{Conversation,Message,InputBar}, App.tsx.
+
+    **Build**: `cd ui && pnpm run build` (tsc -b && vite build) — green. Dev server localhost:5173.
+
+    **Gotchas hit**: TS7 rejects baseUrl (use paths only, vite alias handles runtime); noUnusedLocals trips on shadcn scroll-area React import + stray vars.
+  importance: medium
+  labels:
+  - maquette
+  - frontend
+  - ui
+  - design
+  last_edited_ms: 1781459225685
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-

@@ -92,3 +92,45 @@ export interface StatusModel {
   autoContinue: boolean
   costUsd: number
 }
+
+// ── Thread-centered view ──────────────────────────────────────────
+
+export type ViewMode = "cockpit" | "threads"
+
+/** A single embedded question form inside a thread message (CP signature). */
+export interface ThreadQuestion {
+  prompt: string
+  options: string[]
+  /** allow multiple selections */
+  multi?: boolean
+  /** offer a free-text "other" field */
+  allowOther?: boolean
+}
+
+/** One message in a thread's conversation. */
+export interface ThreadMsg {
+  id: string
+  author: "user" | "assistant"
+  text?: string
+  ts: string
+  /** when present, render an embedded tool-call card */
+  tool?: ToolCall
+  /** when present, render an embedded question form (awaiting the user) */
+  questions?: ThreadQuestion[]
+  /** an attached file reference */
+  fileRef?: string
+  streaming?: boolean
+}
+
+/** A full thread with its conversation log — drives the thread-centered view. */
+export interface ThreadDetail {
+  id: string
+  name: string
+  status: ThreadStatus
+  /** which agent is assigned to / working this thread */
+  agent: string
+  createdAt: string
+  lastActivity: string
+  unread: number
+  log: ThreadMsg[]
+}
