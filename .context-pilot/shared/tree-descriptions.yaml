@@ -1042,6 +1042,10 @@
   path: crates/cp-mod-console/src/manager.rs
   description: TUI-side session handle. spawn()/reconnect()/kill()/send_input() via console server. FilePoller + StatusPoller background threads per session. Orphan cleanup on startup. server_request() short-lived UnixStream per call. Geometric backoff socket wait (25ms→500ms cap, 3s budget).
   last_edited_ms: 0
+385a8915a2e1c410:
+  path: ui/src/lib/theme.tsx
+  description: 'Theme context: light|dark state, localStorage persistence (cp-theme), toggles .dark class on <html>. ThemeProvider + useTheme hook.'
+  last_edited_ms: 1781460332433
 386116b9b854c8ac:
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
@@ -2514,6 +2518,10 @@
   path: src/app/actions/threads.rs
   description: 'Thread action handlers. Archive cleanup: clears focused_thread_id + last_read_count + notified_my_turn_id for archived thread. Question form: YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification.'
   last_edited_ms: 1781450046462
+8d8b2bac43464124:
+  path: ui/src/components/shell/ThemeToggle.tsx
+  description: macOS-style segmented light/dark switch (sun·moon pills). Reads/writes theme context.
+  last_edited_ms: 1781460332443
 8d8c762e3a909931:
   path: website/docs/context.html
   description: 'Docs: context management guide'
@@ -3126,6 +3134,10 @@ af3dcb89932c06f9:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 1781347849843
+af5db61fd6258800:
+  path: ui/src/index.css
+  description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A warm) + DARK ''Sea'' (#2C3333/#395B64/#A5C9CA/#E7F6F2 cool) via :root/.dark token blocks. SF Pro system font for chrome, IBM Plex Mono for data only. Soft shadows, vibrancy, no phosphor glow.'
+  last_edited_ms: 1781460332453
 af638eaf96a0207c:
   path: crates/cp-mod-git/src/classify.rs
   description: ReadOnly/Mutating classification, shell arg parsing with quote handling, operator blocking, subcommand-aware classify_git()
@@ -4246,6 +4258,10 @@ f5ea978699a78842:
   path: ui/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. MY_TURN: active prompt w/ attach + send + key hints. THEIR_TURN: subdued ''agent is working'' spinner state. Design-only.'
   last_edited_ms: 1781459201169
+f6191ad6ed8ba76a:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send: MAX_CONTENT_BYTES=100K, MAX_FILE_PATH_BYTES=1K, MAX_STORED_QUESTIONS=50 caps. execute_read: single-pass unack count+previews via inspect(). build_panel_content: MAX_PANEL_MESSAGES=50 cap. format_age helper.'
+  last_edited_ms: 0
 f62063a3417a112a:
   path: crates/cp-base/src/config/behavioral.rs
   description: 'Extracted injection types: RedirectInjections (conversation_history_close redirect) + TrapInjections (history_cleanup_triggered, history_cleanup_blocked). Moved from config/mod.rs for line-count limit.'

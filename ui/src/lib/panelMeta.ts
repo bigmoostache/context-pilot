@@ -49,12 +49,11 @@ export const accentVar: Record<Accent, string> = {
   muted: "var(--muted-foreground)",
 }
 
-/** Token-load → color: cool grey when light, amber mid, red when heavy. */
+/** Load → color: calm when light, warm caution mid, red when heavy. Theme-aware. */
 export function loadColor(ratio: number): string {
   if (ratio >= 0.85) return "var(--danger)"
-  if (ratio >= 0.55) return "var(--warn)"
-  if (ratio >= 0.25) return "var(--signal)"
-  return "oklch(0.5 0.02 75)"
+  if (ratio >= 0.6) return "var(--warn)"
+  return "var(--ok)"
 }
 
 export function fmtTokens(n: number): string {

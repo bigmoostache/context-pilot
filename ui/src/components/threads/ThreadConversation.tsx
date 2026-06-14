@@ -22,26 +22,24 @@ export function ThreadConversation({ thread }: { thread: ThreadDetail }) {
   const mine = thread.status === "MY_TURN"
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col bg-[oklch(0.155_0.006_75)]">
+    <main className="flex min-w-0 flex-1 flex-col bg-background">
       {/* header */}
-      <div className="flex h-9 shrink-0 items-center gap-2.5 border-b border-border bg-[oklch(0.175_0.007_75)] px-4">
-        <span className="text-[13px] font-semibold text-foreground/90">{thread.name}</span>
+      <div className="flex h-11 shrink-0 items-center gap-2.5 border-b border-border px-5">
+        <span className="text-[13.5px] font-semibold text-foreground/90">{thread.name}</span>
         <span
-          className="inline-flex items-center gap-1.5 rounded-[3px] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
-          style={{
-            background: mine ? "var(--signal)" : "oklch(0.24 0.008 75)",
-            color: mine ? "oklch(0.16 0.02 75)" : "var(--interactive)",
-          }}
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10.5px] font-medium",
+            mine
+              ? "bg-[var(--signal)]/15 text-[var(--signal)]"
+              : "bg-muted text-muted-foreground",
+          )}
         >
-          {mine ? "my turn" : "their turn"}
+          {mine ? "Your turn" : "Agent working"}
         </span>
-        <div className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+        <div className="ml-auto flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
           <span
             className={cn("size-1.5 rounded-full", mine && "animate-pulse")}
-            style={{
-              background: mine ? "var(--signal)" : "var(--interactive)",
-              boxShadow: mine ? "0 0 5px var(--signal)" : "none",
-            }}
+            style={{ background: mine ? "var(--signal)" : "var(--muted-foreground)" }}
           />
           {thread.agent}
         </div>
@@ -51,24 +49,24 @@ export function ThreadConversation({ thread }: { thread: ThreadDetail }) {
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
           <div className="mb-3 flex items-center gap-2">
-            <span className="h-px flex-1 bg-border/50" />
-            <span className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground/40">
+            <span className="h-px flex-1 bg-border/60" />
+            <span className="text-[10.5px] text-muted-foreground/50">
               {thread.createdAt} · thread opened
             </span>
-            <span className="h-px flex-1 bg-border/50" />
+            <span className="h-px flex-1 bg-border/60" />
           </div>
 
           {thread.log.map((m) => (
             <div key={m.id}>
               <Message msg={toChatMessage(m)} />
               {m.questions?.map((q, i) => (
-                <div key={i} className="pb-1.5 pl-1">
+                <div key={i} className="pb-1.5 pl-7">
                   <QuestionForm q={q} />
                 </div>
               ))}
               {m.fileRef && (
-                <div className="pb-1.5 pl-1">
-                  <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-border bg-[oklch(0.19_0.007_75)] px-2 py-1 text-[11px] text-[var(--interactive)]">
+                <div className="pb-1.5 pl-7">
+                  <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-[var(--interactive)] card-shadow">
                     📎 {m.fileRef}
                   </span>
                 </div>

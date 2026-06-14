@@ -4,31 +4,27 @@ import { cn } from "@/lib/utils"
 interface TokenBarProps {
   value: number
   max: number
-  /** force a color instead of the load gradient */
+  /** Override the auto load-based color with a fixed CSS color. */
   color?: string
-  className?: string
-  /** show the animated fill sweep on mount */
+  /** Animate the fill on mount (default true). */
   animate?: boolean
+  className?: string
 }
 
-/** A hairline phosphor fill bar — the signature CP token meter. */
-export function TokenBar({ value, max, color, className, animate = true }: TokenBarProps) {
-  const ratio = max > 0 ? Math.min(value / max, 1) : 0
+/** A slim, rounded progress bar. Color reflects load unless overridden. */
+export function TokenBar({ value, max, color, animate = true, className }: TokenBarProps) {
+  const ratio = max > 0 ? Math.min(1, value / max) : 0
   const fill = color ?? loadColor(ratio)
   return (
     <div
       className={cn(
-        "relative h-1 w-full overflow-hidden rounded-[1px] bg-[oklch(0.26_0.006_75)]",
+        "w-full overflow-hidden rounded-full bg-muted",
         className,
       )}
     >
       <div
-        className={cn("h-full rounded-[1px]", animate && "fill-sweep")}
-        style={{
-          width: `${Math.max(ratio * 100, 1.5)}%`,
-          background: fill,
-          boxShadow: `0 0 6px ${fill}`,
-        }}
+        className={cn("h-full rounded-full", animate && "fill-sweep")}
+        style={{ width: `${ratio * 100}%`, background: fill }}
       />
     </div>
   )

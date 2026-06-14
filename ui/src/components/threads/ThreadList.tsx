@@ -9,42 +9,33 @@ interface ThreadListProps {
   onSelect: (id: string) => void
 }
 
-/** Left rail of the thread-centered view — grouped, classic chat sidebar. */
+/** Left rail of the thread-centered view — a clean, grouped chat sidebar. */
 export function ThreadList({ threads, selectedId, onSelect }: ThreadListProps) {
   const mine = threads.filter((t) => t.status === "MY_TURN")
   const theirs = threads.filter((t) => t.status === "THEIR_TURN")
 
   return (
-    <aside className="flex w-[270px] shrink-0 flex-col border-r border-border bg-[oklch(0.165_0.006_75)]">
+    <aside className="flex w-[280px] shrink-0 flex-col border-r border-border bg-surface">
       {/* header + new thread */}
-      <div className="shrink-0 border-b border-border px-3 py-2.5">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="glow-signal text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--signal)]">
-            Threads
-          </span>
-          <span className="rounded-[2px] bg-card px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
-            {threads.length}
-          </span>
-        </div>
-        <button className="flex w-full items-center gap-2 rounded-[4px] border border-[var(--signal)]/40 bg-[var(--signal)]/10 px-2.5 py-1.5 text-[12px] font-medium text-[var(--signal)] transition-colors hover:bg-[var(--signal)]/18">
-          <Plus className="size-3.5" />
+      <div className="shrink-0 px-3 pb-2 pt-3">
+        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--signal)] px-3 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105">
+          <Plus className="size-4" />
           New Thread
         </button>
-        <div className="mt-2 flex items-center gap-2 rounded-[4px] border border-border bg-[oklch(0.185_0.007_75)] px-2.5 py-1 text-[11px] text-muted-foreground/50">
-          <Search className="size-3" />
-          search…
+        <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] text-muted-foreground/60">
+          <Search className="size-3.5" />
+          Search
         </div>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="px-2 py-2">
-          <Group label="Needs you" count={mine.length} accent="var(--signal)" />
+        <div className="px-2 py-1">
+          {mine.length > 0 && <Group label="Needs you" count={mine.length} />}
           {mine.map((t) => (
             <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} />
           ))}
 
-          <div className="h-2" />
-          <Group label="In progress" count={theirs.length} accent="var(--interactive)" />
+          {theirs.length > 0 && <Group label="In progress" count={theirs.length} />}
           {theirs.map((t) => (
             <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} />
           ))}
@@ -54,14 +45,11 @@ export function ThreadList({ threads, selectedId, onSelect }: ThreadListProps) {
   )
 }
 
-function Group({ label, count, accent }: { label: string; count: number; accent: string }) {
+function Group({ label, count }: { label: string; count: number }) {
   return (
-    <div className="flex items-center gap-2 px-2 pb-1 pt-1">
-      <span className="text-[10px] uppercase tracking-[0.14em]" style={{ color: accent }}>
-        {label}
-      </span>
-      <span className="text-[10px] tabular-nums text-muted-foreground/45">{count}</span>
-      <span className="ml-1 h-px flex-1 bg-border/60" />
+    <div className="flex items-center gap-2 px-2.5 pb-1 pt-3">
+      <span className="text-[11px] font-semibold text-muted-foreground">{label}</span>
+      <span className="text-[11px] tabular-nums text-muted-foreground/45">{count}</span>
     </div>
   )
 }
@@ -83,34 +71,25 @@ function ThreadRow({
     <button
       onClick={() => onSelect(t.id)}
       className={cn(
-        "group relative flex w-full flex-col gap-0.5 rounded-[4px] px-2.5 py-2 text-left transition-colors",
-        selected ? "bg-[oklch(0.22_0.009_75)]" : "hover:bg-[oklch(0.19_0.007_75)]",
+        "flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors",
+        selected ? "bg-card card-shadow" : "hover:bg-muted/60",
       )}
     >
-      {selected && (
-        <span
-          className="absolute inset-y-1 left-0 w-[2px] rounded-full"
-          style={{ background: mine ? "var(--signal)" : "var(--interactive)" }}
-        />
-      )}
       <div className="flex items-center gap-2">
         <span
-          className={cn("size-1.5 shrink-0 rounded-full", mine && "animate-pulse")}
-          style={{
-            background: mine ? "var(--signal)" : "var(--interactive)",
-            boxShadow: mine ? "0 0 5px var(--signal)" : "none",
-          }}
+          className={cn("size-2 shrink-0 rounded-full", mine && "animate-pulse")}
+          style={{ background: mine ? "var(--signal)" : "var(--muted-foreground)" }}
         />
-        <span className="truncate text-[12.5px] font-medium text-foreground/90">{t.name}</span>
-        <span className="ml-auto shrink-0 text-[9px] tabular-nums text-muted-foreground/45">
+        <span className="truncate text-[13px] font-medium text-foreground/90">{t.name}</span>
+        <span className="ml-auto shrink-0 text-[10.5px] tabular-nums text-muted-foreground/50">
           {t.lastActivity}
         </span>
       </div>
-      <div className="flex items-center gap-1.5 pl-3.5">
-        <span className="truncate text-[11px] text-muted-foreground/65">{preview}</span>
+      <div className="flex items-center gap-1.5 pl-4">
+        <span className="truncate text-[11.5px] text-muted-foreground/70">{preview}</span>
         {t.unread > 0 && (
           <span
-            className="ml-auto shrink-0 rounded-full px-1.5 text-[9px] font-bold tabular-nums text-[oklch(0.16_0.02_75)]"
+            className="ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-semibold tabular-nums text-[var(--primary-foreground)]"
             style={{ background: "var(--signal)" }}
           >
             {t.unread}

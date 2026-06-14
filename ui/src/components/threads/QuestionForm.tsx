@@ -18,21 +18,21 @@ export function QuestionForm({ q }: { q: ThreadQuestion }) {
   }
 
   return (
-    <div className="mt-2 max-w-[88%] overflow-hidden rounded-[5px] border border-[var(--interactive)]/35 bg-[oklch(0.185_0.012_200)]">
-      <div className="flex items-center gap-1.5 border-b border-[var(--interactive)]/25 bg-[var(--interactive)]/10 px-3 py-1.5">
-        <span className="size-1.5 animate-pulse rounded-full bg-[var(--interactive)] shadow-[0_0_5px_var(--interactive)]" />
-        <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--interactive)]">
-          question · awaiting you
+    <div className="mt-2 max-w-[88%] overflow-hidden rounded-xl border border-[var(--interactive)]/30 bg-card card-shadow">
+      <div className="flex items-center gap-2 border-b border-border bg-[var(--interactive)]/8 px-3 py-2">
+        <span className="size-1.5 rounded-full bg-[var(--interactive)]" />
+        <span className="text-[11px] font-medium text-[var(--interactive)]">
+          Question · awaiting you
         </span>
         {q.multi && (
-          <span className="ml-auto rounded-[2px] bg-[var(--interactive)]/15 px-1 text-[9px] uppercase tracking-wider text-[var(--interactive)]">
-            multi-select
+          <span className="ml-auto rounded-full bg-[var(--interactive)]/12 px-2 py-0.5 text-[10px] font-medium text-[var(--interactive)]">
+            Multi-select
           </span>
         )}
       </div>
 
-      <div className="px-3 py-2.5">
-        <p className="mb-2 font-sans text-[13px] leading-relaxed text-foreground/90">{q.prompt}</p>
+      <div className="px-3 py-3">
+        <p className="mb-2.5 text-[13px] leading-relaxed text-foreground/90">{q.prompt}</p>
 
         <div className="flex flex-col gap-1.5">
           {q.options.map((opt, i) => {
@@ -42,18 +42,18 @@ export function QuestionForm({ q }: { q: ThreadQuestion }) {
                 key={i}
                 onClick={() => toggle(i)}
                 className={cn(
-                  "group flex items-center gap-2.5 rounded-[3px] border px-2.5 py-1.5 text-left text-[12px] transition-colors",
+                  "flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-[12.5px] transition-colors",
                   on
-                    ? "border-[var(--interactive)] bg-[var(--interactive)]/12 text-foreground"
-                    : "border-border bg-[oklch(0.2_0.008_75)] text-foreground/75 hover:border-[var(--interactive)]/50 hover:text-foreground",
+                    ? "border-[var(--interactive)] bg-[var(--interactive)]/10 text-foreground"
+                    : "border-border bg-muted/40 text-foreground/75 hover:border-[var(--interactive)]/50 hover:text-foreground",
                 )}
               >
                 <span
                   className={cn(
                     "flex size-4 shrink-0 items-center justify-center border",
-                    q.multi ? "rounded-[3px]" : "rounded-full",
+                    q.multi ? "rounded-[4px]" : "rounded-full",
                     on
-                      ? "border-[var(--interactive)] bg-[var(--interactive)] text-[oklch(0.16_0.02_200)]"
+                      ? "border-[var(--interactive)] bg-[var(--interactive)] text-[var(--primary-foreground)]"
                       : "border-muted-foreground/50",
                   )}
                 >
@@ -65,23 +65,23 @@ export function QuestionForm({ q }: { q: ThreadQuestion }) {
           })}
 
           {q.allowOther && (
-            <div className="flex items-center gap-2.5 rounded-[3px] border border-dashed border-border bg-[oklch(0.2_0.008_75)] px-2.5 py-1.5 text-[12px] text-muted-foreground/60">
+            <div className="flex items-center gap-2.5 rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2 text-[12.5px] text-muted-foreground/60">
               <span className="flex size-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/40" />
-              other…
+              Other…
             </div>
           )}
         </div>
 
-        <div className="mt-2.5 flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground/50">
-            {picked.length > 0 ? `${picked.length} selected` : "no selection"}
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground/60">
+            {picked.length > 0 ? `${picked.length} selected` : "No selection"}
           </span>
           <button
             className={cn(
-              "rounded-[3px] px-3 py-1 text-[11px] font-semibold tracking-wide transition-colors",
+              "rounded-lg px-3.5 py-1.5 text-[12px] font-medium transition-[filter]",
               picked.length > 0
-                ? "bg-[var(--interactive)] text-[oklch(0.16_0.02_200)] hover:brightness-110"
-                : "cursor-not-allowed bg-[oklch(0.24_0.008_75)] text-muted-foreground/50",
+                ? "bg-[var(--interactive)] text-[var(--primary-foreground)] hover:brightness-105"
+                : "cursor-not-allowed bg-muted text-muted-foreground/50",
             )}
           >
             Submit

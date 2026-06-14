@@ -165,10 +165,19 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     let panel_content = build_panel_content(state, tid, now_ms);
     ThreadsState::get_mut(state).panel_content = panel_content;
 
-    // Deprecate the panel cache so the new content is picked up
+    // Force the Threads panel to emit fresh THIS tick. Deprecating the cache
+    // alone is insufficient: the unified freeze pass would still restore the
+    // previous snapshot while the panel's breath budget (freeze_count <
+    // max_freezes) lasts, showing the stale conversation right after a Read.
+    // Setting freeze_count to u8::MAX pushes the freeze decision onto the Fresh
+    // branch (freeze_count < max_freezes is false), so the just-read content is
+    // emitted immediately. The Fresh path resets freeze_count to 0 afterwards,
+    // so this is a one-shot force-refresh. (u8::MAX is also the sanctioned
+    // "not frozen" sentinel — the sidebar freeze indicator excludes it.)
     for ctx in &mut state.context {
         if ctx.context_type.as_str() == cp_base::state::context::Kind::THREADS {
             ctx.cache_deprecated = true;
+            ctx.freeze_count = u8::MAX;
             break;
         }
     }
@@ -189,7 +198,12 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     result_lines.push("\nFull conversation in Threads panel.".to_string());
 
     let mut result = ToolResult::new(tool.id.clone(), result_lines.join("\n"), false);
-    result.preserves_tempo = true;
+    // Read must NOT preserve tempo. Preserving it keeps state.tempo = true, which
+    // makes the next freeze pass freeze EVERY panel (tempo short-circuits the
+    // freeze decision before the freeze_count check) — including the Threads
+    // panel we just force-refreshed. Breaking tempo lets the freeze_count = u8::MAX
+    // bump above actually take effect and emit the fresh conversation.
+    result.preserves_tempo = false;
     result
 }
 

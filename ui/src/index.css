@@ -1,104 +1,141 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* IBM Plex superfamily — terminal voice (mono) + prose (sans) */
+/* IBM Plex Mono — reserved for code, data, and tabular numerals only.
+   UI chrome uses the native macOS system stack (SF Pro) for an enterprise feel. */
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 @import "@fontsource/ibm-plex-mono/600.css";
-@import "@fontsource/ibm-plex-mono/700.css";
-@import "@fontsource/ibm-plex-sans/400.css";
-@import "@fontsource/ibm-plex-sans/500.css";
-@import "@fontsource/ibm-plex-sans/600.css";
 
 @custom-variant dark (&:is(.dark *));
 
 /*
-  ════════════════════════════════════════════════════════════════
-  CONTEXT·PILOT — "Phosphor Cockpit" theme
-  Flight-instrument-at-night: warm near-black base, amber signal
-  readouts, cyan interactive accents, muted instrument red/green.
-  ════════════════════════════════════════════════════════════════
+  ════════════════════════════════════════════════════════════════════════
+  CONTEXT·PILOT — Two switchable palettes, enterprise / macOS aesthetic.
+
+  LIGHT  "Cream"   #FEFCF3 · #F5EBE0 · #F0DBDB · #DBA39A   (warm, editorial)
+  DARK   "Sea"     #2C3333 · #395B64 · #A5C9CA · #E7F6F2   (cool, calm)
+
+  To explore other palettes, edit the two token blocks below (:root + .dark).
+  Every component reads these semantic tokens — nothing is hard-coded.
+  ════════════════════════════════════════════════════════════════════════
 */
 
 @theme inline {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui,
+    sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
+  --color-card-foreground: var(--foreground);
   --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
+  --color-popover-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--muted);
+  --color-secondary-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--primary-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Signal palette — semantic instrument colors */
-  --color-signal: var(--signal);            /* amber primary readout */
+  /* Semantic app palette */
+  --color-signal: var(--signal);
   --color-signal-dim: var(--signal-dim);
-  --color-interactive: var(--interactive);  /* cyan links/actions */
-  --color-ok: var(--ok);                    /* green ready */
-  --color-warn: var(--warn);                /* amber-orange caution */
-  --color-danger: var(--danger);            /* red error */
-  --color-grid: var(--grid);                /* hairline rules */
+  --color-interactive: var(--interactive);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-grid: var(--grid);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
 
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
-  --radius-xl: 6px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
 }
 
+/* ─── LIGHT · "Cream" ──────────────────────────────────────────────────── */
 :root {
-  /* near-black, faintly warm cockpit shell */
-  --background: oklch(0.16 0.006 75);
-  --foreground: oklch(0.91 0.012 80);
+  --background: #fefcf3;
+  --surface: #faf6ec; /* sidebars / chrome */
+  --surface-2: #f5ebe0; /* nested surface */
+  --card: #ffffff;
+  --popover: #ffffff;
 
-  --card: oklch(0.19 0.007 75);
-  --card-foreground: oklch(0.92 0.012 80);
-  --popover: oklch(0.17 0.007 75);
-  --popover-foreground: oklch(0.92 0.012 80);
+  --foreground: #3d342b;
+  --muted: #f3ece1;
+  --muted-foreground: #9c8d79;
 
-  /* amber phosphor signal */
-  --primary: oklch(0.82 0.155 75);
-  --primary-foreground: oklch(0.18 0.02 75);
+  --border: #ecdfce;
+  --input: #ecdfce;
+  --grid: #f1e8da;
 
-  --secondary: oklch(0.26 0.008 75);
-  --secondary-foreground: oklch(0.9 0.012 80);
+  --primary: #be7a6e; /* clay rose — primary actions */
+  --primary-foreground: #fffaf4;
+  --accent: #4e7a82; /* teal — secondary accent */
+  --accent-foreground: #ffffff;
+  --ring: #dba39a;
 
-  --muted: oklch(0.24 0.006 75);
-  --muted-foreground: oklch(0.62 0.012 78);
+  --signal: #be7a6e; /* accent text / active */
+  --signal-dim: #d8a9a0;
+  --interactive: #4e7a82; /* links / info */
+  --ok: #6f9a77;
+  --warn: #c2904f;
+  --danger: #c0685c;
 
-  /* cyan interactive */
-  --accent: oklch(0.78 0.12 200);
-  --accent-foreground: oklch(0.16 0.02 200);
+  --shadow-color: 30deg 30% 60%;
+  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.12),
+    0 4px 12px hsl(var(--shadow-color) / 0.08);
+  --shadow-pop: 0 8px 28px hsl(var(--shadow-color) / 0.18);
 
-  --destructive: oklch(0.62 0.2 25);
-  --destructive-foreground: oklch(0.95 0.01 25);
+  color-scheme: light;
+}
 
-  --border: oklch(0.3 0.008 75);
-  --input: oklch(0.3 0.008 75);
-  --ring: oklch(0.82 0.155 75);
+/* ─── DARK · "Sea" ─────────────────────────────────────────────────────── */
+.dark {
+  --background: #2c3333;
+  --surface: #2f3838; /* sidebars / chrome */
+  --surface-2: #344042; /* nested surface */
+  --card: #333d3e;
+  --popover: #36403f;
 
-  --signal: oklch(0.82 0.155 75);
-  --signal-dim: oklch(0.6 0.09 75);
-  --interactive: oklch(0.78 0.12 200);
-  --ok: oklch(0.78 0.15 150);
-  --warn: oklch(0.78 0.16 60);
-  --danger: oklch(0.65 0.2 25);
-  --grid: oklch(0.26 0.006 75);
+  --foreground: #e7f6f2;
+  --muted: #3a4749;
+  --muted-foreground: #93acac;
 
-  --radius: 3px;
+  --border: #3f5054;
+  --input: #3f5054;
+  --grid: #384a4d;
+
+  --primary: #a5c9ca; /* mint — primary actions */
+  --primary-foreground: #1f2727;
+  --accent: #a5c9ca;
+  --accent-foreground: #1f2727;
+  --ring: #a5c9ca;
+
+  --signal: #a5c9ca; /* accent text / active */
+  --signal-dim: #6f8f90;
+  --interactive: #8ec3c5; /* links / info */
+  --ok: #8fc2a9;
+  --warn: #d8be8c;
+  --danger: #d89a92;
+
+  --shadow-color: 190deg 30% 4%;
+  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.4),
+    0 4px 14px hsl(var(--shadow-color) / 0.3);
+  --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 0.5);
+
+  color-scheme: dark;
 }
 
 @layer base {
@@ -106,109 +143,108 @@
     @apply border-border;
   }
 
-  html {
-    color-scheme: dark;
-  }
-
   body {
-    @apply bg-background text-foreground font-mono antialiased;
-    /* layered atmosphere: vignette + faint scanlines + grain */
-    background-image:
-      radial-gradient(
-        140% 120% at 50% 0%,
-        oklch(0.2 0.01 78 / 0.9) 0%,
-        oklch(0.13 0.006 75) 70%,
-        oklch(0.11 0.005 75) 100%
-      ),
-      repeating-linear-gradient(
-        0deg,
-        oklch(1 0 0 / 0.012) 0px,
-        oklch(1 0 0 / 0.012) 1px,
-        transparent 1px,
-        transparent 3px
-      );
-    background-attachment: fixed;
+    @apply bg-background text-foreground font-sans antialiased;
+    transition:
+      background-color 0.35s ease,
+      color 0.35s ease;
   }
 
-  /* film grain overlay */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    pointer-events: none;
-    opacity: 0.035;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    mix-blend-mode: overlay;
-  }
-
+  /* Refined macOS-style scrollbars — slim, subtle, no track. */
   ::-webkit-scrollbar {
-    width: 9px;
-    height: 9px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.34 0.008 75);
-    border-radius: 1px;
+    background: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.45 0.04 75);
+    background: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+    background-clip: content-box;
   }
 }
 
 /*
-  ── utility helpers ──────────────────────────────────────────────
+  ── utility helpers (kept for API compatibility, restyled for the new look) ──
 */
 
-/* phosphor glow on active signal elements */
-.glow-signal {
-  text-shadow: 0 0 8px oklch(0.82 0.155 75 / 0.55);
-}
-.glow-interactive {
-  text-shadow: 0 0 8px oklch(0.78 0.12 200 / 0.5);
-}
-
-/* hairline panel etching */
-.etch {
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.025),
-    inset 0 0 0 1px oklch(0 0 0 / 0.2);
-}
-
-/* uppercase instrument label */
+/* tiny chrome label — refined, low-key */
 .label {
-  font-size: 0.625rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  font-weight: 500;
   color: var(--muted-foreground);
 }
 
-/* blinking terminal cursor */
+/* soft macOS card elevation */
+.card-shadow {
+  box-shadow: var(--shadow-card);
+}
+.pop-shadow {
+  box-shadow: var(--shadow-pop);
+}
+
+/* glassy translucent chrome (vibrancy) */
+.vibrancy {
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* legacy phosphor helpers → neutralised (no glow in the enterprise look) */
+.glow-signal,
+.glow-interactive {
+  text-shadow: none;
+}
+.etch {
+  box-shadow: var(--shadow-card);
+}
+
+/* blinking caret */
 @keyframes blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 .cursor-blink {
-  animation: blink 1.05s step-end infinite;
+  animation: blink 1.1s step-end infinite;
 }
 
-/* staggered panel reveal on load */
+/* gentle entrance */
 @keyframes rise {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .rise {
-  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* token-bar fill sweep */
 @keyframes fill-sweep {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 .fill-sweep {
   transform-origin: left;
-  animation: fill-sweep 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fill-sweep 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
