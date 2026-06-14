@@ -1,0 +1,214 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* IBM Plex superfamily — terminal voice (mono) + prose (sans) */
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/700.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  ════════════════════════════════════════════════════════════════
+  CONTEXT·PILOT — "Phosphor Cockpit" theme
+  Flight-instrument-at-night: warm near-black base, amber signal
+  readouts, cyan interactive accents, muted instrument red/green.
+  ════════════════════════════════════════════════════════════════
+*/
+
+@theme inline {
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Signal palette — semantic instrument colors */
+  --color-signal: var(--signal);            /* amber primary readout */
+  --color-signal-dim: var(--signal-dim);
+  --color-interactive: var(--interactive);  /* cyan links/actions */
+  --color-ok: var(--ok);                    /* green ready */
+  --color-warn: var(--warn);                /* amber-orange caution */
+  --color-danger: var(--danger);            /* red error */
+  --color-grid: var(--grid);                /* hairline rules */
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+}
+
+:root {
+  /* near-black, faintly warm cockpit shell */
+  --background: oklch(0.16 0.006 75);
+  --foreground: oklch(0.91 0.012 80);
+
+  --card: oklch(0.19 0.007 75);
+  --card-foreground: oklch(0.92 0.012 80);
+  --popover: oklch(0.17 0.007 75);
+  --popover-foreground: oklch(0.92 0.012 80);
+
+  /* amber phosphor signal */
+  --primary: oklch(0.82 0.155 75);
+  --primary-foreground: oklch(0.18 0.02 75);
+
+  --secondary: oklch(0.26 0.008 75);
+  --secondary-foreground: oklch(0.9 0.012 80);
+
+  --muted: oklch(0.24 0.006 75);
+  --muted-foreground: oklch(0.62 0.012 78);
+
+  /* cyan interactive */
+  --accent: oklch(0.78 0.12 200);
+  --accent-foreground: oklch(0.16 0.02 200);
+
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(0.95 0.01 25);
+
+  --border: oklch(0.3 0.008 75);
+  --input: oklch(0.3 0.008 75);
+  --ring: oklch(0.82 0.155 75);
+
+  --signal: oklch(0.82 0.155 75);
+  --signal-dim: oklch(0.6 0.09 75);
+  --interactive: oklch(0.78 0.12 200);
+  --ok: oklch(0.78 0.15 150);
+  --warn: oklch(0.78 0.16 60);
+  --danger: oklch(0.65 0.2 25);
+  --grid: oklch(0.26 0.006 75);
+
+  --radius: 3px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground font-mono antialiased;
+    /* layered atmosphere: vignette + faint scanlines + grain */
+    background-image:
+      radial-gradient(
+        140% 120% at 50% 0%,
+        oklch(0.2 0.01 78 / 0.9) 0%,
+        oklch(0.13 0.006 75) 70%,
+        oklch(0.11 0.005 75) 100%
+      ),
+      repeating-linear-gradient(
+        0deg,
+        oklch(1 0 0 / 0.012) 0px,
+        oklch(1 0 0 / 0.012) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    background-attachment: fixed;
+  }
+
+  /* film grain overlay */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.34 0.008 75);
+    border-radius: 1px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.45 0.04 75);
+  }
+}
+
+/*
+  ── utility helpers ──────────────────────────────────────────────
+*/
+
+/* phosphor glow on active signal elements */
+.glow-signal {
+  text-shadow: 0 0 8px oklch(0.82 0.155 75 / 0.55);
+}
+.glow-interactive {
+  text-shadow: 0 0 8px oklch(0.78 0.12 200 / 0.5);
+}
+
+/* hairline panel etching */
+.etch {
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.025),
+    inset 0 0 0 1px oklch(0 0 0 / 0.2);
+}
+
+/* uppercase instrument label */
+.label {
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* blinking terminal cursor */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.cursor-blink {
+  animation: blink 1.05s step-end infinite;
+}
+
+/* staggered panel reveal on load */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* token-bar fill sweep */
+@keyframes fill-sweep {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.fill-sweep {
+  transform-origin: left;
+  animation: fill-sweep 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
