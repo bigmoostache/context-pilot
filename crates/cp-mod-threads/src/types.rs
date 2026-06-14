@@ -148,17 +148,22 @@ impl ThreadQuestionForm {
     /// Returns `None` if the JSON is malformed or empty.
     #[must_use]
     pub fn from_json(thread_id: &str, json: &serde_json::Value) -> Option<Self> {
+        /// Maximum number of questions per form.
+        const MAX_QUESTIONS: usize = 50;
+        /// Maximum number of options per question.
+        const MAX_OPTIONS: usize = 100;
         let arr = json.as_array()?;
         if arr.is_empty() {
             return None;
         }
         let questions: Vec<ThreadQuestion> = arr
             .iter()
+            .take(MAX_QUESTIONS)
             .filter_map(|q| {
                 let header = q.get("header")?.as_str()?.to_owned();
                 let text = q.get("question")?.as_str()?.to_owned();
                 let multi_select = q.get("multiSelect").and_then(serde_json::Value::as_bool).unwrap_or(false);
-                let options = q.get("options")?.as_array()?.iter().filter_map(|o| {
+                let options = q.get("options")?.as_array()?.iter().take(MAX_OPTIONS).filter_map(|o| {
                     Some(ThreadQuestionOption {
                         label: o.get("label")?.as_str()?.to_owned(),
                         description: o.get("description")?.as_str()?.to_owned(),
@@ -320,7 +325,8 @@ impl ThreadQuestionForm {
                 }
             }
             if q.typing_other && !q.other_text.is_empty() {
-                lines.push(format!("  other: \"{}\"", q.other_text));
+                let escaped = q.other_text.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
+                lines.push(format!("  other: \"{escaped}\""));
             }
             if selected_labels.is_empty() && (!q.typing_other || q.other_text.is_empty()) {
                 lines.push("  (no answer)".to_owned());

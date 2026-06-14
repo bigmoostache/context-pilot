@@ -225,6 +225,9 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
 /// presses Enter. Generates a unique thread ID, creates an empty
 /// `TheirTurn` thread, and selects it.
 fn handle_thread_create(state: &mut State) -> ActionResult {
+    /// Maximum thread name length to prevent state bloat.
+    const MAX_THREAD_NAME_LEN: usize = 200;
+
     let name = state.input.trim().to_string();
 
     // Clear input regardless of outcome
@@ -235,6 +238,15 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
     if name.is_empty() {
         return ActionResult::Nothing;
     }
+
+    // Cap thread name length
+    let name = if name.len() > MAX_THREAD_NAME_LEN {
+        name.get(..name.floor_char_boundary(MAX_THREAD_NAME_LEN))
+            .unwrap_or(&name)
+            .to_string()
+    } else {
+        name
+    };
 
     // Generate thread ID and create the thread
     let threads_state = ThreadsState::get_mut(state);

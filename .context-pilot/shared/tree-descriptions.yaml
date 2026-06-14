@@ -1058,6 +1058,10 @@
   path: src/llms/oai_providers/openai_compat.rs
   description: Shared OpenAI-compat message builder for Grok/Groq/DeepSeek. OaiMessage/OaiToolCall types. build_messages() with pre-assembled or raw paths. Tool pairing. Panel injection as fake tool calls.
   last_edited_ms: 0
+39f140275594437f:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
+  last_edited_ms: 0
 39fa458fb6cda1df:
   path: website/docs/modules.html
   description: 'Docs: module system guide'
@@ -1485,6 +1489,10 @@
 549866596144eb9b:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
+  last_edited_ms: 0
+54ab04aa4f799804:
+  path: src/app/actions/input.rs
+  description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
 54eaa3cfe9a5ebbb:
   path: src/ui/ir/sidebar.rs
@@ -3138,6 +3146,10 @@ b9798b6dd8b66239:
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 4 tools: upsert/toggle/open/close editor. Depends on console. CallbackState: definitions (shared) + active_set/editor_open (per-worker). Glob-matched auto-fire on file edits.'
   last_edited_ms: 0
+b982483e20e50501:
+  path: crates/cp-mod-spine/src/coucou.rs
+  description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
+  last_edited_ms: 0
 b9826fb573b2e9d0:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
@@ -3265,6 +3277,10 @@ c192ef13584f001b:
 c20be1c967ed1030:
   path: crates/cp-mod-brave/src/tools.rs
   description: Brave tool dispatch with flame!("brave_search") and flame!("brave_llm_context"). Both async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER.
+  last_edited_ms: 0
+c2baaa90fec05e51:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 0
 c2e8ce0b2cd68b7c:
   path: src/ui/ir/mod.rs
@@ -3510,6 +3526,10 @@ d072e4b6897feccc:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. dry_run via SAVEPOINT+ROLLBACK. request_path reads .sql files. live/output_path routing. Error enrichment with Levenshtein fuzzy matching. ≤150 lines AND ≤8000 bytes inline+tempo, bigger entity_result panel+no tempo. 200-row cap. RETURNING support.
   last_edited_ms: 1780609410327
+d0849e3f0c19a9d4:
+  path: src/main.rs
+  description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 1781448175794
 d09b61c12bbdd00d:
   path: run.sh
   description: Supervisor script. Builds tui + cp-console-server upfront, then loops cargo run --release with reload detection via config.json. --telemetry flag sets CP_FLAMEGRAPH=1. ulimit -n 2048. Loads .env. --resume-stream on reload.

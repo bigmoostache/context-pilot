@@ -330,6 +330,8 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
         "daily" => (86_400_000, Some("daily".to_string())),
         "weekly" => (604_800_000, Some("weekly".to_string())),
         "custom" => {
+            /// Minimum recurrence interval to prevent notification spam (60 seconds).
+            const MIN_RECURRENCE_MS: u64 = 60_000;
             let Some(interval_str) = tool.input.get("interval").and_then(|v| v.as_str()) else {
                 return ToolResult::new(
                     tool.id.clone(),
@@ -338,6 +340,15 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
                 );
             };
             match parse_duration_ms(interval_str) {
+                Ok(ms) if ms < MIN_RECURRENCE_MS => {
+                    return ToolResult::new(
+                        tool.id.clone(),
+                        format!(
+                            "Recurrence interval '{interval_str}' is too short. Minimum is 60s to prevent notification spam."
+                        ),
+                        true,
+                    );
+                }
                 Ok(ms) => (ms, Some(format!("every {}", format_duration(ms)))),
                 Err(e) => {
                     return ToolResult::new(
