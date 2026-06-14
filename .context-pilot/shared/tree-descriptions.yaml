@@ -1146,6 +1146,10 @@
   path: crates/cp-console-server/src/main.rs
   description: Standalone daemon binary. Unix socket + JSON-line protocol (create/send/kill/status/list). BTreeMap<String, Session> for ordered iteration. Thread-per-connection. Signal-driven graceful shutdown. Background reaper. 'stats' diagnostic command.
   last_edited_ms: 0
+3ef8dbc8e645bcfe:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread, ThreadQuestionForm (from_json with 50q x 100opt caps + field-length caps via cap_str, YAML-escaped other_text with \r), ThreadsState + FocusState with TypeMap accessors.'
+  last_edited_ms: 0
 3eff17c7fc51dcc8:
   path: docs/rust-static-analysis-tools.md
   description: 'Comprehensive listing of Rust static analysis tools, modeled after Holzmann''s classic C tools page. Covers: compiler (rustc/clippy), commercial (CodeQL/Semgrep/Coverity/Klocwork/SonarQube/TrustInSoft), academic (Miri/Rudra/MIRAI/MirChecker/lockbud/Yuga), formal verification (Kani/Prusti/Verus/Creusot/Flux/Aeneas/hax), theory (RustBelt/Stacked Borrows), fuzzing (cargo-fuzz/bolero/proptest/loom), supply chain (cargo-audit/deny/geiger/vet/crev), CI pipeline recommendations, textbooks.'
@@ -1509,6 +1513,10 @@
 549866596144eb9b:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
+  last_edited_ms: 0
+54a82e3deeaf447e:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block on Send, count positive. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 0
 54ab04aa4f799804:
   path: src/app/actions/input.rs
@@ -2733,6 +2741,10 @@
 9e2ebd598ceb45b4:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
+9e742fd75d006bc4:
+  path: src/ui/threads_view/mod.rs
+  description: Threads view layout + thread list rendering. Two-pane layout (thread list | messages). Virtual '+ New Thread' entry. IR pipeline for list items (status dots, unread indicators, selection highlight). maybe_activate_thread_question() lazy question form init. truncate_str helper.
   last_edited_ms: 0
 9e7b5def696af37a:
   path: crates/cp-mod-prompt/src/tools.rs
