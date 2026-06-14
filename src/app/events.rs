@@ -216,8 +216,18 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                 return Some(Action::InputSubmit);
             }
 
-            // Let the current panel handle the key first
-            if let Some(ctx) = state.context.get(state.selected_context) {
+            // Let the current panel handle the key first.
+            // In Threads view, always use the conversation panel for input routing
+            // regardless of which panel was selected — the threads view always has
+            // an active input area that needs character/cursor/submit handling.
+            if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+                if let Some(ctx) = state.context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION) {
+                    let panel = get_panel(&ctx.context_type);
+                    if let Some(action) = panel.handle_key(key, state) {
+                        return Some(action);
+                    }
+                }
+            } else if let Some(ctx) = state.context.get(state.selected_context) {
                 let panel = get_panel(&ctx.context_type);
                 if let Some(action) = panel.handle_key(key, state) {
                     return Some(action);

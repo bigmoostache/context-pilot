@@ -618,6 +618,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                             file_path: None,
                             question: None,
                             timestamp: crate::app::panels::now_ms(),
+                            acknowledged: false,
                         });
                         thread.status = cp_mod_threads::types::ThreadStatus::MyTurn;
                     }

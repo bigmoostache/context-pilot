@@ -20,4 +20,3 @@ tools:
       Returns the last N messages formatted with author, timestamp, and content.
     parameters:
       thread_id: "Thread ID to read (e.g., 'T1')"
-      count: "Number of recent messages to retrieve (default: 10)"

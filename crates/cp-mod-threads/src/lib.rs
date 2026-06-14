@@ -62,6 +62,7 @@ impl Module for ThreadsModule {
         json!({
             "threads": ts.threads,
             "next_id": ts.next_id,
+            "panel_content": ts.panel_content,
         })
     }
 
@@ -74,6 +75,9 @@ impl Module for ThreadsModule {
         }
         if let Some(v) = data.get("next_id").and_then(serde_json::Value::as_u64) {
             ts.next_id = v.to_u32();
+        }
+        if let Some(v) = data.get("panel_content").and_then(serde_json::Value::as_str) {
+            v.clone_into(&mut ts.panel_content);
         }
     }
 
@@ -120,7 +124,6 @@ impl Module for ThreadsModule {
                 .category("Threads")
                 .reverie_allowed(false)
                 .param("thread_id", ParamType::String, true)
-                .param("count", ParamType::Integer, false)
                 .build(),
         ]
     }
@@ -173,12 +176,6 @@ impl Module for ThreadsModule {
                     && !ts.threads.iter().any(|t| t.id == tid)
                 {
                     pf.errors.push(format!("Thread '{tid}' not found"));
-                }
-                // Validate count is positive
-                if let Some(count) = tool.input.get("count").and_then(serde_json::Value::as_i64)
-                    && count < 1
-                {
-                    pf.errors.push("count must be a positive integer".to_string());
                 }
             }
             _ => {}

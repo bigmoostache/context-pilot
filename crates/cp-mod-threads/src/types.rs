@@ -46,6 +46,11 @@ impl std::fmt::Display for ThreadAuthor {
 // Structs
 // =============================================================================
 
+/// Serde helper — returns `true`.
+const fn default_true() -> bool {
+    true
+}
+
 /// A single message within a thread.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThreadMessage {
@@ -63,6 +68,11 @@ pub struct ThreadMessage {
     pub question: Option<serde_json::Value>,
     /// Creation timestamp (epoch ms).
     pub timestamp: u64,
+    /// Whether the AI has acknowledged (seen via `Read`) this message.
+    /// AI-authored messages are acknowledged on creation. User messages
+    /// start unacknowledged and become acknowledged when `Read` is called.
+    #[serde(default = "default_true")]
+    pub acknowledged: bool,
 }
 
 /// A parallel discussion/work topic thread.
@@ -331,6 +341,9 @@ pub struct ThreadsState {
     pub threads: Vec<Thread>,
     /// Counter for generating unique thread IDs (T1, T2, ...).
     pub next_id: u32,
+    /// Pre-rendered panel content for the LLM. Only updated by `Read`.
+    /// Contains the thread list summary + focused thread's full conversation.
+    pub panel_content: String,
 }
 
 impl Default for ThreadsState {
@@ -343,7 +356,7 @@ impl ThreadsState {
     /// Create an empty threads state with ID counter at 1.
     #[must_use]
     pub const fn new() -> Self {
-        Self { threads: vec![], next_id: 1 }
+        Self { threads: vec![], next_id: 1, panel_content: String::new() }
     }
 
     /// Get shared ref from State's `TypeMap`.

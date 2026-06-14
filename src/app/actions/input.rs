@@ -183,6 +183,7 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
         file_path: None,
         question: None,
         timestamp: crate::app::panels::now_ms(),
+        acknowledged: false,
     };
     thread.messages.push(msg);
     thread.status = ThreadStatus::MyTurn;

@@ -5,59 +5,14 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 
-use crate::types::{ThreadStatus, ThreadsState};
-use std::fmt::Write as _;
+use crate::types::ThreadsState;
 
 /// Panel that renders the thread list and provides thread context to the LLM.
+///
+/// **Static panel**: the LLM-facing content (`panel_content`) is only updated
+/// when `Read` is called. The TUI-facing `blocks()` renders live data for
+/// visual display but this has no token cost.
 pub(crate) struct ThreadsPanel;
-
-impl ThreadsPanel {
-    /// Format thread data for LLM context.
-    ///
-    /// `MY_TURN` threads get full message history (last 5).
-    /// `THEIR_TURN` threads get a summary line only.
-    fn format_threads_for_context(state: &State) -> String {
-        let ts = ThreadsState::get(state);
-        if ts.threads.is_empty() {
-            return "No threads".to_string();
-        }
-
-        let mut output = String::new();
-        for thread in &ts.threads {
-            let _r = writeln!(output, "{} [{}]  \"{}\"  ({} messages)", thread.id, thread.status, thread.name, thread.messages.len());
-
-            match thread.status {
-                ThreadStatus::MyTurn => {
-                    // Show last 5 messages for MY_TURN threads
-                    let start = thread.messages.len().saturating_sub(5);
-                    for msg in thread.messages.get(start..).unwrap_or_default() {
-                        let content_preview = msg
-                            .content
-                            .as_deref()
-                            .unwrap_or("[no text]");
-                        let truncated = if content_preview.len() > 120 {
-                            format!(
-                                "{}...",
-                                content_preview
-                                    .get(..content_preview.floor_char_boundary(117))
-                                    .unwrap_or("")
-                            )
-                        } else {
-                            content_preview.to_string()
-                        };
-                        let _w = writeln!(output, "  └─ [{}] {}", msg.author, truncated);
-                    }
-                }
-                ThreadStatus::TheirTurn => {
-                    // Summary only for THEIR_TURN
-                    let _w = writeln!(output, "  └─ (waiting for user)");
-                }
-            }
-        }
-
-        output.trim_end().to_string()
-    }
-}
 
 impl Panel for ThreadsPanel {
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
@@ -65,63 +20,27 @@ impl Panel for ThreadsPanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
-        use cp_render::{Block, Semantic, Span as S};
+        use cp_render::{Block, Span as S};
 
         let ts = ThreadsState::get(state);
 
-        if ts.threads.is_empty() {
+        if ts.panel_content.is_empty() {
             return vec![
-                Block::Line(vec![S::muted("  No threads".into()).italic()]),
-                Block::Line(vec![S::muted("  Threads are created from the Threads view (Ctrl+V)".into())]),
+                Block::Line(vec![S::muted("  (empty — AI must call Read to populate)".into())]),
             ];
         }
 
-        let mut blocks = Vec::new();
-        for thread in &ts.threads {
-            // Thread header: T1 [MY_TURN]  "lint audit"  (3 messages)
-            let status_style = match thread.status {
-                ThreadStatus::MyTurn => Semantic::Success,
-                ThreadStatus::TheirTurn => Semantic::Muted,
-            };
-            blocks.push(Block::Line(vec![
-                S::new("  ".into()),
-                S::accent(thread.id.clone()).bold(),
-                S::new(" ".into()),
-                S::styled(format!("[{}]", thread.status), status_style),
-                S::new("  ".into()),
-                S::new(format!("\"{}\"", thread.name)).bold(),
-                S::muted(format!("  ({} msgs)", thread.messages.len())),
-            ]));
-
-            // Last 5 messages
-            let start = thread.messages.len().saturating_sub(5);
-            for msg in thread.messages.get(start..).unwrap_or_default() {
-                let content_preview = msg
-                    .content
-                    .as_deref()
-                    .unwrap_or("[no text]");
-                let truncated = if content_preview.len() > 80 {
-                    format!(
-                        "{}...",
-                        content_preview
-                            .get(..content_preview.floor_char_boundary(77))
-                            .unwrap_or("")
-                    )
+        // Render the same panel_content the LLM sees, line by line
+        ts.panel_content
+            .lines()
+            .map(|line| {
+                if line.is_empty() {
+                    Block::Empty
                 } else {
-                    content_preview.to_string()
-                };
-                blocks.push(Block::Line(vec![
-                    S::new("    └─ ".into()),
-                    S::accent(format!("[{}]", msg.author)),
-                    S::new(" ".into()),
-                    S::muted(truncated),
-                ]));
-            }
-
-            blocks.push(Block::Empty);
-        }
-
-        blocks
+                    Block::Line(vec![S::new(format!("  {line}"))])
+                }
+            })
+            .collect()
     }
 
     fn title(&self, _state: &State) -> String {
@@ -129,7 +48,8 @@ impl Panel for ThreadsPanel {
     }
 
     fn refresh(&self, state: &mut State) {
-        let content = Self::format_threads_for_context(state);
+        // Static panel: content is the pre-rendered panel_content set by Read.
+        let content = ThreadsState::get(state).panel_content.clone();
         let token_count = estimate_tokens(&content);
 
         for ctx in &mut state.context {
@@ -146,7 +66,8 @@ impl Panel for ThreadsPanel {
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        let content = Self::format_threads_for_context(state);
+        // Return the static panel_content — only updated by Read tool.
+        let content = ThreadsState::get(state).panel_content.clone();
         let (id, last_refresh_ms) = state
             .context
             .iter()
@@ -158,7 +79,10 @@ impl Panel for ThreadsPanel {
     fn needs_cache(&self) -> bool {
         false
     }
-    fn refresh_cache(&self, _request: cp_base::panels::CacheRequest) -> Option<cp_base::panels::CacheUpdate> {
+    fn refresh_cache(
+        &self,
+        _request: cp_base::panels::CacheRequest,
+    ) -> Option<cp_base::panels::CacheUpdate> {
         None
     }
     fn build_cache_request(
