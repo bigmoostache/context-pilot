@@ -9,6 +9,8 @@
 
 /// Panel rendering for the thread list.
 mod panel;
+/// Thread-embedded interactive question forms.
+pub mod questions;
 /// Tool execution handlers: `Send` and `Read`.
 pub mod tools;
 /// Thread state types: `Thread`, `ThreadMessage`, `ThreadsState`, `FocusState`.

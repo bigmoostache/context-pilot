@@ -20,7 +20,8 @@ use cp_render::{Block as IrBlock, Semantic, Span as S};
 use crate::state::State;
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
-use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadQuestionForm, ThreadStatus, ThreadsState};
+use cp_mod_threads::questions::ThreadQuestionForm;
+use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
 
 /// Width of the thread list pane in columns.
 pub(crate) const THREAD_LIST_WIDTH: u16 = 28;
