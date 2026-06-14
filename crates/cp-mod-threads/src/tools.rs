@@ -17,16 +17,38 @@ use crate::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, Thread
 /// Creates a `ThreadMessage(author=Assistant)`, appends it to the thread,
 /// sets status → `TheirTurn`, clears focus, and starts the dangling phase.
 pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
+    /// Maximum markdown content length (bytes) to prevent state/disk bloat.
+    const MAX_CONTENT_BYTES: usize = 100_000;
+    /// Maximum `file_path` length (bytes).
+    const MAX_FILE_PATH_BYTES: usize = 1_024;
+    /// Maximum number of questions stored in a single message.
+    const MAX_STORED_QUESTIONS: usize = 50;
+
     let tid = tool.input.get("thread_id")
         .and_then(serde_json::Value::as_str)
         .unwrap_or("");
 
-    let markdown = tool.input.get("markdown").and_then(serde_json::Value::as_str).map(String::from);
-    let file_path = tool.input.get("file_path").and_then(serde_json::Value::as_str).map(String::from);
+    let markdown = tool.input.get("markdown")
+        .and_then(serde_json::Value::as_str)
+        .map(|s| if s.len() > MAX_CONTENT_BYTES {
+            s.get(..s.floor_char_boundary(MAX_CONTENT_BYTES)).unwrap_or(s).to_string()
+        } else {
+            s.to_string()
+        });
+    let file_path = tool.input.get("file_path")
+        .and_then(serde_json::Value::as_str)
+        .map(|s| if s.len() > MAX_FILE_PATH_BYTES {
+            s.get(..s.floor_char_boundary(MAX_FILE_PATH_BYTES)).unwrap_or(s).to_string()
+        } else {
+            s.to_string()
+        });
     let question = tool.input.get("questions")
         .and_then(serde_json::Value::as_array)
         .filter(|a| !a.is_empty())
-        .map(|a| serde_json::Value::Array(a.clone()));
+        .map(|a| {
+            let capped: Vec<serde_json::Value> = a.iter().take(MAX_STORED_QUESTIONS).cloned().collect();
+            serde_json::Value::Array(capped)
+        });
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -124,11 +146,13 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
         ));
     }
 
-    // Previews of newly acknowledged messages in the target thread
+    // Collect count + previews of newly acknowledged messages in a single pass
+    let mut new_count: usize = 0;
     let new_msg_previews: Vec<String> = target_thread
         .messages
         .iter()
         .filter(|m| !m.acknowledged)
+        .inspect(|_| new_count = new_count.saturating_add(1))
         .map(|m| {
             let content = m.content.as_deref().unwrap_or("[no text]");
             let preview = if content.len() > 60 {
@@ -142,8 +166,6 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
             format!("[{}] {preview}", m.author)
         })
         .collect();
-
-    let new_count = target_thread.messages.iter().filter(|m| !m.acknowledged).count();
 
     // --- Phase 2: Mark all messages in target thread as acknowledged ---
     let ts_mut = ThreadsState::get_mut(state);
@@ -196,7 +218,12 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Build the full panel content: thread overview + focused thread conversation.
 ///
 /// Called by `execute_read` to generate the static panel text that the LLM sees.
+/// Limits the focused thread to the last [`MAX_PANEL_MESSAGES`] messages to keep
+/// token usage bounded for long-lived threads.
 fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String {
+    /// Maximum messages shown in the panel for a single focused thread.
+    const MAX_PANEL_MESSAGES: usize = 50;
+
     let ts = ThreadsState::get(state);
     let mut output = String::from("=== Threads ===\n");
 
@@ -213,7 +240,7 @@ fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String 
         );
     }
 
-    // Focused thread's full conversation
+    // Focused thread's conversation (last MAX_PANEL_MESSAGES messages)
     if let Some(thread) = ts.threads.iter().find(|t| t.id == focused_tid) {
         _ = writeln!(output, "\n=== {tid} \"{name}\" [{status}] — Full Conversation ===",
             tid = thread.id,
@@ -224,7 +251,12 @@ fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String 
         if thread.messages.is_empty() {
             _ = writeln!(output, "(no messages)");
         } else {
-            for msg in &thread.messages {
+            let total = thread.messages.len();
+            let skip = total.saturating_sub(MAX_PANEL_MESSAGES);
+            if skip > 0 {
+                _ = writeln!(output, "\n({skip} older message(s) omitted)");
+            }
+            for msg in thread.messages.iter().skip(skip) {
                 let age = format_age(now_ms, msg.timestamp);
                 let content = msg.content.as_deref().unwrap_or("[no text]");
                 _ = writeln!(output, "\n[{author}] {age}:\n{content}", author = msg.author);

@@ -139,15 +139,25 @@ fn archive_start(state: &mut State) -> ActionResult {
 }
 
 /// Confirm thread archive — remove the selected thread.
+///
+/// Cleans up all `FocusState` references to the archived thread:
+/// focused ID, last-read count, `MY_TURN` notification debounce.
 fn archive_confirm(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
     focus.confirming_archive = false;
     let selected_idx = focus.selected_thread_idx;
 
+    // Capture the archived thread's ID for focus cleanup.
+    let archived_id = ThreadsState::get(state)
+        .threads
+        .get(selected_idx)
+        .map(|t| t.id.clone());
+
     let threads_state = ThreadsState::get_mut(state);
     if selected_idx < threads_state.threads.len() {
         let _removed = threads_state.threads.remove(selected_idx);
     }
+
     let len = ThreadsState::get(state).threads.len();
     let focus_after = FocusState::get_mut(state);
     if len == 0 {
@@ -155,6 +165,20 @@ fn archive_confirm(state: &mut State) -> ActionResult {
     } else if focus_after.selected_thread_idx >= len {
         focus_after.selected_thread_idx = len.saturating_sub(1);
     }
+
+    // Clean up all references to the archived thread.
+    if let Some(ref aid) = archived_id {
+        if focus_after.focused_thread_id.as_deref() == Some(aid) {
+            focus_after.focused_thread_id = None;
+            focus_after.dangling_remaining = 0;
+            focus_after.escalation_level = 0;
+        }
+        let _prev = focus_after.last_read_count.remove(aid);
+        if focus_after.notified_my_turn_id.as_deref() == Some(aid) {
+            focus_after.notified_my_turn_id = None;
+        }
+    }
+
     state.flags.ui.dirty = true;
     ActionResult::Save
 }

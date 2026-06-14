@@ -142,31 +142,37 @@ pub struct ThreadQuestionForm {
     pub focused_index: usize,
 }
 
+/// Truncate a string to at most `max` characters, appending "…" if truncated.
+fn cap_str(s: &str, max: usize) -> String {
+    if s.chars().count() <= max { return s.to_owned(); }
+    let mut r: String = s.chars().take(max).collect();
+    r.push('…');
+    r
+}
+
 impl ThreadQuestionForm {
     /// Parse a question form from a thread message's JSON question field.
     ///
     /// Returns `None` if the JSON is malformed or empty.
+    /// Caps: 50 questions × 100 options, header 50 chars, text/desc 2000, label 200.
     #[must_use]
     pub fn from_json(thread_id: &str, json: &serde_json::Value) -> Option<Self> {
-        /// Maximum number of questions per form.
-        const MAX_QUESTIONS: usize = 50;
-        /// Maximum number of options per question.
-        const MAX_OPTIONS: usize = 100;
         let arr = json.as_array()?;
         if arr.is_empty() {
             return None;
         }
+
         let questions: Vec<ThreadQuestion> = arr
             .iter()
-            .take(MAX_QUESTIONS)
+            .take(50)
             .filter_map(|q| {
-                let header = q.get("header")?.as_str()?.to_owned();
-                let text = q.get("question")?.as_str()?.to_owned();
+                let header = cap_str(q.get("header")?.as_str()?, 50);
+                let text = cap_str(q.get("question")?.as_str()?, 2_000);
                 let multi_select = q.get("multiSelect").and_then(serde_json::Value::as_bool).unwrap_or(false);
-                let options = q.get("options")?.as_array()?.iter().take(MAX_OPTIONS).filter_map(|o| {
+                let options = q.get("options")?.as_array()?.iter().take(100).filter_map(|o| {
                     Some(ThreadQuestionOption {
-                        label: o.get("label")?.as_str()?.to_owned(),
-                        description: o.get("description")?.as_str()?.to_owned(),
+                        label: cap_str(o.get("label")?.as_str()?, 200),
+                        description: cap_str(o.get("description")?.as_str()?, 2_000),
                     })
                 }).collect();
                 Some(ThreadQuestion {
@@ -325,7 +331,7 @@ impl ThreadQuestionForm {
                 }
             }
             if q.typing_other && !q.other_text.is_empty() {
-                let escaped = q.other_text.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
+                let escaped = q.other_text.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r");
                 lines.push(format!("  other: \"{escaped}\""));
             }
             if selected_labels.is_empty() && (!q.typing_other || q.other_text.is_empty()) {

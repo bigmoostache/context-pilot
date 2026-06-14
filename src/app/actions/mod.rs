@@ -434,6 +434,9 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::CycleViewMode => {
             state.view_mode = state.view_mode.next();
+            // Reset scroll to avoid stale position from previous view.
+            state.scroll_offset = 0.0;
+            state.flags.stream.user_scrolled = false;
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }

@@ -1060,8 +1060,8 @@
   last_edited_ms: 0
 39f140275594437f:
   path: crates/cp-mod-threads/src/types.rs
-  description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
-  last_edited_ms: 0
+  description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadQuestionForm (from_json with MAX_QUESTIONS=50/MAX_OPTIONS=100 caps, YAML-escaped other_text), ThreadsState + FocusState with TypeMap accessors.'
+  last_edited_ms: 1781448934469
 39fa458fb6cda1df:
   path: website/docs/modules.html
   description: 'Docs: module system guide'
@@ -1492,8 +1492,8 @@
   last_edited_ms: 0
 54ab04aa4f799804:
   path: src/app/actions/input.rs
-  description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
-  last_edited_ms: 0
+  description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
+  last_edited_ms: 1781448934651
 54eaa3cfe9a5ebbb:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
@@ -2402,6 +2402,10 @@
   path: crates/cp-mod-search/src/meili/mod.rs
   description: 'Meilisearch sub-module hub: bootstrap, client, download, overlay, server, tasks.'
   last_edited_ms: 0
+8cbf00556bd55559:
+  path: src/app/actions/threads.rs
+  description: 'Thread action handlers. Dispatches Thread* action variants (select/create/archive/question navigation). Question form: cursor movement, toggle selection, Enter submit (YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification), dismiss, char/backspace for Other field.'
+  last_edited_ms: 0
 8d8c762e3a909931:
   path: website/docs/context.html
   description: 'Docs: context management guide'
@@ -2418,6 +2422,10 @@
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. MINIMAX_API_KEY auth.
   last_edited_ms: 1780565754897
+8e3aa9e17c25144e:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
+  last_edited_ms: 0
 8e412fa8d76c7beb:
   path: docs/ted-talk.md
   description: Full talk script — 25min, 16 slides, speaker notes, Q&A reserve. 'Rebuilding my own Claude Code — The Whys, the Hows and the Wows'.
@@ -2520,8 +2528,8 @@
   last_edited_ms: 0
 94a5320bb61a1ca6:
   path: src/app/actions/threads.rs
-  description: 'Thread action handlers. Dispatches Thread* action variants (select/create/archive/question navigation). Question form: cursor movement, toggle selection, Enter submit (YAML answers → ThreadMessage → MY_TURN + spine notification), dismiss, char/backspace for Other field.'
-  last_edited_ms: 1781447392508
+  description: 'Thread action handlers. Dispatches Thread* action variants (select/create/archive/question navigation). Question form: cursor movement, toggle selection, Enter submit (YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification), dismiss, char/backspace for Other field.'
+  last_edited_ms: 1781448934561
 94f3d1b290438319:
   path: src/app/run/input.rs
   description: App::new() constructor, save_state/message_async(), handle_autocomplete/question_form/palette events
@@ -2894,6 +2902,10 @@ aa1d276af3cf459a:
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
   last_edited_ms: 0
+aa4a6502419c0853:
+  path: src/app/actions/mod.rs
+  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation, threads. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread actions extracted to threads.rs.'
+  last_edited_ms: 0
 aa4fb032325f6ff0:
   path: crates/cp-mod-brave/src/lib.rs
   description: 'Brave Search module. 2 tools: brave_search (snippets), brave_llm_context (deep extracted content). Dynamic brave_result panels. No state. Global, non-core.'
@@ -3148,8 +3160,8 @@ b9798b6dd8b66239:
   last_edited_ms: 0
 b982483e20e50501:
   path: crates/cp-mod-spine/src/coucou.rs
-  description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
-  last_edited_ms: 0
+  description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper. MIN_RECURRENCE_MS=60s floor for custom recurrence.
+  last_edited_ms: 1781448934607
 b9826fb573b2e9d0:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
@@ -3250,6 +3262,10 @@ bf721ed9cc1a06a3:
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
   last_edited_ms: 0
+c036e5d93c04e6ba:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadQuestionForm (from_json with MAX_QUESTIONS=50/MAX_OPTIONS=100 caps, YAML-escaped other_text), ThreadsState + FocusState with TypeMap accessors.'
+  last_edited_ms: 0
 c07395815ca8865e:
   path: crates/cp-mod-firecrawl/Cargo.toml
   description: 'Firecrawl module deps: cp-base, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
@@ -3280,8 +3296,8 @@ c20be1c967ed1030:
   last_edited_ms: 0
 c2baaa90fec05e51:
   path: crates/cp-mod-threads/src/lib.rs
-  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
-  last_edited_ms: 0
+  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block on Send, count positive. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
+  last_edited_ms: 1781448934515
 c2e8ce0b2cd68b7c:
   path: src/ui/ir/mod.rs
   description: IR-to-ratatui adapter. semantic_to_style (pub(crate)) + ir_span_to_ratatui (with reversed support). blocks_to_lines converts IR Block vec to ratatui Lines. Table/ProgressBar/Tree/KeyValue renderers. build_frame + build_active_panel frame assembly.
