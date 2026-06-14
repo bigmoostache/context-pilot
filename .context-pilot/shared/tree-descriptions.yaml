@@ -22,6 +22,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+0238aa4840677705:
+  path: src/modules/overview/mod.rs
+  description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data. Visualizer extracted to visualizers.rs.'
+  last_edited_ms: 1781447353294
 02534f9eb511e493:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -170,6 +174,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+09986e5bc21c125a:
+  path: crates/cp-base/src/config/models.rs
+  description: Per-provider model enums (Anthropic, Grok, Groq, DeepSeek, MiniMax, ClaudeCodeV2) with ModelInfo impls. Pricing, context windows, API names, display names.
+  last_edited_ms: 1781447352999
 09bc3296ceb89b76:
   path: src/ui/ir/mod.rs
   description: IR-to-ratatui adapter. semantic_to_style (pub(crate)) + ir_span_to_ratatui (with reversed support). blocks_to_lines converts IR Block vec to ratatui Lines. Table/ProgressBar/Tree/KeyValue renderers. build_frame + build_active_panel frame assembly.
@@ -362,6 +370,10 @@
   path: src/ui/help/palette.rs
   description: 'Command palette state + IR adapter. CommandPalette struct (state methods: open/close/filter/select). to_ir() builds PaletteOverlay. render_command_palette_from_ir() adapter renders from IR. 19 theme:: calls in adapter only.'
   last_edited_ms: 0
+13fd308c36b41576:
+  path: crates/cp-base/src/state/actions.rs
+  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
+  last_edited_ms: 0
 141e5aae8168208a:
   path: yamls/tools/firecrawl.yaml
   description: 'Firecrawl tools YAML. 4 tools: firecrawl_scrape (single URL), firecrawl_search (search+scrape), firecrawl_map (URL discovery), firecrawl_crawl (recursive crawl to file).'
@@ -534,6 +546,10 @@
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (20 tool + 6 config YAML files) with #[expect(clippy::panic)].'
   last_edited_ms: 0
+1dbea38df5d6be2f:
+  path: src/app/actions/mod.rs
+  description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation, threads. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread actions extracted to threads.rs.'
+  last_edited_ms: 1781447353339
 1e0df9189377d812:
   path: yamls/tools/tree.yaml
   description: Tree tools YAML. tree_filter (gitignore patterns), tree_toggle (open/close/toggle folders), tree_describe (path+description+delete+close_panel params).
@@ -978,6 +994,10 @@
   path: src/infra/profiler.rs
   description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime, elapsed ms, tool name(s).
   last_edited_ms: 0
+36f24767cc65904b:
+  path: src/app/run/mod.rs
+  description: 'Sub-module declarations. 7 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), threads (thread helpers), tools (execution pipeline), watchers (file/GH).'
+  last_edited_ms: 1781447353204
 37083a531f9c290c:
   path: crates/cp-mod-utilities/src/lib.rs
   description: '4 modules: hash, time, dirs, secret. Lightweight replacements for external deps.'
@@ -1205,6 +1225,10 @@
 437b9a6fbb5c551a:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
+  last_edited_ms: 0
+437e75fd8cb10cd6:
+  path: crates/cp-base/src/state/runtime.rs
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
 43bb987e2fb2fc3c:
   path: src/app/run/lifecycle.rs
@@ -2502,6 +2526,10 @@
   path: src/infra/mod.rs
   description: 'Re-exports: api, config, constants, flame (inline re-export of cp_base::flame init/flush), gh_watcher, profiler, tools, watcher. Infrastructure layer between app and core crates.'
   last_edited_ms: 0
+9585095c96a77cfa:
+  path: src/llms/mod.rs
+  description: 'LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging. Re-exports split: llm_types (traits) + models (enums).'
+  last_edited_ms: 1781447353382
 95d0f3e8e8d596b9:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -2794,6 +2822,10 @@ a6f9367d3075fc36:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+a73611bc3edabdd9:
+  path: src/app/run/threads.rs
+  description: Thread-related helpers for the main event loop. maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN detection + spine notification), extract_thread_ids (parse thread IDs from notification content). Free functions taking &mut App.
+  last_edited_ms: 1781447353032
 a73ad7544498bcd8:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -2914,6 +2946,10 @@ af14c600c0042c99:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+af2359efd17eff41:
+  path: src/modules/overview/visualizers.rs
+  description: 'Tool result visualizers for core tools. visualize_core_output: colors closed panel names, highlights enabled/disabled status, shows module activation changes.'
+  last_edited_ms: 1781447353073
 af3dcb89932c06f9:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
@@ -3250,6 +3286,10 @@ c499dbd657a61322:
   path: crates/cp-mod-typst/src/lib.rs
   description: 'Typst module. 1 tool: typst_execute. Embedded compiler (no external binary). Depends on core+callback. catch-all watchlist callback recompiles affected docs. Seeds shared templates. @preview/ package support.'
   last_edited_ms: 0
+c4c082c922d9c61f:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Thread methods extracted to run/threads.rs.'
+  last_edited_ms: 1781447353250
 c4e9d7be47211a1c:
   path: crates/cp-mod-queue/Cargo.toml
   description: 'Queue module deps: cp-base, cp-render, crossterm, serde, serde_json.'
@@ -3662,6 +3702,10 @@ df40ef79b5b08750:
   path: src/ui/help/input.rs
   description: 'Question form and autocomplete popup overlays. Adapter layer: renders QuestionForm and Autocomplete IR data to ratatui widgets. No direct State access. Used by threads_view.rs for thread-embedded question forms.'
   last_edited_ms: 1781391612127
+df4440d55d3a9a7a:
+  path: crates/cp-base/src/config/llm_types.rs
+  description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends). Model enums moved to models.rs.
+  last_edited_ms: 1781447353118
 e0352c6a703737b4:
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). GH sync every 5s. FD cleanup (stale watch removal). suicide() auto-close.
@@ -3694,6 +3738,10 @@ e2c579843c4364f1:
   path: crates/cp-base/src/state/mod.rs
   description: 'Sub-module hub: actions, autocomplete, context, data, flags, runtime (State struct), watchers. Inline reverie module with Session struct (kind, agent, messages, tool_call_count).'
   last_edited_ms: 0
+e2fd11a89a1bc2cd:
+  path: crates/cp-base/src/config/mod.rs
+  description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. ConsoleGuardrails: git/gh only. Sub-modules: constants, global, llm_types, models, yaml_sync, behavioral, accessors.'
+  last_edited_ms: 1781447353162
 e31c48c5949be594:
   path: crates/cp-console-server/src/protocol.rs
   description: JSON-line protocol types. Request (cmd/key/command/cwd/input/log_path). Response (ok/error/pid/status/exit_code/sessions). interpret_escapes() for \n/\t/\xHH.
@@ -4037,6 +4085,10 @@ fbdba9aa57c1a77a:
 fbdfad8623375f53:
   path: src/modules/conversation/render_blocks.rs
   description: 'IR-based message renderer: emits Vec<Block>. Handles tool calls (YAML params with wrapping), tool results (custom visualizers + fallback), text messages (markdown parsing via markdown_ir, code blocks, tables). Complex visualizer blocks passed through as-is. Dev-mode token counts.'
+  last_edited_ms: 0
+fbe8d03ec2b93d7c:
+  path: src/app/actions/helpers.rs
+  description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
   last_edited_ms: 0
 fbef20b30a0e1e2f:
   path: src/app/run/tools/pipeline.rs

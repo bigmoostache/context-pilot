@@ -16,16 +16,16 @@ pub(crate) mod helpers;
 mod history;
 /// Input submission and conversation clearing.
 pub(crate) mod input;
-/// Context panel navigation (next/prev, page jumping).
-mod navigation;
 /// Stream append/done/error handling.
 pub(crate) mod streaming;
+/// Thread action handlers (Thread* variants).
+mod threads;
 
 // Re-export helpers for external use
 pub(crate) use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern, switch_to_panel};
 
 use crate::infra::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
-use crate::state::{Entry, Kind, State, StreamPhase};
+use crate::state::{Kind, State, StreamPhase};
 
 // Re-export Action/ActionResult from cp-base (shared with module crates)
 pub(crate) use cp_base::state::actions::{Action, ActionResult};
@@ -188,49 +188,21 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
         Action::ClearConversation => input::handle_clear_conversation(state),
 
-        Action::NewContext => {
-            let context_id = state.next_available_context_id();
-            state.context.push(Entry {
-                id: context_id,
-                uid: None,
-                context_type: Kind::new(Kind::CONVERSATION),
-                name: format!("Conv {}", state.context.len()),
-                token_count: 0,
-                metadata: std::collections::HashMap::new(),
-                cached_content: None,
-                history_messages: None,
-                cache_deprecated: false,
-                cache_in_flight: false,
-                last_refresh_ms: crate::app::panels::now_ms(),
-                content_hash: None,
-                source_hash: None,
-                current_page: 0,
-                total_pages: 1,
-                full_token_count: 0,
-                scroll_state: cp_base::state::context::ScrollState::default(),
-                panel_cache_hit: false,
-                panel_total_cost: 0.0,
-                freeze_count: 0,
-                total_freezes: 0,
-                total_cache_misses: 0,
-                emitted: cp_base::state::context::EmittedState::default(),
-            });
-            ActionResult::Save
-        }
+        Action::NewContext => helpers::create_new_context(state),
         Action::SelectNextContext => {
-            navigation::select_context(state, true);
+            helpers::select_context(state, true);
             ActionResult::Nothing
         }
         Action::SelectPrevContext => {
-            navigation::select_context(state, false);
+            helpers::select_context(state, false);
             ActionResult::Nothing
         }
         Action::PageDynamicNext => {
-            navigation::page_dynamic(state, true);
+            helpers::page_dynamic(state, true);
             ActionResult::Nothing
         }
         Action::PageDynamicPrev => {
-            navigation::page_dynamic(state, false);
+            helpers::page_dynamic(state, false);
             ActionResult::Nothing
         }
 
@@ -465,196 +437,15 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }
-            Action::ThreadSelectNext => {
-                let thread_count = cp_mod_threads::types::ThreadsState::get(state).threads.len();
-                let total = thread_count.saturating_add(1); // +1 for virtual "New Thread" entry
-                let focus = cp_mod_threads::types::FocusState::get_mut(state);
-                focus.selected_thread_idx = if focus.selected_thread_idx >= total.saturating_sub(1) {
-                    0
-                } else {
-                    focus.selected_thread_idx.saturating_add(1)
-                };
-                // Mark as read only when on a real thread
-                if focus.selected_thread_idx < thread_count {
-                    cp_mod_threads::types::FocusState::mark_selected_read(state);
-                }
-                // Reset scroll so the new thread starts at bottom
-                state.scroll_offset = 0.0;
-                state.flags.stream.user_scrolled = false;
-                state.flags.ui.dirty = true;
-                ActionResult::Nothing
-            }
-            Action::ThreadSelectPrev => {
-                let thread_count = cp_mod_threads::types::ThreadsState::get(state).threads.len();
-                let total = thread_count.saturating_add(1); // +1 for virtual "New Thread" entry
-                let focus = cp_mod_threads::types::FocusState::get_mut(state);
-                focus.selected_thread_idx = if focus.selected_thread_idx == 0 {
-                    total.saturating_sub(1)
-                } else {
-                    focus.selected_thread_idx.saturating_sub(1)
-                };
-                // Mark as read only when on a real thread
-                if focus.selected_thread_idx < thread_count {
-                    cp_mod_threads::types::FocusState::mark_selected_read(state);
-                }
-                // Reset scroll so the new thread starts at bottom
-                state.scroll_offset = 0.0;
-                state.flags.stream.user_scrolled = false;
-                state.flags.ui.dirty = true;
-                ActionResult::Nothing
-            }
-        Action::ThreadCreateStart => {
-            let focus = cp_mod_threads::types::FocusState::get_mut(state);
-            focus.creating_thread = true;
-            state.input.clear();
-            state.input_cursor = 0;
-            state.input_selection_anchor = None;
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadCreateCancel => {
-            let focus = cp_mod_threads::types::FocusState::get_mut(state);
-            focus.creating_thread = false;
-            state.input.clear();
-            state.input_cursor = 0;
-            state.input_selection_anchor = None;
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadArchiveStart => {
-            let has_threads = !cp_mod_threads::types::ThreadsState::get(state).threads.is_empty();
-            if has_threads {
-                cp_mod_threads::types::FocusState::get_mut(state).confirming_archive = true;
-                state.flags.ui.dirty = true;
-            }
-            ActionResult::Nothing
-        }
-        Action::ThreadArchiveConfirm => {
-            let focus = cp_mod_threads::types::FocusState::get_mut(state);
-            focus.confirming_archive = false;
-            let selected_idx = focus.selected_thread_idx;
-
-            let threads_state = cp_mod_threads::types::ThreadsState::get_mut(state);
-            if selected_idx < threads_state.threads.len() {
-                let _removed = threads_state.threads.remove(selected_idx);
-            }
-            // Adjust selection index
-            let len = cp_mod_threads::types::ThreadsState::get(state).threads.len();
-            let focus_after = cp_mod_threads::types::FocusState::get_mut(state);
-            if len == 0 {
-                focus_after.selected_thread_idx = 0;
-            } else if focus_after.selected_thread_idx >= len {
-                focus_after.selected_thread_idx = len.saturating_sub(1);
-            }
-            state.flags.ui.dirty = true;
-            ActionResult::Save
-        }
-        Action::ThreadArchiveCancel => {
-            cp_mod_threads::types::FocusState::get_mut(state).confirming_archive = false;
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadQuestionUp => {
-            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
-                aq.cursor_up();
-            }
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadQuestionDown => {
-            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
-                aq.cursor_down();
-            }
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadQuestionLeft => {
-            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
-                aq.prev_question();
-            }
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadQuestionRight => {
-            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
-                aq.next_question();
-            }
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadQuestionToggle => {
-            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
-                aq.toggle_selection();
-            }
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadQuestionEnter => {
-            // Check if this is the final submit (last question + all answered after enter)
-            let should_submit = {
-                let focus = cp_mod_threads::types::FocusState::get_mut(state);
-                focus.active_question.as_mut().is_some_and(|aq| {
-                    aq.handle_enter();
-                    // After handle_enter: if we're on the last question and all are answered, submit
-                    aq.is_last_question() && aq.all_answered()
-                })
-            };
-            if should_submit {
-                // Extract answer YAML and thread_id, then clear the form
-                let (thread_id, yaml) = {
-                    let focus = cp_mod_threads::types::FocusState::get_mut(state);
-                    let aq = focus.active_question.take();
-                    aq.map_or_else(|| (String::new(), String::new()), |form| {
-                        (form.thread_id.clone(), form.format_answers_yaml())
-                    })
-                };
-                if !thread_id.is_empty() {
-                    // Create answer message + set MY_TURN
-                    let ts = cp_mod_threads::types::ThreadsState::get_mut(state);
-                    if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
-                        thread.messages.push(cp_mod_threads::types::ThreadMessage {
-                            author: cp_mod_threads::types::ThreadAuthor::User,
-                            content: Some(yaml),
-                            file_path: None,
-                            question: None,
-                            timestamp: crate::app::panels::now_ms(),
-                            acknowledged: false,
-                        });
-                        thread.status = cp_mod_threads::types::ThreadStatus::MyTurn;
-                    }
-                    // Fire spine notification so AI picks up the answer
-                    let _id = cp_mod_spine::types::SpineState::create_notification(
-                        state,
-                        cp_mod_spine::types::NotificationType::Custom,
-                        "Thread Question Answered".into(),
-                        format!(
-                            "User answered questions in thread \"{thread_id}\". Use Read(thread_id=\"{thread_id}\") to see the answers."
-                        ),
-                    );
-                }
-            }
-            state.flags.ui.dirty = true;
-            ActionResult::Save
-        }
-        Action::ThreadQuestionDismiss => {
-            cp_mod_threads::types::FocusState::get_mut(state).active_question = None;
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadQuestionChar(c) => {
-            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
-                aq.type_char(c);
-            }
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
-        Action::ThreadQuestionBackspace => {
-            if let Some(aq) = cp_mod_threads::types::FocusState::get_mut(state).active_question.as_mut() {
-                aq.backspace();
-            }
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
-        }
+            Action::ThreadSelectNext | Action::ThreadSelectPrev
+            | Action::ThreadCreateStart | Action::ThreadCreateCancel
+            | Action::ThreadArchiveStart | Action::ThreadArchiveConfirm
+            | Action::ThreadArchiveCancel | Action::ThreadQuestionUp
+            | Action::ThreadQuestionDown | Action::ThreadQuestionLeft
+            | Action::ThreadQuestionRight | Action::ThreadQuestionToggle
+            | Action::ThreadQuestionEnter | Action::ThreadQuestionDismiss
+            | Action::ThreadQuestionBackspace => threads::dispatch(state, &action),
+            Action::ThreadQuestionChar(c) => threads::question_char(state, c),
         Action::None => ActionResult::Nothing,
     }
 }

@@ -64,31 +64,31 @@ pub struct State {
     /// Selected LLM provider
     pub llm_provider: LlmProvider,
     /// Active Anthropic model variant.
-    pub anthropic_model: crate::config::llm_types::AnthropicModel,
+    pub anthropic_model: crate::config::models::AnthropicModel,
     /// Active Grok model variant.
-    pub grok_model: crate::config::llm_types::GrokModel,
+    pub grok_model: crate::config::models::GrokModel,
     /// Active Groq model variant.
-    pub groq_model: crate::config::llm_types::GroqModel,
+    pub groq_model: crate::config::models::GroqModel,
     /// Active `DeepSeek` model variant.
-    pub deepseek_model: crate::config::llm_types::DeepSeekModel,
+    pub deepseek_model: crate::config::models::DeepSeekModel,
     /// Active `MiniMax` model variant.
-    pub minimax_model: crate::config::llm_types::MiniMaxModel,
+    pub minimax_model: crate::config::models::MiniMaxModel,
     /// Active Claude Code V2 model variant.
-    pub claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model,
+    pub claude_code_v2_model: crate::config::models::ClaudeCodeV2Model,
     /// Secondary LLM provider (for reveries / sub-agents)
     pub secondary_provider: LlmProvider,
     /// Secondary Anthropic model variant.
-    pub secondary_anthropic_model: crate::config::llm_types::AnthropicModel,
+    pub secondary_anthropic_model: crate::config::models::AnthropicModel,
     /// Secondary Grok model variant.
-    pub secondary_grok_model: crate::config::llm_types::GrokModel,
+    pub secondary_grok_model: crate::config::models::GrokModel,
     /// Secondary Groq model variant.
-    pub secondary_groq_model: crate::config::llm_types::GroqModel,
+    pub secondary_groq_model: crate::config::models::GroqModel,
     /// Secondary `DeepSeek` model variant.
-    pub secondary_deepseek_model: crate::config::llm_types::DeepSeekModel,
+    pub secondary_deepseek_model: crate::config::models::DeepSeekModel,
     /// Secondary `MiniMax` model variant.
-    pub secondary_minimax_model: crate::config::llm_types::MiniMaxModel,
+    pub secondary_minimax_model: crate::config::models::MiniMaxModel,
     /// Secondary Claude Code V2 model variant.
-    pub secondary_claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model,
+    pub secondary_claude_code_v2_model: crate::config::models::ClaudeCodeV2Model,
     /// View mode: Normal (full sidebar), Collapsed (icons), Hidden, Threads
     pub view_mode: ViewMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
@@ -231,19 +231,19 @@ impl Default for State {
             config_selected_bar: 0,
             active_theme: crate::config::DEFAULT_THEME.to_string(),
             llm_provider: LlmProvider::default(),
-            anthropic_model: crate::config::llm_types::AnthropicModel::default(),
-            grok_model: crate::config::llm_types::GrokModel::default(),
-            groq_model: crate::config::llm_types::GroqModel::default(),
-            deepseek_model: crate::config::llm_types::DeepSeekModel::default(),
-            minimax_model: crate::config::llm_types::MiniMaxModel::default(),
-            claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model::default(),
+            anthropic_model: crate::config::models::AnthropicModel::default(),
+            grok_model: crate::config::models::GrokModel::default(),
+            groq_model: crate::config::models::GroqModel::default(),
+            deepseek_model: crate::config::models::DeepSeekModel::default(),
+            minimax_model: crate::config::models::MiniMaxModel::default(),
+            claude_code_v2_model: crate::config::models::ClaudeCodeV2Model::default(),
             secondary_provider: LlmProvider::Anthropic,
-            secondary_anthropic_model: crate::config::llm_types::AnthropicModel::ClaudeHaiku45,
-            secondary_grok_model: crate::config::llm_types::GrokModel::default(),
-            secondary_groq_model: crate::config::llm_types::GroqModel::default(),
-            secondary_deepseek_model: crate::config::llm_types::DeepSeekModel::default(),
-            secondary_minimax_model: crate::config::llm_types::MiniMaxModel::default(),
-            secondary_claude_code_v2_model: crate::config::llm_types::ClaudeCodeV2Model::default(),
+            secondary_anthropic_model: crate::config::models::AnthropicModel::ClaudeHaiku45,
+            secondary_grok_model: crate::config::models::GrokModel::default(),
+            secondary_groq_model: crate::config::models::GroqModel::default(),
+            secondary_deepseek_model: crate::config::models::DeepSeekModel::default(),
+            secondary_minimax_model: crate::config::models::MiniMaxModel::default(),
+            secondary_claude_code_v2_model: crate::config::models::ClaudeCodeV2Model::default(),
             view_mode: ViewMode::Normal,
             reveries: HashMap::new(),
             cache_hit_tokens: 0,

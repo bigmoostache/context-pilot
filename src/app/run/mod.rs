@@ -6,6 +6,8 @@ pub(crate) mod lifecycle;
 mod reverie;
 /// Stream-event processing, retry logic, typewriter buffer, and stream finalization.
 mod streaming;
+/// Thread-related helpers: auto-Read injection, `MY_TURN` detection.
+pub(super) mod threads;
 /// Tool execution: pipeline, post-execution checks, and watcher-sentinel cleanup.
 mod tools;
 /// File/GH watcher setup, cache updates, timer-based deprecation, and watcher-event dispatch.

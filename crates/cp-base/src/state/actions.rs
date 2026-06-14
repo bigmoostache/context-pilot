@@ -110,17 +110,17 @@ pub enum Action {
     /// Select primary LLM provider.
     ConfigSelectProvider(crate::config::llm_types::LlmProvider),
     /// Select primary Anthropic model.
-    ConfigSelectAnthropicModel(crate::config::llm_types::AnthropicModel),
+    ConfigSelectAnthropicModel(crate::config::models::AnthropicModel),
     /// Select primary Grok model.
-    ConfigSelectGrokModel(crate::config::llm_types::GrokModel),
+    ConfigSelectGrokModel(crate::config::models::GrokModel),
     /// Select primary Groq model.
-    ConfigSelectGroqModel(crate::config::llm_types::GroqModel),
+    ConfigSelectGroqModel(crate::config::models::GroqModel),
     /// Select primary `DeepSeek` model.
-    ConfigSelectDeepSeekModel(crate::config::llm_types::DeepSeekModel),
+    ConfigSelectDeepSeekModel(crate::config::models::DeepSeekModel),
     /// Select primary `MiniMax` model.
-    ConfigSelectMiniMaxModel(crate::config::llm_types::MiniMaxModel),
+    ConfigSelectMiniMaxModel(crate::config::models::MiniMaxModel),
     /// Select primary Claude Code V2 model.
-    ConfigSelectClaudeCodeV2Model(crate::config::llm_types::ClaudeCodeV2Model),
+    ConfigSelectClaudeCodeV2Model(crate::config::models::ClaudeCodeV2Model),
     /// Move config bar selection forward (→).
     ConfigSelectNextBar,
     /// Move config bar selection backward (←).
@@ -144,17 +144,17 @@ pub enum Action {
     /// Select secondary (reverie) LLM provider.
     ConfigSelectSecondaryProvider(crate::config::llm_types::LlmProvider),
     /// Select secondary Anthropic model.
-    ConfigSelectSecondaryAnthropicModel(crate::config::llm_types::AnthropicModel),
+    ConfigSelectSecondaryAnthropicModel(crate::config::models::AnthropicModel),
     /// Select secondary Grok model.
-    ConfigSelectSecondaryGrokModel(crate::config::llm_types::GrokModel),
+    ConfigSelectSecondaryGrokModel(crate::config::models::GrokModel),
     /// Select secondary Groq model.
-    ConfigSelectSecondaryGroqModel(crate::config::llm_types::GroqModel),
+    ConfigSelectSecondaryGroqModel(crate::config::models::GroqModel),
     /// Select secondary `DeepSeek` model.
-    ConfigSelectSecondaryDeepSeekModel(crate::config::llm_types::DeepSeekModel),
+    ConfigSelectSecondaryDeepSeekModel(crate::config::models::DeepSeekModel),
     /// Select secondary `MiniMax` model.
-    ConfigSelectSecondaryMiniMaxModel(crate::config::llm_types::MiniMaxModel),
+    ConfigSelectSecondaryMiniMaxModel(crate::config::models::MiniMaxModel),
     /// Select secondary Claude Code V2 model.
-    ConfigSelectSecondaryClaudeCodeV2Model(crate::config::llm_types::ClaudeCodeV2Model),
+    ConfigSelectSecondaryClaudeCodeV2Model(crate::config::models::ClaudeCodeV2Model),
     /// Toggle reverie (background optimizer) on/off.
     ConfigToggleReverie,
     /// Toggle between primary and secondary model tabs.
