@@ -487,7 +487,7 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS/Vite/Tailwind. Views: fleet|threads|cockpit|finder. Dark theme ''Night Gold'' (#222831/#393E46/#FFD369/#EEEEEE). Details in contents.'
+  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS/Vite/Tailwind. Views: fleet|threads|cockpit|finder. Dark theme ''Cream Noir'' = symmetric lightness-mirror of light ''Cream''. Details in contents.'
   contents: |-
     ## Context Pilot Frontend Maquette
 
@@ -496,18 +496,21 @@
     **Stack**: Vite 8 + React 19 + TS 6 + Tailwind v4 (@tailwindcss/vite) + shadcn (base-ui). Mock data only, NO backend.
 
     **Palettes (switchable, source of truth = src/index.css :root/.dark token blocks)**:
-    - LIGHT 'Cream': #FEFCF3 / #F5EBE0 / #F0DBDB / #DBA39A (warm; clay-rose primary + teal accent)
-    - DARK 'Night Gold': #222831 / #393E46 / #FFD369 / #EEEEEE (charcoal base, slate surfaces, golden-yellow #FFD369 accent/primary with dark text on it, near-white #EEEEEE foreground).
+    - LIGHT 'Cream': #FEFCF3 bg / #F5EBE0 surface / #F0DBDB secondary / clay-rose primary #be7a6e + teal accent #4e7a82. Warm, editorial.
+    - DARK 'Cream Noir' = the SYMMETRIC LIGHTNESS-MIRROR of Cream (not a new palette). Lightness flipped, warm hue + clay-rose + teal preserved. #1C1815 espresso bg / #232019 surface / #2B2620 surface-2 / #26221C card / #F3EBDD cream fg (mirror of light fg #3d342b) / #CF8A7D lifted clay-rose primary+signal / #5D9AA3 teal accent / #6FB0B8 interactive. The elegant inversion: light bg-cream becomes dark fg-cream, light near-black fg becomes dark espresso bg.
 
-    **Aesthetic**: enterprise/macOS — SF Pro chrome, IBM Plex Mono for data only. Traffic-light dots, vibrancy bars, soft shadows, hairline borders. Sun/Moon ThemeToggle top-right, localStorage 'cp-theme'.
+    **Aesthetic**: enterprise/macOS — SF Pro chrome, IBM Plex Mono for data only. Soft shadows, vibrancy bars, hairline borders (NO traffic-light dots — removed). Sun/Moon ThemeToggle top-right, localStorage 'cp-theme'.
 
     **Agent model (user-locked)**: 1 agent = 1 FOLDER = its realm, can't go out. An agent owns MULTIPLE threads that can work in PARALLEL.
 
-    **ViewMode = fleet|threads|cockpit|finder (default 'fleet')**. App.tsx: FleetDashboard at fleet altitude; threads/cockpit/finder are per-agent. TopBar app-mark→fleet; per-agent segmented switcher Threads·Cockpit·Finder (hidden at fleet).
-    1. FLEET (FleetDashboard.tsx) = mission-control welcome + the SOLE place agents are created/managed. Greeting + aggregate stat strip {agents/threads/working/waiting} + AgentCard grid (status, branch, model, thread pills working/waiting, cost, Open→threads / Manage→modal) + New-agent card. AgentModal handles create + manage(rename/model/archive), all decorative.
+    **ViewMode = fleet|threads|cockpit|finder (default 'fleet')**. App.tsx: FleetDashboard at fleet altitude; threads/cockpit/finder are per-agent. TopBar app-mark→fleet; at fleet altitude the AgentSwitcher + branch/cost chips are HIDDEN (shows 'Mission control' caption); inside an agent the per-agent segmented switcher Threads·Cockpit·Finder + branch + cost appear. Far-right Settings gear opens ConfigModal.
+
+    1. FLEET (FleetDashboard.tsx) = mission-control welcome + the SOLE place agents are created/managed. Greeting + aggregate stat strip + AgentCard grid (status Working/Needs input/Standby + one-line task summary + branch·model·cost, Open→threads / Manage→modal) + New-agent card. AgentModal (Apple-grade): create + manage(rename/model/archive), name-as-star field w/ live slugified realm preview (folder picker dropped), rich model cards, all decorative.
     2. THREADS = scoped to active agent's realm (ThreadsView filters threadDetails by agentId; EmptyRealm if none). ThreadList realm header + 'M working in parallel' pill, groups Needs-you/Working. ThreadConversation | ThreadDetailRail. Embedded QuestionForm.
     3. COCKPIT = panel-centered: LeftRail + Conversation + RightInspector.
-    4. FINDER (components/finder/, keyed by agent.id) = per-agent file manager CONFINED to the agent realm. Finder.tsx (tabs + per-tab back/fwd history, breadcrumb, grid/list/Miller-columns, search, sort, multi-select, QuickLook preview pane, drag-drop upload overlay, status bar). FinderChrome (tabs/toolbar/sidebar w/ 'confined realm' note). FinderViews (GridView/ListView/ColumnsView). FinderPreview (QuickLook: code+keyword-tint / spreadsheet grid / slide deck / PDF mock / image gradient / md/json/text / folder summary). kind.tsx (kindMeta icon+accent). lib/finderFs.ts (buildRealm grafts one rich tree onto agent folder; findNode/pathChain/fmtBytes/sortNodes).
+    4. FINDER (components/finder/, keyed by agent.id) = per-agent file manager CONFINED to the agent realm. Apple-grade: tabs+per-tab history, 4 view modes (grid/list/Miller-columns/gallery), icon-size slider, keyboard nav+type-ahead, right-click ContextMenu, GetInfo modal, QuickLook FinderPreview (code/sheet/slides/pdf/image/audio/video/md/json), sidebar Favorites/Locations/Tags. lib/finderFs.ts buildRealm grafts one rich tree onto agent folder.
+
+    **ConfigModal.tsx** (shell/): macOS System-Settings-style settings modal opened from TopBar gear. Category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane surfacing all CP config (provider keys, Voyage, Meili status, Datalab, Brave, Firecrawl, GitHub, default-model, autonomy toggles). Masked keys w/ reveal, Connected/Not-set pills. lucide-react has NO 'Github' export — used Boxes icon.
 
     **Thread→agent mapping (mock)**: threadDetails carry agentId. T8/T2/T7→a-cp, T4→a-opio, T1→a-lean.
 
@@ -517,14 +520,14 @@
 
     **Build**: cd ui && pnpm exec tsc -b (green). Dev: pnpm run dev :5173, HMR live.
 
-    **Gotchas**: TS noUnusedLocals/Parameters trips on unused imports/props. TS7 rejects baseUrl (paths only).
+    **Gotchas**: TS noUnusedLocals/Parameters trips on unused imports/props. TS7 rejects baseUrl (paths only). lucide-react has no Github icon.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781517021697
+  last_edited_ms: 1781520689763
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-

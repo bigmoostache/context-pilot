@@ -3950,6 +3950,10 @@ ce4ce60e0bd4a007:
   path: crates/cp-mod-todo/src/lib.rs
   description: 'Todo module. 3 tools: create/update/move. Fixed TODO panel (fixed_order=0, top priority). Nested object params with parent_id nesting. overview shows X/Y done. Drives spine auto-continuation.'
   last_edited_ms: 0
+cee0067c856dd433:
+  path: ui/src/index.css
+  description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Cream Noir'', the SYMMETRIC LIGHTNESS-MIRROR of Cream (#1C1815 espresso bg / #2B2620 surface / #CF8A7D lifted clay-rose / #F3EBDD cream fg; warm hue + clay-rose primary + teal accent preserved) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (agent dialog), finder-slider.'
+  last_edited_ms: 1781520704488
 cf6078cbda1950a2:
   path: src/modules/conversation/markdown_ir.rs
   description: Thin re-export — delegates to cp_render::markdown::parse_line(). Backward compat for conversation renderer.
