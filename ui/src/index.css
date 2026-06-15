@@ -14,7 +14,7 @@
   CONTEXT·PILOT — Two switchable palettes, enterprise / macOS aesthetic.
 
   LIGHT  "Cream"   #FEFCF3 · #F5EBE0 · #F0DBDB · #DBA39A   (warm, editorial)
-  DARK   "Nordic Tide" #213448 · #547792 · #94B4C1 · #EAE0CF (cool navy + warm beige ink)
+  DARK   "Indigo Ember" #2D3250 · #424769 · #7077A1 · #F6B17A (indigo ground + ember orange)
 
   To explore other palettes, edit the two token blocks below (:root + .dark).
   Every component reads these semantic tokens — nothing is hard-coded.
@@ -101,40 +101,40 @@
   color-scheme: light;
 }
 
-/* ─── DARK · "Nordic Tide" ─────────────────────────────────────────────── */
-/* A cool, vintage-maritime palette: deep navy ground, steel-blue chrome, a
-   seafoam signal, and a warm beige "ink" for text. The elegant tension is
-   cool ground + warm ink — navy surfaces typeset in cream-beige.
-   Source quartet: #213448 · #547792 · #94B4C1 · #EAE0CF. */
+/* ─── DARK · "Indigo Ember" ────────────────────────────────────────────── */
+/* A cool indigo ground lit by a single warm ember-orange accent — the classic
+   complementary contrast (orange on indigo). Periwinkle carries secondary
+   accents and dimmed labels; a soft warm cream is the text "ink".
+   Source quartet: #2D3250 · #424769 · #7077A1 · #F6B17A. */
 .dark {
-  --background: #213448; /* deep navy — app background */
-  --surface: #263c52; /* sidebars / chrome — lifted navy */
-  --surface-2: #2c4459; /* nested surface */
-  --card: #294560; /* raised card */
-  --popover: #294560;
+  --background: #2d3250; /* deep indigo-navy — app background */
+  --surface: #353a5c; /* sidebars / chrome — lifted indigo */
+  --surface-2: #3d4365; /* nested surface */
+  --card: #424769; /* raised card — the source indigo */
+  --popover: #424769;
 
-  --foreground: #eae0cf; /* warm beige cream — the "ink" */
-  --muted: #2c4459;
-  --muted-foreground: #94b4c1; /* seafoam — dimmed labels read cool-grey */
+  --foreground: #ece5da; /* soft warm cream — the "ink" */
+  --muted: #3d4365;
+  --muted-foreground: #7077a1; /* periwinkle — dimmed labels read dusty violet */
 
-  --border: #395874; /* steel-navy — derived between bg and #547792 */
-  --input: #395874;
-  --grid: #294056;
+  --border: #434a73; /* lifted indigo — derived between bg and #424769 */
+  --input: #434a73;
+  --grid: #343a5a;
 
-  --primary: #94b4c1; /* seafoam — primary actions / your-turn */
-  --primary-foreground: #1b2c3c; /* deep navy text on the seafoam */
-  --accent: #547792; /* steel blue — secondary accent */
-  --accent-foreground: #eae0cf;
-  --ring: #94b4c1;
+  --primary: #f6b17a; /* ember orange — primary actions / your-turn */
+  --primary-foreground: #2a2238; /* deep plum-indigo text on the orange */
+  --accent: #7077a1; /* periwinkle — secondary accent */
+  --accent-foreground: #ece5da;
+  --ring: #f6b17a;
 
-  --signal: #94b4c1; /* seafoam — accent text / active */
-  --signal-dim: #5d7d8c;
-  --interactive: #a9c6d1; /* brighter seafoam — links / info */
-  --ok: #8bbf9a; /* cool-leaning green to sit in the palette */
-  --warn: #e0b074; /* warm sand — pops against the cool ground */
-  --danger: #d98777; /* warm coral — clear alarm on navy */
+  --signal: #f6b17a; /* ember orange — accent text / active */
+  --signal-dim: #b9855e;
+  --interactive: #969ed1; /* brighter periwinkle — links / info (distinct from orange) */
+  --ok: #7fb892; /* cool-leaning green to sit on the indigo */
+  --warn: #e8cf6b; /* soft gold — kept distinct from the orange accent */
+  --danger: #e8736b; /* coral red — pushed redder than the peach primary */
 
-  --shadow-color: 210deg 38% 4%;
+  --shadow-color: 232deg 32% 4%;
   --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.55),
     0 4px 14px hsl(var(--shadow-color) / 0.45);
   --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 0.6);
