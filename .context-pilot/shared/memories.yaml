@@ -497,7 +497,7 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS. Views: fleet|threads|cockpit|finder. Dark ''Indigo Ember'' (indigo + ember-orange). Modals on portaled Base UI Dialog. Details in contents.'
+  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS. Views: fleet|threads|cockpit|finder. Dark theme = TUI D&D palette (charcoal grey + torch orange). Modals on portaled Base UI Dialog. Details in contents.'
   contents: |-
     ## Context Pilot Frontend Maquette
 
@@ -507,37 +507,37 @@
 
     **Palettes (switchable, source of truth = src/index.css :root/.dark token blocks)**:
     - LIGHT 'Cream': #FEFCF3 bg / #F5EBE0 surface / #F0DBDB secondary / clay-rose primary #be7a6e + teal accent #4e7a82. Warm, editorial.
-    - DARK 'Cream Noir' = the SYMMETRIC LIGHTNESS-MIRROR of Cream (not a new palette). Lightness flipped, warm hue + clay-rose + teal preserved. #1C1815 espresso bg / #232019 surface / #2B2620 surface-2 / #26221C card / #F3EBDD cream fg (mirror of light fg #3d342b) / #CF8A7D lifted clay-rose primary+signal / #5D9AA3 teal accent / #6FB0B8 interactive. The elegant inversion: light bg-cream becomes dark fg-cream, light near-black fg becomes dark espresso bg.
+    - DARK 'Dungeon Forge' = the Context Pilot TUI's 'D&D' theme palette (yamls/themes.yaml), lifted verbatim. Warm-neutral charcoal greys (#222220 bg_base / #333331 bg_surface / #424240 bg_elevated; derived #3a3a38 surface-2, #4d4d49 hairline border) lit by a single torch-orange #DA7659 (TUI accent) = primary+signal+ring+your-turn; #B26245 (accent_dim) secondary accent; #C98F6B tan interactive/links; #F0F0F0 near-white ink, #909090 dimmed labels; ok=forest-green #86BC6F, warn=gold #E5C07B, danger=blood-red #C85050. (Superseded earlier maquette darks: Night Gold, Cream Noir, Indigo Ember.)
 
-    **Aesthetic**: enterprise/macOS — SF Pro chrome, IBM Plex Mono for data only. Soft shadows, vibrancy bars, hairline borders (NO traffic-light dots — removed). Sun/Moon ThemeToggle top-right, localStorage 'cp-theme'.
+    **Aesthetic**: enterprise/macOS — SF Pro chrome, IBM Plex Mono for data only. Soft shadows, vibrancy bars, hairline borders (NO traffic-light dots). Sun/Moon ThemeToggle top-right, localStorage 'cp-theme'.
 
     **Agent model (user-locked)**: 1 agent = 1 FOLDER = its realm, can't go out. An agent owns MULTIPLE threads that can work in PARALLEL.
 
-    **ViewMode = fleet|threads|cockpit|finder (default 'fleet')**. App.tsx: FleetDashboard at fleet altitude; threads/cockpit/finder are per-agent. TopBar app-mark→fleet; at fleet altitude the AgentSwitcher + branch/cost chips are HIDDEN (shows 'Mission control' caption); inside an agent the per-agent segmented switcher Threads·Cockpit·Finder + branch + cost appear. Far-right Settings gear opens ConfigModal.
+    **ViewMode = fleet|threads|cockpit|finder (default 'fleet')**. App.tsx: FleetDashboard at fleet altitude; threads/cockpit/finder are per-agent. TopBar app-mark→fleet; at fleet altitude the AgentSwitcher + cost + Activity(stats) button + view switcher are HIDDEN (shows 'Mission control' caption); inside an agent the per-agent segmented switcher Threads·Cockpit·Finder + cost + Activity appear. Git branch chip removed everywhere (general-user UI). Far-right Settings gear opens ConfigModal.
 
-    1. FLEET (FleetDashboard.tsx) = mission-control welcome + the SOLE place agents are created/managed. Greeting + aggregate stat strip + AgentCard grid (status Working/Needs input/Standby + one-line task summary + branch·model·cost, Open→threads / Manage→modal) + New-agent card. AgentModal (Apple-grade): create + manage(rename/model/archive), name-as-star field w/ live slugified realm preview (folder picker dropped), rich model cards, all decorative.
-    2. THREADS = scoped to active agent's realm (ThreadsView filters threadDetails by agentId; EmptyRealm if none). ThreadList realm header + 'M working in parallel' pill, groups Needs-you/Working. ThreadConversation | ThreadDetailRail. Embedded QuestionForm.
-    3. COCKPIT = panel-centered: LeftRail + Conversation + RightInspector.
-    4. FINDER (components/finder/, keyed by agent.id) = per-agent file manager CONFINED to the agent realm. Apple-grade: tabs+per-tab history, 4 view modes (grid/list/Miller-columns/gallery), icon-size slider, keyboard nav+type-ahead, right-click ContextMenu, GetInfo modal, QuickLook FinderPreview (code/sheet/slides/pdf/image/audio/video/md/json), sidebar Favorites/Locations/Tags. lib/finderFs.ts buildRealm grafts one rich tree onto agent folder.
+    1. FLEET (FleetDashboard.tsx) = mission-control welcome + the SOLE place agents are created/managed. Greeting + AgentCard grid (status + one-line task + model·cost, no git branch; Open→threads / Manage→modal) + New-agent card. AgentModal (Apple-grade): create + manage(rename/model/archive), name-as-star field w/ live slugified realm preview, rich model cards.
+    2. THREADS = scoped to active agent's realm (ThreadsView filters threadDetails by agentId; EmptyRealm if none). ThreadList + ThreadConversation; thread metadata in on-demand ThreadDetailsPopup (ⓘ button), portaled Dialog. Embedded QuestionForm.
+    3. COCKPIT = panel-centered: LeftRail + Conversation (RightInspector removed; stats now in header StatsPopup).
+    4. FINDER (components/finder/, keyed by agent.id) = per-agent file manager CONFINED to the agent realm. Apple-grade: tabs+per-tab history, file-tabs (dbl-click file→dedicated tab w/ kind icon), 4 view modes (grid/list/Miller/gallery), icon-size slider, keyboard nav+type-ahead, ContextMenu, GetInfo modal, QuickLook FinderPreview, sidebar Favorites/Locations/Tags. lib/finderFs.ts buildRealm grafts one rich tree onto agent folder.
 
-    **ConfigModal.tsx** (shell/): macOS System-Settings-style settings modal opened from TopBar gear. Category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane surfacing all CP config (provider keys, Voyage, Meili status, Datalab, Brave, Firecrawl, GitHub, default-model, autonomy toggles). Masked keys w/ reveal, Connected/Not-set pills. lucide-react has NO 'Github' export — used Boxes icon.
+    **ConfigModal.tsx** + **StatsPopup.tsx** + **ThreadDetailsPopup.tsx**: all on the portaled Base UI Dialog primitive (ui/components/ui/dialog.tsx) — portals to document.body to escape the TopBar .vibrancy backdrop-filter containing block that traps position:fixed (the half-off-screen bug). ConfigModal = macOS System-Settings style (category rail + detail pane: provider keys, Voyage, Meili, Datalab, Brave, Firecrawl, GitHub, default-model, autonomy toggles).
 
     **Thread→agent mapping (mock)**: threadDetails carry agentId. T8/T2/T7→a-cp, T4→a-opio, T1→a-lean.
 
-    **REMOVED**: AgentsView.tsx, AgentDetail.tsx, FileBrowser.tsx (old browse-coupled agent management) — replaced by FleetDashboard (management) + Finder (per-agent fs). fileTree/FsNode remain in mock/types as legacy unused exports.
+    **REMOVED**: AgentsView/AgentDetail/FileBrowser (old browse-coupled mgmt), RightInspector (cockpit right rail), ThreadDetailRail. fileTree/FsNode remain as legacy unused exports.
 
-    **Threads Rust**: Send to a THEIR_TURN thread is now ALLOWED (status stays THEIR_TURN) — pre-flight block removed in cp-mod-threads/src/lib.rs.
+    **Threads Rust**: Send to a THEIR_TURN thread is ALLOWED (status stays THEIR_TURN).
 
     **Build**: cd ui && pnpm exec tsc -b (green). Dev: pnpm run dev :5173, HMR live.
 
-    **Gotchas**: TS noUnusedLocals/Parameters trips on unused imports/props. TS7 rejects baseUrl (paths only). lucide-react has no Github icon.
+    **Gotchas**: TS noUnusedLocals/Parameters trips on unused imports/props. lucide-react has no Github icon (use Boxes).
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781525404520
+  last_edited_ms: 1781530555896
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-

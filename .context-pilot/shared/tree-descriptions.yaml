@@ -4774,3 +4774,7 @@ ffa4da3ef00da59b:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
+ffd10c656a62b649:
+  path: ui/src/index.css
+  description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Dungeon Forge'' = the TUI''s D&D palette lifted verbatim (#222220 charcoal bg / #333331 surface / #424240 card / torch-orange #DA7659 primary+signal+your-turn / #B26245 dim-torch accent / #C98F6B tan interactive / #F0F0F0 near-white ink / #909090 dimmed; ok forest-green #86BC6F, warn gold #E5C07B, danger blood-red #C85050) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (modals), finder-slider.'
+  last_edited_ms: 1781530507655
