@@ -2130,6 +2130,10 @@
   path: crates/cp-mod-todo/Cargo.toml
   description: 'Todo module deps: cp-base, cp-render, crossterm, serde, serde_json.'
   last_edited_ms: 0
+6cfef17043e74399:
+  path: ui/src/components/agents/PromptModal.tsx
+  description: 'Prompts page modals (design-only). PromptModal: LARGE dialog (1180x90vh, max 96vw) — create (kind picker System/Skill/Command + name/description) or view/edit (prefilled, built-in name lock, Delete). Body uses the WYSIWYG MarkdownEditor (flex-grows to fill height), not a textarea; editor remounts on isNew/item.id (NOT kind) so the kind toggle no longer wipes the body. ImportModal: import from other agentic systems (Claude Code/Codex/Cursor/Windsurf/Aider/Continue), per-row Imported state. Shared hand-rolled Backdrop (backdrop-fade+modal-pop) + Field. Used by PromptsPage.'
+  last_edited_ms: 1781534862032
 6d4edeec6476c9c3:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook, CLI subcommands (typst-compile/recompile-watched). use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
@@ -4458,6 +4462,10 @@ e610e21de8868286:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
   last_edited_ms: 0
+e6320611c8e9f107:
+  path: ui/src/components/ui/sheet.tsx
+  description: shadcn Sheet primitive (Base UI Dialog) — side drawer (top/right/bottom/left) with overlay, close button. Not currently consumed by any view; available shadcn building block.
+  last_edited_ms: 1781534862020
 e6b9ad2949d17655:
   path: src/app/panels.rs
   description: Thin wrapper around cp_base::panels. get_panel() delegates to module system. FallbackPanel for orphaned contexts. refresh_all_panels() and collect_all_context() helpers.
