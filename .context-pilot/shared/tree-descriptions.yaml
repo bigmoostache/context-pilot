@@ -4014,6 +4014,10 @@ cf6078cbda1950a2:
   path: src/modules/conversation/markdown_ir.rs
   description: Thin re-export — delegates to cp_render::markdown::parse_line(). Backward compat for conversation renderer.
   last_edited_ms: 0
+cf8e2e265d1ea9ea:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. App mark (Home)→fleet. At fleet altitude ''Mission control'' caption (switcher hidden); inside an agent: AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + cost (git branch chip removed). Far-right: Activity button→StatsPopup (hidden at fleet altitude — vitals are agent-scoped) + ThemeToggle + Settings gear→ConfigModal. Both modals always-mounted, controlled open.'
+  last_edited_ms: 1781530223695
 cf9eeed1e42804e8:
   path: src/modules/conversation/render_input_blocks.rs
   description: IR input area renderer. Cursor + paste placeholder expansion + command highlighting + selection highlighting (via apply_selection_to_spans with reversed spans). InputBlockCtx context, expand_paste_sentinels mapping, command hints.
