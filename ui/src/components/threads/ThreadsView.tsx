@@ -18,8 +18,8 @@ import type { ThreadDetail } from "@/lib/types"
  * filters, **New Thread** prepends a thread, and **archive / restore** moves
  * threads in and out of the archived view.
  *
- * The sidebar collapses by dragging its right **edge rail** — the exact shadcn
- * Sidebar interaction used by the fleet dashboard (no in-rail button).
+ * The thread list is **always open** — there is no collapse/expand affordance
+ * (removed per T23); the rail is a permanent fixture of the threads view.
  */
 export function ThreadsView({
   activeAgentId,
@@ -34,7 +34,6 @@ export function ThreadsView({
   const [selectedId, setSelectedId] = useState(
     () => threads.find((t) => !t.archived)?.id ?? threads[0]?.id ?? "",
   )
-  const [collapsed, setCollapsed] = useState(false)
   const [query, setQuery] = useState("")
   const [showArchived, setShowArchived] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
@@ -78,12 +77,11 @@ export function ThreadsView({
   }
 
   return (
-    <div className="relative flex min-h-0 flex-1">
+    <div className="flex min-h-0 flex-1">
       <ThreadList
         threads={threads}
         selectedId={thread?.id ?? ""}
         onSelect={setSelectedId}
-        collapsed={collapsed}
         query={query}
         onQueryChange={setQuery}
         showArchived={showArchived}
@@ -91,30 +89,6 @@ export function ThreadsView({
         onArchive={handleArchive}
         onNewThread={() => setNewOpen(true)}
       />
-
-      {/* Collapse rail — click the sidebar's right edge to collapse/expand it
-          (the same shadcn Sidebar interaction as the fleet dashboard). A
-          generous hit zone hugs the border; on hover a soft band lights up and
-          a pill-grip handle appears so the affordance reads clearly. Tracks the
-          sidebar width and stays reachable at x≈0 when collapsed. */}
-      <button
-        onClick={() => setCollapsed((v) => !v)}
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="group absolute inset-y-0 z-20 w-5 -translate-x-1/2 cursor-pointer transition-[left] duration-200 ease-in-out"
-        style={{ left: collapsed ? 6 : "var(--sidebar-w)" }}
-      >
-        {/* hover band — a subtle highlight across the seam */}
-        <span className="absolute inset-y-0 left-1/2 w-[3px] -translate-x-1/2 rounded-full bg-border transition-all duration-150 group-hover:w-[5px] group-hover:bg-[var(--interactive)]/45 group-active:bg-[var(--interactive)]/70" />
-        {/* pill-grip handle — the obvious drag/click affordance */}
-        <span className="absolute left-1/2 top-1/2 flex h-11 w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card opacity-0 shadow-sm transition-all duration-150 group-hover:opacity-100 group-active:scale-95">
-          <span className="flex flex-col items-center gap-[3px]">
-            <span className="size-[3px] rounded-full bg-muted-foreground/60" />
-            <span className="size-[3px] rounded-full bg-muted-foreground/60" />
-            <span className="size-[3px] rounded-full bg-muted-foreground/60" />
-          </span>
-        </span>
-      </button>
 
       {thread && <ThreadConversation thread={thread} />}
 

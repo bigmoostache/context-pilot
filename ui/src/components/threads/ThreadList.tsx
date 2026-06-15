@@ -8,8 +8,6 @@ interface ThreadListProps {
   threads: ThreadDetail[]
   selectedId: string
   onSelect: (id: string) => void
-  /** when true the rail animates closed to zero width */
-  collapsed: boolean
   /** live search query (controlled by the parent so it survives collapse) */
   query: string
   onQueryChange: (q: string) => void
@@ -33,9 +31,8 @@ function previewOf(t: ThreadDetail): string {
  * Left rail of the thread-centered view — a clean, grouped chat sidebar.
  *
  * The agent identity (name / folder / logo) is intentionally *not* repeated
- * here: it already lives in the TopBar. Collapsing is driven by the draggable
- * edge **rail** rendered by {@link ThreadsView} (matching the fleet dashboard's
- * shadcn-Sidebar interaction) — there is no in-rail collapse button.
+ * here: it already lives in the TopBar. The rail is **always open** — there is
+ * no collapse affordance (removed per T23).
  *
  * The search box genuinely filters (by name + last-message preview). Threads
  * are grouped by turn-status — **Needs you** (MY_TURN), **Active** (the single
@@ -47,7 +44,6 @@ export function ThreadList({
   threads,
   selectedId,
   onSelect,
-  collapsed,
   query,
   onQueryChange,
   showArchived,
@@ -73,13 +69,8 @@ export function ThreadList({
   const workingCount = live.filter((t) => t.status !== "MY_TURN").length
 
   return (
-    <aside
-      className={cn(
-        "flex shrink-0 flex-col overflow-hidden bg-surface transition-[width] duration-200 ease-in-out",
-        collapsed ? "w-0 border-r-0" : "w-[var(--sidebar-w)] border-r border-border",
-      )}
-    >
-      {/* fixed-width inner shell so content doesn't reflow while collapsing */}
+    <aside className="flex w-[var(--sidebar-w)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface">
+      {/* fixed-width inner shell pinned to the rail width */}
       <div
         className="flex h-full flex-col"
         style={{ width: "var(--sidebar-w)", minWidth: "var(--sidebar-w)" }}
