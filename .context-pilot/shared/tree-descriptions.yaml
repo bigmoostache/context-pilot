@@ -2378,6 +2378,10 @@
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
+7a3d3e9e1ea6a348:
+  path: ui/src/components/agents/FleetSidebar.tsx
+  description: Mission-control left nav rail (fleet dashboard). FleetPage type = agents|prompts|usage|settings. NO identity header (lives in TopBar). NO in-rail collapse button — collapse is driven by the border rail FleetShell renders on the right edge. 4 nav items (icon+label+hint, active=card-shadow). collapsed prop animates aside width 212→0 (fixed-width inner shell). page/onSelect/collapsed props.
+  last_edited_ms: 1781532872876
 7b8f6edeaef20990:
   path: src/app/actions/streaming.rs
   description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'
@@ -3058,6 +3062,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: macOS title bar. App mark (Home)→fleet. AgentSwitcher dropdown. Per-agent segmented switcher Threads·Cockpit·Finder (hidden at fleet). Branch+cost from active agent. ThemeToggle.
   last_edited_ms: 1781516507838
+9d0e6a9adda50aaa:
+  path: ui/src/components/agents/FleetShell.tsx
+  description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + a clickable border RAIL (shadcn Sidebar pattern): thin full-height hit area at x=SIDEBAR_W(212), tracks width, sits at x=0 when collapsed, brightens to interactive on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
+  last_edited_ms: 1781532872888
 9d20b15ef58729cf:
   path: crates/cp-mod-spine/src/tools.rs
   description: Spine tool handlers. execute_mark_processed (batch notification marking), execute_configure (guard rail limits with zero-value rejection, counter reset).
