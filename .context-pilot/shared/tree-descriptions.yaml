@@ -558,6 +558,10 @@
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
   last_edited_ms: 0
+1ab95bffa7deadf1:
+  path: ui/src/components/shell/AgentSwitcher.tsx
+  description: 'TopBar workspace switcher dropdown (1 agent=1 folder). activeId optional: with an agent it shows name+folder; at fleet altitude (undefined) it shows a neutral ''Select an agent'' placeholder (dashed-folder PlaceholderDot) so the card never vanishes. Items wrapped in DropdownMenuGroup (Base UI fix). Switch agent inline; New-agent/Manage jump to fleet (onFleet).'
+  last_edited_ms: 1781533125740
 1b4881ed98b5293d:
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. Nested object params (location). Simple dispatch pattern.'
@@ -3782,6 +3786,10 @@ c09b5ee39c60f5c7:
   path: src/modules/questions/mod.rs
   description: 'QuestionsModule: core, 1 tool (Think only). ThinkState persistence, on_tool_complete counter drift. No ask_user_question tool. Uses core.yaml for tool texts.'
   last_edited_ms: 1781391612172
+c0aeea6c744c259a:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. App mark (Home)->fleet. ALWAYS renders / + AgentSwitcher: inside an agent it shows the workspace + per-agent segmented switcher Threads·Cockpit·Finder + cost; at fleet altitude passes activeId undefined (placeholder switcher) and picking an agent enters it (->threads). Far-right: Activity->StatsPopup (hidden at fleet) + ThemeToggle + Settings gear->ConfigModal. Both modals always-mounted, controlled open. Git branch chip removed.'
+  last_edited_ms: 1781533125751
 c128c6c1a8afa6e1:
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
