@@ -1,10 +1,11 @@
 import { useState } from "react"
-import { GitBranch, LayoutGrid, MessagesSquare, FolderTree, Home, Settings } from "lucide-react"
+import { Activity, GitBranch, LayoutGrid, MessagesSquare, FolderTree, Home, Settings } from "lucide-react"
 import { status, agents } from "@/lib/mock"
 import { fmtCost } from "@/lib/panelMeta"
 import { ThemeToggle } from "./ThemeToggle"
 import { AgentSwitcher } from "./AgentSwitcher"
 import { ConfigModal } from "./ConfigModal"
+import { StatsPopup } from "./StatsPopup"
 import type { ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -21,6 +22,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
   const inFleet = view === "fleet"
   const [configOpen, setConfigOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
 
   return (
     <header className="vibrancy flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
@@ -91,6 +93,14 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
             </span>
           </>
         )}
+        <button
+          onClick={() => setStatsOpen(true)}
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
+          title="Session vitals"
+          aria-label="Open session stats"
+        >
+          <Activity className="size-[17px]" />
+        </button>
         <ThemeToggle />
         <span className="h-5 w-px bg-border/70" />
         <button
@@ -104,6 +114,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
       </div>
 
       <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
+      <StatsPopup open={statsOpen} onClose={() => setStatsOpen(false)} />
     </header>
   )
 }

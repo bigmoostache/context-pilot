@@ -2,7 +2,6 @@ import { useState } from "react"
 import { TopBar } from "@/components/shell/TopBar"
 import { LeftRail } from "@/components/shell/LeftRail"
 import { Conversation } from "@/components/conversation/Conversation"
-import { RightInspector } from "@/components/shell/RightInspector"
 import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetDashboard } from "@/components/agents/FleetDashboard"
@@ -41,7 +40,6 @@ function App() {
           <div className="flex min-h-0 flex-1">
             <LeftRail />
             <Conversation />
-            <RightInspector />
           </div>
         ) : view === "finder" ? (
           <Finder key={activeAgent.id} agent={activeAgent} />
