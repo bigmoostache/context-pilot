@@ -2714,6 +2714,10 @@
   path: src/llms/claude_code/stream.rs
   description: 'Placeholder: stream methods merged into mod.rs to avoid multiple_inherent_impl lint'
   last_edited_ms: 0
+8dc22b79675bf80c:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. App mark (Home)→fleet. At fleet altitude ''Mission control'' caption (switcher hidden); inside an agent: AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + cost (git branch chip removed — general-user UI). Far-right: Activity button (StatsPopup) + ThemeToggle + Settings gear (ConfigModal). Both modals always-mounted, controlled open.'
+  last_edited_ms: 1781530040363
 8dfe4ccc082be2d1:
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers for panel rendering. Align enum + TextCell + render_table_text() (plain-text for LLM context). Tree output parsing helpers (find_size_pattern, find_children_pattern). Sub-modules: question_form, render_cache.'
@@ -2826,6 +2830,10 @@
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
   last_edited_ms: 0
+93f2a0cb0233f725:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, AgentCard grid (status badge + one-line task summary + model·cost meta — no git branch, general-user UI; Open→agent threads, Manage→modal), New-agent card. AgentModal (Apple-grade): backdrop-fade+modal-pop, gradient hero header, name-as-star field w/ live slugified realm preview, rich model cards (MODEL_META tier/blurb/price/icon, opt-rise stagger), quiet Archive ghost, name-gated primary, autofocus+Esc+⌘↵.'
+  last_edited_ms: 1781530040374
 9400c2d396c4f00a:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
