@@ -1490,6 +1490,10 @@
   path: ui/src/main.tsx
   description: React entry — mounts App in StrictMode.
   last_edited_ms: 1781516472146
+4b8eb9dc33764c63:
+  path: ui/src/components/agents/FleetShell.tsx
+  description: 'Fleet mission-control shell. Owns fleetPage + collapsed state, renders collapsible FleetSidebar (floating PanelLeft re-open when collapsed) + active page: agents (FleetDashboard) / prompts (PromptsPage) / usage (UsagePage) / settings (ConfigPanel variant=''inline''). App.tsx renders this at fleet altitude.'
+  last_edited_ms: 1781532231563
 4bb896637366abe2:
   path: crates/cp-mod-spine/src/guard_rail.rs
   description: 'Guard rail implementations: MaxOutputTokens, MaxCost (stream/burst-based), MaxDuration, MaxMessages, MaxAutoRetries. GuardRailStopLogic trait. all_guard_rails() static list.'
@@ -2614,6 +2618,10 @@
   path: docs/architecture.md
   description: High-level architecture overview
   last_edited_ms: 0
+87a3d7cf95477415:
+  path: ui/src/components/agents/FleetSidebar.tsx
+  description: Mission-control left nav rail (fleet dashboard), collapsible. FleetPage type = agents|prompts|usage|settings. NO identity header (lives in TopBar). Top strip = PanelLeftClose collapse trigger; then 4 nav items (icon+label+hint, active=card-shadow). collapsed prop animates aside width 212→0 (fixed-width inner shell). page/onSelect/collapsed/onToggleCollapse props.
+  last_edited_ms: 1781532231552
 87c9c3f805064c63:
   path: crates/cp-mod-entities/src/errors.rs
   description: 'SQL error enrichment: fuzzy suggestions (Levenshtein ≤2) for unknown table/column names + schema context appended to all errors.'
@@ -3026,6 +3034,10 @@
   path: crates/cp-mod-git/Cargo.toml
   description: 'Git module deps: cp-base, cp-render, crossterm, serde_json, regex.'
   last_edited_ms: 1780563847618
+9b5bd654de298c74:
+  path: ui/src/components/shell/ConfigPanel.tsx
+  description: 'Shared settings body (macOS System-Settings: category rail + detail pane). NO identity header on the rail (detail-pane header names the active category). variant=''dialog'' (DialogClose chrome, used by ConfigModal/TopBar gear) | ''inline'' (fills page, Save button, used by fleet Settings page). Categories: General/Providers/Search/DocAI/Web/Integrations. Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
+  last_edited_ms: 1781532231574
 9bb5142dd0e6600d:
   path: src/llms/oai_providers/groq.rs
   description: Groq client. OpenAI-compatible with built-in tools (browser_search, code_interpreter) for GPT-OSS models. GROQ_API_KEY auth.
