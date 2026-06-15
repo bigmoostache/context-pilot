@@ -14,7 +14,7 @@
   CONTEXT·PILOT — Two switchable palettes, enterprise / macOS aesthetic.
 
   LIGHT  "Cream"   #FEFCF3 · #F5EBE0 · #F0DBDB · #DBA39A   (warm, editorial)
-  DARK   "Deep Ocean" #0A2647 · #144272 · #205295 · #2C74B3 (navy base, azure accent)
+  DARK   "Night Gold" #222831 · #393E46 · #FFD369 · #EEEEEE (charcoal base, gold accent)
 
   To explore other palettes, edit the two token blocks below (:root + .dark).
   Every component reads these semantic tokens — nothing is hard-coded.
@@ -101,41 +101,41 @@
   color-scheme: light;
 }
 
-/* ─── DARK · "Deep Ocean" ──────────────────────────────────────────────── */
-/* #0A2647 · #144272 · #205295 · #2C74B3 — deep navy base, layered blues,
-   bright azure accent. Cool icy-white text derived for contrast. */
+/* ─── DARK · "Night Gold" ──────────────────────────────────────────────── */
+/* #222831 · #393E46 · #FFD369 · #EEEEEE — charcoal base, slate surfaces,
+   golden-yellow accent, near-white text. Crisp dark theme with a warm pop. */
 .dark {
-  --background: #0a2647;
-  --surface: #0e2c50; /* sidebars / chrome — between base + card */
-  --surface-2: #143b62; /* nested surface */
-  --card: #144272;
-  --popover: #144272;
+  --background: #222831;
+  --surface: #2a313b; /* sidebars / chrome — between base + card */
+  --surface-2: #333b45; /* nested surface */
+  --card: #393e46;
+  --popover: #393e46;
 
-  --foreground: #dce7f5;
-  --muted: #163a5c;
-  --muted-foreground: #8aa6c4;
+  --foreground: #eeeeee;
+  --muted: #333b45;
+  --muted-foreground: #9aa1ab;
 
-  --border: #1f4f86;
-  --input: #1f4f86;
-  --grid: #0e2c50;
+  --border: #4a525d;
+  --input: #4a525d;
+  --grid: #2a313b;
 
-  --primary: #2c74b3; /* bright azure — primary actions */
-  --primary-foreground: #eaf3fc;
-  --accent: #2c74b3;
-  --accent-foreground: #eaf3fc;
-  --ring: #2c74b3;
+  --primary: #ffd369; /* golden yellow — primary actions */
+  --primary-foreground: #222831; /* dark text on yellow */
+  --accent: #ffd369;
+  --accent-foreground: #222831;
+  --ring: #ffd369;
 
-  --signal: #4f93cf; /* azure — accent text / active (brightened for contrast) */
-  --signal-dim: #205295;
-  --interactive: #5a9bd4; /* lighter azure — links / info */
-  --ok: #5fae8d;
-  --warn: #d6ab63;
-  --danger: #d9776b;
+  --signal: #ffd369; /* golden yellow — accent text / active */
+  --signal-dim: #b89647;
+  --interactive: #ffdf8a; /* lighter gold — links / info */
+  --ok: #6fb585;
+  --warn: #e0913f; /* orange (distinct from the yellow accent) */
+  --danger: #e06c5e;
 
-  --shadow-color: 213deg 60% 4%;
+  --shadow-color: 215deg 18% 4%;
   --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.5),
-    0 4px 14px hsl(var(--shadow-color) / 0.38);
-  --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 0.55);
+    0 4px 14px hsl(var(--shadow-color) / 0.4);
+  --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 0.58);
 
   color-scheme: dark;
 }

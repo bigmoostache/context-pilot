@@ -3658,6 +3658,10 @@ c38efa785cbc3000:
   path: crates/cp-mod-brave/src/types.rs
   description: 'Brave API serde types: BraveSearchResponse (web/rich results), LLMContextResponse (grounding items)'
   last_edited_ms: 0
+c3cec48a83f06e1c:
+  path: ui/src/index.css
+  description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A) + DARK ''Night Gold'' (#222831/#393E46/#FFD369/#EEEEEE: charcoal base, slate surfaces, golden-yellow accent, near-white text) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow.'
+  last_edited_ms: 1781516984137
 c3e00b84691cd46d:
   path: src/llms/claude_code/check_api.rs
   description: 'Health-check helpers: system_block(), CheckRequest struct, build_check_request() with CC-specific headers'
