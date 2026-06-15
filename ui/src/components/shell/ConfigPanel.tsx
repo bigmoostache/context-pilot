@@ -42,8 +42,6 @@ export function ConfigPanel({
   const [cat, setCat] = useState<CatId>("general")
   const inline = variant === "inline"
 
-  const active = CATEGORIES.find((c) => c.id === cat) ?? CATEGORIES[0]
-
   return (
     <div className="flex min-h-0 flex-1">
       {/* category rail */}
@@ -90,22 +88,22 @@ export function ConfigPanel({
 
       {/* detail pane */}
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-border/70 px-6">
-          <active.icon className="size-[17px] text-muted-foreground" />
-          <h2 className="text-[14px] font-semibold tracking-tight text-foreground">{active.label}</h2>
-          <p className="ml-2 hidden truncate text-[12px] text-muted-foreground md:block">{active.blurb}</p>
-          {!inline && (
+        {/* No per-category title here — the focused item in the left rail
+            already names the page, so repeating it as a heading is noise.
+            Dialog variant keeps just a slim bar holding the close control. */}
+        {!inline && (
+          <header className="flex h-[46px] shrink-0 items-center justify-end border-b border-border/70 px-3">
             <DialogClose
-              className="ml-auto flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
               aria-label="Close"
             >
               <X className="size-4" />
             </DialogClose>
-          )}
-        </header>
+          </header>
+        )}
 
         {cat === "usage" ? (
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <CategoryBody cat={cat} />
           </div>
         ) : (

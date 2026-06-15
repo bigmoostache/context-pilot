@@ -24,7 +24,7 @@ export function ConfigModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex h-[560px] w-[820px] max-w-[calc(100vw-3rem)]">
+      <DialogContent className="flex h-[88vh] max-h-[860px] w-[1100px] max-w-[calc(100vw-3rem)]">
         <ConfigPanel variant="dialog" />
       </DialogContent>
     </Dialog>
