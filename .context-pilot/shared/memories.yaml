@@ -487,7 +487,7 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS/Vite/Tailwind. Views: fleet|threads|cockpit|finder. Dark ''Cream Noir'' = lightness-mirror of light ''Cream''. Modals on portaled Base UI Dialog (ui/components/ui/dialog.tsx). Details in contents.'
+  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS/Vite/Tailwind. Views: fleet|threads|cockpit|finder. Dark ''Nordic Tide'' = navy/sea/beige. Modals on portaled Base UI Dialog (ui/components/ui/dialog.tsx). Details in contents.'
   contents: |-
     ## Context Pilot Frontend Maquette
 
@@ -527,7 +527,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781524796397
+  last_edited_ms: 1781524923815
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-

@@ -3850,6 +3850,10 @@ c86f42eaf477c5e2:
   path: yamls/reverie.yaml
   description: 'Reverie sub-agent prompts: kickoff, tool restrictions, report instructions, nudge, error messages'
   last_edited_ms: 0
+c89410cd290ef513:
+  path: ui/src/index.css
+  description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Nordic Tide'' (#213448 deep navy bg / #547792 steel-blue accent / #94B4C1 seafoam primary+signal / #EAE0CF warm beige ''ink'' text; cool ground + warm ink, intermediate surfaces derived) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (modals), finder-slider.'
+  last_edited_ms: 1781524915486
 c92262342f94a31f:
   path: crates/cp-mod-entities/src/panel.rs
   description: Fixed Entities panel. Live schema + sample data context for LLM. Empty-state onboarding guide with quick-start SQL. IR blocks with Accent/Code/Muted styling. Migration count display.
