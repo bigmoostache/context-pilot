@@ -3,7 +3,6 @@ import { Message } from "@/components/conversation/Message"
 import { QuestionForm } from "./QuestionForm"
 import { ThreadComposer } from "./ThreadComposer"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
-import { cn } from "@/lib/utils"
 
 /** Map a thread message onto the shared ChatMessage shape for the renderer. */
 function toChatMessage(m: ThreadMsg): ChatMessage {
@@ -17,38 +16,21 @@ function toChatMessage(m: ThreadMsg): ChatMessage {
   }
 }
 
-/** Center pane — the selected thread's full conversation + composer. */
+/**
+ * Center pane — the selected thread's full conversation + composer.
+ *
+ * Intentionally header-less: the thread's identity (name + turn status) already
+ * lives in the highlighted row of the {@link ThreadList} on the left, so a
+ * repeated title bar here added no information. The conversation now starts
+ * straight at the "thread opened" divider for a calmer, wider surface.
+ */
 export function ThreadConversation({
   thread,
 }: {
   thread: ThreadDetail
 }) {
-  const mine = thread.status === "MY_TURN"
-
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-background">
-      {/* header */}
-      <div className="flex h-11 shrink-0 items-center gap-2.5 border-b border-border px-5">
-        <span className="text-[13.5px] font-semibold text-foreground/90">{thread.name}</span>
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[10.5px] font-medium",
-            mine
-              ? "bg-[var(--signal)]/15 text-[var(--signal)]"
-              : "bg-muted text-muted-foreground",
-          )}
-        >
-          {mine ? "Your turn" : "Agent working"}
-        </span>
-        <div className="ml-auto flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-          <span
-            className={cn("size-1.5 rounded-full", mine && "animate-pulse")}
-            style={{ background: mine ? "var(--signal)" : "var(--muted-foreground)" }}
-          />
-          {thread.agent}
-        </div>
-      </div>
-
       {/* messages */}
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">

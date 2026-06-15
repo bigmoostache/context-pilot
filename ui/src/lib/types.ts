@@ -54,7 +54,15 @@ export interface ChatMessage {
   streaming?: boolean
 }
 
-export type ThreadStatus = "MY_TURN" | "THEIR_TURN"
+/**
+ * Thread turn-status.
+ * - `MY_TURN`    — the thread is waiting on the human (needs you).
+ * - `ACTIVE`     — the agent is *currently streaming* this thread. Exactly ONE
+ *                  thread per realm is ACTIVE at any time; shown in green.
+ * - `THEIR_TURN` — the agent owns the thread but isn't actively streaming it
+ *                  right now (queued / working in parallel).
+ */
+export type ThreadStatus = "MY_TURN" | "ACTIVE" | "THEIR_TURN"
 
 export interface Thread {
   id: string
@@ -289,5 +297,7 @@ export interface ThreadDetail {
   createdAt: string
   lastActivity: string
   unread: number
+  /** archived threads are hidden from the main list, viewable on demand */
+  archived?: boolean
   log: ThreadMsg[]
 }

@@ -2,16 +2,25 @@ import { ArrowUp, Paperclip, Loader2 } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 
 /**
- * Thread composer. When the thread is THEIR_TURN the agent is working, so the
+ * Thread composer. When the thread isn't MY_TURN the agent owns it — either
+ * actively streaming (ACTIVE) or working it in parallel (THEIR_TURN) — so the
  * composer shows a subdued "working" state instead of an active prompt.
  */
 export function ThreadComposer({ status }: { status: ThreadStatus }) {
-  if (status === "THEIR_TURN") {
+  if (status !== "MY_TURN") {
+    const active = status === "ACTIVE"
     return (
       <div className="shrink-0 px-5 pb-4 pt-2">
         <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-muted/40 px-3 py-3 text-[12.5px] text-muted-foreground">
-          <Loader2 className="size-4 animate-spin text-[var(--signal)]" />
-          <span>The agent is working this thread — it'll hand back when it needs you.</span>
+          <Loader2
+            className="size-4 animate-spin"
+            style={{ color: active ? "var(--ok)" : "var(--signal)" }}
+          />
+          <span>
+            {active
+              ? "The agent is streaming this thread right now…"
+              : "The agent is working this thread — it'll hand back when it needs you."}
+          </span>
         </div>
       </div>
     )
