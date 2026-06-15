@@ -1310,6 +1310,10 @@
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 0
+406a20e0a7ccea79:
+  path: ui/src/components/threads/NewThreadDialog.tsx
+  description: New Thread dialog (T15) — focused sheet asking only for a title; on submit the parent prepends a fresh MY_TURN thread and selects it. Built on the portaled Base UI Dialog primitive (focus-trap, scroll-lock, Esc, backdrop fade + modal-pop). Form submit (Enter) creates; Create disabled when title empty.
+  last_edited_ms: 1781543836053
 40789d8290f5438f:
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
@@ -2122,6 +2126,10 @@
   path: src/llms/cache/mod.rs
   description: 'Module declarations: cache_engine, cache_optimizer, density.'
   last_edited_ms: 0
+6c0a1706484314d9:
+  path: ui/src/App.tsx
+  description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Fleet altitude → FleetShell (4-page mission control). Cockpit = LeftRail + Conversation. threads/finder per-agent. openAgent switches agent→threads. Finder keyed by agent.id.
+  last_edited_ms: 0
 6ca310966523a17c:
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
@@ -2234,6 +2242,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 0
+7351e3147fa3275f:
+  path: ui/src/components/threads/ThreadList.tsx
+  description: 'Left rail of threads view (collapsible, width=var(--sidebar-w), w-0 collapsed). NO agent header, NO collapse button (rail lives in ThreadsView). Working search <input> filters by name+last-preview. Groups: ''Needs you'' (MY_TURN, signal), ''Active'' (ACTIVE, green/ok, the one streaming), ''Working in parallel'' (THEIR_TURN). Per-row hover Archive/Restore action. Footer ''Archived (N)'' toggles a read-only archived view. New Thread button → onNewThread. Header pill counts agent-owned working threads.'
+  last_edited_ms: 1781543836077
 73779fd3aa902c62:
   path: crates/cp-mod-entities/src/tools.rs
   description: 'SQL execution engine. execute() dispatches to execute_select/dml/ddl. execute_dml_stmts is row-aware: dispatches per-statement on prep.column_count()>0 so a DML batch can end in a plain SELECT (not just RETURNING) without rusqlite ''Execute returned results'' error. dry_run via SAVEPOINT+ROLLBACK. Parsing from crate::parse. request_path reads .sql. live/output_path routing. ≤150 lines AND ≤8000 bytes inline, bigger→entity_result panel. 200-row cap. 4 DML-dispatch regression tests.'
@@ -2449,6 +2461,10 @@
 7d5e664ea900e309:
   path: src/ui/help/palette.rs
   description: 'Command palette state + IR adapter. CommandPalette struct (state methods: open/close/filter/select). to_ir() builds PaletteOverlay. render_command_palette_from_ir() adapter renders from IR. 19 theme:: calls in adapter only.'
+  last_edited_ms: 0
+7d7a717d612a0eea:
+  path: ui/src/lib/mock.ts
+  description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails (5 convos each with agentId), agents (3 workspaces=folders, each with a task summary), fileTree (agent-badged), activeAgentId.'
   last_edited_ms: 0
 7dacd6443c44c4ff:
   path: src/app/run/streaming.rs
@@ -3198,6 +3214,10 @@ a09bd2cf1845c3a9:
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, chrono, crossterm, serde, serde_json.'
   last_edited_ms: 1780563847635
+a0a473d4d16966f9:
+  path: ui/src/components/threads/ThreadComposer.tsx
+  description: 'Thread input composer. MY_TURN: active prompt w/ attach + send + caret. Non-MY_TURN shows a subdued working spinner — ACTIVE (green/ok, ''streaming this thread right now'') vs THEIR_TURN (signal, ''working it in parallel''). Design-only.'
+  last_edited_ms: 1781543836100
 a0fb74e7facad335:
   path: src/ui/help/config_overlay.rs
   description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access.
@@ -4294,6 +4314,10 @@ d897c147d141bc42:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+d8a1e3373d20cf65:
+  path: ui/src/lib/types.ts
+  description: 'Maquette domain types. Agent (incl task summary), FsNode (legacy). Finder: FinderKind (+audio/video/binary), FinderTag, FinderNode (+tags/created/starred/media/preview payloads), Sheet/SlidePreview, FinderViewMode=grid|list|columns|gallery, FinderSortKey. ThreadDetail+agentId. ViewMode=fleet|cockpit|threads|finder.'
+  last_edited_ms: 0
 d8f43c4c8cae6abd:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -4370,6 +4394,10 @@ defc0e3a44be05bd:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+df192f864acc678d:
+  path: ui/src/components/threads/ThreadsView.tsx
+  description: 'Threads view assembler, scoped to ACTIVE AGENT''s realm (filters threadDetails by agentId; keyed by agentId in App so local state reseeds per realm; EmptyRealm when none). Holds local thread state so maquette interactions genuinely work: search filters, New Thread prepends a MY_TURN thread, archive/restore toggles. 2-pane (collapsible ThreadList | ThreadConversation) + NewThreadDialog. Collapse via FleetShell-style edge RAIL (pill-grip handle + hover band at x=var(--sidebar-w), x=6 collapsed) — no buttons.'
+  last_edited_ms: 1781543836065
 df3094c0e46bb7c6:
   path: ui/src/components/finder/Finder.tsx
   description: Top-level Finder orchestrator. buildRealm(agent) memo, heterogeneous tabs (folder tabs w/ per-tab back/fwd history + file tabs showing one file via FinderPreview variant='full'); double-click file→openInNewTab (reuses tab for same path), double-click folder→navigate in place; navigating on a file tab converts it back to a folder tab. Keyboard nav (arrows/Enter/Backspace/Space QuickLook/⌘A/⌘I/type-ahead), additive+range selection, right-click ContextMenu, Get Info modal, 4 view modes, icon-size slider, path bar, drag-drop overlay, status bar, toast.
@@ -4574,6 +4602,10 @@ ed11d32eca739db4:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
   last_edited_ms: 0
+ed64c4eef51b64b7:
+  path: ui/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: selected thread''s full conversation + composer. Header-less by design (thread identity already in the highlighted ThreadList row — the old name+status+agent header was removed per T15). Starts at the ''thread opened'' divider. toChatMessage() maps ThreadMsg→ChatMessage to reuse the cockpit Message renderer; renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
+  last_edited_ms: 1781543836088
 ed8cdf66722e6f21:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. XAI_API_KEY auth.
