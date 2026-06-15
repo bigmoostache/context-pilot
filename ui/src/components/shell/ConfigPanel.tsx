@@ -2,6 +2,7 @@ import { useState } from "react"
 import {
   Bot,
   Check,
+  Coins,
   Cpu,
   Database,
   Eye,
@@ -18,6 +19,7 @@ import {
   Zap,
 } from "lucide-react"
 import { DialogClose } from "@/components/ui/dialog"
+import { UsagePage } from "@/components/agents/UsagePage"
 import { cn } from "@/lib/utils"
 
 /**
@@ -102,9 +104,15 @@ export function ConfigPanel({
           )}
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-          <CategoryBody cat={cat} />
-        </div>
+        {cat === "usage" ? (
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <CategoryBody cat={cat} />
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            <CategoryBody cat={cat} />
+          </div>
+        )}
 
         <footer className="flex h-[58px] shrink-0 items-center border-t border-border/70 bg-muted/25 px-6">
           <span className="text-[11.5px] text-muted-foreground/70">
@@ -128,7 +136,7 @@ export function ConfigPanel({
 }
 
 // ── categories ────────────────────────────────────────────────────
-type CatId = "general" | "providers" | "search" | "docai" | "web" | "integrations"
+type CatId = "general" | "usage" | "providers" | "search" | "docai" | "web" | "integrations"
 
 const CATEGORIES: {
   id: CatId
@@ -138,6 +146,7 @@ const CATEGORIES: {
   count?: number
 }[] = [
   { id: "general", label: "General", blurb: "Defaults & autonomy", icon: Sliders },
+  { id: "usage", label: "Usage & Cost", blurb: "Spend & token analytics", icon: Coins },
   { id: "providers", label: "Model Providers", blurb: "LLM backends & keys", icon: Bot, count: 6 },
   { id: "search", label: "Search & Embeddings", blurb: "Indexing & vectors", icon: Search },
   { id: "docai", label: "Document AI", blurb: "OCR & extraction", icon: FileText },
@@ -150,6 +159,8 @@ function CategoryBody({ cat }: { cat: CatId }) {
   switch (cat) {
     case "general":
       return <GeneralPane />
+    case "usage":
+      return <UsagePage />
     case "providers":
       return (
         <Stack>

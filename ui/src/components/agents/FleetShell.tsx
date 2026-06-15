@@ -1,64 +1,65 @@
 import { useState } from "react"
-import { FleetSidebar, type FleetPage } from "./FleetSidebar"
+import { LayoutGrid, Library } from "lucide-react"
 import { FleetDashboard } from "./FleetDashboard"
 import { PromptsPage } from "./PromptsPage"
-import { UsagePage } from "./UsagePage"
-import { ConfigPanel } from "@/components/shell/ConfigPanel"
+import { cn } from "@/lib/utils"
 
 /**
  * Fleet shell — the mission-control workspace shown when no agent is focused.
- * A persistent {@link FleetSidebar} on the left navigates the four sections;
- * the right pane swaps the active page:
  *
- *  - **agents**   → {@link FleetDashboard} (the agent grid + create/manage)
- *  - **prompts**  → {@link PromptsPage} (global skills / agents / commands)
- *  - **usage**    → {@link UsagePage} (cost & token analytics)
- *  - **settings** → {@link ConfigPanel} inline (same body the TopBar gear opens
- *                    in a dialog — here it lives directly in the page)
+ * There is **no sidebar** anymore: the dashboard collapsed to a single page
+ * once its other sections found better homes —
+ *   - **Agents** is the default landing (reached via the TopBar "Context Pilot"
+ *     mark), and is now merged with **Prompts** into this one page, switched by
+ *     a segmented toggle at the top.
+ *   - **Usage** moved into the Settings dialog as its own category.
+ *   - **Settings** is reachable only via the TopBar gear (a dialog).
+ *
+ * So this shell is just the merged **Agents ⇄ Prompts** surface with a top
+ * toggle; both sub-pages are rendered full-bleed and untouched below it.
  */
+type HomeTab = "agents" | "prompts"
+
 export function FleetShell({ onOpenAgent }: { onOpenAgent: (id: string) => void }) {
-  const [page, setPage] = useState<FleetPage>("agents")
-  const [collapsed, setCollapsed] = useState(false)
+  const [tab, setTab] = useState<HomeTab>("agents")
 
   return (
-    <div className="relative flex min-h-0 flex-1">
-      <FleetSidebar page={page} onSelect={setPage} collapsed={collapsed} />
-
-      {/* Collapse rail — click the sidebar's right edge to collapse/expand it
-          (the shadcn Sidebar interaction). A generous hit zone hugs the border;
-          on hover a soft band lights up and a pill-grip handle appears so the
-          affordance reads clearly. Tracks the sidebar width, stays reachable at
-          x=0 when collapsed, and flips a chevron to hint the action. */}
-      <button
-        onClick={() => setCollapsed((v) => !v)}
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="group absolute inset-y-0 z-20 w-5 -translate-x-1/2 cursor-pointer transition-[left] duration-200 ease-in-out"
-        style={{ left: collapsed ? 6 : "var(--sidebar-w)" }}
-      >
-        {/* hover band — a subtle highlight across the seam */}
-        <span className="absolute inset-y-0 left-1/2 w-[3px] -translate-x-1/2 rounded-full bg-border transition-all duration-150 group-hover:w-[5px] group-hover:bg-[var(--interactive)]/45 group-active:bg-[var(--interactive)]/70" />
-        {/* pill-grip handle — the obvious drag/click affordance */}
-        <span className="absolute top-1/2 left-1/2 flex h-11 w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card opacity-0 shadow-sm transition-all duration-150 group-hover:opacity-100 group-active:scale-95">
-          <span className="flex flex-col items-center gap-[3px]">
-            <span className="size-[3px] rounded-full bg-muted-foreground/60" />
-            <span className="size-[3px] rounded-full bg-muted-foreground/60" />
-            <span className="size-[3px] rounded-full bg-muted-foreground/60" />
-          </span>
-        </span>
-      </button>
-
-      {page === "agents" ? (
-        <FleetDashboard onOpenAgent={onOpenAgent} />
-      ) : page === "prompts" ? (
-        <PromptsPage />
-      ) : page === "usage" ? (
-        <UsagePage />
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col bg-background">
-          <ConfigPanel variant="inline" />
+    <div className="flex min-h-0 flex-1 flex-col bg-background">
+      {/* top toggle — switch between the agent grid and the prompt library */}
+      <div className="flex h-12 shrink-0 items-center border-b border-border px-6">
+        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
+          <ToggleTab active={tab === "agents"} onClick={() => setTab("agents")} icon={LayoutGrid} label="Agents" />
+          <ToggleTab active={tab === "prompts"} onClick={() => setTab("prompts")} icon={Library} label="Prompts" />
         </div>
-      )}
+      </div>
+
+      {/* active sub-page (rendered untouched) */}
+      {tab === "agents" ? <FleetDashboard onOpenAgent={onOpenAgent} /> : <PromptsPage />}
     </div>
+  )
+}
+
+function ToggleTab({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: typeof LayoutGrid
+  label: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-1.5 rounded-md px-3 py-1 text-[12.5px] font-medium transition-all",
+        active ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      <Icon className="size-3.5" />
+      {label}
+    </button>
   )
 }
