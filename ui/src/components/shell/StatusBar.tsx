@@ -1,6 +1,6 @@
 import { Boxes, MessagesSquare, Wallet } from "lucide-react"
-import { status, agents, threadDetails } from "@/lib/mock"
-import { fmtCost } from "@/lib/panelMeta"
+import { status, agents, threadDetails, cacheStats, tokenBudget } from "@/lib/mock"
+import { fmtCost, fmtTokens } from "@/lib/panelMeta"
 import type { StreamPhase } from "@/lib/types"
 
 const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
@@ -65,12 +65,79 @@ function AgentStatus() {
         <span className="font-medium text-foreground/80">{p.label}</span>
       </span>
 
-      <span className="h-3.5 w-px bg-border" />
-
-      <span className="text-muted-foreground">{status.agent}</span>
-
-      <span className="ml-auto tabular-nums text-muted-foreground">{fmtCost(status.costUsd)}</span>
+      <span className="ml-auto flex items-center gap-3">
+        <ContextBar hit={cacheStats.hit} miss={cacheStats.miss} budget={tokenBudget.budget} />
+        <span className="h-3.5 w-px bg-border" />
+        <span className="tabular-nums text-muted-foreground">{fmtCost(status.costUsd)}</span>
+      </span>
     </footer>
+  )
+}
+
+/**
+ * Fixed-width context-window meter. The bar is the whole context budget; the
+ * filled portion is split into **cache hits** (green — already-cached, cheap
+ * tokens) and **misses** (yellow — fresh input that had to be sent), with the
+ * remaining **free** space shown in grey. Hovering reveals an "ultra-nice"
+ * tooltip above the bar breaking down the exact token counts.
+ */
+function ContextBar({ hit, miss, budget }: { hit: number; miss: number; budget: number }) {
+  const free = Math.max(0, budget - hit - miss)
+  const pct = (v: number) => `${(v / budget) * 100}%`
+  const used = hit + miss
+
+  return (
+    <div className="group/cb relative flex items-center">
+      {/* the meter */}
+      <div className="flex h-2 w-28 overflow-hidden rounded-full bg-muted ring-1 ring-border/60">
+        <span style={{ width: pct(hit), background: "var(--ok)" }} className="h-full" />
+        <span style={{ width: pct(miss), background: "var(--warn)" }} className="h-full" />
+      </div>
+
+      {/* tooltip — opens upward, above the bar */}
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-150 group-hover/cb:translate-y-0 group-hover/cb:opacity-100">
+        <div className="w-[188px] rounded-lg border border-border bg-popover p-2.5 pop-shadow">
+          <div className="mb-2 flex items-baseline justify-between">
+            <span className="text-[11px] font-semibold text-foreground/90">Context window</span>
+            <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+              {((used / budget) * 100).toFixed(0)}%
+            </span>
+          </div>
+          <TipRow color="var(--ok)" label="Cache hits" value={fmtTokens(hit)} />
+          <TipRow color="var(--warn)" label="Misses" value={fmtTokens(miss)} />
+          <TipRow color="var(--muted-foreground)" label="Free" value={fmtTokens(free)} dim />
+          <div className="mt-2 flex items-center justify-between border-t border-border/60 pt-1.5">
+            <span className="text-[10.5px] text-muted-foreground">Used / budget</span>
+            <span className="font-mono text-[10.5px] font-medium tabular-nums text-foreground/85">
+              {fmtTokens(used)} / {fmtTokens(budget)}
+            </span>
+          </div>
+        </div>
+        {/* caret */}
+        <div className="absolute left-1/2 top-full size-2 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r border-border bg-popover" />
+      </div>
+    </div>
+  )
+}
+
+/** One token-breakdown line inside the context tooltip. */
+function TipRow({
+  color,
+  label,
+  value,
+  dim,
+}: {
+  color: string
+  label: string
+  value: string
+  dim?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      <span className="size-2 shrink-0 rounded-[3px]" style={{ background: color }} />
+      <span className={`text-[11px] ${dim ? "text-muted-foreground" : "text-foreground/80"}`}>{label}</span>
+      <span className="ml-auto font-mono text-[10.5px] tabular-nums text-foreground/85">{value}</span>
+    </div>
   )
 }
 
