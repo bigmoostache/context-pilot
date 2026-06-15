@@ -205,6 +205,7 @@ export function ColumnsView({
                   h.onClick(n, mods(e))
                   if (n.kind === "folder") h.onOpen(n)
                 }}
+                onDoubleClick={() => h.onOpen(n)}
                 onContextMenu={(e) => h.onContext(e, n)}
                 className={cn(
                   "mx-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors",

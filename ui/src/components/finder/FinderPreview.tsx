@@ -31,21 +31,21 @@ export function FinderPreview({
         full ? "min-w-0 flex-1" : "w-[420px] border-l border-border",
       )}
     >
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-        <span className="text-[12px] font-semibold text-muted-foreground">
-          {full ? node?.name ?? "Quick Look" : "Quick Look"}
-        </span>
-        <div className="ml-auto flex items-center gap-1">
-          {node && node.kind !== "folder" && (
-            <>
-              <IconBtn icon={Maximize2} title="Open" onClick={() => node && onGetInfo(node)} />
-              <IconBtn icon={Download} title="Download" />
-              <IconBtn icon={Share2} title="Share" />
-            </>
-          )}
-          {!full && <IconBtn icon={X} title="Close" onClick={onClose} />}
+      {!full && (
+        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+          <span className="text-[12px] font-semibold text-muted-foreground">Quick Look</span>
+          <div className="ml-auto flex items-center gap-1">
+            {node && node.kind !== "folder" && (
+              <>
+                <IconBtn icon={Maximize2} title="Open" onClick={() => node && onGetInfo(node)} />
+                <IconBtn icon={Download} title="Download" />
+                <IconBtn icon={Share2} title="Share" />
+              </>
+            )}
+            <IconBtn icon={X} title="Close" onClick={onClose} />
+          </div>
         </div>
-      </div>
+      )}
 
       {!node ? (
         <Empty />
@@ -54,7 +54,7 @@ export function FinderPreview({
           <div className="min-h-0 flex-1 overflow-auto p-4">
             <Body node={node} />
           </div>
-          <Meta node={node} onGetInfo={onGetInfo} />
+          {!full && <Meta node={node} onGetInfo={onGetInfo} />}
         </div>
       )}
     </aside>

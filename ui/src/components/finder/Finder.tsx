@@ -324,6 +324,12 @@ export function Finder({ agent }: { agent: Agent }) {
         }
         onTogglePreview={() => setPreviewOpen((o) => !o)}
         onTogglePathBar={() => setPathBarOpen((o) => !o)}
+        fileActive={!!active.fileNode}
+        onFileGetInfo={() => active.fileNode && setInfo(active.fileNode)}
+        onFileDownload={() =>
+          flash(`Downloading ${active.fileNode?.name ?? "file"}… (design only)`)
+        }
+        onFileShare={() => flash(`Share ${active.fileNode?.name ?? "file"}… (design only)`)}
       />
 
       <div className="flex min-h-0 flex-1">

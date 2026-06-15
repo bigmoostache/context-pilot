@@ -9,9 +9,11 @@ import {
   GalleryHorizontalEnd,
   LayoutGrid,
   List as ListIcon,
+  Maximize2,
   MoreHorizontal,
   PanelBottom,
   Search,
+  Share2,
   Sidebar as SidebarIcon,
   Star,
   Upload,
@@ -117,6 +119,10 @@ export function FinderToolbar({
   onDownload,
   onTogglePreview,
   onTogglePathBar,
+  fileActive,
+  onFileGetInfo,
+  onFileDownload,
+  onFileShare,
 }: {
   crumbs: FinderNode[]
   canBack: boolean
@@ -137,6 +143,11 @@ export function FinderToolbar({
   onDownload: () => void
   onTogglePreview: () => void
   onTogglePathBar: () => void
+  /** true when the active tab is a single file (not a folder) */
+  fileActive: boolean
+  onFileGetInfo: () => void
+  onFileDownload: () => void
+  onFileShare: () => void
 }) {
   const idx = VIEW_ORDER.indexOf(viewMode)
   // collapse a deep breadcrumb: first · … · last two
@@ -186,7 +197,7 @@ export function FinderToolbar({
       </div>
 
       {/* icon-size slider (grid only) */}
-      {viewMode === "grid" && (
+      {!fileActive && viewMode === "grid" && (
         <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 card-shadow">
           <LayoutGrid className="size-3 text-muted-foreground/60" />
           <input
@@ -203,52 +214,66 @@ export function FinderToolbar({
       )}
 
       {/* segmented view switch with sliding indicator */}
-      <div className="relative flex items-center rounded-lg border border-border bg-muted/60 p-0.5">
-        <span
-          className="absolute inset-y-0.5 left-0.5 w-7 rounded-md bg-card card-shadow transition-transform duration-200"
-          style={{ transform: `translateX(${idx * 28}px)` }}
-        />
-        {VIEW_ORDER.map((m) => {
-          const Icon = VIEW_ICON[m]
-          return (
-            <button
-              key={m}
-              title={m[0].toUpperCase() + m.slice(1)}
-              onClick={() => onViewMode(m)}
-              className={cn(
-                "relative z-[1] flex size-7 items-center justify-center rounded-md transition-colors",
-                viewMode === m ? "text-[var(--signal)]" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Icon className="size-4" />
-            </button>
-          )
-        })}
-      </div>
+      {!fileActive && (
+        <div className="relative flex items-center rounded-lg border border-border bg-muted/60 p-0.5">
+          <span
+            className="absolute inset-y-0.5 left-0.5 w-7 rounded-md bg-card card-shadow transition-transform duration-200"
+            style={{ transform: `translateX(${idx * 28}px)` }}
+          />
+          {VIEW_ORDER.map((m) => {
+            const Icon = VIEW_ICON[m]
+            return (
+              <button
+                key={m}
+                title={m[0].toUpperCase() + m.slice(1)}
+                onClick={() => onViewMode(m)}
+                className={cn(
+                  "relative z-[1] flex size-7 items-center justify-center rounded-md transition-colors",
+                  viewMode === m ? "text-[var(--signal)]" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4" />
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* search */}
-      <div className="flex h-8 w-[156px] items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 card-shadow focus-within:border-[var(--signal)]/60">
-        <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
-        <input
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder="Search realm"
-          className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground/50"
-        />
-        {query && (
-          <button onClick={() => onQuery("")} className="text-muted-foreground/50 hover:text-foreground">
-            <X className="size-3.5" />
-          </button>
-        )}
-      </div>
+      {!fileActive && (
+        <div className="flex h-8 w-[156px] items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 card-shadow focus-within:border-[var(--signal)]/60">
+          <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
+          <input
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder="Search realm"
+            className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground/50"
+          />
+          {query && (
+            <button onClick={() => onQuery("")} className="text-muted-foreground/50 hover:text-foreground">
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="mx-0.5 h-5 w-px bg-border" />
 
-      <NavBtn icon={FolderPlus} onClick={onNewFolder} title="New folder" />
-      <NavBtn icon={Upload} onClick={onUpload} title="Upload" />
-      <NavBtn icon={Download} onClick={onDownload} title="Download" />
-      <SegBtn icon={PanelBottom} on={pathBarOpen} onClick={onTogglePathBar} title="Path bar" />
-      <SegBtn icon={SidebarIcon} on={previewOpen} onClick={onTogglePreview} title="Quick Look pane" />
+      {fileActive ? (
+        <>
+          <NavBtn icon={Maximize2} onClick={onFileGetInfo} title="Get Info" />
+          <NavBtn icon={Download} onClick={onFileDownload} title="Download" />
+          <NavBtn icon={Share2} onClick={onFileShare} title="Share" />
+        </>
+      ) : (
+        <>
+          <NavBtn icon={FolderPlus} onClick={onNewFolder} title="New folder" />
+          <NavBtn icon={Upload} onClick={onUpload} title="Upload" />
+          <NavBtn icon={Download} onClick={onDownload} title="Download" />
+          <SegBtn icon={PanelBottom} on={pathBarOpen} onClick={onTogglePathBar} title="Path bar" />
+          <SegBtn icon={SidebarIcon} on={previewOpen} onClick={onTogglePreview} title="Quick Look pane" />
+        </>
+      )}
     </div>
   )
 }
