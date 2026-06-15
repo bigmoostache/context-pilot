@@ -2,12 +2,13 @@ import { useState } from "react"
 import { FolderGit2 } from "lucide-react"
 import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
-import { ThreadDetailRail } from "./ThreadDetailRail"
 import { threadDetails, agents } from "@/lib/mock"
 
 /**
- * Thread-centered view — the "classic" three-pane messaging layout:
- * thread list (left) | conversation (center) | thread detail (right).
+ * Thread-centered view — the conversation-first layout: thread list (left) |
+ * conversation (center). Per-thread metadata used to occupy a permanent right
+ * rail; it now lives in an on-demand popup (the ⓘ button in the conversation
+ * header), keeping the messaging surface wide.
  *
  * Scoped to the **active agent's realm**: an agent lives in its folder and owns
  * the threads inside it, so we only ever show that agent's threads — never a
@@ -40,8 +41,7 @@ export function ThreadsView({
         selectedId={thread?.id ?? ""}
         onSelect={setSelectedId}
       />
-      {thread && <ThreadConversation thread={thread} />}
-      {thread && <ThreadDetailRail thread={thread} onOpenCockpit={onOpenCockpit} />}
+      {thread && <ThreadConversation thread={thread} onOpenCockpit={onOpenCockpit} />}
     </div>
   )
 }

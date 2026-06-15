@@ -1,7 +1,10 @@
+import { useState } from "react"
+import { Info } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { QuestionForm } from "./QuestionForm"
 import { ThreadComposer } from "./ThreadComposer"
+import { ThreadDetailsPopup } from "./ThreadDetailsPopup"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -18,8 +21,15 @@ function toChatMessage(m: ThreadMsg): ChatMessage {
 }
 
 /** Center pane — the selected thread's full conversation + composer. */
-export function ThreadConversation({ thread }: { thread: ThreadDetail }) {
+export function ThreadConversation({
+  thread,
+  onOpenCockpit,
+}: {
+  thread: ThreadDetail
+  onOpenCockpit: () => void
+}) {
   const mine = thread.status === "MY_TURN"
+  const [showDetails, setShowDetails] = useState(false)
 
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-background">
@@ -36,12 +46,22 @@ export function ThreadConversation({ thread }: { thread: ThreadDetail }) {
         >
           {mine ? "Your turn" : "Agent working"}
         </span>
-        <div className="ml-auto flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-          <span
-            className={cn("size-1.5 rounded-full", mine && "animate-pulse")}
-            style={{ background: mine ? "var(--signal)" : "var(--muted-foreground)" }}
-          />
-          {thread.agent}
+        <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+            <span
+              className={cn("size-1.5 rounded-full", mine && "animate-pulse")}
+              style={{ background: mine ? "var(--signal)" : "var(--muted-foreground)" }}
+            />
+            {thread.agent}
+          </div>
+          <button
+            onClick={() => setShowDetails(true)}
+            title="Thread details"
+            aria-label="Thread details"
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Info className="size-4" />
+          </button>
         </div>
       </div>
 
@@ -79,6 +99,14 @@ export function ThreadConversation({ thread }: { thread: ThreadDetail }) {
       <div className="mx-auto w-full max-w-[720px]">
         <ThreadComposer status={thread.status} />
       </div>
+
+      {showDetails && (
+        <ThreadDetailsPopup
+          thread={thread}
+          onOpenCockpit={onOpenCockpit}
+          onClose={() => setShowDetails(false)}
+        />
+      )}
     </main>
   )
 }
