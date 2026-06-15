@@ -4222,6 +4222,10 @@ d6fe3bef04a79aab:
   path: ideas.md
   description: Brainstorming / feature ideas
   last_edited_ms: 0
+d707bae8d2b9a7b6:
+  path: ui/src/components/agents/PromptModal.tsx
+  description: 'Prompts page modals (design-only). PromptModal: create (kind picker System/Skill/Command + name/description/body textarea) or view/edit (prefilled, mock .md body, built-in name lock, Delete). ImportModal: import from other agentic systems (Claude Code/Codex/Cursor/Windsurf/Aider/Continue), per-row Imported state. Shared hand-rolled Backdrop (backdrop-fade+modal-pop) + Field. Used by PromptsPage.'
+  last_edited_ms: 1781532643659
 d794e0ca2d6b10ae:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
@@ -4838,6 +4842,10 @@ ff5281563ad3f9ff:
   path: ui/src/components/finder/FinderViews.tsx
   description: 'Finder main-area views. GridView (icon-size slider + finder-pop stagger + TagDots + focus ring), ListView (zebra + sortable headers + tags), ColumnsView (Miller + trailing metadata preview pane; single-click expands folders, onDoubleClick opens files), GalleryView (hero + filmstrip). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
   last_edited_ms: 1781531576327
+ff702272b5c58ee7:
+  path: ui/src/components/agents/PromptsPage.tsx
+  description: Global prompt-library page (fleet 'Prompts'). Renders mock library[] (system/skills/commands) as cards with KIND_META icon/accent/blurb, filter tabs (all + per-kind w/ counts), kind sections in 'all' view. 'agent' kind labelled 'System' (overloaded word). Header has Import + New buttons. Card click / New / Import open PromptModal + ImportModal. Built-in badge only (no Active — meaningless at fleet altitude).
+  last_edited_ms: 1781532643670
 ffa4da3ef00da59b:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
