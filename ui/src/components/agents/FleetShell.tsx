@@ -20,16 +20,28 @@ import { cn } from "@/lib/utils"
  */
 type HomeTab = "agents" | "prompts"
 
+/**
+ * Shared content width for the whole fleet home — the toggle bar, the agent
+ * grid and the prompt library all centre on this so their left/right edges
+ * line up perfectly as you flip between tabs. Single source of truth.
+ */
+export const FLEET_MAX_W = "max-w-[960px]"
+
 export function FleetShell({ onOpenAgent }: { onOpenAgent: (id: string) => void }) {
   const [tab, setTab] = useState<HomeTab>("agents")
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
-      {/* top toggle — switch between the agent grid and the prompt library */}
-      <div className="flex h-12 shrink-0 items-center border-b border-border px-6">
-        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
-          <ToggleTab active={tab === "agents"} onClick={() => setTab("agents")} icon={LayoutGrid} label="Agents" />
-          <ToggleTab active={tab === "prompts"} onClick={() => setTab("prompts")} icon={Library} label="Prompts" />
+      {/* top toggle — switch between the agent grid and the prompt library.
+          The divider spans full width, but the segmented control is centred
+          and padded to the SAME max-width / gutter as the page content below
+          (FLEET_MAX_W · px-8), so its left edge lines up with the page heading. */}
+      <div className="shrink-0 border-b border-border">
+        <div className={cn("mx-auto flex h-[52px] w-full items-center px-8", FLEET_MAX_W)}>
+          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
+            <ToggleTab active={tab === "agents"} onClick={() => setTab("agents")} icon={LayoutGrid} label="Agents" />
+            <ToggleTab active={tab === "prompts"} onClick={() => setTab("prompts")} icon={Library} label="Prompts" />
+          </div>
         </div>
       </div>
 

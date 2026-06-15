@@ -19,6 +19,7 @@ import { agents } from "@/lib/mock"
 import { accentVar, fmtCost } from "@/lib/panelMeta"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { FLEET_MAX_W } from "./FleetShell"
 
 const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
@@ -64,12 +65,10 @@ export function FleetDashboard({ onOpenAgent }: { onOpenAgent: (id: string) => v
     window.setTimeout(() => setToast(null), 2200)
   }
 
-  const totalCost = agents.reduce((acc, a) => acc + a.costUsd, 0)
-
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <ScrollArea className="min-h-0 flex-1 bg-background">
-        <div className="mx-auto flex w-full max-w-[940px] flex-col gap-7 px-8 py-9">
+        <div className={cn("mx-auto flex w-full flex-col gap-7 px-8 py-9", FLEET_MAX_W)}>
           <header className="flex items-end justify-between gap-4">
             <div className="flex flex-col gap-1.5">
               <span className="label">Mission control</span>
@@ -103,8 +102,7 @@ export function FleetDashboard({ onOpenAgent }: { onOpenAgent: (id: string) => v
           </div>
 
           <p className="text-center text-[11px] text-muted-foreground/55">
-            Design-only — agents map to real folders in the actual app. Total session cost{" "}
-            <span className="font-medium text-muted-foreground/80">{fmtCost(totalCost)}</span>.
+            Design-only — each agent maps to a real folder in the actual app.
           </p>
         </div>
       </ScrollArea>

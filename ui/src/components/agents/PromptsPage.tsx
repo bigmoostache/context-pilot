@@ -5,6 +5,7 @@ import { library } from "@/lib/mock"
 import type { LibraryItem, LibraryKind } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { ImportModal, PromptModal } from "./PromptModal"
+import { FLEET_MAX_W } from "./FleetShell"
 
 /**
  * Global prompt library — the fleet dashboard's "Prompts" page. Manages the
@@ -38,7 +39,7 @@ export function PromptsPage() {
 
   return (
     <ScrollArea className="min-h-0 flex-1 bg-background">
-      <div className="mx-auto flex w-full max-w-[920px] flex-col gap-6 px-8 py-9">
+      <div className={cn("mx-auto flex w-full flex-col gap-7 px-8 py-9", FLEET_MAX_W)}>
         {/* header */}
         <header className="flex items-end justify-between gap-4">
           <div className="flex flex-col gap-1.5">
