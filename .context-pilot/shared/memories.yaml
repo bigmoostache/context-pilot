@@ -497,27 +497,31 @@
 
     **Palettes (switchable, source of truth = src/index.css :root/.dark token blocks)**:
     - LIGHT 'Cream': #FEFCF3 / #F5EBE0 / #F0DBDB / #DBA39A (warm; clay-rose primary + teal accent)
-    - DARK 'Space': #222831 / #393E46 / #00ADB5 / #EEEEEE (deep blue-grey base, grey cards, teal #00ADB5 primary/accent, near-white text). Swap the 4 hexes in either block to re-skin everything.
+    - DARK 'Space': #222831 / #393E46 / #00ADB5 / #EEEEEE (deep blue-grey base, grey cards, teal #00ADB5 primary/accent, near-white text).
 
-    **Aesthetic**: enterprise/macOS — SF Pro chrome, IBM Plex Mono for data/numbers only. Traffic-light dots, vibrancy bars, soft shadows (no glow), hairline borders. Sun/Moon ThemeToggle top-right, localStorage 'cp-theme'.
+    **Aesthetic**: enterprise/macOS — SF Pro chrome, IBM Plex Mono for data only. Traffic-light dots, vibrancy bars, soft shadows, hairline borders. Sun/Moon ThemeToggle top-right, localStorage 'cp-theme'.
 
-    **THREE views (ViewMode = agents|threads|cockpit, default 'agents'), switched via TopBar segmented control**:
-    1. AGENTS launcher (NEW) — multi-agent/workspace mgmt, 1 agent = 1 folder. FileBrowser (navigable fs tree, agent-hosting folders badged) | AgentDetail (agent folder->dashboard+Open; plain folder->Initialize-agent form name+model; file->empty). AgentSwitcher dropdown in TopBar for fast switching. components/agents/{AgentsView,FileBrowser,AgentDetail}.tsx + shell/AgentSwitcher.tsx. Mock: agents[3] (context-pilot/opio-rag/lean-proofs), fileTree, activeAgentId.
-    2. THREADS (classic 3-pane chat) = ThreadList | ThreadConversation | ThreadDetailRail, turn-aware composer, embedded QuestionForm.
-    3. COCKPIT (panel-centered single agent) = LeftRail (panel nav + budget) + Conversation + RightInspector (Stats/Threads/Spine).
+    **Agent model (user-locked)**: 1 agent = 1 FOLDER = its realm, can't go out. An agent owns MULTIPLE threads that can work in PARALLEL.
 
-    StatusBar (phase · agent · cost) always shown. TopBar branch+cost reflect active agent.
+    **THREE views (ViewMode = agents|threads|cockpit, default 'agents'), TopBar segmented control**:
+    1. AGENTS launcher. Two sub-modes inside AgentsView: 'fleet' (default landing = FleetDashboard.tsx welcome page: greeting + aggregate stat strip {agents, threads, working, waiting-on-you} + AgentCard grid per agent {status dot, branch, model, thread pills working/waiting, cost, Open/Manage btns} + New-agent card) and 'browse' (FileBrowser | AgentDetail with an 'All agents' back bar). Manage→browse at the agent's folder; New→browse at fs root. AgentDetail dashboard now shows a confined 'Realm' file tree (RealmTree, rooted at agent folder, 'agent can't go out') + realm thread count.
+    2. THREADS = scoped to the ACTIVE AGENT's realm (ThreadsView filters threadDetails by agentId; EmptyRealm state if none). ThreadList has agent realm header + 'M working in parallel' pulsing pill; groups 'Needs you'/'Working in parallel'. ThreadConversation | ThreadDetailRail. Embedded QuestionForm.
+    3. COCKPIT (panel-centered single agent) = LeftRail + Conversation + RightInspector.
+
+    **Thread→agent mapping (mock)**: threadDetails each carry agentId. T8/T2/T7→a-cp, T4→a-opio, T1→a-lean. ThreadDetail type gained `agentId`.
+
+    **Bug fixed**: Base UI 'MenuGroupContext is missing' — AgentSwitcher's DropdownMenuLabel/items must be wrapped in DropdownMenuGroup. Done.
 
     **Build**: cd ui && pnpm exec tsc -b (green). Dev: pnpm run dev :5173, HMR live.
 
-    **Gotchas**: TS7 rejects baseUrl (paths only, vite alias handles runtime); noUnusedLocals trips on unused imports.
+    **Gotchas**: TS noUnusedLocals/Parameters trips on unused imports/props (removed activeAgentId from AgentsView when fleet refactor made it unused). TS7 rejects baseUrl (paths only).
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781514459192
+  last_edited_ms: 1781515409120
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-

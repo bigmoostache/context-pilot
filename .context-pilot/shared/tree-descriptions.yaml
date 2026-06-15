@@ -1722,6 +1722,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+5e00cb7bf1ea0640:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: 'Fleet welcome dashboard — landing surface of the Agents view. Greeting header + aggregate stat strip (agents/threads/working/waiting) + AgentCard grid (per-agent: status, branch, model, thread pills working/waiting, cost, Open/Manage) + New-agent card. Thread stats derived from threadDetails by agentId.'
+  last_edited_ms: 1781515390685
 5e3b31db34f5f676:
   path: .github/checks/lint-config.chain
   description: 'Hash chain for protected lint configuration files. Each entry: prev_hash:content_hash:chain_hash. Verified by check-lint-config.sh. Currently 15 entries.'
@@ -2350,6 +2354,10 @@
   path: crates/cp-console-server/Cargo.toml
   description: 'Console server deps: serde, serde_json, nix (process), signal-hook, rlimit.'
   last_edited_ms: 1780563847604
+814ded7661832a83:
+  path: ui/src/lib/types.ts
+  description: Maquette domain types. Agent (id/name/folder/branch/model/status/cost/threads/accent), FsNode (fs tree), ThreadDetail with agentId (thread belongs to one agent realm). ViewMode=agents|cockpit|threads.
+  last_edited_ms: 1781515390745
 816db0d29bf86cfc:
   path: .github/checks/check-lint-config.sh
   description: 'Lint integrity hash chain checker. Verifies protected files haven''t been tampered with. --update appends new entry + git diffs of changed protected files. Readers skip non-entry lines via ^[0-9]+: guard. Password required for --update.'
@@ -2398,6 +2406,10 @@
   path: src/llms/claude_code_api_key/helpers.rs
   description: 'CC API-key helpers: constants (endpoint/headers), map_model_name(), inject_system_reminder(), apply_claude_code_headers()'
   last_edited_ms: 0
+855ea80a9a63ee5f:
+  path: ui/src/components/threads/ThreadsView.tsx
+  description: 'Threads view assembler, scoped to ACTIVE AGENT''s realm: filters threadDetails by agentId, EmptyRealm state when none. 3-pane (ThreadList | ThreadConversation | ThreadDetailRail). onOpenCockpit bridges to panel view.'
+  last_edited_ms: 1781515390706
 856d2552e5fd5d0a:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
@@ -2658,6 +2670,10 @@
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Dir-event-only invalidation. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete.'
   last_edited_ms: 0
+91dae7b00974ca29:
+  path: ui/src/components/agents/AgentsView.tsx
+  description: 'Agents launcher. Two modes: ''fleet'' (default, FleetDashboard welcome page) and ''browse'' (FileBrowser | AgentDetail with back bar). Manage→browse at agent''s folder; New→browse at root. findByPath DFS helper.'
+  last_edited_ms: 1781515390696
 91faf7c4fd9fd3ee:
   path: LICENSE
   description: MIT License
@@ -2678,6 +2694,10 @@
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, ignore, cp-mod-utilities.'
   last_edited_ms: 1780565428699
+92e26c73ac8da140:
+  path: ui/src/components/shell/AgentSwitcher.tsx
+  description: TopBar workspace switcher dropdown (1 agent=1 folder). Items wrapped in DropdownMenuGroup (fixes Base UI MenuGroupContext error). Active agent+folder, agent list with status dots, New-agent/Manage actions open Agents view.
+  last_edited_ms: 1781515390735
 93437a4d1fcca158:
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
@@ -3082,6 +3102,10 @@ a83fd0afdd04e258:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
+a849654a0e727274:
+  path: ui/src/lib/mock.ts
+  description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails (5 convos each with agentId: T8/T2/T7→a-cp, T4→a-opio, T1→a-lean), agents (3 workspaces=folders), fileTree (agent-badged), activeAgentId.'
+  last_edited_ms: 1781515390755
 a86121643145f349:
   path: src/app/run/input.rs
   description: App::new() constructor, save_state/message_async(), handle_autocomplete/palette events. No question form event handling (removed).
@@ -3654,6 +3678,10 @@ c789b7f61fb207fe:
   path: src/infra/profiler.rs
   description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime via cp_mod_utilities::time, elapsed ms, tool name(s).
   last_edited_ms: 0
+c7c4475a90dcee17:
+  path: ui/src/components/agents/AgentDetail.tsx
+  description: 'Right pane of Agents browse mode. 3 faces from selected node: agent folder→dashboard (metrics incl realm thread count + confined Realm file tree showing ''agent can''t go out'' + Open workspace), plain folder→Initialize-agent form, file/none→empty state. RealmTree + findByPath helpers.'
+  last_edited_ms: 1781515390725
 c7ea61d3ceb784d8:
   path: crates/cp-base/src/modules.rs
   description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/tool_progress), file watcher integration.
@@ -3994,6 +4022,10 @@ dc10ebfd496e013e:
   path: crates/cp-console-server/Cargo.toml
   description: 'Console server deps: serde, serde_json, nix (process), signal-hook, rlimit.'
   last_edited_ms: 0
+dc15b2a7c9536464:
+  path: ui/src/App.tsx
+  description: App shell. view state (agents|threads|cockpit, default agents) + activeAgentId. TopBar drives view+agent switch. AgentsView/ThreadsView(scoped to activeAgentId)/cockpit dispatch. openAgent switches agent then →threads.
+  last_edited_ms: 1781515390765
 dc25adefd5b31fad:
   path: crates/cp-mod-firecrawl/src/types.rs
   description: Firecrawl response types. ScrapeResponse/Data/Metadata, SearchResponse/SearchResult (polymorphic data field), MapResponse/MapLink. All Serialize+Deserialize.
@@ -4402,6 +4434,10 @@ f957bf9c5e2d5a99:
   path: src/infra/api.rs
   description: Thin re-export of llms::{StreamEvent, StreamParams, start_streaming}. Backward-compat shim.
   last_edited_ms: 0
+f9a59893086fbabb:
+  path: ui/src/components/threads/ThreadList.tsx
+  description: 'Left rail of threads view. Agent realm header (name+folder) + ''M working in parallel'' pulsing pill. Grouped: ''Needs you''=MY_TURN / ''Working in parallel''=THEIR_TURN. Each row: status dot, name, preview, time, unread. New Thread + search.'
+  last_edited_ms: 1781515390716
 fa07059c45a476ab:
   path: crates/cp-mod-memory/src/panel.rs
   description: Memory panel. Sorts by importance (critical→low). format_memories_for_context() YAML output for LLM. blocks() renders KeyValue with importance-colored labels. refresh() updates context entry. context() returns ContextItem. needs_cache=false.

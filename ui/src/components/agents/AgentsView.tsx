@@ -1,34 +1,62 @@
 import { useState } from "react"
+import { ArrowLeft } from "lucide-react"
 import { FileBrowser } from "./FileBrowser"
 import { AgentDetail } from "./AgentDetail"
+import { FleetDashboard } from "./FleetDashboard"
 import { fileTree, agents } from "@/lib/mock"
 import type { FsNode } from "@/lib/types"
 
 /**
- * Agents launcher — the "mission control" for workspaces. Each agent is one
- * folder. Browse the filesystem on the left; the right pane lets you open an
- * existing agent or initialize one in a plain folder. Selecting "Open" switches
- * the active agent and drops you into its threads view.
+ * Agents launcher — "mission control" for workspaces (1 agent = 1 folder).
+ *
+ * Two surfaces:
+ *  • **fleet** (landing) — a welcome dashboard of every agent with thread stats.
+ *  • **browse** — the filesystem tree + detail pane, used to open an agent or
+ *    initialize one in a plain folder.
  */
 export function AgentsView({
-  activeAgentId,
   onOpenAgent,
 }: {
-  activeAgentId: string
   onOpenAgent: (id: string) => void
 }) {
-  // Default selection: the active agent's folder.
-  const activeFolder = agents.find((a) => a.id === activeAgentId)?.folder ?? ""
-  const [selected, setSelected] = useState<FsNode | null>(() => findByPath(fileTree, activeFolder))
+  const [mode, setMode] = useState<"fleet" | "browse">("fleet")
+  const [selected, setSelected] = useState<FsNode | null>(null)
+
+  // Enter browse mode, optionally pre-selecting a folder (e.g. an agent's realm).
+  const browseAt = (path?: string) => {
+    setSelected(path ? findByPath(fileTree, path) : null)
+    setMode("browse")
+  }
+
+  if (mode === "fleet") {
+    return (
+      <div className="flex min-h-0 flex-1">
+        <FleetDashboard
+          onOpenAgent={onOpenAgent}
+          onManageAgent={(id) => browseAt(agents.find((a) => a.id === id)?.folder)}
+          onNewAgent={() => browseAt()}
+        />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex min-h-0 flex-1">
-      <FileBrowser
-        root={fileTree}
-        selectedPath={selected?.path ?? ""}
-        onSelect={setSelected}
-      />
-      <AgentDetail node={selected} onOpenAgent={onOpenAgent} />
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* back bar — return to the fleet welcome dashboard */}
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
+        <button
+          onClick={() => setMode("fleet")}
+          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" />
+          All agents
+        </button>
+        <span className="text-[12px] text-muted-foreground/50">Browse filesystem</span>
+      </div>
+      <div className="flex min-h-0 flex-1">
+        <FileBrowser root={fileTree} selectedPath={selected?.path ?? ""} onSelect={setSelected} />
+        <AgentDetail node={selected} onOpenAgent={onOpenAgent} />
+      </div>
     </div>
   )
 }

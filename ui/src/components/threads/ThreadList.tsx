@@ -1,23 +1,70 @@
-import { Plus, Search } from "lucide-react"
+import { Plus, Search, FolderGit2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import type { ThreadDetail } from "@/lib/types"
+import type { Agent, ThreadDetail } from "@/lib/types"
+import { accentVar } from "@/lib/panelMeta"
 import { cn } from "@/lib/utils"
 
 interface ThreadListProps {
+  agent: Agent
   threads: ThreadDetail[]
   selectedId: string
   onSelect: (id: string) => void
 }
 
 /** Left rail of the thread-centered view — a clean, grouped chat sidebar. */
-export function ThreadList({ threads, selectedId, onSelect }: ThreadListProps) {
+export function ThreadList({ agent, threads, selectedId, onSelect }: ThreadListProps) {
   const mine = threads.filter((t) => t.status === "MY_TURN")
   const theirs = threads.filter((t) => t.status === "THEIR_TURN")
+  // THEIR_TURN = the agent is actively working that thread → parallel work.
+  const working = theirs.length
 
   return (
     <aside className="flex w-[280px] shrink-0 flex-col border-r border-border bg-surface">
-      {/* header + new thread */}
-      <div className="shrink-0 px-3 pb-2 pt-3">
+      {/* realm header — whose threads these are */}
+      <div className="flex items-center gap-2.5 px-3 pb-2.5 pt-3">
+        <span
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg"
+          style={{
+            background: `color-mix(in oklab, ${accentVar[agent.accent]} 16%, transparent)`,
+            color: accentVar[agent.accent],
+          }}
+        >
+          <FolderGit2 className="size-4" />
+        </span>
+        <div className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate text-[13px] font-semibold text-foreground/90">
+            {agent.name}
+          </span>
+          <span className="truncate font-mono text-[10px] text-muted-foreground/65">
+            {agent.folder}
+          </span>
+        </div>
+      </div>
+
+      {/* parallelism indicator */}
+      <div className="flex items-center gap-2 px-3 pb-2.5">
+        <span className="text-[11px] tabular-nums text-muted-foreground">
+          {threads.length} thread{threads.length === 1 ? "" : "s"}
+        </span>
+        {working > 0 && (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
+            style={{
+              background: "color-mix(in oklab, var(--interactive) 14%, transparent)",
+              color: "var(--interactive)",
+            }}
+          >
+            <span className="relative flex size-1.5">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--interactive)] opacity-70" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-[var(--interactive)]" />
+            </span>
+            {working} working in parallel
+          </span>
+        )}
+      </div>
+
+      {/* new thread + search */}
+      <div className="shrink-0 px-3 pb-2">
         <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--signal)] px-3 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105">
           <Plus className="size-4" />
           New Thread
@@ -35,7 +82,7 @@ export function ThreadList({ threads, selectedId, onSelect }: ThreadListProps) {
             <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} />
           ))}
 
-          {theirs.length > 0 && <Group label="In progress" count={theirs.length} />}
+          {theirs.length > 0 && <Group label="Working in parallel" count={theirs.length} />}
           {theirs.map((t) => (
             <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} />
           ))}

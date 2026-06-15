@@ -159,6 +159,8 @@ export interface ThreadDetail {
   id: string
   name: string
   status: ThreadStatus
+  /** the agent (folder/realm) this thread lives in — threads never cross agents */
+  agentId: string
   /** which agent is assigned to / working this thread */
   agent: string
   createdAt: string

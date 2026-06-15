@@ -2,6 +2,7 @@ import { Check, ChevronsUpDown, FolderGit2, Plus } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -56,36 +57,40 @@ export function AgentSwitcher({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-[280px]" align="start" sideOffset={6}>
-        <DropdownMenuLabel className="text-[11px]">Workspaces · one agent per folder</DropdownMenuLabel>
-        {agents.map((a) => (
-          <DropdownMenuItem
-            key={a.id}
-            onClick={() => onSwitch(a.id)}
-            className="flex items-center gap-2.5 py-1.5"
-          >
-            <AgentDot accent={a.accent} status={a.status} />
-            <div className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="truncate text-[12.5px] font-medium text-foreground/90">{a.name}</span>
-              <span className="truncate font-mono text-[10px] text-muted-foreground/65">{a.folder}</span>
-            </div>
-            <span
-              className="shrink-0 text-[10px] font-medium"
-              style={{ color: statusMeta[a.status].color }}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-[11px]">Workspaces · one agent per folder</DropdownMenuLabel>
+          {agents.map((a) => (
+            <DropdownMenuItem
+              key={a.id}
+              onClick={() => onSwitch(a.id)}
+              className="flex items-center gap-2.5 py-1.5"
             >
-              {statusMeta[a.status].label}
-            </span>
-            {a.id === activeId && <Check className="size-3.5 shrink-0 text-[var(--signal)]" />}
-          </DropdownMenuItem>
-        ))}
+              <AgentDot accent={a.accent} status={a.status} />
+              <div className="flex min-w-0 flex-1 flex-col leading-tight">
+                <span className="truncate text-[12.5px] font-medium text-foreground/90">{a.name}</span>
+                <span className="truncate font-mono text-[10px] text-muted-foreground/65">{a.folder}</span>
+              </div>
+              <span
+                className="shrink-0 text-[10px] font-medium"
+                style={{ color: statusMeta[a.status].color }}
+              >
+                {statusMeta[a.status].label}
+              </span>
+              {a.id === activeId && <Check className="size-3.5 shrink-0 text-[var(--signal)]" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onManage} className="gap-2 py-1.5 text-[12.5px]">
-          <Plus className="size-3.5 text-[var(--interactive)]" />
-          New agent / browse filesystem…
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onManage} className="gap-2 py-1.5 text-[12.5px]">
-          <FolderGit2 className="size-3.5 text-muted-foreground" />
-          Manage workspaces
-        </DropdownMenuItem>
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={onManage} className="gap-2 py-1.5 text-[12.5px]">
+            <Plus className="size-3.5 text-[var(--interactive)]" />
+            New agent / browse filesystem…
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onManage} className="gap-2 py-1.5 text-[12.5px]">
+            <FolderGit2 className="size-3.5 text-muted-foreground" />
+            Manage workspaces
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )

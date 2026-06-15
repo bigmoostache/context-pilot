@@ -30,7 +30,7 @@ function App() {
           onSwitchAgent={setActiveAgentId}
         />
         {view === "agents" ? (
-          <AgentsView activeAgentId={activeAgentId} onOpenAgent={openAgent} />
+          <AgentsView onOpenAgent={openAgent} />
         ) : view === "cockpit" ? (
           <div className="flex min-h-0 flex-1">
             <LeftRail />
@@ -38,7 +38,10 @@ function App() {
             <RightInspector />
           </div>
         ) : (
-          <ThreadsView onOpenCockpit={() => setView("cockpit")} />
+          <ThreadsView
+            activeAgentId={activeAgentId}
+            onOpenCockpit={() => setView("cockpit")}
+          />
         )}
         <StatusBar />
       </div>

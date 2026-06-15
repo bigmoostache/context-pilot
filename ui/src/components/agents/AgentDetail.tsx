@@ -1,15 +1,20 @@
 import { useState } from "react"
 import {
   Bot,
+  ChevronRight,
   Clock,
+  File as FileIcon,
+  FileCode,
+  Folder,
   FolderGit2,
   GitBranch,
+  Lock,
   MessagesSquare,
   Plus,
   Rocket,
   Sparkles,
 } from "lucide-react"
-import { agents } from "@/lib/mock"
+import { agents, fileTree, threadDetails } from "@/lib/mock"
 import { accentVar, fmtCost } from "@/lib/panelMeta"
 import type { Agent, AgentStatus, FsNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -18,6 +23,16 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
   "needs-you": { label: "Needs you", color: "var(--signal)" },
   idle: { label: "Idle", color: "var(--muted-foreground)" },
+}
+
+/** Depth-first search for a node by its path. */
+function findByPath(node: FsNode, path: string): FsNode | null {
+  if (node.path === path) return node
+  for (const child of node.children ?? []) {
+    const hit = findByPath(child, path)
+    if (hit) return hit
+  }
+  return null
 }
 
 /**
@@ -47,6 +62,11 @@ function Section({ children }: { children: React.ReactNode }) {
 
 function AgentDashboard({ agent, onOpen }: { agent: Agent; onOpen: () => void }) {
   const s = statusMeta[agent.status]
+  // Threads that live inside this agent's realm (single source of truth).
+  const realmThreads = threadDetails.filter((t) => t.agentId === agent.id)
+  const working = realmThreads.filter((t) => t.status === "THEIR_TURN").length
+  const needsYou = realmThreads.filter((t) => t.status === "MY_TURN").length
+  const realmNode = findByPath(fileTree, agent.folder)
   return (
     <Section>
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-5">
@@ -85,8 +105,33 @@ function AgentDashboard({ agent, onOpen }: { agent: Agent; onOpen: () => void })
         <div className="grid grid-cols-2 gap-3">
           <Metric icon={GitBranch} label="Branch" value={agent.branch} />
           <Metric icon={Bot} label="Model" value={agent.model} />
-          <Metric icon={MessagesSquare} label="Threads" value={`${agent.threads} open`} />
+          <Metric
+            icon={MessagesSquare}
+            label="Threads"
+            value={`${realmThreads.length} · ${working} working`}
+          />
           <Metric icon={Clock} label="Last activity" value={agent.lastActivity} />
+        </div>
+
+        {/* realm — the folder the agent is confined to */}
+        <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-3 card-shadow">
+          <div className="flex items-center gap-2">
+            <Lock className="size-3.5 text-muted-foreground" />
+            <span className="text-[11.5px] font-semibold text-foreground/80">Realm</span>
+            <span className="font-mono text-[11px] text-muted-foreground/70">{agent.folder}</span>
+            <span className="ml-auto text-[10.5px] text-muted-foreground/60">
+              confined — the agent can't go out
+            </span>
+          </div>
+          <div className="rounded-lg bg-muted/40 px-1.5 py-1.5">
+            {realmNode ? (
+              <RealmTree node={realmNode} depth={0} rootPath={realmNode.path} />
+            ) : (
+              <span className="px-2 text-[12px] text-muted-foreground/60">
+                Folder not indexed.
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 card-shadow">
@@ -101,11 +146,87 @@ function AgentDashboard({ agent, onOpen }: { agent: Agent; onOpen: () => void })
             className="flex items-center gap-2 rounded-lg bg-[var(--signal)] px-4 py-2 text-[13px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
           >
             <Rocket className="size-4" />
-            Open workspace
+            Open workspace{needsYou > 0 ? ` · ${needsYou} need you` : ""}
           </button>
         </div>
       </div>
     </Section>
+  )
+}
+
+/**
+ * Compact, read-only file tree for the agent's realm. Rooted at the agent's
+ * folder — there is deliberately no way to navigate above it, expressing the
+ * "an agent can't leave its folder" boundary.
+ */
+function RealmTree({
+  node,
+  depth,
+  rootPath,
+}: {
+  node: FsNode
+  depth: number
+  rootPath: string
+}) {
+  const isRoot = node.path === rootPath
+  const [open, setOpen] = useState(true)
+  const isDir = node.kind === "dir"
+  const FileGlyph =
+    node.name.endsWith(".rs") || node.name.endsWith(".ts") || node.name.endsWith(".lean")
+      ? FileCode
+      : FileIcon
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => isDir && setOpen((o) => !o)}
+        className={cn(
+          "flex w-full items-center gap-1.5 rounded-md py-0.5 pr-2 text-left transition-colors",
+          isDir ? "hover:bg-muted/60" : "cursor-default",
+        )}
+        style={{ paddingLeft: `${depth * 14 + 6}px` }}
+      >
+        {isDir ? (
+          <ChevronRight
+            className={cn(
+              "size-3.5 shrink-0 text-muted-foreground/50 transition-transform",
+              open && "rotate-90",
+            )}
+          />
+        ) : (
+          <span className="w-3.5 shrink-0" />
+        )}
+        {isDir ? (
+          <Folder
+            className="size-4 shrink-0"
+            style={isRoot ? { color: "var(--signal)" } : { color: "var(--warn)" }}
+          />
+        ) : (
+          <FileGlyph className="size-4 shrink-0 text-muted-foreground/70" />
+        )}
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-[12px]",
+            isRoot ? "font-semibold text-foreground/90" : "text-foreground/80",
+          )}
+        >
+          {isRoot ? `${node.name}/` : node.name}
+        </span>
+        {isRoot && (
+          <span className="shrink-0 rounded-full bg-[var(--signal)]/15 px-1.5 py-px text-[9.5px] font-semibold text-[var(--signal)]">
+            realm root
+          </span>
+        )}
+      </button>
+      {isDir && open && node.children && node.children.length > 0 && (
+        <div>
+          {node.children.map((child) => (
+            <RealmTree key={child.path} node={child} depth={depth + 1} rootPath={rootPath} />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
