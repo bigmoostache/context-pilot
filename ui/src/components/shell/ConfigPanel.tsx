@@ -12,7 +12,6 @@ import {
   KeyRound,
   Boxes,
   Search,
-  Settings2,
   Sliders,
   Sparkles,
   X,
@@ -52,17 +51,7 @@ export function ConfigPanel({
           inline ? "bg-surface" : "bg-muted/30",
         )}
       >
-        <div className="flex items-center gap-2.5 px-4 pb-3 pt-5">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-[var(--interactive)]/14 text-[var(--interactive)] ring-1 ring-inset ring-[var(--interactive)]/25">
-            <Settings2 className="size-[18px]" />
-          </span>
-          <div className="flex flex-col">
-            <span className="text-[13.5px] font-semibold tracking-tight text-foreground">Settings</span>
-            <span className="text-[11px] text-muted-foreground">Context Pilot</span>
-          </div>
-        </div>
-        <div className="h-px bg-border/60" />
-        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 py-2.5">
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 py-3.5">
           {CATEGORIES.map((c) => {
             const on = c.id === cat
             return (
