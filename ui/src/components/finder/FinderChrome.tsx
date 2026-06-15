@@ -17,7 +17,7 @@ import {
   Upload,
   X,
 } from "lucide-react"
-import type { FinderNode, FinderTag, FinderViewMode } from "@/lib/types"
+import type { FinderKind, FinderNode, FinderTag, FinderViewMode } from "@/lib/types"
 import { collectStarred } from "@/lib/finderFs"
 import { kindMeta, TAG_META } from "./kind"
 import { cn } from "@/lib/utils"
@@ -27,6 +27,8 @@ export interface FinderTab {
   id: string
   cwd: string
   label: string
+  /** what this tab shows — drives the leading icon (folder, pdf, …) */
+  kind: FinderKind
 }
 
 export function FinderTabs({
@@ -46,6 +48,7 @@ export function FinderTabs({
     <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border bg-surface px-2">
       {tabs.map((t) => {
         const on = t.id === active
+        const TabIcon = kindMeta[t.kind].icon
         return (
           <div
             key={t.id}
@@ -55,6 +58,10 @@ export function FinderTabs({
               on ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:bg-muted/60",
             )}
           >
+            <TabIcon
+              className="size-3.5 shrink-0"
+              style={{ color: t.kind === "folder" ? "var(--warn)" : kindMeta[t.kind].accent }}
+            />
             <span className="max-w-[130px] truncate">{t.label}</span>
             {tabs.length > 1 && (
               <button

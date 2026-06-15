@@ -22,6 +22,8 @@ import { GetInfo } from "./GetInfo"
 interface Tab extends FinderTab {
   back: string[]
   fwd: string[]
+  /** when set, this is a file tab showing one file instead of a folder */
+  fileNode?: FinderNode
 }
 
 let tabSeq = 1
@@ -39,7 +41,7 @@ export function Finder({ agent }: { agent: Agent }) {
   const surfaceRef = useRef<HTMLDivElement>(null)
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
-    { id: "t0", cwd: root.path, label: root.name, back: [], fwd: [] },
+    { id: "t0", cwd: root.path, label: root.name, kind: "folder", back: [], fwd: [] },
   ])
   const [activeId, setActiveId] = useState("t0")
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -82,12 +84,14 @@ export function Finder({ agent }: { agent: Agent }) {
   }
 
   const navigate = (path: string) => {
-    if (path === cwd) return
+    if (path === cwd && !active.fileNode) return
     patchTab((t) => ({
       ...t,
       back: [...t.back, t.cwd],
       fwd: [],
       cwd: path,
+      kind: "folder",
+      fileNode: undefined,
       label: findNode(root, path)?.name ?? t.label,
     }))
     setSelected(new Set())
@@ -136,13 +140,24 @@ export function Finder({ agent }: { agent: Agent }) {
     if (!previewOpen && node.kind !== "folder") setPreviewOpen(true)
   }
 
+  /** Open a file in its own tab (reuse an existing tab for the same file). */
+  const openInNewTab = (node: FinderNode) => {
+    const existing = tabs.find((t) => t.fileNode?.path === node.path)
+    if (existing) {
+      setActiveId(existing.id)
+      return
+    }
+    const id = `t${tabSeq++}`
+    setTabs((ts) => [
+      ...ts,
+      { id, cwd: node.path, label: node.name, kind: node.kind, fileNode: node, back: [], fwd: [] },
+    ])
+    setActiveId(id)
+  }
+
   const open = (node: FinderNode) => {
     if (node.kind === "folder") navigate(node.path)
-    else {
-      setPreview(node)
-      setFocusPath(node.path)
-      setPreviewOpen(true)
-    }
+    else openInNewTab(node)
   }
 
   const openContext = (e: React.MouseEvent, node: FinderNode) => {
@@ -225,7 +240,7 @@ export function Finder({ agent }: { agent: Agent }) {
   // ── tabs ────────────────────────────────────────────────────────
   const newTab = () => {
     const id = `t${tabSeq++}`
-    setTabs((ts) => [...ts, { id, cwd: root.path, label: root.name, back: [], fwd: [] }])
+    setTabs((ts) => [...ts, { id, cwd: root.path, label: root.name, kind: "folder", back: [], fwd: [] }])
     setActiveId(id)
   }
   const closeTab = (id: string) => {
@@ -314,51 +329,62 @@ export function Finder({ agent }: { agent: Agent }) {
       <div className="flex min-h-0 flex-1">
         <FinderSidebar root={root} cwd={cwd} onNavigate={navigate} onOpen={open} />
 
-        <main
-          onClick={(e) => {
-            if (e.currentTarget === e.target) {
-              setSelected(new Set())
-              setFocusPath(null)
-            }
-          }}
-          className={
-            viewMode === "columns" || viewMode === "gallery"
-              ? "min-w-0 flex-1 overflow-hidden"
-              : "min-w-0 flex-1 overflow-auto"
-          }
-        >
-          {viewMode === "grid" && (
-            <GridView key={cwd} nodes={sorted} iconSize={iconSize} {...viewProps} />
-          )}
-          {viewMode === "list" && (
-            <ListView
-              key={cwd}
-              nodes={sorted}
-              sortKey={sortKey}
-              asc={asc}
-              onSort={onSort}
-              {...viewProps}
-            />
-          )}
-          {viewMode === "columns" && (
-            <ColumnsView
-              panes={crumbs.map((c) => ({ path: c.path, nodes: c.children ?? [] }))}
-              activePath={new Set(crumbs.map((c) => c.path))}
-              previewNode={previewNode}
-              {...viewProps}
-            />
-          )}
-          {viewMode === "gallery" && (
-            <GalleryView key={cwd} nodes={sorted} hero={previewNode} {...viewProps} />
-          )}
-        </main>
-
-        {previewOpen && (
+        {active.fileNode ? (
           <FinderPreview
-            node={previewNode}
+            node={active.fileNode}
+            variant="full"
             onGetInfo={(n) => setInfo(n)}
-            onClose={() => setPreviewOpen(false)}
+            onClose={() => closeTab(active.id)}
           />
+        ) : (
+          <>
+            <main
+              onClick={(e) => {
+                if (e.currentTarget === e.target) {
+                  setSelected(new Set())
+                  setFocusPath(null)
+                }
+              }}
+              className={
+                viewMode === "columns" || viewMode === "gallery"
+                  ? "min-w-0 flex-1 overflow-hidden"
+                  : "min-w-0 flex-1 overflow-auto"
+              }
+            >
+              {viewMode === "grid" && (
+                <GridView key={cwd} nodes={sorted} iconSize={iconSize} {...viewProps} />
+              )}
+              {viewMode === "list" && (
+                <ListView
+                  key={cwd}
+                  nodes={sorted}
+                  sortKey={sortKey}
+                  asc={asc}
+                  onSort={onSort}
+                  {...viewProps}
+                />
+              )}
+              {viewMode === "columns" && (
+                <ColumnsView
+                  panes={crumbs.map((c) => ({ path: c.path, nodes: c.children ?? [] }))}
+                  activePath={new Set(crumbs.map((c) => c.path))}
+                  previewNode={previewNode}
+                  {...viewProps}
+                />
+              )}
+              {viewMode === "gallery" && (
+                <GalleryView key={cwd} nodes={sorted} hero={previewNode} {...viewProps} />
+              )}
+            </main>
+
+            {previewOpen && (
+              <FinderPreview
+                node={previewNode}
+                onGetInfo={(n) => setInfo(n)}
+                onClose={() => setPreviewOpen(false)}
+              />
+            )}
+          </>
         )}
       </div>
 

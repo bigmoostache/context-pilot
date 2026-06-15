@@ -15,15 +15,26 @@ export function FinderPreview({
   node,
   onGetInfo,
   onClose,
+  variant = "pane",
 }: {
   node: FinderNode | null
   onGetInfo: (node: FinderNode) => void
   onClose: () => void
+  /** "pane" = the 420px QuickLook side rail; "full" = a file tab's main area */
+  variant?: "pane" | "full"
 }) {
+  const full = variant === "full"
   return (
-    <aside className="flex w-[420px] shrink-0 flex-col border-l border-border bg-surface">
+    <aside
+      className={cn(
+        "flex shrink-0 flex-col bg-surface",
+        full ? "min-w-0 flex-1" : "w-[420px] border-l border-border",
+      )}
+    >
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-        <span className="text-[12px] font-semibold text-muted-foreground">Quick Look</span>
+        <span className="text-[12px] font-semibold text-muted-foreground">
+          {full ? node?.name ?? "Quick Look" : "Quick Look"}
+        </span>
         <div className="ml-auto flex items-center gap-1">
           {node && node.kind !== "folder" && (
             <>
@@ -32,7 +43,7 @@ export function FinderPreview({
               <IconBtn icon={Share2} title="Share" />
             </>
           )}
-          <IconBtn icon={X} title="Close" onClick={onClose} />
+          {!full && <IconBtn icon={X} title="Close" onClick={onClose} />}
         </div>
       </div>
 
