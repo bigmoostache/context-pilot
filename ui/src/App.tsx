@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { TopBar } from "@/components/shell/TopBar"
-import { LeftRail } from "@/components/shell/LeftRail"
-import { Conversation } from "@/components/conversation/Conversation"
+import { CockpitView } from "@/components/shell/CockpitView"
 import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetShell } from "@/components/agents/FleetShell"
@@ -37,10 +36,7 @@ function App() {
         {view === "fleet" ? (
           <FleetShell onOpenAgent={openAgent} />
         ) : view === "cockpit" ? (
-          <div className="flex min-h-0 flex-1">
-            <LeftRail />
-            <Conversation />
-          </div>
+          <CockpitView />
         ) : view === "finder" ? (
           <Finder key={activeAgent.id} agent={activeAgent} />
         ) : (

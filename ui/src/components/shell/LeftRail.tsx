@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { TokenBar } from "@/components/panels/TokenBar"
 import { panels, tokenBudget } from "@/lib/mock"
@@ -9,9 +8,17 @@ import { cn } from "@/lib/utils"
  * Context navigator — a clean, calm list of the agent's panels with a single
  * context-budget meter. The dense per-panel telemetry (token bars, freeze /
  * miss counters) is intentionally omitted for an uncluttered, enterprise feel.
+ *
+ * Selection is **controlled** by the parent (the cockpit lifts it so the chosen
+ * panel drives the center PanelPane).
  */
-export function LeftRail() {
-  const [selected, setSelected] = useState("P5")
+export function LeftRail({
+  selected,
+  onSelect,
+}: {
+  selected: string
+  onSelect: (id: string) => void
+}) {
   const usedRatio = tokenBudget.used / tokenBudget.budget
 
   return (
@@ -48,7 +55,7 @@ export function LeftRail() {
               <li key={p.id}>
                 <button
                   type="button"
-                  onClick={() => setSelected(p.id)}
+                  onClick={() => onSelect(p.id)}
                   className={cn(
                     "group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors",
                     sel

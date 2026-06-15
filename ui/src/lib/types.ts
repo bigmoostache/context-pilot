@@ -301,3 +301,103 @@ export interface ThreadDetail {
   archived?: boolean
   log: ThreadMsg[]
 }
+
+// ── Cockpit panel maquettes (one designed view per sidebar panel) ─────────
+// Lightweight, design-only shapes feeding the panel-centered "cockpit" view.
+// Each mirrors what its real Context Pilot TUI panel surfaces.
+
+export type Importance = "low" | "medium" | "high" | "critical"
+
+/** One memory card in the Memories panel (id · tl;dr · importance · labels). */
+export interface MemoryCard {
+  id: string
+  tldr: string
+  importance: Importance
+  labels: string[]
+}
+
+/** A recency-weighted anchor signal at the top of the Context Radar. */
+export interface RadarAnchor {
+  time: string
+  signal: string
+}
+
+/** A scored recall result in the Context Radar body. */
+export interface RadarResult {
+  content: string
+  datetime: string
+  importance: Importance
+  score: number
+}
+
+/** One (possibly nested) todo row. `depth` drives indentation. */
+export interface TodoItem {
+  id: string
+  name: string
+  status: "pending" | "in_progress" | "done"
+  depth: number
+}
+
+/** A table in the Entities (SQLite) panel. */
+export interface EntityTable {
+  name: string
+  rows: number
+  /** compact column signature, e.g. "name TEXT PK, type TEXT, …" */
+  columns: string
+  /** a couple of sample row tuples, pre-stringified */
+  samples: string[]
+}
+
+/** One tool row inside a Tools-panel category group. */
+export interface ToolRow {
+  name: string
+  status: "on" | "off"
+  desc: string
+}
+
+/** A category grouping of tools in the Tools panel. */
+export interface ToolGroup {
+  category: string
+  tools: ToolRow[]
+}
+
+/** A callback definition row in the Callbacks panel. */
+export interface CallbackRow {
+  id: string
+  name: string
+  pattern: string
+  blocking: boolean
+  timeout: string
+  scope: string
+  cwd: string
+}
+
+/** A queued tool call awaiting flush in the Queue panel. */
+export interface QueueAction {
+  index: number
+  tool: string
+  intent: string
+  preview: string
+}
+
+/** A scratchpad cell (title + body preview). */
+export interface ScratchCell {
+  id: string
+  title: string
+  preview: string
+}
+
+/** One row of the Directory Tree panel (flattened for rendering). */
+export interface TreeRow {
+  depth: number
+  name: string
+  kind: "dir" | "file"
+  /** token-size chip (files/dirs), e.g. "19.5K" */
+  size?: string
+  /** cartographer description */
+  desc?: string
+  /** [!] — file changed since its description was written */
+  changed?: boolean
+  /** open folder (▼) vs closed (▶) */
+  open?: boolean
+}
