@@ -542,6 +542,10 @@
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. No check_question_form call. check_my_turn_threads() with debounce.'
   last_edited_ms: 1781391612154
+19ff2803603b3b4d:
+  path: ui/src/App.tsx
+  description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Fleet altitude → FleetShell (4-page mission control). Cockpit = LeftRail + Conversation. threads/finder per-agent. openAgent switches agent→threads. Finder keyed by agent.id.
+  last_edited_ms: 1781531138896
 1a0030a206077302:
   path: crates/cp-mod-entities/src/types.rs
   description: EntitiesState (db_path, dump_path, migrations_dir, schema_cache), SchemaCache, TableInfo, ColumnInfo, ForeignKeyInfo. get/get_mut helpers for State TypeMap access.
@@ -1462,6 +1466,10 @@
   path: crates/cp-mod-console/src/manager.rs
   description: TUI-side session handle. spawn()/reconnect()/kill()/send_input() via console server. FilePoller + StatusPoller background threads per session. Orphan cleanup on startup. server_request() short-lived UnixStream per call. Geometric backoff socket wait (25ms→500ms cap, 3s budget).
   last_edited_ms: 0
+4acfdf5755024ac9:
+  path: ui/src/components/agents/PromptsPage.tsx
+  description: Global prompt-library page (fleet 'Prompts'). Renders mock library[] (agents/skills/commands) as cards with KIND_META icon/accent/blurb, filter tabs (all + per-kind w/ counts), kind sections in 'all' view, active/built-in badges. Design-only create/edit.
+  last_edited_ms: 1781531138853
 4b3f6bd9675aba4d:
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.5 duplicate Close_conversation_history queue check (panels[].panel_id extraction, skipped during trap), Phase 1 schema validation, Phase 2 module semantic checks.'
@@ -1562,6 +1570,10 @@
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
   last_edited_ms: 1780585450722
+50a1f6f2ff6dad0a:
+  path: ui/src/components/agents/FleetSidebar.tsx
+  description: 'Mission-control left nav rail (fleet dashboard). FleetPage type = agents|prompts|usage|settings. macOS-sidebar register: CP identity header + 4 nav items (icon+label+hint, active=card-shadow). page/onSelect props.'
+  last_edited_ms: 1781531138842
 50b655ad3209fd44:
   path: src/app/mod.rs
   description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file/gh watchers, timers, PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt_builder, reverie, run.'
@@ -2550,6 +2562,10 @@
   path: ui/src/App.tsx
   description: 'Cockpit shell: TopBar / (LeftRail + Conversation + RightInspector) / StatusBar flex layout.'
   last_edited_ms: 1781458541241
+86e8fa11b368db6e:
+  path: ui/src/components/shell/ConfigModal.tsx
+  description: Settings dialog — thin portaled Base UI Dialog wrapper around ConfigPanel variant='dialog'. Used by TopBar gear (in-agent). Portal escapes the .vibrancy backdrop-filter containing block (half-off-screen fix). Controlled open/onClose.
+  last_edited_ms: 1781531138885
 871bb8b9be861acd:
   path: crates/cp-console-server/src/cleanup.rs
   description: 'Process cleanup: reaper thread (30s grace), graceful shutdown (kill_all_sessions), signal handlers (SIGINT/SIGHUP), FD limit raising. Uses BTreeMap for ordered exit_times tracking.'
@@ -2770,6 +2786,10 @@
   path: src/ui/search_overlay/mod.rs
   description: 'Ctrl+I Meilisearch indexing status overlay. Two-column layout: left (server, process CPU/RAM, database, index stats, extensions), right (splitter, embeddings, tasks, recomputed, recently sent). Centered bordered popup.'
   last_edited_ms: 0
+905c0880360bca44:
+  path: ui/src/components/agents/FleetShell.tsx
+  description: 'Fleet mission-control shell — shown when no agent is focused. Owns fleetPage state, renders FleetSidebar + active page: agents (FleetDashboard) / prompts (PromptsPage) / usage (UsagePage) / settings (ConfigPanel variant=''inline''). App.tsx renders this at fleet altitude.'
+  last_edited_ms: 1781531138831
 90759f8bbe365234:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -2862,6 +2882,10 @@
   path: src/app/actions/threads.rs
   description: 'Thread action handlers. Dispatches Thread* action variants (select/create/archive/question navigation). Question form: cursor movement, toggle selection, Enter submit (YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification), dismiss, char/backspace for Other field.'
   last_edited_ms: 1781448934561
+94ade63bb1b1667e:
+  path: ui/src/components/agents/UsagePage.tsx
+  description: Cost & token analytics page (fleet 'Usage'). Reads mock usage{}. Hero stat cards (spend/tokens/cache-hit-rate/messages), spend sparkline, per-agent cost bars (proportional, fill-sweep), token-composition stacked bar, cache economics. CSS-only charts, decorative time-range toggle.
+  last_edited_ms: 1781531138864
 94f3d1b290438319:
   path: src/app/run/input.rs
   description: App::new() constructor, save_state/message_async(), handle_autocomplete/question_form/palette events
@@ -3802,6 +3826,10 @@ c55dd96275144452:
   path: docs/talk/style.css
   description: 'Slide deck global styles: CSS vars, transitions, dark/light slide themes, sidebar, timer'
   last_edited_ms: 1781078806857
+c57234ff1b6d1f95:
+  path: ui/src/components/shell/ConfigPanel.tsx
+  description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog'' (DialogClose chrome, used by ConfigModal/TopBar gear) | ''inline'' (fills page, Save button, used by fleet Settings page). Categories: General/Providers/Search/DocAI/Web/Integrations. Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
+  last_edited_ms: 1781531138874
 c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)

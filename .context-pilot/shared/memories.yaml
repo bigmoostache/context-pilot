@@ -497,7 +497,7 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS. Views: fleet|threads|cockpit|finder. Dark theme = TUI D&D palette (charcoal grey + torch orange). Modals on portaled Base UI Dialog. Details in contents.'
+  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS. Views: fleet|threads|cockpit|finder. Fleet = 4-page mission control (Agents/Prompts/Usage/Settings). Dark theme = TUI D&D palette. Details in contents.'
   contents: |-
     ## Context Pilot Frontend Maquette
 
@@ -513,14 +513,18 @@
 
     **Agent model (user-locked)**: 1 agent = 1 FOLDER = its realm, can't go out. An agent owns MULTIPLE threads that can work in PARALLEL.
 
-    **ViewMode = fleet|threads|cockpit|finder (default 'fleet')**. App.tsx: FleetDashboard at fleet altitude; threads/cockpit/finder are per-agent. TopBar app-mark→fleet; at fleet altitude the AgentSwitcher + cost + Activity(stats) button + view switcher are HIDDEN (shows 'Mission control' caption); inside an agent the per-agent segmented switcher Threads·Cockpit·Finder + cost + Activity appear. Git branch chip removed everywhere (general-user UI). Far-right Settings gear opens ConfigModal.
+    **ViewMode = fleet|threads|cockpit|finder (default 'fleet')**. App.tsx: FleetShell at fleet altitude; threads/cockpit/finder are per-agent. TopBar app-mark→fleet; at fleet altitude the AgentSwitcher + cost + Activity(stats) button + view switcher are HIDDEN (shows 'Mission control' caption); inside an agent the per-agent segmented switcher Threads·Cockpit·Finder + cost + Activity appear. Git branch chip removed everywhere (general-user UI). Far-right Settings gear opens ConfigModal.
 
-    1. FLEET (FleetDashboard.tsx) = mission-control welcome + the SOLE place agents are created/managed. Greeting + AgentCard grid (status + one-line task + model·cost, no git branch; Open→threads / Manage→modal) + New-agent card. AgentModal (Apple-grade): create + manage(rename/model/archive), name-as-star field w/ live slugified realm preview, rich model cards.
+    1. FLEET (FleetShell.tsx) = mission-control workspace shown when NO agent focused. Left FleetSidebar (4 nav items) + page switch:
+       - **Agents** (FleetDashboard.tsx, default) = SOLE place agents are created/managed. Greeting + AgentCard grid (status + one-line task + model·cost, no git branch; Open→threads / Manage→modal) + New-agent card. AgentModal (Apple-grade): create + manage(rename/model/archive), name-as-star field w/ live slugified realm preview, rich model cards.
+       - **Prompts** (PromptsPage.tsx) = GLOBAL prompt library (the captain's intended end-state; today per-agent). Mock library[] agents/skills/commands as cards, KIND_META icon/accent/blurb, filter tabs (all+per-kind counts), kind sections in 'all', active/built-in badges.
+       - **Usage** (UsagePage.tsx) = cost/token analytics. Mock usage{}. Hero stats (spend/tokens/cache-hit/messages), spend sparkline, per-agent cost bars (fill-sweep), token-composition stacked bar, cache economics. CSS-only charts.
+       - **Settings** = ConfigPanel variant='inline' (fills page). Same shared body the TopBar gear opens as a dialog.
     2. THREADS = scoped to active agent's realm (ThreadsView filters threadDetails by agentId; EmptyRealm if none). ThreadList + ThreadConversation; thread metadata in on-demand ThreadDetailsPopup (ⓘ button), portaled Dialog. Embedded QuestionForm.
     3. COCKPIT = panel-centered: LeftRail + Conversation (RightInspector removed; stats now in header StatsPopup).
     4. FINDER (components/finder/, keyed by agent.id) = per-agent file manager CONFINED to the agent realm. Apple-grade: tabs+per-tab history, file-tabs (dbl-click file→dedicated tab w/ kind icon), 4 view modes (grid/list/Miller/gallery), icon-size slider, keyboard nav+type-ahead, ContextMenu, GetInfo modal, QuickLook FinderPreview, sidebar Favorites/Locations/Tags. lib/finderFs.ts buildRealm grafts one rich tree onto agent folder.
 
-    **ConfigModal.tsx** + **StatsPopup.tsx** + **ThreadDetailsPopup.tsx**: all on the portaled Base UI Dialog primitive (ui/components/ui/dialog.tsx) — portals to document.body to escape the TopBar .vibrancy backdrop-filter containing block that traps position:fixed (the half-off-screen bug). ConfigModal = macOS System-Settings style (category rail + detail pane: provider keys, Voyage, Meili, Datalab, Brave, Firecrawl, GitHub, default-model, autonomy toggles).
+    **ConfigPanel.tsx** = shared settings body (macOS System-Settings: category rail + detail pane), variant='dialog'|'inline'. **ConfigModal.tsx** = thin portaled-Dialog wrapper around it (TopBar gear, in-agent). **StatsPopup.tsx** + **ThreadDetailsPopup.tsx** also on the portaled Base UI Dialog primitive (ui/components/ui/dialog.tsx) — portals to document.body to escape the TopBar .vibrancy backdrop-filter containing block that traps position:fixed (the half-off-screen bug). Config categories: General/Providers/Search/DocAI/Web/Integrations.
 
     **Thread→agent mapping (mock)**: threadDetails carry agentId. T8/T2/T7→a-cp, T4→a-opio, T1→a-lean.
 
@@ -537,7 +541,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781530555896
+  last_edited_ms: 1781531198104
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-
