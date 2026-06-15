@@ -21,13 +21,6 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
 
   return (
     <header className="vibrancy flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
-      {/* macOS traffic lights — decorative */}
-      <div className="flex items-center gap-2 pr-1">
-        <span className="size-3 rounded-full bg-[#ff5f57]" />
-        <span className="size-3 rounded-full bg-[#febc2e]" />
-        <span className="size-3 rounded-full bg-[#28c840]" />
-      </div>
-
       {/* app mark → fleet dashboard (mission control) */}
       <button
         onClick={() => onViewChange("fleet")}
