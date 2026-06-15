@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { UploadCloud } from "lucide-react"
 import type {
   Agent,
@@ -7,9 +7,17 @@ import type {
   FinderViewMode,
 } from "@/lib/types"
 import { buildRealm, fmtBytes, findNode, pathChain, sortNodes } from "@/lib/finderFs"
-import { FinderTabs, FinderToolbar, FinderSidebar, type FinderTab } from "./FinderChrome"
-import { GridView, ListView, ColumnsView } from "./FinderViews"
+import {
+  FinderPathBar,
+  FinderSidebar,
+  FinderTabs,
+  FinderToolbar,
+  type FinderTab,
+} from "./FinderChrome"
+import { ColumnsView, GalleryView, GridView, ListView } from "./FinderViews"
 import { FinderPreview } from "./FinderPreview"
+import { ContextMenu, type MenuPos } from "./ContextMenu"
+import { GetInfo } from "./GetInfo"
 
 interface Tab extends FinderTab {
   back: string[]
@@ -20,26 +28,35 @@ let tabSeq = 1
 
 /**
  * Finder — a per-agent file manager confined to the agent's realm. Tabs +
- * history navigation, grid / list / Miller-column views, search, sort, a
- * QuickLook preview pane, and a drag-and-drop upload affordance. Design-only:
- * transfers are decorative, the filesystem is mock.
+ * history navigation, four view modes (grid / list / Miller columns / gallery),
+ * full keyboard control (arrows, type-ahead, Space QuickLook, ⌘I Get Info),
+ * range + additive selection, a right-click context menu, an icon-size slider,
+ * a QuickLook preview pane, a toggleable path bar, and a drag-and-drop upload
+ * affordance. Design-only: transfers are decorative, the filesystem is mock.
  */
 export function Finder({ agent }: { agent: Agent }) {
   const root = useMemo(() => buildRealm(agent.folder, agent.name), [agent])
+  const surfaceRef = useRef<HTMLDivElement>(null)
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
     { id: "t0", cwd: root.path, label: root.name, back: [], fwd: [] },
   ])
   const [activeId, setActiveId] = useState("t0")
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [anchor, setAnchor] = useState<string | null>(null)
+  const [focusPath, setFocusPath] = useState<string | null>(null)
   const [preview, setPreview] = useState<FinderNode | null>(null)
   const [previewOpen, setPreviewOpen] = useState(true)
   const [viewMode, setViewMode] = useState<FinderViewMode>("grid")
+  const [iconSize, setIconSize] = useState(52)
   const [query, setQuery] = useState("")
   const [sortKey, setSortKey] = useState<FinderSortKey>("name")
   const [asc, setAsc] = useState(true)
   const [dragging, setDragging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [menu, setMenu] = useState<MenuPos | null>(null)
+  const [info, setInfo] = useState<FinderNode | null>(null)
+  const [pathBarOpen, setPathBarOpen] = useState(false)
 
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
   const cwd = active.cwd
@@ -50,6 +67,10 @@ export function Finder({ agent }: { agent: Agent }) {
     : children
   const sorted = sortNodes(filtered, sortKey, asc)
   const crumbs = pathChain(root, cwd)
+  const previewNode = preview ?? (focusPath ? findNode(root, focusPath) : null)
+
+  const typeBuf = useRef("")
+  const typeTimer = useRef<number | undefined>(undefined)
 
   // ── mutators ────────────────────────────────────────────────────
   const patchTab = (fn: (t: Tab) => Tab) =>
@@ -70,6 +91,8 @@ export function Finder({ agent }: { agent: Agent }) {
       label: findNode(root, path)?.name ?? t.label,
     }))
     setSelected(new Set())
+    setAnchor(null)
+    setFocusPath(null)
     setQuery("")
   }
   const back = () =>
@@ -84,27 +107,122 @@ export function Finder({ agent }: { agent: Agent }) {
         ? { ...t, back: [...t.back, t.cwd], cwd: t.fwd[0], fwd: t.fwd.slice(1), label: findNode(root, t.fwd[0])?.name ?? t.label }
         : t,
     )
-
-  const onClick = (node: FinderNode, additive: boolean) => {
-    setSelected((cur) => {
-      if (additive) {
-        const next = new Set(cur)
-        next.has(node.path) ? next.delete(node.path) : next.add(node.path)
-        return next
-      }
-      return new Set([node.path])
-    })
-    setPreview(node)
-    if (!previewOpen) setPreviewOpen(true)
+  const goUp = () => {
+    if (crumbs.length > 1) navigate(crumbs[crumbs.length - 2].path)
   }
-  const onOpen = (node: FinderNode) => {
+
+  const select = (node: FinderNode, { additive, range }: { additive: boolean; range: boolean }) => {
+    if (range && anchor) {
+      const ai = sorted.findIndex((n) => n.path === anchor)
+      const bi = sorted.findIndex((n) => n.path === node.path)
+      if (ai >= 0 && bi >= 0) {
+        const [lo, hi] = ai < bi ? [ai, bi] : [bi, ai]
+        setSelected(new Set(sorted.slice(lo, hi + 1).map((n) => n.path)))
+      }
+    } else if (additive) {
+      setSelected((cur) => {
+        const next = new Set(cur)
+        if (next.has(node.path)) next.delete(node.path)
+        else next.add(node.path)
+        return next
+      })
+      setAnchor(node.path)
+    } else {
+      setSelected(new Set([node.path]))
+      setAnchor(node.path)
+    }
+    setFocusPath(node.path)
+    setPreview(node)
+    if (!previewOpen && node.kind !== "folder") setPreviewOpen(true)
+  }
+
+  const open = (node: FinderNode) => {
     if (node.kind === "folder") navigate(node.path)
     else {
       setPreview(node)
+      setFocusPath(node.path)
       setPreviewOpen(true)
     }
   }
 
+  const openContext = (e: React.MouseEvent, node: FinderNode) => {
+    e.preventDefault()
+    if (!selected.has(node.path)) {
+      setSelected(new Set([node.path]))
+      setAnchor(node.path)
+    }
+    setFocusPath(node.path)
+    setPreview(node)
+    setMenu({ x: e.clientX, y: e.clientY, node })
+  }
+
+  // ── keyboard control ────────────────────────────────────────────
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const tag = (e.target as HTMLElement).tagName
+    if (tag === "INPUT" || tag === "TEXTAREA") return
+
+    const idx = focusPath ? sorted.findIndex((n) => n.path === focusPath) : -1
+    const focusAt = (i: number) => {
+      const n = sorted[Math.max(0, Math.min(sorted.length - 1, i))]
+      if (!n) return
+      setFocusPath(n.path)
+      setSelected(new Set([n.path]))
+      setAnchor(n.path)
+      setPreview(n)
+    }
+
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault()
+      focusAt(idx < 0 ? 0 : idx + 1)
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault()
+      focusAt(idx < 0 ? 0 : idx - 1)
+    } else if (e.key === "Enter") {
+      e.preventDefault()
+      if (focusPath) {
+        const n = findNode(root, focusPath)
+        if (n) open(n)
+      }
+    } else if (e.key === "Backspace" || ((e.metaKey || e.ctrlKey) && e.key === "ArrowUp")) {
+      e.preventDefault()
+      goUp()
+    } else if (e.key === " ") {
+      e.preventDefault()
+      setPreviewOpen((o) => !o)
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+      e.preventDefault()
+      setSelected(new Set(sorted.map((n) => n.path)))
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
+      e.preventDefault()
+      if (previewNode) setInfo(previewNode)
+    } else if (e.key === "Escape") {
+      if (menu) setMenu(null)
+      else if (info) setInfo(null)
+      else {
+        setSelected(new Set())
+        setFocusPath(null)
+      }
+    } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      // type-ahead
+      typeBuf.current += e.key.toLowerCase()
+      window.clearTimeout(typeTimer.current)
+      typeTimer.current = window.setTimeout(() => (typeBuf.current = ""), 700)
+      const hit = sorted.find((n) => n.name.toLowerCase().startsWith(typeBuf.current))
+      if (hit) {
+        setFocusPath(hit.path)
+        setSelected(new Set([hit.path]))
+        setAnchor(hit.path)
+        setPreview(hit)
+      }
+    }
+  }
+
+  // focus the surface on mount + when the agent changes, so keys work
+  useEffect(() => {
+    surfaceRef.current?.focus()
+  }, [])
+
+  // ── tabs ────────────────────────────────────────────────────────
   const newTab = () => {
     const id = `t${tabSeq++}`
     setTabs((ts) => [...ts, { id, cwd: root.path, label: root.name, back: [], fwd: [] }])
@@ -131,9 +249,20 @@ export function Finder({ agent }: { agent: Agent }) {
     .map((p) => findNode(root, p))
     .reduce((sum, n) => sum + (n?.size ?? 0), 0)
 
+  const viewProps = {
+    selected,
+    focusPath,
+    onClick: select,
+    onOpen: open,
+    onContext: openContext,
+  }
+
   return (
     <div
-      className="relative flex min-w-0 flex-1 flex-col bg-background"
+      ref={surfaceRef}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      className="relative flex min-w-0 flex-1 flex-col bg-background outline-none"
       onDragOver={(e) => {
         e.preventDefault()
         if (!dragging) setDragging(true)
@@ -159,13 +288,17 @@ export function Finder({ agent }: { agent: Agent }) {
         canBack={active.back.length > 0}
         canForward={active.fwd.length > 0}
         viewMode={viewMode}
+        iconSize={iconSize}
         query={query}
         previewOpen={previewOpen}
+        pathBarOpen={pathBarOpen}
         onBack={back}
         onForward={forward}
         onCrumb={navigate}
         onViewMode={setViewMode}
+        onIconSize={setIconSize}
         onQuery={setQuery}
+        onNewFolder={() => flash("New Folder created (design only)")}
         onUpload={() => flash("Choose files to upload… (design only)")}
         onDownload={() =>
           flash(
@@ -175,45 +308,61 @@ export function Finder({ agent }: { agent: Agent }) {
           )
         }
         onTogglePreview={() => setPreviewOpen((o) => !o)}
+        onTogglePathBar={() => setPathBarOpen((o) => !o)}
       />
 
       <div className="flex min-h-0 flex-1">
-        <FinderSidebar root={root} cwd={cwd} onNavigate={navigate} />
+        <FinderSidebar root={root} cwd={cwd} onNavigate={navigate} onOpen={open} />
 
         <main
+          onClick={(e) => {
+            if (e.currentTarget === e.target) {
+              setSelected(new Set())
+              setFocusPath(null)
+            }
+          }}
           className={
-            viewMode === "columns"
+            viewMode === "columns" || viewMode === "gallery"
               ? "min-w-0 flex-1 overflow-hidden"
               : "min-w-0 flex-1 overflow-auto"
           }
         >
           {viewMode === "grid" && (
-            <GridView nodes={sorted} selected={selected} onClick={onClick} onOpen={onOpen} />
+            <GridView key={cwd} nodes={sorted} iconSize={iconSize} {...viewProps} />
           )}
           {viewMode === "list" && (
             <ListView
+              key={cwd}
               nodes={sorted}
-              selected={selected}
-              onClick={onClick}
-              onOpen={onOpen}
               sortKey={sortKey}
               asc={asc}
               onSort={onSort}
+              {...viewProps}
             />
           )}
           {viewMode === "columns" && (
             <ColumnsView
               panes={crumbs.map((c) => ({ path: c.path, nodes: c.children ?? [] }))}
               activePath={new Set(crumbs.map((c) => c.path))}
-              selected={selected}
-              onClick={onClick}
-              onOpen={onOpen}
+              previewNode={previewNode}
+              {...viewProps}
             />
+          )}
+          {viewMode === "gallery" && (
+            <GalleryView key={cwd} nodes={sorted} hero={previewNode} {...viewProps} />
           )}
         </main>
 
-        {previewOpen && <FinderPreview node={preview} onClose={() => setPreviewOpen(false)} />}
+        {previewOpen && (
+          <FinderPreview
+            node={previewNode}
+            onGetInfo={(n) => setInfo(n)}
+            onClose={() => setPreviewOpen(false)}
+          />
+        )}
       </div>
+
+      {pathBarOpen && <FinderPathBar crumbs={crumbs} onCrumb={navigate} />}
 
       {/* status bar */}
       <div className="flex h-7 shrink-0 items-center gap-3 border-t border-border bg-surface px-4 text-[11px] text-muted-foreground">
@@ -228,13 +377,28 @@ export function Finder({ agent }: { agent: Agent }) {
         )}
         <span className="ml-auto capitalize">{viewMode} view</span>
         <span className="h-3 w-px bg-border" />
+        <span className="hidden sm:inline">128 GB available</span>
+        <span className="h-3 w-px bg-border" />
         <span className="font-mono text-[10.5px]">{cwd}</span>
       </div>
+
+      {/* context menu */}
+      {menu && (
+        <ContextMenu
+          pos={menu}
+          onClose={() => setMenu(null)}
+          onAction={(label) => flash(`${label} (design only)`)}
+          onGetInfo={(n) => setInfo(n)}
+        />
+      )}
+
+      {/* get info */}
+      {info && <GetInfo node={info} onClose={() => setInfo(null)} />}
 
       {/* drag-drop overlay */}
       {dragging && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[var(--signal)]/8 backdrop-blur-[2px]">
-          <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-[var(--signal)] bg-card/90 px-10 py-8 pop-shadow">
+          <div className="ants flex flex-col items-center gap-3 rounded-2xl bg-card/90 px-10 py-8 pop-shadow">
             <UploadCloud className="size-9 text-[var(--signal)]" />
             <span className="text-[14px] font-semibold text-foreground">Drop to upload</span>
             <span className="text-[12px] text-muted-foreground">into {cwdNode.name}</span>

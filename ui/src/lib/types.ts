@@ -138,7 +138,12 @@ export type FinderKind =
   | "markdown"
   | "json"
   | "archive"
+  | "audio"
+  | "video"
   | "binary"
+
+/** macOS-style finder tags (colored dots). */
+export type FinderTag = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "gray"
 
 /** One spreadsheet preview payload. */
 export interface SheetPreview {
@@ -161,6 +166,12 @@ export interface FinderNode {
   size?: number
   /** human relative modified time, e.g. "2d ago" */
   modified: string
+  /** human relative created time */
+  created?: string
+  /** colored finder tags */
+  tags?: FinderTag[]
+  /** shown in Favorites sidebar */
+  starred?: boolean
   children?: FinderNode[]
   // ── optional preview payloads, by kind ──
   code?: { lang: string; lines: string[] }
@@ -168,11 +179,13 @@ export interface FinderNode {
   slides?: SlidePreview[]
   pdf?: { pages: number; title: string; excerpt: string[] }
   image?: { gradient: string; w: number; h: number }
+  /** audio / video payload */
+  media?: { kind: "audio" | "video"; duration: string; poster?: string; peaks?: number[] }
   /** markdown / json / plain-doc preview body */
   text?: string
 }
 
-export type FinderViewMode = "grid" | "list" | "columns"
+export type FinderViewMode = "grid" | "list" | "columns" | "gallery"
 export type FinderSortKey = "name" | "size" | "modified" | "kind"
 
 // ── Thread-centered view ──────────────────────────────────────────

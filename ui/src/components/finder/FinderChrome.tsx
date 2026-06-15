@@ -5,17 +5,21 @@ import {
   Clock,
   Columns3,
   Download,
+  FolderPlus,
+  GalleryHorizontalEnd,
   LayoutGrid,
   List as ListIcon,
-  Plus,
+  MoreHorizontal,
+  PanelBottom,
   Search,
   Sidebar as SidebarIcon,
   Star,
   Upload,
   X,
 } from "lucide-react"
-import type { FinderNode, FinderViewMode } from "@/lib/types"
-import { kindMeta } from "./kind"
+import type { FinderNode, FinderTag, FinderViewMode } from "@/lib/types"
+import { collectStarred } from "@/lib/finderFs"
+import { kindMeta, TAG_META } from "./kind"
 import { cn } from "@/lib/utils"
 
 // ── Tab strip ─────────────────────────────────────────────────────
@@ -48,12 +52,10 @@ export function FinderTabs({
             onClick={() => onSelect(t.id)}
             className={cn(
               "group flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors",
-              on
-                ? "bg-card text-foreground card-shadow"
-                : "text-muted-foreground hover:bg-muted/60",
+              on ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:bg-muted/60",
             )}
           >
-            <span className="max-w-[120px] truncate">{t.label}</span>
+            <span className="max-w-[130px] truncate">{t.label}</span>
             {tabs.length > 1 && (
               <button
                 onClick={(e) => {
@@ -73,47 +75,69 @@ export function FinderTabs({
         title="New tab"
         className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted/60 hover:text-foreground"
       >
-        <Plus className="size-3.5" />
+        +
       </button>
     </div>
   )
 }
 
-// ── Main toolbar: history, breadcrumb, view switch, search, transfer ──
+// ── Main toolbar ──────────────────────────────────────────────────
+const VIEW_ORDER: FinderViewMode[] = ["grid", "list", "columns", "gallery"]
+const VIEW_ICON = {
+  grid: LayoutGrid,
+  list: ListIcon,
+  columns: Columns3,
+  gallery: GalleryHorizontalEnd,
+} as const
+
 export function FinderToolbar({
   crumbs,
   canBack,
   canForward,
   viewMode,
+  iconSize,
   query,
   previewOpen,
+  pathBarOpen,
   onBack,
   onForward,
   onCrumb,
   onViewMode,
+  onIconSize,
   onQuery,
+  onNewFolder,
   onUpload,
   onDownload,
   onTogglePreview,
+  onTogglePathBar,
 }: {
   crumbs: FinderNode[]
   canBack: boolean
   canForward: boolean
   viewMode: FinderViewMode
+  iconSize: number
   query: string
   previewOpen: boolean
+  pathBarOpen: boolean
   onBack: () => void
   onForward: () => void
   onCrumb: (path: string) => void
   onViewMode: (m: FinderViewMode) => void
+  onIconSize: (n: number) => void
   onQuery: (q: string) => void
+  onNewFolder: () => void
   onUpload: () => void
   onDownload: () => void
   onTogglePreview: () => void
+  onTogglePathBar: () => void
 }) {
+  const idx = VIEW_ORDER.indexOf(viewMode)
+  // collapse a deep breadcrumb: first · … · last two
+  const collapsed = crumbs.length > 4
+  const shown = collapsed ? [crumbs[0], ...crumbs.slice(-2)] : crumbs
+
   return (
     <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
-      {/* history */}
       <div className="flex items-center gap-0.5">
         <NavBtn icon={ArrowLeft} disabled={!canBack} onClick={onBack} title="Back" />
         <NavBtn icon={ArrowRight} disabled={!canForward} onClick={onForward} title="Forward" />
@@ -121,40 +145,82 @@ export function FinderToolbar({
 
       {/* breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-lg border border-border bg-card px-2 py-1 card-shadow">
-        {crumbs.map((c, i) => (
-          <span key={c.path} className="flex shrink-0 items-center">
-            {i > 0 && <ChevronRight className="size-3.5 text-muted-foreground/40" />}
-            <button
-              onClick={() => onCrumb(c.path)}
-              className={cn(
-                "rounded px-1.5 py-0.5 text-[12px] transition-colors hover:bg-muted/70",
-                i === crumbs.length - 1
-                  ? "font-semibold text-foreground"
-                  : "text-muted-foreground",
-              )}
-            >
-              {i === 0 ? (
-                <span className="flex items-center gap-1">
-                  <kindMeta.folder.icon className="size-3.5" style={{ color: "var(--signal)" }} />
-                  {c.name}
+        {shown.map((c, i) => {
+          const isFirst = i === 0
+          const showEllipsis = collapsed && i === 1
+          return (
+            <span key={c.path} className="flex shrink-0 items-center">
+              {i > 0 && <ChevronRight className="size-3.5 text-muted-foreground/40" />}
+              {showEllipsis && (
+                <span className="flex items-center">
+                  <MoreHorizontal className="size-3.5 text-muted-foreground/50" />
+                  <ChevronRight className="size-3.5 text-muted-foreground/40" />
                 </span>
-              ) : (
-                c.name
               )}
-            </button>
-          </span>
-        ))}
+              <button
+                onClick={() => onCrumb(c.path)}
+                className={cn(
+                  "rounded px-1.5 py-0.5 text-[12px] transition-colors hover:bg-muted/70",
+                  i === shown.length - 1 ? "font-semibold text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {isFirst ? (
+                  <span className="flex items-center gap-1">
+                    <kindMeta.folder.icon className="size-3.5" style={{ color: "var(--signal)" }} />
+                    {c.name}
+                  </span>
+                ) : (
+                  c.name
+                )}
+              </button>
+            </span>
+          )
+        })}
       </div>
 
-      {/* view-mode segmented switch */}
-      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
-        <SegBtn icon={LayoutGrid} on={viewMode === "grid"} onClick={() => onViewMode("grid")} title="Grid" />
-        <SegBtn icon={ListIcon} on={viewMode === "list"} onClick={() => onViewMode("list")} title="List" />
-        <SegBtn icon={Columns3} on={viewMode === "columns"} onClick={() => onViewMode("columns")} title="Columns" />
+      {/* icon-size slider (grid only) */}
+      {viewMode === "grid" && (
+        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 card-shadow">
+          <LayoutGrid className="size-3 text-muted-foreground/60" />
+          <input
+            type="range"
+            min={36}
+            max={88}
+            step={4}
+            value={iconSize}
+            onChange={(e) => onIconSize(Number(e.target.value))}
+            className="finder-slider h-1 w-16 cursor-pointer"
+            title="Icon size"
+          />
+        </div>
+      )}
+
+      {/* segmented view switch with sliding indicator */}
+      <div className="relative flex items-center rounded-lg border border-border bg-muted/60 p-0.5">
+        <span
+          className="absolute inset-y-0.5 left-0.5 w-7 rounded-md bg-card card-shadow transition-transform duration-200"
+          style={{ transform: `translateX(${idx * 28}px)` }}
+        />
+        {VIEW_ORDER.map((m) => {
+          const Icon = VIEW_ICON[m]
+          return (
+            <button
+              key={m}
+              title={m[0].toUpperCase() + m.slice(1)}
+              onClick={() => onViewMode(m)}
+              className={cn(
+                "relative z-[1] flex size-7 items-center justify-center rounded-md transition-colors",
+                viewMode === m ? "text-[var(--signal)]" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="size-4" />
+            </button>
+          )
+        })}
       </div>
 
       {/* search */}
-      <div className="flex h-8 w-[170px] items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 card-shadow focus-within:border-[var(--signal)]/60">
+      <div className="flex h-8 w-[156px] items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 card-shadow focus-within:border-[var(--signal)]/60">
         <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
         <input
           value={query}
@@ -162,12 +228,20 @@ export function FinderToolbar({
           placeholder="Search realm"
           className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground/50"
         />
+        {query && (
+          <button onClick={() => onQuery("")} className="text-muted-foreground/50 hover:text-foreground">
+            <X className="size-3.5" />
+          </button>
+        )}
       </div>
 
-      {/* transfer + preview toggle */}
+      <div className="mx-0.5 h-5 w-px bg-border" />
+
+      <NavBtn icon={FolderPlus} onClick={onNewFolder} title="New folder" />
       <NavBtn icon={Upload} onClick={onUpload} title="Upload" />
       <NavBtn icon={Download} onClick={onDownload} title="Download" />
-      <SegBtn icon={SidebarIcon} on={previewOpen} onClick={onTogglePreview} title="Preview pane" />
+      <SegBtn icon={PanelBottom} on={pathBarOpen} onClick={onTogglePathBar} title="Path bar" />
+      <SegBtn icon={SidebarIcon} on={previewOpen} onClick={onTogglePreview} title="Quick Look pane" />
     </div>
   )
 }
@@ -216,8 +290,8 @@ function SegBtn({
       title={title}
       onClick={onClick}
       className={cn(
-        "flex size-7 items-center justify-center rounded-md transition-colors",
-        on ? "bg-card text-[var(--signal)] card-shadow" : "text-muted-foreground hover:text-foreground",
+        "flex size-8 items-center justify-center rounded-md transition-colors",
+        on ? "bg-muted text-[var(--signal)]" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
       )}
     >
       <Icon className="size-4" />
@@ -225,20 +299,43 @@ function SegBtn({
   )
 }
 
-// ── Left sidebar: places / favorites ──────────────────────────────
+// ── Left sidebar: favorites / locations / tags ────────────────────
+const SIDEBAR_TAGS: FinderTag[] = ["red", "orange", "green", "blue", "purple"]
+
 export function FinderSidebar({
   root,
   cwd,
   onNavigate,
+  onOpen,
 }: {
   root: FinderNode
   cwd: string
   onNavigate: (path: string) => void
+  onOpen: (node: FinderNode) => void
 }) {
   const topFolders = (root.children ?? []).filter((c) => c.kind === "folder")
+  const starred = collectStarred(root)
+
   return (
-    <aside className="flex w-[200px] shrink-0 flex-col gap-4 border-r border-border bg-surface px-2.5 py-3">
-      <Group label="Realm">
+    <aside className="flex w-[204px] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-border bg-surface px-2.5 py-3">
+      {starred.length > 0 && (
+        <Group label="Favorites">
+          {starred.map((n) => {
+            const I = kindMeta[n.kind].icon
+            return (
+              <Place
+                key={n.path}
+                icon={I}
+                label={n.name}
+                accent={n.kind === "folder" ? "var(--warn)" : kindMeta[n.kind].accent}
+                onClick={() => (n.kind === "folder" ? onNavigate(n.path) : onOpen(n))}
+              />
+            )
+          })}
+        </Group>
+      )}
+
+      <Group label="Locations">
         <Place
           icon={kindMeta.folder.icon}
           label={root.name}
@@ -259,15 +356,28 @@ export function FinderSidebar({
         ))}
       </Group>
 
-      <Group label="Favorites">
-        <Place icon={Star} label="Recents" accent="var(--interactive)" muted />
+      <Group label="Tags">
+        {SIDEBAR_TAGS.map((t) => (
+          <button
+            key={t}
+            className="flex items-center gap-2.5 rounded-md py-1.5 pl-2 pr-2 text-left text-[12.5px] text-foreground/75 transition-colors hover:bg-muted/60"
+          >
+            <span
+              className="size-2.5 shrink-0 rounded-full ring-1 ring-inset ring-black/10"
+              style={{ background: TAG_META[t].color }}
+            />
+            {TAG_META[t].label}
+          </button>
+        ))}
+      </Group>
+
+      <Group label="Recents">
+        <Place icon={Star} label="Starred" accent="var(--interactive)" muted />
         <Place icon={Clock} label="Last 7 days" accent="var(--muted-foreground)" muted />
       </Group>
 
       <div className="mt-auto rounded-lg border border-dashed border-border px-2.5 py-2 text-[10.5px] leading-relaxed text-muted-foreground/60">
-        <span className="flex items-center gap-1 font-medium text-muted-foreground/80">
-          🔒 Confined realm
-        </span>
+        <span className="flex items-center gap-1 font-medium text-muted-foreground/80">🔒 Confined realm</span>
         This Finder can't navigate above the agent's folder.
       </div>
     </aside>
@@ -315,5 +425,31 @@ function Place({
       <Icon className="size-4 shrink-0" style={{ color: accent }} />
       <span className="truncate">{label}</span>
     </button>
+  )
+}
+
+// ── Path bar (bottom) ─────────────────────────────────────────────
+export function FinderPathBar({
+  crumbs,
+  onCrumb,
+}: {
+  crumbs: FinderNode[]
+  onCrumb: (path: string) => void
+}) {
+  return (
+    <div className="flex h-7 shrink-0 items-center gap-0.5 overflow-x-auto border-t border-border bg-surface/80 px-3 text-[11px]">
+      {crumbs.map((c, i) => (
+        <span key={c.path} className="flex shrink-0 items-center">
+          {i > 0 && <ChevronRight className="size-3 text-muted-foreground/40" />}
+          <button
+            onClick={() => onCrumb(c.path)}
+            className="flex items-center gap-1 rounded px-1 py-0.5 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            <kindMeta.folder.icon className="size-3" style={{ color: "var(--warn)" }} />
+            {c.name}
+          </button>
+        </span>
+      ))}
+    </div>
   )
 }
