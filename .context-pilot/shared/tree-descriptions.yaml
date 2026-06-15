@@ -1858,6 +1858,10 @@
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
   last_edited_ms: 0
+5d1e1686cb8c117b:
+  path: ui/src/components/shell/ConfigPanel.tsx
+  description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog'' (DialogClose chrome) | ''inline'' (Save button). NO per-category title header (T20 — sidebar focus already names the page); dialog variant keeps only a slim close-only chrome bar. Categories: General/Usage & Cost/Providers/Search/DocAI/Web/Integrations. Usage renders <UsagePage/> full-bleed in a ''flex min-h-0 flex-1 flex-col overflow-hidden'' wrapper so UsagePage''s inner ScrollArea (flex-1/min-h-0) gets a flex parent and actually scrolls (T20 fix). Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
+  last_edited_ms: 1781545579109
 5d6f0efeeb4eae79:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
@@ -4002,6 +4006,10 @@ c659866126ec4a2c:
   path: crates/cp-mod-logs/src/lib.rs
   description: 'Logs module. 2 tools: log_create + Close_conversation_history (multi-panel, logs as strings, no memories/tags). Chunked JSON storage. build_log_write_ops() for batch persistence. v2 migration. Pre-flight validates panels array.'
   last_edited_ms: 0
+c65ec79f95e72c8f:
+  path: ui/src/components/shell/ConfigModal.tsx
+  description: 'Settings dialog — thin portaled Base UI Dialog wrapper around ConfigPanel variant=''dialog''. Used by TopBar gear (in-agent). LARGE: h-[88vh] max-h-[860px] w-[1100px] max-w-[calc(100vw-3rem)] (T20). Portal escapes the .vibrancy backdrop-filter containing block (half-off-screen fix). Controlled open/onClose.'
+  last_edited_ms: 1781545579121
 c6693ad9a7e8d8a2:
   path: crates/cp-mod-files/src/tools/diff.rs
   description: 'Diff algorithm: LCS-based unified diff, generate_unified_diff(), compute_diff(), O(m*n) DP'
