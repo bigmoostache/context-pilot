@@ -6,6 +6,16 @@
   - workflow
   - spine
   last_edited_ms: 0
+05fbc2fc54d43ec9:
+  tl_dr: 'DEADLOCK FIX (commit 29977d4): history-cleanup trap + threads focus enforcement deadlocked. Fix in src/modules/pre_flight.rs Phase 2: skip threads module pre_flight while QueueState.trap_active.'
+  contents: 'The history-cleanup trap permits ONLY Close_conversation_history. The threads focus-enforcement pre-flight rejected that tool (''focus on a thread'') whenever an unfocused MY_TURN thread existed. Each trap forbade the other''s escape hatch -> hard deadlock, no recoverable tool. Fix: pre_flight_tool() reads cp_mod_queue::types::QueueState.trap_active and `continue`s past module.id()=="threads" in the Phase 2 loop while the trap is active. Built release, reloaded live, committed 29977d4 on maquette, pushed.'
+  importance: high
+  labels:
+  - bugfix
+  - threads
+  - trap
+  - deadlock
+  last_edited_ms: 1781526006168
 07f9cb0fc782bcee:
   tl_dr: 'Meilisearch design complete (9 rounds). Embedded global server, cp-mod-search crate, tree-sitter chunking, unified search tool, log redesign (drop summarization, add tags/importance). Full spec: docs/design-meilisearch.md, branch ''meilisearch''.'
   importance: critical

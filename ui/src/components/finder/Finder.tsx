@@ -262,7 +262,7 @@ export function Finder({ agent }: { agent: Agent }) {
       ref={surfaceRef}
       tabIndex={0}
       onKeyDown={onKeyDown}
-      className="relative flex min-w-0 flex-1 flex-col bg-background outline-none"
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background outline-none"
       onDragOver={(e) => {
         e.preventDefault()
         if (!dragging) setDragging(true)
