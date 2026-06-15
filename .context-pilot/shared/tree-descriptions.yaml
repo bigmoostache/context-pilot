@@ -26,6 +26,10 @@
   path: .github/workflows/rust.yml
   description: 'CI: fmt + clippy + build + test on ubuntu-latest. Pins Rust 1.93.0. Triggers on push/PR to master.'
   last_edited_ms: 0
+01de0d8f6506ce39:
+  path: ui/src/components/shell/LeftRail.tsx
+  description: Cockpit context navigator (width = shared var(--sidebar-w)). Context-budget meter, then a first-class 'Conversation' nav button (MessageSquare, selects sentinel id "conversation") placed ABOVE the 'Panels' label (T24), then the scrollable panel list (icon+name+tokens). Selection is CONTROLLED via props (selected/onSelect) — lifted to CockpitView so the chosen entry drives the center PanelPane. Dense per-panel telemetry omitted for calm enterprise feel.
+  last_edited_ms: 1781553447386
 02229788bdef9209:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
@@ -3670,6 +3674,10 @@ b4d042a53b65c218:
   path: crates/cp-mod-entities/src/format.rs
   description: SQL result formatting utilities. query_to_markdown (shared by tools.rs and result_panel.rs), format_cell, format_markdown_table, extract_table_name. MAX_RESULT_ROWS=200 cap.
   last_edited_ms: 1780608591309
+b5268aca7b513ca5:
+  path: ui/src/components/panels/cockpit/PanelPane.tsx
+  description: Cockpit panel router. Given the selected id, renders its bespoke maquette by kind (the center star). Special id "conversation" short-circuits to the full <Conversation/> surface — conversation is just another panel (T24). Unknown kinds → graceful placeholder in PanelFrame.
+  last_edited_ms: 1781553447269
 b5351f796f673460:
   path: yamls/tools/brave.yaml
   description: Brave Search tools YAML. brave_search (snippets, Tier 1) + brave_llm_context (deep content, Tier 2). Query params, freshness filters, goggles.
@@ -4894,6 +4902,10 @@ f7d9bcc6b3edfae1:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
   last_edited_ms: 1780585450710
+f80737b7b24222fa:
+  path: ui/src/components/shell/CockpitView.tsx
+  description: 'Cockpit (panel-centered) view assembler. TWO columns: LeftRail (controlled selection) | PanelPane (the selected surface, flex-1 star). The conversation is NO LONGER a docked side column — it''s treated as just another panel (T24): default selected id = "conversation", which PanelPane renders as the full Conversation surface. Lifts the rail''s selected-panel state.'
+  last_edited_ms: 1781553447328
 f8162028a837bf57:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
