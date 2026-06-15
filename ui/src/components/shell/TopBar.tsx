@@ -87,14 +87,17 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
             {fmtCost(activeAgent?.costUsd ?? status.costUsd)}
           </span>
         )}
-        <button
-          onClick={() => setStatsOpen(true)}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
-          title="Session vitals"
-          aria-label="Open session stats"
-        >
-          <Activity className="size-[17px]" />
-        </button>
+        {/* session vitals are agent-scoped — irrelevant at fleet altitude */}
+        {!inFleet && (
+          <button
+            onClick={() => setStatsOpen(true)}
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
+            title="Session vitals"
+            aria-label="Open session stats"
+          >
+            <Activity className="size-[17px]" />
+          </button>
+        )}
         <ThemeToggle />
         <span className="h-5 w-px bg-border/70" />
         <button
