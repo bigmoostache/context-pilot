@@ -706,6 +706,10 @@
   path: crates/cp-mod-chat/src/client/download.rs
   description: Tuwunel binary download. Pinned version, GitHub release download + zstd decompress. 24h failure caching via .download-failed marker to avoid wasted HTTP roundtrips on boot.
   last_edited_ms: 0
+2152bf50fdc871c8:
+  path: ui/src/App.tsx
+  description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Fleet → FleetShell (Agents⇄Prompts). Cockpit → CockpitView (LeftRail|PanelPane|Conversation 3-col). threads/finder per-agent. openAgent switches agent→threads. newAgent() (from AgentSwitcher 'New agent') sets view=fleet + createAgent flag, threaded down to FleetShell openCreate→FleetDashboard autoCreate (T21). Finder keyed by agent.id.
+  last_edited_ms: 1781545852589
 215ef55c47b8eef7:
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
@@ -1634,6 +1638,10 @@
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
   last_edited_ms: 0
+50fb848a85d04a55:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Centred on shared FLEET_MAX_W. Greeting, AgentCard grid (status badge + one-line task + model·cost; Open→threads, Manage→modal), New-agent card. autoCreate prop (T21): useEffect opens AgentModal in create mode then calls onAutoCreateConsumed. AgentModal (Apple-grade): gradient hero, name-as-star w/ live slugified realm preview, rich model cards, autofocus+Esc+⌘↵.'
+  last_edited_ms: 1781545852612
 512805df7bc218df:
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
@@ -1766,6 +1774,10 @@
   path: .github/checks/check-lint-config.sh
   description: 'Lint integrity hash chain checker. --verify (CI default), --update (append entry + git diffs, needs password), --deep-verify (reverse-walk diffs to verify historical content hashes), --history, --show. Readers skip non-entry lines via ^[0-9]+: guard.'
   last_edited_ms: 1781348721585
+56d71fe8d88e2036:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. App mark (Home)→fleet. ALWAYS renders / + AgentSwitcher: inside an agent shows workspace + per-agent switcher Threads·Cockpit·Finder + cost; at fleet altitude passes activeId undefined (placeholder) and picking an agent enters it. onNewAgent prop (T21) forwarded to AgentSwitcher ''New agent''. Far-right: Activity→StatsPopup (hidden at fleet) + ThemeToggle + Settings gear→ConfigModal. Git branch chip removed.'
+  last_edited_ms: 1781545852636
 5726da2755f9e360:
   path: crates/cp-base/src/cast.rs
   description: 'Safe trait: saturating numeric casts for all int/float types, macro-driven impls, replaces raw `as` casts'
@@ -3894,6 +3906,10 @@ c16480ad12de8da5:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+c16f14c57e1a7e0c:
+  path: ui/src/components/shell/AgentSwitcher.tsx
+  description: 'TopBar workspace switcher dropdown (1 agent=1 folder). activeId optional: with an agent shows name+folder; at fleet altitude shows neutral ''Select an agent'' placeholder. Items wrapped in DropdownMenuGroup (Base UI fix). ''New agent…'' → onNewAgent (fleet agents page + create dialog, T21); ''Manage agents (fleet)'' → onFleet. Switch agent inline.'
+  last_edited_ms: 1781545852624
 c1830c18dbdec18a:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
@@ -4478,6 +4494,10 @@ e0352c6a703737b4:
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). GH sync every 5s. FD cleanup (stale watch removal). suicide() auto-close.
   last_edited_ms: 0
+e03aec23c9f5c0c6:
+  path: ui/src/components/agents/FleetShell.tsx
+  description: 'Fleet shell — mission-control workspace shown when no agent is focused. NO sidebar: single page with a top segmented [Agents | Prompts] toggle (centred to shared FLEET_MAX_W·px-8). Exports FLEET_MAX_W (max-w-[960px]). Renders FleetDashboard or PromptsPage full-bleed. Accepts openCreate/onCreateConsumed (T21): when set, snaps tab→''agents'' and forwards autoCreate to FleetDashboard so the create dialog pops. Usage moved into Settings dialog.'
+  last_edited_ms: 1781545852601
 e04bf579d6804e04:
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
