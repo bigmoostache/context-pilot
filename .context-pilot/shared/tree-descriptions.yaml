@@ -3258,6 +3258,10 @@ a0596fc66738d4aa:
   path: src/app/actions/history.rs
   description: Prompt history navigation and panel clipboard copy. PromptHistoryNav struct with lazy-load from JSONL. Safe indexing via .get(), saturating arithmetic. handle_history_prev/next (Ctrl+U/D), handle_copy_panel_content (Ctrl+C via pbcopy).
   last_edited_ms: 0
+a0686e5188e9a8f7:
+  path: ui/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer, altitude-aware. fleet=false: single-agent vitals — phase dot+label on the left; right side = a fixed-width tri-color CONTEXT METER (green=cache hits / yellow=misses / grey=free) with an upward hover tooltip breaking down hit/miss/free + used·budget (T22), a divider, then cost. The agent prompt-id text was removed (T22). fleet=true: fleet aggregates — Agents count, Threads count, ''Needs you'' count, right-aligned ''Total spend''. Wired from App.tsx via fleet={view===''fleet''}.'
+  last_edited_ms: 1781552868355
 a09757b61a0a55ed:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
