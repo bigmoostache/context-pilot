@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import type { LibraryItem, LibraryKind } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { MarkdownEditor } from "./MarkdownEditor"
 
 // ── kind identity (mirrors PromptsPage) ───────────────────────────
 const KIND: Record<
@@ -58,14 +59,14 @@ export function PromptModal({
   const [kind, setKind] = useState<LibraryKind>(isNew ? "agent" : item.kind)
   const [name, setName] = useState(isNew ? "" : item.name)
   const [description, setDescription] = useState(isNew ? "" : item.description)
-  const [body, setBody] = useState(isNew ? "" : mockBody(item))
+  const [body] = useState(isNew ? "" : mockBody(item))
   const builtin = !isNew && item.builtin
   const M = KIND[kind]
 
   return (
     <Backdrop onClose={onClose}>
       <div className="backdrop-fade fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="modal-pop relative z-10 flex max-h-[88vh] w-[760px] max-w-[94vw] flex-col overflow-hidden rounded-2xl border border-border bg-card pop-shadow">
+      <div className="modal-pop relative z-10 flex h-[90vh] w-[1180px] max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-border bg-card pop-shadow">
         {/* hero header */}
         <header
           className="relative flex items-center gap-3 px-6 py-5"
@@ -93,7 +94,7 @@ export function PromptModal({
           </button>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-5">
           {/* kind */}
           <Field label="Kind">
             {isNew ? (
@@ -152,20 +153,24 @@ export function PromptModal({
             />
           </Field>
 
-          {/* body */}
-          <Field
-            label={kind === "command" ? "Expansion" : "Body"}
-            hint={kind === "agent" ? "Markdown with YAML frontmatter" : undefined}
-          >
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={10}
-              spellCheck={false}
-              placeholder={"---\nname: …\ndescription: …\n---\n\nWrite the prompt here."}
-              className="w-full resize-none rounded-lg border border-border bg-[var(--surface-2)]/40 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed text-foreground/85 outline-none transition-colors focus:border-[var(--interactive)]/60"
+          {/* body — WYSIWYG markdown editor */}
+          <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+                {kind === "command" ? "Expansion" : "Body"}
+              </span>
+              {kind === "agent" && (
+                <span className="text-[11px] text-muted-foreground/55">
+                  Rich text — formatting is saved as markdown
+                </span>
+              )}
+            </div>
+            <MarkdownEditor
+              key={kind + (isNew ? "new" : item.id)}
+              initialMarkdown={body}
+              placeholder="Write the prompt here…"
             />
-          </Field>
+          </div>
 
           {!isNew && (
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
