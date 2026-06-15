@@ -214,6 +214,10 @@
   path: website/script.js
   description: Website JavaScript
   last_edited_ms: 0
+0a482c3f4f6adf3c:
+  path: ui/src/lib/mock.ts
+  description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails (5 convos each with agentId), agents (3 workspaces=folders, each with a task summary), fileTree (agent-badged), activeAgentId.'
+  last_edited_ms: 1781519105489
 0a90a19323c4050c:
   path: crates/cp-render/src/markdown.rs
   description: Shared markdown→IR parser. to_blocks() (fenced code blocks, headers, bullets, inline). parse_line() (single line). parse_inline() (bold, code, links). Used by skill panels + conversation renderer.
@@ -3286,6 +3290,10 @@ ae31931415268f77:
   path: crates/cp-mod-prompt/src/library_panel.rs
   description: 'LibraryPanel: renders agent/skill/command tables, prompt editor view'
   last_edited_ms: 0
+ae66bdee643a5c9c:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, aggregate stat strip, AgentCard grid (status badge Working/Needs input/Standby + one-line task summary + branch·model·cost, Open→agent threads, Manage→modal), New-agent card, create/manage/archive modal. No folder path or thread pills on cards. Thread stats only in the top aggregate strip via threadDetails.
+  last_edited_ms: 1781519105479
 ae7544be6efd88b2:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, ≤150 lines AND ≤8000 bytes inline+tempo, bigger entity_result panel+no tempo. 200-row cap. RETURNING support.
@@ -3318,6 +3326,10 @@ afd5f6a171e03b31:
   path: website/docs/keyboard.html
   description: 'Docs: keyboard shortcuts reference'
   last_edited_ms: 0
+afe95a8892aed75d:
+  path: ui/src/lib/types.ts
+  description: 'Maquette domain types. Agent (incl task summary), FsNode (legacy). Finder: FinderKind (+audio/video/binary), FinderTag, FinderNode (+tags/created/starred/media/preview payloads), Sheet/SlidePreview, FinderViewMode=grid|list|columns|gallery, FinderSortKey. ThreadDetail+agentId. ViewMode=fleet|cockpit|threads|finder.'
+  last_edited_ms: 1781519105500
 b01e8f34019e0129:
   path: src/ui/perf/overlay.rs
   description: Performance overlay adapter — renders PerfOverlay IR to ratatui. Consumes pre-built IR snapshot (FPS, CPU/RAM, FDs/rlimit, Meili stats, budget bars, sparkline, op table). Uses semantic_to_style() for all styling. No direct State access.
