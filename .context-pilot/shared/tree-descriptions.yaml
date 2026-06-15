@@ -674,6 +674,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+20dc7ba5f120fbaf:
+  path: ui/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook pane with variant prop: ''pane'' (420px side rail w/ Quick Look header + metadata footer + Get Info) or ''full'' (file-tab main area — BARE content only, no header/footer; actions live in the toolbar). Bespoke kind renders: code (copy btn + line numbers + keyword tint), spreadsheet (zebra + frozen header + tabs), slides, PDF (page strip), image (checkerboard + zoom), audio (waveform), video (poster + scrubber), rendered markdown, json/text, folder summary.'
+  last_edited_ms: 1781531576305
 210d0c5c4f54a2fc:
   path: crates/cp-mod-search/src/tools.rs
   description: Search tool execution with flame!("search_exec"). Split keyword+semantic multi-search via MeiliClient. dedup_by_score() merges overlapping results. iso_to_ms() via cp_mod_utilities::time. File/log filters. Async via spawn_async_tool. DynPanel creation. Mandatory semantic_query param.
@@ -1778,6 +1782,10 @@
   path: docs/ROADMAP.md
   description: 'Public roadmap: v0.2 (providers/context/DX), v0.3 (multi-agent/IDE/knowledge), long-term (plugins/collab)'
   last_edited_ms: 0
+5b92fc026f8f9e1b:
+  path: ui/src/components/finder/Finder.tsx
+  description: Top-level Finder orchestrator. buildRealm(agent) memo, heterogeneous tabs (folder tabs w/ per-tab back/fwd history + file tabs showing one file via FinderPreview variant='full'); double-click file→openInNewTab (reuses tab for same path), double-click folder→navigate; navigating on a file tab converts it back to folder tab. Passes fileActive + file-action handlers (Get Info/Download/Share) to FinderToolbar. Keyboard nav (arrows/Enter/Backspace/Space QuickLook/⌘A/⌘I/type-ahead), additive+range selection, right-click ContextMenu, Get Info modal, 4 view modes, icon-size slider, path bar, drag-drop overlay, status bar, toast.
+  last_edited_ms: 1781531576338
 5c51c5888f0b7fc9:
   path: run.sh
   description: Development run script
@@ -2998,6 +3006,10 @@
   path: src/modules/overview/tools/manage_tools.rs
   description: 'tool_manage execute: enable/disable tools, MANAGE_TOOLS_ID + panel_goto_page protection, partial success'
   last_edited_ms: 0
+9a3b7beeb48b2143:
+  path: ui/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome. FinderTabs (strip + new/close; each tab shows a kind icon colored by kindMeta accent). FinderToolbar — context-aware: folder tab shows back/fwd, breadcrumb, icon-size slider [grid], 4-mode segmented control, search, New Folder/Upload/Download, path-bar+QuickLook toggles; FILE tab (fileActive) hides those and shows file actions Get Info(Maximize2)/Download/Share. FinderSidebar (Favorites/Locations/Tags/Recents + confined-realm note). FinderPathBar (bottom).'
+  last_edited_ms: 1781531576316
 9a61a00374a7164b:
   path: src/state/mod.rs
   description: 'Re-exports from cp_base (Entry, Kind, State, Message, etc.) + local submodules: cache, persistence'
@@ -4798,6 +4810,10 @@ feeba821ce42dd7e:
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
   last_edited_ms: 1780497937366
+ff5281563ad3f9ff:
+  path: ui/src/components/finder/FinderViews.tsx
+  description: 'Finder main-area views. GridView (icon-size slider + finder-pop stagger + TagDots + focus ring), ListView (zebra + sortable headers + tags), ColumnsView (Miller + trailing metadata preview pane; single-click expands folders, onDoubleClick opens files), GalleryView (hero + filmstrip). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
+  last_edited_ms: 1781531576327
 ffa4da3ef00da59b:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
