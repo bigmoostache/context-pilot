@@ -23,19 +23,23 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
  * Workspace switcher (1 agent = 1 folder). Sits at the left of the TopBar:
  * shows the active agent + its folder, opens a menu to switch between agents
  * or jump to the Agents launcher to browse the filesystem / create a new one.
+ *
+ * When no agent is focused (fleet altitude), pass `activeId` undefined: the
+ * trigger keeps the same shape but shows a neutral **"Select an agent"**
+ * placeholder, so the header card never disappears — it stays as a consistent,
+ * always-available entry point to switch / create / manage agents.
  */
 export function AgentSwitcher({
   activeId,
   onSwitch,
   onFleet,
 }: {
-  activeId: string
+  activeId?: string
   onSwitch: (id: string) => void
   /** Jump to the fleet dashboard — the only place agents are managed. */
   onFleet: () => void
 }) {
-  const active = agents.find((a) => a.id === activeId) ?? agents[0]
-  if (!active) return null
+  const active = agents.find((a) => a.id === activeId)
 
   return (
     <DropdownMenu>
@@ -45,15 +49,31 @@ export function AgentSwitcher({
           "hover:border-[var(--signal)]/50 card-shadow",
         )}
       >
-        <AgentDot accent={active.accent} status={active.status} />
-        <div className="flex min-w-0 flex-col leading-tight">
-          <span className="truncate text-[12.5px] font-semibold text-foreground/90">
-            {active.name}
-          </span>
-          <span className="truncate font-mono text-[10px] text-muted-foreground/70">
-            {active.folder}
-          </span>
-        </div>
+        {active ? (
+          <>
+            <AgentDot accent={active.accent} status={active.status} />
+            <div className="flex min-w-0 flex-col leading-tight">
+              <span className="truncate text-[12.5px] font-semibold text-foreground/90">
+                {active.name}
+              </span>
+              <span className="truncate font-mono text-[10px] text-muted-foreground/70">
+                {active.folder}
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <PlaceholderDot />
+            <div className="flex min-w-0 flex-col leading-tight">
+              <span className="truncate text-[12.5px] font-semibold text-foreground/80">
+                Select an agent
+              </span>
+              <span className="truncate text-[10px] text-muted-foreground/65">
+                Choose a workspace
+              </span>
+            </div>
+          </>
+        )}
         <ChevronsUpDown className="ml-1 size-3.5 shrink-0 text-muted-foreground/60" />
       </DropdownMenuTrigger>
 
@@ -116,6 +136,15 @@ function AgentDot({ accent, status }: { accent: Agent["accent"]; status: AgentSt
         )}
         style={{ background: statusMeta[status].color }}
       />
+    </span>
+  )
+}
+
+/** Neutral trigger glyph shown when no agent is focused (fleet altitude). */
+function PlaceholderDot() {
+  return (
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground/55">
+      <FolderGit2 className="size-3.5" />
     </span>
   )
 }

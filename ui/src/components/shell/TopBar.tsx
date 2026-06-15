@@ -39,22 +39,23 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
         <span className="text-[13px] font-semibold tracking-tight">Context Pilot</span>
       </button>
 
-      {/* In the fleet (dashboard) no agent is selected — show a neutral
-          mission-control caption. Inside an agent, show the workspace switcher. */}
-      {inFleet ? (
-        <span className="ml-1 hidden text-[12.5px] font-medium text-muted-foreground sm:inline">
-          Mission control
-        </span>
-      ) : (
-        <>
-          <span className="ml-1 text-muted-foreground/40">/</span>
-          <AgentSwitcher
-            activeId={activeAgentId}
-            onSwitch={onSwitchAgent}
-            onFleet={() => onViewChange("fleet")}
-          />
-        </>
-      )}
+      {/* Workspace switcher — always present. Inside an agent it shows the
+          active workspace; at fleet altitude (no agent focused) it falls back
+          to a neutral "Select an agent" placeholder so the card never vanishes.
+          Picking an agent here enters it (→ threads view). */}
+      <span className="ml-1 text-muted-foreground/40">/</span>
+      <AgentSwitcher
+        activeId={inFleet ? undefined : activeAgentId}
+        onSwitch={
+          inFleet
+            ? (id) => {
+                onSwitchAgent(id)
+                onViewChange("threads")
+              }
+            : onSwitchAgent
+        }
+        onFleet={() => onViewChange("fleet")}
+      />
 
       {/* per-agent view switcher (hidden at fleet altitude) */}
       {!inFleet && (
