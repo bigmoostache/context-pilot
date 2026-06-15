@@ -100,13 +100,12 @@ export function ThreadConversation({
         <ThreadComposer status={thread.status} />
       </div>
 
-      {showDetails && (
-        <ThreadDetailsPopup
-          thread={thread}
-          onOpenCockpit={onOpenCockpit}
-          onClose={() => setShowDetails(false)}
-        />
-      )}
+      <ThreadDetailsPopup
+        thread={thread}
+        open={showDetails}
+        onOpenCockpit={onOpenCockpit}
+        onClose={() => setShowDetails(false)}
+      />
     </main>
   )
 }

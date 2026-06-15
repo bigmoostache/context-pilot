@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import {
   Bot,
   Check,
@@ -18,38 +18,34 @@ import {
   X,
   Zap,
 } from "lucide-react"
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 /**
  * Context Pilot settings sheet — a macOS System-Settings-style modal with a
  * category rail on the left and a detail pane on the right. Design-only: every
- * key/value is illustrative, nothing is persisted. Reuses the agent-dialog
- * motion language (backdrop-fade + modal-pop + opt-rise) for cohesion.
+ * key/value is illustrative, nothing is persisted.
+ *
+ * Built on the portaled {@link Dialog} primitive so the surface renders into
+ * `document.body` — NOT inside the TopBar, whose `.vibrancy` `backdrop-filter`
+ * establishes a containing block that previously trapped a `fixed` overlay
+ * inside the 48px header (the "half off-screen / behind content" bug). The
+ * Dialog also brings focus trapping, scroll-lock and Esc-to-close.
  */
-export function ConfigModal({ onClose }: { onClose: () => void }) {
+export function ConfigModal({
+  open,
+  onClose,
+}: {
+  open: boolean
+  onClose: () => void
+}) {
   const [cat, setCat] = useState<CatId>("general")
-  const cardRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [onClose])
 
   const active = CATEGORIES.find((c) => c.id === cat) ?? CATEGORIES[0]
 
   return (
-    <div
-      className="backdrop-fade fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6 backdrop-blur-[3px]"
-      onClick={onClose}
-    >
-      <div
-        ref={cardRef}
-        className="modal-pop flex h-[560px] w-[820px] max-w-full overflow-hidden rounded-2xl border border-border bg-popover pop-shadow"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex h-[560px] w-[820px] max-w-[calc(100vw-3rem)]">
         {/* category rail */}
         <aside className="flex w-[230px] shrink-0 flex-col border-r border-border/70 bg-muted/30">
           <div className="flex items-center gap-2.5 px-4 pb-3 pt-5">
@@ -103,13 +99,12 @@ export function ConfigModal({ onClose }: { onClose: () => void }) {
             <active.icon className="size-[17px] text-muted-foreground" />
             <h2 className="text-[14px] font-semibold tracking-tight text-foreground">{active.label}</h2>
             <p className="ml-2 hidden truncate text-[12px] text-muted-foreground md:block">{active.blurb}</p>
-            <button
-              onClick={onClose}
+            <DialogClose
               className="ml-auto flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
               aria-label="Close"
             >
               <X className="size-4" />
-            </button>
+            </DialogClose>
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
@@ -120,17 +115,14 @@ export function ConfigModal({ onClose }: { onClose: () => void }) {
             <span className="text-[11.5px] text-muted-foreground/70">
               Changes apply on save in the live app.
             </span>
-            <button
-              onClick={onClose}
-              className="ml-auto flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-4 py-2 text-[13px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98]"
-            >
+            <DialogClose className="ml-auto flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-4 py-2 text-[13px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98]">
               <Check className="size-4" strokeWidth={2.5} />
               Done
-            </button>
+            </DialogClose>
           </footer>
         </main>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

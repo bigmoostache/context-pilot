@@ -266,6 +266,10 @@
   path: crates/cp-mod-memory/src/storage.rs
   description: YAML-backed memory storage. FNV-1a keys via cp-mod-utilities. generate_yaml_key, ensure_yaml_key. populate/migrate via YamlSync.
   last_edited_ms: 1780565428690
+0cdd1dd623acf1eb:
+  path: ui/src/components/shell/TopBar.tsx
+  description: macOS title bar. App mark (Home)→fleet. At fleet altitude no agent selected → 'Mission control' caption (switcher + branch/cost hidden); inside an agent shows AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + branch+cost. Far-right Settings gear opens ConfigModal (always-mounted, controlled open). ThemeToggle.
+  last_edited_ms: 1781524763692
 0d51d6ed9f7292b6:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -1125,6 +1129,10 @@
 38ae83a3cc2a1d02:
   path: docs/vision-layered-cognitive-architecture.md
   description: 'Long-term vision doc: 5-layer cognitive architecture (Reflexes→Policies→Reasoning→Reflection→Identity). Core insight: LLM as architect not executor. 6 missing pieces: policy compiler, sensory streams, motor abstraction, persistent life, delegation/swarm, consequence modeling. Maps Context Pilot''s current state to each layer.'
+  last_edited_ms: 0
+38cc8295338d1f92:
+  path: ui/src/components/threads/ThreadsView.tsx
+  description: 'Threads view assembler, scoped to ACTIVE AGENT''s realm: filters threadDetails by agentId, EmptyRealm state when none. 3-pane (ThreadList | ThreadConversation | ThreadDetailRail). onOpenCockpit bridges to panel view.'
   last_edited_ms: 0
 39056915756877d9:
   path: crates/cp-base/src/lib.rs
@@ -2398,6 +2406,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor. Selection-aware InputChar/Delete/InsertText/PasteText. 9 cursor/selection action dispatches.'
   last_edited_ms: 0
+808105a6e4c4e570:
+  path: ui/src/components/ui/dialog.tsx
+  description: shadcn-style Dialog on Base UI primitive. Portals to document.body (escapes ancestor backdrop-filter/transform containing blocks that trap position:fixed — the ConfigModal half-off-screen bug). Focus-trap, scroll-lock, Esc, backdrop fade + modal-pop spring. Exports Dialog/Trigger/Close/Content/Backdrop/Title/Description.
+  last_edited_ms: 1781524763661
 80a907dd70658073:
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
@@ -2445,6 +2457,10 @@
 82202025734699ca:
   path: src/modules/conversation_history/mod.rs
   description: 'Conversation history module. Core/global. Dynamic panels for frozen history chunks. on_close_context redirects to Close_conversation_history tool. Sub-modules: panel, trap.'
+  last_edited_ms: 0
+8251aca4fb98413d:
+  path: ui/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
   last_edited_ms: 0
 825241cf26ff131d:
   path: src/app/context/detach.rs
@@ -4286,6 +4302,10 @@ e6fb6a3d0303b523:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
   last_edited_ms: 0
+e71ccc8acc032f2c:
+  path: ui/src/components/shell/ConfigModal.tsx
+  description: 'Settings modal (macOS System-Settings style) on the portaled Dialog primitive (fixes the vibrancy-trapped fixed-overlay bug). Category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane. All CP config: provider keys, Voyage, Meili status, Datalab, Brave, Firecrawl, GitHub, default-model picker, autonomy toggles. Masked keys w/ reveal, Connected/Not-set pills, opt-rise/modal-pop motion. Controlled open/onClose from TopBar gear. Design-only.'
+  last_edited_ms: 1781524763682
 e749a095816c4807:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
@@ -4542,6 +4562,10 @@ f6930563c8606410:
   path: crates/cp-mod-todo/src/types.rs
   description: TodoStatus (Pending/InProgress/Done), TodoItem, TodoState with has_incomplete_todos() + incomplete_todos_summary()
   last_edited_ms: 0
+f6a27652284984cd:
+  path: ui/src/components/threads/ThreadDetailsPopup.tsx
+  description: Thread dossier popup (replaced the old right rail). Summoned via ⓘ in ThreadConversation header. Built on the portaled Dialog primitive (controlled open/onClose). Status badge, agent/messages/created/last-activity/ID metadata rows, Open-agent-cockpit bridge button.
+  last_edited_ms: 1781524763671
 f7207867229d3d86:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'

@@ -103,7 +103,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
         </button>
       </div>
 
-      {configOpen && <ConfigModal onClose={() => setConfigOpen(false)} />}
+      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
     </header>
   )
 }

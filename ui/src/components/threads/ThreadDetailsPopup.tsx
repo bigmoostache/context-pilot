@@ -1,5 +1,5 @@
-import { useEffect } from "react"
 import { Bot, Clock, Hash, MessageSquare, PanelsTopLeft, X } from "lucide-react"
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import type { ThreadDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -7,39 +7,29 @@ import { cn } from "@/lib/utils"
  * Thread "dossier" popup — the metadata that used to live in a permanent right
  * rail, now summoned on demand from the conversation header. Keeps the messaging
  * surface wide while still exposing status, counts, timestamps, and the bridge
- * into the panel-centered cockpit. Centered modal with backdrop; Esc / click-out
- * to dismiss (matches the ConfigModal / AgentModal motion vocabulary).
+ * into the panel-centered cockpit.
+ *
+ * Built on the portaled {@link Dialog} primitive (renders into `document.body`,
+ * focus-trapped, Esc / click-out to dismiss) for the same reason as the settings
+ * sheet — a hand-rolled `fixed` overlay can be trapped by a transformed/blurred
+ * ancestor's containing block.
  */
 export function ThreadDetailsPopup({
   thread,
+  open,
   onOpenCockpit,
   onClose,
 }: {
   thread: ThreadDetail
+  open: boolean
   onOpenCockpit: () => void
   onClose: () => void
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [onClose])
-
   const mine = thread.status === "MY_TURN"
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[2px] [animation:backdrop-fade_.18s_ease-out]"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className="w-[360px] overflow-hidden rounded-2xl border border-border bg-popover shadow-[var(--shadow-pop)] [animation:modal-pop_.2s_cubic-bezier(.16,1,.3,1)]"
-      >
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="w-[360px] max-w-[calc(100vw-3rem)]">
         {/* header */}
         <div className="flex items-start gap-3 border-b border-border/70 bg-surface/60 px-5 py-4">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -64,13 +54,12 @@ export function ThreadDetailsPopup({
               {mine ? "Your turn" : "Agent working"}
             </span>
           </div>
-          <button
-            onClick={onClose}
+          <DialogClose
             className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Close"
           >
             <X className="size-4" />
-          </button>
+          </DialogClose>
         </div>
 
         {/* metadata */}
@@ -98,8 +87,8 @@ export function ThreadDetailsPopup({
             Inspect this agent's full context — panels, token budget, and cache.
           </p>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
