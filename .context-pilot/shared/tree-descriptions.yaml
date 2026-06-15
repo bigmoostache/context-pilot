@@ -326,6 +326,10 @@
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 1780562263889
+106e813949596459:
+  path: ui/src/components/threads/ThreadList.tsx
+  description: 'Left rail of threads view (collapsible). NO agent identity header (TopBar owns it). Slim top bar: thread count + ''N working'' parallel pill + PanelLeftClose collapse trigger. Width = shared var(--sidebar-w); collapsed animates →0 (fixed-width inner shell prevents reflow). Grouped ''Needs you''=MY_TURN / ''Working in parallel''=THEIR_TURN rows (status dot, name, preview, time, unread). New Thread + search.'
+  last_edited_ms: 1781533961646
 107d265d94900a67:
   path: src/llms/oai_providers/mod.rs
   description: 'Module declarations: deepseek, grok, groq, openai_compat, openai_streaming.'
@@ -842,6 +846,10 @@
   path: crates/cp-mod-files/src/tools/file.rs
   description: 'execute_open: accepts string or array for path param. flame!("file_open"). open_single_file: canonicalize, dedup, auto-expand tree folders. Background cache populates content.'
   last_edited_ms: 0
+299db181a45b70d6:
+  path: ui/src/components/agents/FleetShell.tsx
+  description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + clickable border RAIL (shadcn Sidebar pattern): thin full-height hit area at x=var(--sidebar-w), x=0 collapsed, brightens to interactive on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
+  last_edited_ms: 1781533961635
 2a3a7eb61dfc4e9a:
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
@@ -2026,6 +2034,10 @@
   path: crates/cp-mod-utilities/src/lib.rs
   description: '4 modules: hash, time, dirs, secret. Lightweight replacements for external deps.'
   last_edited_ms: 0
+6770a19d58374b59:
+  path: ui/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome. FinderTabs (strip + new/close; kind-icon per tab). FinderToolbar — context-aware: folder tab = back/fwd, breadcrumb, icon-size slider [grid], 4-mode segmented control, search, New Folder/Upload/Download, path-bar+QuickLook toggles; FILE tab (fileActive) hides those, shows Get Info/Download/Share. FinderSidebar (Favorites/Locations/Tags/Recents + confined-realm note) width = shared var(--sidebar-w). FinderPathBar (bottom).'
+  last_edited_ms: 1781533961668
 67972c83b0a57687:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
@@ -3674,6 +3686,10 @@ b9e499de92a61a13:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 1780562263879
+ba1851aea6e21ecc:
+  path: ui/src/components/agents/FleetSidebar.tsx
+  description: Mission-control left nav rail (fleet dashboard). FleetPage=agents|prompts|usage|settings. NO identity header (TopBar owns it). NO in-rail collapse button — collapse driven by FleetShell's border rail. 4 nav items (icon+label+hint, active=card-shadow). Width = shared var(--sidebar-w); collapsed animates aside width →0 (fixed-width inner shell). page/onSelect/collapsed props.
+  last_edited_ms: 1781533961624
 bab9d0cd28f2d236:
   path: ui/src/lib/finderFs.ts
   description: Finder mock fs + helpers. buildRealm grafts one rich tree (src/modules nesting, docs, media/ w/ mp4+m4a, planning) onto an agent folder. tags/created/starred/media payloads + PEAKS waveform. findNode/pathChain/collectStarred/nodeSize/childCounts/fmtBytes/sortNodes.
@@ -4234,6 +4250,10 @@ d5c1024fa12376ed:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
   last_edited_ms: 0
+d5de5196647aeaa3:
+  path: ui/src/index.css
+  description: 'Enterprise/macOS theme. --sidebar-w (240px, :root) = single source of truth for ALL primary sidebar widths (fleet/threads/cockpit/finder). Two palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Dungeon Forge'' = TUI D&D palette verbatim (#222220/#333331/#424240 charcoal / torch-orange #DA7659 primary+signal+your-turn / #B26245 dim accent / #C98F6B tan interactive / #F0F0F0 ink / ok #86BC6F / warn #E5C07B / danger #C85050). SF Pro chrome, IBM Plex Mono data. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker, modal-pop/backdrop-fade/opt-rise, finder-slider.'
+  last_edited_ms: 1781533961612
 d693aa680fbe23a5:
   path: src/modules/questions/mod.rs
   description: 'QuestionsModule: core, 2 tools (ask_user_question, Think), ThinkState persistence, on_tool_complete counter drift'
@@ -4546,6 +4566,10 @@ eda799977218054d:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+edd321c2de89ceab:
+  path: ui/src/components/shell/LeftRail.tsx
+  description: Cockpit context navigator (width = shared var(--sidebar-w), unified with threads/finder/fleet rails). Context-budget meter + scrollable panel list (icon+name+tokens). Dense per-panel telemetry omitted for calm enterprise feel.
+  last_edited_ms: 1781533961657
 edf0e03e608d5a8b:
   path: test_file_to_describe.txt
   description: Version C of the test file
