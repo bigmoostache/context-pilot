@@ -1686,6 +1686,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 1780563355099
+53cdc65b102546ba:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Centred on shared FLEET_MAX_W (T18). Greeting, AgentCard grid (status badge + one-line task + model·cost meta — no git branch; Open→threads, Manage→modal), New-agent card. AgentModal (Apple-grade): gradient hero, name-as-star w/ live slugified realm preview, rich model cards, autofocus+Esc+⌘↵. Footer caption design-only (total spend now lives in the status footer).'
+  last_edited_ms: 1781545320186
 53d4d56914a84a3d:
   path: src/ui/search_overlay/display.rs
   description: 'Display column builders for the search index overlay. Converts SearchIndexOverlay IR data into ratatui Line sequences for the two-column layout (left: server/database/index/extensions, right: splitter/embeddings/tasks/recomputed/recent). Centered bordered popup.'
@@ -4390,6 +4394,10 @@ db12056c4b00bacd:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
   last_edited_ms: 0
+dbdb848ee0d04af5:
+  path: ui/src/components/agents/PromptsPage.tsx
+  description: Global prompt-library page (fleet 'Prompts'). Centred on shared FLEET_MAX_W (T18, aligns with the toggle + Agents page). Renders mock library[] (system/skills/commands) as cards w/ KIND_META icon/accent/blurb, filter tabs (all + per-kind counts), kind sections in 'all'. 'agent' kind labelled 'System'. Header Import + New buttons. Card/New/Import open PromptModal + ImportModal. Built-in badge only.
+  last_edited_ms: 1781545320197
 dbeaa40a36614e5f:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
@@ -4730,6 +4738,10 @@ f1fce1f96bc1ce04:
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: 'Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"). Crawl delegated to crate::crawl. All async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER. Shared helpers: get_client, err_result, PANEL_WARNING, timeout/poll constants.'
   last_edited_ms: 0
+f20eb801fafd5941:
+  path: ui/src/components/agents/FleetShell.tsx
+  description: 'Fleet shell — mission-control workspace shown when no agent is focused. NO sidebar (T18): single page with a top segmented [Agents | Prompts] toggle (full-bleed divider, control centred to shared FLEET_MAX_W·px-8 so it aligns with the page heading below). Exports FLEET_MAX_W (max-w-[960px]) — single source of truth shared by both sub-pages. Renders FleetDashboard or PromptsPage full-bleed. Usage moved into Settings dialog; Settings via TopBar gear. Prop: onOpenAgent.'
+  last_edited_ms: 1781545320174
 f2416d7f3fc53dce:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
