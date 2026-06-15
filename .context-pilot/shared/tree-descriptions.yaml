@@ -450,6 +450,10 @@
   path: crates/cp-mod-entities/src/panels/mod.rs
   description: 'Panels submodule hub: declares format (SQL result formatting), panel (fixed Entities panel), result_panel (dynamic query result panel).'
   last_edited_ms: 0
+168350f39701d134:
+  path: ui/src/index.css
+  description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A) + DARK ''Forest Clay'' (#2C3639/#3F4E4F/#A27B5C/#DCD7C9: slate base, clay-tan accent, cream text) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow.'
+  last_edited_ms: 1781516507869
 16896bc4c096fb84:
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
@@ -1058,6 +1062,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+381fd475bacd611d:
+  path: ui/index.html
+  description: Vite HTML entry for the maquette.
+  last_edited_ms: 1781516472125
 3837014b45245668:
   path: crates/cp-mod-console/src/manager.rs
   description: TUI-side session handle. spawn()/reconnect()/kill()/send_input() via console server. FilePoller + StatusPoller background threads per session. Orphan cleanup on startup. server_request() short-lived UnixStream per call. Geometric backoff socket wait (25ms→500ms cap, 3s budget).
@@ -1314,6 +1322,10 @@
   path: crates/cp-mod-search/Cargo.toml
   description: 'Search module deps: cp-base, cp-mod-logs, cp-render, crossterm, serde, serde_json, cp-mod-utilities, reqwest, notify, tree-sitter (9 langs), chrono, serde_yaml, log.'
   last_edited_ms: 1780565428724
+4475f1b8547bde04:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, aggregate stat strip, AgentCard grid (status/branch/model/thread pills/cost, Open→agent threads, Manage→modal), New-agent card, create/manage/archive modal. Thread stats from threadDetails by agentId.
+  last_edited_ms: 1781516507817
 44845c8d348a6463:
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine. No PendingForm guard.
@@ -1362,6 +1374,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+486607bef23378be:
+  path: ui/tsconfig.json
+  description: TS project references root (app + node).
+  last_edited_ms: 1781516472166
 486df436aa0dfe78:
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
@@ -1406,6 +1422,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.5 duplicate Close_conversation_history queue check (panels[].panel_id extraction, skipped during trap), Phase 1 schema validation, Phase 2 module semantic checks.'
   last_edited_ms: 0
+4b83468cbc5c99d6:
+  path: ui/src/main.tsx
+  description: React entry — mounts App in StrictMode.
+  last_edited_ms: 1781516472146
 4bb896637366abe2:
   path: crates/cp-mod-spine/src/guard_rail.rs
   description: 'Guard rail implementations: MaxOutputTokens, MaxCost (stream/burst-based), MaxDuration, MaxMessages, MaxAutoRetries. GuardRailStopLogic trait. all_guard_rails() static list.'
@@ -1730,6 +1750,10 @@
   path: .github/checks/lint-config.chain
   description: 'Hash chain for protected lint configuration files. Each entry: prev_hash:content_hash:chain_hash. Verified by check-lint-config.sh. Currently 15 entries.'
   last_edited_ms: 0
+5e76c75abe32286c:
+  path: ui/src/components/finder/kind.tsx
+  description: 'Finder kind metadata: kindMeta (FinderKind→{icon, accent token, label}) + kindTint helper. Shared by all Finder components.'
+  last_edited_ms: 1781516507797
 5e7d3c2549cf9c18:
   path: crates/cp-mod-logs/src/tools.rs
   description: Log tool execution. flame!("log_create") and flame!("close_history"). push_log() helper. execute_log_create() creates entries from array. execute_close_conversation_history() processes panels array — per-panel logs (strings), timestamp from panel's last message, panel removal.
@@ -1890,6 +1914,10 @@
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data.'
   last_edited_ms: 0
+66ca7309ab004897:
+  path: ui/src/App.tsx
+  description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). FleetDashboard at fleet altitude; the other three are per-agent views. openAgent switches agent→threads. Finder keyed by agent.id (remounts per agent).
+  last_edited_ms: 1781516507828
 66cdf4355c091617:
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers").
@@ -2030,6 +2058,10 @@
   path: ui/src/lib/panelMeta.ts
   description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
   last_edited_ms: 1781458541269
+6f870a577bdee50a:
+  path: ui/src/components/shell/AgentSwitcher.tsx
+  description: TopBar workspace switcher dropdown (1 agent=1 folder). Items wrapped in DropdownMenuGroup (Base UI fix). Switch agent inline; New-agent/Manage actions jump to fleet dashboard (onFleet) — the only management surface.
+  last_edited_ms: 1781516507848
 6fb74b94ea91d3ae:
   path: ui/src/lib/panelMeta.ts
   description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
@@ -2042,6 +2074,10 @@
   path: .github/checks/check-lint-config.sh
   description: Lint integrity hash chain checker. Verifies protected files (Cargo.toml lint config, clippy.toml, CI scripts) haven't been tampered with. --update flag to recompute chain (requires password).
   last_edited_ms: 0
+710bbcd6209fe4d9:
+  path: ui/src/components/ui/dropdown-menu.tsx
+  description: shadcn dropdown-menu (Base UI Menu). Items must be wrapped in DropdownMenuGroup. Used by AgentSwitcher.
+  last_edited_ms: 1781516472105
 711dd0d590e72088:
   path: crates/cp-mod-utilities/src/dirs.rs
   description: 'Platform dirs: home_dir() from $HOME, config_dir() macOS Library/Linux XDG. Replaces dirs crate.'
@@ -2274,10 +2310,10 @@
   path: yamls/tools/logs.yaml
   description: Log tools YAML. log_create (entries with content+importance) + Close_conversation_history (panels array with panel_id + logs as simple strings). No tags, no memories.
   last_edited_ms: 0
-7ccbeda452f8c893:
-  path: ui/src/components/agents/FileBrowser.tsx
-  description: 'Left pane of Agents launcher: navigable filesystem tree (recursive TreeRow). Agent-hosting folders badged with accent + ''agent'' chip. Selecting a node drives the detail pane.'
-  last_edited_ms: 1781514430703
+7cd3b2dd7bd4c8f6:
+  path: ui/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome: FinderTabs (tab strip + new/close), FinderToolbar (back/fwd, breadcrumb, grid/list/columns seg, search, upload/download, preview toggle), FinderSidebar (Realm places + favorites + ''confined realm'' note).'
+  last_edited_ms: 1781516507767
 7cfd2cfc2f568cf9:
   path: src/llms/cache/density.rs
   description: 'Divergence density distributions. Production: ConversationTailDensity (zeros out assistant blocks, quadratic on user-side panels + last user turn). Test-only: Uniform, Quadratic, PowerLaw, Empirical.'
@@ -2394,6 +2430,10 @@
   path: tedx.md
   description: 'Talk outline: 3×7min30 structure (WHYs/HOWs/WOWs)'
   last_edited_ms: 1781078806798
+8403debfd0f35683:
+  path: ui/vite.config.ts
+  description: 'Vite config: react + tailwind v4 plugins, @ alias to src.'
+  last_edited_ms: 1781516472156
 8403ec9bec6fc755:
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
@@ -2614,6 +2654,10 @@
   path: docs/ted-talk.md
   description: Full talk script — 25min, 16 slides, speaker notes, Q&A reserve. 'Rebuilding my own Claude Code — The Whys, the Hows and the Wows'.
   last_edited_ms: 0
+8e599736f055a92a:
+  path: ui/src/lib/finderFs.ts
+  description: Finder mock filesystem + helpers. buildRealm(folder,name) grafts one rich project tree onto an agent's folder (confined realm). findNode/pathChain DFS, fmtBytes, sortNodes (folders-first). Files carry preview payloads (code/sheet/slides/pdf/image/text).
+  last_edited_ms: 1781516507807
 8e86d7d94bccc5c8:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
@@ -2866,6 +2910,10 @@
   path: yamls/ui.yaml
   description: 'UI configuration: sidebar layout, status bar, keybindings'
   last_edited_ms: 0
+9caf48a9c4dab0f9:
+  path: ui/src/components/shell/TopBar.tsx
+  description: macOS title bar. App mark (Home)→fleet. AgentSwitcher dropdown. Per-agent segmented switcher Threads·Cockpit·Finder (hidden at fleet). Branch+cost from active agent. ThemeToggle.
+  last_edited_ms: 1781516507838
 9d20b15ef58729cf:
   path: crates/cp-mod-spine/src/tools.rs
   description: Spine tool handlers. execute_mark_processed (batch notification marking), execute_configure (guard rail limits with zero-value rejection, counter reset).
@@ -3326,6 +3374,10 @@ b47edd0289c49cf2:
   path: crates/cp-mod-typst/Cargo.toml
   description: 'Typst module deps: cp-base, cp-render, cp-mod-callback, serde, serde_json, cp-mod-utilities, typst, typst-pdf, reqwest, flate2, tar.'
   last_edited_ms: 0
+b497662fc6326bfe:
+  path: ui/tsconfig.app.json
+  description: 'TS app config: bundler resolution, strict unused checks, @ path alias.'
+  last_edited_ms: 1781516472176
 b49ceed9e40e0a12:
   path: docs/genai-france-vibe.md
   description: GenAI France 2026 conference analysis — lineup, vibe, talk positioning, title naming patterns.
@@ -3374,6 +3426,10 @@ b72e91359bc352c2:
   path: crates/cp-mod-brave/src/panel.rs
   description: Brave result panel. Static content persisted in metadata (META_CONTENT). Cache restore from metadata post-reload. Pagination support. BRAVE_PANEL_TYPE constant.
   last_edited_ms: 0
+b73b6789b41c113d:
+  path: ui/src/lib/types.ts
+  description: 'Maquette domain types. Agent, FsNode (legacy fileTree), ThreadDetail+agentId. Finder types: FinderKind, FinderNode (+preview payloads), SheetPreview/SlidePreview, FinderViewMode=grid|list|columns, FinderSortKey. ViewMode=fleet|cockpit|threads|finder.'
+  last_edited_ms: 1781516507858
 b73b9d54f816cc9a:
   path: docs/talk/index.html
   description: 'Slide deck shell: sidebar nav, slide viewport (current/incoming), position indicator, persistent timer. Loads style.css + script.js.'
@@ -3414,6 +3470,10 @@ b92c4c51d2a37642:
   path: src/modules/mod.rs
   description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 1780568982764
+b96949488bfdc35e:
+  path: ui/src/components/finder/Finder.tsx
+  description: Top-level Finder. buildRealm(agent) memo. Tabs with per-tab back/fwd history. cwd nav, breadcrumb, grid/list/columns switch, search, sort, multi-select, QuickLook preview pane (toggle), drag-drop upload overlay, status bar (item/selected count, path). Design-only transfers.
+  last_edited_ms: 1781516507756
 b9798b6dd8b66239:
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 4 tools: upsert/toggle/open/close editor. Depends on console. CallbackState: definitions (shared) + active_set/editor_open (per-worker). Glob-matched auto-fire on file edits.'
@@ -3466,6 +3526,10 @@ bc6c0b44ae58604e:
   path: ui/src/components/shell/StatusBar.tsx
   description: 'Bottom status bar: phase badge (READY/STREAMING/TOOLING/BLOCKED), agent/skill chips, git/queue/think, reverie/auto, cost.'
   last_edited_ms: 1781458541327
+bc984e2b55facad0:
+  path: ui/src/App.css
+  description: App root sizing (#root full width/height).
+  last_edited_ms: 1781516472135
 bccd6076aebcf1e7:
   path: crates/cp-mod-memory/src/tools.rs
   description: Memory tools with flame!("memory_create") and flame!("memory_update"). tl_dr validation (80 token cap). Importance/labels. Batch create/update/delete.
@@ -3564,12 +3628,16 @@ c192ef13584f001b:
   last_edited_ms: 0
 c1c75b25f257919c:
   path: crates/cp-mod-threads/src/lib.rs
-  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block on Send, count positive. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
-  last_edited_ms: 0
+  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, count positive. Send to a THEIR_TURN thread is ALLOWED (status stays THEIR_TURN) — no block. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
+  last_edited_ms: 1781515609599
 c20be1c967ed1030:
   path: crates/cp-mod-brave/src/tools.rs
   description: Brave tool dispatch with flame!("brave_search") and flame!("brave_llm_context"). Both async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER.
   last_edited_ms: 0
+c27aed29e3940dd3:
+  path: ui/src/components/finder/FinderViews.tsx
+  description: 'Finder main-area views: GridView (icon cards), ListView (sortable details table), ColumnsView (macOS Miller columns from breadcrumb chain). Shared onClick(additive)/onOpen handlers, selection set.'
+  last_edited_ms: 1781516507777
 c2baaa90fec05e51:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block on Send, count positive. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
@@ -3682,10 +3750,6 @@ c789b7f61fb207fe:
   path: src/infra/profiler.rs
   description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime via cp_mod_utilities::time, elapsed ms, tool name(s).
   last_edited_ms: 0
-c7c4475a90dcee17:
-  path: ui/src/components/agents/AgentDetail.tsx
-  description: 'Right pane of Agents browse mode. 3 faces from selected node: agent folder→dashboard (metrics incl realm thread count + confined Realm file tree showing ''agent can''t go out'' + Open workspace), plain folder→Initialize-agent form, file/none→empty state. RealmTree + findByPath helpers.'
-  last_edited_ms: 1781515390725
 c7ea61d3ceb784d8:
   path: crates/cp-base/src/modules.rs
   description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/tool_progress), file watcher integration.
@@ -3906,6 +3970,10 @@ d2eef20869d99ca6:
   path: crates/cp-mod-logs/src/panel.rs
   description: Logs panel. Tree-structured display with summaries. format_timestamp() via cp_mod_utilities::time::epoch_ms_to_local_ymd_hms. IR block rendering with expand/collapse. Context provider for LLM.
   last_edited_ms: 0
+d31e0cea5b615120:
+  path: ui/src/components/ui/scroll-area.tsx
+  description: shadcn scroll-area (Base UI). Used across rails/views.
+  last_edited_ms: 1781516472115
 d3757733b7f060a3:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
@@ -4086,10 +4154,6 @@ e0c59a647adcab4b:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
   last_edited_ms: 0
-e0d9ae4c58a2ea39:
-  path: ui/src/components/agents/AgentDetail.tsx
-  description: 'Right pane of Agents launcher. 3 faces from selected node: agent folder -> dashboard (metrics + Open workspace), plain folder -> Initialize-agent form (name+model), file/none -> empty state.'
-  last_edited_ms: 1781514430713
 e167b2d794ad0a70:
   path: yamls/tools/tree.yaml
   description: Tree tools YAML. tree_filter (gitignore patterns), tree_toggle (open/close/toggle folders), tree_describe (path+description+delete+close_panel params).
@@ -4258,6 +4322,10 @@ ee05b4f7b117952c:
   path: crates/cp-mod-spine/src/tools.rs
   description: Spine tool handlers. execute_mark_processed (batch notification marking), execute_configure (guard rail limits with zero-value rejection, counter reset).
   last_edited_ms: 0
+ee094a5116fc9a90:
+  path: ui/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook preview pane. Kind-aware bespoke renders: code (line numbers + keyword tint), spreadsheet (A/B/C grid), slide deck (hero + thumbnails), PDF (paper mock), image (gradient), markdown/json/text, folder summary. Metadata footer (kind/size/modified/path).'
+  last_edited_ms: 1781516507787
 ee59b893f856d59f:
   path: docs/web_module_design.md
   description: Brave + Firecrawl web module design

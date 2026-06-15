@@ -27,11 +27,12 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
 export function AgentSwitcher({
   activeId,
   onSwitch,
-  onManage,
+  onFleet,
 }: {
   activeId: string
   onSwitch: (id: string) => void
-  onManage: () => void
+  /** Jump to the fleet dashboard — the only place agents are managed. */
+  onFleet: () => void
 }) {
   const active = agents.find((a) => a.id === activeId) ?? agents[0]
   if (!active) return null
@@ -82,13 +83,13 @@ export function AgentSwitcher({
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={onManage} className="gap-2 py-1.5 text-[12.5px]">
+          <DropdownMenuItem onClick={onFleet} className="gap-2 py-1.5 text-[12.5px]">
             <Plus className="size-3.5 text-[var(--interactive)]" />
-            New agent / browse filesystem…
+            New agent…
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onManage} className="gap-2 py-1.5 text-[12.5px]">
+          <DropdownMenuItem onClick={onFleet} className="gap-2 py-1.5 text-[12.5px]">
             <FolderGit2 className="size-3.5 text-muted-foreground" />
-            Manage workspaces
+            Manage agents (fleet)
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

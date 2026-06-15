@@ -125,9 +125,63 @@ export interface FsNode {
   children?: FsNode[]
 }
 
+// ── Finder (per-agent file manager) ───────────────────────────────
+
+export type FinderKind =
+  | "folder"
+  | "code"
+  | "doc"
+  | "pdf"
+  | "sheet"
+  | "slides"
+  | "image"
+  | "markdown"
+  | "json"
+  | "archive"
+  | "binary"
+
+/** One spreadsheet preview payload. */
+export interface SheetPreview {
+  columns: string[]
+  rows: string[][]
+}
+
+/** One slide in a deck preview. */
+export interface SlidePreview {
+  title: string
+  bullets: string[]
+}
+
+/** A node in the Finder's (mock) realm filesystem — confined to one agent. */
+export interface FinderNode {
+  name: string
+  path: string
+  kind: FinderKind
+  /** size in bytes (files only) */
+  size?: number
+  /** human relative modified time, e.g. "2d ago" */
+  modified: string
+  children?: FinderNode[]
+  // ── optional preview payloads, by kind ──
+  code?: { lang: string; lines: string[] }
+  sheet?: SheetPreview
+  slides?: SlidePreview[]
+  pdf?: { pages: number; title: string; excerpt: string[] }
+  image?: { gradient: string; w: number; h: number }
+  /** markdown / json / plain-doc preview body */
+  text?: string
+}
+
+export type FinderViewMode = "grid" | "list" | "columns"
+export type FinderSortKey = "name" | "size" | "modified" | "kind"
+
 // ── Thread-centered view ──────────────────────────────────────────
 
-export type ViewMode = "agents" | "cockpit" | "threads"
+/**
+ * Top-level surfaces. `fleet` = the mission-control dashboard (the ONLY place
+ * agents are managed). The other three are the per-agent views.
+ */
+export type ViewMode = "fleet" | "cockpit" | "threads" | "finder"
 
 /** A single embedded question form inside a thread message (CP signature). */
 export interface ThreadQuestion {

@@ -1,5 +1,5 @@
-import { GitBranch, LayoutGrid, MessagesSquare, FolderTree } from "lucide-react"
-import { PROJECT, status, agents } from "@/lib/mock"
+import { GitBranch, LayoutGrid, MessagesSquare, FolderTree, Home } from "lucide-react"
+import { status, agents } from "@/lib/mock"
 import { fmtCost } from "@/lib/panelMeta"
 import { ThemeToggle } from "./ThemeToggle"
 import { AgentSwitcher } from "./AgentSwitcher"
@@ -13,55 +13,65 @@ interface TopBarProps {
   onSwitchAgent: (id: string) => void
 }
 
-/** Slim macOS-style title bar — app mark, workspace switcher, view tabs, branch, cost, theme. */
+/** Slim macOS-style title bar — app mark (→ fleet), workspace switcher,
+ *  per-agent view tabs (Threads · Cockpit · Finder), branch, cost, theme. */
 export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: TopBarProps) {
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
+  const inFleet = view === "fleet"
+
   return (
     <header className="vibrancy flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
-      {/* macOS traffic lights — purely decorative, sets the desktop-app tone */}
+      {/* macOS traffic lights — decorative */}
       <div className="flex items-center gap-2 pr-1">
         <span className="size-3 rounded-full bg-[#ff5f57]" />
         <span className="size-3 rounded-full bg-[#febc2e]" />
         <span className="size-3 rounded-full bg-[#28c840]" />
       </div>
 
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] font-semibold tracking-tight text-foreground">
-          Context Pilot
-        </span>
-      </div>
+      {/* app mark → fleet dashboard (mission control) */}
+      <button
+        onClick={() => onViewChange("fleet")}
+        className={cn(
+          "flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors",
+          inFleet ? "text-foreground" : "text-foreground/90 hover:bg-muted/50",
+        )}
+        title="Fleet — mission control"
+      >
+        <Home className="size-4 text-[var(--signal)]" />
+        <span className="text-[13px] font-semibold tracking-tight">Context Pilot</span>
+      </button>
 
       {/* workspace switcher — pick which agent (folder) you're working in */}
       <span className="ml-1 text-muted-foreground/40">/</span>
       <AgentSwitcher
         activeId={activeAgentId}
         onSwitch={onSwitchAgent}
-        onManage={() => onViewChange("agents")}
+        onFleet={() => onViewChange("fleet")}
       />
 
-      {/* segmented view switcher */}
-      <div className="ml-2 flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
-        <ViewTab
-          active={view === "agents"}
-          onClick={() => onViewChange("agents")}
-          icon={FolderTree}
-          label="Agents"
-        />
-        <ViewTab
-          active={view === "threads"}
-          onClick={() => onViewChange("threads")}
-          icon={MessagesSquare}
-          label="Threads"
-        />
-        <ViewTab
-          active={view === "cockpit"}
-          onClick={() => onViewChange("cockpit")}
-          icon={LayoutGrid}
-          label="Cockpit"
-        />
-      </div>
-
-      <span className="text-[12.5px] text-muted-foreground">{PROJECT.name}</span>
+      {/* per-agent view switcher (hidden at fleet altitude) */}
+      {!inFleet && (
+        <div className="ml-2 flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
+          <ViewTab
+            active={view === "threads"}
+            onClick={() => onViewChange("threads")}
+            icon={MessagesSquare}
+            label="Threads"
+          />
+          <ViewTab
+            active={view === "cockpit"}
+            onClick={() => onViewChange("cockpit")}
+            icon={LayoutGrid}
+            label="Cockpit"
+          />
+          <ViewTab
+            active={view === "finder"}
+            onClick={() => onViewChange("finder")}
+            icon={FolderTree}
+            label="Finder"
+          />
+        </div>
+      )}
 
       <div className="ml-auto flex items-center gap-3">
         <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px] card-shadow">
