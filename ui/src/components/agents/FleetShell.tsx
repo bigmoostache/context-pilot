@@ -24,17 +24,28 @@ export function FleetShell({ onOpenAgent }: { onOpenAgent: (id: string) => void 
     <div className="relative flex min-h-0 flex-1">
       <FleetSidebar page={page} onSelect={setPage} collapsed={collapsed} />
 
-      {/* Border rail — click the sidebar's right edge to collapse/expand it
-          (the shadcn Sidebar interaction). Tracks the sidebar width so it
-          always hugs the border, and stays reachable at x=0 when collapsed. */}
+      {/* Collapse rail — click the sidebar's right edge to collapse/expand it
+          (the shadcn Sidebar interaction). A generous hit zone hugs the border;
+          on hover a soft band lights up and a pill-grip handle appears so the
+          affordance reads clearly. Tracks the sidebar width, stays reachable at
+          x=0 when collapsed, and flips a chevron to hint the action. */}
       <button
         onClick={() => setCollapsed((v) => !v)}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="group absolute inset-y-0 z-20 w-3 -translate-x-1/2 cursor-pointer transition-[left] duration-200 ease-in-out"
-        style={{ left: collapsed ? 0 : "var(--sidebar-w)" }}
+        className="group absolute inset-y-0 z-20 w-5 -translate-x-1/2 cursor-pointer transition-[left] duration-200 ease-in-out"
+        style={{ left: collapsed ? 6 : "var(--sidebar-w)" }}
       >
-        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-[var(--interactive)]/70 group-active:bg-[var(--interactive)]" />
+        {/* hover band — a subtle highlight across the seam */}
+        <span className="absolute inset-y-0 left-1/2 w-[3px] -translate-x-1/2 rounded-full bg-border transition-all duration-150 group-hover:w-[5px] group-hover:bg-[var(--interactive)]/45 group-active:bg-[var(--interactive)]/70" />
+        {/* pill-grip handle — the obvious drag/click affordance */}
+        <span className="absolute top-1/2 left-1/2 flex h-11 w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card opacity-0 shadow-sm transition-all duration-150 group-hover:opacity-100 group-active:scale-95">
+          <span className="flex flex-col items-center gap-[3px]">
+            <span className="size-[3px] rounded-full bg-muted-foreground/60" />
+            <span className="size-[3px] rounded-full bg-muted-foreground/60" />
+            <span className="size-[3px] rounded-full bg-muted-foreground/60" />
+          </span>
+        </span>
       </button>
 
       {page === "agents" ? (
