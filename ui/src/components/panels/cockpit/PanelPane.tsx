@@ -1,6 +1,7 @@
 import type { ContextPanel, PanelKind } from "@/lib/types"
 import { panels } from "@/lib/mock"
 import { panelIcon } from "@/lib/panelMeta"
+import { Conversation } from "@/components/conversation/Conversation"
 import { PanelFrame } from "./PanelFrame"
 import { TreePanel } from "./TreePanel"
 import { MemoryPanel } from "./MemoryPanel"
@@ -18,10 +19,13 @@ import { ScratchpadPanel } from "./ScratchpadPanel"
 /**
  * Cockpit panel router — given the selected panel id, looks the panel up in the
  * mock registry and renders its bespoke maquette by kind. The center "star" of
- * the panel-centered cockpit view. Unknown / not-yet-designed kinds fall back
- * to a graceful placeholder inside the shared frame.
+ * the panel-centered cockpit view. The special id "conversation" renders the
+ * full conversation surface (the conversation is treated as just another panel,
+ * T24). Unknown / not-yet-designed kinds fall back to a graceful placeholder
+ * inside the shared frame.
  */
 export function PanelPane({ panelId }: { panelId: string }) {
+  if (panelId === "conversation") return <Conversation />
   const panel = panels.find((p) => p.id === panelId) ?? panels[0]
   return renderPanel(panel)
 }
