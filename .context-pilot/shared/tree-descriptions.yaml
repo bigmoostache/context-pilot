@@ -166,6 +166,10 @@
   path: crates/cp-mod-console/src/pollers.rs
   description: FilePoller (tails log file every 100ms into RingBuffer, grace read on stop) + StatusPoller (polls server status every 500ms, marks dead on exit/unreachable).
   last_edited_ms: 0
+08d7419b73036017:
+  path: ui/src/components/finder/GetInfo.tsx
+  description: 'Get Info modal — macOS dossier sheet: large kind icon, name, kind/size/dates, tags, dimensions/duration/pages, ''where'' path. Esc/Done close. Decorative.'
+  last_edited_ms: 1781518321232
 08f578744e64fd36:
   path: .env
   description: Environment variables (.env)
@@ -426,6 +430,10 @@
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+15782d1830b79255:
+  path: ui/src/components/finder/Finder.tsx
+  description: Top-level Finder orchestrator. buildRealm(agent) memo, tabs w/ per-tab back/fwd history, keyboard nav (arrows/Enter/Backspace/Space QuickLook/⌘A/⌘I/type-ahead), additive + range selection, right-click context menu, Get Info modal, 4 view modes, icon-size slider, path bar, drag-drop upload overlay, status bar, transient toast. Stagger re-trigger by keying views on cwd.
+  last_edited_ms: 1781518321273
 157ba8411ad995a2:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
@@ -638,6 +646,14 @@
   path: crates/cp-mod-spine/src/types.rs
   description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom), NotificationStatus (Unprocessed/Blocked/Processed). SpineConfig: guard rail limits + runtime tracking. SpineState: create/mark/delete/unblock notifications. mark_all_unprocessed_as_processed() for continuation consumption.'
   last_edited_ms: 0
+205f659a01433e26:
+  path: ui/src/components/finder/FinderChrome.tsx
+  description: Finder chrome. FinderTabs (strip + new/close). FinderToolbar (back/fwd, overflow breadcrumb, icon-size slider [grid], 4-mode segmented control w/ sliding indicator, search, New Folder/Upload/Download, path-bar + QuickLook toggles). FinderSidebar (Favorites via collectStarred / Locations / Tags / Recents + confined-realm note). FinderPathBar (bottom).
+  last_edited_ms: 1781518321262
+2069aba1b43b3c90:
+  path: ui/src/lib/types.ts
+  description: 'Maquette domain types. Agent, FsNode (legacy). Finder: FinderKind (+audio/video/binary), FinderTag, FinderNode (+tags/created/starred/media/preview payloads), Sheet/SlidePreview, FinderViewMode=grid|list|columns|gallery, FinderSortKey. ThreadDetail+agentId. ViewMode=fleet|cockpit|threads|finder.'
+  last_edited_ms: 1781518321303
 2081231103220bef:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
@@ -694,6 +710,10 @@
   path: ui/src/lib/mock.ts
   description: 'Mock session data approximating a live CP session: panels, tokenBudget, cacheStats, messages, threads, spine, stats, status.'
   last_edited_ms: 1781458541260
+238087f8893cd0d1:
+  path: ui/src/components/finder/kind.tsx
+  description: 'Finder kind metadata: kindMeta (FinderKind→icon/accent/label, incl audio/video), kindTint, kindGradient (depth chips), TAG_META (macOS finder tag colors).'
+  last_edited_ms: 1781518321283
 239c5b0d44871557:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
@@ -1974,6 +1994,10 @@
   path: src/app/actions/config.rs
   description: 'Config bar handlers: context budget, cleaning threshold, target proportion, max cost guard rail, theme cycling'
   last_edited_ms: 0
+694cecf1683c6932:
+  path: ui/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook pane. Bespoke kind renders: code (copy btn + line numbers + keyword tint), spreadsheet (zebra + frozen header + sheet tabs), slides (hero + thumbnails), PDF (paper mock + page strip), image (checkerboard + zoom), audio (waveform player), video (poster + scrubber), rendered markdown (for-loop fence parser), json/text, folder summary. Metadata footer + Get Info.'
+  last_edited_ms: 1781518321252
 6980171814d0d81b:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
@@ -2446,6 +2470,10 @@
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
   last_edited_ms: 0
+848c68f42b0aef3e:
+  path: ui/src/components/finder/FinderViews.tsx
+  description: 'Finder main-area views. GridView (icon-size slider + finder-pop stagger + TagDots + focus ring), ListView (zebra + sortable headers + tags), ColumnsView (Miller + trailing metadata preview pane), GalleryView (hero + filmstrip). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
+  last_edited_ms: 1781518321242
 852931587d049008:
   path: src/llms/claude_code_api_key/helpers.rs
   description: 'CC API-key helpers: constants (endpoint/headers), map_model_name(), inject_system_reminder(), apply_claude_code_headers()'
@@ -3502,6 +3530,10 @@ b9e499de92a61a13:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 1780562263879
+bab9d0cd28f2d236:
+  path: ui/src/lib/finderFs.ts
+  description: Finder mock fs + helpers. buildRealm grafts one rich tree (src/modules nesting, docs, media/ w/ mp4+m4a, planning) onto an agent folder. tags/created/starred/media payloads + PEAKS waveform. findNode/pathChain/collectStarred/nodeSize/childCounts/fmtBytes/sortNodes.
+  last_edited_ms: 1781518321292
 bba5399f6a7db655:
   path: crates/cp-mod-todo/src/tools.rs
   description: Todo CRUD tools with flame!("todo_create"), flame!("todo_update"), flame!("todo_move"). Nested parent_id validation. Status propagation (in_progress auto-cascades to parents). Orphan protection on delete. Move reorder with after_id.
@@ -4574,6 +4606,10 @@ fbf8fe9fb44a116e:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
   last_edited_ms: 0
+fc0e3d283a7c238b:
+  path: ui/src/components/finder/ContextMenu.tsx
+  description: Right-click context menu (macOS action sheet). Open/Get Info/Rename/Duplicate/Download, macOS tag swatches, Move to Trash. Keeps on-screen, Esc/outside-click close. Decorative actions flash a toast.
+  last_edited_ms: 1781518321221
 fc3dcea69df2a495:
   path: yamls/tools/callback.yaml
   description: 'Callback tools YAML. 3 tools: Callback_upsert (create/update/delete), Callback_open_editor, Callback_close_editor.'
