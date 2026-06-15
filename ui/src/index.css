@@ -14,7 +14,7 @@
   CONTEXT·PILOT — Two switchable palettes, enterprise / macOS aesthetic.
 
   LIGHT  "Cream"   #FEFCF3 · #F5EBE0 · #F0DBDB · #DBA39A   (warm, editorial)
-  DARK   "Sea"     #2C3333 · #395B64 · #A5C9CA · #E7F6F2   (cool, calm)
+  DARK   "Space"   #222831 · #393E46 · #00ADB5 · #EEEEEE   (deep, teal accent)
 
   To explore other palettes, edit the two token blocks below (:root + .dark).
   Every component reads these semantic tokens — nothing is hard-coded.
@@ -101,36 +101,36 @@
   color-scheme: light;
 }
 
-/* ─── DARK · "Sea" ─────────────────────────────────────────────────────── */
+/* ─── DARK · "Space" ───────────────────────────────────────────────────── */
 .dark {
-  --background: #2c3333;
-  --surface: #2f3838; /* sidebars / chrome */
-  --surface-2: #344042; /* nested surface */
-  --card: #333d3e;
-  --popover: #36403f;
+  --background: #222831;
+  --surface: #252b33; /* sidebars / chrome */
+  --surface-2: #2d333c; /* nested surface */
+  --card: #393e46;
+  --popover: #393e46;
 
-  --foreground: #e7f6f2;
-  --muted: #3a4749;
-  --muted-foreground: #93acac;
+  --foreground: #eeeeee;
+  --muted: #30363f;
+  --muted-foreground: #8d96a0;
 
-  --border: #3f5054;
-  --input: #3f5054;
-  --grid: #384a4d;
+  --border: #3d444e;
+  --input: #3d444e;
+  --grid: #2a3038;
 
-  --primary: #a5c9ca; /* mint — primary actions */
-  --primary-foreground: #1f2727;
-  --accent: #a5c9ca;
-  --accent-foreground: #1f2727;
-  --ring: #a5c9ca;
+  --primary: #00adb5; /* teal — primary actions */
+  --primary-foreground: #06232a;
+  --accent: #00adb5;
+  --accent-foreground: #06232a;
+  --ring: #00adb5;
 
-  --signal: #a5c9ca; /* accent text / active */
-  --signal-dim: #6f8f90;
-  --interactive: #8ec3c5; /* links / info */
-  --ok: #8fc2a9;
-  --warn: #d8be8c;
-  --danger: #d89a92;
+  --signal: #00adb5; /* accent text / active */
+  --signal-dim: #1b7e84;
+  --interactive: #3cc7ce; /* links / info */
+  --ok: #4caf88;
+  --warn: #d8a657;
+  --danger: #e2746b;
 
-  --shadow-color: 190deg 30% 4%;
+  --shadow-color: 210deg 25% 4%;
   --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.4),
     0 4px 14px hsl(var(--shadow-color) / 0.3);
   --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 0.5);

@@ -66,6 +66,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+03db74a0f2f68bd7:
+  path: ui/src/index.css
+  description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A warm) + DARK ''Space'' (#222831/#393E46/#00ADB5/#EEEEEE deep teal accent) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data only. Soft shadows, vibrancy, no glow.'
+  last_edited_ms: 1781513636430
 03dd8ddbc3368dd7:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
@@ -234,6 +238,10 @@
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 1781354640761
+0b7adaad71edc42c:
+  path: ui/src/components/conversation/Conversation.tsx
+  description: 'Center conversation surface: header strip (msg counts, streaming indicator), scrollable message list, input bar.'
+  last_edited_ms: 0
 0b9103ee30634685:
   path: docs/logs.md
   description: Logging system design
@@ -594,6 +602,10 @@
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, cp-mod-utilities, log.'
   last_edited_ms: 1780565428719
+1ed36b1b1990e2ce:
+  path: ui/src/components/shell/StatusBar.tsx
+  description: 'Bottom status bar: phase badge (READY/STREAMING/TOOLING/BLOCKED), agent/skill chips, git/queue/think, reverie/auto, cost.'
+  last_edited_ms: 0
 1f22019f5a6e5ddb:
   path: src/app/run/tools/checks.rs
   description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer. Each resumes streaming pipeline when condition met. Imports has_dirty_panels from streaming.rs.'
@@ -885,6 +897,10 @@
 2e2432f5d53621ba:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
+  last_edited_ms: 0
+2e44c327688828b7:
+  path: ui/src/components/threads/ThreadDetailRail.tsx
+  description: 'Right rail: thread metadata (status badge, agent, message count, created, last activity, id) + ''Open agent cockpit'' bridge to the panel-centered view.'
   last_edited_ms: 0
 2e908756fdf5dd30:
   path: src/main.rs
@@ -1182,6 +1198,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+3fcf7ba9f357b2db:
+  path: ui/src/components/threads/ThreadList.tsx
+  description: 'Left rail: grouped thread sidebar (''Needs you''=MY_TURN / ''In progress''=THEIR_TURN). Each row: status dot, name, last-msg preview, time, unread badge, selection bar. + New Thread button, search box.'
+  last_edited_ms: 0
 3ffcdfcd3170e1ea:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
@@ -1277,6 +1297,10 @@
 43bb987e2fb2fc3c:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
+  last_edited_ms: 0
+4400bfc4fbc9c1d5:
+  path: ui/src/components/conversation/InputBar.tsx
+  description: 'Mock input bar: blinking caret, key hints (send/cycle-view/file). Non-functional (design only).'
   last_edited_ms: 0
 44284c135428f1f1:
   path: crates/cp-render/src/lib.rs
@@ -1838,6 +1862,10 @@
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation). load_prompt_history() reads back entries.'
   last_edited_ms: 0
+667559f7c3174bf5:
+  path: ui/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
+  last_edited_ms: 0
 6685b46338a4024a:
   path: crates/cp-mod-memory/src/types.rs
   description: Memory types. MemoryItem (id, yaml_key, tl_dr, contents, importance, labels, open). Importance enum (Low/Medium/High/Critical). MemoryState (memories, next_id, open_ids).
@@ -1986,6 +2014,10 @@
   path: ui/src/lib/panelMeta.ts
   description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
   last_edited_ms: 1781458541269
+6fb74b94ea91d3ae:
+  path: ui/src/lib/panelMeta.ts
+  description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
+  last_edited_ms: 0
 6fd3adfcd1ec6cc1:
   path: src/ui/search_overlay/text.rs
   description: Plain-text export of Ctrl+I overlay for clipboard copy. Includes process CPU%/RAM stats for Meilisearch.
@@ -2033,6 +2065,10 @@
 73779fd3aa902c62:
   path: crates/cp-mod-entities/src/tools.rs
   description: 'SQL execution engine. execute() dispatches to execute_select/dml/ddl. execute_dml_stmts is row-aware: dispatches per-statement on prep.column_count()>0 so a DML batch can end in a plain SELECT (not just RETURNING) without rusqlite ''Execute returned results'' error. dry_run via SAVEPOINT+ROLLBACK. Parsing from crate::parse. request_path reads .sql. live/output_path routing. ≤150 lines AND ≤8000 bytes inline, bigger→entity_result panel. 200-row cap. 4 DML-dispatch regression tests.'
+  last_edited_ms: 0
+73a5ef4ffe6b41f7:
+  path: ui/src/components/shell/LeftRail.tsx
+  description: 'Context navigator: token-budget meter, scrollable panel list (icon+name+token-bar+freeze/miss), cache economics footer (hit/miss/out + cost).'
   last_edited_ms: 0
 73d30784479fee52:
   path: src/modules/pre_flight.rs
@@ -2250,6 +2286,10 @@
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
   last_edited_ms: 1780649207740
+7f4830185af50e0a:
+  path: ui/src/components/threads/QuestionForm.tsx
+  description: 'Embedded thread question form (CP signature): single/multi-select options with interactive pick state, allowOther field, submit button. Cyan-accented, decorative but stateful.'
+  last_edited_ms: 0
 7f96c638d0d94837:
   path: src/ui/ir/conversation.rs
   description: 'Conversation + overlay IR builder. Messages, history sections, streaming tools, input area. Overlays: QuestionForm, Autocomplete, PerfOverlay (build_perf_overlay with frame budgets, CPU/Meili stats, FD count, op table). Perf builder calls PERF.snapshot() and cp_mod_search::overlay_info().'
@@ -2670,6 +2710,10 @@
   path: src/infra/mod.rs
   description: 'Re-exports: api, config, constants, flame (inline re-export of cp_base::flame init/flush), gh_watcher, profiler, tools, watcher. Infrastructure layer between app and core crates.'
   last_edited_ms: 0
+9579001733d834e4:
+  path: ui/src/components/threads/ThreadComposer.tsx
+  description: 'Thread input composer. MY_TURN: active prompt w/ attach + send + key hints. THEIR_TURN: subdued ''agent is working'' spinner state. Design-only.'
+  last_edited_ms: 0
 9585095c96a77cfa:
   path: src/llms/mod.rs
   description: 'LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging. Re-exports split: llm_types (traits) + models (enums).'
@@ -2685,6 +2729,10 @@
 960c3ce787fb070f:
   path: crates/cp-render/src/conversation.rs
   description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm (with cursor/typing_other/other_text), Autocomplete (with dir_prefix/total_matches/input_visual_lines), PerfOverlay (with open_fds/fd_limit_soft/fd_semantic), ConfigOverlay, PaletteOverlay, SearchIndexOverlay. All serializable.'
+  last_edited_ms: 0
+961361a2e5e8ebc2:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'Cockpit header strip: app mark, view switcher (Threads/Cockpit segmented control), project breadcrumb, branch chip, global cost, status dot.'
   last_edited_ms: 0
 965292c5106e02e5:
   path: crates/cp-render/src/frame.rs
@@ -2941,6 +2989,10 @@ a4282b39d6c4fdb9:
 a43a679f6a0b0d68:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
+  last_edited_ms: 0
+a43b267eb8dc6c17:
+  path: ui/src/App.tsx
+  description: App shell with view state (threads|cockpit, default threads). TopBar switcher toggles between ThreadsView (3-pane chat) and cockpit (LeftRail+Conversation+RightInspector). StatusBar always shown.
   last_edited_ms: 0
 a445c40881ecc32a:
   path: src/ui/help/mod.rs
@@ -3366,6 +3418,10 @@ bc2adb7e342ab710:
   path: run.sh
   description: Supervisor script. Builds tui + cp-console-server upfront, then loops cargo run --release with reload detection via config.json. --telemetry flag sets CP_FLAMEGRAPH=1. ulimit -n 2048. Loads .env. --resume-stream on reload.
   last_edited_ms: 0
+bc47c82ddfea32f9:
+  path: ui/src/components/shell/RightInspector.tsx
+  description: Right inspector with Stats/Threads/Spine tabs (shadcn Tabs + ScrollArea).
+  last_edited_ms: 0
 bc6c0b44ae58604e:
   path: ui/src/components/shell/StatusBar.tsx
   description: 'Bottom status bar: phase badge (READY/STREAMING/TOOLING/BLOCKED), agent/skill chips, git/queue/think, reverie/auto, cost.'
@@ -3677,6 +3733,10 @@ cd333d308467c2b4:
 cd506418e76f9e43:
   path: crates/cp-mod-files/src/lib.rs
   description: 'Files module. Core/global. 3 tools: Open, Edit, Write. Pre-flight: queue auto-activate, old_string match against both disk and virtual (post-queue) content via build_virtual_content(). 4-way matrix: disk✓/virtual✓→OK, disk✓/virtual✗→ERROR, disk✗/virtual✓→OK, disk✗/virtual✗→ERROR.'
+  last_edited_ms: 0
+cd51ea8e98489845:
+  path: ui/src/components/conversation/Message.tsx
+  description: 'Message renderer: UserMessage (right-aligned bubble), AssistantMessage (signal-badged prose + streaming caret), ToolMessage (collapsible tool card w/ params + result).'
   last_edited_ms: 0
 cd6dbd1b31a7a1cb:
   path: crates/cp-mod-console/src/panel.rs
@@ -4066,6 +4126,10 @@ ea16377a234ddc09:
   path: src/ui/ir/render_conversation.rs
   description: 'IR-controlled chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached(). Autocomplete overlay rendering via IR data. No question form overlay.'
   last_edited_ms: 1781391612145
+ea27e719c9c5f0ff:
+  path: ui/src/components/panels/TokenBar.tsx
+  description: Signature CP token meter — hairline phosphor fill bar with load-gradient color + glow + mount sweep animation.
+  last_edited_ms: 0
 ea3a1361f364015c:
   path: src/ui/ir/render_conversation.rs
   description: 'IR-controlled chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached(). Question form + autocomplete overlay rendering via IR data.'
