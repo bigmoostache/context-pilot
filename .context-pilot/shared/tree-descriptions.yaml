@@ -1026,6 +1026,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+31e40cc8916cabd7:
+  path: ui/src/components/threads/ThreadsView.tsx
+  description: 'Threads view assembler, scoped to ACTIVE AGENT''s realm (filters threadDetails by agentId; keyed by agentId in App so local state reseeds per realm; EmptyRealm when none). Holds local thread state so maquette interactions genuinely work: search filters, New Thread prepends a MY_TURN thread, archive/restore toggles. 2-pane (ThreadList | ThreadConversation) + NewThreadDialog. Sidebar is ALWAYS OPEN — the collapse/expand edge rail was removed entirely (T23).'
+  last_edited_ms: 1781553182543
 320a91c0259e5b70:
   path: crates/cp-mod-entities/src/sync.rs
   description: Meilisearch sync for entity data — incremental dirty-tracked, delete-then-add. ensure_index, sync_table, flush_sync, full_reindex. extract_affected_tables for SQL parsing.
@@ -2866,6 +2870,10 @@
   path: ui/src/lib/finderFs.ts
   description: Finder mock filesystem + helpers. buildRealm(folder,name) grafts one rich project tree onto an agent's folder (confined realm). findNode/pathChain DFS, fmtBytes, sortNodes (folders-first). Files carry preview payloads (code/sheet/slides/pdf/image/text).
   last_edited_ms: 1781516507807
+8e69d18e4972e90c:
+  path: ui/src/components/threads/ThreadList.tsx
+  description: 'Left rail of threads view — ALWAYS OPEN (width=var(--sidebar-w); collapse prop + edge-rail removed per T23). NO agent header. Working search <input> filters by name+last-preview. Groups: ''Needs you'' (MY_TURN, signal), ''Active'' (ACTIVE, green/ok, the one streaming), ''Working in parallel'' (THEIR_TURN). Per-row hover Archive/Restore action. Footer ''Archived (N)'' toggles a read-only archived view. New Thread button → onNewThread. Header pill counts agent-owned working threads.'
+  last_edited_ms: 1781553182555
 8e86d7d94bccc5c8:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
