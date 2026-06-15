@@ -1,11 +1,12 @@
 import { useState } from "react"
-import { PanelLeft } from "lucide-react"
 import { FleetSidebar, type FleetPage } from "./FleetSidebar"
 import { FleetDashboard } from "./FleetDashboard"
 import { PromptsPage } from "./PromptsPage"
 import { UsagePage } from "./UsagePage"
 import { ConfigPanel } from "@/components/shell/ConfigPanel"
-import { Button } from "@/components/ui/button"
+
+/** Sidebar width — kept in sync with FleetSidebar's SIDEBAR_W so the rail lands on the border. */
+const SIDEBAR_W = 212
 
 /**
  * Fleet shell — the mission-control workspace shown when no agent is focused.
@@ -24,23 +25,21 @@ export function FleetShell({ onOpenAgent }: { onOpenAgent: (id: string) => void 
 
   return (
     <div className="relative flex min-h-0 flex-1">
-      <FleetSidebar
-        page={page}
-        onSelect={setPage}
-        collapsed={collapsed}
-        onToggleCollapse={() => setCollapsed((v) => !v)}
-      />
-      {collapsed && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setCollapsed(false)}
-          title="Show sidebar"
-          className="absolute left-2 top-2 z-10 border border-border bg-card text-muted-foreground card-shadow"
-        >
-          <PanelLeft className="size-4" />
-        </Button>
-      )}
+      <FleetSidebar page={page} onSelect={setPage} collapsed={collapsed} />
+
+      {/* Border rail — click the sidebar's right edge to collapse/expand it
+          (the shadcn Sidebar interaction). Tracks the sidebar width so it
+          always hugs the border, and stays reachable at x=0 when collapsed. */}
+      <button
+        onClick={() => setCollapsed((v) => !v)}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        className="group absolute inset-y-0 z-20 w-3 -translate-x-1/2 cursor-pointer transition-[left] duration-200 ease-in-out"
+        style={{ left: collapsed ? 0 : SIDEBAR_W }}
+      >
+        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-[var(--interactive)]/70 group-active:bg-[var(--interactive)]" />
+      </button>
+
       {page === "agents" ? (
         <FleetDashboard onOpenAgent={onOpenAgent} />
       ) : page === "prompts" ? (

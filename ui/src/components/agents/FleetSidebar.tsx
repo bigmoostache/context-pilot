@@ -1,5 +1,4 @@
-import { LayoutGrid, Coins, Library, Settings2, PanelLeftClose } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { LayoutGrid, Coins, Library, Settings2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /** The four sections of the fleet (no-agent-focused) dashboard. */
@@ -24,19 +23,21 @@ const SIDEBAR_W = 212
  * Mission-control sidebar — the navigation rail shown when no agent is focused.
  * Selects between the dashboard's four pages (Agents / Prompts / Usage /
  * Settings). The Context-Pilot identity is intentionally *not* repeated here —
- * it already lives in the TopBar. The rail is collapsible: it animates to zero
- * width, and a floating trigger in {@link FleetShell} re-opens it.
+ * it already lives in the TopBar.
+ *
+ * Collapsing is driven entirely by the **draggable-looking border rail** that
+ * {@link FleetShell} renders on this aside's right edge (the shadcn `Sidebar`
+ * pattern) — there are no in-rail collapse buttons. This component only reacts
+ * to the `collapsed` flag by animating its width to zero.
  */
 export function FleetSidebar({
   page,
   onSelect,
   collapsed,
-  onToggleCollapse,
 }: {
   page: FleetPage
   onSelect: (p: FleetPage) => void
   collapsed: boolean
-  onToggleCollapse: () => void
 }) {
   return (
     <aside
@@ -49,21 +50,8 @@ export function FleetSidebar({
         className="flex h-full flex-col"
         style={{ width: SIDEBAR_W, minWidth: SIDEBAR_W }}
       >
-        {/* collapse trigger */}
-        <div className="flex items-center px-3 pb-1 pt-3">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onToggleCollapse}
-            title="Collapse sidebar"
-            className="ml-auto text-muted-foreground"
-          >
-            <PanelLeftClose className="size-4" />
-          </Button>
-        </div>
-
         {/* nav */}
-        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 px-2.5 py-1">
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 px-2.5 pb-1 pt-4">
           {NAV.map((n) => {
             const on = n.id === page
             return (
