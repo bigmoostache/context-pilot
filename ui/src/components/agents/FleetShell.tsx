@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { LayoutGrid, Library } from "lucide-react"
 import { FleetDashboard } from "./FleetDashboard"
 import { PromptsPage } from "./PromptsPage"
@@ -27,8 +27,24 @@ type HomeTab = "agents" | "prompts"
  */
 export const FLEET_MAX_W = "max-w-[960px]"
 
-export function FleetShell({ onOpenAgent }: { onOpenAgent: (id: string) => void }) {
+export function FleetShell({
+  onOpenAgent,
+  openCreate,
+  onCreateConsumed,
+}: {
+  onOpenAgent: (id: string) => void
+  /** External request (from the workspace switcher's "New agent") to land on
+   *  the Agents tab and pop the create dialog. */
+  openCreate?: boolean
+  onCreateConsumed?: () => void
+}) {
   const [tab, setTab] = useState<HomeTab>("agents")
+
+  // A "new agent" request must surface on the Agents tab — snap to it before
+  // the dashboard opens its create dialog.
+  useEffect(() => {
+    if (openCreate) setTab("agents")
+  }, [openCreate])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
@@ -46,7 +62,15 @@ export function FleetShell({ onOpenAgent }: { onOpenAgent: (id: string) => void 
       </div>
 
       {/* active sub-page (rendered untouched) */}
-      {tab === "agents" ? <FleetDashboard onOpenAgent={onOpenAgent} /> : <PromptsPage />}
+      {tab === "agents" ? (
+        <FleetDashboard
+          onOpenAgent={onOpenAgent}
+          autoCreate={openCreate}
+          onAutoCreateConsumed={onCreateConsumed}
+        />
+      ) : (
+        <PromptsPage />
+      )}
     </div>
   )
 }

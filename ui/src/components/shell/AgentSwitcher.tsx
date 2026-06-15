@@ -33,11 +33,14 @@ export function AgentSwitcher({
   activeId,
   onSwitch,
   onFleet,
+  onNewAgent,
 }: {
   activeId?: string
   onSwitch: (id: string) => void
   /** Jump to the fleet dashboard — the only place agents are managed. */
   onFleet: () => void
+  /** Jump to the fleet dashboard AND open the create-agent dialog. */
+  onNewAgent: () => void
 }) {
   const active = agents.find((a) => a.id === activeId)
 
@@ -103,7 +106,7 @@ export function AgentSwitcher({
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={onFleet} className="gap-2 py-1.5 text-[12.5px]">
+          <DropdownMenuItem onClick={onNewAgent} className="gap-2 py-1.5 text-[12.5px]">
             <Plus className="size-3.5 text-[var(--interactive)]" />
             New agent…
           </DropdownMenuItem>

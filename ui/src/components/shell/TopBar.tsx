@@ -14,11 +14,13 @@ interface TopBarProps {
   onViewChange: (v: ViewMode) => void
   activeAgentId: string
   onSwitchAgent: (id: string) => void
+  /** Raise a "create new agent" request (→ fleet agents page + dialog). */
+  onNewAgent: () => void
 }
 
 /** Slim macOS-style title bar — app mark (→ fleet), workspace switcher,
  *  per-agent view tabs (Threads · Cockpit · Finder), branch, cost, theme. */
-export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: TopBarProps) {
+export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNewAgent }: TopBarProps) {
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
   const inFleet = view === "fleet"
   const [configOpen, setConfigOpen] = useState(false)
@@ -55,6 +57,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
             : onSwitchAgent
         }
         onFleet={() => onViewChange("fleet")}
+        onNewAgent={onNewAgent}
       />
 
       {/* per-agent view switcher (hidden at fleet altitude) */}

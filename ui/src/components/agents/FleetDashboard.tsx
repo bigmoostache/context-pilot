@@ -56,9 +56,28 @@ type Modal = { mode: "create" } | { mode: "manage"; agent: Agent } | null
  * managed. Aggregate stats, a card per agent (1 agent = 1 folder), and the
  * create / manage flows (the per-agent views no longer touch agent management).
  */
-export function FleetDashboard({ onOpenAgent }: { onOpenAgent: (id: string) => void }) {
+export function FleetDashboard({
+  onOpenAgent,
+  autoCreate,
+  onAutoCreateConsumed,
+}: {
+  onOpenAgent: (id: string) => void
+  /** When flipped true (e.g. via the TopBar "New agent" entry), open the
+   *  create dialog immediately and signal back so the flag can be cleared. */
+  autoCreate?: boolean
+  onAutoCreateConsumed?: () => void
+}) {
   const [modal, setModal] = useState<Modal>(null)
   const [toast, setToast] = useState<string | null>(null)
+
+  // Honour an external "create a new agent" request (from the workspace
+  // switcher). Open the dialog in create mode, then consume the flag.
+  useEffect(() => {
+    if (autoCreate) {
+      setModal({ mode: "create" })
+      onAutoCreateConsumed?.()
+    }
+  }, [autoCreate, onAutoCreateConsumed])
 
   const flash = (m: string) => {
     setToast(m)

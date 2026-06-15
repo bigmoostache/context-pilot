@@ -13,6 +13,9 @@ import "./App.css"
 function App() {
   const [view, setView] = useState<ViewMode>("fleet")
   const [activeAgentId, setActiveAgentId] = useState(initialAgentId)
+  // One-shot request to pop the "create agent" dialog on the fleet dashboard
+  // (raised by the workspace switcher's "New agent" entry).
+  const [createAgent, setCreateAgent] = useState(false)
 
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
 
@@ -23,6 +26,12 @@ function App() {
     setView("threads")
   }
 
+  // "New agent" from the switcher → fleet altitude + create dialog.
+  const newAgent = () => {
+    setView("fleet")
+    setCreateAgent(true)
+  }
+
   return (
     <ThemeProvider>
       <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
@@ -31,10 +40,15 @@ function App() {
           onViewChange={setView}
           activeAgentId={activeAgentId}
           onSwitchAgent={setActiveAgentId}
+          onNewAgent={newAgent}
         />
 
         {view === "fleet" ? (
-          <FleetShell onOpenAgent={openAgent} />
+          <FleetShell
+            onOpenAgent={openAgent}
+            openCreate={createAgent}
+            onCreateConsumed={() => setCreateAgent(false)}
+          />
         ) : view === "cockpit" ? (
           <CockpitView />
         ) : view === "finder" ? (
