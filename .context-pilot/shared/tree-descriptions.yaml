@@ -2894,6 +2894,10 @@
   path: crates/cp-mod-entities/src/sql/mod.rs
   description: 'Declares sql submodules: errors + parse.'
   last_edited_ms: 1781122618129
+9413532ddff7d620:
+  path: ui/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: selected thread''s full conversation. Header = thread name + status pill + agent dot (the ⓘ details button was removed — redundant with the global sidebar info; ThreadDetailsPopup deleted). toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
+  last_edited_ms: 1781533385870
 94391f323268729b:
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
@@ -4694,10 +4698,6 @@ f6930563c8606410:
   path: crates/cp-mod-todo/src/types.rs
   description: TodoStatus (Pending/InProgress/Done), TodoItem, TodoState with has_incomplete_todos() + incomplete_todos_summary()
   last_edited_ms: 0
-f6a27652284984cd:
-  path: ui/src/components/threads/ThreadDetailsPopup.tsx
-  description: Thread dossier popup (replaced the old right rail). Summoned via ⓘ in ThreadConversation header. Built on the portaled Dialog primitive (controlled open/onClose). Status badge, agent/messages/created/last-activity/ID metadata rows, Open-agent-cockpit bridge button.
-  last_edited_ms: 1781524763671
 f7207867229d3d86:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'
@@ -4814,6 +4814,10 @@ fceb53aa84039016:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 1780568982802
+fd2cc3a6e7f7a05b:
+  path: ui/src/components/threads/ThreadsView.tsx
+  description: Threads view assembler, scoped to ACTIVE AGENT's realm (filters threadDetails by agentId, EmptyRealm when none). 2-pane (collapsible ThreadList | ThreadConversation). Owns collapsed state; floating PanelLeft Button re-opens the rail when collapsed. No onOpenCockpit (details popup removed).
+  last_edited_ms: 1781533385882
 fd604dcc85d708e3:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
