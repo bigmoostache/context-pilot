@@ -166,7 +166,7 @@ export function PromptModal({
               )}
             </div>
             <MarkdownEditor
-              key={kind + (isNew ? "new" : item.id)}
+              key={isNew ? "new" : item.id}
               initialMarkdown={body}
               placeholder="Write the prompt here…"
             />
