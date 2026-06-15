@@ -108,6 +108,8 @@ export interface Agent {
   model: string
   status: AgentStatus
   costUsd: number
+  /** one-line summary of what the agent is currently working on */
+  task: string
   /** number of open threads on this agent */
   threads: number
   lastActivity: string

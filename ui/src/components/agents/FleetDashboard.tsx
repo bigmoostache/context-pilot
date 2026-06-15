@@ -20,8 +20,8 @@ import { cn } from "@/lib/utils"
 
 const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
-  "needs-you": { label: "Needs you", color: "var(--signal)" },
-  idle: { label: "Idle", color: "var(--muted-foreground)" },
+  "needs-you": { label: "Needs input", color: "var(--signal)" },
+  idle: { label: "Standby", color: "var(--muted-foreground)" },
 }
 
 const MODELS = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-fable-5"]
@@ -185,7 +185,6 @@ function AgentCard({
   onManage: () => void
 }) {
   const s = statusMeta[agent.status]
-  const stats = realmStats(agent.id)
   const accent = accentVar[agent.accent]
 
   return (
@@ -199,9 +198,6 @@ function AgentCard({
         </span>
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
           <span className="truncate text-[14px] font-semibold text-foreground/90">{agent.name}</span>
-          <span className="truncate font-mono text-[10.5px] text-muted-foreground/65">
-            {agent.folder}
-          </span>
         </div>
         <span
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
@@ -215,6 +211,11 @@ function AgentCard({
         </span>
       </div>
 
+      {/* one-line summary of what the agent is doing */}
+      <p className="line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-foreground/70">
+        {agent.task}
+      </p>
+
       <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           <GitBranch className="size-3.5" />
@@ -224,17 +225,7 @@ function AgentCard({
           <Bot className="size-3.5" />
           {agent.model}
         </span>
-        <span className="ml-auto inline-flex items-center gap-1 tabular-nums">
-          <Clock className="size-3.5" />
-          {agent.lastActivity}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Pill value={stats.total} label="threads" color="var(--muted-foreground)" />
-        <Pill value={stats.working} label="working" color="var(--interactive)" dim={stats.working === 0} />
-        <Pill value={stats.waiting} label="waiting" color="var(--signal)" dim={stats.waiting === 0} />
-        <span className="ml-auto text-[12px] font-semibold tabular-nums text-foreground/80">
+        <span className="ml-auto font-semibold tabular-nums text-foreground/80">
           {fmtCost(agent.costUsd)}
         </span>
       </div>
@@ -245,7 +236,7 @@ function AgentCard({
           className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--signal)] px-3 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
         >
           <Rocket className="size-4" />
-          Open{stats.waiting > 0 ? ` · ${stats.waiting} need you` : ""}
+          Open
         </button>
         <button
           onClick={onManage}
@@ -256,31 +247,6 @@ function AgentCard({
         </button>
       </div>
     </div>
-  )
-}
-
-function Pill({
-  value,
-  label,
-  color,
-  dim,
-}: {
-  value: number
-  label: string
-  color: string
-  dim?: boolean
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
-        dim && "opacity-45",
-      )}
-      style={{ background: `color-mix(in oklab, ${color} 12%, transparent)`, color }}
-    >
-      {value}
-      <span className="font-normal opacity-80">{label}</span>
-    </span>
   )
 }
 
