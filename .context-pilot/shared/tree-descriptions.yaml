@@ -3026,6 +3026,10 @@
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
   last_edited_ms: 0
+96681e0aae3cfae5:
+  path: ui/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer, altitude-aware. fleet=false: single-agent vitals (phase dot+label, agent name, cost). fleet=true: fleet aggregates — Agents count, Threads count, ''Needs you'' count, and right-aligned ''Total spend'' (sum of agent costs). Wired from App.tsx via fleet={view===''fleet''} (T19).'
+  last_edited_ms: 1781545022963
 9671d603bc7cefc9:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
