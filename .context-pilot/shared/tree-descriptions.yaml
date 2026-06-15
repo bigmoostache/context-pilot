@@ -1174,6 +1174,10 @@
   path: src/ui/ir/conversation.rs
   description: 'Conversation + overlay IR builder. Messages, history sections, streaming tools, input area. Overlays: QuestionForm, Autocomplete, PerfOverlay (build_perf_overlay with frame budgets, CPU/Meili stats, FD count, op table). Perf builder calls PERF.snapshot() and cp_mod_search::overlay_info().'
   last_edited_ms: 0
+39d0d5f42440f142:
+  path: ui/src/components/agents/UsagePage.tsx
+  description: 'Cost & token analytics page (fleet ''Usage''). Reads mock usagePoints + USAGE_RATES. Controls: agent filter chips, 3M/6M/12M range, $/tokens unit lens. Always bucketed by calendar month, decomposed into 3 canonical sections (cache hits/misses/output) everywhere. Hero cards (total + 3 sections), forecast callout (partial month → full run-rate), CSS stacked bar chart w/ dashed forecast ghost, shadcn monthly table w/ Δ, per-agent breakdown bars. CSS-only charts.'
+  last_edited_ms: 1781534744529
 39e07c2dd8ae1401:
   path: crates/cp-mod-ocr/src/lib.rs
   description: 'OCR module. 1 tool: ocr. Datalab API integration. Non-blocking: returns immediately, fires spine notification on completion. Global, non-core.'
@@ -4446,6 +4450,10 @@ e56f8813070bbbb5:
   path: ui/src/components/conversation/Message.tsx
   description: 'Message renderer: UserMessage (right-aligned bubble), AssistantMessage (signal-badged prose + streaming caret), ToolMessage (collapsible tool card w/ params + result).'
   last_edited_ms: 1781458541346
+e589cf82e3ae867c:
+  path: ui/src/components/ui/table.tsx
+  description: shadcn-style table primitives (Table/Header/Body/Footer/Row/Head/Cell/Caption) — semantic HTML table + Tailwind, no deps. Used by UsagePage monthly breakdown.
+  last_edited_ms: 1781534744506
 e610e21de8868286:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
@@ -4706,6 +4714,10 @@ f5c068f0c1248c19:
   path: src/infra/gh_watcher.rs
   description: 'Re-export: cp_mod_github::watcher::Watcher as GhWatcher'
   last_edited_ms: 0
+f5d4d3f43b22032b:
+  path: ui/src/components/agents/FleetShell.tsx
+  description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + clickable collapse RAIL (shadcn Sidebar pattern): 20px hit zone at x=var(--sidebar-w) (x=6 collapsed), a 3px→5px highlight band that brightens to interactive on hover, plus a pill-grip handle (3 dots) that fades in on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
+  last_edited_ms: 1781534744518
 f5e668bba86256b3:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
