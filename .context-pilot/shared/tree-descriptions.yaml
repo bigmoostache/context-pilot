@@ -426,6 +426,10 @@
   path: crates/cp-mod-callback/Cargo.toml
   description: 'Callback module deps: cp-base, cp-render, cp-mod-console, crossterm, serde, serde_json, globset, sha2.'
   last_edited_ms: 0
+14943f2d479f1101:
+  path: ui/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
+  last_edited_ms: 0
 14d8aa9d69c4a452:
   path: crates/cp-mod-entities/Cargo.toml
   description: 'Entities module deps: cp-base, cp-render, cp-mod-utilities, cp-mod-search, rusqlite (bundled), crossterm, serde_json, log.'
@@ -1578,6 +1582,10 @@
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
   last_edited_ms: 1780497309373
+5187d194ad590c8e:
+  path: src/modules/pre_flight.rs
+  description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks.'
+  last_edited_ms: 0
 51f4a0f6e82fbf3d:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
@@ -2113,6 +2121,10 @@
 6fd3adfcd1ec6cc1:
   path: src/ui/search_overlay/text.rs
   description: Plain-text export of Ctrl+I overlay for clipboard copy. Includes process CPU%/RAM stats for Meilisearch.
+  last_edited_ms: 0
+702cf6546b8e9372:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, aggregate stat strip, AgentCard grid (status badge Working/Needs input/Standby + one-line task summary + branch·model·cost, Open→agent threads, Manage→modal), New-agent card. AgentModal (Apple-grade): backdrop-fade+modal-pop entrance, gradient hero header, name-as-star field with focus-within ring + live slugified realm preview (folder picker dropped — realm derived from name), rich model cards (MODEL_META: tier/blurb/price/icon, radio-check, opt-rise stagger), quiet Archive ghost, name-gated primary, autofocus+Esc+⌘↵ keyboard.'
   last_edited_ms: 0
 70c98161c74f3b8c:
   path: .github/checks/check-lint-config.sh
@@ -3598,6 +3610,10 @@ bc47c82ddfea32f9:
   path: ui/src/components/shell/RightInspector.tsx
   description: Right inspector with Stats/Threads/Spine tabs (shadcn Tabs + ScrollArea).
   last_edited_ms: 0
+bc67a1bb9c10a0a6:
+  path: ui/src/index.css
+  description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Indigo Ember'' (#2D3250 deep indigo bg / #424769 mid-indigo cards / #7077A1 periwinkle accent+dimmed labels / #F6B17A ember-orange primary+signal / #ece5da warm cream ''ink'' text; cool indigo ground + warm orange pop, gold warn + red-coral danger distinct from accent) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (modals), finder-slider.'
+  last_edited_ms: 1781525391120
 bc6c0b44ae58604e:
   path: ui/src/components/shell/StatusBar.tsx
   description: 'Bottom status bar: phase badge (READY/STREAMING/TOOLING/BLOCKED), agent/skill chips, git/queue/think, reverie/auto, cost.'

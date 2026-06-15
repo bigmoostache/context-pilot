@@ -65,8 +65,20 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
     }
     // If tool not found in definitions, skip schema check — dispatch will catch it
 
+    // While the history-cleanup trap is active, the only permitted tool is
+    // `Close_conversation_history`. The threads module's focus enforcement
+    // would otherwise reject that tool ("focus on a thread"), deadlocking the
+    // two traps against each other. Pause focus enforcement for the duration
+    // of the history-cleanup trap so it can be defused.
+    let history_trap_active = cp_mod_queue::types::QueueState::get(state).trap_active;
+
     // Phase 2: Module-specific semantic checks
     for module in all_modules() {
+        // Skip the threads module entirely while the history-cleanup trap is
+        // active — its focus pre-flight is the one that deadlocks the trap.
+        if history_trap_active && module.id() == "threads" {
+            continue;
+        }
         if active_modules.contains(module.id())
             && let Some(module_result) = module.pre_flight(tool, state)
         {

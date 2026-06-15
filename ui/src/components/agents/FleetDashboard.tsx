@@ -3,13 +3,11 @@ import {
   Archive,
   Bot,
   Check,
-  Clock,
   CornerDownLeft,
   FolderGit2,
   FolderPlus,
   Gauge,
   GitBranch,
-  MessagesSquare,
   Rocket,
   Settings2,
   Sparkles,
@@ -18,7 +16,7 @@ import {
   Zap,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { agents, threadDetails } from "@/lib/mock"
+import { agents } from "@/lib/mock"
 import { accentVar, fmtCost } from "@/lib/panelMeta"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -51,16 +49,6 @@ function slugify(name: string): string {
   return s || "untitled"
 }
 
-/** Thread tally for an agent's realm — single source of truth = threadDetails. */
-function realmStats(agentId: string) {
-  const threads = threadDetails.filter((t) => t.agentId === agentId)
-  return {
-    total: threads.length,
-    working: threads.filter((t) => t.status === "THEIR_TURN").length,
-    waiting: threads.filter((t) => t.status === "MY_TURN").length,
-  }
-}
-
 type Modal = { mode: "create" } | { mode: "manage"; agent: Agent } | null
 
 /**
@@ -77,17 +65,7 @@ export function FleetDashboard({ onOpenAgent }: { onOpenAgent: (id: string) => v
     window.setTimeout(() => setToast(null), 2200)
   }
 
-  const totals = agents.reduce(
-    (acc, a) => {
-      const s = realmStats(a.id)
-      acc.threads += s.total
-      acc.working += s.working
-      acc.waiting += s.waiting
-      acc.cost += a.costUsd
-      return acc
-    },
-    { threads: 0, working: 0, waiting: 0, cost: 0 },
-  )
+  const totalCost = agents.reduce((acc, a) => acc + a.costUsd, 0)
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -113,24 +91,6 @@ export function FleetDashboard({ onOpenAgent }: { onOpenAgent: (id: string) => v
             </button>
           </header>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Agents" value={`${agents.length}`} icon={FolderGit2} />
-            <Stat label="Threads" value={`${totals.threads}`} icon={MessagesSquare} />
-            <Stat
-              label="Working"
-              value={`${totals.working}`}
-              icon={Rocket}
-              color="var(--interactive)"
-              live={totals.working > 0}
-            />
-            <Stat
-              label="Waiting on you"
-              value={`${totals.waiting}`}
-              icon={Clock}
-              color="var(--signal)"
-            />
-          </div>
-
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
             {agents.map((a) => (
               <AgentCard
@@ -145,7 +105,7 @@ export function FleetDashboard({ onOpenAgent }: { onOpenAgent: (id: string) => v
 
           <p className="text-center text-[11px] text-muted-foreground/55">
             Design-only — agents map to real folders in the actual app. Total session cost{" "}
-            <span className="font-medium text-muted-foreground/80">{fmtCost(totals.cost)}</span>.
+            <span className="font-medium text-muted-foreground/80">{fmtCost(totalCost)}</span>.
           </p>
         </div>
       </ScrollArea>
@@ -159,43 +119,6 @@ export function FleetDashboard({ onOpenAgent }: { onOpenAgent: (id: string) => v
           {toast}
         </div>
       )}
-    </div>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  icon: Icon,
-  color,
-  live,
-}: {
-  label: string
-  value: string
-  icon: typeof FolderGit2
-  color?: string
-  live?: boolean
-}) {
-  return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-3 card-shadow">
-      <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Icon className="size-3.5" />
-        {label}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span
-          className="text-[22px] font-semibold tabular-nums leading-none"
-          style={{ color: color ?? "var(--foreground)" }}
-        >
-          {value}
-        </span>
-        {live && (
-          <span className="relative flex size-1.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--interactive)] opacity-70" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-[var(--interactive)]" />
-          </span>
-        )}
-      </span>
     </div>
   )
 }
