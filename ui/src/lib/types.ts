@@ -245,25 +245,36 @@ export interface LibraryItem {
 
 // ── Usage / cost analytics (Usage page) ──────────────────────────
 
-/** Per-agent cost + token breakdown for the Usage page. */
-export interface UsageRow {
+/** Which lens the Usage page is viewed through. */
+export type UsageUnit = "usd" | "tokens"
+
+/**
+ * One month of usage for one agent. Tokens are split into the three canonical
+ * sections the Usage page ALWAYS surfaces:
+ *  - **hit**    — cache-read tokens (cheap)
+ *  - **miss**   — input / uncached tokens
+ *  - **output** — generated tokens (expensive)
+ * Dollar figures are derived from these via {@link UsageRates}, so the token
+ * and dollar lenses stay perfectly consistent.
+ */
+export interface UsagePoint {
   agentId: string
-  agent: string
-  accent: Agent["accent"]
-  costUsd: number
-  /** input / output / cache-read tokens */
-  inputTokens: number
+  /** calendar month key, e.g. "2026-06" */
+  month: string
+  hitTokens: number
+  missTokens: number
   outputTokens: number
-  cacheTokens: number
-  messages: number
+  /** the in-progress current month (drives forecasting) */
+  partial?: boolean
+  /** fraction of the month elapsed (0–1), present when partial */
+  elapsed?: number
 }
 
-/** Whole-session usage rollup driving the Usage page. */
-export interface UsageModel {
-  rows: UsageRow[]
-  /** 14-point spend sparkline (most recent last), USD per slice */
-  spend: number[]
-  cache: { hit: number; miss: number; write: number; costUsd: number }
+/** Per-section price, in USD per token. */
+export interface UsageRates {
+  hit: number
+  miss: number
+  output: number
 }
 
 /** A full thread with its conversation log — drives the thread-centered view. */

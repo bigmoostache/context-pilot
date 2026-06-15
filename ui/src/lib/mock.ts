@@ -9,7 +9,8 @@ import type {
   Agent,
   FsNode,
   LibraryItem,
-  UsageModel,
+  UsagePoint,
+  UsageRates,
 } from "./types"
 
 // ── Mock data approximating a live Context Pilot session ──
@@ -481,15 +482,66 @@ export const library: LibraryItem[] = [
 ]
 
 // ── Usage / cost analytics (Usage page) ───────────────────────────
-
-export const usage: UsageModel = {
-  rows: [
-    { agentId: "a-cp", agent: "context-pilot", accent: "signal", costUsd: 5.41, inputTokens: 1_842_000, outputTokens: 96_400, cacheTokens: 4_180_000, messages: 62 },
-    { agentId: "a-opio", agent: "opio-rag", accent: "interactive", costUsd: 1.92, inputTokens: 612_000, outputTokens: 38_200, cacheTokens: 1_344_000, messages: 27 },
-    { agentId: "a-lean", agent: "lean-proofs", accent: "ok", costUsd: 0.34, inputTokens: 88_400, outputTokens: 9_100, cacheTokens: 210_000, messages: 11 },
-  ],
-  // 14-slice spend sparkline (USD per slice) — gentle ramp with a working spike
-  spend: [0.12, 0.18, 0.09, 0.31, 0.44, 0.27, 0.52, 0.68, 0.41, 0.83, 1.12, 0.74, 0.96, 1.21],
-  cache: { hit: 41_822, miss: 12_416, write: 4_063, costUsd: 5.41 },
+// Per-section pricing (USD per token). Cache reads are an order of magnitude
+// cheaper than input, output an order of magnitude dearer — so the token and
+// dollar lenses tell genuinely different stories (tokens dominated by cache
+// hits, dollars dominated by output).
+export const USAGE_RATES: UsageRates = {
+  hit: 0.3 / 1_000_000,
+  miss: 3 / 1_000_000,
+  output: 15 / 1_000_000,
 }
+
+/**
+ * Deterministic 12-month usage history (Jul 2025 → Jun 2026), 3 agents.
+ * A gentle upward trend + per-agent seasonal wiggle; the final month (Jun 2026)
+ * is partial (half elapsed) so the Usage page can forecast it. No randomness at
+ * module-eval time — values are stable across renders.
+ */
+function genUsage(): UsagePoint[] {
+  // 12 calendar months ending at the current (partial) month, Jun 2026.
+  const months: { key: string; idx: number }[] = []
+  let y = 2025
+  let m = 7 // July 2025
+  for (let i = 0; i < 12; i++) {
+    months.push({ key: `${y}-${String(m).padStart(2, "0")}`, idx: i })
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
+  }
+
+  // miss-token base per agent (input/uncached), with a distinct phase.
+  const seeds = [
+    { agentId: "a-cp", base: 1_650_000, phase: 0.0 },
+    { agentId: "a-opio", base: 690_000, phase: 1.7 },
+    { agentId: "a-lean", base: 168_000, phase: 3.1 },
+  ]
+
+  const out: UsagePoint[] = []
+  for (const s of seeds) {
+    for (const mo of months) {
+      const i = mo.idx
+      const trend = 1 + i * 0.058 // ~1.64× growth over the year
+      const wiggle = 1 + 0.14 * Math.sin(i * 1.25 + s.phase)
+      const partial = i === months.length - 1
+      const mtd = partial ? 0.5 : 1 // current month is half-elapsed
+      const missTokens = Math.round(s.base * trend * wiggle * mtd)
+      const hitTokens = Math.round(missTokens * (8.5 + 1.5 * Math.sin(i + s.phase)))
+      const outputTokens = Math.round(missTokens * (0.092 + 0.012 * Math.cos(i + s.phase)))
+      out.push({
+        agentId: s.agentId,
+        month: mo.key,
+        hitTokens,
+        missTokens,
+        outputTokens,
+        ...(partial ? { partial: true, elapsed: 0.5 } : {}),
+      })
+    }
+  }
+  return out
+}
+
+export const usagePoints: UsagePoint[] = genUsage()
 
