@@ -333,7 +333,12 @@ export function Finder({ agent }: { agent: Agent }) {
       />
 
       <div className="flex min-h-0 flex-1">
-        <FinderSidebar root={root} cwd={cwd} onNavigate={navigate} onOpen={open} />
+        {/* The Favorites/Locations/Tags sidebar belongs to folder browsing.
+            On a file tab the main area is a full-bleed QuickLook of one file,
+            so the explorer sidebar is irrelevant — hide it entirely. */}
+        {!active.fileNode && (
+          <FinderSidebar root={root} cwd={cwd} onNavigate={navigate} onOpen={open} />
+        )}
 
         {active.fileNode ? (
           <FinderPreview
