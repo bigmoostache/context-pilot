@@ -4,7 +4,7 @@ import { LeftRail } from "@/components/shell/LeftRail"
 import { Conversation } from "@/components/conversation/Conversation"
 import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
-import { FleetDashboard } from "@/components/agents/FleetDashboard"
+import { FleetShell } from "@/components/agents/FleetShell"
 import { Finder } from "@/components/finder/Finder"
 import { ThemeProvider } from "@/lib/theme"
 import { activeAgentId as initialAgentId, agents } from "@/lib/mock"
@@ -35,7 +35,7 @@ function App() {
         />
 
         {view === "fleet" ? (
-          <FleetDashboard onOpenAgent={openAgent} />
+          <FleetShell onOpenAgent={openAgent} />
         ) : view === "cockpit" ? (
           <div className="flex min-h-0 flex-1">
             <LeftRail />

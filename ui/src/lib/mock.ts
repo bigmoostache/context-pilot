@@ -8,6 +8,8 @@ import type {
   StatusModel,
   Agent,
   FsNode,
+  LibraryItem,
+  UsageModel,
 } from "./types"
 
 // ── Mock data approximating a live Context Pilot session ──
@@ -450,3 +452,44 @@ export const fileTree: FsNode = {
     },
   ],
 }
+
+// ── Global prompt library (Prompts page) ──────────────────────────
+// Drawn from the TUI's prompt library; presented as if it were already global
+// (the captain's intent), shared across every agent.
+
+export const library: LibraryItem[] = [
+  // agents
+  { id: "threaded-consciousness", name: "Threaded Consciousness", kind: "agent", description: "Two-surface model — private reasoning loop, polished thread replies.", meta: "active on 1 agent", active: true },
+  { id: "default", name: "Default", kind: "agent", description: "General-purpose coding assistant.", meta: "built-in", builtin: true },
+  { id: "worker", name: "Worker", kind: "agent", description: "Focused implementation & testing — heads-down execution.", meta: "built-in", builtin: true },
+  { id: "planner", name: "Planner", kind: "agent", description: "Task planning and breakdown before any code is touched.", meta: "built-in", builtin: true },
+  { id: "context-builder", name: "Context Builder", kind: "agent", description: "Explores an unfamiliar codebase and maps its structure.", meta: "built-in", builtin: true },
+  { id: "context-cleaner", name: "Context Cleaner", kind: "agent", description: "Trims and reshapes context for hygiene.", meta: "built-in", builtin: true },
+  { id: "cartographer", name: "Cartographer", kind: "agent", description: "Background agent that describes files & folders in the tree.", meta: "reverie", builtin: true },
+  { id: "pirate-coder", name: "Pirate Coder", kind: "agent", description: "A salty buccaneer who loves the sea and clean diffs.", meta: "custom" },
+
+  // skills
+  { id: "frontend", name: "frontend-design", kind: "skill", description: "Distinctive, production-grade frontend interfaces — avoids generic AI slop.", meta: "loaded", active: true },
+  { id: "egui", name: "egui", kind: "skill", description: "egui immediate-mode GUI framework knowledge & patterns.", meta: "—" },
+  { id: "brave-goggles", name: "Brave Goggles", kind: "skill", description: "Curated Brave Search goggles for domain re-ranking.", meta: "—" },
+  { id: "setup-guides", name: "Setup Guides", kind: "skill", description: "How to wire Telegram, Discord, Slack, Brave, Firecrawl, GitHub.", meta: "—" },
+
+  // commands
+  { id: "boss-hunt", name: "/boss-hunt", kind: "command", description: "Slow, methodical lint & quality sweep.", meta: "/boss-hunt" },
+  { id: "clean", name: "/clean", kind: "command", description: "Launch a reverie cleaner, then resume work in progress.", meta: "/clean" },
+  { id: "hello", name: "/hello", kind: "command", description: "A simple greeting — handy for smoke-testing.", meta: "/hello", builtin: true },
+]
+
+// ── Usage / cost analytics (Usage page) ───────────────────────────
+
+export const usage: UsageModel = {
+  rows: [
+    { agentId: "a-cp", agent: "context-pilot", accent: "signal", costUsd: 5.41, inputTokens: 1_842_000, outputTokens: 96_400, cacheTokens: 4_180_000, messages: 62 },
+    { agentId: "a-opio", agent: "opio-rag", accent: "interactive", costUsd: 1.92, inputTokens: 612_000, outputTokens: 38_200, cacheTokens: 1_344_000, messages: 27 },
+    { agentId: "a-lean", agent: "lean-proofs", accent: "ok", costUsd: 0.34, inputTokens: 88_400, outputTokens: 9_100, cacheTokens: 210_000, messages: 11 },
+  ],
+  // 14-slice spend sparkline (USD per slice) — gentle ramp with a working spike
+  spend: [0.12, 0.18, 0.09, 0.31, 0.44, 0.27, 0.52, 0.68, 0.41, 0.83, 1.12, 0.74, 0.96, 1.21],
+  cache: { hit: 41_822, miss: 12_416, write: 4_063, costUsd: 5.41 },
+}
+

@@ -223,6 +223,49 @@ export interface ThreadMsg {
   streaming?: boolean
 }
 
+// ── Global prompt library (Prompts page) ─────────────────────────
+
+/** Kind of library entry — mirrors the TUI's prompt library. */
+export type LibraryKind = "agent" | "skill" | "command"
+
+/** One entry in the global prompt library. */
+export interface LibraryItem {
+  id: string
+  /** display name */
+  name: string
+  kind: LibraryKind
+  description: string
+  /** e.g. how many agents currently use this skill, or "/cmd" for commands */
+  meta?: string
+  /** a built-in entry ships with the app and can't be deleted */
+  builtin?: boolean
+  /** currently active (agents) / loaded (skills) somewhere */
+  active?: boolean
+}
+
+// ── Usage / cost analytics (Usage page) ──────────────────────────
+
+/** Per-agent cost + token breakdown for the Usage page. */
+export interface UsageRow {
+  agentId: string
+  agent: string
+  accent: Agent["accent"]
+  costUsd: number
+  /** input / output / cache-read tokens */
+  inputTokens: number
+  outputTokens: number
+  cacheTokens: number
+  messages: number
+}
+
+/** Whole-session usage rollup driving the Usage page. */
+export interface UsageModel {
+  rows: UsageRow[]
+  /** 14-point spend sparkline (most recent last), USD per slice */
+  spend: number[]
+  cache: { hit: number; miss: number; write: number; costUsd: number }
+}
+
 /** A full thread with its conversation log — drives the thread-centered view. */
 export interface ThreadDetail {
   id: string
