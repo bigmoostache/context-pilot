@@ -329,6 +329,48 @@
   animation: ants 0.6s linear infinite;
 }
 
+/* ── modal polish ─────────────────────────────────────────────────────── */
+@keyframes backdrop-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.backdrop-fade {
+  animation: backdrop-fade 0.22s ease both;
+}
+
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.modal-pop {
+  animation: modal-pop 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* gentle per-item rise for stacked option cards */
+@keyframes opt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.opt-rise {
+  animation: opt-rise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* finder icon-size slider — slim macOS track + accent thumb */
 .finder-slider {
   -webkit-appearance: none;
