@@ -3562,6 +3562,10 @@ c192ef13584f001b:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
   last_edited_ms: 0
+c1c75b25f257919c:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block on Send, count positive. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
+  last_edited_ms: 0
 c20be1c967ed1030:
   path: crates/cp-mod-brave/src/tools.rs
   description: Brave tool dispatch with flame!("brave_search") and flame!("brave_llm_context"). Both async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER.
