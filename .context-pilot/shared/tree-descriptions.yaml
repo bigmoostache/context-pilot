@@ -682,10 +682,6 @@
   path: crates/cp-mod-chat/src/client/download.rs
   description: Tuwunel binary download. Pinned version, GitHub release download + zstd decompress. 24h failure caching via .download-failed marker to avoid wasted HTTP roundtrips on boot.
   last_edited_ms: 0
-21464531b4bef014:
-  path: ui/src/components/shell/RightInspector.tsx
-  description: Right inspector with Stats/Threads/Spine tabs (shadcn Tabs + ScrollArea).
-  last_edited_ms: 1781458541317
 215ef55c47b8eef7:
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
@@ -1730,6 +1726,10 @@
   path: ui/src/components/agents/AgentsView.tsx
   description: 'Agents launcher (mission control). 2-pane: FileBrowser | AgentDetail. Holds selected FsNode, defaults to active agent''s folder. findByPath DFS helper.'
   last_edited_ms: 1781514430693
+58d63e6da1bfd473:
+  path: ui/src/components/shell/StatsPopup.tsx
+  description: Session 'vitals' popup — the stats that used to live in the cockpit's right rail, now summoned from an Activity button in the global TopBar header. Portaled Dialog primitive (escapes vibrancy containing block). Context-budget meter + threshold tick + stat rows from mock.stats.
+  last_edited_ms: 1781526515046
 59586f088a534ae1:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
@@ -1862,6 +1862,10 @@
   path: src/ui/search_overlay/display.rs
   description: 'Display column builders for the search index overlay. Converts SearchIndexOverlay IR data into ratatui Line sequences for the two-column layout (left: server/database/index/extensions, right: splitter/embeddings/tasks/recomputed/recent). Centered bordered popup.'
   last_edited_ms: 0
+617a24dd83524e60:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. App mark (Home)→fleet. At fleet altitude ''Mission control'' caption (switcher + branch/cost hidden); inside an agent: AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + branch+cost. Far-right: Activity button (StatsPopup) + ThemeToggle + Settings gear (ConfigModal). Both modals always-mounted, controlled open.'
+  last_edited_ms: 1781526515057
 6192121729fa4dc7:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
@@ -3606,10 +3610,6 @@ bc2adb7e342ab710:
   path: run.sh
   description: Supervisor script. Builds tui + cp-console-server upfront, then loops cargo run --release with reload detection via config.json. --telemetry flag sets CP_FLAMEGRAPH=1. ulimit -n 2048. Loads .env. --resume-stream on reload.
   last_edited_ms: 0
-bc47c82ddfea32f9:
-  path: ui/src/components/shell/RightInspector.tsx
-  description: Right inspector with Stats/Threads/Spine tabs (shadcn Tabs + ScrollArea).
-  last_edited_ms: 0
 bc67a1bb9c10a0a6:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Indigo Ember'' (#2D3250 deep indigo bg / #424769 mid-indigo cards / #7077A1 periwinkle accent+dimmed labels / #F6B17A ember-orange primary+signal / #ece5da warm cream ''ink'' text; cool indigo ground + warm orange pop, gold warn + red-coral danger distinct from accent) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (modals), finder-slider.'
@@ -3778,6 +3778,10 @@ c4e9d7be47211a1c:
   path: crates/cp-mod-queue/Cargo.toml
   description: 'Queue module deps: cp-base, cp-render, crossterm, serde, serde_json.'
   last_edited_ms: 1780563847626
+c509a5f5c91dc5b3:
+  path: ui/src/App.tsx
+  description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). FleetDashboard at fleet altitude; threads/cockpit/finder per-agent. Cockpit = LeftRail + Conversation (RightInspector removed; stats now in header popup). openAgent switches agent→threads. Finder keyed by agent.id.
+  last_edited_ms: 1781526515067
 c55dd96275144452:
   path: docs/talk/style.css
   description: 'Slide deck global styles: CSS vars, transitions, dark/light slide themes, sidebar, timer'
