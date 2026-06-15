@@ -1090,6 +1090,10 @@
   path: crates/cp-mod-utilities/src/lib.rs
   description: '4 modules: hash, time, dirs, secret. Lightweight replacements for external deps.'
   last_edited_ms: 1780565428685
+371061d118586a14:
+  path: ui/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook pane with variant prop: ''pane'' (420px side rail w/ close btn) or ''full'' (flex-1 file-tab main area, file name as title, no close btn). Bespoke kind renders: code (copy btn + line numbers + keyword tint), spreadsheet (zebra + frozen header + sheet tabs), slides, PDF (page strip), image (checkerboard + zoom), audio (waveform), video (poster + scrubber), rendered markdown, json/text, folder summary. Metadata footer + Get Info.'
+  last_edited_ms: 1781529817165
 372af39ad148b1d9:
   path: .github/workflows/release.yml
   description: 'Release workflow: builds .deb on tag push (ubuntu-latest, amd64 only). Creates GitHub Release with softprops/action-gh-release.'
@@ -3322,6 +3326,10 @@ ad68ded86b688df6:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 0
+adbbf21a2f610f3e:
+  path: ui/src/components/finder/FinderChrome.tsx
+  description: Finder chrome. FinderTabs (strip + new/close; each tab shows a kind icon — folder/pdf/code/… colored by kindMeta accent; FinderTab interface carries kind:FinderKind). FinderToolbar (back/fwd, overflow breadcrumb, icon-size slider [grid], 4-mode segmented control w/ sliding indicator, search, New Folder/Upload/Download, path-bar + QuickLook toggles). FinderSidebar (Favorites via collectStarred / Locations / Tags / Recents + confined-realm note). FinderPathBar (bottom).
+  last_edited_ms: 1781529817154
 adcf8b60551469d3:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
@@ -4234,6 +4242,10 @@ defc0e3a44be05bd:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+df3094c0e46bb7c6:
+  path: ui/src/components/finder/Finder.tsx
+  description: Top-level Finder orchestrator. buildRealm(agent) memo, heterogeneous tabs (folder tabs w/ per-tab back/fwd history + file tabs showing one file via FinderPreview variant='full'); double-click file→openInNewTab (reuses tab for same path), double-click folder→navigate in place; navigating on a file tab converts it back to a folder tab. Keyboard nav (arrows/Enter/Backspace/Space QuickLook/⌘A/⌘I/type-ahead), additive+range selection, right-click ContextMenu, Get Info modal, 4 view modes, icon-size slider, path bar, drag-drop overlay, status bar, toast.
+  last_edited_ms: 1781529817142
 df40ef79b5b08750:
   path: src/ui/help/input.rs
   description: 'Question form and autocomplete popup overlays. Adapter layer: renders QuestionForm and Autocomplete IR data to ratatui widgets. No direct State access. Used by threads_view.rs for thread-embedded question forms.'
