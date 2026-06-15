@@ -14,7 +14,7 @@
   CONTEXT·PILOT — Two switchable palettes, enterprise / macOS aesthetic.
 
   LIGHT  "Cream"   #FEFCF3 · #F5EBE0 · #F0DBDB · #DBA39A   (warm, editorial)
-  DARK   "Night Gold" #222831 · #393E46 · #FFD369 · #EEEEEE (charcoal base, gold accent)
+  DARK   "Cream Noir" #1C1815 · #2B2620 · #CF8A7D · #F3EBDD (symmetric mirror of Cream)
 
   To explore other palettes, edit the two token blocks below (:root + .dark).
   Every component reads these semantic tokens — nothing is hard-coded.
@@ -101,41 +101,44 @@
   color-scheme: light;
 }
 
-/* ─── DARK · "Night Gold" ──────────────────────────────────────────────── */
-/* #222831 · #393E46 · #FFD369 · #EEEEEE — charcoal base, slate surfaces,
-   golden-yellow accent, near-white text. Crisp dark theme with a warm pop. */
+/* ─── DARK · "Cream Noir" ──────────────────────────────────────────────── */
+/* The symmetric mirror of Light "Cream": lightness is flipped while the warm
+   hue, the clay-rose primary, and the teal accent are preserved. The light
+   theme's warm cream becomes the dark foreground; the warm near-black
+   foreground becomes a deep espresso background. A true light↔dark reflection,
+   not a different palette. */
 .dark {
-  --background: #222831;
-  --surface: #2a313b; /* sidebars / chrome — between base + card */
-  --surface-2: #333b45; /* nested surface */
-  --card: #393e46;
-  --popover: #393e46;
+  --background: #1c1815; /* deep warm espresso — mirror of #fefcf3 */
+  --surface: #232019; /* sidebars / chrome — mirror of #faf6ec */
+  --surface-2: #2b2620; /* nested surface — mirror of #f5ebe0 */
+  --card: #26221c; /* raised card — mirror of #ffffff */
+  --popover: #26221c;
 
-  --foreground: #eeeeee;
-  --muted: #333b45;
-  --muted-foreground: #9aa1ab;
+  --foreground: #f3ebdd; /* warm cream — mirror of the light #3d342b */
+  --muted: #2b2620;
+  --muted-foreground: #a99a85; /* warm taupe — same hue as light #9c8d79 */
 
-  --border: #4a525d;
-  --input: #4a525d;
-  --grid: #2a313b;
+  --border: #3a332a; /* warm dark taupe — mirror of #ecdfce */
+  --input: #3a332a;
+  --grid: #272219;
 
-  --primary: #ffd369; /* golden yellow — primary actions */
-  --primary-foreground: #222831; /* dark text on yellow */
-  --accent: #ffd369;
-  --accent-foreground: #222831;
-  --ring: #ffd369;
+  --primary: #cf8a7d; /* clay rose — same hue as light #be7a6e, lifted to pop */
+  --primary-foreground: #211c18; /* espresso text on the rose */
+  --accent: #5d9aa3; /* teal — same hue as light #4e7a82, lifted */
+  --accent-foreground: #16201f;
+  --ring: #cf8a7d;
 
-  --signal: #ffd369; /* golden yellow — accent text / active */
-  --signal-dim: #b89647;
-  --interactive: #ffdf8a; /* lighter gold — links / info */
-  --ok: #6fb585;
-  --warn: #e0913f; /* orange (distinct from the yellow accent) */
-  --danger: #e06c5e;
+  --signal: #cf8a7d; /* clay rose — accent text / active */
+  --signal-dim: #8f6258;
+  --interactive: #6fb0b8; /* brighter teal — links / info */
+  --ok: #7faf86; /* lifted from light #6f9a77 */
+  --warn: #d6a25c; /* lifted from light #c2904f */
+  --danger: #d4796c; /* lifted from light #c0685c */
 
-  --shadow-color: 215deg 18% 4%;
-  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.5),
-    0 4px 14px hsl(var(--shadow-color) / 0.4);
-  --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 0.58);
+  --shadow-color: 28deg 24% 3%;
+  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.55),
+    0 4px 14px hsl(var(--shadow-color) / 0.45);
+  --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 0.6);
 
   color-scheme: dark;
 }
