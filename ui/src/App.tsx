@@ -43,7 +43,7 @@ function App() {
           <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} />
         )}
 
-        <StatusBar />
+        <StatusBar fleet={view === "fleet"} />
       </div>
     </ThemeProvider>
   )
