@@ -1,8 +1,10 @@
-import { GitBranch, LayoutGrid, MessagesSquare, FolderTree, Home } from "lucide-react"
+import { useState } from "react"
+import { GitBranch, LayoutGrid, MessagesSquare, FolderTree, Home, Settings } from "lucide-react"
 import { status, agents } from "@/lib/mock"
 import { fmtCost } from "@/lib/panelMeta"
 import { ThemeToggle } from "./ThemeToggle"
 import { AgentSwitcher } from "./AgentSwitcher"
+import { ConfigModal } from "./ConfigModal"
 import type { ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -18,6 +20,7 @@ interface TopBarProps {
 export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: TopBarProps) {
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
   const inFleet = view === "fleet"
+  const [configOpen, setConfigOpen] = useState(false)
 
   return (
     <header className="vibrancy flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
@@ -34,13 +37,22 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
         <span className="text-[13px] font-semibold tracking-tight">Context Pilot</span>
       </button>
 
-      {/* workspace switcher — pick which agent (folder) you're working in */}
-      <span className="ml-1 text-muted-foreground/40">/</span>
-      <AgentSwitcher
-        activeId={activeAgentId}
-        onSwitch={onSwitchAgent}
-        onFleet={() => onViewChange("fleet")}
-      />
+      {/* In the fleet (dashboard) no agent is selected — show a neutral
+          mission-control caption. Inside an agent, show the workspace switcher. */}
+      {inFleet ? (
+        <span className="ml-1 hidden text-[12.5px] font-medium text-muted-foreground sm:inline">
+          Mission control
+        </span>
+      ) : (
+        <>
+          <span className="ml-1 text-muted-foreground/40">/</span>
+          <AgentSwitcher
+            activeId={activeAgentId}
+            onSwitch={onSwitchAgent}
+            onFleet={() => onViewChange("fleet")}
+          />
+        </>
+      )}
 
       {/* per-agent view switcher (hidden at fleet altitude) */}
       {!inFleet && (
@@ -67,15 +79,31 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
       )}
 
       <div className="ml-auto flex items-center gap-3">
-        <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px] card-shadow">
-          <GitBranch className="size-3.5 text-muted-foreground" />
-          <span className="text-foreground/90">{activeAgent?.branch ?? status.branch}</span>
-        </div>
-        <span className="text-[12px] tabular-nums text-muted-foreground">
-          {fmtCost(activeAgent?.costUsd ?? status.costUsd)}
-        </span>
+        {/* branch + cost are agent-scoped — only meaningful inside an agent */}
+        {!inFleet && (
+          <>
+            <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px] card-shadow">
+              <GitBranch className="size-3.5 text-muted-foreground" />
+              <span className="text-foreground/90">{activeAgent?.branch ?? status.branch}</span>
+            </div>
+            <span className="text-[12px] tabular-nums text-muted-foreground">
+              {fmtCost(activeAgent?.costUsd ?? status.costUsd)}
+            </span>
+          </>
+        )}
         <ThemeToggle />
+        <span className="h-5 w-px bg-border/70" />
+        <button
+          onClick={() => setConfigOpen(true)}
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
+          title="Settings"
+          aria-label="Open settings"
+        >
+          <Settings className="size-[17px]" />
+        </button>
       </div>
+
+      {configOpen && <ConfigModal onClose={() => setConfigOpen(false)} />}
     </header>
   )
 }
