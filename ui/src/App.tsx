@@ -44,10 +44,7 @@ function App() {
         ) : view === "finder" ? (
           <Finder key={activeAgent.id} agent={activeAgent} />
         ) : (
-          <ThreadsView
-            activeAgentId={activeAgentId}
-            onOpenCockpit={() => setView("cockpit")}
-          />
+          <ThreadsView activeAgentId={activeAgentId} />
         )}
 
         <StatusBar />

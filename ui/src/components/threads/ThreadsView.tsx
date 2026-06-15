@@ -17,10 +17,8 @@ import { threadDetails, agents } from "@/lib/mock"
  */
 export function ThreadsView({
   activeAgentId,
-  onOpenCockpit,
 }: {
   activeAgentId: string
-  onOpenCockpit: () => void
 }) {
   const agent = agents.find((a) => a.id === activeAgentId)
   const realmThreads = threadDetails.filter((t) => t.agentId === activeAgentId)
@@ -55,7 +53,7 @@ export function ThreadsView({
           <PanelLeft className="size-4" />
         </Button>
       )}
-      {thread && <ThreadConversation thread={thread} onOpenCockpit={onOpenCockpit} />}
+      {thread && <ThreadConversation thread={thread} />}
     </div>
   )
 }
