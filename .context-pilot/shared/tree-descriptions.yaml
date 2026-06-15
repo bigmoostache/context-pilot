@@ -1186,6 +1186,10 @@
   path: yamls/tools/firecrawl.yaml
   description: 'Firecrawl tools YAML. 4 tools: firecrawl_scrape (single URL), firecrawl_search (search+scrape), firecrawl_map (URL discovery), firecrawl_crawl (recursive crawl to file).'
   last_edited_ms: 1780560886866
+3ad80d8a6387a180:
+  path: ui/src/components/shell/LeftRail.tsx
+  description: Cockpit context navigator (w-240, unified with threads/finder rails). Context-budget meter + scrollable panel list (icon+name+tokens). Dense per-panel telemetry omitted for calm enterprise feel.
+  last_edited_ms: 1781531986900
 3b6333a154f242aa:
   path: src/state/persistence/save.rs
   description: 'Save operations: flame!("save_batch") + flame!("save_state"). build_save_batch() serializes config/worker/panels/messages/logs into WriteBatch. save_state() blocking sync persist. check_ownership(). log_error() to disk.'
@@ -1346,6 +1350,10 @@
   path: CODE_OF_CONDUCT.md
   description: Code of conduct
   last_edited_ms: 0
+432cbe29efdf52c7:
+  path: ui/src/components/threads/ThreadsView.tsx
+  description: Threads view assembler, scoped to ACTIVE AGENT's realm (filters threadDetails by agentId, EmptyRealm when none). 2-pane (collapsible ThreadList | ThreadConversation). Owns collapsed state; floating PanelLeft Button re-opens the rail when collapsed. onOpenCockpit bridges to panel view.
+  last_edited_ms: 1781531986889
 43532538c41614da:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
@@ -3662,6 +3670,10 @@ bc2adb7e342ab710:
   path: run.sh
   description: Supervisor script. Builds tui + cp-console-server upfront, then loops cargo run --release with reload detection via config.json. --telemetry flag sets CP_FLAMEGRAPH=1. ulimit -n 2048. Loads .env. --resume-stream on reload.
   last_edited_ms: 0
+bc5d0e87b26ec54a:
+  path: ui/src/components/threads/ThreadList.tsx
+  description: 'Left rail of threads view (collapsible). NO agent identity header (lives in TopBar). Slim top bar: thread count + ''N working'' parallel pill + PanelLeftClose collapse trigger. collapsed prop animates aside width 240→0 (fixed-width inner shell prevents reflow). Grouped ''Needs you''=MY_TURN / ''Working in parallel''=THEIR_TURN rows (status dot, name, preview, time, unread). New Thread + search. SIDEBAR_W=240 shared with cockpit/finder rails.'
+  last_edited_ms: 1781531986877
 bc67a1bb9c10a0a6:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Indigo Ember'' (#2D3250 deep indigo bg / #424769 mid-indigo cards / #7077A1 periwinkle accent+dimmed labels / #F6B17A ember-orange primary+signal / #ece5da warm cream ''ink'' text; cool indigo ground + warm orange pop, gold warn + red-coral danger distinct from accent) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (modals), finder-slider.'
