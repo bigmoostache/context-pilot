@@ -3102,6 +3102,10 @@
   path: yamls/ui.yaml
   description: 'UI configuration: sidebar layout, status bar, keybindings'
   last_edited_ms: 0
+9c6a00685c9b3d49:
+  path: ui/src/components/finder/Finder.tsx
+  description: Top-level Finder orchestrator. buildRealm(agent) memo, heterogeneous tabs (folder tabs w/ per-tab back/fwd history + file tabs showing one file via FinderPreview variant='full'); double-click file→openInNewTab (reuses tab for same path), double-click folder→navigate; navigating on a file tab converts it back to folder tab. On a FILE tab the explorer sidebar (FinderSidebar Favorites/Locations/Tags) is HIDDEN — the main area is a full-bleed QuickLook; sidebar only shows on folder tabs. Passes fileActive + file-action handlers (Get Info/Download/Share) to FinderToolbar. Keyboard nav (arrows/Enter/Backspace/Space QuickLook/⌘A/⌘I/type-ahead), additive+range selection, right-click ContextMenu, Get Info modal, 4 view modes, icon-size slider, path bar, drag-drop overlay, status bar, toast.
+  last_edited_ms: 1781543933869
 9caf48a9c4dab0f9:
   path: ui/src/components/shell/TopBar.tsx
   description: macOS title bar. App mark (Home)→fleet. AgentSwitcher dropdown. Per-agent segmented switcher Threads·Cockpit·Finder (hidden at fleet). Branch+cost from active agent. ThemeToggle.
