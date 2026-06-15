@@ -1,17 +1,21 @@
-import { GitBranch, LayoutGrid, MessagesSquare } from "lucide-react"
-import { PROJECT, status } from "@/lib/mock"
+import { GitBranch, LayoutGrid, MessagesSquare, FolderTree } from "lucide-react"
+import { PROJECT, status, agents } from "@/lib/mock"
 import { fmtCost } from "@/lib/panelMeta"
 import { ThemeToggle } from "./ThemeToggle"
+import { AgentSwitcher } from "./AgentSwitcher"
 import type { ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface TopBarProps {
   view: ViewMode
   onViewChange: (v: ViewMode) => void
+  activeAgentId: string
+  onSwitchAgent: (id: string) => void
 }
 
-/** Slim macOS-style title bar — app mark, view switcher, branch, cost, theme. */
-export function TopBar({ view, onViewChange }: TopBarProps) {
+/** Slim macOS-style title bar — app mark, workspace switcher, view tabs, branch, cost, theme. */
+export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: TopBarProps) {
+  const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
   return (
     <header className="vibrancy flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
       {/* macOS traffic lights — purely decorative, sets the desktop-app tone */}
@@ -27,8 +31,22 @@ export function TopBar({ view, onViewChange }: TopBarProps) {
         </span>
       </div>
 
+      {/* workspace switcher — pick which agent (folder) you're working in */}
+      <span className="ml-1 text-muted-foreground/40">/</span>
+      <AgentSwitcher
+        activeId={activeAgentId}
+        onSwitch={onSwitchAgent}
+        onManage={() => onViewChange("agents")}
+      />
+
       {/* segmented view switcher */}
       <div className="ml-2 flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
+        <ViewTab
+          active={view === "agents"}
+          onClick={() => onViewChange("agents")}
+          icon={FolderTree}
+          label="Agents"
+        />
         <ViewTab
           active={view === "threads"}
           onClick={() => onViewChange("threads")}
@@ -48,10 +66,10 @@ export function TopBar({ view, onViewChange }: TopBarProps) {
       <div className="ml-auto flex items-center gap-3">
         <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px] card-shadow">
           <GitBranch className="size-3.5 text-muted-foreground" />
-          <span className="text-foreground/90">{status.branch}</span>
+          <span className="text-foreground/90">{activeAgent?.branch ?? status.branch}</span>
         </div>
         <span className="text-[12px] tabular-nums text-muted-foreground">
-          {fmtCost(status.costUsd)}
+          {fmtCost(activeAgent?.costUsd ?? status.costUsd)}
         </span>
         <ThemeToggle />
       </div>

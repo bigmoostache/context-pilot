@@ -93,9 +93,41 @@ export interface StatusModel {
   costUsd: number
 }
 
+// ── Agents / workspaces (1 agent = 1 folder) ──────────────────────
+
+export type AgentStatus = "working" | "needs-you" | "idle"
+
+/** An agent IS a workspace folder. Switching agents = switching folders. */
+export interface Agent {
+  id: string
+  /** display label */
+  name: string
+  /** absolute folder path the agent lives in */
+  folder: string
+  branch: string
+  model: string
+  status: AgentStatus
+  costUsd: number
+  /** number of open threads on this agent */
+  threads: number
+  lastActivity: string
+  /** accent color token for the agent's dot/avatar */
+  accent: "signal" | "interactive" | "ok" | "warn" | "danger"
+}
+
+/** A node in the (mock) filesystem browser. */
+export interface FsNode {
+  name: string
+  path: string
+  kind: "dir" | "file"
+  /** when this dir hosts an agent, its id (lets us badge it) */
+  agentId?: string
+  children?: FsNode[]
+}
+
 // ── Thread-centered view ──────────────────────────────────────────
 
-export type ViewMode = "cockpit" | "threads"
+export type ViewMode = "agents" | "cockpit" | "threads"
 
 /** A single embedded question form inside a thread message (CP signature). */
 export interface ThreadQuestion {

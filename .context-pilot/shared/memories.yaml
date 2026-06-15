@@ -487,30 +487,37 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS/Vite/Tailwind/shadcn, mock data. Enterprise/macOS look, two switchable palettes (Cream light + Sea dark) + theme toggle. Two views (cockpit + thread-chat). Dev: cd ui && pnpm run dev (:5173).'
+  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS/Vite/Tailwind/shadcn, mock data. Enterprise/macOS look, theme toggle. Two views (cockpit + thread-chat). Dev: cd ui && pnpm run dev (:5173).'
   contents: |-
     ## Context Pilot Frontend Maquette
 
-    Design-only reimagining of the TUI as a GUI. Branch 'maquette', pushed (095487d, 44 files).
+    Design-only reimagining of the TUI as a GUI. Branch 'maquette'.
 
     **Stack**: Vite 8 + React 19 + TS 6 + Tailwind v4 (@tailwindcss/vite) + shadcn (base-ui). Mock data only, NO backend.
 
-    **Aesthetic 'Phosphor Cockpit'**: flight-instrument-at-night. Warm near-black base, amber phosphor signal (primary), cyan interactive accent, instrument red/green. IBM Plex Mono everywhere + Plex Sans prose. 1px hairline borders, tight radii, grain+scanline atmosphere, phosphor glow on active. Theme in src/index.css.
+    **Palettes (switchable, source of truth = src/index.css :root/.dark token blocks)**:
+    - LIGHT 'Cream': #FEFCF3 / #F5EBE0 / #F0DBDB / #DBA39A (warm; clay-rose primary + teal accent)
+    - DARK 'Space': #222831 / #393E46 / #00ADB5 / #EEEEEE (deep blue-grey base, grey cards, teal #00ADB5 primary/accent, near-white text). Swap the 4 hexes in either block to re-skin everything.
 
-    **Layout**: TopBar (mark/breadcrumb/branch/cost) | LeftRail (token-budget meter + panel navigator w/ per-panel token bars+freeze/miss + cache economics) + center Conversation (user/assistant/tool messages + streaming caret + input bar) + RightInspector (Stats/Threads/Spine tabs) | StatusBar (phase badge, agent/skills/git/queue/think/reverie/cost).
+    **Aesthetic**: enterprise/macOS — SF Pro chrome, IBM Plex Mono for data/numbers only. Traffic-light dots, vibrancy bars, soft shadows (no glow), hairline borders. Sun/Moon ThemeToggle top-right, localStorage 'cp-theme'.
 
-    **Files**: lib/{types,mock,panelMeta,inline}, components/panels/TokenBar, components/shell/{TopBar,LeftRail,RightInspector,StatusBar}, components/conversation/{Conversation,Message,InputBar}, App.tsx.
+    **THREE views (ViewMode = agents|threads|cockpit, default 'agents'), switched via TopBar segmented control**:
+    1. AGENTS launcher (NEW) — multi-agent/workspace mgmt, 1 agent = 1 folder. FileBrowser (navigable fs tree, agent-hosting folders badged) | AgentDetail (agent folder->dashboard+Open; plain folder->Initialize-agent form name+model; file->empty). AgentSwitcher dropdown in TopBar for fast switching. components/agents/{AgentsView,FileBrowser,AgentDetail}.tsx + shell/AgentSwitcher.tsx. Mock: agents[3] (context-pilot/opio-rag/lean-proofs), fileTree, activeAgentId.
+    2. THREADS (classic 3-pane chat) = ThreadList | ThreadConversation | ThreadDetailRail, turn-aware composer, embedded QuestionForm.
+    3. COCKPIT (panel-centered single agent) = LeftRail (panel nav + budget) + Conversation + RightInspector (Stats/Threads/Spine).
 
-    **Build**: `cd ui && pnpm run build` (tsc -b && vite build) — green. Dev server localhost:5173.
+    StatusBar (phase · agent · cost) always shown. TopBar branch+cost reflect active agent.
 
-    **Gotchas hit**: TS7 rejects baseUrl (use paths only, vite alias handles runtime); noUnusedLocals trips on shadcn scroll-area React import + stray vars.
+    **Build**: cd ui && pnpm exec tsc -b (green). Dev: pnpm run dev :5173, HMR live.
+
+    **Gotchas**: TS7 rejects baseUrl (paths only, vite alias handles runtime); noUnusedLocals trips on unused imports.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781460358103
+  last_edited_ms: 1781514459192
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-
