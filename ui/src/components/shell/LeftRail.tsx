@@ -15,7 +15,7 @@ export function LeftRail() {
   const usedRatio = tokenBudget.used / tokenBudget.budget
 
   return (
-    <aside className="rise flex w-[272px] shrink-0 flex-col border-r border-border bg-surface">
+    <aside className="rise flex w-[240px] shrink-0 flex-col border-r border-border bg-surface">
       {/* budget meter */}
       <div className="px-4 pb-3 pt-4">
         <div className="mb-2 flex items-baseline justify-between">

@@ -1,7 +1,8 @@
 import { useState } from "react"
-import { FolderGit2 } from "lucide-react"
+import { FolderGit2, PanelLeft } from "lucide-react"
 import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
+import { Button } from "@/components/ui/button"
 import { threadDetails, agents } from "@/lib/mock"
 
 /**
@@ -25,6 +26,7 @@ export function ThreadsView({
   const realmThreads = threadDetails.filter((t) => t.agentId === activeAgentId)
 
   const [selectedId, setSelectedId] = useState(realmThreads[0]?.id ?? "")
+  const [collapsed, setCollapsed] = useState(false)
   // Keep selection valid when the active agent (realm) changes.
   const thread =
     realmThreads.find((t) => t.id === selectedId) ?? realmThreads[0]
@@ -34,13 +36,25 @@ export function ThreadsView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1">
+    <div className="relative flex min-h-0 flex-1">
       <ThreadList
-        agent={agent}
         threads={realmThreads}
         selectedId={thread?.id ?? ""}
         onSelect={setSelectedId}
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed((v) => !v)}
       />
+      {collapsed && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setCollapsed(false)}
+          title="Show threads"
+          className="absolute left-2 top-2 z-10 border border-border bg-card text-muted-foreground card-shadow"
+        >
+          <PanelLeft className="size-4" />
+        </Button>
+      )}
       {thread && <ThreadConversation thread={thread} onOpenCockpit={onOpenCockpit} />}
     </div>
   )
