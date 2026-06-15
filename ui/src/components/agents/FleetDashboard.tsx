@@ -7,7 +7,6 @@ import {
   FolderGit2,
   FolderPlus,
   Gauge,
-  GitBranch,
   Rocket,
   Settings2,
   Sparkles,
@@ -165,10 +164,6 @@ function AgentCard({
       </p>
 
       <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <GitBranch className="size-3.5" />
-          {agent.branch}
-        </span>
         <span className="inline-flex items-center gap-1">
           <Bot className="size-3.5" />
           {agent.model}

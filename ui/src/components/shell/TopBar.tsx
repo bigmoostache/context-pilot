@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Activity, GitBranch, LayoutGrid, MessagesSquare, FolderTree, Home, Settings } from "lucide-react"
+import { Activity, LayoutGrid, MessagesSquare, FolderTree, Home, Settings } from "lucide-react"
 import { status, agents } from "@/lib/mock"
 import { fmtCost } from "@/lib/panelMeta"
 import { ThemeToggle } from "./ThemeToggle"
@@ -81,17 +81,11 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent }: Top
       )}
 
       <div className="ml-auto flex items-center gap-3">
-        {/* branch + cost are agent-scoped — only meaningful inside an agent */}
+        {/* cost is agent-scoped — only meaningful inside an agent */}
         {!inFleet && (
-          <>
-            <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px] card-shadow">
-              <GitBranch className="size-3.5 text-muted-foreground" />
-              <span className="text-foreground/90">{activeAgent?.branch ?? status.branch}</span>
-            </div>
-            <span className="text-[12px] tabular-nums text-muted-foreground">
-              {fmtCost(activeAgent?.costUsd ?? status.costUsd)}
-            </span>
-          </>
+          <span className="text-[12px] tabular-nums text-muted-foreground">
+            {fmtCost(activeAgent?.costUsd ?? status.costUsd)}
+          </span>
         )}
         <button
           onClick={() => setStatsOpen(true)}
