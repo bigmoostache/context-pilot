@@ -14,7 +14,7 @@
   CONTEXT·PILOT — Two switchable palettes, enterprise / macOS aesthetic.
 
   LIGHT  "Cream"   #FEFCF3 · #F5EBE0 · #F0DBDB · #DBA39A   (warm, editorial)
-  DARK   "Cream Noir" #1C1815 · #2B2620 · #CF8A7D · #F3EBDD (symmetric mirror of Cream)
+  DARK   "Nordic Tide" #213448 · #547792 · #94B4C1 · #EAE0CF (cool navy + warm beige ink)
 
   To explore other palettes, edit the two token blocks below (:root + .dark).
   Every component reads these semantic tokens — nothing is hard-coded.
@@ -101,41 +101,40 @@
   color-scheme: light;
 }
 
-/* ─── DARK · "Cream Noir" ──────────────────────────────────────────────── */
-/* The symmetric mirror of Light "Cream": lightness is flipped while the warm
-   hue, the clay-rose primary, and the teal accent are preserved. The light
-   theme's warm cream becomes the dark foreground; the warm near-black
-   foreground becomes a deep espresso background. A true light↔dark reflection,
-   not a different palette. */
+/* ─── DARK · "Nordic Tide" ─────────────────────────────────────────────── */
+/* A cool, vintage-maritime palette: deep navy ground, steel-blue chrome, a
+   seafoam signal, and a warm beige "ink" for text. The elegant tension is
+   cool ground + warm ink — navy surfaces typeset in cream-beige.
+   Source quartet: #213448 · #547792 · #94B4C1 · #EAE0CF. */
 .dark {
-  --background: #1c1815; /* deep warm espresso — mirror of #fefcf3 */
-  --surface: #232019; /* sidebars / chrome — mirror of #faf6ec */
-  --surface-2: #2b2620; /* nested surface — mirror of #f5ebe0 */
-  --card: #26221c; /* raised card — mirror of #ffffff */
-  --popover: #26221c;
+  --background: #213448; /* deep navy — app background */
+  --surface: #263c52; /* sidebars / chrome — lifted navy */
+  --surface-2: #2c4459; /* nested surface */
+  --card: #294560; /* raised card */
+  --popover: #294560;
 
-  --foreground: #f3ebdd; /* warm cream — mirror of the light #3d342b */
-  --muted: #2b2620;
-  --muted-foreground: #a99a85; /* warm taupe — same hue as light #9c8d79 */
+  --foreground: #eae0cf; /* warm beige cream — the "ink" */
+  --muted: #2c4459;
+  --muted-foreground: #94b4c1; /* seafoam — dimmed labels read cool-grey */
 
-  --border: #3a332a; /* warm dark taupe — mirror of #ecdfce */
-  --input: #3a332a;
-  --grid: #272219;
+  --border: #395874; /* steel-navy — derived between bg and #547792 */
+  --input: #395874;
+  --grid: #294056;
 
-  --primary: #cf8a7d; /* clay rose — same hue as light #be7a6e, lifted to pop */
-  --primary-foreground: #211c18; /* espresso text on the rose */
-  --accent: #5d9aa3; /* teal — same hue as light #4e7a82, lifted */
-  --accent-foreground: #16201f;
-  --ring: #cf8a7d;
+  --primary: #94b4c1; /* seafoam — primary actions / your-turn */
+  --primary-foreground: #1b2c3c; /* deep navy text on the seafoam */
+  --accent: #547792; /* steel blue — secondary accent */
+  --accent-foreground: #eae0cf;
+  --ring: #94b4c1;
 
-  --signal: #cf8a7d; /* clay rose — accent text / active */
-  --signal-dim: #8f6258;
-  --interactive: #6fb0b8; /* brighter teal — links / info */
-  --ok: #7faf86; /* lifted from light #6f9a77 */
-  --warn: #d6a25c; /* lifted from light #c2904f */
-  --danger: #d4796c; /* lifted from light #c0685c */
+  --signal: #94b4c1; /* seafoam — accent text / active */
+  --signal-dim: #5d7d8c;
+  --interactive: #a9c6d1; /* brighter seafoam — links / info */
+  --ok: #8bbf9a; /* cool-leaning green to sit in the palette */
+  --warn: #e0b074; /* warm sand — pops against the cool ground */
+  --danger: #d98777; /* warm coral — clear alarm on navy */
 
-  --shadow-color: 28deg 24% 3%;
+  --shadow-color: 210deg 38% 4%;
   --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.55),
     0 4px 14px hsl(var(--shadow-color) / 0.45);
   --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 0.6);
