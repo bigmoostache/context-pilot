@@ -66,6 +66,10 @@
 
 /* ─── LIGHT · "Cream" ──────────────────────────────────────────────────── */
 :root {
+  /* Single source of truth for every primary sidebar / rail width.
+     All top-level sidebars (fleet, threads, cockpit, finder) read this. */
+  --sidebar-w: 240px;
+
   --background: #fefcf3;
   --surface: #faf6ec; /* sidebars / chrome */
   --surface-2: #f5ebe0; /* nested surface */

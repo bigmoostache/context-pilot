@@ -16,9 +16,6 @@ const NAV: {
   { id: "settings", label: "Settings", icon: Settings2, hint: "Providers & config" },
 ]
 
-/** Fixed inner width so content doesn't reflow while the rail collapses. */
-const SIDEBAR_W = 212
-
 /**
  * Mission-control sidebar — the navigation rail shown when no agent is focused.
  * Selects between the dashboard's four pages (Agents / Prompts / Usage /
@@ -43,12 +40,12 @@ export function FleetSidebar({
     <aside
       className={cn(
         "flex shrink-0 flex-col overflow-hidden bg-surface transition-[width] duration-200 ease-in-out",
-        collapsed ? "w-0 border-r-0" : "w-[212px] border-r border-border",
+        collapsed ? "w-0 border-r-0" : "w-[var(--sidebar-w)] border-r border-border",
       )}
     >
       <div
         className="flex h-full flex-col"
-        style={{ width: SIDEBAR_W, minWidth: SIDEBAR_W }}
+        style={{ width: "var(--sidebar-w)", minWidth: "var(--sidebar-w)" }}
       >
         {/* nav */}
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 px-2.5 pb-1 pt-4">

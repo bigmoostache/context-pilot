@@ -20,11 +20,9 @@ interface ThreadListProps {
  * here: it already lives in the TopBar. The rail is collapsible — it animates
  * to zero width, and a floating trigger in {@link ThreadsView} re-opens it.
  *
- * Its width (`SIDEBAR_W` = 240px) is shared with the cockpit and Finder rails
- * so the three views line up consistently.
+ * Its width is the shared `--sidebar-w` CSS variable, so it lines up exactly
+ * with the cockpit, Finder and fleet rails.
  */
-const SIDEBAR_W = 240
-
 export function ThreadList({
   threads,
   selectedId,
@@ -41,13 +39,13 @@ export function ThreadList({
     <aside
       className={cn(
         "flex shrink-0 flex-col overflow-hidden bg-surface transition-[width] duration-200 ease-in-out",
-        collapsed ? "w-0 border-r-0" : "w-[240px] border-r border-border",
+        collapsed ? "w-0 border-r-0" : "w-[var(--sidebar-w)] border-r border-border",
       )}
     >
       {/* fixed-width inner shell so content doesn't reflow while collapsing */}
       <div
         className="flex h-full flex-col"
-        style={{ width: SIDEBAR_W, minWidth: SIDEBAR_W }}
+        style={{ width: "var(--sidebar-w)", minWidth: "var(--sidebar-w)" }}
       >
         {/* top bar — thread count, parallelism, collapse */}
         <div className="flex items-center gap-2 px-3 pb-2.5 pt-3">

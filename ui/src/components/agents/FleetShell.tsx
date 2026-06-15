@@ -5,9 +5,6 @@ import { PromptsPage } from "./PromptsPage"
 import { UsagePage } from "./UsagePage"
 import { ConfigPanel } from "@/components/shell/ConfigPanel"
 
-/** Sidebar width — kept in sync with FleetSidebar's SIDEBAR_W so the rail lands on the border. */
-const SIDEBAR_W = 212
-
 /**
  * Fleet shell — the mission-control workspace shown when no agent is focused.
  * A persistent {@link FleetSidebar} on the left navigates the four sections;
@@ -35,7 +32,7 @@ export function FleetShell({ onOpenAgent }: { onOpenAgent: (id: string) => void 
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         className="group absolute inset-y-0 z-20 w-3 -translate-x-1/2 cursor-pointer transition-[left] duration-200 ease-in-out"
-        style={{ left: collapsed ? 0 : SIDEBAR_W }}
+        style={{ left: collapsed ? 0 : "var(--sidebar-w)" }}
       >
         <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-[var(--interactive)]/70 group-active:bg-[var(--interactive)]" />
       </button>

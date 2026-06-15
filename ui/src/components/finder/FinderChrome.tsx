@@ -349,7 +349,7 @@ export function FinderSidebar({
   const starred = collectStarred(root)
 
   return (
-    <aside className="flex w-[240px] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-border bg-surface px-2.5 py-3">
+    <aside className="flex w-[var(--sidebar-w)] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-border bg-surface px-2.5 py-3">
       {starred.length > 0 && (
         <Group label="Favorites">
           {starred.map((n) => {
