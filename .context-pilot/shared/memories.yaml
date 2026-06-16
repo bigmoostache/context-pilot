@@ -110,7 +110,7 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting''. 30 phases X768-X797. Phases 1-25 done & green. cp-oplog testing COMPLETE (56). Next: Phase 26 (X793 bridge tee/intake/body) through 30, then capstone Phase 20 (X787).'
+  tl_dr: 'Orchestration backend, branch ''demaquetting''. 30 phases X768-X797. Phases 1-26 done & green. cp-oplog testing COMPLETE (56). cp-mod-bridge COMPLETE (48). Next: Phase 27 (X794 backend registry/channel) through 30, then capstone Phase 20 (X787).'
   contents: |-
     ## Orchestration backend — branch 'demaquetting' (30 phases X768-X797)
 
@@ -152,7 +152,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781649021703
+  last_edited_ms: 1781649667066
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
@@ -160,6 +160,20 @@
   - documentation
   - style
   last_edited_ms: 0
+bc38d2fd0bcf015a:
+  tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
+  contents: |-
+    Phase 26 bug: two cp-mod-bridge integration tests hung >60s. Root cause: Intake::handle_connection reads the socket until EOF; the test writer called client.shutdown(Shutdown::Write) expecting the server's read to return 0, but shutdown(Write) on a UnixStream::pair() (socketpair) end does NOT reliably propagate EOF to the peer. Server blocked forever.
+
+    FIX: replace drain-until-EOF with read_acks(stream, expected: usize) that reads EXACTLY the expected count of framed acks, then the writer thread ends and drop(client) closes the fd → peer gets a real EOF → handle_connection returns. This mirrors the proven inline handle_connection test. RULE: never rely on shutdown(Write)→peer-EOF for socketpairs; close/drop the whole stream instead.
+  importance: high
+  labels:
+  - rust
+  - unix-socket
+  - testing
+  - gotcha
+  - bridge
+  last_edited_ms: 1781649648561
 ceac945d9376fcf2:
   tl_dr: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
   contents: |-
