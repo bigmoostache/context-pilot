@@ -1,8 +1,8 @@
 //! The oplog error type and its `Result` alias.
 //!
 //! Every fallible oplog operation — opening, appending, syncing, replaying,
-//! compacting — surfaces an [`OplogError`]. It distinguishes a filesystem
-//! failure ([`OplogError::Io`]) from a framing failure ([`OplogError::Frame`],
+//! compacting — surfaces an [`Error`]. It distinguishes a filesystem
+//! failure ([`Error::Io`]) from a framing failure ([`Error::Frame`],
 //! a [`cp_wire::framing::FrameError`]); a caller almost always treats both as
 //! fatal-to-the-write, but keeping them separate lets a diagnostic tell a
 //! genuine I/O fault from a serialisation/size bug apart.
@@ -19,7 +19,7 @@ use cp_wire::framing::FrameError;
 
 /// An error from oplog operations.
 #[derive(Debug)]
-pub enum OplogError {
+pub enum Error {
     /// An underlying filesystem operation failed (open, write, sync, …).
     Io(io::Error),
 
@@ -28,7 +28,7 @@ pub enum OplogError {
     Frame(FrameError),
 }
 
-impl fmt::Display for OplogError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Io(e) => write!(f, "oplog I/O error: {e}"),
@@ -37,17 +37,17 @@ impl fmt::Display for OplogError {
     }
 }
 
-impl From<io::Error> for OplogError {
+impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
         Self::Io(e)
     }
 }
 
-impl From<FrameError> for OplogError {
+impl From<FrameError> for Error {
     fn from(e: FrameError) -> Self {
         Self::Frame(e)
     }
 }
 
-/// A `Result` whose error is an [`OplogError`].
-pub type OplogResult<T> = Result<T, OplogError>;
+/// A `Result` whose error is an [`Error`].
+pub type OplogResult<T> = Result<T, Error>;

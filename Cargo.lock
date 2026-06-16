@@ -253,9 +253,12 @@ name = "cp-mod-bridge"
 version = "0.1.0"
 dependencies = [
  "cp-base",
+ "cp-oplog",
  "cp-render",
  "cp-wire",
+ "nix 0.30.1",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

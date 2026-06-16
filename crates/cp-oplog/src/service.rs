@@ -25,14 +25,14 @@
 //!   replay reconstructs the latest phase, and the live stream already carried
 //!   the hint (design doc I10/K6). A dropped cost sample is re-aggregated later.
 //!
-//! [`OplogService`] implements exactly this asymmetry: [`append_durable`] blocks
+//! [`Service`] implements exactly this asymmetry: [`append_durable`] blocks
 //! on a bounded channel and returns the durable `rev`; [`append_best_effort`]
 //! is fire-and-forget and reports [`BestEffortOutcome::Dropped`] when the queue
 //! is full. [`Durability::of`] is the pure, tested predicate that classifies a
 //! record so callers route it through the right door.
 //!
-//! [`append_durable`]: OplogService::append_durable
-//! [`append_best_effort`]: OplogService::append_best_effort
+//! [`append_durable`]: Service::append_durable
+//! [`append_best_effort`]: Service::append_best_effort
 //!
 //! # Group commit
 //!
@@ -53,7 +53,16 @@ use std::thread::{self, JoinHandle};
 use cp_wire::types::oplog::OpEntryKind;
 
 use crate::append::{OplogWriter, DEFAULT_SEGMENT_LIMIT};
-use crate::error::{OplogError, OplogResult};
+use crate::error::{Error, OplogResult};
+
+/// The post-sync result handed back to a durable submitter: its assigned `rev`,
+/// or an error message (the channel carries text because [`Error`] is not
+/// `Clone`).
+type DurableAck = Result<u64, String>;
+
+/// A queued durable record's reply channel paired with its buffered append
+/// result, awaiting the group `fdatasync` before release.
+type PendingAck = (SyncSender<DurableAck>, DurableAck);
 
 /// Default bound on the job queue. A full queue blocks durable submitters and
 /// drops best-effort ones — the GAP 2 asymmetry.
@@ -117,7 +126,7 @@ enum Job {
         /// The record to append.
         kind: OpEntryKind,
         /// One-shot reply channel carrying the post-sync result.
-        ack: SyncSender<Result<u64, String>>,
+        ack: SyncSender<DurableAck>,
     },
 
     /// A best-effort record: written if a batch picks it up, never awaited.
@@ -136,9 +145,9 @@ enum Job {
 /// the commit thread, which group-commits batches. Drop or [`shutdown`] to stop
 /// the thread cleanly (the final batch is still synced).
 ///
-/// [`shutdown`]: OplogService::shutdown
+/// [`shutdown`]: Service::shutdown
 #[derive(Debug)]
-pub struct OplogService {
+pub struct Service {
     /// Bounded job queue — full means backpressure (block durable, drop best-effort).
     tx: SyncSender<Job>,
 
@@ -146,14 +155,14 @@ pub struct OplogService {
     handle: Option<JoinHandle<()>>,
 }
 
-impl OplogService {
+impl Service {
     /// Spawn a service over the oplog in `dir` with default segment and queue
     /// sizes.
     ///
     /// # Errors
     ///
-    /// Returns [`OplogError::Io`] if the oplog cannot be opened.
-    pub fn spawn(dir: impl AsRef<Path>) -> OplogResult<Self> {
+    /// Returns [`Error::Io`] if the oplog cannot be opened.
+    pub fn spawn<P: AsRef<Path>>(dir: P) -> OplogResult<Self> {
         Self::spawn_inner(dir.as_ref(), DEFAULT_SEGMENT_LIMIT, DEFAULT_QUEUE_CAPACITY)
     }
 
@@ -162,8 +171,8 @@ impl OplogService {
     ///
     /// # Errors
     ///
-    /// Returns [`OplogError::Io`] if the oplog cannot be opened.
-    pub fn spawn_with_segment_limit(dir: impl AsRef<Path>, segment_limit: u64) -> OplogResult<Self> {
+    /// Returns [`Error::Io`] if the oplog cannot be opened.
+    pub fn spawn_with_segment_limit<P: AsRef<Path>>(dir: P, segment_limit: u64) -> OplogResult<Self> {
         Self::spawn_inner(dir.as_ref(), segment_limit, DEFAULT_QUEUE_CAPACITY)
     }
 
@@ -184,10 +193,10 @@ impl OplogService {
     ///
     /// # Errors
     ///
-    /// Returns [`OplogError::Io`] if the service has stopped or the underlying
+    /// Returns [`Error::Io`] if the service has stopped or the underlying
     /// append/sync failed.
     pub fn append_durable(&self, kind: OpEntryKind) -> OplogResult<u64> {
-        let (ack_tx, ack_rx) = sync_channel::<Result<u64, String>>(1);
+        let (ack_tx, ack_rx) = sync_channel::<DurableAck>(1);
         self.tx
             .send(Job::Durable { kind, ack: ack_tx })
             .map_err(|_ignored| stopped("oplog service stopped"))?;
@@ -215,7 +224,7 @@ impl OplogService {
     ///
     /// # Errors
     ///
-    /// Returns [`OplogError::Io`] if the commit thread panicked.
+    /// Returns [`Error::Io`] if the commit thread panicked.
     pub fn shutdown(mut self) -> OplogResult<()> {
         // Best-effort: if the queue is saturated the Shutdown may not fit, but
         // dropping every sender below still ends the loop.
@@ -231,19 +240,19 @@ impl OplogService {
     }
 }
 
-impl Drop for OplogService {
+impl Drop for Service {
     /// Ensure the commit thread is joined (and its final batch synced) even if
-    /// [`shutdown`](OplogService::shutdown) was not called.
+    /// [`shutdown`](Service::shutdown) was not called.
     fn drop(&mut self) {
         let _ignored = self.tx.try_send(Job::Shutdown);
-        let _ignored = self.join();
+        let _joined = self.join();
     }
 }
 
-/// Build an [`OplogError::Io`] from a message (the channel carries error text
-/// because [`OplogError`] is not `Clone`).
-fn stopped(message: impl Into<String>) -> OplogError {
-    OplogError::Io(io::Error::other(message.into()))
+/// Build an [`Error::Io`] from a message (the channel carries error text
+/// because [`Error`] is not `Clone`).
+fn stopped<M: Into<String>>(message: M) -> Error {
+    Error::Io(io::Error::other(message.into()))
 }
 
 /// The commit thread body: receive a job, drain a batch, group-commit, repeat.
@@ -266,7 +275,7 @@ fn commit_loop(mut writer: OplogWriter, rx: &Receiver<Job>) {
 /// Write every record in `batch` buffered, sync once, then release durable
 /// acks. Returns `true` if the batch contained a shutdown request.
 fn commit_batch(writer: &mut OplogWriter, batch: Vec<Job>) -> bool {
-    let mut acks: Vec<(SyncSender<Result<u64, String>>, Result<u64, String>)> = Vec::new();
+    let mut acks: Vec<PendingAck> = Vec::new();
     let mut shutdown = false;
 
     for job in batch {
@@ -339,7 +348,7 @@ mod tests {
     fn durable_appends_are_monotonic_and_survive_reopen() {
         let dir = tempdir().expect("tempdir");
         {
-            let service = OplogService::spawn(dir.path()).expect("spawn");
+            let service = Service::spawn(dir.path()).expect("spawn");
             let r0 = service.append_durable(effect("c0")).expect("c0");
             let r1 = service.append_durable(msg("T1", 0x11)).expect("m1");
             let r2 = service.append_durable(msg("T1", 0x22)).expect("m2");
@@ -358,7 +367,7 @@ mod tests {
     #[test]
     fn best_effort_is_accepted_when_unsaturated() {
         let dir = tempdir().expect("tempdir");
-        let service = OplogService::spawn(dir.path()).expect("spawn");
+        let service = Service::spawn(dir.path()).expect("spawn");
         let outcome = service.append_best_effort(OpEntryKind::PhaseTransition {
             phase: Phase::Streaming,
         });
@@ -374,7 +383,7 @@ mod tests {
     fn mixed_workload_replays_correctly() {
         let dir = tempdir().expect("tempdir");
         {
-            let service = OplogService::spawn(dir.path()).expect("spawn");
+            let service = Service::spawn(dir.path()).expect("spawn");
             let _p = service.append_best_effort(OpEntryKind::PhaseTransition {
                 phase: Phase::Tooling,
             });
@@ -398,7 +407,7 @@ mod tests {
             // Tiny limit forces rolls inside the commit thread; the buffered
             // roll must flush the old segment so nothing is lost.
             let service =
-                OplogService::spawn_with_segment_limit(dir.path(), 16).expect("spawn");
+                Service::spawn_with_segment_limit(dir.path(), 16).expect("spawn");
             let mut last = 0;
             for byte in 0..12u8 {
                 last = service.append_durable(msg("T1", byte)).expect("append");
@@ -417,7 +426,7 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let last;
         {
-            let service = OplogService::spawn(dir.path()).expect("spawn");
+            let service = Service::spawn(dir.path()).expect("spawn");
             last = service.append_durable(effect("only")).expect("append");
             // No explicit shutdown — Drop must join + the final batch is synced.
         }

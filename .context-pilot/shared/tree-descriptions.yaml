@@ -142,6 +142,10 @@
   path: crates/cp-mod-scratchpad/src/tools.rs
   description: 'Scratchpad tools with flame!("scratch_create"), flame!("scratch_edit"), flame!("scratch_wipe"). Cell CRUD. Wipe: empty array = all, otherwise by ID.'
   last_edited_ms: 0
+05d99c6026071fe5:
+  path: crates/cp-mod-bridge/Cargo.toml
+  description: 'Bridge module deps: cp-base, cp-render, cp-wire, cp-oplog, nix 0.30 (fs, for Flock RAII), serde_json. dev: tempfile. Workspace lints.'
+  last_edited_ms: 1781625056746
 064c633984a0d856:
   path: crates/cp-mod-queue/src/types.rs
   description: 'QueueState + QueuedToolCall types. Trap fields: trap_active, trap_panel_ids, trap_optional_ids. Methods: enqueue, remove_by_index, flush, clear, is_queue_tool.'
@@ -1706,6 +1710,10 @@
   path: crates/cp-base/src/tools/mod.rs
   description: 'Tool system. ToolUse/ToolResult (display, tldr, preserves_tempo). ToolDefinition + ToolDefBuilder (schema in Rust, descriptions from YAML). ParamType recursive JSON Schema. build_api() generates LLM tool array. Sub-modules: pre_flight, async_exec.'
   last_edited_ms: 0
+4f0c3856f531e291:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: all Module trait methods implemented (stubs, behaviorally inert bridge-OFF). is_global=true, no tools/panels. Declares boot+error+identity+registry_io modules (Phase 10 boot machinery). Deps: cp-base, cp-render, cp-wire, cp-oplog, nix(fs), serde_json.'
+  last_edited_ms: 1781625056733
 4f194f47e08db851:
   path: src/app/reverie/tools.rs
   description: 'Reverie tools: build_tool_restrictions_text(), Report (queue guard), optimize_context (agent selection), dispatch_reverie_tool()'
@@ -2094,6 +2102,10 @@
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
   last_edited_ms: 0
+60e6716a3768b76c:
+  path: crates/cp-mod-bridge/src/error.rs
+  description: 'Bridge boot error: Error{AlreadyRunning{folder}, Io{context,source}} + BootResult + Error::io(context,source) helper. NO std::error::Error (dodges missing_trait_methods). Distinguishes ''folder already owned'' (recoverable) from ''disk broken'' (fatal).'
+  last_edited_ms: 1781625056693
 610108d1a979bbe7:
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
@@ -2406,6 +2418,10 @@
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, globset, sha2.'
   last_edited_ms: 1780497937361
+6da62160398166e2:
+  path: crates/cp-mod-bridge/src/registry_io.rs
+  description: 'Atomic 0600 registry write (design §10). default_agents_dir()=$HOME/.context-pilot/agents. write_entry(dir,entry): tmp(0600 mode)→write→fsync→rename→fsync(dir), no torn read, cap_token never world-readable. registry_path(dir,id). 5 tests incl mode-0600, no-tmp-left, overwrite-atomic.'
+  last_edited_ms: 1781625056719
 6da8c79c1f1d06bb:
   path: src/infra/constants.rs
   description: API/layout/loop/persistence constants + theme color accessors (from YAML themes) + card design tokens (card_text, card_agent_bg, card_reverie_bg, card_queue_bg, card_think_bg) + icons + prompts.
@@ -2882,6 +2898,14 @@
   path: ui/src/components/finder/FinderViews.tsx
   description: 'Finder main-area views. GridView (icon-size slider + finder-pop stagger + TagDots + focus ring), ListView (zebra + sortable headers + tags), ColumnsView (Miller + trailing metadata preview pane), GalleryView (hero + filmstrip). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
   last_edited_ms: 1781518321242
+848cd7497f68a9f4:
+  path: crates/cp-mod-bridge/src/identity.rs
+  description: 'Agent identity: folder_id(path)=FNV-1a 64-bit hex (stable naming key, not secret), mint_cap_token()=256 random bits, mint_boot_id()=128 random bits — both via /dev/urandom (no rand dep, mirrors cp-mod-search Meili key). random_hex<N>() helper. 4 tests.'
+  last_edited_ms: 1781625056706
+850e942001747a33:
+  path: crates/cp-mod-bridge/src/boot.rs
+  description: 'Phase 10 (X777): Boot — agent boot sequence + held resources. start_in(folder,agents_dir,model): (1) flock <folder>/bridge.lock EXCLUSIVE|NONBLOCK FIRST (single-process gate I1/D2, EAGAIN→AlreadyRunning); (2) OplogService::spawn(oplog dir); (3) bind stream.sock (unlink stale first); (4) mint cap_token+boot_id; (5) write registry <id>.json LAST (atomic, after all resources). Drop removes registry+socket; lock+oplog release via own Drop. H5 FD-inherit deferred (CLOEXEC kept). 6 tests: all-resources, second-boot-refuses, lock-released-on-drop, registry-removed, stale-socket-replaced.'
+  last_edited_ms: 1781625056680
 852931587d049008:
   path: src/llms/claude_code_api_key/helpers.rs
   description: 'CC API-key helpers: constants (endpoint/headers), map_model_name(), inject_system_reminder(), apply_claude_code_headers()'

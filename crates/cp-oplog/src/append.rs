@@ -50,7 +50,7 @@ use cp_wire::types::oplog::{OpEntry, OpEntryKind};
 use cp_wire::types::snapshot::{Heads, SeenSet, Snapshot};
 
 use crate::error::OplogResult;
-use crate::replay::{self, fold_entry, ReplayState};
+use crate::replay::{self, fold_entry, Recovered};
 use crate::segment;
 
 /// Default segment size limit: roll to a new segment once appending the next
@@ -89,7 +89,7 @@ pub struct OplogWriter {
     /// Running recoverable state (heads + seen-set), folded as records are
     /// appended. Seeded on open by replaying the durable log; its heads and
     /// seen-set are written verbatim into each segment's leading checkpoint.
-    state: ReplayState,
+    state: Recovered,
 }
 
 impl OplogWriter {
@@ -236,7 +236,7 @@ impl OplogWriter {
     /// # Errors
     ///
     /// Returns [`OplogError::Io`] if the `fdatasync` fails.
-    pub fn sync(&mut self) -> OplogResult<()> {
+    pub fn sync(&self) -> OplogResult<()> {
         self.file.sync_data()?;
         Ok(())
     }

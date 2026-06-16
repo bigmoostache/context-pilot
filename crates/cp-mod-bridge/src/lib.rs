@@ -22,8 +22,10 @@ use cp_base::state::runtime::State;
 use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 
-// Wire types will be used in later phases; suppress unused-crate-dep for now.
-use cp_wire as _;
+pub mod boot;
+pub mod error;
+pub mod identity;
+pub mod registry_io;
 
 /// Agent-side orchestration bridge module.
 ///

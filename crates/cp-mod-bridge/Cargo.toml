@@ -13,7 +13,12 @@ readme.workspace = true
 cp-base.workspace = true
 cp-render.workspace = true
 cp-wire = { path = "../cp-wire" }
+cp-oplog = { path = "../cp-oplog" }
+nix = { version = "0.30", default-features = false, features = ["fs"] }
 serde_json.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true

@@ -34,7 +34,7 @@ use std::path::Path;
 /// The recovered state of an oplog: its highest durable `rev` and the bounded
 /// snapshot (heads + seen-set) as of that `rev`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ReplayState {
+pub struct Recovered {
     /// The highest durable `rev` in the log, or `None` if the log is empty.
     pub rev_head: Option<u64>,
 
@@ -46,7 +46,7 @@ pub struct ReplayState {
     pub seen: SeenSet,
 }
 
-/// Fold one entry into a running [`ReplayState`].
+/// Fold one entry into a running [`Recovered`].
 ///
 /// A `Checkpoint` is **authoritative**: it replaces the running snapshot
 /// wholesale (it is a full snapshot, not a delta). A `MessageCreated` advances
@@ -56,7 +56,7 @@ pub struct ReplayState {
 ///
 /// The `rev` is taken from `entry`, so the seen-set records the exact `rev` at
 /// which each command's effect first committed.
-pub(crate) fn fold_entry(state: &mut ReplayState, entry: &OpEntry) {
+pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
     match &entry.kind {
         OpEntryKind::Checkpoint { snapshot } => {
             state.heads.clone_from(&snapshot.heads);
@@ -85,9 +85,9 @@ pub(crate) fn fold_entry(state: &mut ReplayState, entry: &OpEntry) {
 ///
 /// # Errors
 ///
-/// Returns [`OplogError::Io`](crate::error::OplogError::Io) if a segment
+/// Returns [`Error::Io`](crate::error::Error::Io) if a segment
 /// cannot be listed or read.
-pub fn replay(dir: impl AsRef<Path>) -> OplogResult<ReplayState> {
+pub fn replay<P: AsRef<Path>>(dir: P) -> OplogResult<Recovered> {
     let dir = dir.as_ref();
     let indices = segment::indices(dir)?;
 
@@ -101,7 +101,7 @@ pub fn replay(dir: impl AsRef<Path>) -> OplogResult<ReplayState> {
 /// from it and fold only that segment's trailing records. Returns `None` when
 /// no segment offers a usable leading checkpoint (caller falls back to a full
 /// fold).
-fn replay_fast(dir: &Path, indices: &[u64]) -> OplogResult<Option<ReplayState>> {
+fn replay_fast(dir: &Path, indices: &[u64]) -> OplogResult<Option<Recovered>> {
     for &index in indices.iter().rev() {
         let scan = segment::read(&segment::path(dir, index))?;
         let Some(first) = scan.entries.first() else {
@@ -109,7 +109,7 @@ fn replay_fast(dir: &Path, indices: &[u64]) -> OplogResult<Option<ReplayState>> 
             continue;
         };
         if let OpEntryKind::Checkpoint { snapshot } = &first.kind {
-            let mut state = ReplayState {
+            let mut state = Recovered {
                 rev_head: Some(first.rev),
                 heads: snapshot.heads.clone(),
                 seen: snapshot.seen.clone(),
@@ -130,8 +130,8 @@ fn replay_fast(dir: &Path, indices: &[u64]) -> OplogResult<Option<ReplayState>> 
 /// Slow path: fold every record across every segment, oldest to newest. Always
 /// correct; used only when the fast path declines (young single-segment log or
 /// an invariant-violating segment).
-fn replay_full(dir: &Path, indices: &[u64]) -> OplogResult<ReplayState> {
-    let mut state = ReplayState::default();
+fn replay_full(dir: &Path, indices: &[u64]) -> OplogResult<Recovered> {
+    let mut state = Recovered::default();
     for &index in indices {
         let scan = segment::read(&segment::path(dir, index))?;
         for entry in &scan.entries {

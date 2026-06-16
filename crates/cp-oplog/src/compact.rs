@@ -72,7 +72,7 @@ pub const DEFAULT_GC_GRACE: Duration = Duration::from_secs(60);
 
 /// The outcome of a [`compact`] pass.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct CompactReport {
+pub struct Report {
     /// How many whole segments were deleted.
     pub segments_removed: u64,
 
@@ -93,14 +93,14 @@ pub struct CompactReport {
 ///
 /// # Errors
 ///
-/// Returns [`OplogError::Io`](crate::error::OplogError::Io) if a segment
+/// Returns [`Error::Io`](crate::error::Error::Io) if a segment
 /// cannot be listed, read, removed, or if the directory cannot be `fsync`'d.
-pub fn compact(dir: impl AsRef<Path>) -> OplogResult<CompactReport> {
+pub fn compact<P: AsRef<Path>>(dir: P) -> OplogResult<Report> {
     let dir = dir.as_ref();
     let indices = segment::indices(dir)?;
 
     let Some(cut) = newest_checkpoint_index(dir, &indices)? else {
-        return Ok(CompactReport { segments_removed: 0, oldest_index: indices.first().copied() });
+        return Ok(Report { segments_removed: 0, oldest_index: indices.first().copied() });
     };
 
     let mut removed: u64 = 0;
@@ -113,7 +113,7 @@ pub fn compact(dir: impl AsRef<Path>) -> OplogResult<CompactReport> {
     if removed > 0 {
         sync_dir(dir)?;
     }
-    Ok(CompactReport { segments_removed: removed, oldest_index: Some(cut) })
+    Ok(Report { segments_removed: removed, oldest_index: Some(cut) })
 }
 
 /// The highest segment index whose first record is a checkpoint — the segment
@@ -144,9 +144,9 @@ fn sync_dir(dir: &Path) -> OplogResult<()> {
 ///
 /// # Errors
 ///
-/// Returns [`OplogError::Io`](crate::error::OplogError::Io) if the directory
+/// Returns [`Error::Io`](crate::error::Error::Io) if the directory
 /// cannot be listed or a segment's metadata cannot be read.
-pub fn total_bytes(dir: impl AsRef<Path>) -> OplogResult<u64> {
+pub fn total_bytes<P: AsRef<Path>>(dir: P) -> OplogResult<u64> {
     let dir = dir.as_ref();
     let mut total: u64 = 0;
     for index in segment::indices(dir)? {
@@ -158,7 +158,7 @@ pub fn total_bytes(dir: impl AsRef<Path>) -> OplogResult<u64> {
 
 /// Whether the oplog is large enough to warrant compaction.
 #[must_use]
-pub const fn should_compact(total_bytes: u64, threshold: u64) -> bool {
+pub const fn over_threshold(total_bytes: u64, threshold: u64) -> bool {
     total_bytes > threshold
 }
 
@@ -260,14 +260,14 @@ mod tests {
     fn compact_on_empty_dir_is_noop() {
         let dir = tempdir().expect("tempdir");
         let report = compact(dir.path()).expect("compact");
-        assert_eq!(report, CompactReport { segments_removed: 0, oldest_index: None });
+        assert_eq!(report, Report { segments_removed: 0, oldest_index: None });
     }
 
     #[test]
     fn should_compact_respects_threshold() {
-        assert!(!should_compact(100, 256));
-        assert!(!should_compact(256, 256), "strictly greater than the threshold");
-        assert!(should_compact(257, 256));
+        assert!(!over_threshold(100, 256));
+        assert!(!over_threshold(256, 256), "strictly greater than the threshold");
+        assert!(over_threshold(257, 256));
     }
 
     #[test]
