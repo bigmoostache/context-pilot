@@ -47,8 +47,8 @@ use cp_wire::PROTOCOL_VERSION;
 
 use crate::error::{Error, BootResult};
 use crate::heartbeat::Beacon;
-use crate::identity::{folder_id, mint_boot_id, mint_cap_token};
-use crate::registry_io;
+use crate::register::identity::{folder_id, mint_boot_id, mint_cap_token};
+use crate::register::registry;
 
 /// Name of the lock file inside the agent folder whose `flock` gates
 /// single-process ownership.
@@ -105,7 +105,7 @@ impl Boot {
     /// `folder`, or [`Error::Io`] for any filesystem failure (lock, oplog,
     /// socket, registry) — or if `$HOME` is unset.
     pub fn start(folder: &Path, model: &str) -> BootResult<Self> {
-        let agents_dir = registry_io::default_agents_dir()?;
+        let agents_dir = registry::default_agents_dir()?;
         Self::start_in(folder, &agents_dir, model)
     }
 
@@ -158,7 +158,7 @@ impl Boot {
             started_at_ms: now_ms(),
             status: AgentStatus::Starting,
         };
-        let _written = registry_io::write_entry(agents_dir, &entry)?;
+        let _written = registry::write_entry(agents_dir, &entry)?;
 
         // The liveness beacon starts last, once every advertised resource
         // exists: it writes the first beat synchronously, so the moment this
@@ -217,7 +217,7 @@ impl Drop for Boot {
     /// Remove the discovery record and socket file so the backend sees a clean
     /// disappearance. The lock and oplog thread release via their own `Drop`.
     fn drop(&mut self) {
-        let registry = registry_io::registry_path(&self.agents_dir, &self.entry.id);
+        let registry = registry::path(&self.agents_dir, &self.entry.id);
         let _registry_removed = fs::remove_file(&registry);
         let _socket_removed = fs::remove_file(&self.socket_path);
     }
@@ -279,7 +279,7 @@ mod tests {
         let booted = boot(folder.path(), agents.path()).expect("boot");
 
         // Registry record exists, 0600, and round-trips.
-        let registry = registry_io::registry_path(agents.path(), booted.id());
+        let registry = registry::path(agents.path(), booted.id());
         assert!(registry.exists(), "registry record written");
 
         // Socket bound, oplog dir created.
@@ -325,7 +325,7 @@ mod tests {
         let registry;
         {
             let booted = boot(folder.path(), agents.path()).expect("boot");
-            registry = registry_io::registry_path(agents.path(), booted.id());
+            registry = registry::path(agents.path(), booted.id());
             assert!(registry.exists());
         }
         assert!(!registry.exists(), "registry record removed on graceful drop");

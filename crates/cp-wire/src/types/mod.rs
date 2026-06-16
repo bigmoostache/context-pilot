@@ -39,18 +39,40 @@ impl ContentHash {
     pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
-}
 
-/// Hex-encode for JSON/YAML readability.
-impl Serialize for ContentHash {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    /// The SHA-256 content hash of `bytes` — the canonical content address.
+    ///
+    /// Both the agent (which stores bodies) and the backend (which hydrates
+    /// them by hash) compute this, so it must be a fixed, collision-resistant
+    /// digest, not the non-cryptographic FNV used for folder *naming*. The
+    /// digest is always exactly 32 bytes, so the copy is infallible.
+    #[must_use]
+    pub fn of(bytes: &[u8]) -> Self {
+        use sha2::{Digest as _, Sha256};
+        let digest = Sha256::digest(bytes);
+        let mut out = [0u8; 32];
+        out.copy_from_slice(digest.as_slice());
+        Self(out)
+    }
+
+    /// Lowercase-hex rendering of the digest (64 chars) — the on-disk filename
+    /// of a spilled body and the same form [`Serialize`] emits.
+    #[must_use]
+    pub fn to_hex(self) -> String {
         use core::fmt::Write as _;
         let mut hex = String::with_capacity(64);
         for &byte in &self.0 {
             // `write!` on `String` is infallible — discard the always-Ok result.
             _ = write!(hex, "{byte:02x}");
         }
-        serializer.serialize_str(&hex)
+        hex
+    }
+}
+
+/// Hex-encode for JSON/YAML readability.
+impl Serialize for ContentHash {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_hex())
     }
 }
 
@@ -142,6 +164,26 @@ mod tests {
         let json = serde_json::to_string(&hash).expect("serialize");
         let back: ContentHash = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(hash, back);
+    }
+
+    #[test]
+    fn content_hash_of_matches_known_vectors() {
+        // Canonical SHA-256 test vectors.
+        assert_eq!(
+            ContentHash::of(b"").to_hex(),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        );
+        assert_eq!(
+            ContentHash::of(b"abc").to_hex(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        );
+    }
+
+    #[test]
+    fn content_hash_to_hex_matches_serialize() {
+        let hash = ContentHash::of(b"some body bytes");
+        let json = serde_json::to_string(&hash).expect("serialize");
+        assert_eq!(json, format!("\"{}\"", hash.to_hex()));
     }
 
     #[test]

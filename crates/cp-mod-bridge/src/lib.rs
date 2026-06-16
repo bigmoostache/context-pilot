@@ -22,12 +22,12 @@ use cp_base::state::runtime::State;
 use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 
+pub mod body;
 pub mod boot;
 pub mod command;
 pub mod error;
 pub mod heartbeat;
-pub mod identity;
-pub mod registry_io;
+pub mod register;
 pub mod tee;
 
 /// Agent-side orchestration bridge module.

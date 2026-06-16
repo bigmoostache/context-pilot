@@ -42,7 +42,7 @@ pub fn default_agents_dir() -> BootResult<PathBuf> {
 
 /// The path of the registry file for agent `id` inside `agents_dir`.
 #[must_use]
-pub fn registry_path(agents_dir: &Path, id: &str) -> PathBuf {
+pub fn path(agents_dir: &Path, id: &str) -> PathBuf {
     agents_dir.join(format!("{id}.json"))
 }
 
@@ -64,7 +64,7 @@ pub fn write_entry(agents_dir: &Path, entry: &Entry) -> BootResult<PathBuf> {
     let json = serde_json::to_vec_pretty(entry)
         .map_err(|e| Error::io("serialise registry entry", std::io::Error::other(e)))?;
 
-    let final_path = registry_path(agents_dir, &entry.id);
+    let final_path = path(agents_dir, &entry.id);
     let tmp_path = agents_dir.join(format!("{}.json.tmp", entry.id));
 
     write_tmp(&tmp_path, &json)?;
