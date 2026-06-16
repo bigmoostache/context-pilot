@@ -26,3 +26,4 @@
 pub mod channel;
 pub mod liveness;
 pub mod registry;
+pub mod supervisor;

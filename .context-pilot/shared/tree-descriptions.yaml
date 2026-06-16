@@ -626,6 +626,10 @@
   path: src/modules/conversation/refresh.rs
   description: estimate_message_tokens() (content+tools), refresh_conversation_context() updates Conversation context element
   last_edited_ms: 0
+1ba41727f640ea63:
+  path: crates/cp-orchestrator/src/supervisor/mod.rs
+  description: 'Phase 17 (X784): AgentSupervisor process manager. new(allow_list) canonicalizes paths eagerly. validate_binary(req) realpath-canonicalizes vs allow_list (R2-15: defeats symlink/.. escape). spawn(id,bin,folder,args)->pid: validate, Command process_group(0) (NOT setsid — unsafe forbidden; safe + detaches from terminal signals), stdio null, refuse dup id. stop(id): SIGTERM→poll pid_alive up to STOP_GRACE(5s)/POLL_INTERVAL(100ms)→SIGKILL→reap child.wait(). restart=snapshot cfg+stop+spawn. adopt(id,&Entry,bin): record live agent no-spawn (child:None, D7 re-adopt on backend restart). check_liveness()->Vec<Event>: spawned via try_wait reap (Exited{status}), adopted via pid_alive signal-0 (Vanished), dead removed. Helpers: send_signal (swallow ESRCH), pub(crate) pid_alive (Ok|EPERM=alive). Error/Event enums fully field-doc''d; Debug derived. Error has NO std::error::Error (dodges missing_trait_methods).'
+  last_edited_ms: 1781645571137
 1bc3810fb9edcbec:
   path: crates/cp-mod-memory/Cargo.toml
   description: 'Memory module deps: cp-base, cp-render, crossterm, serde, serde_json, cp-mod-utilities.'
@@ -3874,6 +3878,10 @@ ac9e6f95da3b14e4:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+acb71d8973be7b96:
+  path: crates/cp-orchestrator/src/supervisor/tests.rs
+  description: 'Phase 17 supervisor unit tests (9): allow-list accept/reject + symlink/.. canonicalization, spawn_and_stop, dup-id reject, restart yields new pid + kills old, check_liveness reaps exited spawned child (Exited), adopt_and_detect_vanish (reaps external zombie first — unreaped zombie answers kill(pid,0) alive, so must wait() before probe), stop_not_found. use super::* globs parent imports (edition 2024). Entry built with real schema (boot_id/cap_token=String, oplog_path, model/protocol_version/binary_version/started_at_ms).'
+  last_edited_ms: 1781645571152
 acde3d0765ea24ec:
   path: crates/cp-mod-tree/src/tools.rs
   description: Tree tools with flame!(). compute_file_hash uses FNV-1a. Toggle/describe/filter. @-autocomplete via list_dir_entries.
