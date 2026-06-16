@@ -80,8 +80,8 @@ export function AgentModal({
     if (!canSubmit) return
     onFlash?.(
       isManage
-        ? `Saved changes to ${name || agent?.name} (design only)`
-        : `Created “${slugify(name)}” in ${realm} (design only)`,
+        ? `Saved changes to ${name || agent?.name}`
+        : `Created “${slugify(name)}” in ${realm}`,
     )
     onClose()
   }
@@ -244,7 +244,7 @@ export function AgentModal({
           {isManage && (
             <button
               onClick={() => {
-                onFlash?.(`Archived ${agent?.name} (design only)`)
+                onFlash?.(`Archived ${agent?.name}`)
                 onClose()
               }}
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/10"

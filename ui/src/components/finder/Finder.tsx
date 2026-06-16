@@ -288,7 +288,7 @@ export function Finder({ agent }: { agent: Agent }) {
       onDrop={(e) => {
         e.preventDefault()
         setDragging(false)
-        flash("Uploading 3 files to this folder… (design only)")
+        flash("Uploading 3 files to this folder…")
       }}
     >
       <FinderTabs
@@ -313,12 +313,12 @@ export function Finder({ agent }: { agent: Agent }) {
         onViewMode={setViewMode}
         onIconSize={setIconSize}
         onQuery={setQuery}
-        onNewFolder={() => flash("New Folder created (design only)")}
-        onUpload={() => flash("Choose files to upload… (design only)")}
+        onNewFolder={() => flash("New Folder created")}
+        onUpload={() => flash("Choose files to upload…")}
         onDownload={() =>
           flash(
             selected.size
-              ? `Downloading ${selected.size} item(s)… (design only)`
+              ? `Downloading ${selected.size} item(s)…`
               : "Select files to download.",
           )
         }
@@ -327,9 +327,9 @@ export function Finder({ agent }: { agent: Agent }) {
         fileActive={!!active.fileNode}
         onFileGetInfo={() => active.fileNode && setInfo(active.fileNode)}
         onFileDownload={() =>
-          flash(`Downloading ${active.fileNode?.name ?? "file"}… (design only)`)
+          flash(`Downloading ${active.fileNode?.name ?? "file"}…`)
         }
-        onFileShare={() => flash(`Share ${active.fileNode?.name ?? "file"}… (design only)`)}
+        onFileShare={() => flash(`Share ${active.fileNode?.name ?? "file"}…`)}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -424,7 +424,7 @@ export function Finder({ agent }: { agent: Agent }) {
         <ContextMenu
           pos={menu}
           onClose={() => setMenu(null)}
-          onAction={(label) => flash(`${label} (design only)`)}
+          onAction={(label) => flash(label)}
           onGetInfo={(n) => setInfo(n)}
         />
       )}

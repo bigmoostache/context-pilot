@@ -366,10 +366,6 @@ export function UsagePage() {
             </div>
           </section>
         )}
-
-        <p className="text-center text-[11px] text-muted-foreground/55">
-          Design-only — figures are illustrative mock data.
-        </p>
       </div>
     </ScrollArea>
   )

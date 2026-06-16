@@ -66,7 +66,7 @@ function Placeholder({ kind, name }: { kind: PanelKind; name: string }) {
   return (
     <PanelFrame icon={Icon} name={name}>
       <div className="rounded-lg border border-dashed border-border py-16 text-center text-[12.5px] text-muted-foreground/60">
-        No maquette for “{kind}” panels yet.
+        No view for “{kind}” panels yet.
       </div>
     </PanelFrame>
   )

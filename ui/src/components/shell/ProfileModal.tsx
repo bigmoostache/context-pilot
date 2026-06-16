@@ -23,8 +23,9 @@ import { cn } from "@/lib/utils"
  * security live with the org (fields lock, an org callout explains it); when
  * personal, the user gets self-service actions (password, billing, delete).
  *
- * A design-only preview toggle flips between the two so the maquette can show
- * both layouts. Everything here is decorative (no backend).
+ * The account section adapts to {@link User.managedByCompany}: an org callout
+ * when managed, self-service actions when personal. Everything here is
+ * decorative (no backend).
  */
 export function ProfileModal({
   open,
@@ -35,8 +36,7 @@ export function ProfileModal({
 }) {
   const u = currentUser
   const [name, setName] = useState(u.name)
-  // Local, design-only: lets a reviewer preview both account states.
-  const [managed, setManaged] = useState(u.managedByCompany)
+  const managed = u.managedByCompany
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -63,7 +63,7 @@ export function ProfileModal({
               <AvatarMark user={u} className="size-[68px] text-[24px]" />
               <button
                 type="button"
-                title="Change photo (design only)"
+                title="Change photo"
                 className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-popover bg-[var(--interactive)] text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
               >
                 <Camera className="size-3.5" />
@@ -132,15 +132,6 @@ export function ProfileModal({
             </span>
             {managed ? <ManagedAccount company={u.company ?? "your organization"} /> : <PersonalAccount />}
           </div>
-
-          {/* design-only preview toggle */}
-          <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-2.5">
-            <Switch on={managed} onToggle={() => setManaged((m) => !m)} />
-            <span className="flex flex-col leading-tight">
-              <span className="text-[12px] font-medium text-foreground/85">Preview: company-managed account</span>
-              <span className="text-[11px] text-muted-foreground/70">Design only — flip to compare both account layouts.</span>
-            </span>
-          </label>
         </div>
 
         {/* footer */}
@@ -230,28 +221,5 @@ function Field({
       </span>
       {children}
     </label>
-  )
-}
-
-/** Minimal macOS-style switch (design-only). */
-function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      onClick={onToggle}
-      className={cn(
-        "relative h-[18px] w-8 shrink-0 rounded-full transition-colors",
-        on ? "bg-[var(--interactive)]" : "bg-muted-foreground/35",
-      )}
-    >
-      <span
-        className={cn(
-          "absolute top-0.5 size-[14px] rounded-full bg-white shadow-sm transition-transform",
-          on ? "translate-x-[15px]" : "translate-x-0.5",
-        )}
-      />
-    </button>
   )
 }

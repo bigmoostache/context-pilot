@@ -81,9 +81,6 @@ export function ConfigPanel({
             )
           })}
         </nav>
-        <div className="px-4 py-3 text-[10.5px] leading-relaxed text-muted-foreground/55">
-          Design-only — keys are illustrative and nothing is saved.
-        </div>
       </aside>
 
       {/* detail pane */}
@@ -114,7 +111,7 @@ export function ConfigPanel({
 
         <footer className="flex h-[58px] shrink-0 items-center border-t border-border/70 bg-muted/25 px-6">
           <span className="text-[11.5px] text-muted-foreground/70">
-            Changes apply on save in the live app.
+            Changes apply on save.
           </span>
           {inline ? (
             <button className="ml-auto flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-4 py-2 text-[13px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98]">

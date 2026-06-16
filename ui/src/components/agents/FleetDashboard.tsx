@@ -85,10 +85,6 @@ export function FleetDashboard({
             ))}
             <NewAgentCard onClick={() => setModal({ mode: "create" })} />
           </div>
-
-          <p className="text-center text-[11px] text-muted-foreground/55">
-            Design-only — each agent maps to a real folder in the actual app.
-          </p>
         </div>
       </ScrollArea>
 

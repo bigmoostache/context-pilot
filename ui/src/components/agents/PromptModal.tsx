@@ -175,7 +175,7 @@ export function PromptModal({
           {!isNew && (
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
               <FileCode2 className="size-3.5" />
-              Edits open <code className="font-mono">{`.context-pilot/${kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"}/${!isNew ? item.id : ""}.md`}</code> in the live app.
+              Edits open <code className="font-mono">{`.context-pilot/${kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"}/${!isNew ? item.id : ""}.md`}</code>.
             </p>
           )}
         </div>
@@ -292,7 +292,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <footer className="flex h-[56px] shrink-0 items-center border-t border-border bg-muted/25 px-6">
-          <span className="text-[11px] text-muted-foreground/65">Design-only — nothing is written to disk.</span>
+          <span className="text-[11px] text-muted-foreground/65">Import rules &amp; agents from your other tools.</span>
           <button
             onClick={onClose}
             className="ml-auto rounded-lg bg-[var(--interactive)] px-4 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98]"

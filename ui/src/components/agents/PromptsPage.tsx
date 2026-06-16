@@ -96,10 +96,6 @@ export function PromptsPage() {
         ) : (
           <Grid items={shown} onOpen={setEditing} />
         )}
-
-        <p className="text-center text-[11px] text-muted-foreground/55">
-          Design-only — editing a prompt opens its <code className="font-mono">.md</code> file in the live app.
-        </p>
       </div>
 
       {editing && <PromptModal item={editing} onClose={() => setEditing(null)} />}

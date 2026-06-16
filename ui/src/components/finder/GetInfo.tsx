@@ -85,7 +85,7 @@ export function GetInfo({ node, onClose }: { node: FinderNode; onClose: () => vo
         </dl>
 
         <div className="flex items-center justify-between border-t border-border/70 px-5 py-3">
-          <span className="text-[11px] text-muted-foreground/60">Design-only inspector</span>
+          <span className="text-[11px] text-muted-foreground/60">Get Info</span>
           <button
             onClick={onClose}
             className="rounded-lg bg-[var(--signal)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
