@@ -110,11 +110,11 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting'', 30 phases X768-X797. Phases 1-28 done & green. Next: Phase 29 (X796 services), 30 (X797 transport+e2e), then capstone 20 (X787). Details in contents.'
+  tl_dr: 'Orchestration backend, branch ''demaquetting'', 30 phases X768-X797. Phases 1-29 done & green. Next: Phase 30 (X797 transport+e2e) then capstone 20 (X787). Details in contents.'
   contents: |-
     ## Orchestration backend — branch 'demaquetting' (30 phases X768-X797)
 
-    Phases 1-19 PRODUCTION DONE & green. Testing phases 21-28 DONE.
+    Phases 1-19 PRODUCTION DONE & green. Testing phases 21-29 DONE.
 
     ### Trichotomy (each file's doc says which side)
     - cp-wire + cp-oplog = SHARED (I/O contract + WAL)
@@ -125,34 +125,34 @@
     - cp-wire: 74 (59 lib + 8 framing_integrity + 7 protocol)
     - cp-oplog: 56 COMPLETE
     - cp-mod-bridge: 48 COMPLETE
-    - cp-orchestrator: 85 (77 lib + 4 registry_channel + 4 supervisor_lifecycle)
+    - cp-orchestrator: 89 (77 lib + 4 registry_channel + 4 services_integration + 4 supervisor_lifecycle)
 
-    ### Phase 28 (X795) DONE+committed 1bb1136: tests/supervisor_lifecycle.rs (4)
-    Black-box public-API + real processes: (1) SIGTERM→grace→SIGKILL escalation vs trap-TERM shell; (2) fleet teardown 3 agents all ESRCH-gone; (3) adopted foreign signalled on stop status.signal()==15; (4) check_liveness Exited+Vanished one pass. pid_present via nix kill ESRCH.
+    ### Phase 29 (X796) DONE+committed e18327e: tests/services_integration.rs (4)
+    MaterializedView+CostBreaker+StreamHub driven TOGETHER vs real cp-oplog via Tailer: (1) restart rebuild I5+V9 append_durable->shutdown->Tailer.poll->apply_batch->rebuild_from_view trips; (2) real rolled Checkpoint folds to ground-truth head (assert >=1 Checkpoint in stream); (3) R2-17 reconcile = view heads = authoritative snapshot, mark_reconciled clears; (4) 2-agent fleet isolation across all 3 services.
 
-    ### CRITICAL lint gotchas (carry to phases 29-30)
-    - Each tests/ file is a SEPARATE crate target. per-target unused-crate-dependencies (forbid) flags every dep the file doesn't directly name → `use <crate> as _;` block at top.
+    ### CRITICAL lint gotchas (carry to phase 30)
+    - Each tests/ file is a SEPARATE crate target. per-target unused-crate-dependencies (forbid) flags every dep the file doesn't directly name → `use <crate> as _;` block at top. cp-orchestrator unnamed-in-tests so far: cp_mod_bridge, nix, serde, serde_json, tiny_http.
     - dev-deps unnamed by LIB code flag LIB-TEST target; unnamed by BIN code flag BIN-TEST target → `#[cfg(test)] use <crate> as _;` in lib.rs AND main.rs (cp-mod-bridge needed both).
     - CB3 rust-check LIB-ONLY — ALWAYS `cargo test -p <crate>` (or --test <name>) before commit.
     - Test lints: let-underscore-drop, unused-results, unused-crate-dependencies, unused-imports. No `as u8`/to_le_bytes.
     - M62: real connect/accept UDS propagate EOF reliably; socketpair shutdown(Write) does NOT.
 
-    ### Remaining: phases 29-30 (X796-X797) + capstone Phase 20 (X787)
-    - 29 (X796): backend services — MaterializedView fold-every-kind + Checkpoint authoritative I5, CostBreaker high-water V9 + poison fail-closed + rebuild, StreamHub fan-out/overflow-evict-oldest/per-sub-degraded/cap0/mark_reconciled.
-    - 30 (X797): transport + e2e — ticket single-use/TTL/unknown, REST rev-envelope+cmd receipt+body-hydrate+404/400, SSE Last-Event-ID replay-by-rev + gap→resync, END-TO-END loopback spawn→POST→journal→Tailer→SSE→reconnect, breaker-tripped-blocks, soak FD/thread/mem.
+    ### Remaining: phase 30 (X797) + capstone Phase 20 (X787)
+    - 30 (X797): transport + e2e — ticket single-use/TTL/unknown, REST rev-envelope+cmd receipt+body-hydrate+404/400, SSE Last-Event-ID replay-by-rev + gap→resync, END-TO-END loopback spawn→POST→journal→Tailer→SSE→reconnect, breaker-tripped-blocks, soak FD/thread/mem. transport on tiny_http (blocking thread-per-conn). Files src/transport/{mod,rest,sse,ticket}.rs. NEED TO READ transport module for exact API before writing tests.
     - 20 (X787) LAST: M4 ship gate = full V1-V12 fault matrix + observability + soak + sign-off.
 
-    ### cp-orchestrator lib API surface (for phases 29-30 tests)
-    - services::{MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber} (Phase 29). Files src/services/{materialized_view,cost_breaker,stream_hub,mod}.rs.
-    - transport::{Backend, ticket::TicketStore, rest, sse} on tiny_http (Phase 30). Files src/transport/{mod,rest,sse,ticket}.rs.
-    - AgentSupervisor public: new/len/is_empty/spawn/stop/restart/adopt/check_liveness + Error + Event{Exited,Vanished}. validate_binary/pid_alive are pub(crate) (unit-only).
+    ### cp-orchestrator lib API surface
+    - services::{MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber}. CostBreaker::new(budget)/observe/rebuild_from_view(&view)/check->Verdict{Allowed,Tripped}/poison/clear_poison. MaterializedView::new/apply/apply_batch(id,&[OpEntry])/get->Option<&AgentView>/remove/len/agent_ids. StreamHub::new(cap)/subscribe(id)->u64/publish(id,&Frame)->usize(clean)/drain(id,sub)->Option<Vec<Frame>>/subscriber(id,sub)->Option<&Subscriber>/mark_reconciled/unsubscribe/subscriber_count. Subscriber.is_degraded/dropped_count/buffered/id.
+    - channel::Tailer::new(PathBuf)/seed(rev)/poll()->io::Result<Vec<OpEntry>>/last_rev. AgentChannel::from_entry/hydrate/send/send_with_retry.
+    - transport::{Backend, ticket::TicketStore, rest, sse} on tiny_http.
+    - AgentSupervisor: new/len/is_empty/spawn/stop/restart/adopt/check_liveness + Error + Event{Exited,Vanished}.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781650369611
+  last_edited_ms: 1781650707121
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
