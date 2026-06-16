@@ -1610,6 +1610,10 @@
   path: crates/cp-mod-ocr/src/client.rs
   description: Datalab OCR API client. Multipart upload, exponential backoff polling, disk cache keyed by FNV-1a hash of file bytes + mode.
   last_edited_ms: 0
+4eaaa9ebd9d39ab1:
+  path: ui/src/components/shell/ProfileModal.tsx
+  description: 'Profile modal (T30) — opened from the avatar menu, on the portaled Base-UI Dialog primitive. Editable display-name + email (email locks when company-managed), large AvatarMark + camera change-badge, and an Account section that switches on managedByCompany: ManagedAccount org callout (locked, SSO) vs PersonalAccount self-service rows (password/billing/delete). A design-only Switch previews both states. All decorative.'
+  last_edited_ms: 1781596817744
 4ede68cb38534c4d:
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
@@ -1898,6 +1902,10 @@
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog'' (DialogClose chrome) | ''inline'' (Save button). NO per-category title header (T20 — sidebar focus already names the page); dialog variant keeps only a slim close-only chrome bar. Categories: General/Usage & Cost/Providers/Search/DocAI/Web/Integrations. Usage renders <UsagePage/> full-bleed in a ''flex min-h-0 flex-1 flex-col overflow-hidden'' wrapper so UsagePage''s inner ScrollArea (flex-1/min-h-0) gets a flex parent and actually scrolls (T20 fix). Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
   last_edited_ms: 1781545579109
+5d6c3bd44be65976:
+  path: ui/src/lib/types.ts
+  description: 'Maquette domain types. User (T30: name/email/initials/accent/managedByCompany/company/role for avatar menu + Profile modal). Agent, FsNode, Finder types, ThreadDetail+agentId, ThreadStatus (MY_TURN/ACTIVE/THEIR_TURN), ViewMode=fleet|cockpit|threads|finder, Library/Usage types. Cockpit panel maquette types (T16).'
+  last_edited_ms: 1781596817767
 5d6f0efeeb4eae79:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
@@ -2018,6 +2026,10 @@
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
   last_edited_ms: 0
+62fde7fb54d0ece4:
+  path: ui/src/components/shell/UserMenu.tsx
+  description: 'Account avatar menu (T30) — replaced the old top-right Settings gear. Portaled Base-UI dropdown: avatar trigger (gradient-initials AvatarMark) opens a floating menu with an identity header (name/email + Company/Personal pill via currentUser) and Profile / Settings / Sign-out items. Settings still opens ConfigModal (reversible re-skin). Exports UserMenu + AvatarMark (shared with ProfileModal).'
+  last_edited_ms: 1781596817732
 6361792c7f8df4c1:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
@@ -2138,6 +2150,10 @@
   path: src/ui/help/config_overlay.rs
   description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access.
   last_edited_ms: 0
+68bf048ab52e44c3:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. App mark (Home)→fleet. ALWAYS renders / + AgentSwitcher. Per-agent view switcher order Threads·Finder·Cockpit (T25), each tab + app-mark/Activity/theme/agent-config carry <Tip> tooltips. Right cluster (in-agent): cost, Activity→StatsPopup, theme, divider, then Settings2 ''Agent configuration'' (T26, AgentModal manage mode). The old top-right global Settings gear was replaced (T30) by the <UserMenu/> account avatar menu (Profile + Settings); Settings still opens ConfigModal, reversible. ConfigModal + ProfileModal + StatsPopup mounted; AgentModal rendered as a SIBLING of the .vibrancy header (fragment) so its absolute-inset backdrop anchors to the viewport.'
+  last_edited_ms: 1781596817755
 68cbe83e88995a59:
   path: src/ui/input.rs
   description: Renders question form and @autocomplete popup overlays. calculate_question_form_height, render_question_form, calculate_autocomplete_height, render_autocomplete_popup. Consumes QuestionForm/Autocomplete IR data directly.
@@ -3186,6 +3202,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: macOS title bar. App mark (Home)→fleet. AgentSwitcher dropdown. Per-agent segmented switcher Threads·Cockpit·Finder (hidden at fleet). Branch+cost from active agent. ThemeToggle.
   last_edited_ms: 1781516507838
+9cc693c5a0b4085d:
+  path: ui/src/lib/mock.ts
+  description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails, agents, fileTree, library, usagePoints+USAGE_RATES, cockpit panel maquette data (T16), and currentUser (T30 — company-managed account for the avatar menu/Profile modal).'
+  last_edited_ms: 1781596817778
 9d0e6a9adda50aaa:
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + a clickable border RAIL (shadcn Sidebar pattern): thin full-height hit area at x=SIDEBAR_W(212), tracks width, sits at x=0 when collapsed, brightens to interactive on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'

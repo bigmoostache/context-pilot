@@ -21,6 +21,7 @@ import type {
   QueueAction,
   ScratchCell,
   TreeRow,
+  User,
 } from "./types"
 
 // ── Mock data approximating a live Context Pilot session ──
@@ -723,6 +724,22 @@ export const callbackRows: CallbackRow[] = [
   { id: "CB3", name: "rust-check", pattern: "*.rs", blocking: true, timeout: "60s", scope: "global", cwd: "project root" },
 ]
 
+/** Scratchpad panel — ephemeral working cells. */
+export const scratchCells: ScratchCell[] = [
+  {
+    id: "C1",
+    title: "Cockpit maquette — panel checklist",
+    preview:
+      "tree · memory · radar · todo · threads · stats · tools · entities · spine · callbacks · queue · scratchpad — 12 total, each wraps PanelFrame.",
+  },
+  {
+    id: "C2",
+    title: "Layout decision",
+    preview:
+      "Cockpit = LeftRail (240) | PanelPane (flex, the star) | Conversation (420, secondary). Panel-centered: selection in rail drives the center.",
+  },
+]
+
 /** Queue panel — pending tool calls awaiting an atomic flush. */
 export const queueActions: QueueAction[] = [
   { index: 1, tool: "Write", intent: "Create PanelFrame shell", preview: "ui/src/components/panels/cockpit/PanelFrame.tsx" },
@@ -730,17 +747,17 @@ export const queueActions: QueueAction[] = [
   { index: 3, tool: "Edit", intent: "Rewire cockpit layout", preview: "ui/src/App.tsx — CockpitView 3-column" },
 ]
 
-/** Scratchpad panel — ephemeral working cells. */
-export const scratchCells: ScratchCell[] = [
-  {
-    id: "C1",
-    title: "Cockpit maquette — panel checklist",
-    preview: "tree · memory · radar · todo · threads · stats · tools · entities · spine · callbacks · queue · scratchpad — 12 total, each wraps PanelFrame.",
-  },
-  {
-    id: "C2",
-    title: "Layout decision",
-    preview: "Cockpit = LeftRail (240) | PanelPane (flex, the star) | Conversation (420, secondary). Panel-centered: selection in rail drives the center.",
-  },
-]
+// ── Account / current user (avatar menu + Profile modal) ──────────
+// The signed-in human. `managedByCompany: true` showcases the enterprise/SSO
+// path (locked email + org callout); flip it in the Profile modal's design-only
+// preview toggle to see the personal-account layout.
+export const currentUser: User = {
+  name: "Guillaume Draznieks",
+  email: "g.draznieks@acme-robotics.com",
+  initials: "GD",
+  accent: "interactive",
+  managedByCompany: true,
+  company: "Acme Robotics",
+  role: "Staff Engineer",
+}
 

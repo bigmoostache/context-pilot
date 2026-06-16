@@ -101,6 +101,29 @@ export interface StatusModel {
   costUsd: number
 }
 
+// ── Account / current user (avatar menu + profile) ───────────────
+
+/**
+ * The signed-in human's account. Drives the TopBar avatar menu and the Profile
+ * modal (T30). `managedByCompany` decides whether the profile is editable or
+ * provisioned (SSO) by an organization — the modal renders a different account
+ * section for each case.
+ */
+export interface User {
+  name: string
+  email: string
+  /** 1–2 letter fallback shown in the avatar when there's no picture */
+  initials: string
+  /** accent token for the avatar fallback gradient */
+  accent: "signal" | "interactive" | "ok" | "warn" | "danger"
+  /** true → account is provisioned & managed by an organization (SSO/org) */
+  managedByCompany: boolean
+  /** the managing organization (present when managedByCompany) */
+  company?: string
+  /** the user's role label */
+  role?: string
+}
+
 // ── Agents / workspaces (1 agent = 1 folder) ──────────────────────
 
 export type AgentStatus = "working" | "needs-you" | "idle"

@@ -1,11 +1,13 @@
 import { useState } from "react"
-import { Activity, LayoutGrid, MessagesSquare, FolderTree, Home, Settings, Settings2 } from "lucide-react"
+import { Activity, LayoutGrid, MessagesSquare, FolderTree, Home, Settings2 } from "lucide-react"
 import { status, agents } from "@/lib/mock"
 import { fmtCost } from "@/lib/panelMeta"
 import { ThemeToggle } from "./ThemeToggle"
 import { AgentSwitcher } from "./AgentSwitcher"
 import { ConfigModal } from "./ConfigModal"
+import { ProfileModal } from "./ProfileModal"
 import { StatsPopup } from "./StatsPopup"
+import { UserMenu } from "./UserMenu"
 import { AgentModal } from "@/components/agents/AgentModal"
 import { Tip } from "@/components/ui/tip"
 import type { ViewMode } from "@/lib/types"
@@ -28,6 +30,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
   const [configOpen, setConfigOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   return (
     <>
@@ -151,18 +154,20 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
             </button>
           </Tip>
         )}
-        <Tip title="Settings" body="Providers, search, web & integrations, and usage." side="bottom">
-          <button
-            onClick={() => setConfigOpen(true)}
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
-            aria-label="Open settings"
-          >
-            <Settings className="size-[17px]" />
-          </button>
-        </Tip>
+        {/* Account avatar menu (T30) — replaced the old top-right Settings
+            gear. The gear's behaviour is preserved: the menu's "Settings" item
+            still opens the same ConfigModal, and "Profile" opens the profile
+            sheet. To revert, restore a <Tip><button onClick={() =>
+            setConfigOpen(true)}><Settings/></button></Tip> here in place of
+            <UserMenu/> (and re-import the Settings icon). */}
+        <UserMenu
+          onOpenSettings={() => setConfigOpen(true)}
+          onOpenProfile={() => setProfileOpen(true)}
+        />
       </div>
 
       <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
       <StatsPopup open={statsOpen} onClose={() => setStatsOpen(false)} />
     </header>
 
