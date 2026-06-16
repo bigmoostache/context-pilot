@@ -110,33 +110,28 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. Phases 1-11 done & green; GAP1/2/3 tested; M0 crash-replay green; bridge boot+heartbeat live. Next: Phase 12 (X779) stream tee SPSC enqueue + publisher thread + UDS (MILESTONE M1).'
+  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. Phases 1-13 done & green. Next: Phase 14 (X781) bridge body store.'
   contents: |-
-    ## Orchestration Backend Design — v6 (branch maquette)
+    ## Orchestration backend — branch 'demaquetting' (20 phases X768-X787)
 
-    v5 = code-grounded three-tier durability. v6 = honesty pass answering a senior-dev review (thread T35). Keystone unchanged:
-    - ① **Oplog** (bridge-owned `cp-mod-bridge`): append-only, durable, never coalesced. Authoritative for command effects, rev, seen-marks, phase, lifecycle, cost + the immutable content-addressed body store.
-    - ② **State cache**: existing UNTOUCHED `PersistenceWriter` (writer.rs) — async/debounced/coalescing. Mutable `messages/{uid}.yaml`.
-    - ③ **Stream**: lossy UDS live tokens + hints.
+    Phases 1-13 DONE & green:
+    - cp-wire (shared protocol, I/O-free): framing (len+CRC), all wire types, heartbeat record, N-1 compat. command::Frame{schema_version,auth,command} envelope wraps Command (authn at transport layer). SeenSet::rev_of(token) for idempotent dup-ack.
+    - cp-oplog (shared tier-① WAL): append/segment/replay/compact/service. GAP1 (leading-checkpoint bounds replay), GAP2 (group-commit thread + asymmetric backpressure), GAP3 (orphan-body GC 60s grace) all TESTED. M0 crash-replay harness green (V1 real SIGKILL, V2 deadman re-exec; V12 pending Phase 14 body store).
+    - cp-mod-bridge (AGENT): boot (flock gate + oplog + socket + registry 0600 + identity), heartbeat Beacon, tee (M1 SPSC), command Intake (M2: authn + journal-then-ack + dedup). Intake::new seeds SeenSet via replay; handle_frame->(framed_ack, Option<Command>); does NOT own OplogService (by ref) nor apply (caller injects via input.rs K7). 7 tests incl V2 dedup-survives-deadman-reexec.
+    - cp-orchestrator (BACKEND): Phase 3 scaffold only.
 
-    ### v6 corrections (the three real findings)
-    1. **Inertness honesty (§11.1, I2, V11):** 'behaviorally inert / exactly as today' was overclaimed. Logic identical bridge on/off; TIMING is not. Bridge-ON adds per-event oplog durability latency — moved OFF the hot path via a dedicated oplog thread + group commit, but non-zero. 'Exactly as today' holds only bridge-OFF. V11 measures ON-vs-OFF latency vs the agent's turn-cadence budget.
-    2. **fsync model (I2, B7):** per-append `fsync(file)+fsync(dir)` was overkill → `fdatasync` per commit-group + `fsync(dir)` only on segment creation, on the oplog thread.
-    3. **Body-storage contradiction RESOLVED (§3.1, I3/I5, V12):** v5 called message bodies BOTH the mutable tier-② cache AND immutable content-addressed — impossible for the same file. v6 splits into two physical stores: tier-② `messages/{uid}.yaml` (mutable, writer-owned, agent self-reload) vs the bridge-owned immutable content-addressed body store (small bodies inlined in the oplog entry = zero double-write; large bodies spill to `oplog/bodies/{hash}` = the named double-write). writer.rs still untouched (bridge adds a disjoint write path). I1 intact: I1 = single-PROCESS exclusion (flock), and two threads in one process writing disjoint paths (messages/ vs oplog/) is permitted — I1 restated to say so.
+    Trichotomy: cp-wire+cp-oplog=SHARED, cp-mod-bridge=AGENT, cp-orchestrator=BACKEND.
+    Workspace forbids unsafe_code. CB3 rust-check runs clippy WITHOUT --all-targets (lib-only gate).
+    Tee + Intake NOT yet wired into Boot accept-loop — deferred to bridge-on wiring (single bidirectional UDS per peer, UnixStream::try_clone split halves).
 
-    Also: Open-Q1 LOCKED (framed records + per-record CRC, since V1 torn-tail depends on it). §20 register banner: every ✅ = 'designed, test-pending', §25 is the real status (v4 was fully ✅ and wrong). First code = isolated oplog append+crash-replay harness passing V1/V2/V10 against kill -9 + simulated deadman re-exec, before more doc.
-
-    Companion: architecture-adversarial-analysis.md, roadmap.md (P0-P11). NOT implemented (discussion).
-
-    ## Context Pilot Frontend Maquette (ui/, unchanged)
-    Vite+React19+TS+Tailwind v4+shadcn(base-ui). Branch 'maquette'. Mock only. ViewMode=fleet|threads|cockpit|finder. Build: cd ui && pnpm exec tsc -b.
+    Next: Phase 14 (X781) bridge body store: inline-small bodies in oplog entry (zero double-write); large bodies spill to oplog/bodies/{hash} via tmp->fdatasync->rename BEFORE referencing entry commits (I13 barrier). tier-2 messages/{uid}.yaml stays mutable writer-owned cache. writer.rs untouched. V12 validates.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781626216705
+  last_edited_ms: 1781627497436
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical

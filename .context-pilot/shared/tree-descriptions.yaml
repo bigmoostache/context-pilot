@@ -2446,6 +2446,10 @@
   path: crates/cp-mod-search/src/radar.rs
   description: Context Radar with flame!("radar_refresh") and flame!("radar_push_signal"). Adaptive log-count-based decay scoring, Meilisearch log queries via background thread. format_timestamp_ms via cp_mod_utilities::time. Recent logs (10) deterministic + semantic top 40.
   last_edited_ms: 0
+6e5a5d0508fac63f:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: all Module trait methods implemented (stubs, behaviorally inert bridge-OFF). is_global=true, no tools/panels. Declares boot+command+error+heartbeat+identity+registry_io+tee modules. Deps: cp-base, cp-render, cp-wire, cp-oplog, nix(fs), serde_json.'
+  last_edited_ms: 1781627477165
 6e8612aca76b3e84:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (ID/name/pattern/blocking/timeout/scope/success_msg/cwd). Editor sub-view shows script content for one callback. No Active column.
@@ -5250,6 +5254,10 @@ f324d67733a4d09a:
   path: crates/cp-mod-callback/src/firing.rs
   description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. fire_async/blocking_callbacks() for batch dispatch. flame!("cb_fire"), flame!("cb_fire_async"), flame!("cb_fire_blocking"). CallbackWatcher: exit 0→success_message, exit 7→silent, exit !=0→deferred panel, timeout→deferred panel.'
   last_edited_ms: 0
+f3653b71de53c804:
+  path: crates/cp-mod-bridge/src/command.rs
+  description: 'Phase 13 (X780) MILESTONE M2: Intake — agent command intake (authn + journal-then-ack + dedup, I9/I11/I4). new(oplog_dir,cap_token) seeds SeenSet via replay. handle_frame(oplog,bytes)->(framed_ack, Option<Command>): decode_frame (decode_raw+from_slice, None=malformed→reject) → process(): (1) auth empty-or-mismatch→reject ''bad bearer''; (2) seen.contains(dedup)→accept w/ rev_of, NO re-apply (idempotent); (3) append_durable(CommandEffect{cmd_id,dedup}) fsync-before-accept, seen.mark, accept+Some(command); journal err→reject ''journal failed'' (fail-closed). handle_connection(oplog,&mut UnixStream): read framed frames in a loop (boxed READ_CHUNK buf, MAX_CONNECTION_BUFFER 1MiB overflow guard), ack each, return freshly-accepted Commands. Does NOT apply (caller injects via actions/input.rs K7) and does NOT own OplogService (single-writer, Boot-owned, by ref). 7 tests incl V2 dedup-survives-deadman-reexec + handle_connection over socketpair.'
+  last_edited_ms: 1781627477150
 f379d2a878f22b32:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, cp-mod-utilities, serde_json, secrecy.'

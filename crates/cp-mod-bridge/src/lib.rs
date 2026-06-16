@@ -23,6 +23,7 @@ use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 
 pub mod boot;
+pub mod command;
 pub mod error;
 pub mod heartbeat;
 pub mod identity;

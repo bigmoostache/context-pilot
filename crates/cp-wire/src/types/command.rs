@@ -85,9 +85,48 @@ pub enum Kind {
     Unknown,
 }
 
+/// Transport envelope carrying a [`Command`] plus its bearer credential.
+///
+/// The command's authn lives **outside** the [`Command`] struct, in this
+/// envelope, so a receiver checks the bearer before trusting the payload
+/// (design doc I9). For v1 the credential is the agent's `cap_token` (a
+/// presence-checked bearer secret read from the `0600` registry file); the
+/// remote-transport seam (G7) later wraps this same envelope in an HMAC/nonce
+/// without changing the shape.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Frame {
+    /// Wire-schema revision for this struct.
+    pub schema_version: u32,
+
+    /// Bearer credential — the agent's `cap_token`. An empty string is a
+    /// missing bearer and is always rejected.
+    pub auth: String,
+
+    /// The command to apply once the bearer is verified.
+    pub command: Command,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn command_frame_round_trip() {
+        let frame = Frame {
+            schema_version: 1,
+            auth: "tok-secret".into(),
+            command: Command {
+                schema_version: 1,
+                id: "cmd-1".into(),
+                seq: 1,
+                dedup_token: "dt-1".into(),
+                kind: Kind::Stop,
+            },
+        };
+        let json = serde_json::to_string(&frame).expect("serialize");
+        let back: Frame = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(frame, back);
+    }
 
     #[test]
     fn command_round_trip() {

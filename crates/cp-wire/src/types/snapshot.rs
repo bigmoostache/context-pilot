@@ -148,6 +148,17 @@ impl SeenSet {
         self.entries.iter().any(|entry| entry.token == token)
     }
 
+    /// The `rev` at which `token`'s effect first committed, or `None` if the
+    /// token is not (or no longer) in the set.
+    ///
+    /// Command intake uses this to acknowledge a duplicate delivery with the
+    /// `rev` the effect originally landed at, so a retrying commander learns
+    /// where its (already-applied) command lives without re-journaling it.
+    #[must_use]
+    pub fn rev_of(&self, token: &str) -> Option<u64> {
+        self.entries.iter().find(|entry| entry.token == token).map(|entry| entry.rev)
+    }
+
     /// Drop every token whose effect committed at or before `ack_rev`.
     ///
     /// Called at compaction (a later phase) once the backend has durably
@@ -224,6 +235,15 @@ mod tests {
         seen.mark("cmd-a", 9); // duplicate delivery at a later rev
         assert_eq!(seen.len(), 1, "duplicate token must not add a second entry");
         assert_eq!(seen.entries.first().expect("entry").rev, 3, "first rev is kept");
+    }
+
+    #[test]
+    fn seen_set_rev_of_returns_first_commit_rev() {
+        let mut seen = SeenSet::default();
+        assert_eq!(seen.rev_of("cmd-a"), None, "absent token has no rev");
+        seen.mark("cmd-a", 3);
+        seen.mark("cmd-a", 9);
+        assert_eq!(seen.rev_of("cmd-a"), Some(3), "rev_of returns the first-commit rev");
     }
 
     #[test]
