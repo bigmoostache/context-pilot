@@ -184,7 +184,7 @@ Agent Rust loop (per folder):
   `fsync`'d append contains `{cmd_id, dedup_token, rev, effect}`. Either the append
   is durable (effect happened, token seen) or it isn't (neither) — there is no
   partial state, by the atomicity of append-then-fsync. Subsumed into I8.
-- **I7 — The live plane is best-effort and MUST NOT backpressure the agent.** The
+- **I7 — The stream plane (tier ③) is best-effort and MUST NOT backpressure the agent.** The
   tee is a **lock-free SPSC enqueue** on the loop; a **dedicated publisher thread**
   serializes + writes the socket. Ring-full ⇒ **O(1) fail-fast drop** (never block,
   never allocate) + a `degraded` mark; the publisher uses **non-blocking writes +
