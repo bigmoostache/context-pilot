@@ -22,7 +22,16 @@ import {
 import type { FinderKind, FinderNode, FinderTag, FinderViewMode } from "@/lib/types"
 import { collectStarred } from "@/lib/finderFs"
 import { kindMeta, TAG_META } from "./kind"
+import { Tip } from "@/components/ui/tip"
 import { cn } from "@/lib/utils"
+
+// Per-view-mode tooltip copy — the segmented control's icons aren't obvious.
+const VIEW_TIP: Record<FinderViewMode, { title: string; body: string }> = {
+  grid: { title: "Icons", body: "A grid of file & folder icons." },
+  list: { title: "List", body: "A compact, sortable detail list." },
+  columns: { title: "Columns", body: "Browse the hierarchy column by column (Miller)." },
+  gallery: { title: "Gallery", body: "A large preview with a filmstrip of the rest." },
+}
 
 // ── Tab strip ─────────────────────────────────────────────────────
 export interface FinderTab {
@@ -79,13 +88,14 @@ export function FinderTabs({
           </div>
         )
       })}
-      <button
-        onClick={onNew}
-        title="New tab"
-        className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted/60 hover:text-foreground"
-      >
-        +
-      </button>
+      <Tip title="New tab" body="Open another folder in a separate tab." side="bottom">
+        <button
+          onClick={onNew}
+          className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted/60 hover:text-foreground"
+        >
+          +
+        </button>
+      </Tip>
     </div>
   )
 }
@@ -223,17 +233,17 @@ export function FinderToolbar({
           {VIEW_ORDER.map((m) => {
             const Icon = VIEW_ICON[m]
             return (
-              <button
-                key={m}
-                title={m[0].toUpperCase() + m.slice(1)}
-                onClick={() => onViewMode(m)}
-                className={cn(
-                  "relative z-[1] flex size-7 items-center justify-center rounded-md transition-colors",
-                  viewMode === m ? "text-[var(--signal)]" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Icon className="size-4" />
-              </button>
+              <Tip key={m} title={VIEW_TIP[m].title} body={VIEW_TIP[m].body} side="bottom">
+                <button
+                  onClick={() => onViewMode(m)}
+                  className={cn(
+                    "relative z-[1] flex size-7 items-center justify-center rounded-md transition-colors",
+                    viewMode === m ? "text-[var(--signal)]" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-4" />
+                </button>
+              </Tip>
             )
           })}
         </div>
@@ -289,9 +299,8 @@ function NavBtn({
   onClick: () => void
   title: string
 }) {
-  return (
+  const btn = (
     <button
-      title={title}
       disabled={disabled}
       onClick={onClick}
       className={cn(
@@ -303,6 +312,14 @@ function NavBtn({
     >
       <Icon className="size-4" />
     </button>
+  )
+  // A disabled control swallows pointer events, so its tooltip never opens —
+  // skip the wrapper entirely in that state.
+  if (disabled) return btn
+  return (
+    <Tip title={title} side="bottom">
+      {btn}
+    </Tip>
   )
 }
 
@@ -318,16 +335,17 @@ function SegBtn({
   title: string
 }) {
   return (
-    <button
-      title={title}
-      onClick={onClick}
-      className={cn(
-        "flex size-8 items-center justify-center rounded-md transition-colors",
-        on ? "bg-muted text-[var(--signal)]" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-      )}
-    >
-      <Icon className="size-4" />
-    </button>
+    <Tip title={title} side="bottom">
+      <button
+        onClick={onClick}
+        className={cn(
+          "flex size-8 items-center justify-center rounded-md transition-colors",
+          on ? "bg-muted text-[var(--signal)]" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+        )}
+      >
+        <Icon className="size-4" />
+      </button>
+    </Tip>
   )
 }
 

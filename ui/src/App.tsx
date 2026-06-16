@@ -5,6 +5,7 @@ import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetShell } from "@/components/agents/FleetShell"
 import { Finder } from "@/components/finder/Finder"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/lib/theme"
 import { activeAgentId as initialAgentId, agents } from "@/lib/mock"
 import type { ViewMode } from "@/lib/types"
@@ -34,31 +35,33 @@ function App() {
 
   return (
     <ThemeProvider>
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-        <TopBar
-          view={view}
-          onViewChange={setView}
-          activeAgentId={activeAgentId}
-          onSwitchAgent={setActiveAgentId}
-          onNewAgent={newAgent}
-        />
-
-        {view === "fleet" ? (
-          <FleetShell
-            onOpenAgent={openAgent}
-            openCreate={createAgent}
-            onCreateConsumed={() => setCreateAgent(false)}
+      <TooltipProvider delay={350} closeDelay={80}>
+        <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+          <TopBar
+            view={view}
+            onViewChange={setView}
+            activeAgentId={activeAgentId}
+            onSwitchAgent={setActiveAgentId}
+            onNewAgent={newAgent}
           />
-        ) : view === "cockpit" ? (
-          <CockpitView />
-        ) : view === "finder" ? (
-          <Finder key={activeAgent.id} agent={activeAgent} />
-        ) : (
-          <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} />
-        )}
 
-        <StatusBar fleet={view === "fleet"} />
-      </div>
+          {view === "fleet" ? (
+            <FleetShell
+              onOpenAgent={openAgent}
+              openCreate={createAgent}
+              onCreateConsumed={() => setCreateAgent(false)}
+            />
+          ) : view === "cockpit" ? (
+            <CockpitView />
+          ) : view === "finder" ? (
+            <Finder key={activeAgent.id} agent={activeAgent} />
+          ) : (
+            <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} />
+          )}
+
+          <StatusBar fleet={view === "fleet"} />
+        </div>
+      </TooltipProvider>
     </ThemeProvider>
   )
 }

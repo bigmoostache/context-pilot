@@ -6,6 +6,7 @@ import { ThemeToggle } from "./ThemeToggle"
 import { AgentSwitcher } from "./AgentSwitcher"
 import { ConfigModal } from "./ConfigModal"
 import { StatsPopup } from "./StatsPopup"
+import { Tip } from "@/components/ui/tip"
 import type { ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -29,17 +30,18 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
   return (
     <header className="vibrancy flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
       {/* app mark → fleet dashboard (mission control) */}
-      <button
-        onClick={() => onViewChange("fleet")}
-        className={cn(
-          "flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors",
-          inFleet ? "text-foreground" : "text-foreground/90 hover:bg-muted/50",
-        )}
-        title="Fleet — mission control"
-      >
-        <Home className="size-4 text-[var(--signal)]" />
-        <span className="text-[13px] font-semibold tracking-tight">Context Pilot</span>
-      </button>
+      <Tip title="Mission control" body="Back to the fleet — an overview of all your agents." side="bottom">
+        <button
+          onClick={() => onViewChange("fleet")}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors",
+            inFleet ? "text-foreground" : "text-foreground/90 hover:bg-muted/50",
+          )}
+        >
+          <Home className="size-4 text-[var(--signal)]" />
+          <span className="text-[13px] font-semibold tracking-tight">Context Pilot</span>
+        </button>
+      </Tip>
 
       {/* Workspace switcher — always present. Inside an agent it shows the
           active workspace; at fleet altitude (no agent focused) it falls back
@@ -60,27 +62,44 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
         onNewAgent={onNewAgent}
       />
 
-      {/* per-agent view switcher (hidden at fleet altitude) */}
+      {/* per-agent view switcher (hidden at fleet altitude). Order: Threads ·
+          Finder · Cockpit (T25). Each tab carries a tooltip explaining the view
+          since the names aren't obvious to a first-time user. */}
       {!inFleet && (
         <div className="ml-2 flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
-          <ViewTab
-            active={view === "threads"}
-            onClick={() => onViewChange("threads")}
-            icon={MessagesSquare}
-            label="Threads"
-          />
-          <ViewTab
-            active={view === "cockpit"}
-            onClick={() => onViewChange("cockpit")}
-            icon={LayoutGrid}
-            label="Cockpit"
-          />
-          <ViewTab
-            active={view === "finder"}
-            onClick={() => onViewChange("finder")}
-            icon={FolderTree}
-            label="Finder"
-          />
+          <Tip
+            title="Threads"
+            body="Chat with this agent. Each thread is a separate conversation or task it can run in parallel."
+          >
+            <ViewTab
+              active={view === "threads"}
+              onClick={() => onViewChange("threads")}
+              icon={MessagesSquare}
+              label="Threads"
+            />
+          </Tip>
+          <Tip
+            title="Finder"
+            body="Browse this agent's files — the project folder it lives in and is confined to."
+          >
+            <ViewTab
+              active={view === "finder"}
+              onClick={() => onViewChange("finder")}
+              icon={FolderTree}
+              label="Finder"
+            />
+          </Tip>
+          <Tip
+            title="Cockpit"
+            body="Look inside the agent's mind: its live context panels — memory, todos, stats and more."
+          >
+            <ViewTab
+              active={view === "cockpit"}
+              onClick={() => onViewChange("cockpit")}
+              icon={LayoutGrid}
+              label="Cockpit"
+            />
+          </Tip>
         </div>
       )}
 
@@ -93,25 +112,31 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
         )}
         {/* session vitals are agent-scoped — irrelevant at fleet altitude */}
         {!inFleet && (
-          <button
-            onClick={() => setStatsOpen(true)}
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
-            title="Session vitals"
-            aria-label="Open session stats"
-          >
-            <Activity className="size-[17px]" />
-          </button>
+          <Tip title="Session vitals" body="Live tokens, cost and context-budget for this agent." side="bottom">
+            <button
+              onClick={() => setStatsOpen(true)}
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
+              aria-label="Open session stats"
+            >
+              <Activity className="size-[17px]" />
+            </button>
+          </Tip>
         )}
-        <ThemeToggle />
+        <Tip title="Appearance" body="Switch between light and dark." side="bottom">
+          <span className="inline-flex">
+            <ThemeToggle />
+          </span>
+        </Tip>
         <span className="h-5 w-px bg-border/70" />
-        <button
-          onClick={() => setConfigOpen(true)}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
-          title="Settings"
-          aria-label="Open settings"
-        >
-          <Settings className="size-[17px]" />
-        </button>
+        <Tip title="Settings" body="Providers, search, web & integrations, and usage." side="bottom">
+          <button
+            onClick={() => setConfigOpen(true)}
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
+            aria-label="Open settings"
+          >
+            <Settings className="size-[17px]" />
+          </button>
+        </Tip>
       </div>
 
       <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />

@@ -1,6 +1,7 @@
 import { MessageSquare } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { TokenBar } from "@/components/panels/TokenBar"
+import { Tip } from "@/components/ui/tip"
 import { panels, tokenBudget } from "@/lib/mock"
 import { panelIcon, fmtTokens, loadColor } from "@/lib/panelMeta"
 import { cn } from "@/lib/utils"
@@ -46,22 +47,29 @@ export function LeftRail({
           above the panel list (T24). Selecting it renders the full conversation
           in the center pane, just like any panel. */}
       <div className="px-2 pb-1.5">
-        <button
-          type="button"
-          onClick={() => onSelect("conversation")}
-          className={cn(
-            "group flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
-            selected === "conversation"
-              ? "bg-card text-foreground card-shadow"
-              : "text-foreground/70 hover:bg-muted/60",
-          )}
+        <Tip
+          title="Conversation"
+          body="The agent's main dialogue — the running chat stream, shown here like any other panel."
+          side="right"
+          triggerClassName="block"
         >
-          <MessageSquare
-            className="size-4 shrink-0"
-            style={{ color: selected === "conversation" ? "var(--signal)" : "var(--muted-foreground)" }}
-          />
-          <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium">Conversation</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => onSelect("conversation")}
+            className={cn(
+              "group flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
+              selected === "conversation"
+                ? "bg-card text-foreground card-shadow"
+                : "text-foreground/70 hover:bg-muted/60",
+            )}
+          >
+            <MessageSquare
+              className="size-4 shrink-0"
+              style={{ color: selected === "conversation" ? "var(--signal)" : "var(--muted-foreground)" }}
+            />
+            <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium">Conversation</span>
+          </button>
+        </Tip>
       </div>
 
       <div className="px-4 pb-1.5">
