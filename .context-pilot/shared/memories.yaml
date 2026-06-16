@@ -110,35 +110,49 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting''. 30 phases X768-X797. Phases 1-19 done & green (77 orchestrator tests). Next: Phase 20 (X787 M4 fault-gate/observability/soak) + 10 testing phases 21-30 (X788-X797).'
+  tl_dr: 'Orchestration backend, branch ''demaquetting''. 30 phases X768-X797. Phases 1-21 done & green. Next: Phase 22 (X789 cp-oplog append/segment/replay suite) onward through 30, then capstone Phase 20 (X787).'
   contents: |-
     ## Orchestration backend — branch 'demaquetting' (30 phases X768-X797)
 
-    Phases 1-19 DONE & green (77 orchestrator tests + cp-wire + cp-oplog suites):
-    - cp-wire (shared protocol, I/O-free): framing (len+CRC32C), all wire types, heartbeat record (60B), N-1 compat. command::Frame{schema_version,auth,command}. SeenSet::rev_of idempotent dup-ack. ContentHash::of(&[u8])->SHA-256; to_hex(self) by-value; from_hex(s) inverse (transport /body/{hash}). registry::Entry full schema. AgentView+CostSnapshot are Serialize (transport REST).
-    - cp-oplog (shared tier-① WAL): append/segment/replay/compact/service. GAP1 (leading-checkpoint), GAP2 (group-commit + asymmetric backpressure), GAP3 (orphan-body GC 60s grace) all TESTED. M0 crash-replay green (V1 SIGKILL, V2 deadman re-exec).
-    - cp-mod-bridge (AGENT): boot (flock gate), heartbeat Beacon, tee (M1 SPSC), command Intake (M2), body Store (Phase 14, I13). Tee+Intake+body NOT yet wired into Boot accept-loop (bridge-ON wiring deferred).
-    - cp-orchestrator (BACKEND): lib+bin. liveness verdict, registry scan-and-diff, channel Tailer+AgentChannel, supervisor (M3 spawn/stop/restart/adopt), services (MaterializedView/CostBreaker/StreamHub), transport (Phase 19).
+    Phases 1-19 PRODUCTION DONE & green. Phase 21 (X788) testing DONE.
 
-    ## Phase 19 transport (REST + SSE on tiny_http, blocking thread-per-conn, NO async runtime)
-    Files in crates/cp-orchestrator/src/transport/:
-    - mod.rs: Backend{view,breaker,hub,tickets,agents_dir} Arc<Mutex>. serve(addr,state) acceptor loop, thread-per-request. route_rest router. handle_stream = GET /api/stream?agent&ticket: redeem single-use ticket, run_stream producer (Tailer.seed(last_rev from Last-Event-ID) replay + gap→resync + hub frame drain + keepalive). MAX_BODY 1MiB, STREAM_POLL 200ms. read_body binds _read, respond binds _sent.
-    - rest.rs: HttpReply, Envelope<T>{rev,data} (every read carries rev), CommandReceipt{cmd_id,dedup_token,rev}. handlers fleet/agent/body/command/mint_ticket. fail-closed 503 on tripped CostBreaker. resolve_entry reads <id>.json.
-    - sse.rs: SseMessage encode (id/event/data, multiline split). SseBody blocking Read over mpsc (Ok(0) EOF on all-senders-dropped). SseSink.send/keep_alive (Err=client gone=stop). channel(). Reconnect-replay-by-rev native via Last-Event-ID.
-    - ticket.rs: TicketStore mint/redeem single-use + TTL 30s + lazy sweep, /dev/urandom 256-bit token (I9b: malicious-website defense CORS can't give).
-    tiny_http=0.12 dep. lib.rs declares pub mod transport. main.rs: use nix/serde/serde_json/cp_oplog/tiny_http as _ (per-target unused-crate-dependencies).
+    ### Trichotomy (each file's doc says which side)
+    - cp-wire + cp-oplog = SHARED (I/O contract + WAL)
+    - cp-mod-bridge = AGENT-only
+    - cp-orchestrator = BACKEND-only
 
-    Trichotomy: cp-wire+cp-oplog=SHARED, cp-mod-bridge=AGENT, cp-orchestrator=BACKEND.
-    Workspace forbids unsafe_code. CB3 rust-check runs clippy WITHOUT --all-targets (lib-only) — does NOT catch -F let-underscore-drop / unused-results / unused-crate-dependencies on bin+test targets; ALWAYS cargo test before commit. let-underscore-drop fires on `let _ =` for Result with destructor (io::Error) — bind `let _named =`.
+    ### Crate test counts (all green under full lint gate)
+    - cp-wire: 74 (59 lib + 8 framing_integrity + 7 protocol)
+    - cp-orchestrator: 77
+    - cp-oplog: append/segment/replay/compact/service inline + crash_replay integration (M0 V1/V2)
+    - cp-mod-bridge: boot/heartbeat/tee/intake/body inline
 
-    Next: Phase 20 (X787) M4 = full V1-V12 fault gate + observability + soak + sign-off. Plus 10 testing phases 21-30 (X788-X797): per-component exhaustive suites (cp-wire, cp-oplog append/dedup/service, bridge boot/tee/intake/body, backend registry/channel/supervisor/services, transport+e2e). Captain asked to confirm 21-30 plan before writing the 10 suites.
+    ### Phase 21 (X788) DONE: cp-wire test suite
+    Two integration files in crates/cp-wire/tests/: framing_integrity.rs (8 tests, byte-granular torn-tail/corruption sweep) + protocol.rs (7 tests, every OpEntryKind round-trip incl Checkpoint{Snapshot}, accepts() N-1 sweep, ContentHash from_hex bijection, SeenSet evict barrier, Heads upsert). Committed + pushed.
+
+    ### CRITICAL lint gotchas (carry forward to phases 22-30)
+    - Each tests/ file is a SEPARATE crate target. per-target `unused-crate-dependencies` (forbid) flags every cp-wire/crate dep the test file does NOT directly name. FIX: add `use <crate> as _;` block at top for the unnamed deps. CB3 rust-check is LIB-ONLY (no --all-targets) — does NOT catch this. ALWAYS `cargo test -p <crate>` before commit.
+    - Test-target rustc lints that fire under cargo test but NOT CB3: let-underscore-drop (bind `let _named =` for Result-with-destructor), unused-results (bind discarded usize/insert returns), unused-crate-dependencies.
+    - Lint-safe test patterns: avoid `as u8` (cast_possible_truncation deny) → u8::try_from(x & 0xFF).unwrap_or(0); avoid to_le_bytes (little_endian_bytes forbid) → [0xFF;4] copy_from_slice for corrupt u32::MAX prefix. expect()/panic!/assert_eq with f64-containing struct (derived PartialEq, not my ==) all allowed in test context.
+
+    ### Remaining: phases 22-30 (X789-X797) per-component exhaustive suites, then capstone Phase 20 (X787) M4 = full V1-V12 fault gate + observability + soak + sign-off.
+    - 22 (X789): cp-oplog append/segment/replay (rev monotonic, segment naming/parse, roll-at-limit, leading-checkpoint, torn-tail recovery, replay_fast==replay_full equivalence over many shapes).
+    - 23 (X790): cp-oplog dedup/compaction (V3 long-gap no-op, ack-rev-only eviction, mark idempotent, compaction deletes pre-checkpoint segs + replay identical, body_gc_eligible 60s boundary).
+    - 24 (X791): cp-oplog service group-commit (Durability::of exhaustive, append_durable blocks under full queue, append_best_effort drops, commit_loop one-fdatasync-per-group, sync-failure overrides, Drop+shutdown join+sync, concurrent submitters rev-monotonic).
+    - 25 (X792): bridge boot/heartbeat (flock second-boot-refuses, atomic 0600 record, identity entropy, Drop cleanup, Beacon first-beat-sync/in-place/cadence/verdict matrix).
+    - 26 (X793): bridge tee/intake/body (producer-never-blocks 100k<5s, O(1)drop+degraded, intake bad-bearer-reject/journal-then-ack/dedup-across-deadman/fail-closed, body inline-vs-spill I13/get-integrity/gc-grace V12).
+    - 27 (X794): backend registry/channel (scan-and-diff event matrix, Stale only on Live→non-live, reap_tmp, liveness three-factor matrix, Tailer gap-free/idempotent/segment-roll/seed, hydrate verified/missing/corrupt, send framed-ack/refused-retry).
+    - 28 (X795): backend supervisor (allow-list realpath gate symlink/.., duplicate-id, SIGTERM→grace→SIGKILL, reap-no-zombie, restart new-pid, adopt+vanish signal-0, check_liveness reap).
+    - 29 (X796): backend services (MaterializedView fold-every-kind + Checkpoint authoritative I5, CostBreaker high-water V9 + poison fail-closed + rebuild, StreamHub fan-out/overflow-evict-oldest/per-sub-degraded/cap0/mark_reconciled).
+    - 30 (X797): transport + e2e (ticket single-use/TTL/unknown, REST rev-envelope+cmd receipt+body-hydrate+404/400, SSE Last-Event-ID replay-by-rev + gap→resync, END-TO-END loopback spawn→POST→journal→Tailer→SSE→reconnect, breaker-tripped-blocks, soak FD/thread/mem stability).
+    - 20 (X787) LAST: M4 ship gate.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781647677465
+  last_edited_ms: 1781648212811
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
