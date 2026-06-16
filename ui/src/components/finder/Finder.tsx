@@ -18,6 +18,8 @@ import { ColumnsView, GalleryView, GridView, ListView } from "./FinderViews"
 import { FinderPreview } from "./FinderPreview"
 import { ContextMenu, type MenuPos } from "./ContextMenu"
 import { GetInfo } from "./GetInfo"
+import { useMarquee } from "./useMarquee"
+import { cn } from "@/lib/utils"
 
 interface Tab extends FinderTab {
   back: string[]
@@ -272,6 +274,20 @@ export function Finder({ agent }: { agent: Agent }) {
     onContext: openContext,
   }
 
+  // ── box (marquee) selection ─────────────────────────────────────
+  const mainRef = useRef<HTMLElement>(null)
+  const marqueeOn = viewMode === "grid" || viewMode === "list"
+  const marquee = useMarquee({
+    containerRef: mainRef,
+    enabled: marqueeOn,
+    getSelected: () => selected,
+    onChange: setSelected,
+    onEmptyClick: () => {
+      setSelected(new Set())
+      setFocusPath(null)
+    },
+  })
+
   return (
     <div
       ref={surfaceRef}
@@ -350,18 +366,34 @@ export function Finder({ agent }: { agent: Agent }) {
         ) : (
           <>
             <main
+              ref={mainRef}
+              {...marquee.handlers}
               onClick={(e) => {
+                if (marquee.didDrag()) return
                 if (e.currentTarget === e.target) {
                   setSelected(new Set())
                   setFocusPath(null)
                 }
               }}
-              className={
+              className={cn(
+                "relative min-w-0 flex-1",
                 viewMode === "columns" || viewMode === "gallery"
-                  ? "min-w-0 flex-1 overflow-hidden"
-                  : "min-w-0 flex-1 overflow-auto"
-              }
+                  ? "overflow-hidden"
+                  : "overflow-auto",
+                marqueeOn && "select-none",
+              )}
             >
+              {marquee.band && (
+                <div
+                  className="pointer-events-none absolute z-10 rounded-[2px] border border-[var(--signal)] bg-[var(--signal)]/12"
+                  style={{
+                    left: marquee.band.left,
+                    top: marquee.band.top,
+                    width: marquee.band.width,
+                    height: marquee.band.height,
+                  }}
+                />
+              )}
               {viewMode === "grid" && (
                 <GridView key={cwd} nodes={sorted} iconSize={iconSize} {...viewProps} />
               )}

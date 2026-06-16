@@ -55,6 +55,8 @@ export function GridView({
           <button
             key={n.path}
             title={n.name}
+            data-finder-item=""
+            data-path={n.path}
             onClick={(e) => h.onClick(n, mods(e))}
             onDoubleClick={() => h.onOpen(n)}
             onContextMenu={(e) => h.onContext(e, n)}
@@ -115,6 +117,8 @@ export function ListView({
         return (
           <button
             key={n.path}
+            data-finder-item=""
+            data-path={n.path}
             onClick={(e) => h.onClick(n, mods(e))}
             onDoubleClick={() => h.onOpen(n)}
             onContextMenu={(e) => h.onContext(e, n)}
