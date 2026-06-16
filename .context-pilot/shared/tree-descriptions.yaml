@@ -2558,6 +2558,10 @@
   path: docs/rust-static-analysis-tools.md
   description: 'Comprehensive listing of Rust static analysis tools, modeled after Holzmann''s classic C tools page. Covers: compiler (rustc/clippy), commercial (CodeQL/Semgrep/Coverity/Klocwork/SonarQube/TrustInSoft), academic (Miri/Rudra/MIRAI/MirChecker/lockbud/Yuga), formal verification (Kani/Prusti/Verus/Creusot/Flux/Aeneas/hax), theory (RustBelt/Stacked Borrows), fuzzing (cargo-fuzz/bolero/proptest/loom), supply chain (cargo-audit/deny/geiger/vet/crev), CI pipeline recommendations, textbooks.'
   last_edited_ms: 0
+745f0477e0e8a7c5:
+  path: crates/cp-mod-bridge/src/tee.rs
+  description: 'Phase 12 (X779) MILESTONE M1: agent-side stream tee. Tee::publish(frame)->Outcome{Published,Dropped} = ONE non-blocking try_send into a bounded mpsc::sync_channel (unsafe forbidden → no hand-rolled lock-free ring; producer-never-blocks contract preserved). Ring-full → O(1) drop + degraded flag + dropped counter (P3 observability). Dedicated Publisher thread owns receiver + UnixListener: non-blocking accept (≤1 observer), drain frame, serialize JSON + framing::encode_raw (len+CRC, same as oplog), non-blocking UDS write with bounded backoff (MAX_WRITE_ATTEMPTS×WRITE_BACKOFF ~5ms then drop+degraded; broken pipe → drop observer). No observer → discard (late observer sees live frames not backlog). RAII Drop stops+joins. NOT yet wired into Boot — socket ownership (bidirectional? stream-out + command-in) deferred to Phase 13. 5 tests incl V7 stalled-consumer-never-blocks-producer (100k publishes <5s despite wedged reader).'
+  last_edited_ms: 1781626840261
 748367d53cf70c66:
   path: crates/cp-base/Cargo.lock
   description: Foundation crate lockfile

@@ -27,6 +27,7 @@ pub mod error;
 pub mod heartbeat;
 pub mod identity;
 pub mod registry_io;
+pub mod tee;
 
 /// Agent-side orchestration bridge module.
 ///
