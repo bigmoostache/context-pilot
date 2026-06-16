@@ -4714,6 +4714,10 @@ e04bf579d6804e04:
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
   last_edited_ms: 0
+e0967f55f964e135:
+  path: Cargo.toml
+  description: Workspace root. 22 crate members (incl cp-wire). Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny). openssl vendored.
+  last_edited_ms: 1781615410305
 e0c2ca859aee6bef:
   path: yamls/tools/logs.yaml
   description: Log tools YAML. log_create (entries with content+importance) + Close_conversation_history (panels array with panel_id + logs as simple strings). No tags, no memories.

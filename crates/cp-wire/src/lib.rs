@@ -16,8 +16,10 @@
 //! peer must be able to decide — before decoding a payload — whether it can
 //! speak to the sender at all. [`accepts`] encodes that decision.
 //!
-//! *Phase 1 scaffold:* this module currently establishes only the versioning
-//! primitives. The concrete message types land in Phase 2.
+//! *Phase 2:* the concrete message types ([`types`]) are defined — commands,
+//! oplog entries, stream frames, heads, bodies, acks, and registry entries.
+
+pub mod types;
 
 /// The protocol's current major version.
 ///
