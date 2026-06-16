@@ -110,7 +110,7 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. Phases 1-10 done & green; GAP1/2/3 tested; M0 crash-replay green. Next: Phase 11 (X778) heartbeat thread + liveness.'
+  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. Phases 1-11 done & green; GAP1/2/3 tested; M0 crash-replay green; bridge boot+heartbeat live. Next: Phase 12 (X779) stream tee SPSC enqueue + publisher thread + UDS (MILESTONE M1).'
   contents: |-
     ## Orchestration Backend Design — v6 (branch maquette)
 
@@ -136,7 +136,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781625078325
+  last_edited_ms: 1781626216705
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical

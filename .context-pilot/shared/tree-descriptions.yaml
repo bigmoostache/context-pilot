@@ -2222,6 +2222,10 @@
   path: crates/cp-base/src/config/constants.rs
   description: Layout/timing constants. SIDEBAR_HELP_HEIGHT=10 (9 help hints + separator). MAX_SIDEBAR_LABEL_LEN, INPUT_RESERVE, TEMPO_*, token thresholds, typing indicator timing.
   last_edited_ms: 1780499299747
+65e6451d405f146f:
+  path: crates/cp-mod-bridge/src/heartbeat.rs
+  description: 'Phase 11 (X778): Beacon — agent-side liveness heartbeat thread. start(&Path,pid,boot_id,cadence) opens/creates file, writes first beat (seq 0) synchronously, spawns thread. beat_loop(File,&Beat,&Receiver) recv_timeout(cadence): Timeout=write next beat in-place (seek0+write_all+sync_data, fixed-size never grows), signal/Disconnected=stop. Beat{pid,boot_id,cadence} bundles params (too_many_arguments). RAII Drop signals+joins. 4 tests.'
+  last_edited_ms: 1781626203763
 66534c47658ea1f7:
   path: .github/checks/lint-config.chain
   description: Cryptographic hash chain protecting 12 critical lint/config files
@@ -4946,6 +4950,10 @@ e31c48c5949be594:
   path: crates/cp-console-server/src/protocol.rs
   description: JSON-line protocol types. Request (cmd/key/command/cwd/input/log_path). Response (ok/error/pid/status/exit_code/sessions). interpret_escapes() for \n/\t/\xHH.
   last_edited_ms: 0
+e41498051393a608:
+  path: crates/cp-wire/src/heartbeat.rs
+  description: 'Phase 11 (X778): fixed 60-byte binary liveness record. Heartbeat{schema_version,timestamp_ms,sequence,pid,boot_id} + encode/decode (LE: ver4+ts8+seq8+pid4+boot_id32+crc4) + is_fresh(now,max_age, saturating) + matches_boot (pid-reuse defence). Error enum (renamed off HeartbeatError for module_name_repetitions). Manual u32/u64 to_le/from_le (little_endian_bytes forbids to_le_bytes). HEARTBEAT_LEN=60, DEFAULT_CADENCE=1s, DEFAULT_MAX_AGE=5s. I/O-free. 11 tests.'
+  last_edited_ms: 1781626203750
 e42b947f77dc2bb4:
   path: crates/cp-mod-spine/src/engine.rs
   description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'

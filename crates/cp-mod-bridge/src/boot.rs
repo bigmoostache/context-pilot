@@ -41,10 +41,12 @@ use nix::errno::Errno;
 use nix::fcntl::{Flock, FlockArg};
 
 use cp_oplog::service::Service as OplogService;
+use cp_wire::heartbeat::DEFAULT_CADENCE;
 use cp_wire::types::registry::{AgentStatus, Entry};
 use cp_wire::PROTOCOL_VERSION;
 
 use crate::error::{Error, BootResult};
+use crate::heartbeat::Beacon;
 use crate::identity::{folder_id, mint_boot_id, mint_cap_token};
 use crate::registry_io;
 
@@ -87,6 +89,10 @@ pub struct Boot {
 
     /// The bound socket's path (for drop cleanup).
     socket_path: PathBuf,
+
+    /// The liveness beacon thread — stopped and joined on drop. The leading
+    /// underscore documents that it is owned for its `Drop`, not read.
+    _heartbeat: Beacon,
 }
 
 impl Boot {
@@ -154,6 +160,17 @@ impl Boot {
         };
         let _written = registry_io::write_entry(agents_dir, &entry)?;
 
+        // The liveness beacon starts last, once every advertised resource
+        // exists: it writes the first beat synchronously, so the moment this
+        // returns the backend can both discover (registry) and verify (beat).
+        let heartbeat = Beacon::start(
+            Path::new(&entry.heartbeat_path),
+            entry.pid,
+            entry.boot_id.clone(),
+            DEFAULT_CADENCE,
+        )
+        .map_err(|e| Error::io(format!("start heartbeat {}", entry.heartbeat_path), e))?;
+
         Ok(Self {
             _lock: lock,
             oplog,
@@ -161,6 +178,7 @@ impl Boot {
             entry,
             agents_dir: agents_dir.to_path_buf(),
             socket_path,
+            _heartbeat: heartbeat,
         })
     }
 

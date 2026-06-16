@@ -24,6 +24,7 @@ use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 
 pub mod boot;
 pub mod error;
+pub mod heartbeat;
 pub mod identity;
 pub mod registry_io;
 

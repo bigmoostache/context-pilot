@@ -18,8 +18,10 @@
 //!
 //! *Phase 2:* the concrete message types ([`types`]) are defined — commands,
 //! oplog entries, stream frames, heads, bodies, acks, and registry entries.
+//! *Phase 11:* the fixed-size [`heartbeat`] liveness record is added.
 
 pub mod framing;
+pub mod heartbeat;
 pub mod types;
 
 /// The protocol's current major version.
