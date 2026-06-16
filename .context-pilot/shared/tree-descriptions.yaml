@@ -506,6 +506,10 @@
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A) + DARK ''Forest Clay'' (#2C3639/#3F4E4F/#A27B5C/#DCD7C9: slate base, clay-tan accent, cream text) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow.'
   last_edited_ms: 1781516507869
+16841a63a26bdc5f:
+  path: crates/cp-wire/src/types/command.rs
+  description: Command envelope (id, seq, dedup_token) + CommandKind (SendMessage, CreateThread, ArchiveThread, RestoreThread, InterruptStream, Stop, Unknown).
+  last_edited_ms: 1781616040214
 16896bc4c096fb84:
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
@@ -1182,6 +1186,10 @@
   path: .github/workflows/release.yml
   description: 'Release workflow: builds .deb on tag push (ubuntu-latest, amd64 only). Creates GitHub Release with softprops/action-gh-release.'
   last_edited_ms: 0
+37530dfa848d902a:
+  path: crates/cp-wire/src/types/mod.rs
+  description: ContentHash (SHA-256, custom hex serde, Copy), Phase (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped). Re-exports all submodule types.
+  last_edited_ms: 1781616040201
 37c090f619a600a6:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -1878,6 +1886,10 @@
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
   last_edited_ms: 0
+580461c72be5915b:
+  path: crates/cp-wire/src/types/stream.rs
+  description: StreamFrame (agent/worker/thread/message_id, seq) + StreamKind (MessageStartHint, Token, ToolArgs, PhaseHint, Unknown).
+  last_edited_ms: 1781616040239
 581ea00f4be2d58b:
   path: crates/cp-mod-chat/src/server.rs
   description: Global Tuwunel homeserver lifecycle. PID/socket/config file management. UDS HTTP helpers (get/post/put). pre_start_daemon() for parallel boot. ensure_daemon_running() + start_server(state). Geometric backoff health polling (50ms→500ms cap, 15s budget).
@@ -2066,6 +2078,10 @@
   path: crates/cp-mod-brave/src/api.rs
   description: Brave Search HTTP client. BraveClient with retry (3 attempts, 1s delay on 5xx). SearchParams + LLMContextParams structs. Rich callback fetching. Custom URL encoding. 10s request timeout.
   last_edited_ms: 0
+61f57db31a0c2cc9:
+  path: crates/cp-wire/src/types/body.rs
+  description: 'Content-addressed Body: hash + data bytes. Inline-small in oplog or spill to oplog/bodies/{hash}.'
+  last_edited_ms: 1781616040264
 6243fb33364b1a75:
   path: src/llms/cache/cache_engine.rs
   description: Cache breakpoint engine. Hash chain (acc_hash = sha256(block + prev)). Tracks alive BPs via hash match. Places beacon at frontier+20. Runs DP optimizer for 3 additional BPs (4 total). 5-min TTL matching Anthropic.
@@ -2186,6 +2202,10 @@
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet shell — mission-control workspace shown when no agent is focused. NO sidebar (T18): collapsed to a single page. Slim top bar with a segmented [Agents | Prompts] toggle; renders FleetDashboard or PromptsPage full-bleed below. Usage moved into the Settings dialog (ConfigPanel ''usage'' category); Settings reachable only via TopBar gear. Only prop: onOpenAgent.'
   last_edited_ms: 1781544801616
+676f2d57d118cabb:
+  path: crates/cp-wire/src/lib.rs
+  description: 'Versioning primitives: PROTOCOL_VERSION const + accepts(their_major) N-1 compat check. 4 tests. Phase 2 adds wire types.'
+  last_edited_ms: 1781616040302
 6770a19d58374b59:
   path: ui/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome. FinderTabs (strip + new/close; kind-icon per tab). FinderToolbar — context-aware: folder tab = back/fwd, breadcrumb, icon-size slider [grid], 4-mode segmented control, search, New Folder/Upload/Download, path-bar+QuickLook toggles; FILE tab (fileActive) hides those, shows Get Info/Download/Share. FinderSidebar (Favorites/Locations/Tags/Recents + confined-realm note) width = shared var(--sidebar-w). FinderPathBar (bottom).'
@@ -2258,6 +2278,10 @@
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 1780612872558
+6b9f77904ef7fe30:
+  path: crates/cp-wire/src/types/oplog.rs
+  description: OpEntry (rev, timestamp_ms) + OpEntryKind (CommandEffect, SeenMark, PhaseTransition, MessageCreated, Lifecycle, CostAggregate, Checkpoint, Unknown).
+  last_edited_ms: 1781616040226
 6ba7c45a67b4d4f7:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
@@ -2626,6 +2650,10 @@
   path: yamls/tools/logs.yaml
   description: Log tools YAML. log_create (entries with content+importance) + Close_conversation_history (panels array with panel_id + logs as simple strings). No tags, no memories.
   last_edited_ms: 0
+7ca7c8e1bd88699a:
+  path: crates/cp-wire/src/types/registry.rs
+  description: RegistryEntry (id, folder, pid, boot_id, cap_token, paths, status) + AgentStatus (Starting/Running/Stopping/Down).
+  last_edited_ms: 1781616040289
 7cd3b2dd7bd4c8f6:
   path: ui/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome: FinderTabs (tab strip + new/close), FinderToolbar (back/fwd, breadcrumb, grid/list/columns seg, search, upload/download, preview toggle), FinderSidebar (Realm places + favorites + ''confined realm'' note).'
@@ -3190,6 +3218,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'Cockpit header strip: app mark, view switcher (Threads/Cockpit segmented control), project breadcrumb, branch chip, global cost, status dot.'
   last_edited_ms: 0
+962bf92c20525005:
+  path: crates/cp-wire/src/types/heads.rs
+  description: 'Heads snapshot: bounded set of ThreadHead + PanelHead content hashes. O(threads+panels) not O(total-files).'
+  last_edited_ms: 1781616040251
 965292c5106e02e5:
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
@@ -4058,6 +4090,10 @@ bf721ed9cc1a06a3:
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
   last_edited_ms: 0
+bfe86519072f84a5:
+  path: crates/cp-wire/src/types/ack.rs
+  description: 'Command Ack: cmd_id + AckStatus (Accepted/Rejected) + optional rev. Journal-then-ack (I11).'
+  last_edited_ms: 1781616040276
 c036e5d93c04e6ba:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread, ThreadQuestionForm (from_json with 50q x 100opt caps + field-length caps via cap_str, YAML-escaped other_text with \r), ThreadsState + FocusState with TypeMap accessors.'
@@ -4954,6 +4990,10 @@ ee094a5116fc9a90:
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook preview pane. Kind-aware bespoke renders: code (line numbers + keyword tint), spreadsheet (A/B/C grid), slide deck (hero + thumbnails), PDF (paper mock), image (gradient), markdown/json/text, folder summary. Metadata footer (kind/size/modified/path).'
   last_edited_ms: 1781516507787
+ee41eb6a94d78b30:
+  path: crates/cp-wire/Cargo.toml
+  description: Wire protocol crate manifest. No deps yet (I/O-free). Workspace lints inherited.
+  last_edited_ms: 1781616040314
 ee59b893f856d59f:
   path: docs/web_module_design.md
   description: Brave + Firecrawl web module design
