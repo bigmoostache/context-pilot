@@ -4138,6 +4138,10 @@ c80cf4a36c945d80:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
   last_edited_ms: 0
+c834a61ebb6faa99:
+  path: ui/src/components/agents/PromptsPage.tsx
+  description: 'Global prompt-library page (fleet ''Prompts''). Centred on shared FLEET_MAX_W. Slim header (T28): ''Prompts'' h1 + Import/New buttons (no ''Prompt library'' label, no subtitle). Renders mock library[] (system/skills/commands) as cards w/ KIND_META icon/accent/blurb, filter tabs (all + per-kind counts), kind sections in ''all''. ''agent'' kind labelled ''System''. Card/New/Import open PromptModal + ImportModal. Built-in badge only.'
+  last_edited_ms: 1781597617608
 c83e02c82f575734:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -4598,6 +4602,10 @@ e167b2d794ad0a70:
   path: yamls/tools/tree.yaml
   description: Tree tools YAML. tree_filter (gitignore patterns), tree_toggle (open/close/toggle folders), tree_describe (path+description+delete+close_panel params).
   last_edited_ms: 0
+e19314fbc0e8ca8e:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: 'Fleet welcome dashboard — agent create/manage entry. Centred on shared FLEET_MAX_W. Slim header (T28): just an ''Agents'' h1 + New-agent button (no ''Mission control'' label, no subtitle). AgentCard grid (status badge + one-line task + model·cost; Open→threads, Manage→AgentModal), New-agent card. autoCreate prop (T21) opens AgentModal in create mode then calls onAutoCreateConsumed. AgentModal lives in ./AgentModal (T26), shared with the TopBar per-agent config button.'
+  last_edited_ms: 1781597617596
 e1f54075ea2f5313:
   path: crates/cp-mod-files/Cargo.toml
   description: 'Files module deps: cp-base, cp-mod-tree, cp-mod-queue, cp-render, crossterm, serde_json.'
