@@ -26,20 +26,30 @@
 //! from the durable state on disk, guaranteeing `rev`s are never reused and the
 //! next checkpoint is accurate.
 //!
-//! This is a *synchronous* writer: `append` performs the `fdatasync` inline.
-//! The off-loop group-commit thread that amortizes syncs across many records
-//! arrives in a later phase; the durability contract it must preserve is
-//! defined and tested here first.
+//! # Synchronous vs buffered append (group commit)
+//!
+//! [`OplogWriter::append`] is *synchronous*: it writes and `fdatasync`s before
+//! returning, so an announced `rev` is always durable. For amortised
+//! throughput, the writer also exposes a **buffered** path:
+//! [`OplogWriter::append_buffered`] writes the frame **without** syncing and
+//! [`OplogWriter::sync`] flushes the current segment once. The off-loop
+//! group-commit service ([`crate::service`]) drains a batch of records,
+//! `append_buffered`s each, then calls `sync` **once** — one `fdatasync` per
+//! group instead of per record. A buffered `rev` is *not* durable until the
+//! next `sync`, so a caller must never announce it before then
+//! (announce-after-durable, design doc K9). A segment roll flushes the old
+//! segment durably before switching, so a batch that spans a roll still leaves
+//! every record on a synced segment.
 
-use std::fmt;
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Seek as _, SeekFrom, Write as _};
+use std::io::{Seek as _, SeekFrom, Write as _};
 use std::path::{Path, PathBuf};
 
-use cp_wire::framing::{self, FrameError};
+use cp_wire::framing;
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
 use cp_wire::types::snapshot::{Heads, SeenSet, Snapshot};
 
+use crate::error::OplogResult;
 use crate::replay::{self, fold_entry, ReplayState};
 use crate::segment;
 
@@ -49,41 +59,6 @@ pub const DEFAULT_SEGMENT_LIMIT: u64 = 64 * 1024 * 1024;
 
 /// Schema version stamped onto every [`OpEntry`] this writer emits.
 const WRITER_SCHEMA_VERSION: u32 = 1;
-
-/// An error from oplog write operations.
-#[derive(Debug)]
-pub enum OplogError {
-    /// An underlying filesystem operation failed (open, write, sync, …).
-    Io(io::Error),
-
-    /// The entry could not be framed (serialisation failed or it was too
-    /// large to carry a 32-bit length prefix).
-    Frame(FrameError),
-}
-
-impl fmt::Display for OplogError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Io(e) => write!(f, "oplog I/O error: {e}"),
-            Self::Frame(e) => write!(f, "oplog framing error: {e}"),
-        }
-    }
-}
-
-impl From<io::Error> for OplogError {
-    fn from(e: io::Error) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl From<FrameError> for OplogError {
-    fn from(e: FrameError) -> Self {
-        Self::Frame(e)
-    }
-}
-
-/// A `Result` whose error is an [`OplogError`].
-pub type OplogResult<T> = Result<T, OplogError>;
 
 /// Append-only writer for one oplog directory.
 #[derive(Debug)]
@@ -202,22 +177,41 @@ impl OplogWriter {
         Ok(())
     }
 
-    /// Append one record, returning its durably-assigned `rev`.
+    /// Append one record synchronously, returning its durably-assigned `rev`.
     ///
-    /// The bytes are framed, written, and `fdatasync`'d before the `rev` is
-    /// returned, so the caller never observes a `rev` that a crash could undo.
-    /// If the current segment is full, the writer first rolls to a new segment
-    /// and stamps its leading checkpoint (GAP 1) — the checkpoint and this
-    /// record both land durably.
+    /// Equivalent to [`append_buffered`](Self::append_buffered) followed by
+    /// [`sync`](Self::sync): the bytes are framed, written, and `fdatasync`'d
+    /// before the `rev` is returned, so the caller never observes a `rev` that a
+    /// crash could undo. If the current segment is full, the writer first rolls
+    /// to a new segment and stamps its leading checkpoint (GAP 1).
     ///
     /// # Errors
     ///
     /// Returns [`OplogError::Frame`] if the entry cannot be framed, or
     /// [`OplogError::Io`] if the write, sync, or a segment roll fails.
     pub fn append(&mut self, kind: OpEntryKind) -> OplogResult<u64> {
+        let rev = self.append_buffered(kind)?;
+        self.sync()?;
+        Ok(rev)
+    }
+
+    /// Append one record **without** syncing, returning its assigned `rev`.
+    ///
+    /// The frame is written and the `rev` assigned, but the bytes are not yet
+    /// durable — the caller **must** call [`sync`](Self::sync) before announcing
+    /// the `rev` (announce-after-durable, design doc K9). This is the primitive
+    /// the group-commit service ([`crate::service`]) batches: many buffered
+    /// appends share a single `fdatasync`. A segment roll triggered here flushes
+    /// the old segment durably first (see [`roll`](Self::roll)).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OplogError::Frame`] if the entry cannot be framed, or
+    /// [`OplogError::Io`] if the write or a segment roll fails.
+    pub fn append_buffered(&mut self, kind: OpEntryKind) -> OplogResult<u64> {
         // Probe the framed size to decide whether this record would overflow
-        // the segment. (The probe re-encodes; a later phase amortises this with
-        // the group-commit path. `rev`/timestamp do not affect the decision.)
+        // the segment. (The probe re-encodes; `rev`/timestamp do not affect the
+        // decision, so a zeroed placeholder is fine.)
         let probe = OpEntry {
             schema_version: WRITER_SCHEMA_VERSION,
             rev: self.next_rev,
@@ -233,6 +227,20 @@ impl OplogWriter {
         self.write_record(kind, true)
     }
 
+    /// `fdatasync` the current segment, making every buffered append durable.
+    ///
+    /// This is the single point a group commit amortises: one `fdatasync`
+    /// covers an entire batch of [`append_buffered`](Self::append_buffered)
+    /// calls (design doc I2).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OplogError::Io`] if the `fdatasync` fails.
+    pub fn sync(&mut self) -> OplogResult<()> {
+        self.file.sync_data()?;
+        Ok(())
+    }
+
     /// Force a checkpoint (a full [`Heads`] snapshot) into the current segment.
     ///
     /// Mostly emitted automatically on segment roll; exposed so a future
@@ -245,11 +253,21 @@ impl OplogWriter {
     /// failure.
     pub fn checkpoint(&mut self) -> OplogResult<u64> {
         let snapshot = self.snapshot();
-        self.write_record(OpEntryKind::Checkpoint { snapshot }, false)
+        let rev = self.write_record(OpEntryKind::Checkpoint { snapshot }, false)?;
+        self.sync()?;
+        Ok(rev)
     }
 
     /// Roll to a fresh segment and stamp its leading checkpoint.
+    ///
+    /// The current (old) segment is `fdatasync`'d **before** the switch, so any
+    /// buffered-but-unsynced records on it become durable at the roll boundary
+    /// — a group-commit batch that spans a roll never leaves records on an
+    /// unsynced, abandoned segment. The new segment's leading checkpoint is
+    /// written buffered; the caller's trailing `sync` (or the next group commit)
+    /// makes it durable.
     fn roll(&mut self) -> OplogResult<()> {
+        self.sync()?;
         let next_index = self.index.wrapping_add(1);
         let file = Self::create_segment(&self.dir, next_index)?;
         self.file = file;
@@ -261,9 +279,11 @@ impl OplogWriter {
         Ok(())
     }
 
-    /// Low-level append: frame, write, `fdatasync`, advance `rev`, fold heads.
-    /// `is_record` marks whether this is a real record (vs a checkpoint), which
-    /// gates future rolls. This is the single place a `rev` is assigned.
+    /// Low-level buffered append: frame, write, advance `rev`, fold state. Does
+    /// **not** sync — durability is the caller's responsibility via
+    /// [`sync`](Self::sync). `is_record` marks whether this is a real record (vs
+    /// a checkpoint), which gates future rolls. This is the single place a `rev`
+    /// is assigned.
     fn write_record(&mut self, kind: OpEntryKind, is_record: bool) -> OplogResult<u64> {
         let rev = self.next_rev;
         let entry =
@@ -271,7 +291,6 @@ impl OplogWriter {
         let frame = framing::encode_entry(&entry)?;
 
         self.file.write_all(&frame)?;
-        self.file.sync_data()?;
 
         self.segment_bytes = self.segment_bytes.wrapping_add(frame.len() as u64);
         self.next_rev = self.next_rev.wrapping_add(1);

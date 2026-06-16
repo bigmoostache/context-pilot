@@ -27,7 +27,7 @@
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
 use cp_wire::types::snapshot::{Heads, SeenSet};
 
-use crate::append::OplogResult;
+use crate::error::OplogResult;
 use crate::segment;
 use std::path::Path;
 
@@ -85,7 +85,7 @@ pub(crate) fn fold_entry(state: &mut ReplayState, entry: &OpEntry) {
 ///
 /// # Errors
 ///
-/// Returns [`OplogError::Io`](crate::append::OplogError::Io) if a segment
+/// Returns [`OplogError::Io`](crate::error::OplogError::Io) if a segment
 /// cannot be listed or read.
 pub fn replay(dir: impl AsRef<Path>) -> OplogResult<ReplayState> {
     let dir = dir.as_ref();

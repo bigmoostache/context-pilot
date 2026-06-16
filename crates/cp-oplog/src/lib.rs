@@ -35,12 +35,14 @@
 //! on the next open by a CRC/length failure and truncated away, so the log
 //! always reopens at a clean record boundary (V1).
 //!
-//! *Phase 4–7* implement the writer, segment reading + torn-tail recovery,
-//! replay-to-heads, the dedup `seen`-set, and segment compaction + the
-//! orphan-body GC grace rule. The off-loop group-commit thread and the bridge
-//! body store arrive in later phases.
+//! *Phase 4–8* implement the writer, segment reading + torn-tail recovery,
+//! replay-to-heads, the dedup `seen`-set, segment compaction + the orphan-body
+//! GC grace rule, and the off-loop group-commit service with asymmetric
+//! backpressure. The bridge body store arrives in a later phase.
 
 pub mod append;
 pub mod compact;
+pub mod error;
 pub mod replay;
 pub mod segment;
+pub mod service;

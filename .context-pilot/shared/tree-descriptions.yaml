@@ -1006,6 +1006,10 @@
   path: .github/workflows/release.yml
   description: 'Release workflow: builds .deb on tag push (ubuntu-latest, amd64 only). Creates GitHub Release with softprops/action-gh-release.'
   last_edited_ms: 0
+2c9a637c8ec007d3:
+  path: crates/cp-oplog/src/lib.rs
+  description: 'Oplog crate root. Doc: durability tier ①, why-separate-crate (agent writes+replays, backend tails), announce-after-durable. Declares append + compact + error + replay + segment + service modules. Phase 4-8 done.'
+  last_edited_ms: 1781623192187
 2d8795d69497a439:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -2098,6 +2102,10 @@
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
   last_edited_ms: 1780565754894
+613a03b6bbdd6bbb:
+  path: crates/cp-oplog/src/replay.rs
+  description: 'Oplog replay (GAP1/I5): ReplayState{rev_head,heads,seen}. fold_entry(&mut ReplayState,&entry) pub(crate): Checkpoint=authoritative clone_from(heads+seen), MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark(token,rev), others no-op. replay() fast-path reads ONLY newest segment when it opens with a checkpoint (Snapshot-seeded); replay_full fallback for seg-0-only. OplogResult from crate::error. Heads PartialEq order-sensitive. 10 tests incl seen-set V3 + fast==full.'
+  last_edited_ms: 1781623209038
 61495db76887c8f1:
   path: src/ui/search_overlay/display.rs
   description: 'Display column builders for the search index overlay. Converts SearchIndexOverlay IR data into ratatui Line sequences for the two-column layout (left: server/database/index/extensions, right: splitter/embeddings/tasks/recomputed/recent). Centered bordered popup.'
@@ -2138,6 +2146,10 @@
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'
   last_edited_ms: 0
+627ad0b53f94107a:
+  path: crates/cp-oplog/src/append.rs
+  description: 'OplogWriter: single-writer append-only log + running ReplayState fold (heads+seen). open() seeds via replay. append(kind)=append_buffered+sync (announce-after-durable K9). append_buffered(kind)=frame+write_all+fold, NO sync (group-commit primitive). sync()=single fdatasync (the amortised group-commit point, I2). roll() fdatasyncs old segment BEFORE switching (batch spanning a roll loses nothing), stamps leading Checkpoint(Snapshot) on new seg (GAP1). write_record=sole rev point (no sync). checkpoint()/heads()/seen()/snapshot() public. 7 tests.'
+  last_edited_ms: 1781623192175
 627f069be19818e7:
   path: src/ui/ir/render_sidebar_stats.rs
   description: Sidebar cache stats renderer — token table (hit/miss/out per row), format_cost closure ($K tier for ≥1000), total cost line, uncached count. Consumes CacheStats IR data.
@@ -2322,6 +2334,10 @@
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
   last_edited_ms: 0
+6ac2dc94e8071e0e:
+  path: crates/cp-oplog/src/error.rs
+  description: 'OplogError{Io,Frame} + Display + From<io::Error>/From<FrameError> + OplogResult alias. Extracted from append.rs (folder-size: append.rs hit 501 lines). Deliberately NO std::error::Error impl (dodges missing_trait_methods on unstable provide()).'
+  last_edited_ms: 1781623192148
 6afe0e875956a37f:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
@@ -3902,6 +3918,10 @@ b3ff665a662b885f:
   path: CONTRIBUTING.md
   description: Contributing guidelines
   last_edited_ms: 0
+b410fc09231b32ca:
+  path: crates/cp-oplog/src/service.rs
+  description: 'Phase 8 (X775) GAP2: OplogService — off-loop group-commit thread + asymmetric backpressure. Durability::of(&kind) pure predicate: PhaseTransition|CostAggregate=BestEffort, all else (incl Unknown, conservative) =Durable. append_durable(kind)->rev blocks on bounded sync_channel (durability backpressure), awaits post-sync ack (announce-after-durable). append_best_effort(kind)->Submitted|Dropped via try_send (drop-on-full). Dedicated commit_loop drains a batch (≤MAX_BATCH 1024), append_buffered each, ONE sync, then releases durable acks (sync failure overrides per-record success). Drop+shutdown both join (final batch synced). ack channel carries Result<u64,String> (OplogError not Clone). 6 tests.'
+  last_edited_ms: 1781623192162
 b41e9edd57e06bd2:
   path: src/ui/threads_view/mod.rs
   description: Threads view layout + thread list rendering. Two-pane layout (thread list | messages). Virtual '+ New Thread' entry. IR pipeline for list items (status dots, unread indicators, selection highlight). maybe_activate_thread_question() lazy question form init. truncate_str helper.
@@ -4646,6 +4666,10 @@ d475f8969e0647fa:
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook pane, variant ''pane'' (420px rail) | ''full'' (file-tab main). Bespoke kind renders: code (copy+line-nums+keyword tint), sheet (zebra+frozen header+tabs), slides, PDF (page strip), image (checkerboard+zoom), audio (waveform), video (poster+scrubber), markdown, json/text. Folder + Generic previews + metadata footer use macOS <FileIcon> (T27).'
   last_edited_ms: 1781597468913
+d480dfbe8c4b7ba0:
+  path: crates/cp-oplog/src/compact.rs
+  description: 'Phase 7 (X774): segment compaction + GAP3 grace rule. compact(dir) deletes every segment older than the newest checkpoint-bearing segment (replay fast-path already ignores them → replay output unchanged; checkpoint Snapshot carries live heads+seen, so the checkpoint IS the ack-rev barrier). CompactReport{segments_removed,oldest_index}. total_bytes/should_compact size trigger (256MiB). body_gc_eligible(age,grace) const predicate for GAP3: only GC bodies older than DEFAULT_GC_GRACE(60s) >> I13 barrier window, so in-flight spills never collected, only crash-orphans. OplogResult from crate::error. 7 tests incl replay-identical-after-compaction.'
+  last_edited_ms: 1781623209051
 d486285ed7025782:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.

@@ -54,7 +54,7 @@ use std::time::Duration;
 
 use cp_wire::types::oplog::OpEntryKind;
 
-use crate::append::OplogResult;
+use crate::error::OplogResult;
 use crate::segment;
 
 /// Default size threshold above which [`should_compact`] advises a compaction
@@ -93,7 +93,7 @@ pub struct CompactReport {
 ///
 /// # Errors
 ///
-/// Returns [`OplogError::Io`](crate::append::OplogError::Io) if a segment
+/// Returns [`OplogError::Io`](crate::error::OplogError::Io) if a segment
 /// cannot be listed, read, removed, or if the directory cannot be `fsync`'d.
 pub fn compact(dir: impl AsRef<Path>) -> OplogResult<CompactReport> {
     let dir = dir.as_ref();
@@ -144,7 +144,7 @@ fn sync_dir(dir: &Path) -> OplogResult<()> {
 ///
 /// # Errors
 ///
-/// Returns [`OplogError::Io`](crate::append::OplogError::Io) if the directory
+/// Returns [`OplogError::Io`](crate::error::OplogError::Io) if the directory
 /// cannot be listed or a segment's metadata cannot be read.
 pub fn total_bytes(dir: impl AsRef<Path>) -> OplogResult<u64> {
     let dir = dir.as_ref();

@@ -110,7 +110,7 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting''. Design v7 + 20 phases X768-X787. Crates: cp-wire/cp-oplog (shared), cp-mod-bridge (agent), cp-orchestrator (backend). Phases 1-7 done & green. Next: Phase 8 (X775 oplog queue backpressure + group-commit thread, GAP2).'
+  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. cp-wire/cp-oplog (shared), cp-mod-bridge (agent), cp-orchestrator (backend). Phases 1-8 done & green; GAP1/2/3 tested. Next: Phase 9 (X776, M0 crash-replay harness).'
   contents: |-
     ## Orchestration Backend Design — v6 (branch maquette)
 
@@ -136,7 +136,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781622196922
+  last_edited_ms: 1781623241835
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
