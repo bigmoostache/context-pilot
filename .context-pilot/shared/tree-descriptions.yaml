@@ -842,6 +842,14 @@
   path: crates/cp-mod-entities/src/sql/parse.rs
   description: 'SQL statement parsing: SqlKind classify (SELECT/DML/DDL/CTE), strip_leading_comments, split_statements. split_statements is a SQLite-aware mini-tokenizer (skips ''/"/`/[] quoted spans + --/* */ comments) so ; inside them never mis-splits. Byte-offset-correct via str::char_indices() (fixes #113 multi-byte truncation). 15 regression tests.'
   last_edited_ms: 1781123413469
+25c411f4e4753d79:
+  path: crates/cp-orchestrator/src/services/mod.rs
+  description: 'services/ hub: declares + re-exports MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber.'
+  last_edited_ms: 1781646122338
+25c44a6e451a20cd:
+  path: crates/cp-orchestrator/src/services/stream_hub.rs
+  description: 'Phase 18: StreamHub — per-agent stream fan-out to N bounded subscribers (R2-17). Subscriber{id,buffer:VecDeque<Frame>,capacity,degraded,dropped}: admit() evicts OLDEST on full (coalesce toward latest window) + sets degraded + bumps dropped; cap 0 drops all. StreamHub{agents:HashMap<id,Vec<Subscriber>>,next_id,sub_capacity}: subscribe→id, unsubscribe, publish(id,&frame)=fan to all (clone per sub, returns clean-delivery count), drain(id,sub), subscriber(id,sub) inspect, mark_reconciled clears degraded+dropped (after caller delivers oplog-snapshot resync). Single-owner lock-free; socket-read + WS-writer wiring deferred to Phase 19. 8 tests incl per-subscriber degraded isolation + overflow-evicts-oldest.'
+  last_edited_ms: 1781646122383
 2610b21d60e96425:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
@@ -3366,6 +3374,10 @@
   path: ui/src/components/agents/UsagePage.tsx
   description: Cost & token analytics page (fleet 'Usage'). Reads mock usage{}. Hero stat cards (spend/tokens/cache-hit-rate/messages), spend sparkline, per-agent cost bars (proportional, fill-sweep), token-composition stacked bar, cache economics. CSS-only charts, decorative time-range toggle.
   last_edited_ms: 1781531138864
+94c9f015736f744e:
+  path: crates/cp-orchestrator/src/services/cost_breaker.rs
+  description: 'Phase 18: CostBreaker — durable per-agent spend breaker (R2-8/V9). Verdict{Allowed,Tripped}. observe(id,cumulative_usd) = HIGH-WATER MAX (a post-reboot cumulative-0 can''t lower the mark → trip survives crash-loop, V9). check(id): poisoned→Tripped (fail-closed under read uncertainty), spend>budget→Tripped, else Allowed (no-entry = definite-zero = Allowed, NOT fail-closed). rebuild_from_view(&MaterializedView) reconstructs trip state from durable oplog-derived cost on backend restart. poison/clear_poison for indeterminate cost. 6 tests incl V9 crash-loop latch + rebuild-after-restart.'
+  last_edited_ms: 1781646122368
 94f3d1b290438319:
   path: src/app/run/input.rs
   description: App::new() constructor, save_state/message_async(), handle_autocomplete/question_form/palette events
@@ -5166,6 +5178,10 @@ e8a5bca5e649ea19:
   path: crates/cp-mod-chat/src/tools/mod.rs
   description: 'Chat tool dispatch with flame!("chat_dispatch"). Routes Chat_open/send/react/configure/search/create_room/invite. Open: resolve room, start server, backfill messages. Configure: filter params (n_messages, max_age, query).'
   last_edited_ms: 0
+e8c4bbec187df79f:
+  path: crates/cp-orchestrator/src/services/materialized_view.rs
+  description: 'Phase 18: MaterializedView — in-mem fleet projection folded from OpEntry stream (one AgentView per agent). AgentView{rev,heads,phase,lifecycle,cost:CostSnapshot}.apply(&OpEntry): Checkpoint=authoritative heads reset (I5 count-bounded restart mechanism at view layer), MessageCreated=set_thread_head, PhaseTransition/Lifecycle/CostAggregate=latest-wins (cost cumulative-since-boot so NOT summed), CommandEffect/SeenMark/Unknown=inert. rev=max. MaterializedView{agents:HashMap}: apply/apply_batch/get/remove/len/agent_ids. 7 tests.'
+  last_edited_ms: 1781646122353
 e8c87aefe7be8bef:
   path: src/ui/search_overlay/text.rs
   description: Plain-text export of Ctrl+I overlay for clipboard copy. Includes process CPU%/RAM stats for Meilisearch.

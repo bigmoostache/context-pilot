@@ -19,11 +19,19 @@
 //!   diffs successive passes into appeared / disappeared / status-changed /
 //!   stale events.
 //!
-//! Later phases add the per-agent oplog tail + hydrate (`AgentChannel`),
-//! lifecycle control (`AgentSupervisor`), and the `StreamHub` / `CostBreaker` /
-//! `MaterializedView` services.
+//! * [`channel`] — the per-agent [`AgentChannel`](channel::AgentChannel): oplog
+//!   tail ([`Tailer`](channel::Tailer)), rev-pinned body hydrate, and command
+//!   send.
+//! * [`supervisor`] — the
+//!   [`AgentSupervisor`](supervisor::AgentSupervisor): spawn / stop / restart /
+//!   adopt of agent processes.
+//! * [`services`] — the runtime services layer:
+//!   [`MaterializedView`](services::MaterializedView) (fleet-state projection),
+//!   [`CostBreaker`](services::CostBreaker) (durable spend breaker), and
+//!   [`StreamHub`](services::StreamHub) (stream fan-out).
 
 pub mod channel;
 pub mod liveness;
 pub mod registry;
+pub mod services;
 pub mod supervisor;

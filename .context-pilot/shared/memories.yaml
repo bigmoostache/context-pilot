@@ -110,28 +110,28 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. Phases 1-17 done & green. Next: Phase 18 (X785) backend services StreamHub/CostBreaker/MaterializedView.'
+  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. Phases 1-18 done & green. Next: Phase 19 (X786) frontend transport REST + authenticated WS + reconnect/replay.'
   contents: |-
     ## Orchestration backend — branch 'demaquetting' (20 phases X768-X787)
 
-    Phases 1-17 DONE & green:
+    Phases 1-18 DONE & green:
     - cp-wire (shared protocol, I/O-free): framing (len+CRC), all wire types, heartbeat record, N-1 compat. command::Frame{schema_version,auth,command} wraps Command (authn at transport layer). SeenSet::rev_of for idempotent dup-ack. ContentHash::of(&[u8])->SHA-256 canonical content address; to_hex(self) by-value. registry::Entry schema: schema_version,id,folder,pid,boot_id(String),model,protocol_version,binary_version,socket_path,oplog_path,heartbeat_path,cap_token(String),started_at_ms,status(AgentStatus).
     - cp-oplog (shared tier-① WAL): append/segment/replay/compact/service. GAP1 (leading-checkpoint bounds replay), GAP2 (group-commit thread + asymmetric backpressure), GAP3 (orphan-body GC 60s grace) all TESTED. M0 crash-replay harness green (V1 real SIGKILL, V2 deadman re-exec).
     - cp-mod-bridge (AGENT): boot (flock gate + oplog + socket + registry 0600 + identity), heartbeat Beacon, tee (M1 SPSC), command Intake (M2: authn + journal-then-ack + dedup), body Store (Phase 14). Tee+Intake+body Store NOT yet wired into Boot accept-loop — deferred to bridge-on wiring.
-    - cp-orchestrator (BACKEND): lib+bin. liveness.rs: verdict() pure. registry.rs: AgentRegistry poll scan-and-diff. channel.rs: Tailer + AgentChannel (hydrate+send). supervisor/ (M3, Phase 17): AgentSupervisor spawn(process_group(0))/stop(SIGTERM→grace→SIGKILL)/restart/adopt + check_liveness (try_wait reap | signal-0). validate_binary realpath vs allow_list (R2-15). 32 tests.
+    - cp-orchestrator (BACKEND): lib+bin. liveness.rs verdict() pure. registry.rs AgentRegistry poll scan-and-diff. channel.rs Tailer + AgentChannel (hydrate+send). supervisor/ (M3): spawn(process_group(0))/stop(SIGTERM→grace→SIGKILL)/restart/adopt + check_liveness. services/ (Phase 18): MaterializedView (fold OpEntry→AgentView{heads,phase,lifecycle,cost}; Checkpoint=authoritative reset=I5; cost latest-wins), CostBreaker (high-water-max spend → V9 crash-loop latch; fail-closed via poison; rebuild_from_view on restart), StreamHub (per-agent fan-out N bounded subscribers, evict-oldest+degraded+mark_reconciled, R2-17). 53 tests.
 
     Trichotomy: cp-wire+cp-oplog=SHARED, cp-mod-bridge=AGENT, cp-orchestrator=BACKEND.
-    Workspace forbids unsafe_code. CB3 rust-check runs clippy WITHOUT --all-targets (lib-only gate) — does NOT catch -F unused-results / unused-crate-dependencies / test-target errors that `cargo test` does; ALWAYS run cargo test before commit.
-    GOTCHA: unreaped zombie answers kill(pid,0) as alive — must wait() before signal-0 liveness probe.
+    Workspace forbids unsafe_code. CB3 rust-check runs clippy WITHOUT --all-targets (lib-only gate) — does NOT catch -F redundant-imports / unused-results / unused-crate-dependencies / E0689 ambiguous-numeric / test-target errors that `cargo test` does; ALWAYS run cargo test before commit.
+    GOTCHAS: unreaped zombie answers kill(pid,0) as alive — must wait() before signal-0 probe. `use super::*` in #[cfg(test)] globs the parent module's `use` imports (edition 2024) — do NOT re-import them. Untyped integer accumulators (let mut x=0; x.saturating_add) → annotate type.
 
-    Next: Phase 18 (X785) backend services: StreamHub (1 UDS consumer/agent -> N WS subscribers, bounded buffers, overflow coalesce/drop), CostBreaker (oplog-backed durable aggregate, trip survives crash-loop V9), MaterializedView (in-mem, rebuilt from oplog heads on restart, latency scales with agent COUNT not disk). MILESTONE: none (M4 at Phase 20).
+    Next: Phase 19 (X786) frontend transport: REST (load + point queries + non-streaming actions, every response carries rev; actions return cmd-id + dedup_token) + authenticated WS (backend mints short-lived single-use upgrade ticket out-of-band NOT CORS/Origin, I9b; handshake binds session to one connection; carries rev-numbered replayable oplog deltas + ephemeral stream hints; reconnect replays by rev, gap→resync; client action queue replays dedup-safe). Then Phase 20 (X787) MILESTONE M4 = full V1-V12 fault gate + observability + soak + sign-off.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781645596647
+  last_edited_ms: 1781646159641
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
