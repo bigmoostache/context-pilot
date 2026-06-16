@@ -23,5 +23,6 @@
 //! lifecycle control (`AgentSupervisor`), and the `StreamHub` / `CostBreaker` /
 //! `MaterializedView` services.
 
+pub mod channel;
 pub mod liveness;
 pub mod registry;

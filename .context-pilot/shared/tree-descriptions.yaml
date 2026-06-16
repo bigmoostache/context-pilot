@@ -894,6 +894,10 @@
   path: docs/talk/slides/2-4.html
   description: 'Slide: Feedbacks & Constraints with control theory (HOWs section)'
   last_edited_ms: 1781078806788
+280da00800be2873:
+  path: crates/cp-orchestrator/src/channel.rs
+  description: 'Phase 16 (X783): backend AgentChannel — per-agent read/write handle. Tailer{dir,last_index,last_rev}: incremental gap-free oplog poll primitive (no kernel watch, external driver), seed() skips known history, poll()->Vec<OpEntry> ascending rev. AgentChannel{socket_path,cap_token,bodies_dir}: from_entry(&Entry), hydrate(hash)->Option<Vec<u8>> (re-hashes+verifies integrity, NotFound=None=inline/GC''d), send(Command)->Ack (framed CommandFrame over UDS, ACK_READ_TIMEOUT 5s, half-close write, read_ack bounded MAX_ACK_BUFFER 64KB), send_with_retry(cmd,retries) on ConnectionRefused with RETRY_DELAY 100ms. 10 tests: 5 tailer (catchup, idempotent, segment-roll gap-free, seed skip, missing dir), 3 hydrate (verified, missing=None, corruption=Err), 2 send (echo-ack-server, connection-refused).'
+  last_edited_ms: 1781630135178
 28535222aec6d878:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -1358,6 +1362,10 @@
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
   last_edited_ms: 0
+3d0ef7ba17232429:
+  path: crates/cp-orchestrator/src/lib.rs
+  description: 'Phase 16 (X783): backend library root (split from main.rs for unit-testability). Declares channel + liveness + registry modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails them across a fleet.'
+  last_edited_ms: 1781630135192
 3db99c7fa34b728d:
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
@@ -3186,6 +3194,10 @@
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers for panel rendering. Align enum + TextCell + render_table_text() (plain-text for LLM context). Tree output parsing helpers (find_size_pattern, find_children_pattern). Sub-modules: question_form, render_cache.'
   last_edited_ms: 0
+8e2c857eb13843ce:
+  path: crates/cp-orchestrator/src/main.rs
+  description: 'Backend entry point. Phase 16: prints version+protocol+agents dir, exits (no runtime loop yet — arrives with supervisor). Thin: machinery in lib. `use nix/serde_json/cp_oplog as _` + cfg(test) tempfile acknowledge lib-only deps for per-target unused-crate-dependencies.'
+  last_edited_ms: 1781630135208
 8e397fda95df9fad:
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. MINIMAX_API_KEY auth.
@@ -4542,6 +4554,10 @@ c97c773bc3b5cd0b:
   path: ui/src/App.tsx
   description: App shell with view state (agents|threads|cockpit, default agents) + activeAgentId. TopBar drives view + agent switch. AgentsView/ThreadsView/cockpit dispatch. openAgent switches agent then -> threads.
   last_edited_ms: 1781514443019
+c99917ed2399e73a:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal, for kill signal-0 pid-liveness) + serde_json (registry record parse). dev: tempfile. lib+bin package. Workspace lints.'
+  last_edited_ms: 1781630135222
 c9d4aeb2bf4dfbe4:
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (with recompute tracking + task_signals ring buffer), SearchState (with SharedRadarCache Arc<Mutex>), Chunk, SearchResult (no tags), SearchMetrics, SearchOverlayInfo (with meili_cpu_pct/meili_memory_bytes), MeiliLiveStats (with meili_cpu_ticks for delta), IndexerCmd, WatcherHandle. logs_index_settings without tags.

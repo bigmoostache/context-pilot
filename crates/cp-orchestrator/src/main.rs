@@ -26,6 +26,7 @@ use cp_orchestrator::registry;
 // suppression). `tempfile` is a dev-dependency used only by the library's
 // tests, acknowledged under `cfg(test)` so non-test builds never reference it.
 use nix as _;
+use cp_oplog as _;
 use serde_json as _;
 #[cfg(test)]
 use tempfile as _;
