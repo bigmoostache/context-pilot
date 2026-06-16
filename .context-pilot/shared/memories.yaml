@@ -110,11 +110,11 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting'', 30 phases X768-X797. Phases 1-27 done & green. Next: Phase 28 (X795 supervisor), 29 (X796 services), 30 (X797 transport+e2e), then capstone 20 (X787). Details in contents.'
+  tl_dr: 'Orchestration backend, branch ''demaquetting'', 30 phases X768-X797. Phases 1-28 done & green. Next: Phase 29 (X796 services), 30 (X797 transport+e2e), then capstone 20 (X787). Details in contents.'
   contents: |-
     ## Orchestration backend — branch 'demaquetting' (30 phases X768-X797)
 
-    Phases 1-19 PRODUCTION DONE & green. Phase 21 (X788) testing DONE.
+    Phases 1-19 PRODUCTION DONE & green. Testing phases 21-28 DONE.
 
     ### Trichotomy (each file's doc says which side)
     - cp-wire + cp-oplog = SHARED (I/O contract + WAL)
@@ -123,36 +123,36 @@
 
     ### Crate test counts (all green under full lint gate)
     - cp-wire: 74 (59 lib + 8 framing_integrity + 7 protocol)
-    - cp-orchestrator: 77
-    - cp-oplog: append/segment/replay/compact/service inline + crash_replay integration (M0 V1/V2)
-    - cp-mod-bridge: boot/heartbeat/tee/intake/body inline
+    - cp-oplog: 56 COMPLETE
+    - cp-mod-bridge: 48 COMPLETE
+    - cp-orchestrator: 85 (77 lib + 4 registry_channel + 4 supervisor_lifecycle)
 
-    ### Phase 21 (X788) DONE: cp-wire test suite
-    Two integration files in crates/cp-wire/tests/: framing_integrity.rs (8 tests, byte-granular torn-tail/corruption sweep) + protocol.rs (7 tests, every OpEntryKind round-trip incl Checkpoint{Snapshot}, accepts() N-1 sweep, ContentHash from_hex bijection, SeenSet evict barrier, Heads upsert). Committed + pushed.
+    ### Phase 28 (X795) DONE+committed 1bb1136: tests/supervisor_lifecycle.rs (4)
+    Black-box public-API + real processes: (1) SIGTERM→grace→SIGKILL escalation vs trap-TERM shell; (2) fleet teardown 3 agents all ESRCH-gone; (3) adopted foreign signalled on stop status.signal()==15; (4) check_liveness Exited+Vanished one pass. pid_present via nix kill ESRCH.
 
-    ### CRITICAL lint gotchas (carry forward to phases 22-30)
-    - Each tests/ file is a SEPARATE crate target. per-target `unused-crate-dependencies` (forbid) flags every cp-wire/crate dep the test file does NOT directly name. FIX: add `use <crate> as _;` block at top for the unnamed deps. CB3 rust-check is LIB-ONLY (no --all-targets) — does NOT catch this. ALWAYS `cargo test -p <crate>` before commit.
-    - Test-target rustc lints that fire under cargo test but NOT CB3: let-underscore-drop (bind `let _named =` for Result-with-destructor), unused-results (bind discarded usize/insert returns), unused-crate-dependencies.
-    - Lint-safe test patterns: avoid `as u8` (cast_possible_truncation deny) → u8::try_from(x & 0xFF).unwrap_or(0); avoid to_le_bytes (little_endian_bytes forbid) → [0xFF;4] copy_from_slice for corrupt u32::MAX prefix. expect()/panic!/assert_eq with f64-containing struct (derived PartialEq, not my ==) all allowed in test context.
+    ### CRITICAL lint gotchas (carry to phases 29-30)
+    - Each tests/ file is a SEPARATE crate target. per-target unused-crate-dependencies (forbid) flags every dep the file doesn't directly name → `use <crate> as _;` block at top.
+    - dev-deps unnamed by LIB code flag LIB-TEST target; unnamed by BIN code flag BIN-TEST target → `#[cfg(test)] use <crate> as _;` in lib.rs AND main.rs (cp-mod-bridge needed both).
+    - CB3 rust-check LIB-ONLY — ALWAYS `cargo test -p <crate>` (or --test <name>) before commit.
+    - Test lints: let-underscore-drop, unused-results, unused-crate-dependencies, unused-imports. No `as u8`/to_le_bytes.
+    - M62: real connect/accept UDS propagate EOF reliably; socketpair shutdown(Write) does NOT.
 
-    ### Remaining: phases 22-30 (X789-X797) per-component exhaustive suites, then capstone Phase 20 (X787) M4 = full V1-V12 fault gate + observability + soak + sign-off.
-    - 22 (X789): cp-oplog append/segment/replay (rev monotonic, segment naming/parse, roll-at-limit, leading-checkpoint, torn-tail recovery, replay_fast==replay_full equivalence over many shapes).
-    - 23 (X790): cp-oplog dedup/compaction (V3 long-gap no-op, ack-rev-only eviction, mark idempotent, compaction deletes pre-checkpoint segs + replay identical, body_gc_eligible 60s boundary).
-    - 24 (X791): cp-oplog service group-commit (Durability::of exhaustive, append_durable blocks under full queue, append_best_effort drops, commit_loop one-fdatasync-per-group, sync-failure overrides, Drop+shutdown join+sync, concurrent submitters rev-monotonic).
-    - 25 (X792): bridge boot/heartbeat (flock second-boot-refuses, atomic 0600 record, identity entropy, Drop cleanup, Beacon first-beat-sync/in-place/cadence/verdict matrix).
-    - 26 (X793): bridge tee/intake/body (producer-never-blocks 100k<5s, O(1)drop+degraded, intake bad-bearer-reject/journal-then-ack/dedup-across-deadman/fail-closed, body inline-vs-spill I13/get-integrity/gc-grace V12).
-    - 27 (X794): backend registry/channel (scan-and-diff event matrix, Stale only on Live→non-live, reap_tmp, liveness three-factor matrix, Tailer gap-free/idempotent/segment-roll/seed, hydrate verified/missing/corrupt, send framed-ack/refused-retry).
-    - 28 (X795): backend supervisor (allow-list realpath gate symlink/.., duplicate-id, SIGTERM→grace→SIGKILL, reap-no-zombie, restart new-pid, adopt+vanish signal-0, check_liveness reap).
-    - 29 (X796): backend services (MaterializedView fold-every-kind + Checkpoint authoritative I5, CostBreaker high-water V9 + poison fail-closed + rebuild, StreamHub fan-out/overflow-evict-oldest/per-sub-degraded/cap0/mark_reconciled).
-    - 30 (X797): transport + e2e (ticket single-use/TTL/unknown, REST rev-envelope+cmd receipt+body-hydrate+404/400, SSE Last-Event-ID replay-by-rev + gap→resync, END-TO-END loopback spawn→POST→journal→Tailer→SSE→reconnect, breaker-tripped-blocks, soak FD/thread/mem stability).
-    - 20 (X787) LAST: M4 ship gate.
+    ### Remaining: phases 29-30 (X796-X797) + capstone Phase 20 (X787)
+    - 29 (X796): backend services — MaterializedView fold-every-kind + Checkpoint authoritative I5, CostBreaker high-water V9 + poison fail-closed + rebuild, StreamHub fan-out/overflow-evict-oldest/per-sub-degraded/cap0/mark_reconciled.
+    - 30 (X797): transport + e2e — ticket single-use/TTL/unknown, REST rev-envelope+cmd receipt+body-hydrate+404/400, SSE Last-Event-ID replay-by-rev + gap→resync, END-TO-END loopback spawn→POST→journal→Tailer→SSE→reconnect, breaker-tripped-blocks, soak FD/thread/mem.
+    - 20 (X787) LAST: M4 ship gate = full V1-V12 fault matrix + observability + soak + sign-off.
+
+    ### cp-orchestrator lib API surface (for phases 29-30 tests)
+    - services::{MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber} (Phase 29). Files src/services/{materialized_view,cost_breaker,stream_hub,mod}.rs.
+    - transport::{Backend, ticket::TicketStore, rest, sse} on tiny_http (Phase 30). Files src/transport/{mod,rest,sse,ticket}.rs.
+    - AgentSupervisor public: new/len/is_empty/spawn/stop/restart/adopt/check_liveness + Error + Event{Exited,Vanished}. validate_binary/pid_alive are pub(crate) (unit-only).
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781650168720
+  last_edited_ms: 1781650369611
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
