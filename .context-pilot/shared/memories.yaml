@@ -497,51 +497,30 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'docs/design-orchestration-backend.md is v4 (branch maquette): two-plane arch + invariants I1-I10, hardened against the adversarial review (all 18 issues resolved, §23). CP maquette in ui/ unchanged.'
+  tl_dr: 'docs/design-orchestration-backend.md is v5 (branch maquette): code-grounded three-tier durability (oplog + state-cache + stream). CP maquette in ui/ unchanged.'
   contents: |-
-    ## Context Pilot Frontend Maquette
+    ## Orchestration Backend Design — v5 (branch maquette)
 
-    Design-only reimagining of the TUI as a GUI. Branch 'maquette'.
+    Code-grounded rewrite (v4 was authored against an imagined persistence layer). Keystone = THREE durability tiers:
+    - ① **Oplog** (NEW, bridge-owned `cp-mod-bridge`): append-only, fsync'd, never coalesced. Authoritative for command effects, rev assignment, seen-marks, phase, lifecycle, cost aggregate. O(1) append+fsync.
+    - ② **State cache**: the EXISTING `PersistenceWriter` (writer.rs) UNTOUCHED — async/50ms-debounced/coalescing/no-fsync. A reconstructible cache of replaying ①.
+    - ③ **Stream**: lossy UDS, live tokens + latency hints.
 
-    **Stack**: Vite 8 + React 19 + TS 6 + Tailwind v4 (@tailwindcss/vite) + shadcn (base-ui). Mock data only, NO backend.
+    12 invariants. I8 oplog-as-truth (writer.rs NOT modified → constraint #7 honored for real, not by relabeling a rewrite as 'hardening'). I11 journal-to-oplog-then-ack ('accepted'=durable, survives deadman re-exec). I12 single inotify watch per agent (no fleet-scale exhaustion). I2 fsync confined to oplog. I3 content-addressed bodies + bounded heads (not O(S²) manifest). I4 dedup token evicted by ack-rev.
 
-    **Palettes (switchable, source of truth = src/index.css :root/.dark token blocks)**:
-    - LIGHT 'Cream': #FEFCF3 bg / #F5EBE0 surface / #F0DBDB secondary / clay-rose primary #be7a6e + teal accent #4e7a82. Warm, editorial.
-    - DARK 'Dungeon Forge' = the Context Pilot TUI's 'D&D' theme palette (yamls/themes.yaml), lifted verbatim. Warm-neutral charcoal greys (#222220 bg_base / #333331 bg_surface / #424240 bg_elevated; derived #3a3a38 surface-2, #4d4d49 hairline border) lit by a single torch-orange #DA7659 (TUI accent) = primary+signal+ring+your-turn; #B26245 (accent_dim) secondary accent; #C98F6B tan interactive/links; #F0F0F0 near-white ink, #909090 dimmed labels; ok=forest-green #86BC6F, warn=gold #E5C07B, danger=blood-red #C85050. (Superseded earlier maquette darks: Night Gold, Cream Noir, Indigo Ember.)
+    Command injection via existing user-message entry (actions/input.rs), NOT the autonomy spine (engine.rs check_spine guards would stall external commands — K7).
 
-    **Aesthetic**: enterprise/macOS — SF Pro chrome, IBM Plex Mono for data only. Soft shadows, vibrancy bars, hairline borders (NO traffic-light dots). Sun/Moon ThemeToggle top-right, localStorage 'cp-theme'.
+    §24 = invariant→real file/function→additive-vs-core map. §25 = fault-injection acceptance matrix V1-V10. §20 register folds round-3 K1-K9 + round-2 R2. Resolves the critique that v4 was ungrounded. Companion: architecture-adversarial-analysis.md. NOT implemented (discussion).
 
-    **Agent model (user-locked)**: 1 agent = 1 FOLDER = its realm, can't go out. An agent owns MULTIPLE threads that can work in PARALLEL.
-
-    **ViewMode = fleet|threads|cockpit|finder (default 'fleet')**. App.tsx: FleetShell at fleet altitude; threads/cockpit/finder are per-agent. TopBar app-mark→fleet; at fleet altitude the AgentSwitcher + cost + Activity(stats) button + view switcher are HIDDEN (shows 'Mission control' caption); inside an agent the per-agent segmented switcher Threads·Cockpit·Finder + cost + Activity appear. Git branch chip removed everywhere (general-user UI). Far-right Settings gear opens ConfigModal.
-
-    1. FLEET (FleetShell.tsx) = mission-control workspace shown when NO agent focused. Left FleetSidebar (4 nav items) + page switch:
-       - **Agents** (FleetDashboard.tsx, default) = SOLE place agents are created/managed. Greeting + AgentCard grid (status + one-line task + model·cost, no git branch; Open→threads / Manage→modal) + New-agent card. AgentModal (Apple-grade): create + manage(rename/model/archive), name-as-star field w/ live slugified realm preview, rich model cards.
-       - **Prompts** (PromptsPage.tsx) = GLOBAL prompt library (the captain's intended end-state; today per-agent). Mock library[] agents/skills/commands as cards, KIND_META icon/accent/blurb, filter tabs (all+per-kind counts), kind sections in 'all', active/built-in badges.
-       - **Usage** (UsagePage.tsx) = cost/token analytics. Mock usage{}. Hero stats (spend/tokens/cache-hit/messages), spend sparkline, per-agent cost bars (fill-sweep), token-composition stacked bar, cache economics. CSS-only charts.
-       - **Settings** = ConfigPanel variant='inline' (fills page). Same shared body the TopBar gear opens as a dialog.
-    2. THREADS = scoped to active agent's realm (ThreadsView filters threadDetails by agentId; EmptyRealm if none). ThreadList + ThreadConversation; thread metadata in on-demand ThreadDetailsPopup (ⓘ button), portaled Dialog. Embedded QuestionForm.
-    3. COCKPIT = panel-centered: LeftRail + Conversation (RightInspector removed; stats now in header StatsPopup).
-    4. FINDER (components/finder/, keyed by agent.id) = per-agent file manager CONFINED to the agent realm. Apple-grade: tabs+per-tab history, file-tabs (dbl-click file→dedicated tab w/ kind icon), 4 view modes (grid/list/Miller/gallery), icon-size slider, keyboard nav+type-ahead, ContextMenu, GetInfo modal, QuickLook FinderPreview, sidebar Favorites/Locations/Tags. lib/finderFs.ts buildRealm grafts one rich tree onto agent folder.
-
-    **ConfigPanel.tsx** = shared settings body (macOS System-Settings: category rail + detail pane), variant='dialog'|'inline'. **ConfigModal.tsx** = thin portaled-Dialog wrapper around it (TopBar gear, in-agent). **StatsPopup.tsx** + **ThreadDetailsPopup.tsx** also on the portaled Base UI Dialog primitive (ui/components/ui/dialog.tsx) — portals to document.body to escape the TopBar .vibrancy backdrop-filter containing block that traps position:fixed (the half-off-screen bug). Config categories: General/Providers/Search/DocAI/Web/Integrations.
-
-    **Thread→agent mapping (mock)**: threadDetails carry agentId. T8/T2/T7→a-cp, T4→a-opio, T1→a-lean.
-
-    **REMOVED**: AgentsView/AgentDetail/FileBrowser (old browse-coupled mgmt), RightInspector (cockpit right rail), ThreadDetailRail. fileTree/FsNode remain as legacy unused exports.
-
-    **Threads Rust**: Send to a THEIR_TURN thread is ALLOWED (status stays THEIR_TURN).
-
-    **Build**: cd ui && pnpm exec tsc -b (green). Dev: pnpm run dev :5173, HMR live.
-
-    **Gotchas**: TS noUnusedLocals/Parameters trips on unused imports/props. lucide-react has no Github icon (use Boxes).
+    ## Context Pilot Frontend Maquette (ui/, unchanged)
+    Vite+React19+TS+Tailwind v4+shadcn(base-ui). Branch 'maquette'. Mock only, no backend. ViewMode=fleet|threads|cockpit|finder. Dark 'Dungeon Forge' palette (torch-orange #DA7659 on warm charcoal). Per M60 history: FleetShell/FleetDashboard/PromptsPage/UsagePage, ConfigPanel/ConfigModal, ProfileModal/UserMenu account context, Finder (per-agent realm). Build: cd ui && pnpm exec tsc -b.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781602332660
+  last_edited_ms: 1781608750449
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-

@@ -4,16 +4,26 @@
 > artifact we iterate on until we're perfectly aligned on the infrastructure
 > that powers the orchestration frontend (the `ui/` maquette).
 >
-> **v4 — hardened against the adversarial review.** v3 introduced the two-plane
-> architecture (durable control plane + ephemeral stream plane) and the Problem
-> Register. v4 closes **every** issue raised in
-> [`architecture-adversarial-analysis.md`](./architecture-adversarial-analysis.md):
-> three new invariants (**I8** single-writer commit transaction, **I9**
-> capability-token command auth, **I10** cross-plane causal ordering), phase
-> moved off the lossy plane onto the durable plane, a real WS handshake auth, a
-> semantic dedup token, lazy cold-rebuild, an N-1 version-compat window, a global
-> cost circuit-breaker + spawn allow-list, and an explicit fsync barrier. §23
-> maps each of the 18 adversarial issues to its resolution.
+> **v5 — grounded in the actual codebase.** v4 hardened the design against an
+> adversarial review but was authored against an *imagined* persistence layer. A
+> code-grounded round of attack (reading `src/state/persistence/writer.rs`,
+> `save.rs`, `crates/cp-mod-spine/src/engine.rs`, `src/app/run/streaming.rs`, and
+> the deadman re-exec) showed that the agent's **real** writer is *async,
+> 50 ms-debounced, coalescing, and never `fsync`s*; its command path is the
+> *autonomy-safety spine*; and its crash-recovery is a *process-replacing
+> re-exec*. v4's I8/I2/I3 each assumed a substrate that doesn't exist and partly
+> *can't* coexist with the one that does.
+>
+> **v5's keystone move:** stop trying to make the agent's shared
+> `PersistenceWriter` transactional. Introduce a separate, bridge-owned
+> **append-only, `fsync`'d operation log (oplog)** as the agent's authoritative
+> cross-process interface; treat the existing state files as a *coalesced,
+> reconstructible cache* of replaying it. This leaves `writer.rs` **untouched**
+> (honoring the prime directive, constraint #7), makes commits **O(1)
+> append+fsync** instead of O(total-files), makes "accepted" mean *durable*, and
+> never skips a `rev`. New §24 maps **every invariant to the exact code it
+> touches**; new §25 is a fault-injection acceptance matrix. §23 retains the v4
+> adversarial map.
 
 ---
 
@@ -51,15 +61,17 @@ backend** between the frontend and the fleet.
 5. Design backend ↔ agent comms.
 6. Backend must **discover** agents.
 7. **CRITICAL — minimal impact on agent Rust code.** Additive changes (expose a
-   socket, write a heartbeat) are fine; **never change how the agent
-   reasons/acts**. The agent must run identically whether or not the backend is
-   watching.
+   socket, append to a log, write a heartbeat) are fine; **never change how the
+   agent reasons/acts**, and **never rewrite the shared persistence path the 22
+   modules depend on**. The agent must run identically whether or not the backend
+   is watching. *(v5 takes this literally: see §24 — the only agent-side change
+   is one additive module; `writer.rs` is not modified.)*
 8. Catalog **information to gather from** + **actions to perform on** agents.
 9. **Live streaming must be FLUID.** Flow: *LLM provider → rust agent → backend →
    frontend*, **near-millisecond added delay** end-to-end. Every added
    millisecond costs users. Hard requirement.
 10. **Production-ready on v1.** No "rewrite it three times." Foreseeable issues
-    are tracked (§20) and designed against now.
+    are tracked (§20), grounded in the real code (§24), and validated (§25).
 
 **Preferences:** simple, robust, leverage existing choices. Same machine for now,
 but an **abstraction layer** over comms **and** discovery. Per-agent connection
@@ -67,31 +79,37 @@ managed internally.
 
 ---
 
-## 3. The central idea: two planes
+## 3. The keystone: three durability tiers + two planes
 
-We split all backend↔agent traffic into two planes with **opposite** trade-offs,
-so neither requirement compromises the other.
+v4 split traffic into two planes (durable control / ephemeral stream). v5 keeps
+that, but **grounds the "durable" side in how the agent actually persists** by
+naming **three durability tiers** with sharply different guarantees:
 
-| | **Control plane (durable)** | **Stream plane (live)** |
-|---|---|---|
-| Carries | thread state, final messages, panels, cost, registry, **commands**, **phase/status transitions**, **command-lifecycle** | **live token deltas**, streaming tool-arg deltas, **message-start frames** |
-| Medium | **disk** (`.context-pilot/`) + file-watch + poll | **Unix domain socket** (UDS), in-memory push |
-| Latency | 50–200 ms (tolerant) | **sub-millisecond** |
-| Durability | **authoritative** — survives any crash | **ephemeral** — droppable |
-| Consistency | snapshot-consistent (rev/manifest) | best-effort, causally ordered per message (I10) |
-| On loss | N/A (it's the truth) | irrelevant — the **final** message + the **phase** still land on the control plane |
+| Tier | What | Medium | Guarantee | Coalesced? | `fsync`? |
+|---|---|---|---|---|---|
+| **① Oplog** (NEW v5) | command effects, `rev` assignment, `seen`-marks, phase transitions, lifecycle, cost aggregate | **append-only file** `.context-pilot/oplog/` (bridge-owned) | **authoritative, durable, exactly-once** | **never** | **yes, per append** |
+| **② State cache** | panel snapshots, worker state, message bodies | existing `.context-pilot/` files via the **untouched** `PersistenceWriter` | **best-effort, reconstructible** by replaying ① | yes (50 ms debounce) | no (as today) |
+| **③ Stream** | live token deltas, tool-arg deltas, **latency hints** for phase/message-start | **Unix domain socket** (UDS) | **ephemeral, droppable** | n/a | no |
 
-**Why this is the keystone.** The stream plane is *allowed to be lossy* because
-the control plane is authoritative: drop a live token and the assembled message
-arrives via the control plane within a tick. **Streaming is fast; state is safe;
-neither compromises the other.**
+**Why three, not two.** The code-grounded attack showed v4 conflated two very
+different needs onto one "control plane": (a) a *handful* of events that must be
+**exactly-once and observed in order** (a command's effect, the `rev`), and (b) a
+*large, churny* body of **state** that is fine to lose and rebuild (panels,
+message bodies). Tier ① is tiny, append-only, `fsync`'d — cheap to make perfect.
+Tier ② is large and churny — left exactly as the real `writer.rs` already does it
+(async, debounced, coalescing), because for state, *last-write-wins is correct*
+(it's a cache of replaying ①, per I5). **You only pay for durability where you
+need it.**
 
-**v4 correction (adversarial #6).** *Sticky/latched* state — phase (idle ·
-streaming · tooling), status — is **never** on the lossy plane. A dropped "stream
-ended" frame must not strand the UI as "streaming forever." Phase rides the
-**durable control plane** with a `rev`. The stream plane carries **only**
-ephemeral deltas that are safe to drop (tokens, tool-arg deltas) plus the
-self-describing **message-start** frame (I10).
+**The relationship:** ② is a *materialized view* of ①. The agent appends an
+effect to ① (`fsync`), then lets its normal best-effort save update ②. On crash,
+replay ① to rebuild what ② lost. The backend **tails ①** for truth and
+**hydrates ② on demand** for bodies (I5).
+
+**Sticky state never rides ③ alone.** Phase (idle·streaming·tooling) has its
+**authoritative** record in ① and a **latency hint** on ③ — fast to show, but ①
+wins and self-heals a dropped hint (resolves the v4 #6 fix's latency regression,
+K6, and I10's dropped-`MessageStart`, R2-7).
 
 ---
 
@@ -99,29 +117,30 @@ self-describing **message-start** frame (I10).
 
 ```
 React frontend
-   │  REST (load + actions)  +  WebSocket (auth'd: seq'd control deltas + ephemeral token frames)  ← §9
+   │  REST (load + actions)  +  ONE auth'd WebSocket (oplog deltas + ephemeral stream hints)  ← §9
    ▼
 Orchestrator backend (standalone, Rust — reuses cp-base/cp-render types)
    ├── AgentRegistry   (discovery)   → watch ~/.context-pilot/agents/*.json (rare writes)
    ├── AgentChannel[]  (per-agent transport, internally managed)
-   │      DURABLE read:   watch <folder>/.context-pilot/ + rev/manifest gating + poll sweep
-   │      LIVE stream:    connect <folder>/.context-pilot/stream.sock (UDS) ← token tee
-   │      liveness:       UDS connected  +  polled heartbeat file (NOT a watched rename)
-   │      command:        UDS frame (fast) + cap-token + dedup-token, DURABLE inbox/ fallback + outbox ack
-   ├── AgentSupervisor (lifecycle)   → spawn DETACHED `cp --headless` (ALLOW-LIST gated)
+   │      OPLOG tail:    ONE inotify watch on <folder>/.context-pilot/oplog (append-only)   ← truth (I12)
+   │      body hydrate:  on-demand reads of content-addressed bodies referenced by the oplog (I5)
+   │      LIVE stream:   connect <folder>/.context-pilot/stream.sock (UDS) ← token tee + hints
+   │      liveness:      UDS connected  +  polled heartbeat file (NOT a watched rename)
+   │      command:       append to oplog (fsync) → ack "committed"; UDS = low-latency wake
+   ├── AgentSupervisor (lifecycle)   → spawn DETACHED `cp --headless` (ALLOW-LIST gated, canonicalized)
    ├── StreamHub       (per-agent fan-out: 1 UDS in → N frontend WS out, bounded buffers, degraded flag)
-   ├── CostBreaker     (global aggregate-spend circuit-breaker)
-   └── MaterializedView[]  (in-memory cache = backend's only "state"; LAZY rebuild)
+   ├── CostBreaker     (global aggregate-spend circuit-breaker; counter is oplog-backed = durable)
+   └── MaterializedView[]  (in-memory cache, rebuilt by replaying oplog heads; LAZY body hydration)
    │
    ▼  Backend ↔ Agent
 Agent Rust loop (per folder):
-   ├── [hardening]  commit-transaction writer + manifest + boot flock(FD-inherited)   (read-safety, inert)
-   └── [additive]   cp-mod-bridge:
-         • boot:    flock agent.lock (FD-inheritable) ; write registry entry + cap_token ; bind stream.sock
+   ├── [UNCHANGED]  PersistenceWriter (writer.rs) — async/debounced/coalescing state cache (tier ②)
+   └── [additive]   cp-mod-bridge (the ENTIRE agent-side footprint — see §24):
+         • boot:    flock agent.lock (FD-inheritable, H5) ; write registry + cap_token ; bind stream.sock ; open oplog
+         • oplog:   append-only WAL; command effect + rev + seen-mark + phase + lifecycle = ONE fsync'd append (I8/I11)
          • heartbeat: DEDICATED thread → polled heartbeat file (decoupled from registry)
          • stream TEE: StreamEvent → lock-free SPSC enqueue → DEDICATED publisher thread → stream.sock
-         • command:  verify cap_token + dedup_token → spine notification (existing user-msg path) → outbox ack
-         • (already) persists all state to .context-pilot/ → backend reads it
+         • command:  journal-to-oplog-THEN-ack ; inject via the existing USER-MESSAGE entry (NOT the spine, K7)
 ```
 
 ---
@@ -129,60 +148,85 @@ Agent Rust loop (per folder):
 ## 5. Invariants (the robustness spine)
 
 - **I1 — Single writer per folder.** `flock` on `.context-pilot/agent.lock`. A 2nd
-  instance refuses / goes passive. Backend never writes agent state (only
-  `inbox/`). Cardinal rule. *(See H5 for the deadman-re-exec interaction.)*
-- **I2 — Atomic, power-safe file writes.** `tmp → write → fsync(file) → rename(2)`,
-  and for a batch: **fsync every data file, then rename the manifest, then fsync
-  the containing directory**. Readers see old-or-new, never torn; a durable
-  manifest can never reference content lost from the page cache. *(Required
-  hardening — today it's a plain `fs::write`.)*
-- **I3 — Snapshot consistency via a manifest.** Each batch writes, **last**, a
-  `manifest = { rev, files: [{path, hash}] }` (atomic). The backend reads the
-  manifest, then only files whose hash changed; a referenced file missing / with a
-  stale hash ⇒ batch in-flight ⇒ wait for next rev. No mtime, no clock dependence;
-  doubles as an incremental-read index.
+  instance refuses / goes passive. Backend never writes agent state; it only
+  *appends commands to the oplog*. *(See H5 for the deadman-re-exec interaction.)*
+- **I2 — Durable writes where they matter, not everywhere.** *Tier ①* oplog
+  appends use `write → fsync(file) → fsync(dir)` (the append is the commit). *Tier
+  ②* state files keep the existing best-effort `fs::write` (no `fsync`) — they are
+  a reconstructible cache (I5), so paying for `fsync` there is waste. A periodic
+  tier-② **checkpoint** (coalesced) bounds replay length. *(v4 wrongly demanded a
+  per-write fsync barrier on the shared writer — K1/K4. v5 confines durability to
+  the tiny oplog.)*
+- **I3 — Snapshot consistency via bounded heads, not full enumeration.** The oplog
+  carries a monotonic `rev`. Message/panel **bodies are content-addressed**
+  (filename = content hash → immutable once written, never rewritten or re-listed).
+  The snapshot reference is a **bounded set of current heads** (per-thread
+  last-message hash, per-panel hash), not an enumeration of all history. Reading a
+  `rev` means reading its heads + hydrating referenced bodies on demand. *(v4's
+  "manifest enumerates every file including messages" was O(total-files) rewritten
+  every commit → O(S²) amplification, K3. Content-addressing + heads makes it
+  O(threads+panels), bounded.)*
 - **I4 — Commands idempotent + ordered + ack'd, by SEMANTIC key.** Each command
-  carries a unique transport id + sortable seq **and** a client-supplied
-  **`dedup_token`** (semantic key). The agent's `seen` ledger keys on the
-  `dedup_token`, so a TTL-reissue with a *new transport id but the same
-  dedup_token* is still deduped. At-least-once delivery, **exactly-once effect**.
-- **I5 — Backend view is a LAZILY-rebuildable cache.** Only durable truth =
-  agents' disks + registry. On restart the backend eagerly rebuilds **only** the
-  registry + each agent's `rev`/manifest head; message bodies and large panels are
-  **hydrated on demand**. Restart latency is bounded, independent of fleet disk
-  size.
-- **I6 — A command's effect and its `seen` mark commit in the SAME transaction**
-  (subsumed by I8). Either both the spine-notification (effect) and the dedup mark
-  persist, or neither. No partial states across a crash.
+  carries a transport id + sortable seq **and** a client-supplied **`dedup_token`**
+  (semantic key). The oplog's `seen`-set keys on `dedup_token`; a TTL-reissue with
+  the *same* `dedup_token` is deduped. At-least-once delivery, **exactly-once
+  effect**. The `seen`-set is **evicted by acknowledged-`rev`, not by time** — a
+  token retires only once its effect's `rev` is durably confirmed consumed, so a
+  replay after *any* outage duration is still deduped (resolves R2-1: dedup-window
+  vs long-outage replay).
+- **I5 — Tier ② is a LAZILY-rebuildable cache of the oplog.** Only durable truth =
+  the oplog + content-addressed bodies + registry. On restart the backend rebuilds
+  **only** registry + each agent's oplog **head** (`rev` + heads); bodies hydrate
+  on demand, pinned to the requested `rev`'s head hash (so a lazy read can never
+  return a *newer* body than the snapshot, resolving R2-9). Restart latency is
+  bounded by agent **count**, not fleet **disk**.
+- **I6 — A command's effect and its `seen`-mark are the SAME oplog append.** One
+  `fsync`'d append contains `{cmd_id, dedup_token, rev, effect}`. Either the append
+  is durable (effect happened, token seen) or it isn't (neither) — there is no
+  partial state, by the atomicity of append-then-fsync. Subsumed into I8.
 - **I7 — The live plane is best-effort and MUST NOT backpressure the agent.** The
-  tee is a **lock-free SPSC enqueue** on the hot loop; a **dedicated publisher
-  thread** serializes + writes the socket. If a buffer is full, frames are
-  dropped/coalesced, never queued against the agent's work — and the affected
-  stream is flagged **degraded** so the UI can show it (not silent jank). The
-  durable plane is the safety net.
-- **I8 — Single-writer commit transaction (NEW v4).** Data files, **message
-  files**, `seen`-ledger marks, and the `rev`/manifest bump all flow through **one
-  ordered durable transaction on one channel**. The manifest enumerates **every**
-  file in the batch *including messages* (closing the v3 "message path escapes the
-  rev" hole, B3). The single persistence actor assigns `rev` and atomically
-  snapshots **all workers** per batch (closing the multi-worker rev question). The
-  v3 dual `Batch`/`Message` channel split is **removed for command-effect and
-  state writes**; message writes participate in the manifest.
-- **I9 — Every command is authenticated by a capability token (NEW v4).** At boot
-  the agent mints a random 256-bit `cap_token`, stored in its `0600` registry
-  entry. **Every** command — UDS frame *and* `inbox/` file — must carry the
-  matching `cap_token`; the agent rejects mismatches. Raises the bar from "any
-  same-user process may blindly inject into `inbox/`" to "must first read the
-  `0700` registry" and makes the backend the sole practical command author.
-  *(True defense against same-user malware needs OS sandboxing — §17, future.)*
-- **I10 — Cross-plane causal ordering (NEW v4).** A token frame may arrive before
-  the control-plane "message created" delta. Resolution is twofold and composes:
-  (a) the **first** `StreamFrame` for a `message_id` is a self-describing
-  **`MessageStart`** carrying `{thread_id, worker_id, author, base_rev}` — enough
-  to lazily create the buffer; (b) the frontend additionally **buffers orphan
-  tokens** by `message_id` until the start frame or control delta lands. A `seq`
-  gap on the stream ⇒ ignore live, reconcile from the final message on the control
-  plane.
+  tee is a **lock-free SPSC enqueue** on the loop; a **dedicated publisher thread**
+  serializes + writes the socket. Ring-full ⇒ **O(1) fail-fast drop** (never block,
+  never allocate) + a `degraded` mark; the publisher uses **non-blocking writes +
+  bounded backoff** on a slow/dead UDS (never spins, never wedges — R2-13/R2-14).
+  The oplog is the safety net. *(Today the agent drains a single `StreamEvent`
+  channel on the main loop — `streaming.rs::process_stream_events` — so the tee is
+  genuinely single-producer; see §24 note on future multi-worker.)*
+- **I8 — The oplog is the authoritative, append-only, `fsync`'d event log (NEW
+  v5).** Command effects, `rev` assignment, `seen`-marks, phase transitions,
+  lifecycle states, and the cost aggregate commit as **append-only oplog entries**
+  — **O(1) append + fsync, never coalesced.** The agent's existing
+  `PersistenceWriter` (tier ②) is **not modified**: it remains the best-effort,
+  debounced, coalescing state cache. The single main loop assigns `rev` (it's the
+  oplog append offset) — inherently serialized, no cross-worker race (the v4
+  "atomic cross-worker snapshot" worry is moot: `build_save_batch` already
+  snapshots synchronously on one thread — retraction noted in §22).
+- **I9 — Every command is authenticated AND fresh (NEW v4, hardened v5).** The
+  agent mints a 256-bit `cap_token` at boot (in its `0600` registry entry). Every
+  command carries **an HMAC over `{seq, dedup_token, body}` keyed by `cap_token`
+  plus a monotonic nonce**; the agent rejects bad MACs and stale/replayed nonces.
+  This upgrades the bearer secret to a real challenge — a captured frame cannot be
+  replayed (resolves R2-6). The `cap_token` **rotates each boot** and consumed
+  oplog command entries are compacted, bounding at-rest exposure (R2-11).
+- **I10 — Cross-plane causal ordering (NEW v4, hardened v5).** The **durable**
+  "message created" record lives in the oplog; the stream plane's `MessageStart`
+  is a *latency hint* only. A token frame may beat the hint — the frontend buffers
+  orphan tokens by `message_id` (bounded: per-message byte cap + global cap + TTL,
+  drop-and-refetch on overflow — R2-3), and the oplog "message created" entry is
+  the *guaranteed* arrival of the header (bounded by commit cadence, not the 2–3 s
+  poll). A dropped `MessageStart` self-heals from the oplog (resolves R2-7). `seq`
+  is **per-`message_id`** so gaps are unambiguous.
+- **I11 — "Accepted" means durable (NEW v5).** A command is appended to the oplog
+  (`fsync`) **before** the "accepted" ack is sent. The UDS-fast path is *delivery +
+  wake*, not durability; the oplog **is** the durable inbox. So a deadman re-exec
+  (which fires precisely on a hung stream — the agent's own recovery path) replays
+  the oplog and re-derives the effect, deduped by `seen`. No lost effect, no false
+  ack, no double-apply (resolves K2). The two-phase ack's "accepted" is honest.
+- **I12 — One watch per agent (NEW v5).** The backend observes each agent via **a
+  single inotify watch on its append-only oplog** (+ on-demand body hydration). It
+  does **not** enumerate per-file watches over `.context-pilot/`. N agents = N
+  watches — well under `fs.inotify.max_user_watches` — so the control plane stays
+  event-driven at fleet scale (resolves K8); the 2–3 s poll is a pure backstop.
 
 ---
 
@@ -195,27 +239,28 @@ interface AgentRegistry {              // §10 discovery
 }
 
 interface AgentChannel {               // per-agent transport (one connection, internally managed)
-    snapshot() -> (rev, AgentState)         // consistent durable snapshot (read)
-    subscribe_state() -> stream<StateDelta> // durable deltas since a rev (control plane; incl phase + cmd-lifecycle)
-    subscribe_stream() -> stream<StreamFrame> // LIVE token/MessageStart frames (stream plane, best-effort)
-    send(Command) -> Future<Ack>        // cap-token + dedup-token; ordered, idempotent; UDS-fast w/ inbox fallback
+    head() -> (rev, Heads)                  // current oplog head: rev + content-addressed heads (read)
+    tail_oplog(since_rev) -> stream<OpEntry> // authoritative, append-only, gap-free deltas (tier ①)
+    hydrate(hash) -> Body                   // on-demand body fetch, content-addressed, rev-pinned (I5)
+    subscribe_stream() -> stream<StreamFrame> // LIVE token/hint frames (tier ③, best-effort)
+    send(Command) -> Future<Ack>        // HMAC+nonce; journaled-to-oplog-then-ack (I11); ordered, idempotent
     health() -> Liveness                // UDS connected + polled heartbeat
 }
 
 interface AgentSupervisor {            // lifecycle / process control
-    spawn(folder, opts) -> Future<AgentHandle>   // ALLOW-LIST gated; detached; resolves on registration
+    spawn(folder, opts) -> Future<AgentHandle>   // ALLOW-LIST gated (canonicalized); detached; resolves on registration
     stop(id, mode) ; restart(id) ; adopt(handle)
 }
 ```
 
-- **v1 impls:** `LocalRegistry` (watch the registry dir), `LocalChannel` (durable
-  = disk watch + manifest; live = `stream.sock` UDS; command = UDS frame + cap/dedup
-  tokens + `inbox/` fallback + `outbox/` ack), `LocalSupervisor` (detached
-  `cp --headless`, adopt via registry).
-- **One transport-agnostic, versioned wire protocol** (`Command` / `StateDelta` /
-  `StreamFrame` / `AgentState`). The medium is swappable (UDS → TCP/QUIC remote, or
-  shared-memory ring for lower local latency) **without touching orchestration
-  logic**.
+- **v1 impls:** `LocalRegistry` (watch the registry dir), `LocalChannel` (truth =
+  oplog tail over a single inotify watch; bodies = content-addressed on-demand
+  reads; live = `stream.sock` UDS; command = HMAC'd oplog append + UDS wake),
+  `LocalSupervisor` (detached `cp --headless`, adopt via registry).
+- **One transport-agnostic, versioned wire protocol** (`Command` / `OpEntry` /
+  `StreamFrame` / `Heads` / `Body`). The medium is swappable (UDS → TCP/QUIC
+  remote, or shared-memory ring for lower local latency) **without touching
+  orchestration logic**.
 
 ---
 
@@ -231,85 +276,80 @@ backend recv ──fan-out──▶ frontend WS                : ~microseconds (
 frontend ──rAF batch──▶ DOM                          : next animation frame
 ```
 
-**The agent tee (adversarial #5).** The agent already receives
-`StreamEvent::Chunk` deltas and renders them. The bridge adds a **lock-free SPSC
-enqueue** at that exact point — **one atomic push, no serialization on the hot
-loop**. A **dedicated publisher thread** drains the ring, serializes `StreamFrame`s
-and writes the socket. The agent renders/persists **identically**; the tee can
-never steal CPU from or backpressure the main loop (I7). This is the only new
-hot-path code and it is a single enqueue.
+**The agent tee.** The agent drains a single `StreamEvent` channel on its main
+loop (`streaming.rs::process_stream_events`). The bridge adds a **lock-free SPSC
+enqueue** at that point — **one atomic push, no serialization on the loop**. A
+**dedicated publisher thread** drains the ring, serializes `StreamFrame`s, writes
+the socket. The agent renders/persists identically; the tee can never steal CPU
+from or backpressure the loop (I7).
 
-**Frame schema** (small, ordered, attributable):
-`StreamFrame { agent_id, worker_id, thread_id, message_id, seq, kind, payload }`
-with `kind ∈ { MessageStart, Token, ToolArgs }`. **Phase is NOT here** — it is a
-durable control-plane delta (adversarial #6). The **first** frame per `message_id`
-is `MessageStart` (I10), self-describing so the frontend can create the buffer
-before the control delta lands.
+**Frame schema:** `StreamFrame { agent_id, worker_id, thread_id, message_id, seq,
+kind, payload }`, `kind ∈ { MessageStartHint, Token, ToolArgs, PhaseHint }`.
+**`MessageStartHint` and `PhaseHint` are latency hints only** — their durable
+truth is the oplog (I8/I10). The first hint per `message_id` is self-describing so
+the frontend can paint before the oplog entry lands; if it drops, the oplog
+"message created" entry self-heals it.
 
 **Fan-out (StreamHub).** One UDS consumer per agent → N frontend WS subscribers.
-The agent never scales connections (good for #7). Fan-out is O(subscribers) direct
-writes.
+The agent never scales connections. Fan-out is O(subscribers) direct writes.
 
-**Backpressure (I7, adversarial #11).**
-- *Agent → backend:* non-blocking publisher; drop/coalesce frames if the UDS send
-  buffer is full.
-- *Backend → frontend:* each WS connection has a **bounded** buffer; on overflow,
-  coalesce pending token deltas (or drop) **and set a `degraded` flag** on that
-  stream. The flag is pushed to the UI ("stream degraded — catching up") and the
-  backend emits a control-plane "reconcile from final message" hint. A slow browser
-  never stalls the agent or other viewers, and degradation is **never silent**.
+**Backpressure (I7).** *Agent → backend:* non-blocking publisher; **O(1)
+fail-fast drop** if the ring is full (drop must keep `MessageStartHint`/`Token`
+coherent — a token whose start was dropped is replayable from the oplog). *Backend
+→ frontend:* bounded per-WS buffer; on overflow, coalesce/drop **and set a
+`degraded` flag** surfaced to the UI ("stream degraded — catching up"). Because a
+*long* degraded stream has no final message yet, the backend falls back to
+**periodic oplog phase/partial snapshots** as the reconcile target, not just the
+final message (resolves R2-17).
 
-**Frontend rendering contract (adversarial #10).** The browser is the real latency
-floor. Mandatory frontend rule (documented here because it determines the
-end-to-end UX): incoming tokens accumulate into a per-message buffer and are
-flushed to the DOM **once per `requestAnimationFrame`** — **never** `setState`
-per token. This is a first-class requirement of "fluid," not an implementation
-detail.
+**Publisher on a dead/slow UDS:** non-blocking `write` + bounded backoff; never
+spins (no CPU burn), never blocks the ring beyond its bound (R2-14).
 
-**Latency hygiene.** `TCP_NODELAY` on any TCP hop, no output buffering, **flush
-per frame**, never debounce tokens, never route tokens through disk.
+**Frontend rendering contract.** Mandatory: tokens accumulate into a per-message
+buffer flushed **once per `requestAnimationFrame`** — **never** `setState` per
+token. This is a first-class requirement of "fluid," not an implementation detail.
 
-**Crash mid-stream.** Agent dies → `stream.sock` closes → backend marks the
-stream ended **on the durable control plane** (phase → `down`/`interrupted`, so
-the UI can never get stuck). Partial live text is ephemeral. *(Optional knob:
-checkpoint partial assistant text to disk every N tokens — default off in v1.)*
+**Latency hygiene.** `TCP_NODELAY` on any TCP hop, flush per frame, never debounce
+tokens, never route tokens through disk.
 
-**Don't firehose blobs.** Only small deltas on the stream plane. Large tool
-outputs / panels are referenced by `rev`; the frontend fetches them via REST.
+**Crash mid-stream.** Agent dies → `stream.sock` closes → backend reads the oplog
+phase (→ `down`/`interrupted`) — never stuck. Partial live text is ephemeral.
 
 ---
 
-## 8. Backend ↔ Agent (control plane)
+## 8. Backend ↔ Agent (control = oplog)
 
-### 8.1 Read — disk + manifest (safe by I2/I3, reliable by event+poll)
-Watch `.context-pilot/`, gate on the manifest, incrementally read changed files.
-Event-driven watcher for latency **+** a 2–3 s poll-reconcile sweep for
-correctness (`notify` drops/coalesces under load — the search indexer already uses
-this belt-and-suspenders). A human TUI can be open while the backend reads (I1
-single writer).
+### 8.1 Read — tail the oplog (truth) + hydrate bodies (lazy)
+The backend keeps **one inotify watch on the append-only oplog** (I12) and tails
+appended `OpEntry`s — **gap-free by construction** (append-only never coalesces,
+unlike the tier-② debounced writer that *replaces* its pending batch and skips
+intermediate revs — K5). Bodies referenced by an entry are hydrated on demand,
+content-addressed and `rev`-pinned (I5). A 2–3 s poll of the oplog tail is a pure
+backstop for a dropped inotify event.
 
-### 8.2 Write — command, UDS-fast with durable fallback
-- **Authn (I9):** every command carries the agent's `cap_token`. Mismatch ⇒
-  rejected, logged.
-- **Idempotency (I4):** every command carries a client-supplied **`dedup_token`**.
-  The `seen` ledger keys on it, so retries/reissues never double-execute even with
-  a fresh transport id.
-- **Socket up (normal):** UDS frame → agent applies it in its loop (same path as a
-  typed user message; queued safely if mid-stream) → acks over UDS. Fast.
-- **Socket down / busy-booting:** drop a durable `inbox/<seq>-<id>.json` (atomic,
-  carries cap+dedup tokens). Processed on reconnect/boot.
-- **Atomicity (I8):** the command's effect (message + spine notification) + its
-  `seen` mark + the `rev`/manifest bump commit in **one transaction**; observable
-  via `outbox/<id>` and the resulting `rev`.
-- **Lifecycle states**, pushed as **control-plane deltas** so the UI shows real
-  progress (adversarial #12): `queued → delivered → processing → done | failed |
-  expired`. A TTL bounds the wait; on expiry the backend marks `expired` and
-  reissues with a **new transport id but the SAME `dedup_token`** (so the reissue
-  can never become a semantic duplicate). The `seen`-window is kept longer than the
-  TTL.
-- **Two-phase semantics:** "send message" **acks on acceptance** (fast); the LLM
-  work is observed later via the stream + state planes. Mutations like "archive
-  thread" ack on completion. Never block an ack for minutes.
+### 8.2 Write — command, journal-then-ack
+- **Authn + freshness (I9):** every command carries an HMAC over
+  `{seq, dedup_token, body}` keyed by `cap_token`, plus a monotonic nonce. Bad MAC
+  or stale nonce ⇒ rejected, logged.
+- **Idempotency (I4):** the oplog `seen`-set keys on `dedup_token`, evicted by
+  acknowledged-`rev` (not time) — replay-safe across any outage.
+- **Journal-then-ack (I11):** the command is **appended to the oplog (`fsync`)
+  first**, *then* `accepted` is returned. UDS is the low-latency wake; the oplog is
+  the durable inbox. Survives deadman re-exec.
+- **Injection bypasses the autonomy spine (K7):** the bridge applies a command's
+  effect via the **existing user-message entry point** (the same path a human
+  typing in the TUI uses — `actions/input.rs`, which clears `user_stopped`), **not**
+  via `check_spine` / `apply_continuation`. The spine's anti-loop guards ("no two
+  synthetic in a row," `2^n` error backoff, `user_stopped` hard-stop —
+  `engine.rs`) exist to stop the agent looping on *itself*; a backend command is
+  *external user input* and must not be throttled or swallowed by them.
+- **Lifecycle states** (`queued → delivered → processing → done | failed |
+  expired`) are **oplog appends** (never coalesced), so the UI reliably observes
+  "processing" rather than a coalesced jump to "done" (resolves K5/#12). TTL bounds
+  the wait; on expiry, reissue keeps the **same `dedup_token`**.
+- **Two-phase semantics:** "send message" acks on **durable acceptance** (I11);
+  the LLM work is observed later via the stream + oplog. Mutations ("archive
+  thread") ack on completion.
 
 ---
 
@@ -317,439 +357,416 @@ single writer).
 
 - **REST** — initial load + point queries + non-streaming actions. Every response
   carries `rev`. Actions return a `command id` + echo the `dedup_token`.
-- **WebSocket** — the single live channel, **authenticated** (adversarial #3): the
-  backend mints a per-session **bearer token** delivered to the frontend
-  out-of-band (the backend serves the frontend and injects it, or prints it for
-  paste). The WS **handshake requires the token** (via `Sec-WebSocket-Protocol` or
-  a mandatory first auth frame); connections without it are rejected. **CORS /
-  `Origin` are NOT relied upon** — they don't protect WS. The channel carries:
-  - *control deltas* — `seq`-numbered, **replayable** (state, new messages, phase,
-    MY_TURN, cost, command-lifecycle).
-  - *token/stream frames* — ephemeral, **not** replayed (final message covers any
-    gap).
-  Full-duplex → instant `stop`/`interrupt`/`answer`. Binary frames keep token
-  overhead minimal.
-- **Reconnect:** control plane replays the gap by `seq` (bounded ring); gap >
-  buffer ⇒ `resync` → REST refetch. Stream plane: missed tokens dropped; the final
-  message is already in state.
-- **Backend-down resilience (adversarial #14):** the frontend **queues user
-  actions client-side** while the backend is unreachable and **replays them on
-  reconnect**. Replay is safe because each action carries its `dedup_token` (I4) —
-  a replayed-but-already-applied action is deduped. In-flight intent is therefore
-  **not** silently lost during a backend blip. *(Future: a thin local helper could
-  write `inbox/` directly when co-located; the browser itself cannot.)*
-- **Client monotonic rev:** ignore any WS frame or REST response with `rev ≤` the
-  applied rev (defeats event-before-snapshot races).
+- **WebSocket** — the single live channel, **authenticated** (R2-10 hardened): the
+  backend mints a **short-lived, single-use upgrade ticket** delivered out-of-band;
+  the WS handshake exchanges it for a session bound to that one connection (a
+  leaked served ticket is useless after first use; sessions refresh). **CORS /
+  `Origin` are NOT relied upon.** The channel carries:
+  - *oplog deltas* — `rev`-numbered, **replayable, gap-free** (state, new messages,
+    phase, MY_TURN, cost, lifecycle).
+  - *stream hints* — ephemeral, **not** replayed (the oplog covers any gap).
+- **Reconnect:** the backend replays oplog deltas by `rev` (the oplog is the ring);
+  gap beyond the buffer ⇒ `resync` → REST refetch of heads + lazy hydrate.
+- **Backend-down resilience (R2-1 resolved):** the frontend **queues actions
+  client-side** and **replays on reconnect**; replay is safe because the oplog
+  `seen`-set is evicted by acknowledged-`rev`, not time, so a replay after a long
+  outage is still deduped.
+- **Client monotonic rev:** ignore any frame/response with `rev ≤` applied rev.
 
 ---
 
 ## 10. Discovery, heartbeat & single-instance
 
-- On boot: take the **folder flock** (I1, FD-inheritable — see H5), bind
-  `stream.sock`, mint `cap_token`, then register `~/.context-pilot/agents/<id>.json`
-  (`0600`) = `{ id, folder, pid, boot_id, model, protocol_version, binary_version,
-  socket_path, heartbeat_path, cap_token, started_at, status }` (atomic). The
-  registry entry is written **rarely** (boot + status change), **not** per
-  heartbeat.
-- **Liveness — decoupled from the registry (adversarial #16).** Two signals, neither
-  of which churns the manifest/registry rename path: (1) the **UDS being connected**
-  (primary, instant), and (2) a **dedicated `heartbeat` file the backend POLLS** (not
-  watches) at its own cadence, refreshed by the agent's dedicated heartbeat thread.
-  No mtime dependence (I3-safe), no watcher storm.
-- **Heartbeat thread.** Dedicated thread, never the main loop — a busy agent (long
-  tool, big stream) must still look alive. Reuses the deadman dedicated-thread
-  pattern.
-- **Liveness verdict:** fresh polled heartbeat **AND** live pid **AND** matching
+- On boot: take the **folder flock** (I1, FD-inheritable — H5), bind `stream.sock`,
+  **open/create the oplog**, mint `cap_token`, then register
+  `~/.context-pilot/agents/<id>.json` (`0600`) = `{ id, folder, pid, boot_id,
+  model, protocol_version, binary_version, socket_path, oplog_path, heartbeat_path,
+  cap_token, started_at, status }` (atomic). Registry entry written **rarely**
+  (boot + status change), **not** per heartbeat.
+- **Liveness — decoupled (R2-18 hardened).** Two signals, neither churning the
+  oplog/registry: (1) the **UDS being connected** (primary), and (2) a **polled
+  heartbeat file** the agent updates by a **fixed-size, single-word, aligned
+  in-place write** (torn-read-safe; no rename churn) on a dedicated thread, polled
+  by the backend at a documented cadence. No mtime dependence.
+- **Liveness verdict:** fresh heartbeat **AND** live pid **AND** matching
   `boot_id`/start-time (defeats pid reuse). Else stale → down.
-- **Spawn = try-lock-or-adopt:** a live registry entry / held flock ⇒ adopt; else
-  launch; the launched process's flock arbitrates a race, loser exits, backend
-  adopts the winner. **Spawn is allow-list gated** (§17).
+- **Spawn = try-lock-or-adopt**, **allow-list gated with path canonicalization**
+  (realpath before matching; reject symlink/`..` traversal out of an allow-listed
+  root — R2-15).
 - **GC:** registry `*.tmp` reaped by age; stale `stream.sock` unlinked before
-  re-binding on boot.
+  re-binding on boot; the oplog is **compacted** past the acknowledged-`rev`
+  barrier (bounds its size; preserves the `seen`-set semantics).
 - **Unmanaged agents:** live lock, no registry entry (bridge off / old binary) →
-  listed read-only via disk; no command/stream channel.
+  listed read-only via tier-② files; no command/stream channel.
 
 ---
 
-## 11. Agent-side delta (the entire footprint)
+## 11. Agent-side delta (the entire footprint — see §24 for the code map)
 
-### 11.1 Additive module — `cp-mod-bridge` (behaviorally inert)
-1. **Lock + register + heartbeat** (heartbeat + polled file on a dedicated thread).
-2. **Stream tee** — **lock-free SPSC enqueue** of each `StreamEvent`; a dedicated
-   publisher thread serializes + writes `stream.sock` (I7). Pure observer, zero hot-
-   loop serialization.
-3. **Command intake** — verify `cap_token` + `dedup_token` (I9/I4) on UDS frames +
-   `inbox/` files → spine notifications (existing user-message path) → ack via
-   `outbox/`.
+### 11.1 Additive module — `cp-mod-bridge` (behaviorally inert for reasoning)
+1. **Lock + register + heartbeat** (heartbeat = aligned in-place write on a
+   dedicated thread).
+2. **Oplog** — open the append-only WAL; append command effects + rev + seen +
+   phase + lifecycle as `fsync`'d entries (I8/I11). Content-address bodies.
+3. **Stream tee** — lock-free SPSC enqueue of each `StreamEvent`; dedicated
+   publisher thread serializes + writes `stream.sock` (I7).
+4. **Command intake** — verify HMAC + nonce (I9); journal-then-ack (I11); apply
+   the effect via the **existing user-message entry** (K7), never the spine.
 
-Disable the bridge ⇒ the agent runs **exactly** as today.
+**Crucially, the module does not touch `writer.rs`** — tier-② persistence is
+unchanged. Disable the bridge ⇒ the agent runs **exactly** as today.
 
-### 11.2 Required hardening to the existing persistence path (behavior-preserving)
-- **H1 (I2):** atomic, power-safe writes — `fsync(file) → rename`, and per batch
-  **fsync all data files → rename manifest → fsync directory**.
-- **H2 (I3/I8):** stamp `rev` + write the `manifest` (hashes of **all** batch files,
-  *including messages*) **last**.
-- **H3 (I8):** collapse the dual `Batch`/`Message` writer channels into **one commit
-  transaction** for state + command-effect writes (so messages participate in the
-  rev; no escape path).
-- **H4 (I9):** mint + persist the `cap_token`; verify it on every command.
-- **H5 (I1 × deadman re-exec).** The deadman watchdog re-execs the process
-  (`CommandExt::exec`). To avoid an unlocked window or a self-deadlock, the agent
-  **clears `FD_CLOEXEC` on `agent.lock`** and passes `CP_AGENT_LOCK_FD=<n>` across
-  the exec; the re-exec'd image detects the env and **adopts the inherited lock**
-  (no re-lock). Absent the env (fresh launch) ⇒ normal `flock`.
-
-> Entire impact: one additive inert module + five behavior-preserving robustness
-> upgrades. Nothing changes *how the agent reasons or acts*. The tee is a single
-> lock-free enqueue.
+### 11.2 What v5 does NOT require (vs v4)
+v4 demanded a rewrite of the shared `PersistenceWriter` (fsync barrier, collapse
+the dual channel, manifest-of-everything) — violating constraint #7 (K4) and
+incurring O(S²) amplification (K3). **v5 requires none of that.** The only durable
+machinery is the bridge's own oplog. The single agent-side interaction with
+existing code is calling the **user-message entry point** to inject a command
+effect (additive, K7) and reading the `StreamEvent` channel for the tee (additive,
+I7). `flock`/deadman FD inheritance (H5) is the one watchdog touch.
 
 ---
 
 ## 12. Identity & multi-worker
 
 - **Stable id:** FNV-1a of the canonical folder path (reuses search's scheme) →
-  stable across restarts. Folder move/rename ⇒ new id + old tombstone (registry
-  stores the canonical path so a future "rebind" is possible).
-- **Multi-worker:** an agent may run N internal workers. The frontend speaks
-  **threads**; the backend flattens threads across workers, carrying `worker_id` as
-  metadata (and in every `StreamFrame`). **The single persistence actor assigns
-  `rev` and snapshots all workers atomically per batch** (I8) — so the per-agent
-  `rev` is well-defined despite concurrent workers.
+  stable across restarts. Folder move/rename ⇒ new id + tombstone.
+- **Multi-worker:** an agent may run N internal workers. **Today** the agent drains
+  a single `StreamEvent` channel and `build_save_batch` snapshots synchronously on
+  one thread → the tee is single-producer and the snapshot is consistent (no
+  cross-worker race). **Under the future multi-worker model** (not yet merged),
+  each worker has its own stream → **one SPSC ring + one publisher thread per
+  worker** (not an MPSC ring; the thread budget is per-worker), and each worker's
+  effects append to the shared oplog under the single main loop's `rev`
+  assignment. `worker_id` rides every frame and oplog entry.
 
 ---
 
-## 13. Failure modes & recovery (summary; full register in §20)
+## 13. Failure modes & recovery (summary; full register §20, validation §25)
 
 | Actor | Failure | Detection | Recovery |
 |---|---|---|---|
-| Agent | Hard crash | stale heartbeat + dead pid; `stream.sock` closes | mark down (phase on control plane); last snapshot readable; offer restart |
-| Agent | Mid-batch crash | manifest points at last committed rev | resume from last committed snapshot (commit txn I8) |
-| Agent | Double-launch | flock contention (I1) | 2nd passive; truth uncorrupted |
-| Agent | Deadman re-exec | inherited lock FD (H5) | no unlocked window; same single writer |
-| Agent | Re-run command post-crash | `seen` ledger keyed on `dedup_token` (I4) + I8 | duplicate skipped; exactly-once effect |
-| Stream | Slow frontend / backend | bounded buffers | coalesce/drop + **degraded flag** (I7); agent unaffected |
-| Stream | Agent dies mid-stream | socket close | phase→interrupted on control plane; final message via state |
-| Backend | Crash / restart | n/a | **lazy** rebuild: registry + rev heads eager, bodies on demand (I5); re-adopt detached agents; re-open UDS; frontends reconnect + replay queued actions |
-| Transport | `notify` event dropped | poll-reconcile sweep | converges within sweep |
-| Transport | Torn / power-lost write | atomic rename + dir fsync (I2) | prior committed version |
-| Frontend | WS disconnect | reconnect + `seq` replay / `resync` | gap replay or REST refetch; client action queue replays |
-| Security | Forged command | `cap_token` mismatch (I9) | rejected + logged |
-| Protocol | Version skew | `protocol_version` + per-msg `schema_version` | tolerant decode within **N-1 major** (§18) |
-| Process | pid reuse | `boot_id`/start-time mismatch | treated as down |
-| Fleet | Runaway spend | `CostBreaker` aggregate ceiling (§17) | stop issuing commands/spawns; surface |
+| Agent | Hard crash | stale heartbeat + dead pid; socket closes | replay oplog → rebuild tier-② cache; phase from oplog; offer restart |
+| Agent | Mid-append crash | partial last oplog entry | append is atomic-by-fsync; torn tail entry is discarded on replay |
+| Agent | Double-launch | flock contention (I1) | 2nd passive |
+| Agent | **Deadman re-exec mid-command** | — | command was oplog-journaled before ack (I11) → replayed, deduped by seen (I4) → no loss/dup (K2) |
+| Agent | Re-run command post-crash | `seen`-set in oplog (I4), ack-rev evicted | duplicate skipped; exactly-once effect |
+| Stream | Slow frontend/backend | bounded buffers | coalesce/drop + degraded flag (I7); agent unaffected |
+| Stream | Dropped `MessageStartHint`/`PhaseHint` | — | self-heals from oplog (I8/I10); hint is latency-only |
+| Backend | Crash / restart | n/a | rebuild registry + oplog heads (eager), bodies lazy & rev-pinned (I5); re-adopt detached agents; reconnect; clients replay queued actions |
+| Backend | **Restart resets CostBreaker?** | — | **no** — cost aggregate is oplog-backed/durable (R2-8) |
+| Transport | inotify event dropped | oplog poll backstop | converges within poll; oplog gap-free so no lost rev (K5) |
+| Transport | inotify watch exhaustion | — | one watch per agent (I12) → not hit at fleet scale (K8) |
+| Frontend | WS disconnect | reconnect + oplog `rev` replay / resync | gap replay or REST refetch; client action queue replays (R2-1 safe) |
+| Security | Forged/replayed command | HMAC + nonce (I9) | rejected + logged |
+| Protocol | Version skew | `protocol_version` + per-entry `schema_version` | N-1 major window; **backend upgrades first** (R2-16) |
+| Fleet | Runaway spend | durable CostBreaker ceiling | stop issuing commands/spawns; surface |
 
-Backend is **supervised** (systemd/launchd); spawned agents are **detached**
-(`setsid`) so they survive a backend restart and are re-adopted.
+Backend is **supervised**; spawned agents are **detached** (`setsid`) and
+re-adopted.
 
 ---
 
 ## 14. Sequence diagrams
 
-**Live streaming token (the fluid path):**
+**Live streaming token (fluid path):**
 ```
 provider →(SSE)→ agent: StreamEvent::Chunk("Hel")
 agent: render to typewriter  AND  SPSC enqueue (hot loop, one atomic push)
-publisher thread: serialize → stream.sock {MessageStart once, then Token seq, "Hel"}
-backend: recv frame → fan-out to N WS (bounded; degraded flag on overflow)
-frontend: route by (thread,message); rAF-batch append → paint next frame
-… repeat per token, sub-ms added latency …
-agent: StreamDone → commit txn: persist final message + manifest rev++ (I8)
-backend: control delta {message finalized@rev, phase→idle} → WS (authoritative)
-frontend: reconcile final text (covers any dropped live token)
+publisher thread: serialize → stream.sock {MessageStartHint once, then Token seq, "Hel"}
+backend: recv → fan-out to N WS (bounded; degraded flag on overflow)
+frontend: route by (thread,message); rAF-batch append → paint
+… repeat, sub-ms added latency …
+agent: StreamDone → tier-② async save (best-effort) + oplog append {message created@rev} (fsync, authoritative)
+backend: oplog delta {message@rev, phase→idle} → WS (truth; covers any dropped hint)
 ```
 
-**Send-message (auth'd, idempotent, two-phase ack):**
+**Send-message (durable, idempotent, deadman-safe):**
 ```
 UI →(REST/WS auth'd) POST message {text, dedup_token}
-backend: assign cmd-id+seq; UDS frame {cap_token, dedup_token} (or inbox/ if socket down)
-agent: verify cap_token; dedup on dedup_token; → backend: accepted {cmd-id}  (fast)
-agent: spine notification (queued if streaming); effect+seen+rev in one txn (I8)
-agent: outbox/<cmd-id> {ok, rev_after}; control delta {lifecycle: processing→done}; then streams (→ live path)
+backend: HMAC+nonce; append to oplog (fsync) → ack accepted {cmd-id}   (I11: durable BEFORE ack)
+agent: bridge sees oplog/UDS wake → inject via USER-MESSAGE entry (NOT spine, K7) → streams (→ live path)
+[if deadman re-execs here] → on resume, replay oplog → effect re-derived, deduped by seen (K2) → no loss/dup
+agent: oplog appends {lifecycle: processing→done, message created@rev}
 ```
 
-**Backend restart recovery (lazy):**
+**Backend restart recovery (lazy, rev-pinned):**
 ```
-scan registry → verify liveness (heartbeat+pid+boot_id) → adopt live / tombstone dead
-per live agent: open AgentChannel → read rev/manifest HEAD only (bodies lazy) → reconnect stream.sock
-scan outbox/ for unacked → reconcile in-flight commands (dedup-safe)
-accept frontend WS (auth'd; resync) → UI refetches + replays its queued actions
+scan registry → verify liveness → adopt live / tombstone dead
+per live agent: open AgentChannel → tail oplog from HEAD (rev + heads); bodies lazy, rev-pinned
+rebuild durable CostBreaker aggregate from oplog
+accept frontend WS (auth'd; resync) → clients refetch heads + replay queued actions (dedup-safe)
 ```
 
 ---
 
 ## 15. Information to gather FROM agents
 
-Identity/lifecycle; **phase/status** (idle·streaming·tooling·blocked·needs-input·
-errored·down — **durable control plane**); threads (id, name, MY_TURN/ACTIVE/
-THEIR_TURN, unread, preview, full conversation on demand, pending questions);
-conversation messages + **live streaming deltas** (stream plane); command
-lifecycle state; economics (tokens/cost per agent+thread, cache hit/miss/output,
-context budget); every context panel (todos, memories, logs, entities, spine,
-queue, scratchpad, tools, callbacks, tree, radar); fleet-level MY_TURN signals +
+Identity/lifecycle; **phase/status** (durable in oplog + live hint); threads (id,
+name, MY_TURN/ACTIVE/THEIR_TURN, unread, preview, full conversation on demand,
+pending questions); messages + **live deltas** (stream); command lifecycle;
+economics (tokens/cost per agent+thread, cache hit/miss/output, context budget —
+cost aggregate is durable); every context panel (todos, memories, logs, entities,
+spine, queue, scratchpad, tools, callbacks, tree, radar); fleet MY_TURN signals +
 total spend + current `rev` + degraded-stream flags.
 
 ## 16. Actions to perform ON agents
 
-Send-to-thread (primary driver); thread create/archive/restore/answer-question;
-lifecycle spawn (**allow-list gated**)/stop/restart/pause/**interrupt-stream**
-(instant via WS→UDS); manage rename/model/archive; toggles
-(auto-continuation/reverie/think); thread-scoped coucou. All as **cap-token-auth'd,
-dedup-token-idempotent**, ack'd commands (§8.2).
+Send-to-thread (primary); thread create/archive/restore/answer-question; lifecycle
+spawn (allow-list, canonicalized)/stop/restart/pause/**interrupt-stream**;
+manage rename/model/archive; toggles (auto-continuation/reverie/think);
+thread-scoped coucou. All as **HMAC-auth'd, nonce-fresh, dedup-idempotent,
+oplog-journaled-before-ack** commands (§8.2), injected via the user-message entry.
 
 ---
 
 ## 17. Security & permissions
 
-- **Command authn (I9):** per-agent `cap_token` (256-bit, minted at boot, in the
-  `0600` registry entry), required on **every** UDS frame and `inbox/` file. The
-  backend is the sole practical command author. *(Same-user malware that reads the
-  `0700` registry can still forge — true defense needs OS sandboxing, future.)*
-- **Frontend WS (adversarial #3):** localhost-bind **plus** a per-session bearer
-  token required in the WS handshake. **No reliance on CORS/`Origin`.**
-- **Spawn blast radius (adversarial #18):** the supervisor refuses any folder **not
-  on a configured allow-list** — a compromised/buggy backend cannot spawn agents in
-  arbitrary paths. Spawned agents inherit the user's keys and run user tools (RCE
-  blast radius is inherent to running agents); the allow-list + cost breaker bound
-  it; sandboxing is future.
-- **Global cost circuit-breaker (`CostBreaker`):** the backend tracks **aggregate
-  fleet spend**; past a configured ceiling it **stops issuing commands and
-  spawns** and surfaces the trip. Per-worker guard rails do **not** bound a backend
-  issuing commands in a loop — this does.
-- **Permissions:** `0700` on `.context-pilot/`, registry dir, and `stream.sock`;
-  `0600` on the registry entry (holds the cap token).
-- **Secrets:** the registry holds **no** API keys; secrets stay in the agent's env/
-  config. The `cap_token` is a capability, not a credential to an external service.
-- **Future (network/multi-tenant):** auth (bearer/mTLS), signed commands at the
-  transport seam — designed-in via the abstraction, no orchestration changes.
+- **Command authn + anti-replay (I9):** per-agent `cap_token` (256-bit, `0600`,
+  rotated each boot) + **HMAC over `{seq, dedup_token, body}` + monotonic nonce**.
+  Captured frames are not replayable. Consumed oplog command entries compacted.
+- **Frontend WS (R2-10):** localhost-bind + **single-use upgrade ticket → session
+  bound to one connection**, short-lived + refreshable. No CORS/`Origin` reliance.
+- **Spawn (R2-15):** **allow-list with realpath canonicalization** (reject
+  symlink/`..` escape). Spawned agents inherit user keys + run user tools (RCE
+  blast radius intrinsic to running agents); allow-list + CostBreaker **bound** it;
+  sandboxing is future.
+- **Global cost circuit-breaker:** aggregate fleet spend, **durable (oplog-backed,
+  R2-8)** so a restart/crash-loop cannot reset the ceiling; trips → stop
+  commands/spawns, fail-closed on a missing counter.
+- **Permissions:** `0700` on `.context-pilot/`, oplog dir, registry dir,
+  `stream.sock`; `0600` on the registry entry.
+- **Secrets:** registry holds no API keys; `cap_token` is a capability, not an
+  external credential.
+- **Residual honesty:** `cap_token` defends against *blind* injection, not against
+  same-user malware that reads the `0700` registry (needs OS sandboxing, future);
+  the spawn RCE blast radius is intrinsic and only *bounded*, not eliminated.
 
-## 18. Versioning & compatibility (adversarial #17)
+## 18. Versioning & compatibility (R2-16)
 
-`schema_version` on every file/frame; serde tolerant decode (ignore unknown,
-default missing); registry advertises `protocol_version` + supported commands.
-**Compatibility window: the backend supports the current AND previous major
-(N-1)**; it rejects only majors older than N-1 or newer-than-known, with an
-explicit error. This makes the rolling binary upgrade the design explicitly
-supports (long-lived agents, upgrade-in-place) **safe** — a new backend never
-hard-orphans a one-major-old live agent.
+`schema_version` on every entry/frame; serde tolerant decode; registry advertises
+`protocol_version`. **N-1 major compatibility window**, with the explicit ordering
+invariant: **the backend upgrades before any agent** (so it never meets an N+1
+agent it must reject). A backend may additionally tolerate N+1 oplog entries
+read-only.
 
-## 19. Observability & ops (production necessity)
+## 19. Observability & ops
 
-The backend exports: per-agent **stream latency p50/p99**, **dropped/coalesced
-frame counts + degraded-stream events** (adversarial #11), command queue depth +
-lifecycle-state histogram, **rev lag** (how far the view trails the agent),
-heartbeat freshness, WS subscriber counts, reconnect/resync rates, **CostBreaker
-state + aggregate spend**, rejected-command (auth-fail) counts. Structured logs
-with `agent_id` + `cmd_id` correlation. Without this, "fluid as fuck" is
-unmeasurable and regressions ship silently.
+Per-agent **stream latency p50/p99**, **dropped/coalesced frames + degraded
+events**, command queue depth + lifecycle histogram, **`rev` lag** (view vs oplog
+head), oplog append latency + `fsync` time, heartbeat freshness, WS subscriber
+counts, reconnect/resync rates, **durable CostBreaker state**, rejected-command
+(auth/MAC/nonce) counts, **inotify watch count vs limit**. Structured logs keyed by
+`agent_id` + `cmd_id` + `rev`.
 
 ---
 
 ## 20. Problem Register (track ALL problems)
 
-Severity: 🔴 critical · 🟠 high · 🟡 medium. Status: ✅ designed · 🔵 knob/optional.
+Severity 🔴/🟠/🟡 · Status ✅ designed · 🔵 knob/future. *(v5 rows fold the
+code-grounded round; see §24 for the code map and §25 for validation.)*
 
 ### A. Streaming / latency
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|A1|Disk-tailing too slow for tokens|🔴|Two-plane split: UDS live plane (§3/§7)|✅|
-|A2|Nagle / output buffering adds latency|🟠|`TCP_NODELAY`, no buffering, flush per frame|✅|
-|A3|Fan-out O(N) scan per token|🟠|Per-agent subscriber list, O(subs) direct writes|✅|
-|A4|Slow frontend backpressures chain|🔴|Bounded per-WS buffer, coalesce/drop + degraded flag (I7)|✅|
-|A5|Slow backend stalls agent via tee|🔴|Lock-free SPSC enqueue + dedicated publisher thread (I7)|✅|
-|A6|Token reorder / wrong-thread / pre-message|🔴|MessageStart self-describing + orphan buffering + seq (I10)|✅|
-|A7|Background-tab throttling|🟡|Frontend coalesces; refetch final on focus|✅|
-|A8|Thundering herd (many agents stream)|🟡|Async runtime, one task per UDS, cheap fan-out|✅|
-|A9|Control msg stalls token flow (HoL)|🟠|Separate frame types / logical streams|✅|
-|A10|Per-token serialize steals hot-loop CPU|🟠|Tee = one SPSC enqueue; publisher thread serializes (I7)|✅|
-|A11|Coalescing = silent UX regression|🟡|`degraded` flag surfaced + reconcile-from-final hint|✅|
-|A12|Browser setState-per-token janks|🟠|Mandatory rAF token-batching contract (§7)|✅|
+|A1|Disk-tailing too slow for tokens|🔴|UDS stream plane (§7)|✅|
+|A2|Nagle/buffering latency|🟠|`TCP_NODELAY`, flush per frame|✅|
+|A3|Fan-out O(N) per token|🟠|Per-agent subscriber list|✅|
+|A4|Slow frontend backpressures chain|🔴|Bounded WS buffer + degraded (I7)|✅|
+|A5|Slow backend stalls agent via tee|🔴|SPSC enqueue + publisher thread (I7)|✅|
+|A6|Token reorder / pre-message|🔴|Durable "message created" in oplog + orphan buffer (I10)|✅|
+|A7|Background-tab throttling|🟡|Frontend coalesces; refetch on focus|✅|
+|A10|Per-token serialize steals CPU|🟠|Tee = one SPSC enqueue (I7)|✅|
+|A11|Coalescing = silent UX regression|🟡|degraded flag + periodic oplog snapshot reconcile (R2-17)|✅|
+|A12|Browser setState-per-token janks|🟠|rAF batching contract (§7)|✅|
+|A13|Ring-full hot-loop behavior|🟡|O(1) fail-fast drop, coherent (R2-13)|✅|
+|A14|Publisher on dead UDS spins/wedges|🟡|Non-blocking write + bounded backoff (R2-14)|✅|
 
-### B. Consistency / state
+### B. Consistency / durability
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|B1|Torn file reads|🔴|Atomic rename (I2)|✅|
-|B2|Cross-file inconsistency|🔴|Manifest commit marker (I3)|✅|
-|B3|Messages on non-batched path escape rev|🟠|Single commit txn; manifest enumerates messages (I8)|✅|
-|B4|Delete vs not-yet-written ambiguity|🟠|Interpret refs per-rev manifest only|✅|
-|B5|mtime granularity / clock steps|🟠|Manifest hashes, no clock dependence (I3)|✅|
-|B6|Read amplification on big agents|🟡|Manifest per-file hashes → incremental re-read (I3)|✅|
-|B7|Power-loss after rename, content in page cache|🟡|fsync data → rename manifest → **fsync dir** (I2)|✅|
-|B8|Multi-worker rev race|🟡|Single persistence actor assigns rev + atomic snapshot (I8)|✅|
+|B1|Torn reads|🔴|Content-addressed immutable bodies + atomic oplog append (I2/I3)|✅|
+|B2|Cross-file inconsistency|🔴|Oplog `rev` + bounded heads (I3)|✅|
+|B3|Messages escape the rev (real writer)|🟠|Effects are oplog appends; tier-② is a cache (I8)|✅|
+|B5|mtime/clock dependence|🟠|Oplog rev + content hashes, no clock (I3)|✅|
+|B7|Power-loss durability|🟡|fsync(append)+fsync(dir) on the *oplog only* (I2)|✅|
+|B9|**v4 fsync-per-write on shared writer**|🔴|Confine fsync to the tiny oplog; tier-② unchanged (I2, K1)|✅|
+|B10|**Manifest O(total-files) → O(S²)**|🔴|Content-addressed bodies + bounded heads, not enumeration (I3, K3)|✅|
+|B11|**Debounce coalescing skips revs**|🟠|Oplog is append-only/gap-free; lifecycle on oplog (I8, K5)|✅|
+|B12|**rev announced before durable**|🟠|rev = fsync'd oplog offset; announce-after-durable (I8, K9)|✅|
 
 ### C. Command delivery
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|C1|Double-execution on crash|🔴|`seen` ledger (dedup_token) + atomic effect+mark (I4/I8)|✅|
-|C2|Ordering|🟠|Sortable seq|✅|
-|C3|Lost command|🟠|Durable inbox fallback + outbox ack + retry by dedup_token|✅|
-|C4|Command to a down agent|🟠|Liveness check; durable queue; lifecycle + TTL surfaced|✅|
-|C5|TTL-reissue creates a semantic duplicate|🟠|Reissue keeps SAME `dedup_token`; seen keys on it (I4)|✅|
-|C6|Ack semantics (accept vs done) / hidden delay|🟡|Lifecycle states pushed as control deltas to the UI|✅|
-|C7|Ack lost (crash after effect)|🟡|Re-derive from rev / idempotent reissue|✅|
-|C8|Forged / unauthenticated command|🔴|`cap_token` required + verified on every command (I9)|✅|
+|C1|Double-execution on crash|🔴|Oplog `seen`-set + atomic append (I4/I8)|✅|
+|C2|Ordering|🟠|Sortable seq + append order|✅|
+|C3|Lost command|🟠|Oplog is durable inbox; journal-then-ack (I11)|✅|
+|C5|TTL-reissue semantic dup|🟠|Same `dedup_token`; ack-rev eviction (I4)|✅|
+|C6|Ack hides delay|🟡|Lifecycle deltas on oplog (gap-free) (§8.2)|✅|
+|C8|Forged command|🔴|HMAC + nonce (I9)|✅|
+|C9|**Deadman re-exec drops accepted cmd**|🔴|Journal-then-ack; replay+dedup (I11, K2)|✅|
+|C10|**Replayable bearer frame**|🟠|HMAC+nonce anti-replay (I9, R2-6)|✅|
+|C11|**Dedup window vs long-outage replay**|🔴|`seen` evicted by ack-rev, not time (I4, R2-1)|✅|
+|C12|**Spine guards stall backend commands**|🟠|Inject via user-message entry, not spine (§8.2, K7)|✅|
 
 ### D. Discovery / lifecycle / identity
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|D1|Ghost registry entries|🟠|Heartbeat+pid+boot_id liveness|✅|
-|D2|Double-launch same folder|🔴|flock (I1)|✅|
-|D3|Folder move/rename changes id|🟡|Canonical path in registry; tombstone; future rebind|✅|
-|D4|Heartbeat on main loop ⇒ busy looks dead|🔴|Dedicated heartbeat thread|✅|
-|D5|Spawn race|🟠|try-lock-or-adopt; flock arbitrates|✅|
-|D6|Spawn failure (env/keys/folder)|🟠|Handshake w/ timeout; read boot-error file; surface|✅|
-|D7|Backend restart kills child agents|🔴|Detached `setsid`; re-adopt|✅|
-|D8|Registry `*.tmp` litter|🟡|Age-based GC|✅|
-|D9|Stale `stream.sock` after crash|🟡|Unlink-before-bind on boot; graceful connect-refused|✅|
-|D10|flock lost/double across deadman re-exec|🟠|Inherit lock FD (clear CLOEXEC, pass fd) (H5)|✅|
-|D11|Heartbeat rename storms the watcher (vs I3)|🟡|Liveness = UDS + POLLED heartbeat file, not watched rename|✅|
+|D1|Ghost registry entries|🟠|Heartbeat+pid+boot_id|✅|
+|D2|Double-launch|🔴|flock (I1)|✅|
+|D4|Heartbeat on main loop|🔴|Dedicated thread|✅|
+|D7|Backend restart kills children|🔴|Detached setsid; re-adopt|✅|
+|D10|flock × deadman re-exec|🟠|Inherit lock FD (H5)|✅|
+|D11|Heartbeat vs mtime ban|🟡|UDS + polled aligned-word heartbeat file (R2-18)|✅|
+|D12|**inotify watch exhaustion**|🟡|One watch per agent on the oplog (I12, K8)|✅|
 
 ### E. Backend robustness
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|E1|Backend SPOF|🟠|Supervised + near-stateless rebuild (I5)|✅|
-|E2|Restart loses in-flight commands|🟠|Durable inbox/outbox reconcile (dedup-safe)|✅|
-|E3|Memory growth (views/buffers)|🟠|Bounded ring buffers, lazy materialization|✅|
-|E4|Backend↔frontend version skew|🟡|schema_version + capability negotiation|✅|
-|E5|Eager cold rebuild scales with fleet disk|🟠|**Lazy materialization in v1** (I5)|✅|
-|E6|Backend-down = action blackout|🟡|Client action queue + replay on reconnect (dedup-safe)|✅|
+|E1|Backend SPOF|🟠|Supervised + rebuild from oplog (I5)|✅|
+|E2|Restart loses in-flight cmds|🟠|Oplog reconcile (dedup-safe)|✅|
+|E5|Eager cold rebuild cost|🟠|Lazy bodies; eager heads only (I5)|✅|
+|E6|Backend-down blackout|🟡|Client queue + replay (R2-1 safe)|✅|
+|E7|**Lazy hydration reads newer rev**|🟠|Rev-pinned content-addressed reads (I5, R2-9)|✅|
+|E8|**CostBreaker resets on restart**|🟠|Durable oplog-backed aggregate (R2-8)|✅|
 
 ### F. Frontend consistency
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|F1|Event before snapshot|🟠|Client monotonic rev; ignore ≤ applied|✅|
-|F2|Reconnect after sleep|🟠|seq replay / resync→refetch; drop missed tokens|✅|
-|F3|Optimistic UI hangs|🟡|Command lifecycle + TTL surfaced|✅|
-|F4|Duplicate/out-of-order/orphan tokens|🟡|seq gap → final message; MessageStart + orphan buffer (I10)|✅|
+|F1|Event before snapshot|🟠|Client monotonic rev|✅|
+|F2|Reconnect after sleep|🟠|Oplog rev replay / resync|✅|
+|F3|Optimistic UI hangs|🟡|Lifecycle on oplog + TTL|✅|
+|F4|Duplicate/orphan tokens|🟡|Bounded orphan buffer + oplog header (I10, R2-3)|✅|
 
 ### G. Security
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|G1|Command injection via inbox/UDS|🔴|`cap_token` auth on every command (I9) + 0600 entry|✅|
-|G2|WS unauthenticated (CORS ≠ WS auth)|🔴|Bearer token in WS handshake; no Origin reliance (§9/§17)|✅|
-|G3|Spawn RCE amplifier|🟠|Spawn allow-list (§17)|✅|
-|G4|Runaway fleet spend|🟠|Global CostBreaker circuit-breaker (§17)|✅|
-|G5|Network/multi-tenant future|🟡|Auth/mTLS/signed cmds at transport seam|🔵|
-|G6|Secrets leak via registry/disk|🟠|Registry holds no API keys; cap_token ≠ external credential|✅|
+|G1|Command injection|🔴|HMAC+nonce + 0600 (I9)|✅|
+|G2|WS unauth (CORS≠WS)|🔴|Single-use ticket → bound session (R2-10)|✅|
+|G3|Spawn RCE amplifier|🟠|Allow-list + canonicalization (R2-15)|✅|
+|G4|Runaway spend|🟠|Durable CostBreaker (R2-8)|✅|
+|G6|cap_token at-rest exposure|🟡|Rotate each boot; compact consumed entries (R2-11)|✅|
+|G7|Network/multi-tenant future|🟡|mTLS/signed cmds at transport seam|🔵|
 
-### H. Ops / versioning / observability
+### H. Ops / versioning
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|H1|Binary upgrade w/ live agents (hard-reject)|🟠|**N-1 major** compatibility window (§18)|✅|
-|H2|No observability|🟠|Metrics + correlated logs + degraded/cost-breaker events (§19)|✅|
-|H3|Multi-machine clock sync (future)|🟡|Relative timestamps on receipt|🔵|
-|H4|Disk full on agent|🟡|`errored` status surfaced, no silent wedge|✅|
+|H1|Upgrade w/ live agents|🟠|N-1 window + backend-upgrades-first (R2-16)|✅|
+|H2|No observability|🟠|Metrics + correlated logs (§19)|✅|
+|H5|**Phase latency from #6 fix**|🟠|Durable oplog phase + live hint, self-healing (I8/I10, K6)|✅|
 
-### I. Edge / correctness
+### I. Edge / correctness / process
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|I1|Multi-worker→thread mapping|🟡|Flatten threads; worker_id metadata|✅|
-|I2|Message to actively-streaming thread|🟡|Spine safe-point queue (existing)|✅|
-|I3|Partial assistant msg on crash|🟡|Stream ephemeral; optional disk checkpoint|🔵|
-|I4|Giant blobs over stream plane|🟠|Reference by rev; REST fetch; keep stream small|✅|
-|I5|UTF-8 split mid-token|🟡|Concatenate by message_id; agent buffer handles|✅|
-|I6|Phase (sticky) dropped on lossy plane|🟠|Phase → durable control plane (§3/§6)|✅|
+|I1|Multi-worker→thread mapping|🟡|Flatten; worker_id metadata|✅|
+|I4b|Giant blobs over stream|🟠|Reference by hash; REST fetch|✅|
+|I7b|**I8/H3 rewrites shared writer (#7)**|🔴|Bridge-owned oplog; writer.rs untouched (I8, K4)|✅|
+|I8b|UTF-8 split mid-token|🟡|Concatenate by message_id|✅|
+|M1|**✅ "designed" ≠ "validated"**|🔵|§25 fault-injection acceptance matrix (R2-19)|🔵|
 
 ---
 
 ## 21. Open questions (genuine choices)
 
-1. **Stream-plane transport confirm:** UDS for v1 (my lean) — agree? (Future:
-   shared-memory ring, same abstraction.)
-2. **Partial-message checkpointing (I3-stream):** off in v1 (my lean) or checkpoint
-   partial assistant text every N tokens for crash survival?
-3. **Multi-worker exposure:** flatten to threads (my lean) vs surface worker lanes?
-4. **Reaping:** tombstone `down` agents (my lean) vs auto-reap?
-5. **Backend stack = Rust** (reuse serializable state/IR types verbatim) — confirm?
-6. **Spawn allow-list source:** explicit config file (my lean) vs a "register this
-   folder" UI gesture vs both?
+1. **Oplog format:** length-prefixed framed records vs JSON-lines? (lean: framed +
+   CRC per record for torn-tail detection.)
+2. **Oplog compaction trigger:** size threshold vs ack-rev barrier vs both?
+3. **Stream-plane transport:** UDS v1; shared-memory ring future — confirm?
+4. **Partial-message checkpoint cadence** on a long degraded stream (R2-17): every
+   N tokens / M ms?
+5. **Backend stack = Rust** (reuse serializable types) — confirm?
+6. **Spawn allow-list source:** config file vs "register this folder" UI vs both?
 
-*(Resolved since v3: frontend live channel = one authenticated WebSocket; command
-auth = capability token; idempotency = semantic dedup token; cold rebuild =
-lazy.)*
+*(Resolved since v4: durability model = three tiers w/ a bridge-owned oplog;
+exactly-once = oplog append; command auth = HMAC+nonce; rev = oplog offset;
+control observation = single watch per agent.)*
 
-## 22. Decision log
+## 22. Decision log (v5 deltas + retractions)
 
-Each entry: date · question · ruling · rationale.
-
-- **2026-06-16 · Two-plane architecture** · *Provisional:* durable control plane
-  (disk) + ephemeral stream plane (UDS) · fluid streaming *and* crash-proof state
-  without compromise.
-- **2026-06-16 · Phase on which plane** · *Locked (v4):* phase/status on the
-  **durable** plane, never the lossy stream · sticky state on a droppable channel
-  strands the UI (adversarial #6).
-- **2026-06-16 · Stream tee mechanism** · *Locked (v4):* lock-free SPSC enqueue +
-  dedicated publisher thread · zero hot-loop serialization / CPU steal
-  (adversarial #5).
-- **2026-06-16 · Cross-plane ordering** · *Locked (v4):* self-describing
-  `MessageStart` + frontend orphan-buffering (I10) · tokens can precede the control
-  delta (adversarial #4).
-- **2026-06-16 · Commit atomicity** · *Locked (v4):* single-writer commit
-  transaction; manifest enumerates messages (I8) · closes the dual-channel escape
-  (adversarial #1) + multi-worker rev (adversarial #15).
-- **2026-06-16 · Command auth** · *Locked (v4):* per-agent capability token on
-  every command (I9) · perms-only is not authentication (adversarial #2).
-- **2026-06-16 · Frontend WS auth** · *Locked (v4):* bearer token in the WS
-  handshake; no CORS reliance · CORS doesn't protect WS (adversarial #3).
-- **2026-06-16 · Idempotency** · *Locked (v4):* client-supplied semantic
-  `dedup_token`; reissue keeps the same token (I4) · TTL-reissue otherwise
-  double-executes (adversarial #13).
-- **2026-06-16 · Cold rebuild** · *Locked (v4):* lazy materialization in v1 (I5) ·
-  eager rebuild scales with fleet disk (adversarial #9).
-- **2026-06-16 · Power-loss durability** · *Locked (v4):* data fsync → manifest
-  rename → dir fsync (I2) · a renamed manifest can else reference lost content
-  (adversarial #8).
-- **2026-06-16 · flock × deadman re-exec** · *Locked (v4):* inherit the lock FD
-  across exec (H5) · avoids unlocked window / self-deadlock (adversarial #7).
-- **2026-06-16 · Heartbeat mechanism** · *Locked (v4):* UDS + polled heartbeat
-  file, decoupled from registry rename · avoids watcher storm vs I3 mtime ban
-  (adversarial #16).
-- **2026-06-16 · Version compatibility** · *Locked (v4):* N-1 major window (§18) ·
-  resolves the tolerant-decode-vs-hard-reject contradiction (adversarial #17).
-- **2026-06-16 · Spawn + cost safety** · *Locked (v4):* spawn allow-list + global
-  CostBreaker (§17) · bounds RCE blast radius + runaway spend (adversarial #18).
-- **2026-06-16 · Read transport** · *Provisional:* disk + manifest, incremental.
-- **2026-06-16 · Command transport** · *Provisional:* UDS-fast + durable inbox
-  fallback.
-- **2026-06-16 · Discovery** · *Provisional:* registry dir + heartbeat + flock.
-- **2026-06-16 · Identity** · *Provisional:* FNV-1a of canonical folder path.
-- **2026-06-16 · Backend stack** · *Provisional:* Rust.
-- **2026-06-16 · Invariants** · *Locked candidates:* I1–I10 — the non-negotiable
-  robustness + security spine.
-
-_(Promote "Provisional" → "Locked" as the captain confirms.)_
+- **2026-06-16 · Durability model** · *Locked (v5):* three tiers — bridge-owned
+  append-only `fsync`'d **oplog** (truth) + existing best-effort **state cache** +
+  lossy **stream**. *Rationale:* the real `writer.rs` is async/debounced/coalescing/
+  unsynced; only a tiny set of events needs exactly-once, so confine durability to
+  the oplog and leave the shared writer untouched (K1/K4).
+- **2026-06-16 · Manifest** · *Locked (v5):* content-addressed immutable bodies +
+  bounded current-heads, **not** full enumeration. *Rationale:* v4's
+  enumerate-everything manifest was O(S²) write-amplification (K3).
+- **2026-06-16 · "Accepted" = durable** · *Locked (v5):* journal-to-oplog-then-ack
+  (I11). *Rationale:* deadman re-exec would otherwise vaporize a UDS-accepted
+  in-memory command (K2).
+- **2026-06-16 · Command injection path** · *Locked (v5):* the existing
+  user-message entry, **not** the autonomy spine. *Rationale:* spine anti-loop
+  guards would stall/swallow external commands (K7).
+- **2026-06-16 · Control observation** · *Locked (v5):* single inotify watch per
+  agent on the append-only oplog. *Rationale:* per-file watches exhaust inotify at
+  fleet scale (K8).
+- **2026-06-16 · Phase** · *Locked (v5):* durable in oplog + live stream hint,
+  self-healing. *Rationale:* the v4 phase→durable fix added 2–3 s phase latency
+  (K6).
+- **2026-06-16 · Command freshness** · *Locked (v5):* HMAC + monotonic nonce
+  (R2-6). · **Dedup eviction** · ack-rev, not time (R2-1). · **CostBreaker** ·
+  durable/oplog-backed (R2-8). · **WS auth** · single-use ticket → bound session
+  (R2-10). · **Lazy hydration** · rev-pinned (R2-9). · **Upgrade** · backend-first
+  ordering (R2-16). · **Allow-list** · canonicalized (R2-15).
+- **2026-06-16 · RETRACTIONS** (code proved them wrong): *cross-worker snapshot
+  consistency* is a non-issue — `build_save_batch` snapshots synchronously on one
+  thread. *SPSC-vs-multi-worker* is scoped to the future multi-worker model only;
+  today the agent drains a single `StreamEvent` channel (single-producer).
+- *Provisional (unchanged):* read transport, identity (FNV-1a), backend stack
+  (Rust), discovery (registry + heartbeat + flock).
 
 ---
 
-## 23. Adversarial review resolution
+## 23. Adversarial review resolution (round 1 — retained)
 
-Direct mapping of every issue in
-[`architecture-adversarial-analysis.md`](./architecture-adversarial-analysis.md)
-to its v4 resolution. **All 18 accepted as relevant; none dismissed.**
+The v4 §23 map of the 18 round-1 issues → resolutions is retained verbatim in git
+history (commit `e2c97e9`); every row remains ✅ or is *strengthened* by the v5
+oplog model (e.g. #1/#6/#9/#13 now resolve via the oplog rather than a shared-
+writer rewrite). The round-2 issues (R2-1…R2-19) and the code-grounded round-3
+issues (K1…K9) are folded into §20 above and mapped to code in §24.
 
-| # | Issue (sev) | Resolution in v4 | Where |
+## 24. Code-grounding pass — invariant → real code → impact
+
+The critique that produced v5: *the design was written against an imagined
+persistence layer.* This section maps each load-bearing claim to the **actual
+file/function** it depends on, and states whether the agent-side change is
+**additive** (constraint #7 safe) or **core** (forbidden).
+
+| Invariant / mechanism | Real code it touches | Change type | Notes |
 |---|---|---|---|
-| 1 | Effect+seen+rev not one transaction 🔴 | **I8** single-writer commit transaction; manifest enumerates messages; dual Batch/Message channel collapsed | I8, H2/H3, §8.2, B3 |
-| 2 | Command auth = perms only 🔴 | **I9** per-agent capability token, required + verified on every command | I9, §8.2, §17, G1 |
-| 3 | WS auth = localhost+CORS 🔴 | Per-session **bearer token in the WS handshake**; CORS not relied upon | §9, §17, G2 |
-| 4 | Cross-plane token/message ordering 🔴 | **I10** self-describing `MessageStart` + frontend orphan buffering | I10, §7, A6/F4 |
-| 5 | Tee CPU steal on hot loop 🟠 | Lock-free **SPSC enqueue** + dedicated publisher thread | I7, §7, §11.1, A10 |
-| 6 | Phase (sticky) on lossy plane 🟠 | Phase moved to the **durable control plane** | §3, §6, §15, I6-row |
-| 7 | flock × deadman re-exec 🟠 | **H5** inherit lock FD (clear CLOEXEC, pass fd) across exec | H5, §10, D10 |
-| 8 | Power-loss: no dir fsync 🟡 | **I2** full barrier: data fsync → manifest rename → **dir fsync** | I2, H1, B7 |
-| 9 | Eager cold rebuild cost 🟡 | **I5** lazy materialization in v1 (heads eager, bodies on demand) | I5, §13, E5 |
-| 10 | Browser render floor out of scope 🟠 | Mandatory **rAF token-batching** frontend contract | §7, A12 |
-| 11 | Coalescing = silent UX regression 🟡 | **`degraded` flag** surfaced + reconcile hint + metric | §7, §19, A11 |
-| 12 | "Accepted" hides effect delay 🟡 | Command **lifecycle states pushed as control deltas** to the UI | §8.2, §9, C6 |
-| 13 | No semantic idempotency 🟠 | **I4** client-supplied `dedup_token`; reissue keeps same token | I4, §8.2, C5 |
-| 14 | Backend-down action blackout 🟡 | **Client action queue + replay on reconnect** (dedup-safe) | §9, E6 |
-| 15 | Multi-worker rev serialization 🟡 | **I8** single persistence actor assigns rev + atomic cross-worker snapshot | I8, §12, B8 |
-| 16 | Heartbeat vs I3 (mtime ban) 🟡 | Liveness = **UDS + polled heartbeat file**, decoupled from registry rename | §10, D11 |
-| 17 | Upgrade hard-reject vs tolerant 🟠 | **N-1 major** compatibility window | §18, H1 |
-| 18 | Spawn RCE + no cost breaker 🟠 | **Spawn allow-list + global CostBreaker** circuit-breaker | §17, G3/G4 |
+| I8 oplog | NEW `crates/cp-mod-bridge` only | **additive** | does **not** touch `writer.rs` |
+| I2 fsync | oplog append in the bridge | **additive** | `writer.rs::write_file` (plain `fs::write`) **unchanged** |
+| I3 heads/content-addr | bridge serializer; tier-② bodies already per-file | **additive** | `save.rs::build_save_batch` unchanged; bridge derives heads from it |
+| Tier-② cache | `writer.rs` (async, 50 ms debounce, coalescing) | **unchanged** | explicitly left as-is |
+| I11 journal-then-ack | bridge command intake | **additive** | UDS is wake-only |
+| K7 command injection | `src/app/actions/input.rs` user-message entry (clears `user_stopped`) | **additive call** | bridge calls it; `engine.rs::check_spine` **untouched** |
+| I7 tee | `streaming.rs::process_stream_events` (single channel, main loop) | **additive read** | one SPSC enqueue at the existing drain point |
+| H5 flock × deadman | the deadman re-exec (`CommandExt::exec`, `--resume-stream`) | **core-adjacent** | clear `FD_CLOEXEC`, pass `CP_AGENT_LOCK_FD`; the one watchdog touch |
+| I12 single watch | backend side only (`notify`/inotify) | **backend** | no agent impact |
+| Phase hint (K6) | bridge tee + oplog | **additive** | live hint on ③, truth on ① |
 
-**Residual honesty.** Two limits are inherent, not hand-waved: (a) `cap_token`
-(I9) defends against *blind* same-user injection but not against malware that
-reads the `0700` registry — true defense needs OS sandboxing (future); (b) a
-spawned agent runs the user's tools, so the RCE blast radius is intrinsic to
-*running agents at all* — the allow-list + CostBreaker **bound** it; sandboxing
-is future. Both are flagged 🔵 where future work, ✅ where bounded today.
+**Verdict:** v5's agent-side footprint is **one additive module + one additive
+call into the existing user-message entry + one additive read at the stream drain
++ the H5 watchdog FD tweak.** The shared `PersistenceWriter` and the autonomy
+`spine` are **not modified** — constraint #7 is satisfied *for real*, not by
+relabeling a rewrite as "hardening" (the v4 mistake, K4).
+
+## 25. Fault-injection acceptance matrix (production-v1 gate)
+
+"Designed" ≠ "validated." Each 🔴/🟠 durability/concurrency/security mechanism must
+pass a fault-injection test before its §20 status is trusted (R2-19/M1).
+
+| # | Mechanism | Fault injected | Pass criterion |
+|---|---|---|---|
+| V1 | I8 oplog append | `kill -9` between `write` and `fsync` | replay discards torn tail; no half-effect |
+| V2 | I11 journal-then-ack | deadman re-exec after ack, before stream | effect replayed exactly once; no false-accept loss |
+| V3 | I4 dedup | replay same `dedup_token` after a 2-h simulated outage | second apply is a no-op |
+| V4 | I2 durability | power-cut (fsync fault) after dir fsync | committed `rev` fully readable; uncommitted absent |
+| V5 | I10 ordering | drop + reorder stream frames; drop `MessageStartHint` | UI reconstructs from oplog; no orphan leak (bounded buffer) |
+| V6 | I9 auth | replay a captured command frame; tamper body | rejected (stale nonce / bad MAC) |
+| V7 | I7 backpressure | stall the WS consumer; fill the ring | agent loop latency unaffected; degraded flag set |
+| V8 | I12 / K8 | spawn 10k agents | inotify watch count ≈ agent count; no exhaustion |
+| V9 | R2-8 CostBreaker | crash-loop the backend at the spend ceiling | breaker stays tripped (durable counter) |
+| V10 | K5 gap-free | coalesce tier-② saves under load | oplog rev stream has no gaps; lifecycle "processing" observed |
+
+Until a row passes, its §20 entries are **"designed, test-pending,"** not ✅.
