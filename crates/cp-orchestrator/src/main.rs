@@ -19,15 +19,18 @@
 
 use cp_orchestrator::registry;
 
-// `nix` and `serde_json` are dependencies of this package's *library* half
-// (`liveness`, `registry`); the binary does not name them directly, so the
-// per-target `unused-crate-dependencies` lint needs an explicit acknowledgement
-// here (the canonical `use … as _;` form Cargo itself suggests, not a lint
-// suppression). `tempfile` is a dev-dependency used only by the library's
-// tests, acknowledged under `cfg(test)` so non-test builds never reference it.
+// `nix`, `serde`, `serde_json`, `cp_oplog`, and `tiny_http` are dependencies of
+// this package's *library* half (`liveness`, `registry`, `services`,
+// `transport`); the binary does not name them directly, so the per-target
+// `unused-crate-dependencies` lint needs an explicit acknowledgement here (the
+// canonical `use … as _;` form Cargo itself suggests, not a lint suppression).
+// `tempfile` is a dev-dependency used only by the library's tests, acknowledged
+// under `cfg(test)` so non-test builds never reference it.
 use nix as _;
 use cp_oplog as _;
+use serde as _;
 use serde_json as _;
+use tiny_http as _;
 #[cfg(test)]
 use tempfile as _;
 

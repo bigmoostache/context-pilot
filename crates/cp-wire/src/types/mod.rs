@@ -67,6 +67,25 @@ impl ContentHash {
         }
         hex
     }
+
+    /// Parse a 64-char lowercase/uppercase hex string into a hash.
+    ///
+    /// Returns `None` if the length is wrong or any character is not hex — the
+    /// inverse of [`to_hex`](Self::to_hex). Used by the transport layer to turn
+    /// a `/body/{hash}` path segment back into a content address.
+    #[must_use]
+    pub fn from_hex(s: &str) -> Option<Self> {
+        if s.len() != 64 {
+            return None;
+        }
+        let mut bytes = [0u8; 32];
+        for (i, chunk) in s.as_bytes().chunks_exact(2).enumerate() {
+            let hi = hex_nibble(*chunk.first()?)?;
+            let lo = hex_nibble(*chunk.get(1)?)?;
+            *bytes.get_mut(i)? = hi.wrapping_shl(4) | lo;
+        }
+        Some(Self(bytes))
+    }
 }
 
 /// Hex-encode for JSON/YAML readability.
@@ -192,6 +211,19 @@ mod tests {
         let json = serde_json::to_string(&hash).expect("serialize");
         let expected = format!("\"{}\"", "ab".repeat(32));
         assert_eq!(json, expected);
+    }
+
+    #[test]
+    fn content_hash_from_hex_round_trips() {
+        let hash = ContentHash::of(b"round trip me");
+        let parsed = ContentHash::from_hex(&hash.to_hex()).expect("valid hex parses");
+        assert_eq!(hash, parsed);
+    }
+
+    #[test]
+    fn content_hash_from_hex_rejects_bad_input() {
+        assert!(ContentHash::from_hex("too short").is_none(), "wrong length");
+        assert!(ContentHash::from_hex(&"zz".repeat(32)).is_none(), "non-hex chars");
     }
 
     #[test]

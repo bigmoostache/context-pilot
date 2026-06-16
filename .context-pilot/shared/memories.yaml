@@ -110,28 +110,35 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. Phases 1-18 done & green. Next: Phase 19 (X786) frontend transport REST + authenticated WS + reconnect/replay.'
+  tl_dr: 'Orchestration backend, branch ''demaquetting''. 30 phases X768-X797. Phases 1-19 done & green (77 orchestrator tests). Next: Phase 20 (X787 M4 fault-gate/observability/soak) + 10 testing phases 21-30 (X788-X797).'
   contents: |-
-    ## Orchestration backend — branch 'demaquetting' (20 phases X768-X787)
+    ## Orchestration backend — branch 'demaquetting' (30 phases X768-X797)
 
-    Phases 1-18 DONE & green:
-    - cp-wire (shared protocol, I/O-free): framing (len+CRC), all wire types, heartbeat record, N-1 compat. command::Frame{schema_version,auth,command} wraps Command (authn at transport layer). SeenSet::rev_of for idempotent dup-ack. ContentHash::of(&[u8])->SHA-256 canonical content address; to_hex(self) by-value. registry::Entry schema: schema_version,id,folder,pid,boot_id(String),model,protocol_version,binary_version,socket_path,oplog_path,heartbeat_path,cap_token(String),started_at_ms,status(AgentStatus).
-    - cp-oplog (shared tier-① WAL): append/segment/replay/compact/service. GAP1 (leading-checkpoint bounds replay), GAP2 (group-commit thread + asymmetric backpressure), GAP3 (orphan-body GC 60s grace) all TESTED. M0 crash-replay harness green (V1 real SIGKILL, V2 deadman re-exec).
-    - cp-mod-bridge (AGENT): boot (flock gate + oplog + socket + registry 0600 + identity), heartbeat Beacon, tee (M1 SPSC), command Intake (M2: authn + journal-then-ack + dedup), body Store (Phase 14). Tee+Intake+body Store NOT yet wired into Boot accept-loop — deferred to bridge-on wiring.
-    - cp-orchestrator (BACKEND): lib+bin. liveness.rs verdict() pure. registry.rs AgentRegistry poll scan-and-diff. channel.rs Tailer + AgentChannel (hydrate+send). supervisor/ (M3): spawn(process_group(0))/stop(SIGTERM→grace→SIGKILL)/restart/adopt + check_liveness. services/ (Phase 18): MaterializedView (fold OpEntry→AgentView{heads,phase,lifecycle,cost}; Checkpoint=authoritative reset=I5; cost latest-wins), CostBreaker (high-water-max spend → V9 crash-loop latch; fail-closed via poison; rebuild_from_view on restart), StreamHub (per-agent fan-out N bounded subscribers, evict-oldest+degraded+mark_reconciled, R2-17). 53 tests.
+    Phases 1-19 DONE & green (77 orchestrator tests + cp-wire + cp-oplog suites):
+    - cp-wire (shared protocol, I/O-free): framing (len+CRC32C), all wire types, heartbeat record (60B), N-1 compat. command::Frame{schema_version,auth,command}. SeenSet::rev_of idempotent dup-ack. ContentHash::of(&[u8])->SHA-256; to_hex(self) by-value; from_hex(s) inverse (transport /body/{hash}). registry::Entry full schema. AgentView+CostSnapshot are Serialize (transport REST).
+    - cp-oplog (shared tier-① WAL): append/segment/replay/compact/service. GAP1 (leading-checkpoint), GAP2 (group-commit + asymmetric backpressure), GAP3 (orphan-body GC 60s grace) all TESTED. M0 crash-replay green (V1 SIGKILL, V2 deadman re-exec).
+    - cp-mod-bridge (AGENT): boot (flock gate), heartbeat Beacon, tee (M1 SPSC), command Intake (M2), body Store (Phase 14, I13). Tee+Intake+body NOT yet wired into Boot accept-loop (bridge-ON wiring deferred).
+    - cp-orchestrator (BACKEND): lib+bin. liveness verdict, registry scan-and-diff, channel Tailer+AgentChannel, supervisor (M3 spawn/stop/restart/adopt), services (MaterializedView/CostBreaker/StreamHub), transport (Phase 19).
+
+    ## Phase 19 transport (REST + SSE on tiny_http, blocking thread-per-conn, NO async runtime)
+    Files in crates/cp-orchestrator/src/transport/:
+    - mod.rs: Backend{view,breaker,hub,tickets,agents_dir} Arc<Mutex>. serve(addr,state) acceptor loop, thread-per-request. route_rest router. handle_stream = GET /api/stream?agent&ticket: redeem single-use ticket, run_stream producer (Tailer.seed(last_rev from Last-Event-ID) replay + gap→resync + hub frame drain + keepalive). MAX_BODY 1MiB, STREAM_POLL 200ms. read_body binds _read, respond binds _sent.
+    - rest.rs: HttpReply, Envelope<T>{rev,data} (every read carries rev), CommandReceipt{cmd_id,dedup_token,rev}. handlers fleet/agent/body/command/mint_ticket. fail-closed 503 on tripped CostBreaker. resolve_entry reads <id>.json.
+    - sse.rs: SseMessage encode (id/event/data, multiline split). SseBody blocking Read over mpsc (Ok(0) EOF on all-senders-dropped). SseSink.send/keep_alive (Err=client gone=stop). channel(). Reconnect-replay-by-rev native via Last-Event-ID.
+    - ticket.rs: TicketStore mint/redeem single-use + TTL 30s + lazy sweep, /dev/urandom 256-bit token (I9b: malicious-website defense CORS can't give).
+    tiny_http=0.12 dep. lib.rs declares pub mod transport. main.rs: use nix/serde/serde_json/cp_oplog/tiny_http as _ (per-target unused-crate-dependencies).
 
     Trichotomy: cp-wire+cp-oplog=SHARED, cp-mod-bridge=AGENT, cp-orchestrator=BACKEND.
-    Workspace forbids unsafe_code. CB3 rust-check runs clippy WITHOUT --all-targets (lib-only gate) — does NOT catch -F redundant-imports / unused-results / unused-crate-dependencies / E0689 ambiguous-numeric / test-target errors that `cargo test` does; ALWAYS run cargo test before commit.
-    GOTCHAS: unreaped zombie answers kill(pid,0) as alive — must wait() before signal-0 probe. `use super::*` in #[cfg(test)] globs the parent module's `use` imports (edition 2024) — do NOT re-import them. Untyped integer accumulators (let mut x=0; x.saturating_add) → annotate type.
+    Workspace forbids unsafe_code. CB3 rust-check runs clippy WITHOUT --all-targets (lib-only) — does NOT catch -F let-underscore-drop / unused-results / unused-crate-dependencies on bin+test targets; ALWAYS cargo test before commit. let-underscore-drop fires on `let _ =` for Result with destructor (io::Error) — bind `let _named =`.
 
-    Next: Phase 19 (X786) frontend transport: REST (load + point queries + non-streaming actions, every response carries rev; actions return cmd-id + dedup_token) + authenticated WS (backend mints short-lived single-use upgrade ticket out-of-band NOT CORS/Origin, I9b; handshake binds session to one connection; carries rev-numbered replayable oplog deltas + ephemeral stream hints; reconnect replays by rev, gap→resync; client action queue replays dedup-safe). Then Phase 20 (X787) MILESTONE M4 = full V1-V12 fault gate + observability + soak + sign-off.
+    Next: Phase 20 (X787) M4 = full V1-V12 fault gate + observability + soak + sign-off. Plus 10 testing phases 21-30 (X788-X797): per-component exhaustive suites (cp-wire, cp-oplog append/dedup/service, bridge boot/tee/intake/body, backend registry/channel/supervisor/services, transport+e2e). Captain asked to confirm 21-30 plan before writing the 10 suites.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781646159641
+  last_edited_ms: 1781647677465
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical

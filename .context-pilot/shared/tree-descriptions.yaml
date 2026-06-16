@@ -38,6 +38,10 @@
   path: ui/src/components/shell/LeftRail.tsx
   description: Cockpit context navigator (width = shared var(--sidebar-w)). Context-budget meter, then a first-class 'Conversation' nav button (MessageSquare, selects sentinel id "conversation") placed ABOVE the 'Panels' label (T24), then the scrollable panel list (icon+name+tokens). Selection is CONTROLLED via props (selected/onSelect) — lifted to CockpitView so the chosen entry drives the center PanelPane. Dense per-panel telemetry omitted for calm enterprise feel.
   last_edited_ms: 1781553447386
+01e5c76c573c40b3:
+  path: crates/cp-orchestrator/src/transport/rest.rs
+  description: 'Phase 19: REST handlers. HttpReply{status,body} transport-agnostic. Envelope<T>{rev,data} wraps every read so client knows currency + SSE resume point. CommandReceipt{cmd_id,dedup_token,rev,status}. fleet (max-rev across agents), agent (404 unknown), mint_ticket, body (hydrate via AgentChannel, 400 malformed hash/404 absent/502 read-fail), command (fail-closed 503 on tripped breaker, 400 malformed, 502 unreachable). resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. 8 tests.'
+  last_edited_ms: 1781647650721
 02229788bdef9209:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
@@ -458,6 +462,10 @@
   path: crates/cp-base/src/state/data/config.rs
   description: SidebarMode, Shared (config.json), WorkerState (per-worker), PanelData (panel persistence) — all serde structs
   last_edited_ms: 0
+1445dfea2e0c6c4c:
+  path: crates/cp-orchestrator/src/transport/sse.rs
+  description: 'Phase 19: SSE plumbing. SseMessage{id:Option<rev>,event,data}.encode() → id:/event:/data: lines (multiline data split per SSE grammar). delta(rev)/stream/resync constructors. encode_comment keepalive. SseBody: blocking Read fed by mpsc Receiver<Vec<u8>>, refills on exhaust, Ok(0) EOF when all senders dropped — fits tiny_http pump. SseSink.send/keep_alive (Err = client gone = producer stop signal). channel() pairs them. Reconnect-replay-by-rev native via Last-Event-ID. 7 tests.'
+  last_edited_ms: 1781647650735
 1446786ab370bc6c:
   path: docs/talk/slides/2-1.html
   description: 'Learnings: Pot-Pourri — interactive feature explorer with 11 panel blocks'
@@ -1090,6 +1098,10 @@
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules() (incl BridgeModule). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 1781617163175
+304e122c2b347b38:
+  path: crates/cp-orchestrator/src/lib.rs
+  description: 'Phase 16 (X783): backend library root (split from main.rs for unit-testability). Declares channel + liveness + registry modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails them across a fleet.'
+  last_edited_ms: 0
 305eae7b157d07fc:
   path: crates/cp-mod-callback/src/firing.rs
   description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. fire_async/blocking_callbacks() for batch dispatch. flame!("cb_fire"), flame!("cb_fire_async"), flame!("cb_fire_blocking"). CallbackWatcher: exit 0→success_message, exit 7→silent, exit !=0→deferred panel, timeout→deferred panel.'
@@ -2106,6 +2118,10 @@
   path: crates/cp-mod-spine/src/engine.rs
   description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'
   last_edited_ms: 0
+5ef0edc62bb421db:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal, for kill signal-0 pid-liveness) + serde_json (registry record parse). dev: tempfile. lib+bin package. Workspace lints.'
+  last_edited_ms: 0
 5f3b4848b37bb4a1:
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine, checks chat rooms.
@@ -2862,6 +2878,10 @@
   path: ui/src/components/threads/QuestionForm.tsx
   description: 'Embedded thread question form (CP signature): single/multi-select options with interactive pick state, allowOther field, submit button. Cyan-accented, decorative but stateful.'
   last_edited_ms: 0
+7f79d28c2cc42852:
+  path: crates/cp-orchestrator/src/lib.rs
+  description: 'Backend library root. Declares channel + liveness + registry + services + supervisor + transport modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails across a fleet.'
+  last_edited_ms: 1781647650763
 7f96c638d0d94837:
   path: src/ui/ir/conversation.rs
   description: 'Conversation + overlay IR builder. Messages, history sections, streaming tools, input area. Overlays: QuestionForm, Autocomplete, PerfOverlay (build_perf_overlay with frame budgets, CPU/Meili stats, FD count, op table). Perf builder calls PERF.snapshot() and cp_mod_search::overlay_info().'
@@ -3714,6 +3734,10 @@ a39ccb64ad178103:
   path: src/modules/overview/tools_blocks.rs
   description: Tools-only IR block builder. tools_blocks() renders grouped tool table with category descriptions, enable/disable status. No agents/skills/commands (those live in Library only).
   last_edited_ms: 0
+a3a8daa167736d62:
+  path: crates/cp-orchestrator/src/main.rs
+  description: Backend entry point (thin). Prints version+protocol+agents dir, exits (no runtime loop yet). use nix/serde/serde_json/cp_oplog/tiny_http as _ acknowledges lib-only deps for per-target unused-crate-dependencies; cfg(test) tempfile likewise.
+  last_edited_ms: 1781647650777
 a4282b39d6c4fdb9:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
@@ -3922,6 +3946,10 @@ adcf8b60551469d3:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
   last_edited_ms: 1780562263886
+ae2d4174f5fe2c4d:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 ae31931415268f77:
   path: crates/cp-mod-prompt/src/library_panel.rs
   description: 'LibraryPanel: renders agent/skill/command tables, prompt editor view'
@@ -4338,6 +4366,10 @@ bfe86519072f84a5:
   path: crates/cp-wire/src/types/ack.rs
   description: 'Command Ack: cmd_id + AckStatus (Accepted/Rejected) + optional rev. Journal-then-ack (I11).'
   last_edited_ms: 1781616040276
+c008e19f49f44419:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Phase 19: transport hub. Backend{view,breaker,hub,tickets,agents_dir} under Arc<Mutex>. serve(addr,state) = tiny_http acceptor, thread-per-request. route_rest dispatches GET /api/fleet|/agent/{id}|/agent/{id}/body/{hash}, POST /agent/{id}/command|/ticket. handle_stream: GET /api/stream?agent&ticket — redeem single-use ticket, spawn run_stream producer (Tailer.seed(last_rev) replay + gap→resync + hub frame drain + keepalive disconnect-probe, unsubscribe on exit). MAX_BODY 1MiB, STREAM_POLL 200ms. QueryParams + Last-Event-ID parsing. read_body binds _read; respond binds _sent (let-underscore-drop).'
+  last_edited_ms: 1781647650706
 c036e5d93c04e6ba:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread, ThreadQuestionForm (from_json with 50q x 100opt caps + field-length caps via cap_str, YAML-escaped other_text with \r), ThreadsState + FocusState with TypeMap accessors.'
@@ -5010,6 +5042,10 @@ df4440d55d3a9a7a:
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends). Model enums moved to models.rs.
   last_edited_ms: 1781447353118
+df5ab077cc587ce2:
+  path: crates/cp-orchestrator/src/transport/ticket.rs
+  description: 'Phase 19: single-use SSE upgrade tickets (I9b). TicketStore{live:HashMap<token,expiry_ms>,ttl}. mint() (sweep+/dev/urandom 256-bit hex token, DEFAULT_TTL 30s), redeem() true exactly once per unexpired token (remove+expiry check), lazy sweep on mint/redeem bounds map. Defends localhost endpoint vs malicious website (confused-deputy/DNS-rebind) that CORS/Origin can''t stop. 5 tests.'
+  last_edited_ms: 1781647650749
 e00dc446a2196468:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.

@@ -27,7 +27,7 @@ use cp_wire::types::{LifecycleState, Phase};
 ///
 /// A [`CostAggregate`](OpEntryKind::CostAggregate) is cumulative-since-boot, so
 /// the **latest** entry supersedes earlier ones (the figures are not summed).
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize)]
 pub struct CostSnapshot {
     /// Cumulative input tokens since the agent booted.
     pub input_tokens: u64,
@@ -42,7 +42,7 @@ pub struct CostSnapshot {
 /// Folded from the agent's [`OpEntry`] stream; every field reflects the most
 /// recent relevant entry (heads accumulate per thread, the scalars are
 /// latest-wins).
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
 pub struct AgentView {
     /// Highest `rev` folded into this view so far.
     pub rev: u64,

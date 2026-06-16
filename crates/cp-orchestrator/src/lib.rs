@@ -35,3 +35,4 @@ pub mod liveness;
 pub mod registry;
 pub mod services;
 pub mod supervisor;
+pub mod transport;
