@@ -3274,6 +3274,10 @@
   path: .github/CODEOWNERS
   description: 'Code ownership: PR review assignments'
   last_edited_ms: 0
+8f7e949f6243f706:
+  path: crates/cp-oplog/tests/dedup_compaction.rs
+  description: 'Phase 23 (X790): cp-oplog dedup + compaction public-API black-box suite (7 tests). V3 dedup-across-long-gap: CommandEffect token committed early, 24 filler records force rolls (token lives only in checkpoint), duplicate SeenMark delivery folds no-op (seen.len unchanged, rev_of keeps FIRST commit rev = exactly-once), survives reopen+replay. Compaction: replay() Recovered (rev_head+heads+seen) byte-identical before/after over rich 3-thread/multi-token/many-roll log (build_rich_log), every committed token rides surviving checkpoint, no segment older than oldest_index remains; idempotent (2nd pass removes 0, boundary stable); reopen-after-compact keeps appending (rev_head advances, T1 head=fresh write); noop-before-first-roll (seg-0 alone). total_bytes feeds over_threshold trigger (strict greater-than boundary). body_gc_eligible parametric in grace knob (10ms grace: 5ms keep, =grace keep, 20ms eligible). tempfile+cp_wire direct (no as _).'
+  last_edited_ms: 1781648604853
 8facb37b4c21cf2a:
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, sha2, log.'
@@ -5438,6 +5442,10 @@ f39aced1820ba7c8:
   path: crates/cp-mod-logs/Cargo.toml
   description: Logs crate dependencies. cp-base, cp-render, log, serde, serde_json, chrono. No cp-mod-memory dependency.
   last_edited_ms: 0
+f3a015643be58dc9:
+  path: crates/cp-wire/src/types/mod.rs
+  description: 'ContentHash (SHA-256, Copy, custom hex serde): new/as_bytes/of(&[u8])->canonical SHA-256 content address (vs FNV folder naming), to_hex(self by-value, wrong_self_convention on Copy), from_hex(&str)->Option (case-insensitive, len/char validated, inverse of to_hex). Serialize reuses to_hex; Deserialize validates 64 hex. Phase enum (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped) both serde snake_case. Declares+re-exports submodules ack/body/command/oplog/registry/snapshot/stream. Known-vector SHA-256 + round-trip + from_hex reject tests.'
+  last_edited_ms: 1781648475697
 f4073f6d2cafea84:
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: cp-render, cp-mod-utilities, ratatui, crossterm, serde, serde_json, serde_yaml, unicode-width, log.'
