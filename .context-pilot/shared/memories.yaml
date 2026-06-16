@@ -497,30 +497,33 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'docs/design-orchestration-backend.md is v5 (branch maquette): code-grounded three-tier durability (oplog + state-cache + stream). CP maquette in ui/ unchanged.'
+  tl_dr: 'docs/design-orchestration-backend.md is v6 (branch maquette): code-grounded three-tier durability (oplog + state-cache + stream) + v6 honesty pass. CP maquette in ui/ unchanged.'
   contents: |-
-    ## Orchestration Backend Design — v5 (branch maquette)
+    ## Orchestration Backend Design — v6 (branch maquette)
 
-    Code-grounded rewrite (v4 was authored against an imagined persistence layer). Keystone = THREE durability tiers:
-    - ① **Oplog** (NEW, bridge-owned `cp-mod-bridge`): append-only, fsync'd, never coalesced. Authoritative for command effects, rev assignment, seen-marks, phase, lifecycle, cost aggregate. O(1) append+fsync.
-    - ② **State cache**: the EXISTING `PersistenceWriter` (writer.rs) UNTOUCHED — async/50ms-debounced/coalescing/no-fsync. A reconstructible cache of replaying ①.
-    - ③ **Stream**: lossy UDS, live tokens + latency hints.
+    v5 = code-grounded three-tier durability. v6 = honesty pass answering a senior-dev review (thread T35). Keystone unchanged:
+    - ① **Oplog** (bridge-owned `cp-mod-bridge`): append-only, durable, never coalesced. Authoritative for command effects, rev, seen-marks, phase, lifecycle, cost + the immutable content-addressed body store.
+    - ② **State cache**: existing UNTOUCHED `PersistenceWriter` (writer.rs) — async/debounced/coalescing. Mutable `messages/{uid}.yaml`.
+    - ③ **Stream**: lossy UDS live tokens + hints.
 
-    12 invariants. I8 oplog-as-truth (writer.rs NOT modified → constraint #7 honored for real, not by relabeling a rewrite as 'hardening'). I11 journal-to-oplog-then-ack ('accepted'=durable, survives deadman re-exec). I12 single inotify watch per agent (no fleet-scale exhaustion). I2 fsync confined to oplog. I3 content-addressed bodies + bounded heads (not O(S²) manifest). I4 dedup token evicted by ack-rev.
+    ### v6 corrections (the three real findings)
+    1. **Inertness honesty (§11.1, I2, V11):** 'behaviorally inert / exactly as today' was overclaimed. Logic identical bridge on/off; TIMING is not. Bridge-ON adds per-event oplog durability latency — moved OFF the hot path via a dedicated oplog thread + group commit, but non-zero. 'Exactly as today' holds only bridge-OFF. V11 measures ON-vs-OFF latency vs the agent's turn-cadence budget.
+    2. **fsync model (I2, B7):** per-append `fsync(file)+fsync(dir)` was overkill → `fdatasync` per commit-group + `fsync(dir)` only on segment creation, on the oplog thread.
+    3. **Body-storage contradiction RESOLVED (§3.1, I3/I5, V12):** v5 called message bodies BOTH the mutable tier-② cache AND immutable content-addressed — impossible for the same file. v6 splits into two physical stores: tier-② `messages/{uid}.yaml` (mutable, writer-owned, agent self-reload) vs the bridge-owned immutable content-addressed body store (small bodies inlined in the oplog entry = zero double-write; large bodies spill to `oplog/bodies/{hash}` = the named double-write). writer.rs still untouched (bridge adds a disjoint write path). I1 intact: I1 = single-PROCESS exclusion (flock), and two threads in one process writing disjoint paths (messages/ vs oplog/) is permitted — I1 restated to say so.
 
-    Command injection via existing user-message entry (actions/input.rs), NOT the autonomy spine (engine.rs check_spine guards would stall external commands — K7).
+    Also: Open-Q1 LOCKED (framed records + per-record CRC, since V1 torn-tail depends on it). §20 register banner: every ✅ = 'designed, test-pending', §25 is the real status (v4 was fully ✅ and wrong). First code = isolated oplog append+crash-replay harness passing V1/V2/V10 against kill -9 + simulated deadman re-exec, before more doc.
 
-    §24 = invariant→real file/function→additive-vs-core map. §25 = fault-injection acceptance matrix V1-V10. §20 register folds round-3 K1-K9 + round-2 R2. Resolves the critique that v4 was ungrounded. Companion: architecture-adversarial-analysis.md. NOT implemented (discussion).
+    Companion: architecture-adversarial-analysis.md, roadmap.md (P0-P11). NOT implemented (discussion).
 
     ## Context Pilot Frontend Maquette (ui/, unchanged)
-    Vite+React19+TS+Tailwind v4+shadcn(base-ui). Branch 'maquette'. Mock only, no backend. ViewMode=fleet|threads|cockpit|finder. Dark 'Dungeon Forge' palette (torch-orange #DA7659 on warm charcoal). Per M60 history: FleetShell/FleetDashboard/PromptsPage/UsagePage, ConfigPanel/ConfigModal, ProfileModal/UserMenu account context, Finder (per-agent realm). Build: cd ui && pnpm exec tsc -b.
+    Vite+React19+TS+Tailwind v4+shadcn(base-ui). Branch 'maquette'. Mock only. ViewMode=fleet|threads|cockpit|finder. Build: cd ui && pnpm exec tsc -b.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781608750449
+  last_edited_ms: 1781610979848
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-

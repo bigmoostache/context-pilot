@@ -24,6 +24,33 @@
 > never skips a `rev`. New §24 maps **every invariant to the exact code it
 > touches**; new §25 is a fault-injection acceptance matrix. §23 retains the v4
 > adversarial map.
+>
+> **v6 — honesty pass (senior-dev review).** A second reviewer accepted the
+> keystone but flagged three things the v5 formalism papered over, now fixed:
+> (1) **"behaviorally inert" was overclaimed** — the *logic* is unchanged, but
+> turning the bridge ON adds per-event durability latency the agent didn't pay
+> before; v6 moves that cost **off the hot path** (dedicated oplog thread +
+> group commit) and restates the claim honestly (only *bridge OFF* = "exactly as
+> today"). (2) **`fsync(file)+fsync(dir)` per append was overkill** — v6 uses
+> `fdatasync` per commit-group and `fsync(dir)` **only on segment creation**.
+> (3) **The body-storage model was internally contradictory** — v5 listed message
+> bodies as the *mutable* tier-② cache *and* called them immutable & content-
+> addressed; those can't both be true of the same files. v6 resolves ownership
+> explicitly (see §3.1): tier-② `messages/{uid}.yaml` is the agent's **mutable
+> self-reload cache**; the **bridge** owns a separate **immutable, content-
+> addressed body store** (`oplog/bodies/`, small bodies inlined in the oplog,
+> large bodies spilled) — a *named* second write path, not a free property. v6
+> also **locks Open-Q1** (framed + per-record CRC) because the 🔴 torn-tail
+> invariant V1 depends on it.
+>
+> **Read §20 through §25.** Every ✅ in the problem register means **"designed,"
+> not "validated."** v4 was fully ✅'d and was wrong because it wasn't grounded in
+> code; a register where every problem is solved *on paper before any code* is
+> argument-completeness, not correctness. **§25 is the real status.** The first
+> code written should be the isolated oplog append + crash-replay harness
+> (V1/V2/V10) against `kill -9` and a simulated deadman re-exec — that tiny
+> prototype tests the load-bearing durability claim better than another doc
+> revision can.
 
 ---
 
@@ -87,8 +114,8 @@ naming **three durability tiers** with sharply different guarantees:
 
 | Tier | What | Medium | Guarantee | Coalesced? | `fsync`? |
 |---|---|---|---|---|---|
-| **① Oplog** (NEW v5) | command effects, `rev` assignment, `seen`-marks, phase transitions, lifecycle, cost aggregate | **append-only file** `.context-pilot/oplog/` (bridge-owned) | **authoritative, durable, exactly-once** | **never** | **yes, per append** |
-| **② State cache** | panel snapshots, worker state, message bodies | existing `.context-pilot/` files via the **untouched** `PersistenceWriter` | **best-effort, reconstructible** by replaying ① | yes (50 ms debounce) | no (as today) |
+| **① Oplog** (NEW v5) | command effects, `rev` assignment, `seen`-marks, phase transitions, lifecycle, cost aggregate, **+ immutable body store** (§3.1) | **append-only file** `.context-pilot/oplog/` + `oplog/bodies/` (bridge-owned) | **authoritative, durable, exactly-once** | **never** | **yes — `fdatasync` per commit-group; `fsync(dir)` per segment** |
+| **② State cache** | panel snapshots, worker state, **mutable** message bodies (`messages/{uid}.yaml`) | existing `.context-pilot/` files via the **untouched** `PersistenceWriter` | **best-effort, reconstructible** by replaying ① | yes (50 ms debounce) | no (as today) |
 | **③ Stream** | live token deltas, tool-arg deltas, **latency hints** for phase/message-start | **Unix domain socket** (UDS) | **ephemeral, droppable** | n/a | no |
 
 **Why three, not two.** The code-grounded attack showed v4 conflated two very
@@ -104,7 +131,41 @@ need it.**
 **The relationship:** ② is a *materialized view* of ①. The agent appends an
 effect to ① (`fsync`), then lets its normal best-effort save update ②. On crash,
 replay ① to rebuild what ② lost. The backend **tails ①** for truth and
-**hydrates ② on demand** for bodies (I5).
+**hydrates bodies** from the oplog's immutable store on demand (§3.1, I5).
+
+### 3.1 Who owns message bodies — the two stores are different files
+
+v5 contradicted itself: it listed message bodies under the *mutable, overwritten*
+tier-② cache **and** called them *immutable, content-addressed, never rewritten*.
+Those cannot both hold for the same file. If `writer.rs` overwrites
+`messages/{uid}.yaml` in place, the bytes for an *older* `rev` are clobbered, and
+rev-pinning can only stop you reading a *newer* body — it cannot resurrect an
+older one that no longer exists. v6 resolves this by splitting ownership into
+**two physically distinct stores**:
+
+| Store | Path | Owner | Mutability | Reader |
+|---|---|---|---|---|
+| **Agent self-reload cache** | `messages/{uid}.yaml` | the **untouched** `PersistenceWriter` (tier ②) | **mutable**, overwritten in place, uid-named | the agent on its own reload; unmanaged-agent read-only listing |
+| **Immutable body store** | `oplog/bodies/{hash}` *(or inlined in the oplog entry)* | the **bridge** (tier ①) | **immutable**, content-addressed, write-once | the backend's rev-pinned hydration (I3/I5) |
+
+So "content-addressed immutable bodies" is **real** — but it is a property of the
+**bridge-written** `oplog/bodies/` store, *not* of the agent's mutable cache. This
+costs an honest, **named** trade:
+
+- **A second write path.** For a finalized message, the bridge writes an immutable
+  hash-named body (in addition to the writer's mutable `{uid}.yaml`). To keep this
+  cheap, **small bodies are inlined directly into the oplog entry** (already
+  immutable, already in the fsync'd append — *zero* extra file, *zero* double
+  write); **only large bodies spill** to `oplog/bodies/{hash}`. Spilled bodies are
+  the only genuine double-write, and they are rare.
+- **`writer.rs` is still untouched.** The bridge *adds* a write path; it does not
+  modify the writer. Constraint #7 ("never rewrite the shared persistence path")
+  holds — the shared path is unchanged; an *additional, disjoint* one exists.
+- **This is not a second writer in the I1 sense.** I1 forbids two **processes**
+  writing a folder (enforced by `flock`). Within the *one* agent process, the
+  `PersistenceWriter` thread and the bridge's oplog thread are two threads writing
+  **disjoint paths** (`messages/` vs `oplog/`); there is no same-file race. I1 is
+  about cross-process exclusion, not intra-process thread count.
 
 **Sticky state never rides ③ alone.** Phase (idle·streaming·tooling) has its
 **authoritative** record in ① and a **latency hint** on ③ — fast to show, but ①
@@ -147,25 +208,42 @@ Agent Rust loop (per folder):
 
 ## 5. Invariants (the robustness spine)
 
-- **I1 — Single writer per folder.** `flock` on `.context-pilot/agent.lock`. A 2nd
-  instance refuses / goes passive. Backend never writes agent state; it only
-  *appends commands to the oplog*. *(See H5 for the deadman-re-exec interaction.)*
-- **I2 — Durable writes where they matter, not everywhere.** *Tier ①* oplog
-  appends use `write → fsync(file) → fsync(dir)` (the append is the commit). *Tier
-  ②* state files keep the existing best-effort `fs::write` (no `fsync`) — they are
-  a reconstructible cache (I5), so paying for `fsync` there is waste. A periodic
-  tier-② **checkpoint** (coalesced) bounds replay length. *(v4 wrongly demanded a
-  per-write fsync barrier on the shared writer — K1/K4. v5 confines durability to
-  the tiny oplog.)*
+- **I1 — Single writer *process* per folder.** `flock` on
+  `.context-pilot/agent.lock`. A 2nd *instance* refuses / goes passive. Backend
+  never writes agent state; it only *appends commands to the oplog*. This is
+  **cross-process** exclusion: within the one live agent process, the existing
+  `PersistenceWriter` thread (tier ② `messages/`/panels) and the bridge's oplog
+  thread (tier ① `oplog/`) write **disjoint paths** and do not race (§3.1) — I1
+  does not forbid that. *(See H5 for the deadman-re-exec interaction.)*
+- **I2 — Durable writes where they matter, off the hot path, minimal syscalls.**
+  *Tier ①* oplog appends are durable via **`fdatasync` per commit-group** (not
+  `fsync`) and **`fsync(dir)` only when a new oplog segment file is created** — an
+  append to an existing segment needs only `fdatasync` (it flushes the appended
+  data + the size change required to read it back; per-append dir-fsync is
+  unjustified cost). A **dedicated oplog thread** performs the append+sync, so the
+  agent's main loop **enqueues** (cheap) and only **blocks on durability where an
+  external ack requires it** (command journaling, I11) — routine effect/phase/
+  lifecycle appends are ordered and group-committed **without stalling the loop**
+  per event. *Tier ②* state files keep the existing best-effort `fs::write` (no
+  sync) — a reconstructible cache (I5). A periodic tier-② **checkpoint**
+  (coalesced) bounds replay length. *(v4 wrongly demanded a per-write fsync
+  barrier on the shared writer — K1/K4. v5 confined durability to the oplog; v6
+  further confines its **cost**: `fdatasync`-per-group off the main loop, dir-fsync
+  only on segment rollover. **Honesty:** with the bridge ON this still adds
+  per-message durability latency vs a no-bridge run — bounded, off-hot-path, and
+  measured by V11 — so "exactly as today" holds only when the bridge is OFF.)*
 - **I3 — Snapshot consistency via bounded heads, not full enumeration.** The oplog
-  carries a monotonic `rev`. Message/panel **bodies are content-addressed**
-  (filename = content hash → immutable once written, never rewritten or re-listed).
-  The snapshot reference is a **bounded set of current heads** (per-thread
-  last-message hash, per-panel hash), not an enumeration of all history. Reading a
-  `rev` means reading its heads + hydrating referenced bodies on demand. *(v4's
-  "manifest enumerates every file including messages" was O(total-files) rewritten
-  every commit → O(S²) amplification, K3. Content-addressing + heads makes it
-  O(threads+panels), bounded.)*
+  carries a monotonic `rev`. Message/panel **bodies are content-addressed in the
+  bridge-owned immutable store** (filename = content hash → write-once, never
+  rewritten; small bodies inlined in the oplog entry, large bodies in
+  `oplog/bodies/{hash}` — §3.1). This is the **bridge's** store, distinct from the
+  mutable tier-② `messages/{uid}.yaml` cache. The snapshot reference is a
+  **bounded set of current heads** (per-thread last-message hash, per-panel hash),
+  not an enumeration of all history. Reading a `rev` means reading its heads +
+  hydrating referenced bodies on demand. *(v4's "manifest enumerates every file
+  including messages" was O(total-files) rewritten every commit → O(S²)
+  amplification, K3. Content-addressing + heads makes it O(threads+panels),
+  bounded.)*
 - **I4 — Commands idempotent + ordered + ack'd, by SEMANTIC key.** Each command
   carries a transport id + sortable seq **and** a client-supplied **`dedup_token`**
   (semantic key). The oplog's `seen`-set keys on `dedup_token`; a TTL-reissue with
@@ -175,11 +253,13 @@ Agent Rust loop (per folder):
   replay after *any* outage duration is still deduped (resolves R2-1: dedup-window
   vs long-outage replay).
 - **I5 — Tier ② is a LAZILY-rebuildable cache of the oplog.** Only durable truth =
-  the oplog + content-addressed bodies + registry. On restart the backend rebuilds
-  **only** registry + each agent's oplog **head** (`rev` + heads); bodies hydrate
-  on demand, pinned to the requested `rev`'s head hash (so a lazy read can never
-  return a *newer* body than the snapshot, resolving R2-9). Restart latency is
-  bounded by agent **count**, not fleet **disk**.
+  the oplog + its **immutable content-addressed body store** (§3.1) + registry. On
+  restart the backend rebuilds **only** registry + each agent's oplog **head**
+  (`rev` + heads); bodies hydrate on demand from the bridge's immutable store,
+  pinned to the requested `rev`'s head hash — and because that store is write-once,
+  the pinned hash **always still exists** (a lazy read can neither return a *newer*
+  body nor find an older one clobbered, resolving R2-9). Restart latency is bounded
+  by agent **count**, not fleet **disk**.
 - **I6 — A command's effect and its `seen`-mark are the SAME oplog append.** One
   `fsync`'d append contains `{cmd_id, dedup_token, rev, effect}`. Either the append
   is durable (effect happened, token seen) or it isn't (neither) — there is no
@@ -403,18 +483,29 @@ backstop for a dropped inotify event.
 
 ## 11. Agent-side delta (the entire footprint — see §24 for the code map)
 
-### 11.1 Additive module — `cp-mod-bridge` (behaviorally inert for reasoning)
+### 11.1 Additive module — `cp-mod-bridge` (identical reasoning; added durability latency)
 1. **Lock + register + heartbeat** (heartbeat = aligned in-place write on a
    dedicated thread).
-2. **Oplog** — open the append-only WAL; append command effects + rev + seen +
-   phase + lifecycle as `fsync`'d entries (I8/I11). Content-address bodies.
+2. **Oplog** — open the append-only WAL on a **dedicated oplog thread**; append
+   command effects + rev + seen + phase + lifecycle as group-committed entries
+   (`fdatasync` per group, I2/I8/I11). **Write immutable content-addressed bodies**
+   into the oplog (inline small / `oplog/bodies/{hash}` spilled large, §3.1) — the
+   bridge owns this store; `writer.rs` is untouched.
 3. **Stream tee** — lock-free SPSC enqueue of each `StreamEvent`; dedicated
    publisher thread serializes + writes `stream.sock` (I7).
 4. **Command intake** — verify HMAC + nonce (I9); journal-then-ack (I11); apply
    the effect via the **existing user-message entry** (K7), never the spine.
 
-**Crucially, the module does not touch `writer.rs`** — tier-② persistence is
-unchanged. Disable the bridge ⇒ the agent runs **exactly** as today.
+**The module does not touch `writer.rs`** — tier-② persistence is unchanged, and
+the bridge's body store is an *additional, disjoint* write path (§3.1). But the
+inertness claim must be stated honestly: **the agent's *reasoning and decisions*
+are identical with the bridge on or off; its *timing* is not.** With the bridge
+**ON**, routine message/phase/lifecycle events incur per-event oplog durability
+latency (off the hot path via the oplog thread + group commit, but non-zero) and
+spilled-large bodies are written twice. Only with the bridge **OFF** does the
+agent run **exactly** as today (no oplog, no added latency, no second write path).
+V11 measures whether the ON-path latency violates anything the agent's own cadence
+cares about.
 
 ### 11.2 What v5 does NOT require (vs v4)
 v4 demanded a rewrite of the shared `PersistenceWriter` (fsync barrier, collapse
@@ -564,6 +655,12 @@ counts, reconnect/resync rates, **durable CostBreaker state**, rejected-command
 ## 20. Problem Register (track ALL problems)
 
 Severity 🔴/🟠/🟡 · Status ✅ designed · 🔵 knob/future. *(v5 rows fold the
+
+> **⚠️ Read this register through §25.** Every ✅ below means **"designed,"
+> not "validated."** This is a hypothesis list, not a proof: v4's register was
+> *also* fully ✅ and was wrong because it wasn't grounded in code. A problem is
+> only **correctness-confirmed** when its §25 fault-injection row (V1–V11) passes.
+> Treat ✅ as "designed, test-pending" everywhere in this table.
 code-grounded round; see §24 for the code map and §25 for validation.)*
 
 ### A. Streaming / latency
@@ -589,7 +686,7 @@ code-grounded round; see §24 for the code map and §25 for validation.)*
 |B2|Cross-file inconsistency|🔴|Oplog `rev` + bounded heads (I3)|✅|
 |B3|Messages escape the rev (real writer)|🟠|Effects are oplog appends; tier-② is a cache (I8)|✅|
 |B5|mtime/clock dependence|🟠|Oplog rev + content hashes, no clock (I3)|✅|
-|B7|Power-loss durability|🟡|fsync(append)+fsync(dir) on the *oplog only* (I2)|✅|
+|B7|Power-loss durability|🟡|`fdatasync`/commit-group + `fsync(dir)`/segment, oplog only (I2)|✅|
 |B9|**v4 fsync-per-write on shared writer**|🔴|Confine fsync to the tiny oplog; tier-② unchanged (I2, K1)|✅|
 |B10|**Manifest O(total-files) → O(S²)**|🔴|Content-addressed bodies + bounded heads, not enumeration (I3, K3)|✅|
 |B11|**Debounce coalescing skips revs**|🟠|Oplog is append-only/gap-free; lifecycle on oplog (I8, K5)|✅|
@@ -668,8 +765,9 @@ code-grounded round; see §24 for the code map and §25 for validation.)*
 
 ## 21. Open questions (genuine choices)
 
-1. **Oplog format:** length-prefixed framed records vs JSON-lines? (lean: framed +
-   CRC per record for torn-tail detection.)
+1. **Oplog format:** ~~framed vs JSON-lines?~~ **LOCKED (v6): length-prefixed
+   framed records + per-record CRC** — the 🔴 torn-tail invariant (V1) depends on
+   CRC to discard a partial tail, so this cannot stay a "lean."
 2. **Oplog compaction trigger:** size threshold vs ack-rev barrier vs both?
 3. **Stream-plane transport:** UDS v1; shared-memory ring future — confirm?
 4. **Partial-message checkpoint cadence** on a long degraded stream (R2-17): every
@@ -683,6 +781,26 @@ control observation = single watch per agent.)*
 
 ## 22. Decision log (v5 deltas + retractions)
 
+- **2026-06-16 · v6 body-store ownership** · *Locked:* the **bridge** owns an
+  immutable content-addressed body store (inline-small / `oplog/bodies/`-spilled);
+  tier-② `messages/{uid}.yaml` stays the **mutable** agent cache (§3.1).
+  *Rationale:* v5 called the same files both mutable and immutable — impossible.
+  Cost named: a second (disjoint) write path; spilled-large bodies double-written.
+  I1 intact (cross-process, not intra-thread).
+- **2026-06-16 · v6 fsync model** · *Locked:* `fdatasync` per commit-group +
+  `fsync(dir)` only on segment creation, on a dedicated oplog thread (I2).
+  *Rationale:* per-append `fsync(file)+fsync(dir)` was unjustified syscall cost;
+  durability belongs off the hot path.
+- **2026-06-16 · v6 inertness honesty** · *Restated:* "exactly as today" holds
+  only **bridge-OFF**; bridge-ON adds bounded, off-hot-path per-event durability
+  latency (§11.1), measured by V11. *Rationale:* "behaviorally inert" conflated
+  identical *logic* with identical *timing*.
+- **2026-06-16 · v6 Open-Q1** · *Locked:* framed records + per-record CRC.
+  *Rationale:* V1 (torn-tail) depends on it; a 🔴 invariant cannot rest on an open
+  question.
+- **2026-06-16 · v6 register discipline** · *Adopted:* §20 ✅ = "designed,
+  test-pending"; §25 is the real status. *Rationale:* an all-✅ pre-code register
+  is argument-completeness, not correctness (v4 proved it).
 - **2026-06-16 · Durability model** · *Locked (v5):* three tiers — bridge-owned
   append-only `fsync`'d **oplog** (truth) + existing best-effort **state cache** +
   lossy **stream**. *Rationale:* the real `writer.rs` is async/debounced/coalescing/
@@ -770,3 +888,15 @@ pass a fault-injection test before its §20 status is trusted (R2-19/M1).
 | V10 | K5 gap-free | coalesce tier-② saves under load | oplog rev stream has no gaps; lifecycle "processing" observed |
 
 Until a row passes, its §20 entries are **"designed, test-pending,"** not ✅.
+
+### v6 additions
+
+| # | Mechanism | Fault injected | Pass criterion |
+|---|---|---|---|
+| V11 | I2 / §11.1 bridge latency | run a fixed scripted session **bridge-ON vs bridge-OFF**; measure per-message added latency from the oplog group-commit path | added p99 latency is below the agent's own turn-cadence budget (does not stall reasoning); bridge-OFF run is byte-identical to today |
+| V12 | §3.1 body store | crash after the mutable `{uid}.yaml` write but **before** the bridge's immutable body write (and vice-versa) | replay reconstructs the body from whichever store survived + the oplog head; no dangling head-hash with no body |
+
+**First prototype (do this before more doc):** implement the isolated oplog
+append + crash-replay loop and pass **V1, V2, V10** against real `kill -9` and a
+simulated deadman re-exec. ~few hundred lines; it falsifies (or confirms) the
+load-bearing durability claim faster than any further revision.
