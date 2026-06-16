@@ -1210,6 +1210,10 @@
   path: src/modules/conversation_history/trap.rs
   description: History cleanup trap. check_and_trigger_trap() activates when ≥3 history panels on Queue_execute. trap_blocks_tool() blocks all except Close_conversation_history and Think. would_defuse_trap() projects remaining after queued closes. force_deactivate_trap() for auto-flush path. maybe_deactivate_trap() lifts when <3 remain. Shared project_remaining_panels() helper.
   last_edited_ms: 0
+369db6de4104aa84:
+  path: crates/cp-orchestrator/src/registry.rs
+  description: 'Phase 15 (X782): AgentRegistry — fleet discovery via poll-based scan-and-diff (NOT kernel watch; agents appear/vanish rarely). scan()->Vec<Event>{Appeared(Entry),Disappeared(id),StatusChanged(id,status),Stale(id,Liveness)} reads ~/.context-pilot/agents/*.json, applies liveness verdict, diffs vs prior pass (known:HashMap<id,Snapshot{entry,liveness}>). Stale fires only on Live→non-live transition (first-sight staleness rides Appeared). reap_tmp(grace) deletes *.tmp older than DEFAULT_TMP_GRACE(60s) — GAP3 grace rule applied to registry writes. read_records skips *.tmp+unparseable (half-written/foreign non-fatal). read_heartbeat=None on absent/torn/wrong-len. default_agents_dir=$HOME/.context-pilot/agents. 7 tests. let _previous=fresh.insert (unused_results).'
+  last_edited_ms: 1781629188033
 36c52623bdc50f5d:
   path: src/infra/profiler.rs
   description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime, elapsed ms, tool name(s).
@@ -2458,6 +2462,10 @@
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, globset, sha2.'
   last_edited_ms: 1780497937361
+6d90c10e31ca4440:
+  path: crates/cp-orchestrator/src/main.rs
+  description: 'Backend entry point. Phase 15: prints version+protocol+agents dir, exits (no runtime loop yet — arrives with supervisor). Thin: machinery in lib. `use nix/serde_json as _` + cfg(test) tempfile acknowledge lib-only deps for per-target unused-crate-dependencies (Cargo-suggested form, not a suppression).'
+  last_edited_ms: 1781629188048
 6da62160398166e2:
   path: crates/cp-mod-bridge/src/registry_io.rs
   description: 'Atomic 0600 registry write (design §10). default_agents_dir()=$HOME/.context-pilot/agents. write_entry(dir,entry): tmp(0600 mode)→write→fsync→rename→fsync(dir), no torn read, cap_token never world-readable. registry_path(dir,id). 5 tests incl mode-0600, no-tmp-left, overwrite-atomic.'
@@ -2990,6 +2998,10 @@
   path: ui/src/App.tsx
   description: 'Cockpit shell: TopBar / (LeftRail + Conversation + RightInspector) / StatusBar flex layout.'
   last_edited_ms: 1781458541241
+86e430b56e1c2543:
+  path: crates/cp-orchestrator/src/liveness.rs
+  description: 'Phase 15: per-agent liveness verdict (§10). Liveness enum{Live,StalePid,StaleHeartbeat,BootIdMismatch}+is_live(). verdict(entry,Option<&Heartbeat>,now_ms,max_age) pure, cheapest-first: !pid_alive→StalePid, no hb→StaleHeartbeat, !matches_boot→BootIdMismatch (pid-reuse defence), !is_fresh→StaleHeartbeat, else Live. pid_alive via nix kill(pid,None) signal-0 (Ok|EPERM=alive). 5 exhaustive verdict-matrix tests, no process spawning.'
+  last_edited_ms: 1781629188017
 86e8fa11b368db6e:
   path: ui/src/components/shell/ConfigModal.tsx
   description: Settings dialog — thin portaled Base UI Dialog wrapper around ConfigPanel variant='dialog'. Used by TopBar gear (in-agent). Portal escapes the .vibrancy backdrop-filter containing block (half-off-screen fix). Controlled open/onClose.
@@ -3442,6 +3454,10 @@
   path: crates/cp-mod-ocr/src/lib.rs
   description: 'OCR module. 1 tool: ocr. Datalab API integration. Non-blocking: returns immediately, fires spine notification on completion. Global, non-core.'
   last_edited_ms: 0
+99dab3a44b74b436:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire + nix 0.30 (signal, for kill signal-0 pid-liveness) + serde_json (registry record parse). dev: tempfile. lib+bin package. Workspace lints.'
+  last_edited_ms: 1781629188061
 99fbd4b8aeefd42b:
   path: src/llms/claude_code_v2/mod.rs
   description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
@@ -5458,6 +5474,10 @@ f957bf9c5e2d5a99:
   path: src/infra/api.rs
   description: Thin re-export of llms::{StreamEvent, StreamParams, start_streaming}. Backward-compat shim.
   last_edited_ms: 0
+f9624475fd1e00ba:
+  path: crates/cp-orchestrator/src/lib.rs
+  description: 'Phase 15 (X782): backend library root (split from main.rs for unit-testability). Declares liveness + registry modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails them across a fleet.'
+  last_edited_ms: 1781629188001
 f9a59893086fbabb:
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view. Agent realm header (name+folder) + ''M working in parallel'' pulsing pill. Grouped: ''Needs you''=MY_TURN / ''Working in parallel''=THEIR_TURN. Each row: status dot, name, preview, time, unread. New Thread + search.'

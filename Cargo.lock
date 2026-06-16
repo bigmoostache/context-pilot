@@ -508,6 +508,9 @@ name = "cp-orchestrator"
 version = "0.1.0"
 dependencies = [
  "cp-wire",
+ "nix 0.30.1",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

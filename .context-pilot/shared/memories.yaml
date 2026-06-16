@@ -110,28 +110,27 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. Phases 1-14 done & green. Next: Phase 15 (X782) backend AgentRegistry (discovery).'
+  tl_dr: 'Orchestration backend, branch ''demaquetting''. 20 phases X768-X787. Phases 1-15 done & green. Next: Phase 16 (X783) backend AgentChannel (oplog tail + rev-pinned hydrate + send command).'
   contents: |-
     ## Orchestration backend — branch 'demaquetting' (20 phases X768-X787)
 
-    Phases 1-14 DONE & green:
+    Phases 1-15 DONE & green:
     - cp-wire (shared protocol, I/O-free): framing (len+CRC), all wire types, heartbeat record, N-1 compat. command::Frame{schema_version,auth,command} envelope wraps Command (authn at transport layer). SeenSet::rev_of(token) for idempotent dup-ack. ContentHash::of(&[u8])->SHA-256 (sha2 dep) = canonical content address; to_hex(self) by-value (Copy).
-    - cp-oplog (shared tier-① WAL): append/segment/replay/compact/service. GAP1 (leading-checkpoint bounds replay), GAP2 (group-commit thread + asymmetric backpressure), GAP3 (orphan-body GC 60s grace) all TESTED. M0 crash-replay harness green (V1 real SIGKILL, V2 deadman re-exec; V12 now meaningful via Phase 14 body store).
-    - cp-mod-bridge (AGENT): boot (flock gate + oplog + socket + registry 0600 + identity), heartbeat Beacon, tee (M1 SPSC), command Intake (M2: authn + journal-then-ack + dedup), body Store (Phase 14). register/ subdir groups identity+registry (folder-size). body::Store put=inline-small/spill-large, I13 barrier (spill durable before put returns), get verifies hash, gc reuses cp_oplog body_gc_eligible. NOT yet wired into MessageCreated.
-    - cp-orchestrator (BACKEND): Phase 3 scaffold only.
+    - cp-oplog (shared tier-① WAL): append/segment/replay/compact/service. GAP1 (leading-checkpoint bounds replay), GAP2 (group-commit thread + asymmetric backpressure), GAP3 (orphan-body GC 60s grace) all TESTED. M0 crash-replay harness green (V1 real SIGKILL, V2 deadman re-exec).
+    - cp-mod-bridge (AGENT): boot (flock gate + oplog + socket + registry 0600 + identity), heartbeat Beacon, tee (M1 SPSC), command Intake (M2: authn + journal-then-ack + dedup), body Store (Phase 14). register/ subdir groups identity+registry. Tee+Intake+body Store NOT yet wired into Boot accept-loop — deferred to bridge-on wiring.
+    - cp-orchestrator (BACKEND): Phase 15 done. lib+bin package (lib.rs declares liveness+registry; main.rs thin, `use nix/serde_json as _`+cfg(test) tempfile for per-target unused-crate-deps). liveness.rs: Liveness{Live,StalePid,StaleHeartbeat,BootIdMismatch}+verdict() pure (pid signal-0 + hb freshness + boot_id match, pid-reuse defence). registry.rs: AgentRegistry poll scan-and-diff -> Event{Appeared,Disappeared,StatusChanged,Stale}; reap_tmp(60s grace); known:HashMap<id,Snapshot>; Stale only on Live->non-live transition. 12 tests.
 
     Trichotomy: cp-wire+cp-oplog=SHARED, cp-mod-bridge=AGENT, cp-orchestrator=BACKEND.
-    Workspace forbids unsafe_code. CB3 rust-check runs clippy WITHOUT --all-targets (lib-only gate).
-    Tee + Intake + body Store NOT yet wired into Boot accept-loop — deferred to bridge-on wiring.
+    Workspace forbids unsafe_code. CB3 rust-check runs clippy WITHOUT --all-targets (lib-only gate) — does NOT catch -F unused-results / unused-crate-dependencies that `cargo test` does; always run cargo test before commit.
 
-    Next: Phase 15 (X782) backend AgentRegistry: watch ~/.context-pilot/agents/*.json; emit appeared/disappeared/status/stale; liveness verdict (heartbeat+pid+boot_id); reap *.tmp by age.
+    Next: Phase 16 (X783) AgentChannel: one inotify watch per agent on append-only oplog (I12); tail OpEntry gap-free + 2-3s poll backstop. hydrate(hash): on-demand rev-pinned body fetch. send(Command): bearer frame, append to agent oplog (durable inbox), UDS wake, Ack on durable acceptance.
   importance: medium
   labels:
   - maquette
   - frontend
   - ui
   - design
-  last_edited_ms: 1781628404016
+  last_edited_ms: 1781629214893
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical

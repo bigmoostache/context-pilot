@@ -1,17 +1,34 @@
-//! Standalone orchestration backend — discovers, observes, and commands
+//! Standalone orchestration backend binary — discovers, observes, and commands
 //! a fleet of Context Pilot agents.
 //!
-//! This binary is the **backend** half of the orchestration architecture
-//! (design doc §4).  It owns:
+//! This is the **backend** half of the orchestration architecture (design doc
+//! §4). Its machinery lives in the [`cp_orchestrator`] library (so it is
+//! unit-testable without spawning processes); this binary is the thin entry
+//! point that will wire those pieces into a runtime:
 //!
-//! - **`AgentRegistry`** — discovers agents via `~/.context-pilot/agents/`.
-//! - **`AgentChannel`** — per-agent oplog tail + stream + command channel.
-//! - **`AgentSupervisor`** — lifecycle (spawn/stop/restart), allow-list gated.
-//! - **`StreamHub`** — fan-out from per-agent UDS to N frontend WebSockets.
-//! - **`CostBreaker`** — durable fleet-wide spend circuit-breaker.
-//! - **`MaterializedView`** — in-memory cache rebuilt from oplog heads.
+//! - [`AgentRegistry`](cp_orchestrator::registry::AgentRegistry) — discovers
+//!   agents via `~/.context-pilot/agents/` and derives per-agent liveness.
+//! - `AgentChannel` — per-agent oplog tail + stream + command channel (later).
+//! - `AgentSupervisor` — lifecycle (spawn/stop/restart), allow-list gated.
+//! - `StreamHub` — fan-out from per-agent UDS to N frontend WebSockets.
+//! - `CostBreaker` — durable fleet-wide spend circuit-breaker.
+//! - `MaterializedView` — in-memory cache rebuilt from oplog heads.
 //!
-//! Phase 3 scaffold: boots, logs a startup message, exits cleanly.
+//! Phase 15: the registry exists and self-tests; the binary still boots, prints
+//! its identity, and exits — the live scan loop arrives with the supervisor.
+
+use cp_orchestrator::registry;
+
+// `nix` and `serde_json` are dependencies of this package's *library* half
+// (`liveness`, `registry`); the binary does not name them directly, so the
+// per-target `unused-crate-dependencies` lint needs an explicit acknowledgement
+// here (the canonical `use … as _;` form Cargo itself suggests, not a lint
+// suppression). `tempfile` is a dev-dependency used only by the library's
+// tests, acknowledged under `cfg(test)` so non-test builds never reference it.
+use nix as _;
+use serde_json as _;
+#[cfg(test)]
+use tempfile as _;
 
 fn main() {
     eprintln!(
@@ -19,5 +36,9 @@ fn main() {
         env!("CARGO_PKG_VERSION"),
         cp_wire::PROTOCOL_VERSION,
     );
-    eprintln!("Phase 3 scaffold — no runtime yet.");
+    match registry::default_agents_dir() {
+        Ok(dir) => eprintln!("agents directory: {}", dir.display()),
+        Err(e) => eprintln!("agents directory unavailable: {e}"),
+    }
+    eprintln!("Phase 15 — AgentRegistry ready; no runtime loop yet.");
 }
