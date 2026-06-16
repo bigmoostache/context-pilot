@@ -866,6 +866,10 @@
   path: .github/workflows/pr-cleanup.yml
   description: 'CI: stale PR auto-cleanup'
   last_edited_ms: 0
+28ffe41d41c04232:
+  path: ui/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome. FinderTabs (kind FileIcon per tab), FinderToolbar (context-aware: folder tab = back/fwd/breadcrumb/icon-size slider[grid]/4-mode segmented/search/New-Folder/Upload/Download/path-bar+QuickLook toggles; FILE tab = Get Info/Download/Share; NavBtn/SegBtn/view-modes use <Tip>), FinderSidebar (Favorites/Locations FileIcon via Place leading prop + Tags/Recents), FinderPathBar (folder FileIcon). All folder/file glyphs are macOS FileIcon (T27); Place gained optional `leading` ReactNode.'
+  last_edited_ms: 1781597468901
 297ff0502006cc9d:
   path: crates/cp-mod-chat/src/lib.rs
   description: 'Chat module. 7 tools, 2 panels (dashboard+room). Depends on spine. init: bootstrap→Tuwunel server→Matrix client→sync loop→bridge recovery. Typing indicators via on_tool_progress. Bridge management for Telegram/Discord/Slack/GChat.'
@@ -1914,6 +1918,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+5de500ecea4bf8da:
+  path: ui/src/components/finder/macIcons.tsx
+  description: macOS-faithful Finder icons (T27). <FileIcon kind ext size /> — blue gradient MacFolder (back tab + front flap + top sheen) + white MacDocument sheet (folded top-right corner + colored ext-derived type tag PDF/JS/MD…) + QuickLook DocGlyph art for image/audio/video/zip. 28x28 viewBox, useId-scoped gradients, EXT_COLOR lang map. Full-color, no external tint. Replaces the old monochrome lucide kind glyphs everywhere in the finder.
+  last_edited_ms: 1781597468867
 5e00cb7bf1ea0640:
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — landing surface of the Agents view. Greeting header + aggregate stat strip (agents/threads/working/waiting) + AgentCard grid (per-agent: status, branch, model, thread pills working/waiting, cost, Open/Manage) + New-agent card. Thread stats derived from threadDetails by agentId.'
@@ -2426,6 +2434,10 @@
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail: grouped thread sidebar (''Needs you''=MY_TURN / ''In progress''=THEIR_TURN). Each row: status dot, name, last-msg preview, time, unread badge, selection bar. + New Thread button, search box.'
   last_edited_ms: 1781459201140
+77abbe4ef44712f4:
+  path: ui/src/components/finder/FinderViews.tsx
+  description: 'Finder main-area views. GridView/ListView/ColumnsView/GalleryView all render macOS <FileIcon kind ext size/> (T27) instead of lucide glyphs. Grid (icon-size slider + finder-pop stagger + TagDots + focus ring), List (zebra + sortable headers + tags), Columns (Miller + metadata preview pane w/ size-84 FileIcon), Gallery (hero size-132 + filmstrip; n.image still overrides w/ gradient thumb). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
+  last_edited_ms: 1781597468890
 782b15ad724cdaf8:
   path: .github/workflows/codeql.yml
   description: 'CI: CodeQL security analysis'
@@ -4330,6 +4342,10 @@ d29264e579275bb3:
   path: crates/cp-mod-utilities/src/time.rs
   description: Timestamp formatting/parsing. Hinnant civil_from_days, date +%z cached offset. RFC 3339, epoch conversions, local time. decompose_epoch_secs returns Local struct. Replaces chrono crate.
   last_edited_ms: 0
+d2aa0f3b9841fc8d:
+  path: ui/src/components/finder/GetInfo.tsx
+  description: 'Get Info modal — macOS dossier sheet: large macOS <FileIcon> (T27), name, kind/size/dates, tags, dimensions/duration/pages, ''where'' path. Esc/Done close. Decorative.'
+  last_edited_ms: 1781597468925
 d2ad0203ee1c00b8:
   path: crates/cp-mod-queue/src/tools.rs
   description: Tool handlers for Queue_pause and Queue_undo with flame!("queue_pause") and flame!("queue_undo"). Queue_execute handled in pipeline.rs.
@@ -4374,6 +4390,10 @@ d45b12e52c9d6ca6:
   path: ui/src/components/conversation/Conversation.tsx
   description: 'Center conversation surface: header strip (msg counts, streaming indicator), scrollable message list, input bar.'
   last_edited_ms: 1781458541336
+d475f8969e0647fa:
+  path: ui/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook pane, variant ''pane'' (420px rail) | ''full'' (file-tab main). Bespoke kind renders: code (copy+line-nums+keyword tint), sheet (zebra+frozen header+tabs), slides, PDF (page strip), image (checkerboard+zoom), audio (waveform), video (poster+scrubber), markdown, json/text. Folder + Generic previews + metadata footer use macOS <FileIcon> (T27).'
+  last_edited_ms: 1781597468913
 d486285ed7025782:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
@@ -4690,6 +4710,10 @@ e92f540548fee6a0:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
   last_edited_ms: 0
+ea13b93f9b577ee9:
+  path: ui/src/components/finder/kind.tsx
+  description: 'Finder kind metadata (T27: .icon REMOVED). kindMeta = FinderKind→{accent,label} only (icons now via FileIcon/macIcons.tsx). kindTint, kindGradient (decorative chips), TAG_META (macOS finder tag colors), extOf(name) helper.'
+  last_edited_ms: 1781597468878
 ea16377a234ddc09:
   path: src/ui/ir/render_conversation.rs
   description: 'IR-controlled chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached(). Autocomplete overlay rendering via IR data. No question form overlay.'
