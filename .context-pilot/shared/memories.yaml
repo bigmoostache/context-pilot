@@ -497,7 +497,7 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend design doc docs/design-orchestration-backend.md is v3 (commit fcb11da, branch maquette): two-plane architecture + exhaustive problem register. CP maquette in ui/ unchanged.'
+  tl_dr: 'docs/design-orchestration-backend.md is v4 (branch maquette): two-plane arch + invariants I1-I10, hardened against the adversarial review (all 18 issues resolved, §23). CP maquette in ui/ unchanged.'
   contents: |-
     ## Context Pilot Frontend Maquette
 
@@ -541,7 +541,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781601554690
+  last_edited_ms: 1781602332660
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-

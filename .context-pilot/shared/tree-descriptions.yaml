@@ -2938,6 +2938,10 @@
   path: crates/cp-base/src/state/watchers.rs
   description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'
   last_edited_ms: 0
+8c786064a8f1ecc9:
+  path: docs/design-orchestration-backend.md
+  description: 'Orchestration backend design doc, v4 (branch maquette). Two-plane architecture: durable control plane (disk + manifest, authoritative) + ephemeral stream plane (UDS token tee, sub-ms, droppable). 10 invariants I1-I10: single-writer flock(FD-inherited across deadman re-exec H5), atomic+power-safe writes (data fsync→manifest rename→dir fsync), manifest snapshot consistency (no mtime), semantic dedup_token idempotency, LAZY backend rebuild, single-writer commit transaction (I8: messages participate in rev, atomic cross-worker snapshot), capability-token command auth (I9), cross-plane causal ordering (I10: self-describing MessageStart + frontend orphan buffering). Phase/status on DURABLE plane (never lossy). Streaming tee = lock-free SPSC enqueue + dedicated publisher thread. Frontend↔backend = REST + ONE auth''d WebSocket (bearer token in handshake, no CORS reliance) + client action queue/replay on backend-down. Security: cap tokens, WS bearer, spawn allow-list, global CostBreaker. N-1 major version compat. §20 problem register (9 categories, all ✅/🔵). §23 maps all 18 adversarial-review issues→v4 resolution. Companion: architecture-adversarial-analysis.md. NOT implemented (discussion).'
+  last_edited_ms: 1781602314662
 8c8b9d4645917223:
   path: crates/cp-mod-search/src/meili/mod.rs
   description: 'Meilisearch sub-module hub: bootstrap, client, download, overlay, server, tasks.'
