@@ -4254,6 +4254,10 @@ cd6dbd1b31a7a1cb:
   path: crates/cp-mod-console/src/panel.rs
   description: Console panel. Background cache with 200ms polling interval. Ring buffer snapshot on main thread, hash-based change detection. MAX_CONTEXT_CHARS=8000 tail truncation. Status metadata updates.
   last_edited_ms: 1780608591303
+cd978ea148e13465:
+  path: ui/src/components/shell/ConfigPanel.tsx
+  description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog''|''inline''. NO per-category title header (dialog keeps slim close-only chrome). Categories: General/Usage & Cost/Providers/Search/DocAI/Web/Integrations. When currentUser.managedByCompany (T30): key-bearing panes show a ManagedKeysNotice banner + each KeyRow is LOCKED (Lock glyph replaces reveal eye, value stays masked, ManagedPill + ''Managed by {company}'' caption) — org provisions keys centrally. Usage renders <UsagePage/> full-bleed. Masked keys w/ reveal (personal accounts), Connected/Locked pills, toggles, default-model picker.'
+  last_edited_ms: 1781598237668
 cdb83890e56a7d79:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
