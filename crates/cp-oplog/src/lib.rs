@@ -40,4 +40,5 @@
 //! group-commit thread arrive in later phases.
 
 pub mod append;
+pub mod replay;
 pub mod segment;

@@ -1078,6 +1078,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+317419d9909428b1:
+  path: crates/cp-oplog/Cargo.toml
+  description: 'cp-oplog crate manifest. deps: cp-wire (only). dev: tempfile. Workspace lints inherited. Tier-① WAL file I/O.'
+  last_edited_ms: 1781619527681
 31e40cc8916cabd7:
   path: ui/src/components/threads/ThreadsView.tsx
   description: 'Threads view assembler, scoped to ACTIVE AGENT''s realm (filters threadDetails by agentId; keyed by agentId in App so local state reseeds per realm; EmptyRealm when none). Holds local thread state so maquette interactions genuinely work: search filters, New Thread prepends a MY_TURN thread, archive/restore toggles. 2-pane (ThreadList | ThreadConversation) + NewThreadDialog. Sidebar is ALWAYS OPEN — the collapse/expand edge rail was removed entirely (T23).'
@@ -2050,6 +2054,10 @@
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data.'
   last_edited_ms: 0
+6000af6b05cfd495:
+  path: crates/cp-oplog/src/replay.rs
+  description: 'Oplog replay (GAP1/I5): ReplayState{rev_head,heads}. fold_entry pub(crate): Checkpoint=authoritative clone_from, MessageCreated=set_thread_head, others enumerated no-op. replay() fast-path reads ONLY newest segment when it opens with a checkpoint (bounded by 1 segment); replay_full fallback for seg-0-only. Heads PartialEq order-sensitive (build expected in fold order). 7 tests incl fast==full equivalence.'
+  last_edited_ms: 1781619407276
 600c2e87914b10ac:
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
@@ -2158,6 +2166,10 @@
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 0
+64b70e5f389ed02c:
+  path: crates/cp-wire/src/types/heads.rs
+  description: 'Bounded snapshot Heads: per-thread + per-panel content hashes, O(threads+panels) not O(files) (I3). impl Default (schema_version=1, empty). set_thread_head(id,hash) upsert (insert-or-update-in-place, deterministic order). ThreadHead/PanelHead. 2 round-trip tests. Import path: cp_wire::types::heads::Heads (no re-export, pub_use banned).'
+  last_edited_ms: 1781619407302
 650a0ba5c8a439e2:
   path: ui/src/components/threads/ThreadDetailRail.tsx
   description: 'Right rail: thread metadata (status badge, agent, message count, created, last activity, id) + ''Open agent cockpit'' bridge to the panel-centered view.'
@@ -2294,6 +2306,10 @@
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
   last_edited_ms: 0
+6a80600c66d89e02:
+  path: crates/cp-oplog/src/append.rs
+  description: 'OplogWriter: single-writer append-only fsync''d log + running Heads fold. open() seeds heads via replay. append(kind)->rev probes frame size, rolls at 64MiB. roll() stamps leading Checkpoint(heads) as new segment''s first record (GAP1). write_record = sole rev-assignment point (frame+write_all+sync_data+fold_entry, announce-after-durable K9). checkpoint() public. seg-0 has no leading cp. OplogError{Io,Frame}. 7 tests.'
+  last_edited_ms: 1781619407289
 6a8813b4b941d847:
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
@@ -2434,6 +2450,10 @@
   path: crates/cp-mod-utilities/src/dirs.rs
   description: 'Platform dirs: home_dir() from $HOME, config_dir() macOS Library/Linux XDG. Replaces dirs crate.'
   last_edited_ms: 1780565428677
+7153278a1919c86c:
+  path: crates/cp-wire/src/lib.rs
+  description: 'Versioning primitives: PROTOCOL_VERSION const + accepts(their_major) N-1 compat check. Declares framing + types modules. 4 tests.'
+  last_edited_ms: 1781619500107
 718d9f6f398a7051:
   path: src/ui/ir/render_conversation.rs
   description: 'IR-controlled chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached(). Question form + autocomplete overlay rendering via IR data.'
@@ -3638,6 +3658,10 @@ a7b95447dd5bdb0b:
   path: docs/talk/slides/1-2.html
   description: 'Slide: What''s failing — 11-item slider (WHYs section)'
   last_edited_ms: 1781078806822
+a80704251bc77c86:
+  path: crates/cp-wire/src/types/oplog.rs
+  description: 'OpEntry (schema_version, rev, timestamp_ms) + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated, Lifecycle, CostAggregate, Checkpoint{heads}, Unknown catch-all. Framed payload (len+CRC) on wire. 3 round-trip + tolerant-decode tests.'
+  last_edited_ms: 1781619500082
 a83fd0afdd04e258:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
@@ -4326,6 +4350,10 @@ c789b7f61fb207fe:
   path: src/infra/profiler.rs
   description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime via cp_mod_utilities::time, elapsed ms, tool name(s).
   last_edited_ms: 0
+c7d014dda0e55831:
+  path: crates/cp-wire/Cargo.toml
+  description: 'Wire protocol crate manifest. deps: crc32c, serde, serde_json (I/O-free). Workspace lints inherited.'
+  last_edited_ms: 1781619500094
 c7ea61d3ceb784d8:
   path: crates/cp-base/src/modules.rs
   description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/tool_progress), file watcher integration.
@@ -5070,6 +5098,10 @@ ef88c139f0bdac2b:
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
   last_edited_ms: 0
+f0295daf8bbd04ee:
+  path: Cargo.toml
+  description: Workspace root. 25 crate members (incl cp-wire/cp-oplog/cp-mod-bridge/cp-orchestrator). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
+  last_edited_ms: 1781619527694
 f03a92cce423e618:
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data.'

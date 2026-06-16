@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use super::ContentHash;
 
+/// Wire-schema revision stamped onto a freshly-constructed [`Heads`].
+const HEADS_SCHEMA_VERSION: u32 = 1;
+
 /// Snapshot of an agent's current heads at a specific `rev`.
 ///
 /// Each head is a content-addressed reference into the immutable body
@@ -24,6 +27,29 @@ pub struct Heads {
 
     /// Per-panel content head.
     pub panels: Vec<PanelHead>,
+}
+
+impl Default for Heads {
+    /// An empty head set — the state of a freshly-booted agent before any
+    /// message or panel exists.
+    fn default() -> Self {
+        Self { schema_version: HEADS_SCHEMA_VERSION, threads: Vec::new(), panels: Vec::new() }
+    }
+}
+
+impl Heads {
+    /// Set (or insert) the last-message head for `thread_id`.
+    ///
+    /// Replay folds a `MessageCreated` entry through this: the most recent
+    /// message of a thread overwrites the previous head, so the head set stays
+    /// bounded at one entry per thread (design doc I3).
+    pub fn set_thread_head(&mut self, thread_id: &str, last_message_hash: ContentHash) {
+        if let Some(existing) = self.threads.iter_mut().find(|head| head.thread_id == thread_id) {
+            existing.last_message_hash = last_message_hash;
+        } else {
+            self.threads.push(ThreadHead { thread_id: thread_id.to_owned(), last_message_hash });
+        }
+    }
 }
 
 /// A single thread's head — the hash of its most recent message body.
