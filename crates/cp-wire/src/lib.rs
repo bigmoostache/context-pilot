@@ -19,6 +19,7 @@
 //! *Phase 2:* the concrete message types ([`types`]) are defined — commands,
 //! oplog entries, stream frames, heads, bodies, acks, and registry entries.
 
+pub mod framing;
 pub mod types;
 
 /// The protocol's current major version.

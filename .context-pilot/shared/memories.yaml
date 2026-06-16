@@ -110,7 +110,7 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend CODING on branch ''demaquetting''. Source of truth: design-orchestration-backend.md v7 (roadmap.md deleted/deprecated; plan = 20-phase todos X768-X787). Crates: cp-wire (shared), cp-mod-bridge (agent), cp-orchestrator (backend).'
+  tl_dr: 'Orchestration backend coding on branch ''demaquetting''. Truth: design doc v7 + todos X768-X787. Crates: cp-wire/cp-oplog (shared), cp-mod-bridge (agent), cp-orchestrator (backend). Phases 1-4 done; next Phase 5 (replay + head-checkpoint, GAP1). Details in contents.'
   contents: |-
     ## Orchestration Backend Design — v6 (branch maquette)
 
@@ -136,7 +136,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781614878421
+  last_edited_ms: 1781618600743
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical

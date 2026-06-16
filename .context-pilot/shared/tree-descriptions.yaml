@@ -870,6 +870,10 @@
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, cp-mod-utilities, crossterm, serde, serde_json.'
   last_edited_ms: 0
+27e02466fb70db0f:
+  path: crates/cp-wire/src/framing.rs
+  description: 'Oplog record framing: len(4B LE)+CRC32C(4B LE)+JSON payload. encode_raw/decode_raw + encode_entry/decode_entry. Manual u32_to_le (const)/u32_from_le (non-const: From not const-stable). FrameError enum (no std::error::Error — dodges missing_trait_methods). All buffer access via .get() (indexing_slicing forbid). 15 tests.'
+  last_edited_ms: 1781618522811
 280c42eb58c1c171:
   path: docs/talk/slides/2-4.html
   description: 'Slide: Feedbacks & Constraints with control theory (HOWs section)'
@@ -1042,6 +1046,10 @@
   path: crates/cp-base/src/config/global.rs
   description: 'Global config at ~/.config/context-pilot/config.json. API key resolution cascade: env var → config file. KEY_ENV_MAP for canonical names. store_api_key/resolve_api_key/env_var_for_key.'
   last_edited_ms: 1780565428671
+2ffa7822cffc7ddf:
+  path: src/modules/mod.rs
+  description: Module registry. 21 modules via all_modules() (incl BridgeModule). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
+  last_edited_ms: 1781617163175
 305eae7b157d07fc:
   path: crates/cp-mod-callback/src/firing.rs
   description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. fire_async/blocking_callbacks() for batch dispatch. flame!("cb_fire"), flame!("cb_fire_async"), flame!("cb_fire_blocking"). CallbackWatcher: exit 0→success_message, exit 7→silent, exit !=0→deferred panel, timeout→deferred panel.'
@@ -1566,6 +1574,10 @@
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
   last_edited_ms: 0
+487cd9f823663cf3:
+  path: crates/cp-wire/src/types/heads.rs
+  description: 'Heads snapshot: bounded set of ThreadHead + PanelHead content hashes. O(threads+panels) not O(total-files).'
+  last_edited_ms: 1781617163200
 48cc4020fe96e1d1:
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
@@ -1870,6 +1882,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar. App mark (Home)→fleet. ALWAYS renders / + AgentSwitcher: inside an agent shows workspace + per-agent switcher Threads·Cockpit·Finder + cost; at fleet altitude passes activeId undefined (placeholder) and picking an agent enters it. onNewAgent prop (T21) forwarded to AgentSwitcher ''New agent''. Far-right: Activity→StatsPopup (hidden at fleet) + ThemeToggle + Settings gear→ConfigModal. Git branch chip removed.'
   last_edited_ms: 1781545852636
+56fc32445b9a76b3:
+  path: crates/cp-oplog/src/lib.rs
+  description: 'Oplog crate root. Doc: durability tier ①, why-separate-crate (agent writes+replays, backend tails), announce-after-durable contract. Declares `append` + `segment` modules.'
+  last_edited_ms: 1781618522773
 5726da2755f9e360:
   path: crates/cp-base/src/cast.rs
   description: 'Safe trait: saturating numeric casts for all int/float types, macro-driven impls, replaces raw `as` casts'
@@ -3486,6 +3502,10 @@ a0fb74e7facad335:
   path: src/ui/help/config_overlay.rs
   description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access.
   last_edited_ms: 0
+a12420afe30fa1d5:
+  path: crates/cp-oplog/src/segment.rs
+  description: 'Segment files: seg-{n}.log zero-padded sortable naming. Scan{entries,valid_len,torn_tail}. path/parse_index/indices/read/scan_bytes — torn-tail-aware frame walk (decode until first CRC/length failure, report clean boundary for truncation, V1).'
+  last_edited_ms: 1781618522786
 a128756ff810873f:
   path: crates/cp-console-server/src/protocol.rs
   description: JSON-line protocol types. Request (cmd/key/command/cwd/input/log_path). Response (ok/error/pid/status/exit_code/sessions). interpret_escapes() for \n/\t/\xHH.
@@ -4418,6 +4438,10 @@ cc9e047bb5de40f3:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+ccc5f36bc89c57cf:
+  path: crates/cp-wire/src/types/body.rs
+  description: 'Content-addressed Body: hash + data bytes. Inline-small in oplog or spill to oplog/bodies/{hash}.'
+  last_edited_ms: 1781617163188
 cd333d308467c2b4:
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers"). No PendingForm references.
@@ -4698,6 +4722,10 @@ db12056c4b00bacd:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
   last_edited_ms: 0
+db224a5ff42275a6:
+  path: crates/cp-oplog/src/append.rs
+  description: 'OplogWriter: single-writer append-only fsync''d log. open/open_with_segment_limit, append(kind)->rev (frame+write_all+sync_data, announce-after-durable K9), maybe_roll (64MiB segments), create_segment (dir fsync I2), scan_for_resume (rev resume past highest durable, torn-tail truncate on open). OplogError{Io,Frame}. 6 tests.'
+  last_edited_ms: 1781618522798
 dbdb848ee0d04af5:
   path: ui/src/components/agents/PromptsPage.tsx
   description: Global prompt-library page (fleet 'Prompts'). Centred on shared FLEET_MAX_W (T18, aligns with the toggle + Agents page). Renders mock library[] (system/skills/commands) as cards w/ KIND_META icon/accent/blurb, filter tabs (all + per-kind counts), kind sections in 'all'. 'agent' kind labelled 'System'. Header Import + New buttons. Card/New/Import open PromptModal + ImportModal. Built-in badge only.

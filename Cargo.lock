@@ -493,6 +493,14 @@ name = "cp-mod-utilities"
 version = "0.1.0"
 
 [[package]]
+name = "cp-oplog"
+version = "0.1.0"
+dependencies = [
+ "cp-wire",
+ "tempfile",
+]
+
+[[package]]
 name = "cp-orchestrator"
 version = "0.1.0"
 dependencies = [
@@ -510,6 +518,7 @@ dependencies = [
 name = "cp-wire"
 version = "0.1.0"
 dependencies = [
+ "crc32c",
  "serde",
  "serde_json",
 ]
@@ -521,6 +530,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "crc32c"
+version = "0.6.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a47af21622d091a8f0fb295b88bc886ac74efcc613efc19f5d0b21de5c89e47"
+dependencies = [
+ "rustc_version",
 ]
 
 [[package]]
