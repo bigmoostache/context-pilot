@@ -1098,6 +1098,10 @@
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point. Phase 3: prints version + protocol version, exits. Future: AgentRegistry, AgentChannel, AgentSupervisor, StreamHub, CostBreaker.'
   last_edited_ms: 1781617086617
+32453767392c8e30:
+  path: crates/cp-oplog/src/lib.rs
+  description: 'Oplog crate root. Doc: durability tier ①, why-separate-crate (agent writes+replays, backend tails), announce-after-durable contract. Declares append + compact + replay + segment modules.'
+  last_edited_ms: 1781622185013
 3279dfee597f2c60:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
@@ -4674,6 +4678,10 @@ d5de5196647aeaa3:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme. --sidebar-w (240px, :root) = single source of truth for ALL primary sidebar widths (fleet/threads/cockpit/finder). Two palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Dungeon Forge'' = TUI D&D palette verbatim (#222220/#333331/#424240 charcoal / torch-orange #DA7659 primary+signal+your-turn / #B26245 dim accent / #C98F6B tan interactive / #F0F0F0 ink / ok #86BC6F / warn #E5C07B / danger #C85050). SF Pro chrome, IBM Plex Mono data. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker, modal-pop/backdrop-fade/opt-rise, finder-slider.'
   last_edited_ms: 1781533961612
+d68035df2e8b5920:
+  path: crates/cp-oplog/src/compact.rs
+  description: 'Phase 7 (X774): segment compaction + GAP3 grace rule. compact(dir) deletes every segment older than the newest checkpoint-bearing segment (replay fast-path already ignores them → replay output unchanged; the checkpoint Snapshot carries live heads+seen, so the checkpoint IS the ack-rev barrier). CompactReport{segments_removed,oldest_index}. total_bytes/should_compact size trigger (DEFAULT_COMPACT_THRESHOLD 256MiB). body_gc_eligible(age,grace) const predicate for GAP3 orphan-body GC: only GC bodies older than DEFAULT_GC_GRACE(60s) >> I13 barrier window, so in-flight spills never collected, only crash-orphans. 7 tests incl replay-identical-after-compaction.'
+  last_edited_ms: 1781622184996
 d693aa680fbe23a5:
   path: src/modules/questions/mod.rs
   description: 'QuestionsModule: core, 2 tools (ask_user_question, Think), ThinkState persistence, on_tool_complete counter drift'
