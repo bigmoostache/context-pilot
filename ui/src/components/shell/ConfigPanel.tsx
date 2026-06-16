@@ -1,6 +1,7 @@
 import { useState } from "react"
 import {
   Bot,
+  Building2,
   Check,
   Coins,
   Cpu,
@@ -12,6 +13,7 @@ import {
   Globe,
   KeyRound,
   Boxes,
+  Lock,
   Search,
   Sliders,
   Sparkles,
@@ -20,6 +22,7 @@ import {
 } from "lucide-react"
 import { DialogClose } from "@/components/ui/dialog"
 import { UsagePage } from "@/components/agents/UsagePage"
+import { currentUser } from "@/lib/mock"
 import { cn } from "@/lib/utils"
 
 /**
@@ -151,6 +154,11 @@ const CATEGORIES: {
 
 // ── per-category bodies ───────────────────────────────────────────
 function CategoryBody({ cat }: { cat: CatId }) {
+  // Company-managed accounts can't edit API keys — the org provisions them
+  // centrally. Lock every key-bearing pane and explain why.
+  const managed = currentUser.managedByCompany
+  const company = currentUser.company ?? "your organization"
+
   switch (cat) {
     case "general":
       return <GeneralPane />
@@ -159,18 +167,20 @@ function CategoryBody({ cat }: { cat: CatId }) {
     case "providers":
       return (
         <Stack>
-          <KeyRow i={0} name="Anthropic" env="ANTHROPIC_API_KEY" icon={Sparkles} status="connected" hint="Claude 4 family" sample="sk-ant-••••••••••3f7a" />
-          <KeyRow i={1} name="Claude Code (OAuth)" env="Keychain · ~/.claude" icon={Cpu} status="connected" hint="opus-4-8 · sonnet-4-6 · fable-5" sample="oauth-••••••••••2c19" />
-          <KeyRow i={2} name="Grok (xAI)" env="XAI_API_KEY" icon={Zap} status="missing" hint="grok-4" />
-          <KeyRow i={3} name="Groq" env="GROQ_API_KEY" icon={Gauge} status="connected" hint="Llama 3.x · fast" sample="gsk_••••••••••8b02" />
-          <KeyRow i={4} name="DeepSeek" env="DEEPSEEK_API_KEY" icon={Bot} status="missing" hint="deepseek-chat / reasoner" />
-          <KeyRow i={5} name="MiniMax" env="MINIMAX_API_KEY" icon={Bot} status="connected" hint="Token Plan" sample="sk-cp-••••••••••5Wk8" />
+          {managed && <ManagedKeysNotice company={company} />}
+          <KeyRow i={0} name="Anthropic" env="ANTHROPIC_API_KEY" icon={Sparkles} status="connected" hint="Claude 4 family" sample="sk-ant-••••••••••3f7a" managed={managed} company={company} />
+          <KeyRow i={1} name="Claude Code (OAuth)" env="Keychain · ~/.claude" icon={Cpu} status="connected" hint="opus-4-8 · sonnet-4-6 · fable-5" sample="oauth-••••••••••2c19" managed={managed} company={company} />
+          <KeyRow i={2} name="Grok (xAI)" env="XAI_API_KEY" icon={Zap} status="missing" hint="grok-4" managed={managed} company={company} />
+          <KeyRow i={3} name="Groq" env="GROQ_API_KEY" icon={Gauge} status="connected" hint="Llama 3.x · fast" sample="gsk_••••••••••8b02" managed={managed} company={company} />
+          <KeyRow i={4} name="DeepSeek" env="DEEPSEEK_API_KEY" icon={Bot} status="missing" hint="deepseek-chat / reasoner" managed={managed} company={company} />
+          <KeyRow i={5} name="MiniMax" env="MINIMAX_API_KEY" icon={Bot} status="connected" hint="Token Plan" sample="sk-cp-••••••••••5Wk8" managed={managed} company={company} />
         </Stack>
       )
     case "search":
       return (
         <Stack>
-          <KeyRow i={0} name="Voyage AI" env="VOYAGE_API_KEY" icon={Database} status="connected" hint="voyage-code-3 · 1024-dim embeddings" sample="pa-••••••••••d41e" />
+          {managed && <ManagedKeysNotice company={company} />}
+          <KeyRow i={0} name="Voyage AI" env="VOYAGE_API_KEY" icon={Database} status="connected" hint="voyage-code-3 · 1024-dim embeddings" sample="pa-••••••••••d41e" managed={managed} company={company} />
           <StatusRow i={1} name="Meilisearch" icon={Search} state="Running" detail="Embedded server · 6 417 chunks · port 49286" />
           <ToggleRow i={2} name="Hybrid semantic search" detail="Blend keyword + vector results" on />
         </Stack>
@@ -178,24 +188,45 @@ function CategoryBody({ cat }: { cat: CatId }) {
     case "docai":
       return (
         <Stack>
-          <KeyRow i={0} name="Datalab" env="DATALAB_API_KEY" icon={FileText} status="connected" hint="Surya OCR · PDF / image → markdown" sample="dl-••••••••••9a23" />
+          {managed && <ManagedKeysNotice company={company} />}
+          <KeyRow i={0} name="Datalab" env="DATALAB_API_KEY" icon={FileText} status="connected" hint="Surya OCR · PDF / image → markdown" sample="dl-••••••••••9a23" managed={managed} company={company} />
           <ToggleRow i={1} name="Cache OCR results" detail="~/.context-pilot/ocr-cache" on />
         </Stack>
       )
     case "web":
       return (
         <Stack>
-          <KeyRow i={0} name="Brave Search" env="BRAVE_API_KEY" icon={Globe} status="connected" hint="Independent 40-B index" sample="BSA-••••••••••71fd" />
-          <KeyRow i={1} name="Firecrawl" env="FIRECRAWL_API_KEY" icon={Globe} status="connected" hint="Scrape · search · crawl" sample="fc-••••••••••e0c8" />
+          {managed && <ManagedKeysNotice company={company} />}
+          <KeyRow i={0} name="Brave Search" env="BRAVE_API_KEY" icon={Globe} status="connected" hint="Independent 40-B index" sample="BSA-••••••••••71fd" managed={managed} company={company} />
+          <KeyRow i={1} name="Firecrawl" env="FIRECRAWL_API_KEY" icon={Globe} status="connected" hint="Scrape · search · crawl" sample="fc-••••••••••e0c8" managed={managed} company={company} />
         </Stack>
       )
     case "integrations":
       return (
         <Stack>
-          <KeyRow i={0} name="GitHub" env="GITHUB_TOKEN" icon={Boxes} status="connected" hint="PRs · issues · gh CLI" sample="ghp_••••••••••a7d5" />
+          {managed && <ManagedKeysNotice company={company} />}
+          <KeyRow i={0} name="GitHub" env="GITHUB_TOKEN" icon={Boxes} status="connected" hint="PRs · issues · gh CLI" sample="ghp_••••••••••a7d5" managed={managed} company={company} />
         </Stack>
       )
   }
+}
+
+/** Banner shown atop key-bearing panes when the account is company-managed. */
+function ManagedKeysNotice({ company }: { company: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-[var(--interactive)]/30 bg-[var(--interactive)]/[0.06] px-3.5 py-3">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--interactive)]/14 text-[var(--interactive)]">
+        <Building2 className="size-4" />
+      </span>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[12.5px] font-semibold text-foreground/90">Keys managed by {company}</span>
+        <span className="text-[11.5px] leading-relaxed text-muted-foreground">
+          API keys are provisioned centrally by your organization and can't be edited here. Contact
+          your administrator to change a provider key.
+        </span>
+      </div>
+    </div>
+  )
 }
 
 function GeneralPane() {
@@ -290,6 +321,8 @@ function KeyRow({
   status,
   hint,
   sample,
+  managed = false,
+  company,
 }: {
   i: number
   name: string
@@ -298,11 +331,14 @@ function KeyRow({
   status: "connected" | "missing"
   hint: string
   sample?: string
+  managed?: boolean
+  company?: string
 }) {
   const connected = status === "connected"
   const [reveal, setReveal] = useState(false)
   const value = sample ?? ""
-  const shown = reveal && connected ? value.replace(/•+/, "sk-live-7Q2a8FnZ") : value
+  // Managed accounts never reveal/edit — keep the value masked regardless.
+  const shown = reveal && connected && !managed ? value.replace(/•+/, "sk-live-7Q2a8FnZ") : value
 
   return (
     <div
@@ -317,24 +353,38 @@ function KeyRow({
           <span className="truncate text-[13px] font-medium text-foreground/90">{name}</span>
           <span className="truncate text-[11px] text-muted-foreground">{hint}</span>
         </div>
-        <StatusPill connected={connected} />
+        {managed && connected ? <ManagedPill /> : <StatusPill connected={connected} />}
       </div>
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-2.5 py-1.5">
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5",
+          managed && connected ? "bg-muted/40" : "bg-background/60",
+        )}
+      >
         <KeyRound className="size-3.5 shrink-0 text-muted-foreground/55" />
         <code className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-foreground/75">
           {connected ? shown : <span className="text-muted-foreground/45">not configured</span>}
         </code>
         <span className="shrink-0 rounded bg-muted/70 px-1.5 py-px font-mono text-[9.5px] text-muted-foreground/70">{env}</span>
-        {connected && (
-          <button
-            onClick={() => setReveal((r) => !r)}
-            className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground"
-            aria-label={reveal ? "Hide" : "Reveal"}
-          >
-            {reveal ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-          </button>
-        )}
+        {connected &&
+          (managed ? (
+            <Lock className="size-3.5 shrink-0 text-muted-foreground/50" aria-label="Locked by organization" />
+          ) : (
+            <button
+              onClick={() => setReveal((r) => !r)}
+              className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground"
+              aria-label={reveal ? "Hide" : "Reveal"}
+            >
+              {reveal ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            </button>
+          ))}
       </div>
+      {managed && connected && (
+        <span className="flex items-center gap-1 pl-0.5 text-[10.5px] text-muted-foreground/65">
+          <Lock className="size-3" />
+          Managed by {company ?? "your organization"} — contact your administrator to change.
+        </span>
+      )}
     </div>
   )
 }
@@ -408,6 +458,16 @@ function ToggleRow({
         />
       </span>
     </button>
+  )
+}
+
+/** A small "Locked" pill for keys the company manages. */
+function ManagedPill() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted/70 px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground/80">
+      <Lock className="size-3" />
+      Locked
+    </span>
   )
 }
 
