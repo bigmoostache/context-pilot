@@ -33,5 +33,7 @@ done < <(find . -mindepth 1 -type d \
   -not -path './jobs' \
   -not -path './jobs/*' \
   -not -path './benchmarks/terminal-bench/jobs' \
-  -not -path './benchmarks/terminal-bench/jobs/*')
+  -not -path './benchmarks/terminal-bench/jobs/*' \
+  -not -path './ui' \
+  -not -path './ui/*')
 exit $exit_code

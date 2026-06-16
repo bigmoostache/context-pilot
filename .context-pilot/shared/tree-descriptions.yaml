@@ -26,6 +26,10 @@
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc, v5 (branch maquette) — CODE-GROUNDED rewrite. Keystone: THREE durability tiers, not two — ① bridge-owned append-only fsync''d OPLOG (authoritative: command effects, rev, seen-marks, phase, lifecycle, cost; O(1) append, never coalesced) + ② existing UNTOUCHED PersistenceWriter as a best-effort coalesced reconstructible state cache + ③ lossy UDS stream plane (live tokens + latency hints). 12 invariants I1-I12: I8 oplog-as-truth (writer.rs NOT modified — honors constraint #7 for real), I11 journal-to-oplog-then-ack (''accepted''=durable, survives deadman re-exec), I12 single inotify watch per agent (no fleet-scale watch exhaustion), I2 fsync confined to oplog (not every state write), I3 content-addressed bodies + bounded heads (not O(S²) manifest enumeration), I4 dedup by semantic token evicted by ack-rev. Command injection via the existing user-message entry (actions/input.rs), NOT the autonomy spine (engine.rs check_spine guards would stall external commands — K7). §24 maps every invariant→real file/function→additive-vs-core change type. §25 fault-injection acceptance matrix (V1-V10). §20 register folds round-3 K1-K9 + round-2 R2. Resolves the round-3 critique that v4 was authored against an imagined persistence layer. Companion: architecture-adversarial-analysis.md. NOT implemented (discussion).'
   last_edited_ms: 1781608697546
+01bfbf5b9ab05a09:
+  path: crates/cp-wire/Cargo.toml
+  description: Wire protocol crate manifest. No deps yet (I/O-free). Workspace lints inherited.
+  last_edited_ms: 1781615263418
 01d1849089129726:
   path: .github/workflows/rust.yml
   description: 'CI: fmt + clippy + build + test on ubuntu-latest. Pins Rust 1.93.0. Triggers on push/PR to master.'
@@ -1354,6 +1358,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+3fc537fea007568f:
+  path: crates/cp-wire/src/lib.rs
+  description: 'Versioning primitives: PROTOCOL_VERSION const + accepts(their_major) N-1 compat check. 4 tests. Phase 2 adds wire types.'
+  last_edited_ms: 1781615263430
 3fcf7ba9f357b2db:
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail: grouped thread sidebar (''Needs you''=MY_TURN / ''In progress''=THEIR_TURN). Each row: status dot, name, last-msg preview, time, unread badge, selection bar. + New Thread button, search box.'
