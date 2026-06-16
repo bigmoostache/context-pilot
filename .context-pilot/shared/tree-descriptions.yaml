@@ -1394,6 +1394,10 @@
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
   last_edited_ms: 0
+3cf54932d4c7b6ea:
+  path: crates/cp-orchestrator/tests/registry_channel.rs
+  description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: (1) real Boot→AgentRegistry Appeared+Live→idempotent quiet scan→drop→Disappeared; (2) Stale fires ONLY on Live→non-live transition, first-sight staleness rides Appeared (crafted Entry+Heartbeat); (3) body Store spill→OplogService MessageCreated→Tailer.poll→AgentChannel.hydrate integrity-verified + inlined body hydrate=None; (4) AgentChannel.send→real Intake.handle_connection over UnixListener (Accepted), resend same dedup_token Accepted but replay seen.len==1 (exactly-once). Top `use nix/serde/tiny_http as _;` for per-target unused-crate-dependencies.'
+  last_edited_ms: 1781650132073
 3d0ef7ba17232429:
   path: crates/cp-orchestrator/src/lib.rs
   description: 'Phase 16 (X783): backend library root (split from main.rs for unit-testability). Declares channel + liveness + registry modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails them across a fleet.'
@@ -1746,6 +1750,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+4d19bb2520d4039a:
+  path: crates/cp-orchestrator/src/main.rs
+  description: 'Backend entry point (thin). Prints version+protocol+agents dir, exits (no runtime loop yet). use nix/serde/serde_json/cp_oplog/tiny_http as _ acknowledges lib-only deps; #[cfg(test)] use cp_mod_bridge as _ + tempfile as _ acknowledge dev-deps for the bin-test target''s per-target unused-crate-dependencies.'
+  last_edited_ms: 1781650132105
 4d457b7ceca9acae:
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
@@ -4006,6 +4014,10 @@ af638eaf96a0207c:
   path: crates/cp-mod-git/src/classify.rs
   description: ReadOnly/Mutating classification, shell arg parsing with quote handling, operator blocking, subcommand-aware classify_git()
   last_edited_ms: 0
+af63a1c3cc1bf35d:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal, kill signal-0 pid-liveness) + serde + serde_json + tiny_http (0.12, transport). dev: cp-mod-bridge (test-only seam validation, never a runtime dep) + tempfile. lib+bin package. Workspace lints.'
+  last_edited_ms: 1781650132119
 afd5f6a171e03b31:
   path: website/docs/keyboard.html
   description: 'Docs: keyboard shortcuts reference'
@@ -4046,6 +4058,10 @@ b1981e09477550a2:
   path: ui/src/components/threads/ThreadsView.tsx
   description: 'Threads view assembler: 3-pane layout (ThreadList | ThreadConversation | ThreadDetailRail), holds selectedId state, onOpenCockpit bridges to panel view.'
   last_edited_ms: 1781459201130
+b1b7702212647f46:
+  path: crates/cp-orchestrator/src/lib.rs
+  description: Backend library root. Declares channel+liveness+registry+services+supervisor+transport. Backend-only peer of cp-mod-bridge (bridge WRITES registry/heartbeat/oplog, backend READS/tails). `#[cfg(test)] use cp_mod_bridge as _;` acknowledges the seam-test dev-dep for the lib-test target's per-target unused-crate-dependencies lint.
+  last_edited_ms: 1781650132089
 b1cafb4647761a69:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
