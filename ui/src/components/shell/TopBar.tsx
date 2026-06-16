@@ -1,11 +1,12 @@
 import { useState } from "react"
-import { Activity, LayoutGrid, MessagesSquare, FolderTree, Home, Settings } from "lucide-react"
+import { Activity, LayoutGrid, MessagesSquare, FolderTree, Home, Settings, Settings2 } from "lucide-react"
 import { status, agents } from "@/lib/mock"
 import { fmtCost } from "@/lib/panelMeta"
 import { ThemeToggle } from "./ThemeToggle"
 import { AgentSwitcher } from "./AgentSwitcher"
 import { ConfigModal } from "./ConfigModal"
 import { StatsPopup } from "./StatsPopup"
+import { AgentModal } from "@/components/agents/AgentModal"
 import { Tip } from "@/components/ui/tip"
 import type { ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -26,8 +27,10 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
   const inFleet = view === "fleet"
   const [configOpen, setConfigOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [manageOpen, setManageOpen] = useState(false)
 
   return (
+    <>
     <header className="vibrancy flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
       {/* app mark → fleet dashboard (mission control) */}
       <Tip title="Mission control" body="Back to the fleet — an overview of all your agents." side="bottom">
@@ -128,6 +131,26 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
           </span>
         </Tip>
         <span className="h-5 w-px bg-border/70" />
+        {/* per-agent configuration — the one-click shortcut to the same
+            "Manage <agent>" dialog the fleet exposes, so editing the focused
+            agent no longer needs the four-step switcher journey (T26). Only
+            meaningful inside an agent; sits just left of the global gear so the
+            two cog buttons (agent-scoped vs global) read as a pair. */}
+        {!inFleet && (
+          <Tip
+            title="Agent configuration"
+            body="Rename, switch model, or archive this agent — the same dialog as Manage."
+            side="bottom"
+          >
+            <button
+              onClick={() => setManageOpen(true)}
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
+              aria-label="Configure this agent"
+            >
+              <Settings2 className="size-[17px]" />
+            </button>
+          </Tip>
+        )}
         <Tip title="Settings" body="Providers, search, web & integrations, and usage." side="bottom">
           <button
             onClick={() => setConfigOpen(true)}
@@ -142,6 +165,17 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
       <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
       <StatsPopup open={statsOpen} onClose={() => setStatsOpen(false)} />
     </header>
+
+    {/* Rendered as a SIBLING of the .vibrancy header (never a descendant) so its
+        `absolute inset-0` backdrop anchors to the viewport and escapes the
+        header's backdrop-filter containing block. */}
+    {!inFleet && manageOpen && activeAgent && (
+      <AgentModal
+        modal={{ mode: "manage", agent: activeAgent }}
+        onClose={() => setManageOpen(false)}
+      />
+    )}
+    </>
   )
 }
 

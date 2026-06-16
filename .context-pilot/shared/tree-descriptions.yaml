@@ -858,6 +858,10 @@
   path: crates/cp-mod-files/src/panel.rs
   description: File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based).
   last_edited_ms: 1780608591297
+289fab6ac2eccb97:
+  path: ui/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog — single source of truth for both flows (extracted from FleetDashboard, T26). Exports AgentModal + AgentModalMode + MODELS/MODEL_META/slugify. Manage mode: rename / switch model / archive (realm fixed); create mode: name-as-star w/ live slugified realm preview. Gradient hero, rich model cards, autofocus+Esc+⌘↵. onFlash OPTIONAL toast sink (fleet supplies one; TopBar omits). Backdrop is absolute inset-0 → host must give a viewport-sized positioning context (fleet uses a relative container; TopBar renders it as a sibling of the .vibrancy header to escape the backdrop-filter containing block).'
+  last_edited_ms: 1781596446457
 28ba0eb542d49455:
   path: .github/workflows/pr-cleanup.yml
   description: 'CI: stale PR auto-cleanup'
@@ -4146,6 +4150,10 @@ ca3fb28c65d5c4e6:
   path: src/app/run/tools/metadata.rs
   description: Global tool metadata middleware — validates `intent`/`verb` on every tool call. Returns warning string for missing/invalid metadata.
   last_edited_ms: 1780651199814
+ca61d72fc90b435b:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard — mission control + agent create/manage entry. Centred on shared FLEET_MAX_W. Greeting, AgentCard grid (status badge + one-line task + model·cost; Open→threads, Manage→AgentModal), New-agent card. autoCreate prop (T21) opens AgentModal in create mode then calls onAutoCreateConsumed. AgentModal now lives in its own file (./AgentModal, T26) and is shared with the TopBar per-agent config button.
+  last_edited_ms: 1781596446469
 cad059175f38fce1:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: MAX_CONTENT_BYTES=100K, MAX_FILE_PATH_BYTES=1K, MAX_STORED_QUESTIONS=50 caps. execute_read: single-pass unack count+previews via inspect(). build_panel_content: MAX_PANEL_MESSAGES=50 cap. format_age helper.'
@@ -5022,6 +5030,10 @@ fc4be9dd868a81ef:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. XAI_API_KEY auth.
   last_edited_ms: 0
+fc9cc30874f14d93:
+  path: ui/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. App mark (Home)→fleet. ALWAYS renders / + AgentSwitcher. Per-agent view switcher order Threads·Finder·Cockpit (T25), each tab + app-mark/Activity/theme/Settings carry <Tip> tooltips. Right cluster (in-agent): cost, Activity→StatsPopup, theme, divider, then a PAIR of cog buttons — Settings2 ''Agent configuration'' (T26, opens shared AgentModal in manage mode for the active agent, one-click shortcut to the 4-step Manage flow) + Settings gear→ConfigModal (global). AgentModal rendered as a SIBLING of the .vibrancy header (fragment return) so its absolute-inset backdrop anchors to the viewport. At fleet altitude the agent-scoped controls are hidden.'
+  last_edited_ms: 1781596446481
 fcc26df09619a38a:
   path: ui/src/lib/inline.tsx
   description: Minimal inline renderer for **bold**, `code`, line breaks — typesets assistant/user prose without a markdown dep.
