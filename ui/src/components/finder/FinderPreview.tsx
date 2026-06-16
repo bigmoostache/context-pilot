@@ -2,7 +2,8 @@ import { useState } from "react"
 import { Check, Copy, Download, Maximize2, Pause, Play, Share2, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { fmtBytes } from "@/lib/finderFs"
-import { kindGradient, kindMeta, kindTint, TAG_META } from "./kind"
+import { extOf, kindMeta, TAG_META } from "./kind"
+import { FileIcon } from "./macIcons"
 import { TagDots } from "./FinderViews"
 import { cn } from "@/lib/utils"
 
@@ -474,12 +475,7 @@ function FolderPreview({ node }: { node: FinderNode }) {
   const files = kids.length - folders
   return (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
-      <span
-        className="flex size-16 items-center justify-center rounded-2xl border border-border/50"
-        style={{ background: kindGradient("folder"), color: kindMeta.folder.accent }}
-      >
-        <kindMeta.folder.icon className="size-8" />
-      </span>
+      <FileIcon kind="folder" size={68} />
       <div className="flex flex-col gap-0.5">
         <span className="text-[14px] font-semibold text-foreground/90">{node.name}</span>
         <span className="text-[12px] text-muted-foreground">
@@ -488,15 +484,12 @@ function FolderPreview({ node }: { node: FinderNode }) {
       </div>
       {/* mini contents stack */}
       <div className="mt-1 flex w-full flex-col gap-1 px-2">
-        {kids.slice(0, 5).map((k) => {
-          const I = kindMeta[k.kind].icon
-          return (
-            <div key={k.path} className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1 text-left text-[11px]">
-              <I className="size-3.5 shrink-0" style={{ color: kindMeta[k.kind].accent }} />
-              <span className="truncate text-foreground/75">{k.name}</span>
-            </div>
-          )
-        })}
+        {kids.slice(0, 5).map((k) => (
+          <div key={k.path} className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1 text-left text-[11px]">
+            <FileIcon kind={k.kind} ext={extOf(k.name)} size={15} className="shrink-0" />
+            <span className="truncate text-foreground/75">{k.name}</span>
+          </div>
+        ))}
         {kids.length > 5 && <span className="text-[10.5px] text-muted-foreground/60">+{kids.length - 5} more</span>}
       </div>
     </div>
@@ -504,15 +497,9 @@ function FolderPreview({ node }: { node: FinderNode }) {
 }
 
 function Generic({ node }: { node: FinderNode }) {
-  const M = kindMeta[node.kind]
   return (
     <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <span
-        className="flex size-16 items-center justify-center rounded-2xl border border-border/50"
-        style={{ background: kindGradient(node.kind), color: M.accent }}
-      >
-        <M.icon className="size-8" />
-      </span>
+      <FileIcon kind={node.kind} ext={extOf(node.name)} size={68} />
       <span className="text-[13px] text-muted-foreground">No preview available</span>
     </div>
   )
@@ -523,15 +510,7 @@ function Meta({ node, onGetInfo }: { node: FinderNode; onGetInfo: (n: FinderNode
   return (
     <div className="shrink-0 border-t border-border bg-card/60 px-4 py-3">
       <div className="mb-2 flex items-center gap-2">
-        <span
-          className="flex size-7 items-center justify-center rounded-md"
-          style={{ background: kindTint(node.kind), color: kindMeta[node.kind].accent }}
-        >
-          {(() => {
-            const I = kindMeta[node.kind].icon
-            return <I className="size-4" />
-          })()}
-        </span>
+        <FileIcon kind={node.kind} ext={extOf(node.name)} size={22} className="shrink-0" />
         <span className="truncate text-[12.5px] font-medium text-foreground/90">{node.name}</span>
         {node.tags && <TagDots tags={node.tags} className="ml-auto" />}
       </div>

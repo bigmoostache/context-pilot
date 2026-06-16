@@ -1,35 +1,28 @@
-import {
-  File as FileIcon,
-  FileArchive,
-  FileAudio,
-  FileCode,
-  FileImage,
-  FileJson,
-  FileSpreadsheet,
-  FileText,
-  FileType,
-  FileVideo,
-  Folder,
-  Presentation,
-  type LucideIcon,
-} from "lucide-react"
 import type { FinderKind, FinderTag } from "@/lib/types"
 
-/** Visual identity for each file kind: icon, accent token, human label. */
-export const kindMeta: Record<FinderKind, { icon: LucideIcon; accent: string; label: string }> = {
-  folder: { icon: Folder, accent: "var(--warn)", label: "Folder" },
-  code: { icon: FileCode, accent: "var(--interactive)", label: "Source" },
-  doc: { icon: FileText, accent: "var(--signal)", label: "Document" },
-  pdf: { icon: FileType, accent: "var(--danger)", label: "PDF" },
-  sheet: { icon: FileSpreadsheet, accent: "var(--ok)", label: "Spreadsheet" },
-  slides: { icon: Presentation, accent: "var(--warn)", label: "Keynote" },
-  image: { icon: FileImage, accent: "var(--interactive)", label: "Image" },
-  markdown: { icon: FileText, accent: "var(--signal)", label: "Markdown" },
-  json: { icon: FileJson, accent: "var(--ok)", label: "JSON" },
-  archive: { icon: FileArchive, accent: "var(--muted-foreground)", label: "Archive" },
-  audio: { icon: FileAudio, accent: "var(--signal)", label: "Audio" },
-  video: { icon: FileVideo, accent: "var(--interactive)", label: "Video" },
-  binary: { icon: FileIcon, accent: "var(--muted-foreground)", label: "Binary" },
+/**
+ * Visual identity for each file kind: accent token + human label.
+ *
+ * The actual file/folder *icons* are no longer monochrome lucide glyphs — they
+ * are full-color, macOS-faithful SVGs rendered by `<FileIcon>` in `macIcons.tsx`
+ * (T27). What remains here is the non-icon metadata every view still needs: the
+ * `accent` token (for tints, focus, small swatches) and the `label` ("Source",
+ * "PDF"…) shown in list/columns/info surfaces.
+ */
+export const kindMeta: Record<FinderKind, { accent: string; label: string }> = {
+  folder: { accent: "var(--warn)", label: "Folder" },
+  code: { accent: "var(--interactive)", label: "Source" },
+  doc: { accent: "var(--signal)", label: "Document" },
+  pdf: { accent: "var(--danger)", label: "PDF" },
+  sheet: { accent: "var(--ok)", label: "Spreadsheet" },
+  slides: { accent: "var(--warn)", label: "Keynote" },
+  image: { accent: "var(--interactive)", label: "Image" },
+  markdown: { accent: "var(--signal)", label: "Markdown" },
+  json: { accent: "var(--ok)", label: "JSON" },
+  archive: { accent: "var(--muted-foreground)", label: "Archive" },
+  audio: { accent: "var(--signal)", label: "Audio" },
+  video: { accent: "var(--interactive)", label: "Video" },
+  binary: { accent: "var(--muted-foreground)", label: "Binary" },
 }
 
 /** Soft tinted background derived from a kind's accent. */
@@ -37,7 +30,7 @@ export function kindTint(kind: FinderKind, pct = 14): string {
   return `color-mix(in oklab, ${kindMeta[kind].accent} ${pct}%, transparent)`
 }
 
-/** A subtle two-stop gradient for the big icon chips — gives them depth. */
+/** A subtle two-stop gradient — kept for non-icon decorative chips. */
 export function kindGradient(kind: FinderKind): string {
   const a = kindMeta[kind].accent
   return `linear-gradient(160deg, color-mix(in oklab, ${a} 26%, transparent), color-mix(in oklab, ${a} 9%, transparent))`
@@ -52,4 +45,10 @@ export const TAG_META: Record<FinderTag, { color: string; label: string }> = {
   blue: { color: "#0a84ff", label: "Blue" },
   purple: { color: "#bf5af2", label: "Purple" },
   gray: { color: "#98989d", label: "Gray" },
+}
+
+/** Extension helper for `<FileIcon ext>` — bare uppercase ext from a filename. */
+export function extOf(name: string): string | undefined {
+  const i = name.lastIndexOf(".")
+  return i > 0 ? name.slice(i + 1) : undefined
 }

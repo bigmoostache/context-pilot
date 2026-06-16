@@ -2,7 +2,8 @@ import type { MouseEvent as ReactMouseEvent } from "react"
 import { ChevronRight } from "lucide-react"
 import type { FinderNode, FinderSortKey, FinderTag } from "@/lib/types"
 import { childCounts, fmtBytes, sortNodes } from "@/lib/finderFs"
-import { kindGradient, kindMeta, kindTint, TAG_META } from "./kind"
+import { extOf, kindMeta, kindTint, TAG_META } from "./kind"
+import { FileIcon } from "./macIcons"
 import { cn } from "@/lib/utils"
 
 export interface ViewHandlers {
@@ -48,7 +49,6 @@ export function GridView({
       style={{ gridTemplateColumns: `repeat(auto-fill,minmax(${cell}px,1fr))` }}
     >
       {nodes.map((n, i) => {
-        const M = kindMeta[n.kind]
         const sel = h.selected.has(n.path)
         const focus = h.focusPath === n.path
         return (
@@ -67,17 +67,12 @@ export function GridView({
               focus && !sel && "ring-2 ring-[var(--signal)]/45",
             )}
           >
-            <span
-              className="flex items-center justify-center rounded-2xl border border-border/40 transition-transform duration-150 group-hover:scale-[1.06] group-active:scale-95"
-              style={{
-                width: iconSize,
-                height: iconSize,
-                background: kindGradient(n.kind),
-                color: M.accent,
-              }}
-            >
-              <M.icon style={{ width: iconSize * 0.5, height: iconSize * 0.5 }} />
-            </span>
+            <FileIcon
+              kind={n.kind}
+              ext={extOf(n.name)}
+              size={iconSize}
+              className="transition-transform duration-150 group-hover:scale-[1.06] group-active:scale-95"
+            />
             <span className="line-clamp-2 w-full px-0.5 text-[11.5px] font-medium leading-tight text-foreground/85">
               {n.name}
             </span>
@@ -133,7 +128,7 @@ export function ListView({
             )}
           >
             <span className="flex min-w-0 items-center gap-2">
-              <M.icon className="size-4 shrink-0" style={{ color: M.accent }} />
+              <FileIcon kind={n.kind} ext={extOf(n.name)} size={17} className="shrink-0" />
               <span className="truncate font-medium">{n.name}</span>
               <TagDots tags={n.tags} className="shrink-0" />
             </span>
@@ -195,7 +190,6 @@ export function ColumnsView({
           className="flex w-[218px] shrink-0 flex-col overflow-y-auto border-r border-border py-1"
         >
           {sortNodes(pane.nodes, "name", true).map((n) => {
-            const M = kindMeta[n.kind]
             const onTrail = activePath.has(n.path)
             const sel = h.selected.has(n.path)
             return (
@@ -214,7 +208,7 @@ export function ColumnsView({
                     : "text-foreground/80 hover:bg-muted/45",
                 )}
               >
-                <M.icon className="size-4 shrink-0" style={{ color: M.accent }} />
+                <FileIcon kind={n.kind} ext={extOf(n.name)} size={17} className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate font-medium">{n.name}</span>
                 <TagDots tags={n.tags} />
                 {n.kind === "folder" && (
@@ -228,15 +222,7 @@ export function ColumnsView({
 
       {showPreviewPane && previewNode && (
         <div className="flex w-[230px] shrink-0 flex-col items-center gap-3 px-5 py-7 text-center">
-          <span
-            className="flex size-20 items-center justify-center rounded-2xl border border-border/50"
-            style={{ background: kindGradient(previewNode.kind), color: kindMeta[previewNode.kind].accent }}
-          >
-            {(() => {
-              const I = kindMeta[previewNode.kind].icon
-              return <I className="size-10" />
-            })()}
-          </span>
+          <FileIcon kind={previewNode.kind} ext={extOf(previewNode.name)} size={84} />
           <span className="text-[13px] font-semibold text-foreground/90">{previewNode.name}</span>
           <TagDots tags={previewNode.tags} />
           <dl className="mt-1 flex w-full flex-col gap-1 text-[11px]">
@@ -276,7 +262,6 @@ export function GalleryView({
       {/* filmstrip */}
       <div className="flex shrink-0 items-end gap-2 overflow-x-auto border-t border-border bg-surface px-4 py-3">
         {nodes.map((n) => {
-          const M = kindMeta[n.kind]
           const active = node?.path === n.path
           return (
             <button
@@ -290,16 +275,14 @@ export function GalleryView({
                 active ? "bg-[var(--signal)]/14 ring-1 ring-[var(--signal)]/50" : "hover:bg-muted/50",
               )}
             >
-              <span
-                className="flex size-12 items-center justify-center rounded-lg border border-border/40"
-                style={
-                  n.image
-                    ? { background: n.image.gradient }
-                    : { background: kindGradient(n.kind), color: M.accent }
-                }
-              >
-                {!n.image && <M.icon className="size-6" />}
-              </span>
+              {n.image ? (
+                <span
+                  className="flex size-12 items-center justify-center rounded-lg border border-border/40"
+                  style={{ background: n.image.gradient }}
+                />
+              ) : (
+                <FileIcon kind={n.kind} ext={extOf(n.name)} size={48} />
+              )}
               <span className="max-w-[68px] truncate text-[10px] text-muted-foreground">{n.name}</span>
             </button>
           )
@@ -320,12 +303,7 @@ function Hero({ node }: { node: FinderNode }) {
           style={{ background: node.image.gradient }}
         />
       ) : (
-        <span
-          className="flex size-36 items-center justify-center rounded-3xl border border-border/50 card-shadow"
-          style={{ background: kindGradient(node.kind), color: M.accent }}
-        >
-          <M.icon className="size-20" />
-        </span>
+        <FileIcon kind={node.kind} ext={extOf(node.name)} size={132} className="card-shadow" />
       )}
       <div className="flex flex-col items-center gap-1.5 text-center">
         <span className="text-[17px] font-semibold tracking-tight text-foreground">{node.name}</span>

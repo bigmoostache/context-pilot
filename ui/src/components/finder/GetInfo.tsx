@@ -2,7 +2,8 @@ import { useEffect } from "react"
 import { X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { childCounts, fmtBytes, nodeSize } from "@/lib/finderFs"
-import { kindGradient, kindMeta, TAG_META } from "./kind"
+import { extOf, kindMeta, TAG_META } from "./kind"
+import { FileIcon } from "./macIcons"
 
 /**
  * "Get Info" inspector — a macOS-style modal sheet with the full dossier for a
@@ -44,12 +45,7 @@ export function GetInfo({ node, onClose }: { node: FinderNode; onClose: () => vo
 
         {/* identity */}
         <div className="flex items-center gap-3.5 px-5 py-4">
-          <span
-            className="flex size-16 shrink-0 items-center justify-center rounded-2xl border border-border/60"
-            style={{ background: kindGradient(node.kind), color: M.accent }}
-          >
-            <M.icon className="size-9" />
-          </span>
+          <FileIcon kind={node.kind} ext={extOf(node.name)} size={64} className="shrink-0" />
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="truncate text-[15px] font-semibold text-foreground">{node.name}</span>
             <span className="text-[12px] tabular-nums text-muted-foreground">

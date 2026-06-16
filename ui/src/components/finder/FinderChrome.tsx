@@ -21,7 +21,8 @@ import {
 } from "lucide-react"
 import type { FinderKind, FinderNode, FinderTag, FinderViewMode } from "@/lib/types"
 import { collectStarred } from "@/lib/finderFs"
-import { kindMeta, TAG_META } from "./kind"
+import { extOf, kindMeta, TAG_META } from "./kind"
+import { FileIcon } from "./macIcons"
 import { Tip } from "@/components/ui/tip"
 import { cn } from "@/lib/utils"
 
@@ -59,7 +60,6 @@ export function FinderTabs({
     <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border bg-surface px-2">
       {tabs.map((t) => {
         const on = t.id === active
-        const TabIcon = kindMeta[t.kind].icon
         return (
           <div
             key={t.id}
@@ -69,10 +69,7 @@ export function FinderTabs({
               on ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:bg-muted/60",
             )}
           >
-            <TabIcon
-              className="size-3.5 shrink-0"
-              style={{ color: t.kind === "folder" ? "var(--warn)" : kindMeta[t.kind].accent }}
-            />
+            <FileIcon kind={t.kind} ext={extOf(t.label)} size={15} className="shrink-0" />
             <span className="max-w-[130px] truncate">{t.label}</span>
             {tabs.length > 1 && (
               <button
@@ -194,7 +191,7 @@ export function FinderToolbar({
               >
                 {isFirst ? (
                   <span className="flex items-center gap-1">
-                    <kindMeta.folder.icon className="size-3.5" style={{ color: "var(--signal)" }} />
+                    <FileIcon kind="folder" size={15} />
                     {c.name}
                   </span>
                 ) : (
@@ -370,24 +367,21 @@ export function FinderSidebar({
     <aside className="flex w-[var(--sidebar-w)] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-border bg-surface px-2.5 py-3">
       {starred.length > 0 && (
         <Group label="Favorites">
-          {starred.map((n) => {
-            const I = kindMeta[n.kind].icon
-            return (
-              <Place
-                key={n.path}
-                icon={I}
-                label={n.name}
-                accent={n.kind === "folder" ? "var(--warn)" : kindMeta[n.kind].accent}
-                onClick={() => (n.kind === "folder" ? onNavigate(n.path) : onOpen(n))}
-              />
-            )
-          })}
+          {starred.map((n) => (
+            <Place
+              key={n.path}
+              leading={<FileIcon kind={n.kind} ext={extOf(n.name)} size={16} />}
+              label={n.name}
+              accent={n.kind === "folder" ? "var(--warn)" : kindMeta[n.kind].accent}
+              onClick={() => (n.kind === "folder" ? onNavigate(n.path) : onOpen(n))}
+            />
+          ))}
         </Group>
       )}
 
       <Group label="Locations">
         <Place
-          icon={kindMeta.folder.icon}
+          leading={<FileIcon kind="folder" size={16} />}
           label={root.name}
           active={cwd === root.path}
           accent="var(--signal)"
@@ -396,7 +390,7 @@ export function FinderSidebar({
         {topFolders.map((f) => (
           <Place
             key={f.path}
-            icon={kindMeta.folder.icon}
+            leading={<FileIcon kind="folder" size={16} />}
             label={f.name}
             active={cwd === f.path}
             accent="var(--warn)"
@@ -447,6 +441,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 
 function Place({
   icon: Icon,
+  leading,
   label,
   active,
   accent,
@@ -454,7 +449,9 @@ function Place({
   muted,
   onClick,
 }: {
-  icon: typeof Star
+  icon?: typeof Star
+  /** custom leading element (e.g. a macOS FileIcon); overrides `icon` */
+  leading?: React.ReactNode
   label: string
   active?: boolean
   accent: string
@@ -472,7 +469,7 @@ function Place({
         muted && "cursor-default opacity-70",
       )}
     >
-      <Icon className="size-4 shrink-0" style={{ color: accent }} />
+      {leading ?? (Icon && <Icon className="size-4 shrink-0" style={{ color: accent }} />)}
       <span className="truncate">{label}</span>
     </button>
   )
@@ -495,7 +492,7 @@ export function FinderPathBar({
             onClick={() => onCrumb(c.path)}
             className="flex items-center gap-1 rounded px-1 py-0.5 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           >
-            <kindMeta.folder.icon className="size-3" style={{ color: "var(--warn)" }} />
+            <FileIcon kind="folder" size={13} />
             {c.name}
           </button>
         </span>
