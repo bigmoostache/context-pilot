@@ -519,6 +519,7 @@ dependencies = [
 name = "cp-orchestrator"
 version = "0.1.0"
 dependencies = [
+ "cp-mod-bridge",
  "cp-oplog",
  "cp-wire",
  "nix 0.30.1",

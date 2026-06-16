@@ -36,3 +36,11 @@ pub mod registry;
 pub mod services;
 pub mod supervisor;
 pub mod transport;
+
+// `cp-mod-bridge` is a dev-dependency the `tests/registry_channel.rs` integration
+// suite uses to boot a real agent across the backend↔agent seam. The library's
+// own `#[cfg(test)]` modules never name it, so the per-target
+// `unused-crate-dependencies` lint on the lib-test target needs this explicit
+// acknowledgement (the canonical `use … as _;` form, not a lint suppression).
+#[cfg(test)]
+use cp_mod_bridge as _;

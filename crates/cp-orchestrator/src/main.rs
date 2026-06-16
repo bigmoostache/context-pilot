@@ -25,12 +25,16 @@ use cp_orchestrator::registry;
 // `unused-crate-dependencies` lint needs an explicit acknowledgement here (the
 // canonical `use … as _;` form Cargo itself suggests, not a lint suppression).
 // `tempfile` is a dev-dependency used only by the library's tests, acknowledged
-// under `cfg(test)` so non-test builds never reference it.
+// under `cfg(test)` so non-test builds never reference it. `cp-mod-bridge` is a
+// dev-dependency the integration suite uses to boot a real agent across the
+// backend↔agent seam; the bin's own test target links it but does not name it.
 use nix as _;
 use cp_oplog as _;
 use serde as _;
 use serde_json as _;
 use tiny_http as _;
+#[cfg(test)]
+use cp_mod_bridge as _;
 #[cfg(test)]
 use tempfile as _;
 
