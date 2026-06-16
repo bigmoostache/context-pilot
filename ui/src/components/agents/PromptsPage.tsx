@@ -43,11 +43,7 @@ export function PromptsPage() {
         {/* header */}
         <header className="flex items-end justify-between gap-4">
           <div className="flex flex-col gap-1.5">
-            <span className="label">Prompt library</span>
             <h1 className="text-[24px] font-semibold tracking-tight text-foreground">Prompts</h1>
-            <p className="max-w-[560px] text-[13px] text-muted-foreground">
-              A global library of system prompts, skills and commands — shared across every agent in the fleet.
-            </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button

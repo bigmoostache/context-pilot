@@ -61,14 +61,9 @@ export function FleetDashboard({
         <div className={cn("mx-auto flex w-full flex-col gap-7 px-8 py-9", FLEET_MAX_W)}>
           <header className="flex items-end justify-between gap-4">
             <div className="flex flex-col gap-1.5">
-              <span className="label">Mission control</span>
               <h1 className="text-[24px] font-semibold tracking-tight text-foreground">
-                Your agents
+                Agents
               </h1>
-              <p className="text-[13px] text-muted-foreground">
-                Each agent lives in one folder — its realm. Manage them here; everything else
-                happens inside the agent.
-              </p>
             </div>
             <button
               onClick={() => setModal({ mode: "create" })}
