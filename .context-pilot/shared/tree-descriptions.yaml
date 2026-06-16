@@ -1322,6 +1322,10 @@
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
   last_edited_ms: 0
+3f6424f8b005fcf0:
+  path: ui/src/components/shell/ProfileModal.tsx
+  description: 'Profile modal (T30) — opened from the avatar menu, on the portaled Base-UI Dialog primitive. Reads {user, managed, setManaged} from the shared account context (useAccount). Editable display-name + email (email locks when company-managed), large AvatarMark + camera change-badge. Account section switches on managed: ManagedAccount org callout (locked, SSO) vs PersonalAccount self-service rows. An AccountTypeSwitch (Company/Personal segmented control) in the Account header flips the shared managed flag — updating both this modal AND the Settings key-lock so you can compare states. All decorative.'
+  last_edited_ms: 1781599152950
 3fc30e63661d20bd:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
@@ -2218,6 +2222,10 @@
   path: src/llms/cache/mod.rs
   description: 'Module declarations: cache_engine, cache_optimizer, density.'
   last_edited_ms: 0
+6bfc602e35e3fb91:
+  path: ui/src/lib/account.tsx
+  description: Shared account context (T30). AccountProvider holds the mutable `managedByCompany` flag (seeded from currentUser mock) + setManaged; useAccount() hook exposes {user, managed, setManaged}. Single source of truth so the ProfileModal account-type toggle drives BOTH the Profile account section AND the ConfigPanel API-key lock in sync. Mounted in App.tsx around the shell.
+  last_edited_ms: 1781599152937
 6c0a1706484314d9:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Fleet altitude → FleetShell (4-page mission control). Cockpit = LeftRail + Conversation. threads/finder per-agent. openAgent switches agent→threads. Finder keyed by agent.id.
@@ -2586,6 +2594,10 @@
   path: src/ui/ir/conversation.rs
   description: 'Conversation + overlay IR builder. Messages, history sections, streaming tools, input area. Overlays: QuestionForm, Autocomplete, PerfOverlay (build_perf_overlay with frame budgets, CPU/Meili stats, FD count, op table). Perf builder calls PERF.snapshot() and cp_mod_search::overlay_info().'
   last_edited_ms: 0
+7fd5238bda68c982:
+  path: ui/src/components/shell/UserMenu.tsx
+  description: 'Account avatar menu (T30) — replaced the old top-right Settings gear. Reads the live user from the shared account context (useAccount). Portaled Base-UI dropdown: gradient-initials AvatarMark trigger opens a floating menu with an identity header (name/email + Company/Personal pill) and Profile / Settings / Sign-out items. Settings still opens ConfigModal (reversible). Exports UserMenu + AvatarMark (shared with ProfileModal).'
+  last_edited_ms: 1781599152962
 80070fa8e8f24d93:
   path: crates/cp-mod-todo/src/panel.rs
   description: 'TodoPanel: hierarchical tree display with status icons, format_todos_for_context() for LLM, recursive flatten'
@@ -4022,6 +4034,10 @@ c3e00b84691cd46d:
   path: src/llms/claude_code/check_api.rs
   description: 'Health-check helpers: system_block(), CheckRequest struct, build_check_request() with CC-specific headers'
   last_edited_ms: 0
+c40782194df37336:
+  path: ui/src/App.tsx
+  description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Mounts <AccountProvider> (T30 shared managed-account state) + <TooltipProvider delay=350 closeDelay=80> around the shell. Fleet → FleetShell (Agents⇄Prompts). Cockpit → CockpitView. threads/finder per-agent (Finder keyed by agent.id). openAgent switches agent→threads. newAgent() sets view=fleet + createAgent flag → FleetShell openCreate.
+  last_edited_ms: 1781599152974
 c420a45f730117d1:
   path: crates/cp-mod-entities/src/panel.rs
   description: Fixed Entities panel. Live schema + sample data context for LLM. Empty-state onboarding guide with quick-start SQL. IR blocks with Accent/Code/Muted styling. Migration count display. EntityResultPanel for large query results (dynamic, metadata-persisted). max_freezes=2.
