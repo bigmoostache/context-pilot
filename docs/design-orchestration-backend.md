@@ -51,6 +51,35 @@
 > (V1/V2/V10) against `kill -9` and a simulated deadman re-exec — that tiny
 > prototype tests the load-bearing durability claim better than another doc
 > revision can.
+>
+> **v7 — two load-bearing answers + one subtraction (round-2 senior review).**
+> The review accepted the architecture (WAL + materialized view) but found that
+> v6 left two questions under the keystone unanswered, and that the v1 security
+> machinery was over-built. v7 answers both and subtracts the bloat:
+> (1) **Who guarantees the body is durable before the oplog entry that names
+> it?** ⇒ new **I13 body-before-reference barrier**: a content hash may appear in
+> a *durable* oplog entry only after that body is itself durable. Small bodies are
+> inlined into the same fsync'd append (trivially satisfied); a spilled large body
+> is `fdatasync`'d **before** its referencing entry commits. Content-addressing
+> makes a crash in the gap a harmless *orphan body* (GC'd), never a dangling
+> reference. So **"accepted = durable" now covers the contents, not just the
+> envelope.** The tier-② mutable `messages/{uid}.yaml` copy is explicitly **not**
+> load-bearing for durability — the authoritative body is the bridge's fsync'd
+> immutable one. (2) **On which thread do oplog appends run?** ⇒ explicit
+> execution model (I2): **the main loop never fsyncs.** It does one lock-free,
+> non-blocking *enqueue* per record (like the tee); the **dedicated oplog thread**
+> group-commits — N phase transitions in a window cost **one** `fdatasync`,
+> off-loop. The only durability-gated ack (command-accept, I11) runs on the
+> intake/oplog thread, never the hot loop. Phase rides the stream as a sub-ms hint
+> and lands durably a group-commit later. (3) **Subtraction:** HMAC + monotonic
+> nonce + per-boot rotation (old I9) guarded frame-replay on a `0700`/`0600` local
+> UDS — a *strictly weaker* attacker than the same-user malware the perms can't
+> stop anyway. v7 makes **filesystem perms + a presence-checked bearer `cap_token`
+> the v1 command authn**, and moves HMAC/nonce/mTLS to the **remote-transport seam
+> (future)** where they actually earn their keep. The frontend WS ticket is
+> **kept** but re-justified: its real threat is a malicious *website* in the
+> user's browser reaching `ws://localhost` (a confused-deputy / DNS-rebind that
+> perms don't cover and `Origin` can't be trusted for) — not a local process.
 
 ---
 
@@ -167,6 +196,29 @@ costs an honest, **named** trade:
   **disjoint paths** (`messages/` vs `oplog/`); there is no same-file race. I1 is
   about cross-process exclusion, not intra-process thread count.
 
+**The tier-② copy is NOT load-bearing for durability (v7).** The
+unsynced/coalescing `messages/{uid}.yaml` is a *convenience cache* for the agent's
+own reload + unmanaged-agent listing. If it is stale or lost after a crash, replay
+of the oplog + the immutable body store **rebuilds it**. The *authoritative* body
+is the bridge's fsync'd immutable one — so the fact that `writer.rs` writes the
+cache copy without `fsync` is **correct**, not a durability hole: it isn't the
+authority.
+
+**Body-before-reference barrier (v7, I13) — what makes "accepted = durable" true
+for *contents*, not just the envelope.** A durable oplog entry that says "message
+M, head = `H`" is only honest if body `H` is already on disk. The rule:
+
+- A content hash `H` may appear in a **durable** oplog entry **only after** the
+  body for `H` is itself durable.
+- **Inlined small bodies** are *in* the same fsync'd append — the barrier is
+  trivially satisfied (the body *is* the entry).
+- A **spilled large body** is written `tmp → fdatasync → atomic rename`, and that
+  rename must complete **before** the referencing entry joins a commit group.
+- A crash *in the gap* (body written, entry not yet durable) leaves an **orphan
+  body** — unreferenced, idempotent to rewrite, GC'd at compaction. A crash *after*
+  the entry is durable means its body provably preceded it. Either way: **no
+  durable entry ever references a missing body** (validated by V12).
+
 **Sticky state never rides ③ alone.** Phase (idle·streaming·tooling) has its
 **authoritative** record in ① and a **latency hint** on ③ — fast to show, but ①
 wins and self-heals a dropped hint (resolves the v4 #6 fix's latency regression,
@@ -215,23 +267,27 @@ Agent Rust loop (per folder):
   `PersistenceWriter` thread (tier ② `messages/`/panels) and the bridge's oplog
   thread (tier ① `oplog/`) write **disjoint paths** and do not race (§3.1) — I1
   does not forbid that. *(See H5 for the deadman-re-exec interaction.)*
-- **I2 — Durable writes where they matter, off the hot path, minimal syscalls.**
-  *Tier ①* oplog appends are durable via **`fdatasync` per commit-group** (not
-  `fsync`) and **`fsync(dir)` only when a new oplog segment file is created** — an
-  append to an existing segment needs only `fdatasync` (it flushes the appended
-  data + the size change required to read it back; per-append dir-fsync is
-  unjustified cost). A **dedicated oplog thread** performs the append+sync, so the
-  agent's main loop **enqueues** (cheap) and only **blocks on durability where an
-  external ack requires it** (command journaling, I11) — routine effect/phase/
-  lifecycle appends are ordered and group-committed **without stalling the loop**
-  per event. *Tier ②* state files keep the existing best-effort `fs::write` (no
-  sync) — a reconstructible cache (I5). A periodic tier-② **checkpoint**
-  (coalesced) bounds replay length. *(v4 wrongly demanded a per-write fsync
-  barrier on the shared writer — K1/K4. v5 confined durability to the oplog; v6
-  further confines its **cost**: `fdatasync`-per-group off the main loop, dir-fsync
-  only on segment rollover. **Honesty:** with the bridge ON this still adds
-  per-message durability latency vs a no-bridge run — bounded, off-hot-path, and
-  measured by V11 — so "exactly as today" holds only when the bridge is OFF.)*
+- **I2 — Durable writes off the hot path; the main loop never `fsync`s.**
+  **Execution model (v7, explicit):** every oplog append — including frequent
+  **phase transitions** during streaming — is a **lock-free, non-blocking enqueue**
+  on the main loop (one atomic push, exactly like the stream tee). A **dedicated
+  oplog thread** drains the queue and **group-commits**: it writes all pending
+  records and issues **one `fdatasync` per group**, so N phase transitions in a
+  commit window cost **one** sync, entirely off-loop. `fsync(dir)` happens **only
+  on new-segment creation**, not per append (`fdatasync` covers appended data + the
+  size needed to read it back). The **one** durability-gated wait — command-accept
+  (journal-then-ack, I11) — runs on the **intake/oplog thread**, *not* the main
+  loop: the loop is never blocked on a sync. *Tier ②* state files keep the existing
+  best-effort `fs::write` (no sync) — a reconstructible cache (I5); a periodic
+  coalesced **checkpoint** bounds replay length. *(v4 wrongly demanded a per-write
+  fsync barrier on the shared writer — K1/K4; v5 confined durability to the oplog;
+  v6 confined its cost to `fdatasync`-per-group; v7 pins down **where it runs** —
+  the answer the round-2 review demanded: nowhere on the hot loop. Phase rides the
+  stream plane as a sub-ms hint and its authoritative record lands a group-commit
+  later; a crash in that window replays to the last durable phase, which self-heals,
+  I10/K6. **Honesty:** bridge-ON still adds bounded per-event durability work vs a
+  no-bridge run — off-loop, group-amortized, and measured by V11 — so "exactly as
+  today" holds only bridge-OFF.)*
 - **I3 — Snapshot consistency via bounded heads, not full enumeration.** The oplog
   carries a monotonic `rev`. Message/panel **bodies are content-addressed in the
   bridge-owned immutable store** (filename = content hash → write-once, never
@@ -281,13 +337,29 @@ Agent Rust loop (per folder):
   oplog append offset) — inherently serialized, no cross-worker race (the v4
   "atomic cross-worker snapshot" worry is moot: `build_save_batch` already
   snapshots synchronously on one thread — retraction noted in §22).
-- **I9 — Every command is authenticated AND fresh (NEW v4, hardened v5).** The
-  agent mints a 256-bit `cap_token` at boot (in its `0600` registry entry). Every
-  command carries **an HMAC over `{seq, dedup_token, body}` keyed by `cap_token`
-  plus a monotonic nonce**; the agent rejects bad MACs and stale/replayed nonces.
-  This upgrades the bearer secret to a real challenge — a captured frame cannot be
-  replayed (resolves R2-6). The `cap_token` **rotates each boot** and consumed
-  oplog command entries are compacted, bounding at-rest exposure (R2-11).
+- **I9 — Command authn is the filesystem for v1; crypto is the remote seam
+  (v7 subtraction).** On the same-machine v1, the command channel (UDS + oplog
+  inbox) lives under `0700`/`0600`: anything that can write it is **already running
+  as the same user**. So v1 authn = **perms + a presence-checked bearer
+  `cap_token`** (minted per boot in the `0600` registry; rejects blind/accidental
+  cross-talk; cheap). HMAC over the frame + a monotonic nonce + per-boot rotation
+  defend against frame *replay/forgery* — but that attacker is **strictly weaker**
+  than the same-user malware the perms already can't stop (it can read the
+  `cap_token` and forge freely, or just write `inbox/` directly). So the crypto
+  guards a non-threat for v1 and is **moved to the remote-transport seam** (the
+  wire protocol keeps an `auth` field: local impl = perms+bearer; remote impl =
+  HMAC/mTLS/signed commands — §17 G7 🔵). The honest v1 truth: against same-user
+  malware, perms, bearer, and crypto are *all* defeated; only OS sandboxing helps,
+  and it's out of scope. (The **frontend WS** ticket is a *different* threat model
+  and is **kept** — see I9b/§17.)
+- **I9b — The frontend WebSocket ticket defends the browser, not the loopback
+  (v7).** `ws://localhost` is reachable by **any website** the user opens — a
+  malicious page can attempt to drive the fleet (confused-deputy / DNS-rebinding).
+  `Origin`/CORS is advisory for WS and can't be trusted; perms don't help because
+  the *browser is the user's own process*. So the backend mints a **short-lived,
+  single-use upgrade ticket** out-of-band; the WS handshake exchanges it for a
+  session bound to that one connection. This earns its keep precisely because the
+  attacker (a website) is **not** a same-user process.
 - **I10 — Cross-plane causal ordering (NEW v4, hardened v5).** The **durable**
   "message created" record lives in the oplog; the stream plane's `MessageStart`
   is a *latency hint* only. A token frame may beat the hint — the frontend buffers
@@ -323,7 +395,7 @@ interface AgentChannel {               // per-agent transport (one connection, i
     tail_oplog(since_rev) -> stream<OpEntry> // authoritative, append-only, gap-free deltas (tier ①)
     hydrate(hash) -> Body                   // on-demand body fetch, content-addressed, rev-pinned (I5)
     subscribe_stream() -> stream<StreamFrame> // LIVE token/hint frames (tier ③, best-effort)
-    send(Command) -> Future<Ack>        // HMAC+nonce; journaled-to-oplog-then-ack (I11); ordered, idempotent
+    send(Command) -> Future<Ack>        // auth (v1: perms+bearer; remote: HMAC); journaled-to-oplog-then-ack (I11); ordered, idempotent
     health() -> Liveness                // UDS connected + polled heartbeat
 }
 
@@ -335,7 +407,7 @@ interface AgentSupervisor {            // lifecycle / process control
 
 - **v1 impls:** `LocalRegistry` (watch the registry dir), `LocalChannel` (truth =
   oplog tail over a single inotify watch; bodies = content-addressed on-demand
-  reads; live = `stream.sock` UDS; command = HMAC'd oplog append + UDS wake),
+  reads; live = `stream.sock` UDS; command = bearer-checked oplog append + UDS wake),
   `LocalSupervisor` (detached `cp --headless`, adopt via registry).
 - **One transport-agnostic, versioned wire protocol** (`Command` / `OpEntry` /
   `StreamFrame` / `Heads` / `Body`). The medium is swappable (UDS → TCP/QUIC
@@ -408,9 +480,9 @@ content-addressed and `rev`-pinned (I5). A 2–3 s poll of the oplog tail is a p
 backstop for a dropped inotify event.
 
 ### 8.2 Write — command, journal-then-ack
-- **Authn + freshness (I9):** every command carries an HMAC over
-  `{seq, dedup_token, body}` keyed by `cap_token`, plus a monotonic nonce. Bad MAC
-  or stale nonce ⇒ rejected, logged.
+- **Authn (I9, v7):** v1 = **filesystem perms (`0700`/`0600`) + a presence-checked
+  bearer `cap_token`** on every command. The same-machine assumption makes this the
+  honest authn boundary; HMAC/nonce live at the remote seam (§17 G7).
 - **Idempotency (I4):** the oplog `seen`-set keys on `dedup_token`, evicted by
   acknowledged-`rev` (not time) — replay-safe across any outage.
 - **Journal-then-ack (I11):** the command is **appended to the oplog (`fsync`)
@@ -493,7 +565,8 @@ backstop for a dropped inotify event.
    bridge owns this store; `writer.rs` is untouched.
 3. **Stream tee** — lock-free SPSC enqueue of each `StreamEvent`; dedicated
    publisher thread serializes + writes `stream.sock` (I7).
-4. **Command intake** — verify HMAC + nonce (I9); journal-then-ack (I11); apply
+4. **Command intake** — verify bearer `cap_token` (I9; HMAC/nonce only at the
+   remote seam); journal-then-ack (I11); apply
    the effect via the **existing user-message entry** (K7), never the spine.
 
 **The module does not touch `writer.rs`** — tier-② persistence is unchanged, and
@@ -549,7 +622,7 @@ I7). `flock`/deadman FD inheritance (H5) is the one watchdog touch.
 | Transport | inotify event dropped | oplog poll backstop | converges within poll; oplog gap-free so no lost rev (K5) |
 | Transport | inotify watch exhaustion | — | one watch per agent (I12) → not hit at fleet scale (K8) |
 | Frontend | WS disconnect | reconnect + oplog `rev` replay / resync | gap replay or REST refetch; client action queue replays (R2-1 safe) |
-| Security | Forged/replayed command | HMAC + nonce (I9) | rejected + logged |
+| Security | Forged command (v1) | perms + bearer `cap_token` (I9) | rejected + logged; replay/forgery anti at remote seam (G7) |
 | Protocol | Version skew | `protocol_version` + per-entry `schema_version` | N-1 major window; **backend upgrades first** (R2-16) |
 | Fleet | Runaway spend | durable CostBreaker ceiling | stop issuing commands/spawns; surface |
 
@@ -575,7 +648,7 @@ backend: oplog delta {message@rev, phase→idle} → WS (truth; covers any dropp
 **Send-message (durable, idempotent, deadman-safe):**
 ```
 UI →(REST/WS auth'd) POST message {text, dedup_token}
-backend: HMAC+nonce; append to oplog (fsync) → ack accepted {cmd-id}   (I11: durable BEFORE ack)
+backend: bearer-check; append to oplog (fsync) → ack accepted {cmd-id}   (I11: durable BEFORE ack)
 agent: bridge sees oplog/UDS wake → inject via USER-MESSAGE entry (NOT spine, K7) → streams (→ live path)
 [if deadman re-execs here] → on resume, replay oplog → effect re-derived, deduped by seen (K2) → no loss/dup
 agent: oplog appends {lifecycle: processing→done, message created@rev}
@@ -606,18 +679,24 @@ total spend + current `rev` + degraded-stream flags.
 Send-to-thread (primary); thread create/archive/restore/answer-question; lifecycle
 spawn (allow-list, canonicalized)/stop/restart/pause/**interrupt-stream**;
 manage rename/model/archive; toggles (auto-continuation/reverie/think);
-thread-scoped coucou. All as **HMAC-auth'd, nonce-fresh, dedup-idempotent,
+thread-scoped coucou. All as **bearer-auth'd (v1; HMAC/nonce at the remote seam), dedup-idempotent,
 oplog-journaled-before-ack** commands (§8.2), injected via the user-message entry.
 
 ---
 
 ## 17. Security & permissions
 
-- **Command authn + anti-replay (I9):** per-agent `cap_token` (256-bit, `0600`,
-  rotated each boot) + **HMAC over `{seq, dedup_token, body}` + monotonic nonce**.
-  Captured frames are not replayable. Consumed oplog command entries compacted.
-- **Frontend WS (R2-10):** localhost-bind + **single-use upgrade ticket → session
-  bound to one connection**, short-lived + refreshable. No CORS/`Origin` reliance.
+- **Command authn (I9, v7):** v1 = **filesystem perms + presence-checked bearer
+  `cap_token`** (256-bit, `0600`, per boot). The same-machine channel is under
+  `0700`/`0600`, so perms *are* the authn boundary; **HMAC + nonce + rotation are
+  deferred to the remote-transport seam** (G7) because for v1 they guard a strictly
+  weaker attacker than the same-user malware perms already can't stop. *(Earned
+  simplification — the round-2 review was right that the crypto didn't pay for
+  itself locally.)*
+- **Frontend WS (I9b/R2-10):** **kept** — `ws://localhost` is reachable by any
+  **website** in the user's browser (confused-deputy/DNS-rebind), which perms don't
+  cover and `Origin` can't be trusted for. Single-use upgrade ticket → session
+  bound to one connection, short-lived + refreshable. No CORS/`Origin` reliance.
 - **Spawn (R2-15):** **allow-list with realpath canonicalization** (reject
   symlink/`..` escape). Spawned agents inherit user keys + run user tools (RCE
   blast radius intrinsic to running agents); allow-list + CostBreaker **bound** it;
@@ -647,7 +726,7 @@ Per-agent **stream latency p50/p99**, **dropped/coalesced frames + degraded
 events**, command queue depth + lifecycle histogram, **`rev` lag** (view vs oplog
 head), oplog append latency + `fsync` time, heartbeat freshness, WS subscriber
 counts, reconnect/resync rates, **durable CostBreaker state**, rejected-command
-(auth/MAC/nonce) counts, **inotify watch count vs limit**. Structured logs keyed by
+(bad-bearer; remote seam: MAC/nonce) counts, **inotify watch count vs limit**. Structured logs keyed by
 `agent_id` + `cmd_id` + `rev`.
 
 ---
@@ -683,6 +762,7 @@ code-grounded round; see §24 for the code map and §25 for validation.)*
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
 |B1|Torn reads|🔴|Content-addressed immutable bodies + atomic oplog append (I2/I3)|✅|
+|B0|**Body durable before the entry that names it**|🔴|body-before-reference barrier; orphan-safe via content-addressing (I13, V12)|✅|
 |B2|Cross-file inconsistency|🔴|Oplog `rev` + bounded heads (I3)|✅|
 |B3|Messages escape the rev (real writer)|🟠|Effects are oplog appends; tier-② is a cache (I8)|✅|
 |B5|mtime/clock dependence|🟠|Oplog rev + content hashes, no clock (I3)|✅|
@@ -700,9 +780,9 @@ code-grounded round; see §24 for the code map and §25 for validation.)*
 |C3|Lost command|🟠|Oplog is durable inbox; journal-then-ack (I11)|✅|
 |C5|TTL-reissue semantic dup|🟠|Same `dedup_token`; ack-rev eviction (I4)|✅|
 |C6|Ack hides delay|🟡|Lifecycle deltas on oplog (gap-free) (§8.2)|✅|
-|C8|Forged command|🔴|HMAC + nonce (I9)|✅|
+|C8|Forged command|🔴|v1: perms+bearer cap_token (I9); HMAC/nonce at remote seam (G7)|✅|
 |C9|**Deadman re-exec drops accepted cmd**|🔴|Journal-then-ack; replay+dedup (I11, K2)|✅|
-|C10|**Replayable bearer frame**|🟠|HMAC+nonce anti-replay (I9, R2-6)|✅|
+|C10|**Replayable bearer frame**|🟠|v1: perms gate same-user (I9); anti-replay HMAC/nonce deferred to remote seam (G7)|🔵|
 |C11|**Dedup window vs long-outage replay**|🔴|`seen` evicted by ack-rev, not time (I4, R2-1)|✅|
 |C12|**Spine guards stall backend commands**|🟠|Inject via user-message entry, not spine (§8.2, K7)|✅|
 
@@ -738,11 +818,11 @@ code-grounded round; see §24 for the code map and §25 for validation.)*
 ### G. Security
 | | Problem | Sev | Mitigation | St |
 |---|---|---|---|---|
-|G1|Command injection|🔴|HMAC+nonce + 0600 (I9)|✅|
+|G1|Command injection|🔴|`0700`/`0600` perms + presence-checked bearer cap_token (I9)|✅|
 |G2|WS unauth (CORS≠WS)|🔴|Single-use ticket → bound session (R2-10)|✅|
 |G3|Spawn RCE amplifier|🟠|Allow-list + canonicalization (R2-15)|✅|
 |G4|Runaway spend|🟠|Durable CostBreaker (R2-8)|✅|
-|G6|cap_token at-rest exposure|🟡|Rotate each boot; compact consumed entries (R2-11)|✅|
+|G6|cap_token at-rest exposure|🟡|Bearer cap (not a frame key); per-boot mint; only blind cross-talk defended — same-user malware needs sandboxing (I9)|🔵|
 |G7|Network/multi-tenant future|🟡|mTLS/signed cmds at transport seam|🔵|
 
 ### H. Ops / versioning
@@ -774,13 +854,35 @@ code-grounded round; see §24 for the code map and §25 for validation.)*
    N tokens / M ms?
 5. **Backend stack = Rust** (reuse serializable types) — confirm?
 6. **Spawn allow-list source:** config file vs "register this folder" UI vs both?
+7. **Inline-vs-spill body size threshold `T`** (I13): below `T` a body is inlined
+   into the oplog entry (zero double-write); above `T` it spills to
+   `oplog/bodies/{hash}` under the barrier. Pure tuning (oplog size/replay cost vs
+   double-write frequency) — *not* a correctness question; inlining is always safe.
 
 *(Resolved since v4: durability model = three tiers w/ a bridge-owned oplog;
-exactly-once = oplog append; command auth = HMAC+nonce; rev = oplog offset;
+exactly-once = oplog append; command auth = perms+bearer (v1); rev = oplog offset;
 control observation = single watch per agent.)*
 
 ## 22. Decision log (v5 deltas + retractions)
 
+- **2026-06-16 · v7 body-before-reference (I13)** · *Locked:* a content hash may
+  appear in a durable oplog entry only after its body is durable; small inlined,
+  large spilled-then-fsync'd-before-the-entry; crash-in-gap = orphan body (GC'd),
+  never a dangling reference. *Rationale:* closes the round-2 gap — "accepted =
+  durable" must cover *contents*, not just the envelope. Tier-② copy declared
+  non-load-bearing for durability.
+- **2026-06-16 · v7 oplog execution model** · *Locked:* the main loop **never
+  fsyncs** — it lock-free-enqueues each record (incl. phase transitions); the
+  dedicated oplog thread group-commits (one `fdatasync`/group); command-accept ack
+  runs on the intake/oplog thread. *Rationale:* round-2 asked which thread appends
+  run on; fsync-per-phase-on-loop would violate I7's latency budget.
+- **2026-06-16 · v7 security subtraction** · *Locked:* v1 command authn = perms +
+  presence-checked bearer `cap_token`; **HMAC/nonce/rotation moved to the remote
+  seam** (G7). WS single-use ticket **kept**, re-justified as browser
+  confused-deputy defense (not loopback). *Rationale:* round-2 was right — local
+  crypto guarded a strictly-weaker attacker than same-user malware (which perms
+  can't stop either); it didn't earn its keep. Earned simplification, not a
+  capitulation: the seam survives, the cost doesn't.
 - **2026-06-16 · v6 body-store ownership** · *Locked:* the **bridge** owns an
   immutable content-addressed body store (inline-small / `oplog/bodies/`-spilled);
   tier-② `messages/{uid}.yaml` stays the **mutable** agent cache (§3.1).
@@ -821,8 +923,10 @@ control observation = single watch per agent.)*
 - **2026-06-16 · Phase** · *Locked (v5):* durable in oplog + live stream hint,
   self-healing. *Rationale:* the v4 phase→durable fix added 2–3 s phase latency
   (K6).
-- **2026-06-16 · Command freshness** · *Locked (v5):* HMAC + monotonic nonce
-  (R2-6). · **Dedup eviction** · ack-rev, not time (R2-1). · **CostBreaker** ·
+- **2026-06-16 · Command freshness** · *Locked (v5), **superseded by v7**:* HMAC +
+  monotonic nonce (R2-6) → **deferred to the remote seam**; v1 freshness is moot on
+  a `0700`/`0600` local channel (perms gate the same-user boundary, I9). · **Dedup
+  eviction** · ack-rev, not time (R2-1). · **CostBreaker** ·
   durable/oplog-backed (R2-8). · **WS auth** · single-use ticket → bound session
   (R2-10). · **Lazy hydration** · rev-pinned (R2-9). · **Upgrade** · backend-first
   ordering (R2-16). · **Allow-list** · canonicalized (R2-15).
@@ -854,7 +958,8 @@ file/function** it depends on, and states whether the agent-side change is
 |---|---|---|---|
 | I8 oplog | NEW `crates/cp-mod-bridge` only | **additive** | does **not** touch `writer.rs` |
 | I2 fsync | oplog append in the bridge | **additive** | `writer.rs::write_file` (plain `fs::write`) **unchanged** |
-| I3 heads/content-addr | bridge serializer; tier-② bodies already per-file | **additive** | `save.rs::build_save_batch` unchanged; bridge derives heads from it |
+| I3 heads/content-addr | bridge serializer; bridge **writes+fsyncs** authoritative immutable bodies (§3.1) | **additive** | `save.rs::build_save_batch` unchanged; the heads the bridge records reference its **own** fsync'd bodies (I13), not the tier-② cache |
+| I13 body-before-reference | bridge oplog thread (body durable → then entry) | **additive** | content-addressed ⇒ a crash in the gap is an orphan body, never a dangling reference |
 | Tier-② cache | `writer.rs` (async, 50 ms debounce, coalescing) | **unchanged** | explicitly left as-is |
 | I11 journal-then-ack | bridge command intake | **additive** | UDS is wake-only |
 | K7 command injection | `src/app/actions/input.rs` user-message entry (clears `user_stopped`) | **additive call** | bridge calls it; `engine.rs::check_spine` **untouched** |
@@ -881,7 +986,7 @@ pass a fault-injection test before its §20 status is trusted (R2-19/M1).
 | V3 | I4 dedup | replay same `dedup_token` after a 2-h simulated outage | second apply is a no-op |
 | V4 | I2 durability | power-cut (fsync fault) after dir fsync | committed `rev` fully readable; uncommitted absent |
 | V5 | I10 ordering | drop + reorder stream frames; drop `MessageStartHint` | UI reconstructs from oplog; no orphan leak (bounded buffer) |
-| V6 | I9 auth | replay a captured command frame; tamper body | rejected (stale nonce / bad MAC) |
+| V6 | I9 auth | v1: command with missing/invalid bearer `cap_token`; remote seam: replay a captured frame / tamper body | v1: bad-bearer rejected; remote seam: rejected (stale nonce / bad MAC) |
 | V7 | I7 backpressure | stall the WS consumer; fill the ring | agent loop latency unaffected; degraded flag set |
 | V8 | I12 / K8 | spawn 10k agents | inotify watch count ≈ agent count; no exhaustion |
 | V9 | R2-8 CostBreaker | crash-loop the backend at the spend ceiling | breaker stays tripped (durable counter) |
@@ -893,8 +998,8 @@ Until a row passes, its §20 entries are **"designed, test-pending,"** not ✅.
 
 | # | Mechanism | Fault injected | Pass criterion |
 |---|---|---|---|
-| V11 | I2 / §11.1 bridge latency | run a fixed scripted session **bridge-ON vs bridge-OFF**; measure per-message added latency from the oplog group-commit path | added p99 latency is below the agent's own turn-cadence budget (does not stall reasoning); bridge-OFF run is byte-identical to today |
-| V12 | §3.1 body store | crash after the mutable `{uid}.yaml` write but **before** the bridge's immutable body write (and vice-versa) | replay reconstructs the body from whichever store survived + the oplog head; no dangling head-hash with no body |
+| V11 | I2 / §11.1 bridge latency + loop-fsync | (a) bridge-ON vs bridge-OFF scripted session; (b) **burst of phase transitions** during streaming | (a) added p99 below the agent's turn-cadence budget, bridge-OFF byte-identical to today; (b) the per-transition op is a lock-free enqueue — **loop tick time statistically unchanged** under the burst (no fsync on the loop) |
+| V12 | I13 body-before-reference barrier | `kill -9` **between** a spilled body's `fdatasync` and its referencing oplog entry's commit (and after the entry commits) | crash-in-gap ⇒ orphan body, **no durable entry references a missing body**; crash-after ⇒ body present; replay never yields a dangling head-hash |
 
 **First prototype (do this before more doc):** implement the isolated oplog
 append + crash-replay loop and pass **V1, V2, V10** against real `kill -9` and a

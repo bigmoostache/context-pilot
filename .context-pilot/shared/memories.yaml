@@ -497,7 +497,7 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'docs/design-orchestration-backend.md is v6 (branch maquette): code-grounded three-tier durability (oplog + state-cache + stream) + v6 honesty pass. CP maquette in ui/ unchanged.'
+  tl_dr: 'docs/design-orchestration-backend.md is v7 (branch maquette): three-tier durability + v7 round-2 fixes (I13 body-before-reference barrier, off-loop fsync execution model, security subtraction: v1 authn=perms+bearer, HMAC→remote seam). CP maquette ui/ unchanged.'
   contents: |-
     ## Orchestration Backend Design — v6 (branch maquette)
 
@@ -523,7 +523,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781610979848
+  last_edited_ms: 1781611831950
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-
