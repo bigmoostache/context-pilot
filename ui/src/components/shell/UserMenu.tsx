@@ -4,7 +4,6 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -45,15 +44,16 @@ export function UserMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-[268px]" align="end" sideOffset={8}>
-        {/* identity header — non-interactive */}
-        <DropdownMenuLabel className="flex items-center gap-2.5 px-2 py-2">
+        {/* identity header — non-interactive (plain div: GroupLabel would
+            require a Menu.Group ancestor and throws MenuGroupContext otherwise). */}
+        <div className="flex items-center gap-2.5 px-2 py-2">
           <AvatarMark user={u} className="size-9 text-[13px]" />
           <div className="flex min-w-0 flex-col leading-tight">
             <span className="truncate text-[12.5px] font-semibold text-foreground/90">{u.name}</span>
             <span className="truncate text-[11px] font-normal text-muted-foreground/75">{u.email}</span>
             <AccountPill user={u} />
           </div>
-        </DropdownMenuLabel>
+        </div>
 
         <DropdownMenuSeparator />
 
