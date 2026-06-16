@@ -4994,6 +4994,10 @@ f2750957712b6508:
   path: src/ui/help/config_overlay/budget_bars.rs
   description: Budget bars adapter for config overlay. Renders ConfigBudgetBar IR entries as filled/empty block bars with semantic colors. 24-cell bar width.
   last_edited_ms: 0
+f286c01884848f6b:
+  path: docs/architecture-adversarial-analysis.md
+  description: 'Adversarial review of the v3 orchestration backend design (design-orchestration-backend.md). 18 issues in 4 buckets (robustness/latency/vulnerability/grey-area), severity-ranked, each with a concrete fix + a priority-summary table. 4 v1-blockers: commit transaction boundary (effect+seen+rev not atomic vs the dual Batch/Message writer paths), command auth = perms-only (capability token needed), WS auth = localhost+CORS (bearer token needed), cross-plane token/message ordering + sticky phase on the lossy plane. Companion to design-orchestration-backend.md.'
+  last_edited_ms: 1781601969997
 f2cd95dba878f52e:
   path: .gitignore
   description: Git ignore rules
