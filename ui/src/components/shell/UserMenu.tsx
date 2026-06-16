@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { currentUser } from "@/lib/mock"
+import { useAccount } from "@/lib/account"
 import { accentVar } from "@/lib/panelMeta"
 import type { User } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -30,7 +30,7 @@ export function UserMenu({
   onOpenSettings: () => void
   onOpenProfile: () => void
 }) {
-  const u = currentUser
+  const { user: u } = useAccount()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger

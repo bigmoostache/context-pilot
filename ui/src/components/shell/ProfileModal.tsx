@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
-import { currentUser } from "@/lib/mock"
+import { useAccount } from "@/lib/account"
 import { AvatarMark } from "./UserMenu"
 import { cn } from "@/lib/utils"
 
@@ -34,9 +34,8 @@ export function ProfileModal({
   open: boolean
   onClose: () => void
 }) {
-  const u = currentUser
+  const { user: u, managed, setManaged } = useAccount()
   const [name, setName] = useState(u.name)
-  const managed = u.managedByCompany
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -127,9 +126,12 @@ export function ProfileModal({
 
           {/* account management */}
           <div className="flex flex-col gap-2">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
-              Account
-            </span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+                Account
+              </span>
+              <AccountTypeSwitch managed={managed} onChange={setManaged} />
+            </div>
             {managed ? <ManagedAccount company={u.company ?? "your organization"} /> : <PersonalAccount />}
           </div>
         </div>
@@ -201,6 +203,46 @@ function ActionRow({
         <span className="text-[11px] text-muted-foreground/70">{sub}</span>
       </span>
     </button>
+  )
+}
+
+/**
+ * Account-type switch — flips the account between **Company** (managed) and
+ * **Personal**. Drives the shared account context, so it updates both this
+ * modal's account section *and* the API-key lock in Settings, letting you
+ * compare the two states.
+ */
+function AccountTypeSwitch({
+  managed,
+  onChange,
+}: {
+  managed: boolean
+  onChange: (managed: boolean) => void
+}) {
+  return (
+    <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
+      {(
+        [
+          { id: true, label: "Company" },
+          { id: false, label: "Personal" },
+        ] as const
+      ).map((o) => {
+        const on = o.id === managed
+        return (
+          <button
+            key={o.label}
+            type="button"
+            onClick={() => onChange(o.id)}
+            className={cn(
+              "rounded-md px-2 py-0.5 text-[11px] font-medium transition-all",
+              on ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

@@ -22,7 +22,7 @@ import {
 } from "lucide-react"
 import { DialogClose } from "@/components/ui/dialog"
 import { UsagePage } from "@/components/agents/UsagePage"
-import { currentUser } from "@/lib/mock"
+import { useAccount } from "@/lib/account"
 import { cn } from "@/lib/utils"
 
 /**
@@ -156,8 +156,9 @@ const CATEGORIES: {
 function CategoryBody({ cat }: { cat: CatId }) {
   // Company-managed accounts can't edit API keys — the org provisions them
   // centrally. Lock every key-bearing pane and explain why.
-  const managed = currentUser.managedByCompany
-  const company = currentUser.company ?? "your organization"
+  const { user } = useAccount()
+  const managed = user.managedByCompany
+  const company = user.company ?? "your organization"
 
   switch (cat) {
     case "general":

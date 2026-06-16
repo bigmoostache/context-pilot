@@ -7,6 +7,7 @@ import { FleetShell } from "@/components/agents/FleetShell"
 import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/lib/theme"
+import { AccountProvider } from "@/lib/account"
 import { activeAgentId as initialAgentId, agents } from "@/lib/mock"
 import type { ViewMode } from "@/lib/types"
 import "./App.css"
@@ -35,7 +36,8 @@ function App() {
 
   return (
     <ThemeProvider>
-      <TooltipProvider delay={350} closeDelay={80}>
+      <AccountProvider>
+        <TooltipProvider delay={350} closeDelay={80}>
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
           <TopBar
             view={view}
@@ -61,7 +63,8 @@ function App() {
 
           <StatusBar fleet={view === "fleet"} />
         </div>
-      </TooltipProvider>
+        </TooltipProvider>
+      </AccountProvider>
     </ThemeProvider>
   )
 }
