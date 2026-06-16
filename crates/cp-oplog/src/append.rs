@@ -37,10 +37,10 @@ use std::io::{self, Seek as _, SeekFrom, Write as _};
 use std::path::{Path, PathBuf};
 
 use cp_wire::framing::{self, FrameError};
-use cp_wire::types::heads::Heads;
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
+use cp_wire::types::snapshot::{Heads, SeenSet, Snapshot};
 
-use crate::replay::{self, fold_entry};
+use crate::replay::{self, fold_entry, ReplayState};
 use crate::segment;
 
 /// Default segment size limit: roll to a new segment once appending the next
@@ -111,10 +111,10 @@ pub struct OplogWriter {
     /// Roll to a new segment once a write would push `segment_bytes` past this.
     segment_limit: u64,
 
-    /// Running head snapshot, folded as records are appended. Seeded on open by
-    /// replaying the durable log; written verbatim into each segment's leading
-    /// checkpoint.
-    heads: Heads,
+    /// Running recoverable state (heads + seen-set), folded as records are
+    /// appended. Seeded on open by replaying the durable log; its heads and
+    /// seen-set are written verbatim into each segment's leading checkpoint.
+    state: ReplayState,
 }
 
 impl OplogWriter {
@@ -166,7 +166,7 @@ impl OplogWriter {
                 segment_has_record,
                 next_rev,
                 segment_limit,
-                heads: recovered.heads,
+                state: recovered,
             })
         } else {
             // Fresh oplog: create segment 0 (no leading checkpoint — there is
@@ -180,7 +180,7 @@ impl OplogWriter {
                 segment_has_record: false,
                 next_rev,
                 segment_limit,
-                heads: recovered.heads,
+                state: recovered,
             })
         }
     }
@@ -244,8 +244,8 @@ impl OplogWriter {
     /// Returns [`OplogError::Frame`] or [`OplogError::Io`] on a framing or I/O
     /// failure.
     pub fn checkpoint(&mut self) -> OplogResult<u64> {
-        let snapshot = self.heads.clone();
-        self.write_record(OpEntryKind::Checkpoint { heads: snapshot }, false)
+        let snapshot = self.snapshot();
+        self.write_record(OpEntryKind::Checkpoint { snapshot }, false)
     }
 
     /// Roll to a fresh segment and stamp its leading checkpoint.
@@ -256,8 +256,8 @@ impl OplogWriter {
         self.index = next_index;
         self.segment_bytes = 0;
         self.segment_has_record = false;
-        let snapshot = self.heads.clone();
-        let _cp_rev = self.write_record(OpEntryKind::Checkpoint { heads: snapshot }, false)?;
+        let snapshot = self.snapshot();
+        let _cp_rev = self.write_record(OpEntryKind::Checkpoint { snapshot }, false)?;
         Ok(())
     }
 
@@ -278,7 +278,7 @@ impl OplogWriter {
         if is_record {
             self.segment_has_record = true;
         }
-        fold_entry(&mut self.heads, &entry);
+        fold_entry(&mut self.state, &entry);
         Ok(rev)
     }
 
@@ -297,7 +297,20 @@ impl OplogWriter {
     /// The writer's running head snapshot.
     #[must_use]
     pub const fn heads(&self) -> &Heads {
-        &self.heads
+        &self.state.heads
+    }
+
+    /// The writer's running dedup seen-set.
+    #[must_use]
+    pub const fn seen(&self) -> &SeenSet {
+        &self.state.seen
+    }
+
+    /// A clone of the full recoverable snapshot (heads + seen-set), as written
+    /// into a checkpoint record.
+    #[must_use]
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot { heads: self.state.heads.clone(), seen: self.state.seen.clone() }
     }
 }
 
@@ -427,7 +440,7 @@ mod tests {
         let scan = segment::read(&segment::path(dir.path(), 0)).expect("read");
         let last = scan.entries.last().expect("entries");
         match &last.kind {
-            OpEntryKind::Checkpoint { heads } => assert_eq!(heads, writer.heads()),
+            OpEntryKind::Checkpoint { snapshot } => assert_eq!(&snapshot.heads, writer.heads()),
             other => panic!("expected trailing checkpoint, got {other:?}"),
         }
     }

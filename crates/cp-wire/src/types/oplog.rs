@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::heads::Heads;
+use super::snapshot::Snapshot;
 use super::{ContentHash, LifecycleState, Phase};
 
 /// A single oplog record.
@@ -92,11 +92,11 @@ pub enum OpEntryKind {
         cost_usd: f64,
     },
 
-    /// Heads checkpoint — bounds replay length on restart (GAP 1 / I5).
+    /// State checkpoint — bounds replay length on restart (GAP 1 / I5).
     #[serde(rename = "checkpoint")]
     Checkpoint {
-        /// Snapshot of current heads at this rev.
-        heads: Heads,
+        /// Full recoverable snapshot (heads + seen-set) at this rev.
+        snapshot: Snapshot,
     },
 
     /// Catch-all for variants from a newer protocol version.

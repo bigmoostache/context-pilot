@@ -318,6 +318,10 @@
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing, initial metrics population from Meilisearch facets.'
   last_edited_ms: 0
+0e5ab7b600422f98:
+  path: crates/cp-wire/src/types/snapshot.rs
+  description: 'Bounded replay snapshot: Snapshot{heads,seen}. Heads (per-thread/panel content hashes, O(threads+panels)) + SeenSet (dedup-tokens of durable command effects, evicted by acked-rev via evict_through, NEVER time — I4/R2-1). SeenSet.mark idempotent keeps first rev. Checkpoint carries Snapshot (both heads AND seen) so seen rebuild doesn''t fold from offset 0. Replaces old heads.rs (merged to keep types/ ≤ 8 files). 9 tests.'
+  last_edited_ms: 1781620291993
 0ef0bd81edb04193:
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
@@ -1578,10 +1582,6 @@
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
   last_edited_ms: 0
-487cd9f823663cf3:
-  path: crates/cp-wire/src/types/heads.rs
-  description: 'Heads snapshot: bounded set of ThreadHead + PanelHead content hashes. O(threads+panels) not O(total-files).'
-  last_edited_ms: 1781617163200
 48cc4020fe96e1d1:
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
@@ -1750,6 +1750,10 @@
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
   last_edited_ms: 0
+5166dcba8cf624a4:
+  path: crates/cp-oplog/src/append.rs
+  description: 'OplogWriter: single-writer append-only fsync''d log + running ReplayState fold (heads+seen). open() seeds via replay::replay. append(kind)->rev probes frame size, rolls at 64MiB. roll() stamps leading Checkpoint(Snapshot) as new segment''s first record (GAP1). write_record = sole rev point (frame+write_all+sync_data+fold_entry, announce-after-durable K9). checkpoint()/heads()/seen()/snapshot() public. OplogError{Io,Frame}. 8 tests.'
+  last_edited_ms: 1781620292020
 516b9052cc0e542b:
   path: docs/search-module.md
   description: Search module documentation. Architecture diagram, component table, server lifecycle, index schemas (files+logs), file pipeline, search tool params, Ctrl+I overlay, log integration, tree-sitter languages.
@@ -1870,6 +1874,10 @@
   path: crates/cp-mod-search/src/meili/download.rs
   description: Meilisearch binary download. Pinned v1.13.3. Platform detection (macOS/Linux, amd64/aarch64). GitHub releases download to ~/.context-pilot/meilisearch/bin/. Skips if already present. 5-min timeout.
   last_edited_ms: 0
+5664af275f4d4125:
+  path: crates/cp-oplog/src/replay.rs
+  description: 'Oplog replay (GAP1/I5): ReplayState{rev_head,heads,seen}. fold_entry(&mut ReplayState,&entry) pub(crate): Checkpoint=authoritative clone_from(heads+seen), MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark(token,rev), others no-op. replay() fast-path reads ONLY newest segment when it opens with a checkpoint (Snapshot-seeded); replay_full fallback for seg-0-only. Heads PartialEq order-sensitive. 10 tests incl seen-set V3 + fast==full.'
+  last_edited_ms: 1781620292007
 568015166ff3348a:
   path: crates/cp-mod-spine/src/types.rs
   description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom), NotificationStatus (Unprocessed/Blocked/Processed). SpineConfig: guard rail limits + runtime tracking. SpineState: create/mark/delete/unblock notifications. mark_all_unprocessed_as_processed() for continuation consumption.'
@@ -2166,10 +2174,6 @@
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 0
-64b70e5f389ed02c:
-  path: crates/cp-wire/src/types/heads.rs
-  description: 'Bounded snapshot Heads: per-thread + per-panel content hashes, O(threads+panels) not O(files) (I3). impl Default (schema_version=1, empty). set_thread_head(id,hash) upsert (insert-or-update-in-place, deterministic order). ThreadHead/PanelHead. 2 round-trip tests. Import path: cp_wire::types::heads::Heads (no re-export, pub_use banned).'
-  last_edited_ms: 1781619407302
 650a0ba5c8a439e2:
   path: ui/src/components/threads/ThreadDetailRail.tsx
   description: 'Right rail: thread metadata (status badge, agent, message count, created, last activity, id) + ''Open agent cockpit'' bridge to the panel-centered view.'
@@ -3274,10 +3278,6 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'Cockpit header strip: app mark, view switcher (Threads/Cockpit segmented control), project breadcrumb, branch chip, global cost, status dot.'
   last_edited_ms: 0
-962bf92c20525005:
-  path: crates/cp-wire/src/types/heads.rs
-  description: 'Heads snapshot: bounded set of ThreadHead + PanelHead content hashes. O(threads+panels) not O(total-files).'
-  last_edited_ms: 1781616040251
 965292c5106e02e5:
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
@@ -5090,6 +5090,10 @@ eea64e117a25ef2b:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
   last_edited_ms: 0
+eeb29188814b9471:
+  path: crates/cp-wire/src/types/oplog.rs
+  description: 'OpEntry (schema_version,rev,timestamp_ms) + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated, Lifecycle, CostAggregate, Checkpoint{snapshot:Snapshot}, Unknown catch-all. Framed payload (len+CRC) on wire. 3 round-trip + tolerant-decode tests.'
+  last_edited_ms: 1781620292034
 eeb8ddd22c31de65:
   path: crates/cp-base/src/state/watchers.rs
   description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'

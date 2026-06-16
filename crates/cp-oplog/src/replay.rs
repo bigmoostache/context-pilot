@@ -24,15 +24,15 @@
 //! rolled even once, every newer segment is self-sufficient and the fast path
 //! applies.
 
-use cp_wire::types::heads::Heads;
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
+use cp_wire::types::snapshot::{Heads, SeenSet};
 
 use crate::append::OplogResult;
 use crate::segment;
 use std::path::Path;
 
-/// The recovered state of an oplog: its highest durable `rev` and the heads as
-/// of that `rev`.
+/// The recovered state of an oplog: its highest durable `rev` and the bounded
+/// snapshot (heads + seen-set) as of that `rev`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ReplayState {
     /// The highest durable `rev` in the log, or `None` if the log is empty.
@@ -41,26 +41,34 @@ pub struct ReplayState {
     /// The bounded head set (per-thread last-message hash, per-panel hash) as
     /// of `rev_head`.
     pub heads: Heads,
+
+    /// The dedup-tokens of durable command effects as of `rev_head` (I4).
+    pub seen: SeenSet,
 }
 
-/// Fold one entry into a running head set.
+/// Fold one entry into a running [`ReplayState`].
 ///
-/// A `Checkpoint` is **authoritative**: it replaces the running heads wholesale
-/// (it is a full snapshot, not a delta). A `MessageCreated` advances its
-/// thread's head. All other variants carry no head information and are
-/// no-ops here (they matter to other folds — e.g. the dedup `seen`-set — not to
-/// heads).
-pub(crate) fn fold_entry(heads: &mut Heads, entry: &OpEntry) {
+/// A `Checkpoint` is **authoritative**: it replaces the running snapshot
+/// wholesale (it is a full snapshot, not a delta). A `MessageCreated` advances
+/// its thread's head. A `CommandEffect` or `SeenMark` marks its dedup token as
+/// seen at this entry's `rev` (I4). The remaining variants carry no recoverable
+/// state and are no-ops here.
+///
+/// The `rev` is taken from `entry`, so the seen-set records the exact `rev` at
+/// which each command's effect first committed.
+pub(crate) fn fold_entry(state: &mut ReplayState, entry: &OpEntry) {
     match &entry.kind {
-        OpEntryKind::Checkpoint { heads: snapshot } => {
-            heads.clone_from(snapshot);
+        OpEntryKind::Checkpoint { snapshot } => {
+            state.heads.clone_from(&snapshot.heads);
+            state.seen.clone_from(&snapshot.seen);
         }
         OpEntryKind::MessageCreated { thread_id, head, .. } => {
-            heads.set_thread_head(thread_id, *head);
+            state.heads.set_thread_head(thread_id, *head);
         }
-        OpEntryKind::CommandEffect { .. }
-        | OpEntryKind::SeenMark { .. }
-        | OpEntryKind::PhaseTransition { .. }
+        OpEntryKind::CommandEffect { dedup_token, .. } | OpEntryKind::SeenMark { dedup_token } => {
+            state.seen.mark(dedup_token, entry.rev);
+        }
+        OpEntryKind::PhaseTransition { .. }
         | OpEntryKind::Lifecycle { .. }
         | OpEntryKind::CostAggregate { .. }
         | OpEntryKind::Unknown => {}
@@ -100,10 +108,14 @@ fn replay_fast(dir: &Path, indices: &[u64]) -> OplogResult<Option<ReplayState>> 
             // Empty or torn-at-zero segment: try the next-older one.
             continue;
         };
-        if let OpEntryKind::Checkpoint { heads } = &first.kind {
-            let mut state = ReplayState { rev_head: Some(first.rev), heads: heads.clone() };
+        if let OpEntryKind::Checkpoint { snapshot } = &first.kind {
+            let mut state = ReplayState {
+                rev_head: Some(first.rev),
+                heads: snapshot.heads.clone(),
+                seen: snapshot.seen.clone(),
+            };
             for entry in scan.entries.iter().skip(1) {
-                fold_entry(&mut state.heads, entry);
+                fold_entry(&mut state, entry);
                 state.rev_head = Some(entry.rev);
             }
             return Ok(Some(state));
@@ -123,7 +135,7 @@ fn replay_full(dir: &Path, indices: &[u64]) -> OplogResult<ReplayState> {
     for &index in indices {
         let scan = segment::read(&segment::path(dir, index))?;
         for entry in &scan.entries {
-            fold_entry(&mut state.heads, entry);
+            fold_entry(&mut state, entry);
             state.rev_head = Some(entry.rev);
         }
     }
@@ -245,5 +257,57 @@ mod tests {
         let mut expected = Heads::default();
         expected.set_thread_head("T1", ContentHash::new([0x66; 32]));
         assert_eq!(state.heads, expected);
+    }
+
+    #[test]
+    fn replay_rebuilds_seen_set_from_command_effects() {
+        let dir = tempdir().expect("tempdir");
+        let mut writer = OplogWriter::open(dir.path()).expect("open");
+        let _a = writer
+            .append(OpEntryKind::CommandEffect {
+                cmd_id: "c1".to_owned(),
+                dedup_token: "tok-a".to_owned(),
+            })
+            .expect("append");
+        // A duplicate delivery of the same token folds as a no-op.
+        let _b = writer.append(OpEntryKind::SeenMark { dedup_token: "tok-a".to_owned() }).expect("dup");
+        let _c = writer
+            .append(OpEntryKind::CommandEffect {
+                cmd_id: "c2".to_owned(),
+                dedup_token: "tok-b".to_owned(),
+            })
+            .expect("append");
+
+        let state = replay(dir.path()).expect("replay");
+        assert!(state.seen.contains("tok-a"), "first command's token is seen");
+        assert!(state.seen.contains("tok-b"), "second command's token is seen");
+        assert_eq!(state.seen.len(), 2, "duplicate delivery added no extra entry");
+    }
+
+    #[test]
+    fn seen_set_survives_checkpoint_and_reopen() {
+        // V3 across the real replay path: a token committed before a segment
+        // roll lands in the rolled segment's leading checkpoint, so replay
+        // recovers it by reading only the newest segment — no time bound, no
+        // dependence on folding from offset 0.
+        let dir = tempdir().expect("tempdir");
+        let mut writer = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("open");
+        let _e = writer
+            .append(OpEntryKind::CommandEffect {
+                cmd_id: "c1".to_owned(),
+                dedup_token: "tok-early".to_owned(),
+            })
+            .expect("append");
+        // Force several rolls so the token is carried only by a checkpoint.
+        for byte in 0..8u8 {
+            let _r = writer.append(msg("T1", byte)).expect("append");
+        }
+        let indices = segment::indices(dir.path()).expect("indices");
+        assert!(indices.len() > 1, "tiny limit must have rolled");
+
+        let fast = replay(dir.path()).expect("fast");
+        let full = replay_full(dir.path(), &indices).expect("full");
+        assert_eq!(fast, full, "fast path (checkpoint-seeded) equals full replay");
+        assert!(fast.seen.contains("tok-early"), "token survives via checkpoint");
     }
 }

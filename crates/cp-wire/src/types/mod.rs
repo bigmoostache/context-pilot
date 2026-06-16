@@ -8,9 +8,9 @@
 pub mod ack;
 pub mod body;
 pub mod command;
-pub mod heads;
 pub mod oplog;
 pub mod registry;
+pub mod snapshot;
 pub mod stream;
 
 use serde::{Deserialize, Serialize};
