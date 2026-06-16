@@ -1,0 +1,16 @@
+[package]
+name = "cp-orchestrator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Standalone orchestration backend — discovers, observes, and commands agent fleets"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+cp-wire = { path = "../cp-wire" }
+
+[lints]
+workspace = true

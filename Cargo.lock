@@ -249,6 +249,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-mod-bridge"
+version = "0.1.0"
+dependencies = [
+ "cp-base",
+ "cp-render",
+ "cp-wire",
+ "serde_json",
+]
+
+[[package]]
 name = "cp-mod-callback"
 version = "0.1.0"
 dependencies = [
@@ -481,6 +491,13 @@ dependencies = [
 [[package]]
 name = "cp-mod-utilities"
 version = "0.1.0"
+
+[[package]]
+name = "cp-orchestrator"
+version = "0.1.0"
+dependencies = [
+ "cp-wire",
+]
 
 [[package]]
 name = "cp-render"
@@ -2967,6 +2984,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-brave",
+ "cp-mod-bridge",
  "cp-mod-callback",
  "cp-mod-console",
  "cp-mod-entities",

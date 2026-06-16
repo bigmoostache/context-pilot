@@ -14,7 +14,7 @@ use super::ContentHash;
 /// Each head is a content-addressed reference into the immutable body
 /// store; hydrating a snapshot means fetching bodies by hash on demand
 /// (lazy, rev-pinned — design doc I5).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Heads {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
@@ -27,7 +27,7 @@ pub struct Heads {
 }
 
 /// A single thread's head — the hash of its most recent message body.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ThreadHead {
     /// Thread identifier.
     pub thread_id: String,
@@ -37,7 +37,7 @@ pub struct ThreadHead {
 }
 
 /// A single panel's head — the hash of its serialised content.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PanelHead {
     /// Panel identifier.
     pub panel_id: String,

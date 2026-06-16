@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// "Accepted" means **durable**: the command's effect is in the fsync'd
 /// oplog before this ack is sent (I11).  A deadman re-exec replays it
 /// exactly once (I4/K2).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ack {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
@@ -20,16 +20,16 @@ pub struct Ack {
     pub cmd_id: String,
 
     /// Whether the command was accepted or rejected.
-    pub status: AckStatus,
+    pub status: Status,
 
     /// The oplog `rev` at which the effect landed (only present on accept).
     pub rev: Option<u64>,
 }
 
 /// Outcome of command processing.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "status")]
-pub enum AckStatus {
+pub enum Status {
     /// Command durably accepted — effect is in the oplog.
     #[serde(rename = "accepted")]
     Accepted,
@@ -51,7 +51,7 @@ mod tests {
         let ack = Ack {
             schema_version: 1,
             cmd_id: "cmd-99".into(),
-            status: AckStatus::Accepted,
+            status: Status::Accepted,
             rev: Some(42),
         };
         let json = serde_json::to_string(&ack).expect("serialize");
@@ -64,7 +64,7 @@ mod tests {
         let ack = Ack {
             schema_version: 1,
             cmd_id: "cmd-100".into(),
-            status: AckStatus::Rejected {
+            status: Status::Rejected {
                 reason: "bad bearer token".into(),
             },
             rev: None,
@@ -84,6 +84,6 @@ mod tests {
             "future_field": "ignored"
         }"#;
         let ack: Ack = serde_json::from_str(json).expect("tolerant decode");
-        assert_eq!(ack.status, AckStatus::Accepted);
+        assert_eq!(ack.status, Status::Accepted);
     }
 }

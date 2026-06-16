@@ -1,0 +1,19 @@
+[package]
+name = "cp-mod-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Agent-side orchestration bridge — additive Module for oplog, stream tee, command intake, and heartbeat"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+cp-base.workspace = true
+cp-render.workspace = true
+cp-wire = { path = "../cp-wire" }
+serde_json.workspace = true
+
+[lints]
+workspace = true

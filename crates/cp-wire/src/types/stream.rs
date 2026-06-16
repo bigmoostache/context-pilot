@@ -1,6 +1,6 @@
 //! Live streaming frame — ephemeral tier ③ traffic.
 //!
-//! [`StreamFrame`] carries a single token delta, tool-arg chunk, or
+//! [`Frame`] carries a single token delta, tool-arg chunk, or
 //! latency hint from the agent to the backend over the UDS stream plane.
 //! Frames are best-effort and droppable (design doc I7); the oplog is the
 //! safety net for any dropped hint.
@@ -14,8 +14,8 @@ use super::Phase;
 /// The `seq` is **per-`message_id`** so gaps are unambiguous (design doc
 /// I10).  The backend fans these out to N frontend WebSocket subscribers
 /// without touching the agent.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct StreamFrame {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Frame {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
 
@@ -35,16 +35,16 @@ pub struct StreamFrame {
     pub seq: u64,
 
     /// What this frame carries.
-    pub kind: StreamKind,
+    pub kind: Kind,
 }
 
-/// The payload a [`StreamFrame`] delivers.
+/// The payload a [`Frame`] delivers.
 ///
 /// Internally tagged by `"kind"` with an `Unknown` catch-all for
 /// forward compatibility.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
-pub enum StreamKind {
+pub enum Kind {
     /// Latency hint that a new message is starting (self-describing so the
     /// frontend can paint before the oplog entry lands).
     #[serde(rename = "message_start_hint")]
@@ -87,37 +87,37 @@ mod tests {
 
     #[test]
     fn stream_frame_round_trip() {
-        let frame = StreamFrame {
+        let frame = Frame {
             schema_version: 1,
             agent_id: "agent-a".into(),
             worker_id: "w0".into(),
             thread_id: "T1".into(),
             message_id: "msg-42".into(),
             seq: 7,
-            kind: StreamKind::Token {
+            kind: Kind::Token {
                 text: "Hello".into(),
             },
         };
         let json = serde_json::to_string(&frame).expect("serialize");
-        let back: StreamFrame = serde_json::from_str(&json).expect("deserialize");
+        let back: Frame = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(frame, back);
     }
 
     #[test]
     fn phase_hint_round_trip() {
-        let frame = StreamFrame {
+        let frame = Frame {
             schema_version: 1,
             agent_id: "a".into(),
             worker_id: "w".into(),
             thread_id: "T".into(),
             message_id: "m".into(),
             seq: 0,
-            kind: StreamKind::PhaseHint {
+            kind: Kind::PhaseHint {
                 phase: Phase::Tooling,
             },
         };
         let json = serde_json::to_string(&frame).expect("serialize");
-        let back: StreamFrame = serde_json::from_str(&json).expect("deserialize");
+        let back: Frame = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(frame, back);
     }
 
@@ -132,7 +132,7 @@ mod tests {
             "seq": 0,
             "kind": {"kind": "future_stream_thing"}
         }"#;
-        let frame: StreamFrame = serde_json::from_str(json).expect("tolerant decode");
-        assert_eq!(frame.kind, StreamKind::Unknown);
+        let frame: Frame = serde_json::from_str(json).expect("tolerant decode");
+        assert_eq!(frame.kind, Kind::Unknown);
     }
 }

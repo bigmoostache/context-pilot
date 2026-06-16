@@ -5,21 +5,13 @@
 //! catch-all `Unknown` variant (`#[serde(other)]`) so an N-1 receiver
 //! gracefully round-trips a variant it has never seen.
 
-mod ack;
-mod body;
-mod command;
-mod heads;
-mod oplog;
-mod registry;
-mod stream;
-
-pub use ack::{Ack, AckStatus};
-pub use body::Body;
-pub use command::{Command, CommandKind};
-pub use heads::{Heads, PanelHead, ThreadHead};
-pub use oplog::{OpEntry, OpEntryKind};
-pub use registry::{AgentStatus, RegistryEntry};
-pub use stream::{StreamFrame, StreamKind};
+pub mod ack;
+pub mod body;
+pub mod command;
+pub mod heads;
+pub mod oplog;
+pub mod registry;
+pub mod stream;
 
 use serde::{Deserialize, Serialize};
 
@@ -52,17 +44,13 @@ impl ContentHash {
 /// Hex-encode for JSON/YAML readability.
 impl Serialize for ContentHash {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        /// Lookup table for byte → two hex ASCII chars.
-        const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
-
-        let mut hex = [0u8; 64];
-        for (i, &byte) in self.0.iter().enumerate() {
-            hex[i * 2] = HEX_CHARS[(byte >> 4) as usize];
-            hex[i * 2 + 1] = HEX_CHARS[(byte & 0x0f) as usize];
+        use core::fmt::Write as _;
+        let mut hex = String::with_capacity(64);
+        for &byte in &self.0 {
+            // `write!` on `String` is infallible — discard the always-Ok result.
+            _ = write!(hex, "{byte:02x}");
         }
-        // SAFETY: hex[] contains only ASCII hex digits — always valid UTF-8.
-        let s = core::str::from_utf8(&hex).expect("hex is ASCII");
-        serializer.serialize_str(s)
+        serializer.serialize_str(&hex)
     }
 }
 
@@ -74,23 +62,38 @@ impl<'de> Deserialize<'de> for ContentHash {
         }
         let mut bytes = [0u8; 32];
         for (i, chunk) in s.as_bytes().chunks_exact(2).enumerate() {
-            bytes[i] = hex_nibble(chunk[0]).ok_or_else(|| {
-                serde::de::Error::custom(format!("invalid hex char: {}", chunk[0] as char))
-            })? << 4
-                | hex_nibble(chunk[1]).ok_or_else(|| {
-                    serde::de::Error::custom(format!("invalid hex char: {}", chunk[1] as char))
-                })?;
+            let hi = chunk
+                .first()
+                .copied()
+                .and_then(hex_nibble)
+                .ok_or_else(|| serde::de::Error::custom("invalid hex char"))?;
+            let lo = chunk
+                .get(1)
+                .copied()
+                .and_then(hex_nibble)
+                .ok_or_else(|| serde::de::Error::custom("invalid hex char"))?;
+            if let Some(slot) = bytes.get_mut(i) {
+                *slot = hi.wrapping_shl(4) | lo;
+            }
         }
         Ok(Self(bytes))
+    }
+
+    fn deserialize_in_place<D: serde::Deserializer<'de>>(
+        deserializer: D,
+        place: &mut Self,
+    ) -> Result<(), D::Error> {
+        *place = Self::deserialize(deserializer)?;
+        Ok(())
     }
 }
 
 /// Decode a single hex ASCII byte to its 4-bit value.
 const fn hex_nibble(b: u8) -> Option<u8> {
     match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
+        b'0'..=b'9' => Some(b.wrapping_sub(b'0')),
+        b'a'..=b'f' => Some(b.wrapping_sub(b'a').wrapping_add(10)),
+        b'A'..=b'F' => Some(b.wrapping_sub(b'A').wrapping_add(10)),
         _ => None,
     }
 }

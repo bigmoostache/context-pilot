@@ -13,7 +13,7 @@ use super::ContentHash;
 ///
 /// The hash is the SHA-256 of `data` — the receiver **must** verify this
 /// on ingest (the hash is the identity, not a convenience).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Body {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,

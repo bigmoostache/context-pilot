@@ -1,7 +1,7 @@
 //! Backend → agent command envelope.
 //!
 //! A [`Command`] is the unit of work the orchestrator sends to an agent.
-//! Every command carries a [`CommandKind`] discriminant, a transport-level
+//! Every command carries a [`Kind`] discriminant, a transport-level
 //! `seq` for ordering, and a semantic `dedup_token` for exactly-once
 //! idempotency (design doc I4).
 
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Authn is handled at the transport layer (v1: bearer `cap_token` checked
 /// before deserialisation reaches this struct — design doc I9).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Command {
     /// Wire-schema revision for this struct (always `1` today).
     pub schema_version: u32,
@@ -27,17 +27,18 @@ pub struct Command {
     pub dedup_token: String,
 
     /// What the command asks the agent to do.
-    pub kind: CommandKind,
+    pub kind: Kind,
 }
 
 /// The action a [`Command`] requests.
 ///
 /// Uses an internally-tagged representation (`"kind"` field) so that an
 /// older receiver encountering a variant it has never seen deserialises it
-/// as [`Unknown`](CommandKind::Unknown) instead of failing hard.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// as [`Unknown`](Kind::Unknown) instead of failing hard.
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
-pub enum CommandKind {
+pub enum Kind {
     /// Send a message to a thread (the primary user action).
     #[serde(rename = "send_message")]
     SendMessage {
@@ -95,7 +96,7 @@ mod tests {
             id: "cmd-001".into(),
             seq: 42,
             dedup_token: "user-msg-abc".into(),
-            kind: CommandKind::SendMessage {
+            kind: Kind::SendMessage {
                 thread_id: "T1".into(),
                 content: "Hello".into(),
             },
@@ -115,7 +116,7 @@ mod tests {
             "kind": {"kind": "fancy_future_thing", "data": 123}
         }"#;
         let cmd: Command = serde_json::from_str(json).expect("tolerant decode");
-        assert_eq!(cmd.kind, CommandKind::Unknown);
+        assert_eq!(cmd.kind, Kind::Unknown);
     }
 
     #[test]
@@ -129,6 +130,6 @@ mod tests {
             "future_field": true
         }"#;
         let cmd: Command = serde_json::from_str(json).expect("ignore unknown fields");
-        assert_eq!(cmd.kind, CommandKind::Stop);
+        assert_eq!(cmd.kind, Kind::Stop);
     }
 }

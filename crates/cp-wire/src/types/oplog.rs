@@ -7,7 +7,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{ContentHash, Heads, LifecycleState, Phase};
+use super::heads::Heads;
+use super::{ContentHash, LifecycleState, Phase};
 
 /// A single oplog record.
 ///

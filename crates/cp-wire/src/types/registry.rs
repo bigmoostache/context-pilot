@@ -1,6 +1,6 @@
 //! Agent registry entry — the discovery record written at boot.
 //!
-//! A [`RegistryEntry`] is the JSON file an agent writes to
+//! An [`Entry`] is the JSON file an agent writes to
 //! `~/.context-pilot/agents/<id>.json` on startup (design doc §10).  The
 //! backend's `AgentRegistry` watches this directory and emits
 //! appeared/disappeared/stale events.
@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 /// One agent's registration record, written atomically (tmp + rename) on
 /// boot and updated only on status changes — **not** per heartbeat.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct RegistryEntry {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Entry {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
 
@@ -76,8 +76,8 @@ mod tests {
     use super::*;
 
     /// Helper to build a minimal valid entry for tests.
-    fn sample_entry() -> RegistryEntry {
-        RegistryEntry {
+    fn sample_entry() -> Entry {
+        Entry {
             schema_version: 1,
             id: "abc123".into(),
             folder: "/home/user/project".into(),
@@ -99,7 +99,7 @@ mod tests {
     fn registry_entry_round_trip() {
         let entry = sample_entry();
         let json = serde_json::to_string(&entry).expect("serialize");
-        let back: RegistryEntry = serde_json::from_str(&json).expect("deserialize");
+        let back: Entry = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(entry, back);
     }
 
@@ -136,7 +136,7 @@ mod tests {
             "status": "running",
             "future_field": 42
         }"#;
-        let entry: RegistryEntry = serde_json::from_str(json).expect("tolerant decode");
+        let entry: Entry = serde_json::from_str(json).expect("tolerant decode");
         assert_eq!(entry.status, AgentStatus::Running);
     }
 }
