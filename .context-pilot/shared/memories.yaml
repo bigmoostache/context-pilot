@@ -497,7 +497,7 @@
   importance: high
   last_edited_ms: 0
 83d3f9f01cc82a78:
-  tl_dr: 'CP frontend maquette in ui/ (branch ''maquette''). Design-only React/TS. Views: fleet|threads|cockpit|finder. Fleet = 4-page mission control (Agents/Prompts/Usage/Settings). Dark theme = TUI D&D palette. Details in contents.'
+  tl_dr: 'Orchestration backend design doc docs/design-orchestration-backend.md is v3 (commit fcb11da, branch maquette): two-plane architecture + exhaustive problem register. CP maquette in ui/ unchanged.'
   contents: |-
     ## Context Pilot Frontend Maquette
 
@@ -541,7 +541,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781531198104
+  last_edited_ms: 1781601554690
 83e84589e8deaf29:
   tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
   contents: |-
