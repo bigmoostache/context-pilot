@@ -34,6 +34,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+0227420ccb59bbec:
+  path: ui/src/components/finder/Finder.tsx
+  description: Top-level Finder orchestrator. buildRealm(agent) memo, heterogeneous tabs (folder tabs w/ per-tab back/fwd history + file tabs via FinderPreview variant='full'); dbl-click file→openInNewTab (reuses tab), dbl-click folder→navigate. File-tab hides explorer sidebar. Keyboard nav (arrows/Enter/Backspace/Space/⌘A/⌘I/type-ahead), additive+range select, ContextMenu, GetInfo, 4 view modes, icon-size slider, path bar, drag-drop overlay, status bar, toast.
+  last_edited_ms: 1781600078258
 0238aa4840677705:
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data. Visualizer extracted to visualizers.rs.'
@@ -162,6 +166,10 @@
   path: crates/cp-mod-git/src/cache_invalidation.rs
   description: 'Cache invalidation: 11 regex rules mapping mutating git commands to stale panel patterns, find_invalidations()'
   last_edited_ms: 0
+07a1f5c0f653a66f:
+  path: ui/src/components/shell/ConfigPanel.tsx
+  description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog''|''inline''. Categories: General/Usage/Providers/Search/DocAI/Web/Integrations. Reads useAccount: when managedByCompany (T30) key panes show ManagedKeysNotice banner + each KeyRow LOCKED (Lock glyph, masked, ManagedPill). Usage renders <UsagePage/> full-bleed. Personal accounts: masked keys w/ reveal eye, toggles, default-model picker.'
+  last_edited_ms: 1781600078282
 07c4e2a77b4470b1:
   path: yamls/tools/ocr.yaml
   description: 'OCR tool YAML. Single tool: ocr with path/mode/output params. Datalab Surya engine, markdown or text_boxes modes.'
@@ -250,6 +258,10 @@
   path: docs/talk/slides/3-1.html
   description: 'Slide: WOWs Showcase — 7 domain slider (Medicine/Chemistry/Hardware/Maths/Finance/Education/Misc)'
   last_edited_ms: 1781078806848
+0b4815290c1d5d33:
+  path: ui/src/components/panels/cockpit/PanelFrame.tsx
+  description: 'Cockpit maquette shared shell: PanelFrame (accent-tiled icon + name/subtitle + token/cost chip + scrolling body) plus PanelSection/ImportanceDot/Chip helpers reused by every cockpit panel maquette.'
+  last_edited_ms: 1781600050324
 0b4883b6bad3068a:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
@@ -902,6 +914,10 @@
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). All overlays consume IR data.
   last_edited_ms: 0
+2acd97845cc5d377:
+  path: ui/src/components/panels/cockpit/ToolsPanel.tsx
+  description: 'Cockpit Tools maquette: enabled tool registry grouped by category (name, one-line desc, enabled/disabled dot). Reads mock toolGroups.'
+  last_edited_ms: 1781600050408
 2ad0adde669b4af1:
   path: src/llms/oai_providers/openai_streaming.rs
   description: 'OAI SSE types: StreamResponse/StreamDelta, ToolCallAccumulator (index-based), normalize_stop_reason(), dump_request()'
@@ -1122,6 +1138,10 @@
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A) + DARK ''Night Gold'' (#222831/#393E46/#FFD369/#EEEEEE: charcoal base, slate surfaces, golden-yellow accent, near-white text) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (agent dialog), finder-slider.'
   last_edited_ms: 1781519595891
+35e50392f564e64f:
+  path: ui/src/components/panels/cockpit/QueuePanel.tsx
+  description: 'Cockpit Queue maquette: staged tool calls (index, tool, intent, target preview) + Execute/Pause affordances, active state. Reads mock queueActions.'
+  last_edited_ms: 1781600050456
 3626ade6e9ad38d4:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -1462,6 +1482,10 @@
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine. No PendingForm guard.
   last_edited_ms: 1781391612076
+448805d7b179c5fd:
+  path: ui/src/components/finder/useMarquee.ts
+  description: Finder box/marquee (rubber-band) selection hook (T32). useMarquee({containerRef,enabled,getSelected,onChange,onEmptyClick}) → {band, didDrag(), handlers}. Press on empty space + drag sweeps a rectangle; live getBoundingClientRect() hit-test against [data-finder-item][data-path] cells selects intersecting items. ⌘/Ctrl unions onto the pre-drag selection snapshot, else replaces. 4px drag threshold; press-no-drag clears. didDrag() = one-shot flag so the host suppresses its background-click clear after a sweep. Pointer handlers only (no window listeners), gated to grid/list.
+  last_edited_ms: 1781600745220
 44920171b54ee28f:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
@@ -1750,6 +1774,10 @@
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
   last_edited_ms: 1781448934651
+54db368ac9a4efa9:
+  path: ui/src/components/panels/cockpit/SpinePanel.tsx
+  description: 'Cockpit Spine maquette: notification list (kind dot, id, time, processed state) + guard-rail/auto-continuation config rows. Reads mock spine.'
+  last_edited_ms: 1781600050432
 54eaa3cfe9a5ebbb:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
@@ -1846,6 +1874,10 @@
   path: ui/src/components/agents/AgentsView.tsx
   description: 'Agents launcher (mission control). 2-pane: FileBrowser | AgentDetail. Holds selected FsNode, defaults to active agent''s folder. findByPath DFS helper.'
   last_edited_ms: 1781514430693
+587780672099ede1:
+  path: ui/src/components/ui/avatar.tsx
+  description: 'shadcn-style Avatar primitive on Base UI: Avatar/Image/Fallback + Badge/Group/GroupCount, size variants. Building block (UserMenu/Profile use their own gradient AvatarMark).'
+  last_edited_ms: 1781600050480
 58d63e6da1bfd473:
   path: ui/src/components/shell/StatsPopup.tsx
   description: Session 'vitals' popup — the stats that used to live in the cockpit's right rail, now summoned from an Activity button in the global TopBar header. Portaled Dialog primitive (escapes vibrancy containing block). Context-budget meter + threshold tick + stat rows from mock.stats.
@@ -1862,6 +1894,10 @@
   path: src/modules/overview/tools_panel.rs
   description: 'Tools panel. Title ''Tools''. Delegates blocks to tools_blocks(). Context: markdown table of all tools. No cache.'
   last_edited_ms: 0
+59a9efb81a7691d8:
+  path: ui/src/components/panels/cockpit/StatsPanel.tsx
+  description: 'Cockpit Statistics maquette: context-budget meter, session stat grid, cache-economics chips, per-panel token weight bars. Reads mock stats/tokenBudget/cacheStats/panels.'
+  last_edited_ms: 1781600050397
 5a31461824e01298:
   path: ui/src/lib/mock.ts
   description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails (5 full convos), agents (3 workspaces=folders), fileTree (nav-able fs with agent-badged folders), activeAgentId.'
@@ -2042,6 +2078,10 @@
   path: ui/src/components/shell/UserMenu.tsx
   description: 'Account avatar menu (T30) — replaced the old top-right Settings gear. Portaled Base-UI dropdown: avatar trigger (gradient-initials AvatarMark) opens a floating menu with an identity header (name/email + Company/Personal pill via currentUser) and Profile / Settings / Sign-out items. Settings still opens ConfigModal (reversible re-skin). Exports UserMenu + AvatarMark (shared with ProfileModal).'
   last_edited_ms: 1781596817732
+630d6115abc684bb:
+  path: ui/src/components/ui/tooltip.tsx
+  description: App-wide tooltip wrapper (T25). <Tip title body side triggerClassName>. Base-UI tooltip, portals to document.body (escapes .vibrancy containing block), --popover-token surface+arrow (theme-correct), title(bold)+optional body. Shared TooltipProvider at App root (delay 350/close 80).
+  last_edited_ms: 1781600078174
 6361792c7f8df4c1:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
@@ -2110,6 +2150,10 @@
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). FleetDashboard at fleet altitude; the other three are per-agent views. openAgent switches agent→threads. Finder keyed by agent.id (remounts per agent).
   last_edited_ms: 1781516507828
+66cd14d2cf82a036:
+  path: ui/src/components/panels/cockpit/PanelPane.tsx
+  description: Cockpit panel router (T16). Given selected id, renders its bespoke maquette by kind. Special id 'conversation' → full <Conversation/> surface (T24). Unknown kinds → graceful placeholder in PanelFrame.
+  last_edited_ms: 1781600078270
 66cdf4355c091617:
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers").
@@ -2262,6 +2306,10 @@
   path: crates/cp-mod-console/Cargo.toml
   description: 'Console module deps: cp-base, cp-render, crossterm, serde, serde_json, regex.'
   last_edited_ms: 0
+6e38c40b8230f2af:
+  path: ui/src/components/panels/cockpit/MemoryPanel.tsx
+  description: 'Cockpit Memories maquette: long-term recall cards (id + importance dot, tl;dr, freeform label chips). Reads mock memoryCards.'
+  last_edited_ms: 1781600050350
 6e5870d980b4c6f3:
   path: crates/cp-mod-search/src/radar.rs
   description: Context Radar with flame!("radar_refresh") and flame!("radar_push_signal"). Adaptive log-count-based decay scoring, Meilisearch log queries via background thread. format_timestamp_ms via cp_mod_utilities::time. Recent logs (10) deterministic + semantic top 40.
@@ -2282,6 +2330,10 @@
   path: ui/src/lib/panelMeta.ts
   description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
   last_edited_ms: 1781458541269
+6f745b9289574be9:
+  path: ui/src/components/panels/cockpit/EntitiesPanel.tsx
+  description: 'Cockpit Entities maquette: per-table cards (name, row count, column signature, sample rows in mono). Reads mock entityTables.'
+  last_edited_ms: 1781600050420
 6f870a577bdee50a:
   path: ui/src/components/shell/AgentSwitcher.tsx
   description: TopBar workspace switcher dropdown (1 agent=1 folder). Items wrapped in DropdownMenuGroup (Base UI fix). Switch agent inline; New-agent/Manage actions jump to fleet dashboard (onFleet) — the only management surface.
@@ -3442,6 +3494,10 @@ a5e9c30f4b25aabc:
   path: crates/cp-render/src/markdown.rs
   description: Shared markdown→IR parser. to_blocks() (fenced code blocks, headers, bullets, inline). parse_line() (single line). parse_inline() (bold, code, links). Used by skill panels + conversation renderer.
   last_edited_ms: 0
+a60f55ef75b710ea:
+  path: ui/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard — agent create/manage entry. Centred on FLEET_MAX_W. Slim 'Agents' h1 + New-agent button (T28). AgentCard grid (status badge + one-line task + model·cost; Open→threads, Manage→AgentModal), New-agent card. autoCreate prop (T21) opens AgentModal create mode. AgentModal in ./AgentModal (T26), shared w/ TopBar config button.
+  last_edited_ms: 1781600078187
 a61f9b3e3a51d9b2:
   path: ui/src/components/threads/QuestionForm.tsx
   description: 'Embedded thread question form (CP signature): single/multi-select options with interactive pick state, allowOther field, submit button. Cyan-accented, decorative but stateful.'
@@ -3650,6 +3706,10 @@ b15c976b1b6f7804:
   path: src/llms/claude_code/debug.rs
   description: 'Debug helpers: dump_last_request (writes API request JSON to disk) + StreamErrorContext/build_stream_read_error (verbose stream failure diagnostics).'
   last_edited_ms: 0
+b18c7caa4f869853:
+  path: ui/src/components/finder/FinderViews.tsx
+  description: 'Finder main-area views. GridView/ListView/ColumnsView/GalleryView render macOS <FileIcon kind ext size/> (T27). Grid (icon-size slider + finder-pop stagger + TagDots + focus ring), List (zebra + sortable headers + tags), Columns (Miller + metadata preview pane), Gallery (hero + filmstrip). Grid + List buttons carry data-finder-item + data-path for marquee hit-testing (T32). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
+  last_edited_ms: 1781600745244
 b1981e09477550a2:
   path: ui/src/components/threads/ThreadsView.tsx
   description: 'Threads view assembler: 3-pane layout (ThreadList | ThreadConversation | ThreadDetailRail), holds selectedId state, onOpenCockpit bridges to panel view.'
@@ -3754,6 +3814,10 @@ b5e5095cae7ebe03:
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table.'
   last_edited_ms: 0
+b5ec61994019026b:
+  path: ui/src/components/panels/cockpit/CallbacksPanel.tsx
+  description: 'Cockpit Callbacks maquette: file-edit hook cards (id, name, glob pattern, blocking pill, timeout, scope, cwd). Reads mock callbackRows.'
+  last_edited_ms: 1781600050444
 b5f00ac6a4ae8a14:
   path: .github/checks/check-lint-config.sh
   description: Lint integrity hash chain checker. Verifies protected files (Cargo.toml lint config, clippy.toml, CI scripts) haven't been tampered with. --update flag to recompute chain (requires password).
@@ -3822,6 +3886,10 @@ b92c4c51d2a37642:
   path: src/modules/mod.rs
   description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 1780568982764
+b93a801b0d39d75c:
+  path: ui/src/components/panels/cockpit/ThreadsPanel.tsx
+  description: 'Cockpit Threads maquette: thread roster cards (status dot Needs-you/Active/Working, name, msg count, last activity, last-message preview). Reads mock threadDetails.'
+  last_edited_ms: 1781600050385
 b96949488bfdc35e:
   path: ui/src/components/finder/Finder.tsx
   description: Top-level Finder. buildRealm(agent) memo. Tabs with per-tab back/fwd history. cwd nav, breadcrumb, grid/list/columns switch, search, sort, multi-select, QuickLook preview pane (toggle), drag-drop upload overlay, status bar (item/selected count, path). Design-only transfers.
@@ -3854,6 +3922,10 @@ ba1851aea6e21ecc:
   path: ui/src/components/agents/FleetSidebar.tsx
   description: Mission-control left nav rail (fleet dashboard). FleetPage=agents|prompts|usage|settings. NO identity header (TopBar owns it). NO in-rail collapse button — collapse driven by FleetShell's border rail. 4 nav items (icon+label+hint, active=card-shadow). Width = shared var(--sidebar-w); collapsed animates aside width →0 (fixed-width inner shell). page/onSelect/collapsed props.
   last_edited_ms: 1781533961624
+ba4b46d00e37d261:
+  path: ui/src/components/agents/PromptModal.tsx
+  description: 'Prompts page modals. PromptModal: LARGE dialog (1180x90vh) — create (kind picker System/Skill/Command + name/desc) or view/edit (prefilled, built-in name lock, Delete). Body = WYSIWYG MarkdownEditor, remounts on isNew/item.id (not kind). ImportModal: import from Claude Code/Codex/Cursor/Windsurf/Aider/Continue, per-row Imported state. Shared Backdrop+Field.'
+  last_edited_ms: 1781600078223
 bab9d0cd28f2d236:
   path: ui/src/lib/finderFs.ts
   description: Finder mock fs + helpers. buildRealm grafts one rich tree (src/modules nesting, docs, media/ w/ mp4+m4a, planning) onto an agent folder. tags/created/starred/media payloads + PEAKS waveform. findNode/pathChain/collectStarred/nodeSize/childCounts/fmtBytes/sortNodes.
@@ -4298,6 +4370,10 @@ cee0067c856dd433:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Cream Noir'', the SYMMETRIC LIGHTNESS-MIRROR of Cream (#1C1815 espresso bg / #2B2620 surface / #CF8A7D lifted clay-rose / #F3EBDD cream fg; warm hue + clay-rose primary + teal accent preserved) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (agent dialog), finder-slider.'
   last_edited_ms: 1781520704488
+cf4e3535295d01f1:
+  path: ui/src/components/finder/Finder.tsx
+  description: Top-level Finder orchestrator. buildRealm(agent) memo, heterogeneous tabs (folder tabs w/ per-tab back/fwd history + file tabs via FinderPreview variant='full'); dbl-click file→openInNewTab, dbl-click folder→navigate. File-tab hides explorer sidebar. Keyboard nav (arrows/Enter/Backspace/Space/⌘A/⌘I/type-ahead), additive+range click select, BOX/MARQUEE select (T32) via useMarquee on the grid/list <main> (relative+select-none, renders accent band, didDrag suppresses click-clear), ContextMenu, GetInfo, 4 view modes, icon-size slider, path bar, drag-drop overlay, status bar, toast.
+  last_edited_ms: 1781600745232
 cf6078cbda1950a2:
   path: src/modules/conversation/markdown_ir.rs
   description: Thin re-export — delegates to cp_render::markdown::parse_line(). Backward compat for conversation renderer.
@@ -4390,6 +4466,10 @@ d2eef20869d99ca6:
   path: crates/cp-mod-logs/src/panel.rs
   description: Logs panel. Tree-structured display with summaries. format_timestamp() via cp_mod_utilities::time::epoch_ms_to_local_ymd_hms. IR block rendering with expand/collapse. Context provider for LLM.
   last_edited_ms: 0
+d30bd0afc964e93a:
+  path: ui/src/components/agents/UsagePage.tsx
+  description: Cost & token analytics page (fleet 'Usage', mounted as ConfigPanel category). Reads mock usagePoints+USAGE_RATES. Agent-filter chips, 3M/6M/12M range, $/tokens lens. Monthly buckets decomposed into cache hits/misses/output. Hero cards + forecast callout (partial→run-rate) + CSS stacked bar w/ dashed ghost + monthly table w/ Δ + per-agent bars.
+  last_edited_ms: 1781600078199
 d31e0cea5b615120:
   path: ui/src/components/ui/scroll-area.tsx
   description: shadcn scroll-area (Base UI). Used across rails/views.
@@ -4634,6 +4714,10 @@ e29a9e64463f2ec8:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated list of allowed #[expect]/#[allow] annotations (10 entries). Every occurrence in the codebase MUST have an entry here. Fields: path, match, reason, strategy.'
   last_edited_ms: 0
+e2c3fd78a28d00cd:
+  path: ui/src/components/panels/cockpit/RadarPanel.tsx
+  description: 'Cockpit Context Radar maquette: anchor signals + recency-weighted scored results with score meter, importance dot, timestamp. Reads mock radarAnchors/radarResults.'
+  last_edited_ms: 1781600050362
 e2c579843c4364f1:
   path: crates/cp-base/src/state/mod.rs
   description: 'Sub-module hub: actions, autocomplete, context, data, flags, runtime (State struct), watchers. Inline reverie module with Session struct (kind, agent, messages, tool_call_count).'
@@ -4658,6 +4742,10 @@ e445bc97e31d455a:
   path: crates/cp-mod-callback/src/types.rs
   description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, active_set, editor_open).
   last_edited_ms: 0
+e48d20dd3b0e5ca4:
+  path: ui/src/components/agents/PromptsPage.tsx
+  description: Global prompt-library page (fleet 'Prompts'). Centred on FLEET_MAX_W. Slim 'Prompts' h1 + Import/New (T28). mock library[] (system/skills/commands) cards w/ KIND_META icon/accent/blurb, filter tabs (all+per-kind counts), kind sections in 'all'. 'agent' kind labelled 'System'. Opens PromptModal/ImportModal. Built-in badge only.
+  last_edited_ms: 1781600078211
 e493d21e31f3e450:
   path: crates/cp-mod-github/src/tools.rs
   description: GitHub CLI tool. Read-only → dynamic github_result panels. Mutating → async subprocess via spawn_async_tool. flame!("gh_exec"). Token redaction. Cache invalidation of affected panels. GIT_PROMPT_DISABLED.
@@ -4678,6 +4766,10 @@ e5e547cda3e3fcfc:
   path: ui/src/lib/mock.ts
   description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails (6 convos w/ agentId, incl ACTIVE + archived), agents (3 workspaces), fileTree, library, usagePoints+USAGE_RATES. Cockpit panel maquette data (T16): treeRows, memoryCards, radarAnchors/radarResults, todoItems, entityTables, toolGroups, callbackRows, queueActions, scratchCells.'
   last_edited_ms: 1781544549055
+e5f1d908e91433aa:
+  path: ui/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog — single source of truth for both flows (T26). Exports AgentModal + AgentModalMode + MODELS/MODEL_META/slugify. Manage: rename/switch-model/archive (realm fixed); create: name-as-star w/ live slugified realm preview. Gradient hero, rich model cards, autofocus+Esc+⌘↵. Backdrop absolute inset-0 → host gives viewport positioning ctx (TopBar renders it as .vibrancy sibling).'
+  last_edited_ms: 1781600078246
 e610e21de8868286:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
@@ -4686,6 +4778,10 @@ e6320611c8e9f107:
   path: ui/src/components/ui/sheet.tsx
   description: shadcn Sheet primitive (Base UI Dialog) — side drawer (top/right/bottom/left) with overlay, close button. Not currently consumed by any view; available shadcn building block.
   last_edited_ms: 1781534862020
+e69f3535896b2598:
+  path: ui/src/components/panels/cockpit/ScratchpadPanel.tsx
+  description: 'Cockpit Scratchpad maquette: ephemeral working-cell cards (id, title, content preview) + empty state. Reads mock scratchCells.'
+  last_edited_ms: 1781600050468
 e6b9ad2949d17655:
   path: src/app/panels.rs
   description: Thin wrapper around cp_base::panels. get_panel() delegates to module system. FallbackPanel for orphaned contexts. refresh_all_panels() and collect_all_context() helpers.
@@ -4938,6 +5034,10 @@ f51a2491e78e66d4:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
   last_edited_ms: 0
+f54924eedb3c09b1:
+  path: ui/src/components/panels/cockpit/TodoPanel.tsx
+  description: 'Cockpit Todo List maquette: depth-indented hierarchical tasks, status glyph (pending/in-progress/done), header progress bar. Reads mock todoItems.'
+  last_edited_ms: 1781600050373
 f55198d7c0c7fc0e:
   path: src/modules/mod.rs
   description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -5022,6 +5122,10 @@ f8eeeec12b309794:
   path: crates/cp-mod-search/src/meili/mod.rs
   description: 'Meilisearch sub-module hub: bootstrap, client, download, overlay, server, tasks.'
   last_edited_ms: 0
+f92c5bde1453df0b:
+  path: ui/src/components/finder/GetInfo.tsx
+  description: 'Get Info modal — macOS dossier sheet: large macOS <FileIcon> (T27), name, kind/size/dates, tags, dimensions/duration/pages, ''where'' path. Esc/Done close. Decorative.'
+  last_edited_ms: 1781600078235
 f957bf9c5e2d5a99:
   path: src/infra/api.rs
   description: Thin re-export of llms::{StreamEvent, StreamParams, start_streaming}. Backward-compat shim.
@@ -5118,6 +5222,10 @@ fd2cc3a6e7f7a05b:
   path: ui/src/components/threads/ThreadsView.tsx
   description: Threads view assembler, scoped to ACTIVE AGENT's realm (filters threadDetails by agentId, EmptyRealm when none). 2-pane (collapsible ThreadList | ThreadConversation). Owns collapsed state; floating PanelLeft Button re-opens the rail when collapsed. No onOpenCockpit (details popup removed).
   last_edited_ms: 1781533385882
+fd5c5364aaf6141a:
+  path: ui/src/components/panels/cockpit/TreePanel.tsx
+  description: 'Cockpit Directory Tree maquette: depth-indented annotated rows (folder/file glyph, token-size chip, cartographer description, [!] stale marker). Reads mock treeRows.'
+  last_edited_ms: 1781600050337
 fd604dcc85d708e3:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
