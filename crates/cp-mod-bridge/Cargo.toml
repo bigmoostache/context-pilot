@@ -14,6 +14,7 @@ cp-base.workspace = true
 cp-render.workspace = true
 cp-wire = { path = "../cp-wire" }
 cp-oplog = { path = "../cp-oplog" }
+log = "0.4"
 nix = { version = "0.30", default-features = false, features = ["fs"] }
 serde_json.workspace = true
 

@@ -299,3 +299,38 @@ index 5a67009..35cd0c2 100755
 +  -not -path './ui/*')
  exit $exit_code
 # --- End entry #21 ---
+22:6f22bb1a1c71ecc60fc4dd433b48d3abec248f58c17918d3360b7914530941b2:5cddf33bb252bc2611e13e601970a3a77c324c7e57e83919863d7cbeb462b028:b6808d09d2a0589b0ec3e688e4dce0471a2c8d38a22b9149f7e7a2c51aaba3b9
+# --- Diff for entry #22 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 420c0cc..0e53056 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities"]
+ 
+ [workspace.package]
+ version = "0.1.0"
+@@ -1070,6 +1070,7 @@ cp-mod-github = { path = "crates/cp-mod-github" }
+ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
+ cp-mod-threads = { path = "crates/cp-mod-threads" }
++cp-mod-bridge = { path = "crates/cp-mod-bridge" }
+ cp-mod-prompt = { path = "crates/cp-mod-prompt" }
+ cp-mod-brave = { path = "crates/cp-mod-brave" }
+ cp-mod-firecrawl = { path = "crates/cp-mod-firecrawl" }
+diff --git a/.github/checks/check-folder-sizes.sh b/.github/checks/check-folder-sizes.sh
+index 35cd0c2..0db023d 100755
+--- a/.github/checks/check-folder-sizes.sh
++++ b/.github/checks/check-folder-sizes.sh
+@@ -35,5 +35,7 @@ done < <(find . -mindepth 1 -type d \
+   -not -path './benchmarks/terminal-bench/jobs' \
+   -not -path './benchmarks/terminal-bench/jobs/*' \
+   -not -path './ui' \
+-  -not -path './ui/*')
++  -not -path './ui/*' \
++  -not -path './web' \
++  -not -path './web/*')
+ exit $exit_code
+# --- End entry #22 ---

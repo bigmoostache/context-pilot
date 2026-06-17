@@ -30,6 +30,7 @@
 use cp_base as _;
 use cp_oplog as _;
 use cp_render as _;
+use log as _;
 use nix as _;
 
 use std::fs;

@@ -18,9 +18,12 @@
 use cp_base::modules::Module;
 use cp_base::panels::Panel;
 use cp_base::state::context::Kind;
+use cp_base::state::data::model_helpers::ModelPricing as _;
 use cp_base::state::runtime::State;
 use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
+
+use crate::boot::Boot;
 
 pub mod body;
 pub mod boot;
@@ -30,10 +33,25 @@ pub mod heartbeat;
 pub mod register;
 pub mod tee;
 
+/// Runtime state for the bridge (stored in [`State`]'s `TypeMap`).
+///
+/// Not serializable — [`Boot`] holds OS resources (folder lock, stream socket,
+/// oplog commit thread, heartbeat beacon) that are created fresh each session.
+/// `save_module_data` / `load_module_data` return `Null`.
+#[derive(Debug)]
+pub struct BridgeState {
+    /// The held boot resources, or `None` when the bridge is OFF or boot failed.
+    pub boot: Option<Boot>,
+}
+
 /// Agent-side orchestration bridge module.
 ///
-/// Phase 3 scaffold: registered but no-op.  Future phases add oplog,
-/// stream tee, command intake, and heartbeat.
+/// Inert when `CP_BRIDGE` is unset or not `"1"`.  When active, [`init_state`]
+/// acquires the folder lock, opens the oplog, binds the stream socket, starts
+/// the heartbeat beacon, and writes a registry record so the backend discovers
+/// this agent.
+///
+/// [`init_state`]: Module::init_state
 #[derive(Clone, Copy, Debug)]
 pub struct BridgeModule;
 
@@ -62,7 +80,39 @@ impl Module for BridgeModule {
         true
     }
 
-    fn init_state(&self, _state: &mut State) {}
+    fn init_state(&self, state: &mut State) {
+        let active = std::env::var("CP_BRIDGE").as_deref() == Ok("1");
+        if !active {
+            state.set_ext(BridgeState { boot: None });
+            return;
+        }
+
+        let folder = match std::env::current_dir() {
+            Ok(f) => f,
+            Err(e) => {
+                log::error!("bridge: cannot determine working directory: {e}");
+                state.set_ext(BridgeState { boot: None });
+                return;
+            }
+        };
+
+        let model = state.current_model();
+
+        match Boot::start(&folder, &model) {
+            Ok(boot) => {
+                log::info!(
+                    "bridge: activated for {} ({})",
+                    boot.id(),
+                    folder.display(),
+                );
+                state.set_ext(BridgeState { boot: Some(boot) });
+            }
+            Err(e) => {
+                log::error!("bridge: boot failed: {e:?}");
+                state.set_ext(BridgeState { boot: None });
+            }
+        }
+    }
 
     fn reset_state(&self, _state: &mut State) {}
 
@@ -187,5 +237,11 @@ mod tests {
     fn bridge_module_no_tools() {
         let m = BridgeModule;
         assert!(m.tool_definitions().is_empty());
+    }
+
+    #[test]
+    fn bridge_state_default_is_none() {
+        let bs = BridgeState { boot: None };
+        assert!(bs.boot.is_none());
     }
 }

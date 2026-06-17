@@ -1938,6 +1938,10 @@
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
   last_edited_ms: 0
+5163a5f8d270c77e:
+  path: web/src/lib/finderFs.ts
+  description: Finder mock fs + helpers. buildRealm grafts one rich tree onto an agent folder. findNode/pathChain/collectStarred/nodeSize/childCounts/fmtBytes/sortNodes. Used by Finder.tsx for sortNodes/fmtBytes only (live mode).
+  last_edited_ms: 1781696062492
 5166dcba8cf624a4:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only fsync''d log + running ReplayState fold (heads+seen). open() seeds via replay::replay. append(kind)->rev probes frame size, rolls at 64MiB. roll() stamps leading Checkpoint(Snapshot) as new segment''s first record (GAP1). write_record = sole rev point (frame+write_all+sync_data+fold_entry, announce-after-durable K9). checkpoint()/heads()/seen()/snapshot() public. OplogError{Io,Frame}. 8 tests.'
@@ -2834,6 +2838,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks.'
   last_edited_ms: 1780651842172
+75d1e3b1ba2d8dde:
+  path: web/src/components/agents/UsagePage.tsx
+  description: Cost & token analytics — fleet Usage page. Agent filter, date range, unit lens ($/tokens). Monthly stacked bar chart + table + forecast. Still on mock data (usagePoints/USAGE_RATES) — needs richer monthly-history backend endpoint.
+  last_edited_ms: 1781696062508
 75eb33edbee482d1:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, metadata, pipeline, queue_flush.'
@@ -2870,6 +2878,10 @@
   path: ui/src/components/finder/FinderViews.tsx
   description: 'Finder main-area views. GridView/ListView/ColumnsView/GalleryView all render macOS <FileIcon kind ext size/> (T27) instead of lucide glyphs. Grid (icon-size slider + finder-pop stagger + TagDots + focus ring), List (zebra + sortable headers + tags), Columns (Miller + metadata preview pane w/ size-84 FileIcon), Gallery (hero size-132 + filmstrip; n.image still overrides w/ gradient thumb). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
   last_edited_ms: 1781597468890
+77cdeca6b1b5c174:
+  path: web/src/lib/mock.ts
+  description: Mock session data for the maquette. Panels, tokenBudget, messages, threads, threadDetails, agents, fileTree, library, usagePoints+USAGE_RATES, cockpit panel data, currentUser. Partially superseded by live hooks — still used as fallback for UsagePage, StatusBar cache bar, PromptsPage.
+  last_edited_ms: 1781696062524
 782b15ad724cdaf8:
   path: .github/workflows/codeql.yml
   description: 'CI: CodeQL security analysis'
