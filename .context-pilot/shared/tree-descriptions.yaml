@@ -1182,6 +1182,10 @@
   path: rust_lints_compared_list.md
   description: Rustc lint comparison results
   last_edited_ms: 0
+33ca8b9fffaf3424:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 33de1c508379ae28:
   path: crates/cp-mod-callback/src/tools.rs
   description: Callback tool dispatch. Routes upsert/open_editor/close_editor. Delegates upsert to tools_upsert.rs.
@@ -1517,6 +1521,10 @@
 4096b6b974af5a9c:
   path: src/ui/help/mod.rs
   description: Re-exports CommandPalette, config_overlay module
+  last_edited_ms: 0
+409c26540705b0a2:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Phase 19: transport hub. Backend{view,breaker,hub,tickets,agents_dir} under Arc<Mutex>. serve(addr,state) = tiny_http acceptor, thread-per-request. route_rest dispatches GET /api/fleet|/agent/{id}|/agent/{id}/body/{hash}, POST /agent/{id}/command|/ticket. handle_stream: GET /api/stream?agent&ticket — redeem single-use ticket, spawn run_stream producer (Tailer.seed(last_rev) replay + gap→resync + hub frame drain + keepalive disconnect-probe, unsubscribe on exit). MAX_BODY 1MiB, STREAM_POLL 200ms. QueryParams + Last-Event-ID parsing. read_body binds _read; respond binds _sent (let-underscore-drop).'
   last_edited_ms: 0
 40d78bef84f55ac4:
   path: src/infra/mod.rs
@@ -3882,6 +3890,10 @@ a886f7300cfb14d0:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
   last_edited_ms: 0
+a89593dca254bf7d:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Phase 19/30: transport hub. Backend{view,breaker,hub,tickets,agents_dir} under Arc<Mutex>. serve(addr,state)/serve_bound(server,state) (split so tests bind 127.0.0.1:0 + read server_addr before serving) = tiny_http acceptor, thread-per-request. route_rest dispatches GET /api/fleet|/agent/{id}|/agent/{id}/body/{hash}, POST /agent/{id}/command|/ticket. handle_stream: GET /api/stream?agent&ticket — redeem single-use ticket, spawn run_stream producer (Tailer.seed(last_rev) replay + gap→resync + hub drain + keepalive probe, unsubscribe on exit). stream_to_client: SSE delivered via request.into_writer() + manual HTTP preamble + flush-after-every-event (tiny_http 0.12 respond() buffers body through a 1KiB BufWriter flushed only after raw_print returns = fatal for unbounded SSE — small events stuck forever; into_writer+per-event flush fixes it). MAX_BODY 1MiB, STREAM_POLL 200ms. QueryParams + Last-Event-ID parsing.'
+  last_edited_ms: 1781679569056
 a8ee523e02ccb580:
   path: src/llms/claude_code_api_key/check.rs
   description: 'Placeholder: check methods merged into mod.rs to avoid multiple_inherent_impl lint'
@@ -4530,6 +4542,10 @@ c57234ff1b6d1f95:
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog'' (DialogClose chrome, used by ConfigModal/TopBar gear) | ''inline'' (fills page, Save button, used by fleet Settings page). Categories: General/Providers/Search/DocAI/Web/Integrations. Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
   last_edited_ms: 1781531138874
+c577fd87e0690b02:
+  path: crates/cp-orchestrator/tests/common/mod.rs
+  description: 'Phase 30 shared test harness (a tests/ submodule, NOT an auto-run integration binary, no #[test]). Hand-rolled dependency-free blocking HTTP/1.1 client + SSE reader over raw TcpStream: request/get/post_json (Connection: close, read-to-EOF, status+body parse) + sse_collect(addr,path,headers,want,deadline)->(status,Vec<SseEvent>) (200ms read-timeout poll loop, parses id:/event:/data: blocks split by blank line, ignores comment/keepalive). SseEvent{id:Option<u64>,event,data}. Proves real tiny_http server bytes round-trip on the wire without an async HTTP stack. pub(crate) visibility (unreachable_pub in test crate).'
+  last_edited_ms: 1781679569012
 c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
@@ -4666,6 +4682,10 @@ ca1fb9a37e39702d:
   path: logs/bridge.log
   description: Bridge activity log
   last_edited_ms: 0
+ca34cce3829894e2:
+  path: crates/cp-orchestrator/tests/transport_http.rs
+  description: 'Phase 30 (X797) transport surface over a real tiny_http server on an ephemeral port (4 tests, green ~2s). Harness(agent_id,n_msgs) seeds OplogWriter + Entry json + Backend.apply_batch, spawns serve_bound on 127.0.0.1:0. (1) REST /fleet+/agent/{id} carry rev envelope, unknown agent 404; (2) POST /ticket mints, /command malformed=400 + tripped-breaker fail-closed 503; (3) SSE ticket gate: no/bogus ticket=401, valid=200+delta, redeemed ticket single-use 401; (4) Last-Event-ID resume: only deltas rev>2 delivered, each delta.data carries serialized OpEntry. Top `use cp_mod_bridge/nix/serde as _;`.'
+  last_edited_ms: 1781679569026
 ca3fb28c65d5c4e6:
   path: src/app/run/tools/metadata.rs
   description: Global tool metadata middleware — validates `intent`/`verb` on every tool call. Returns warning string for missing/invalid metadata.
@@ -5054,6 +5074,10 @@ dc669315644ebb28:
   path: crates/cp-mod-git/src/types.rs
   description: GitChangeType, GitFileChange, GitState (branch/changes/diff_base) with ext/ext_mut, GitResultRequest
   last_edited_ms: 0
+dc9b4729550534d2:
+  path: crates/cp-orchestrator/tests/end_to_end.rs
+  description: 'Phase 30 (X797) end-to-end loopback capstone (3 tests, green ~0.06s). Real agent stack ↔ real backend transport over real sockets, no mocks. (1) capstone loop: agent thread = OplogService + Intake + UnixListener accept; client POST /command → AgentChannel::send (UDS) → Intake journal-then-ack → receipt cmd_id+dedup_token+rev:0+accepted; replay confirms durable; then SSE /stream tails the SAME oplog → CommandEffect re-emerges as delta with id=Some(0) (rev framing) + data carries dedup token = full loop closed; (2) spilled body hydrates over GET /…/body/{hash} byte-for-byte, malformed=400, absent=404; (3) soak: 25 SSE connect/disconnect cycles all 200+delta, server still healthy after (no FD/thread leak hang). serve_backend helper. Top `use nix/serde as _;`.'
+  last_edited_ms: 1781679569041
 dcb9ef498a7d8eef:
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'

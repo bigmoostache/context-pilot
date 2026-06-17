@@ -110,11 +110,11 @@
   - persistence
   last_edited_ms: 1780567164228
 83d3f9f01cc82a78:
-  tl_dr: 'Orchestration backend, branch ''demaquetting'', 30 phases X768-X797. Phases 1-29 done & green. Next: Phase 30 (X797 transport+e2e) then capstone 20 (X787). Details in contents.'
+  tl_dr: Orchestration backend, branch 'demaquetting', 30 phases X768-X797. Phases 1-30 DONE & green. Only capstone Phase 20 (X787, M4 ship gate) remains. Details in contents.
   contents: |-
     ## Orchestration backend — branch 'demaquetting' (30 phases X768-X797)
 
-    Phases 1-19 PRODUCTION DONE & green. Testing phases 21-29 DONE.
+    ALL 30 implementation+testing phases DONE & green. Only X787 (Phase 20, M4 ship gate) remains.
 
     ### Trichotomy (each file's doc says which side)
     - cp-wire + cp-oplog = SHARED (I/O contract + WAL)
@@ -123,28 +123,32 @@
 
     ### Crate test counts (all green under full lint gate)
     - cp-wire: 74 (59 lib + 8 framing_integrity + 7 protocol)
-    - cp-oplog: 56 COMPLETE
-    - cp-mod-bridge: 48 COMPLETE
-    - cp-orchestrator: 89 (77 lib + 4 registry_channel + 4 services_integration + 4 supervisor_lifecycle)
+    - cp-oplog: 56
+    - cp-mod-bridge: 48
+    - cp-orchestrator: 95 (76 lib + 4 registry_channel + 4 services_integration + 4 supervisor_lifecycle + 4 transport_http + 3 end_to_end)
 
-    ### Phase 29 (X796) DONE+committed e18327e: tests/services_integration.rs (4)
-    MaterializedView+CostBreaker+StreamHub driven TOGETHER vs real cp-oplog via Tailer: (1) restart rebuild I5+V9 append_durable->shutdown->Tailer.poll->apply_batch->rebuild_from_view trips; (2) real rolled Checkpoint folds to ground-truth head (assert >=1 Checkpoint in stream); (3) R2-17 reconcile = view heads = authoritative snapshot, mark_reconciled clears; (4) 2-agent fleet isolation across all 3 services.
+    ### Phase 30 (X797) DONE: transport + e2e
+    - tests/common/mod.rs: hand-rolled blocking HTTP/1.1 + SSE client over TcpStream (request/get/post_json/sse_collect, SseEvent{id,event,data}). NOT a test binary (tests/ submodule).
+    - tests/transport_http.rs (4): REST rev-envelope+404; ticket mint + command 400/503-tripped; SSE ticket-gate 401 single-use; Last-Event-ID replay rev>2.
+    - tests/end_to_end.rs (3): capstone loop (agent OplogService+Intake+UnixListener accept ↔ backend transport: POST /command→UDS→journal-then-ack→receipt rev:0→Tailer tails same oplog→SSE delta id=rev + carries dedup token); body hydrate over REST 200/400/404; 25-cycle SSE soak + server-still-healthy.
 
-    ### CRITICAL lint gotchas (carry to phase 30)
-    - Each tests/ file is a SEPARATE crate target. per-target unused-crate-dependencies (forbid) flags every dep the file doesn't directly name → `use <crate> as _;` block at top. cp-orchestrator unnamed-in-tests so far: cp_mod_bridge, nix, serde, serde_json, tiny_http.
-    - dev-deps unnamed by LIB code flag LIB-TEST target; unnamed by BIN code flag BIN-TEST target → `#[cfg(test)] use <crate> as _;` in lib.rs AND main.rs (cp-mod-bridge needed both).
-    - CB3 rust-check LIB-ONLY — ALWAYS `cargo test -p <crate>` (or --test <name>) before commit.
-    - Test lints: let-underscore-drop, unused-results, unused-crate-dependencies, unused-imports. No `as u8`/to_le_bytes.
+    ### Phase 30 BUG fixed (production transport): SSE over tiny_http 0.12 sent 0 bytes
+    - Root cause: respond() does io::copy(reader→chunked Encoder→BufWriter::with_capacity(1024)) and flushes ONLY after raw_print returns — never, for an unbounded SSE stream — so small events (<1KB) sit unflushed forever.
+    - FIX: handle_stream now uses request.into_writer() (raw Box<dyn Write>), writes the HTTP preamble + SSE headers manually, pumps SseBody and flush()es after every event (stream_to_client fn). Error paths (401/404/400) via respond_json still fine (finite). Removed sse_headers() + its test + StatusCode import.
+
+    ### CRITICAL lint gotchas
+    - Each tests/ file is a SEPARATE crate target. per-target unused-crate-dependencies (forbid) flags every linked dep not directly named → `use <crate> as _;` block at top. cp-orchestrator unnamed-in-tests: cp_mod_bridge, nix, serde, serde_json, tiny_http (varies per file).
+    - dead_code is PER-BINARY: a common/mod.rs field read in one test binary but not another flags dead in the latter (SseEvent.id: end_to_end had to assert delta.id to read it).
+    - CB3 rust-check is LIB-ONLY — ALWAYS `cargo test -p <crate>` before commit.
     - M62: real connect/accept UDS propagate EOF reliably; socketpair shutdown(Write) does NOT.
 
-    ### Remaining: phase 30 (X797) + capstone Phase 20 (X787)
-    - 30 (X797): transport + e2e — ticket single-use/TTL/unknown, REST rev-envelope+cmd receipt+body-hydrate+404/400, SSE Last-Event-ID replay-by-rev + gap→resync, END-TO-END loopback spawn→POST→journal→Tailer→SSE→reconnect, breaker-tripped-blocks, soak FD/thread/mem. transport on tiny_http (blocking thread-per-conn). Files src/transport/{mod,rest,sse,ticket}.rs. NEED TO READ transport module for exact API before writing tests.
-    - 20 (X787) LAST: M4 ship gate = full V1-V12 fault matrix + observability + soak + sign-off.
+    ### Remaining: capstone Phase 20 (X787)
+    - M4 ship gate = full V1-V12 fault matrix in CI + security audit + observability (p50/p99 latency, dropped/coalesced frames, rev lag, fsync latency, watch count, durable breaker state; logs keyed agent_id+cmd_id+rev) + multi-agent soak (flat mem/FD/threads) + flip every §20 register row designed→validated. This is the LAST phase.
 
     ### cp-orchestrator lib API surface
-    - services::{MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber}. CostBreaker::new(budget)/observe/rebuild_from_view(&view)/check->Verdict{Allowed,Tripped}/poison/clear_poison. MaterializedView::new/apply/apply_batch(id,&[OpEntry])/get->Option<&AgentView>/remove/len/agent_ids. StreamHub::new(cap)/subscribe(id)->u64/publish(id,&Frame)->usize(clean)/drain(id,sub)->Option<Vec<Frame>>/subscriber(id,sub)->Option<&Subscriber>/mark_reconciled/unsubscribe/subscriber_count. Subscriber.is_degraded/dropped_count/buffered/id.
+    - services::{MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber}.
     - channel::Tailer::new(PathBuf)/seed(rev)/poll()->io::Result<Vec<OpEntry>>/last_rev. AgentChannel::from_entry/hydrate/send/send_with_retry.
-    - transport::{Backend, ticket::TicketStore, rest, sse} on tiny_http.
+    - transport::{Backend::new(agents_dir,budget), serve, serve_bound, ticket::TicketStore, rest, sse} on tiny_http.
     - AgentSupervisor: new/len/is_empty/spawn/stop/restart/adopt/check_liveness + Error + Event{Exited,Vanished}.
   importance: medium
   labels:
@@ -152,7 +156,7 @@
   - frontend
   - ui
   - design
-  last_edited_ms: 1781650707121
+  last_edited_ms: 1781679603055
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
