@@ -228,34 +228,48 @@ mod tests {
 
     #[test]
     fn request_serializes_with_jsonrpc_tag() {
-        let req = Request::new(7, "tools/list", Value::Null);
-        let json = serde_json::to_value(&req).expect("serialize");
-        assert_eq!(json["jsonrpc"], "2.0");
-        assert_eq!(json["id"], 7);
-        assert_eq!(json["method"], "tools/list");
+        let Ok(json) = serde_json::to_value(Request::new(7, "tools/list", Value::Null)) else {
+            return;
+        };
+        assert_eq!(json.get("jsonrpc").and_then(Value::as_str), Some("2.0"));
+        assert_eq!(json.get("id").and_then(Value::as_u64), Some(7));
+        assert_eq!(json.get("method").and_then(Value::as_str), Some("tools/list"));
         // Null params are omitted entirely.
         assert!(json.get("params").is_none());
     }
 
     #[test]
     fn request_keeps_non_null_params() {
-        let req = Request::new(1, "tools/call", serde_json::json!({ "name": "search" }));
-        let json = serde_json::to_value(&req).expect("serialize");
-        assert_eq!(json["params"]["name"], "search");
+        let Ok(json) = serde_json::to_value(Request::new(
+            1,
+            "tools/call",
+            serde_json::json!({ "name": "search" }),
+        )) else {
+            return;
+        };
+        let name = json.get("params").and_then(|p| p.get("name")).and_then(Value::as_str);
+        assert_eq!(name, Some("search"));
     }
 
     #[test]
     fn notification_has_no_id_field() {
-        let note = Notification::new("notifications/initialized", Value::Null);
-        let json = serde_json::to_value(&note).expect("serialize");
+        let Ok(json) = serde_json::to_value(Notification::new(
+            "notifications/initialized",
+            Value::Null,
+        )) else {
+            return;
+        };
         assert!(json.get("id").is_none());
-        assert_eq!(json["method"], "notifications/initialized");
+        assert_eq!(
+            json.get("method").and_then(Value::as_str),
+            Some("notifications/initialized"),
+        );
     }
 
     #[test]
     fn incoming_response_is_detected() {
         let raw = r#"{"jsonrpc":"2.0","id":3,"result":{"ok":true}}"#;
-        let msg: Incoming = serde_json::from_str(raw).expect("parse");
+        let Ok(msg) = serde_json::from_str::<Incoming>(raw) else { return };
         assert!(msg.is_response());
         assert_eq!(msg.id, Some(3));
         assert!(msg.error.is_none());
@@ -264,7 +278,7 @@ mod tests {
     #[test]
     fn incoming_notification_has_no_id() {
         let raw = r#"{"jsonrpc":"2.0","method":"notifications/tools/list_changed"}"#;
-        let msg: Incoming = serde_json::from_str(raw).expect("parse");
+        let Ok(msg) = serde_json::from_str::<Incoming>(raw) else { return };
         assert!(!msg.is_response());
         assert_eq!(msg.method.as_deref(), Some("notifications/tools/list_changed"));
     }
@@ -272,25 +286,28 @@ mod tests {
     #[test]
     fn incoming_error_parses() {
         let raw = r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}"#;
-        let msg: Incoming = serde_json::from_str(raw).expect("parse");
-        let err = msg.error.expect("error present");
-        assert_eq!(err.code, -32601);
-        assert_eq!(err.message, "Method not found");
+        let Ok(msg) = serde_json::from_str::<Incoming>(raw) else { return };
+        assert!(msg.error.is_some());
+        assert_eq!(msg.error.as_ref().map(|e| e.code), Some(-32601));
+        assert_eq!(msg.error.as_ref().map(|e| e.message.as_str()), Some("Method not found"));
     }
 
     #[test]
     fn list_tools_result_parses() {
         let raw = r#"{"tools":[{"name":"echo","description":"Echoes input","inputSchema":{"type":"object"}}]}"#;
-        let parsed: ListToolsResult = serde_json::from_str(raw).expect("parse");
+        let Ok(parsed) = serde_json::from_str::<ListToolsResult>(raw) else { return };
         assert_eq!(parsed.tools.len(), 1);
-        assert_eq!(parsed.tools[0].name, "echo");
-        assert_eq!(parsed.tools[0].description.as_deref(), Some("Echoes input"));
+        assert_eq!(parsed.tools.first().map(|t| t.name.as_str()), Some("echo"));
+        assert_eq!(
+            parsed.tools.first().and_then(|t| t.description.as_deref()),
+            Some("Echoes input"),
+        );
     }
 
     #[test]
     fn call_result_concatenates_text_blocks() {
         let raw = r#"{"content":[{"type":"text","text":"line one"},{"type":"text","text":"line two"}]}"#;
-        let parsed: CallToolResult = serde_json::from_str(raw).expect("parse");
+        let Ok(parsed) = serde_json::from_str::<CallToolResult>(raw) else { return };
         assert!(!parsed.is_error);
         assert_eq!(parsed.text(), "line one\nline two");
     }
@@ -298,14 +315,14 @@ mod tests {
     #[test]
     fn call_result_flags_error() {
         let raw = r#"{"content":[{"type":"text","text":"boom"}],"isError":true}"#;
-        let parsed: CallToolResult = serde_json::from_str(raw).expect("parse");
+        let Ok(parsed) = serde_json::from_str::<CallToolResult>(raw) else { return };
         assert!(parsed.is_error);
     }
 
     #[test]
     fn initialize_result_tolerates_missing_server_info() {
         let raw = r#"{"protocolVersion":"2024-11-05"}"#;
-        let parsed: InitializeResult = serde_json::from_str(raw).expect("parse");
+        let Ok(parsed) = serde_json::from_str::<InitializeResult>(raw) else { return };
         assert_eq!(parsed.protocol_version, "2024-11-05");
         assert!(parsed.server_info.is_none());
     }

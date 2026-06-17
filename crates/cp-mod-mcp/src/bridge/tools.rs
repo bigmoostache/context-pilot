@@ -188,14 +188,15 @@ mod tests {
         let params = schema_to_params(&schema);
         assert_eq!(params.len(), 4);
         // Sorted: count, deep, path, tags
-        let path = params.iter().find(|p| p.name == "path").expect("path param");
-        assert!(path.required);
-        assert_eq!(path.description.as_deref(), Some("file path"));
-        let count = params.iter().find(|p| p.name == "count").expect("count param");
-        assert!(matches!(count.param_type, ParamType::Integer));
-        let tags = params.iter().find(|p| p.name == "tags").expect("tags param");
-        assert!(matches!(tags.param_type, ParamType::Array(_)));
-        assert!(!count.required);
+        let path = params.iter().find(|p| p.name == "path");
+        assert!(path.is_some());
+        assert_eq!(path.map(|p| p.required), Some(true));
+        assert_eq!(path.and_then(|p| p.description.as_deref()), Some("file path"));
+        let count = params.iter().find(|p| p.name == "count");
+        assert!(count.is_some_and(|p| matches!(p.param_type, ParamType::Integer)));
+        let tags = params.iter().find(|p| p.name == "tags");
+        assert!(tags.is_some_and(|p| matches!(p.param_type, ParamType::Array(_))));
+        assert_eq!(count.map(|p| p.required), Some(false));
     }
 
     #[test]
@@ -219,7 +220,10 @@ mod tests {
             "properties": { "mode": {"type": "string", "enum": ["fast", "slow"]} },
         });
         let params = schema_to_params(&schema);
-        assert_eq!(params[0].enum_values.as_deref(), Some(&["fast".to_string(), "slow".to_string()][..]));
+        assert_eq!(
+            params.first().and_then(|p| p.enum_values.as_deref()),
+            Some(&["fast".to_string(), "slow".to_string()][..]),
+        );
     }
 
     #[test]

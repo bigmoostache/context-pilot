@@ -782,6 +782,10 @@
   path: docs/design-meilisearch.md
   description: Meilisearch integration design doc. 9 decision rounds, architecture diagram, data model (files+logs indexes), module design, indexer thread, splitter chain, OCR pipeline, implementation plan (6 phases). Fully implemented — see docs/search-module.md.
   last_edited_ms: 1780582405227
+2edf0b1dcbf14407:
+  path: crates/cp-mod-mcp/src/bridge/tools.rs
+  description: 'MCP↔CP tool bridge. schema_to_params: JSON Schema→Vec<ToolParam> (type union, enum, required). tool_definition: ToolDefinition id={server}__{tool} via struct literal (no intent/verb — injected globally). namespaced_id/split_id on ''__''. call_result_to_tool_result, strip_metadata (drops intent/verb before forwarding).'
+  last_edited_ms: 0
 2f549657a1b2300b:
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
@@ -966,6 +970,10 @@
   path: yamls/tools/firecrawl.yaml
   description: 'Firecrawl tools YAML. 4 tools: firecrawl_scrape (single URL), firecrawl_search (search+scrape), firecrawl_map (URL discovery), firecrawl_crawl (recursive crawl to file).'
   last_edited_ms: 1780560886866
+3a80a6fcbad5d6a7:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0
 3a8c84d6085d8f52:
   path: crates/cp-base/src/modules.rs
   description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/tool_progress), file watcher integration.
@@ -2762,6 +2770,10 @@ b92c4c51d2a37642:
   path: src/modules/mod.rs
   description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 1780568982764
+b942345491e14e04:
+  path: crates/cp-mod-mcp/tests/stdio_integration.rs
+  description: E2E stdio test against a self-contained Python mock MCP server (offline, deterministic). handshake→tools/list→tools/call (echo round-trip, ping→pong, unknown→isError). Skips if python3 absent. Unused crate deps (cp_base/cp_render/crossterm/serde/reqwest) silenced via `use X as _;`.
+  last_edited_ms: 1781686595566
 b9798b6dd8b66239:
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 4 tools: upsert/toggle/open/close editor. Depends on console. CallbackState: definitions (shared) + active_set/editor_open (per-worker). Glob-matched auto-fire on file edits.'
@@ -2814,6 +2826,10 @@ bddf74016a26a659:
   path: src/llms/cache/cache_engine.rs
   description: Cache breakpoint engine. Hash chain (acc_hash = sha256(block + prev)). Tracks alive BPs via hash match. Places beacon at frontier+20. Runs DP optimizer for 3 additional BPs (4 total). 5-min TTL matching Anthropic.
   last_edited_ms: 0
+bdf8069498f3d256:
+  path: crates/cp-mod-mcp/src/protocol.rs
+  description: JSON-RPC 2.0 + MCP wire types (pure serialization, no I/O). Request/Notification/Incoming/RpcError, InitializeParams/ClientInfo/ServerInfo/InitializeResult, Tool/ListToolsResult, ContentBlock/CallToolResult (text() concatenates text blocks). PROTOCOL_VERSION 2024-11-05. 10 unit tests.
+  last_edited_ms: 1781686595556
 be5cb31393a75d26:
   path: crates/cp-base/src/panels.rs
   description: Panel trait + caching infra. hash_content uses FNV-1a via cp-mod-utilities. Freeze system. time_arith. paginate_content.
@@ -3646,3 +3662,7 @@ feeba821ce42dd7e:
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
   last_edited_ms: 1780497937366
+ffed52dbb1f2de02:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0

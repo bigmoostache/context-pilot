@@ -66,18 +66,19 @@
   - feature
   last_edited_ms: 0
 13a1d96ff4a4e7d0:
-  tl_dr: 'Context Pilot: Rust TUI AI coding assistant (~15K LOC, Ratatui+Crossterm). 23 module crates + 1 binary. MCP Phase 3 complete (HTTP transport, branch mcp-client).'
+  tl_dr: 'Context Pilot: Rust TUI AI coding assistant, 23 crates + binaire. MCP Phase 3 fini (HTTP transport, branche mcp-client). ⚠️ Tests MCP jamais --all-targets clean (38 erreurs forbid) ; seul le lib/CB3 l''est.'
   contents: |-
     MCP module progress:
     - Phase 1 (ed7cf02): protocol.rs, stdio transport, client (handshake/list/call).
-    - Phase 2 (1b7b94a): dynamic tool registration, dispatch ({server}__{tool}), .mcp.json config, McpPanel status panel. dynamic_tool_definitions is an associated fn on McpModule (no Module trait method — would break missing_trait_methods=deny across ~22 impls), injected concretely by rebuild_tools mirroring optimize_context. Clippy --all-targets clean; 16 unit + 1 integration + 1 doctest green.
-    - Phase 3: transport/streamable.rs = HttpTransport (Streamable HTTP + SSE). Pull-based: send_line POSTs JSON-RPC to single endpoint w/ optional static bearer token + Mcp-Session-Id echo, drains response (202 / application/json / text-event-stream) into VecDeque inbox; recv pops. parse_sse + parse_json_messages free fns, 7 new unit tests. clients.rs gained connect_http(url, token). reqwest workspace dep (blocking+json) added to crate Cargo.toml; stdio_integration.rs silences it via `use reqwest as _;`. Module named streamable.rs (not http.rs) to dodge module_name_repetitions on HttpTransport. Lib clippy-clean. 23 unit + 1 integration + 1 doctest green. NOTE: bridge/servers.rs does NOT yet wire url config entries through connect_http — still flagged Unsupported from Phase 2. Long-lived server-push streams deferred to Phase 5.
+    - Phase 2 (1b7b94a): dynamic tool registration, dispatch ({server}__{tool}), .mcp.json config, McpPanel status panel. dynamic_tool_definitions is an associated fn on McpModule (no Module trait method — would break missing_trait_methods=deny across ~22 impls), injected concretely by rebuild_tools mirroring optimize_context. 16 unit + 1 integration + 1 doctest green.
+    - Phase 3: transport/streamable.rs = HttpTransport (Streamable HTTP + SSE). Pull-based: send_line POSTs JSON-RPC to single endpoint w/ optional static bearer token + Mcp-Session-Id echo, drains response (202 / application/json / text-event-stream) into VecDeque inbox; recv pops. parse_sse + parse_json_messages free fns, 7 new unit tests. clients.rs gained connect_http(url, token). reqwest workspace dep (blocking+json) added to crate Cargo.toml; stdio_integration.rs silences it via `use reqwest as _;`. Module named streamable.rs (not http.rs) to dodge module_name_repetitions on HttpTransport. 23 unit + 1 integration + 1 doctest green. NOTE: bridge/servers.rs does NOT yet wire url config entries through connect_http — still flagged Unsupported from Phase 2. Long-lived server-push streams deferred to Phase 5.
+    - Lint cleanup: all tests rewritten without expect/unwrap/indexing. cargo clippy -p cp-mod-mcp --all-targets = exit 0, zero suppressions. Conformant M19.
 
     Module renames to dodge module_name_repetitions: client.rs->clients.rs, error.rs->errors.rs, transport/stdio.rs->transport/pipe.rs (type SubprocessTransport), bridge/state.rs->bridge/servers.rs (type McpState).
 
     Next: Phase 4 OAuth 2.1+PKCE for Notion, Phase 5 polish (incl. wiring url entries through connect_http in the bridge).
   importance: high
-  last_edited_ms: 1781681483056
+  last_edited_ms: 1781686595576
 141fecab40a0635e:
   tl_dr: 'Claude Code V2: only `diagnostics` body field is internal-only (400). thinking/output_config/context_management/temperature/top_p/top_k all WORK with the 9 beta flags. V2 = headers + models opus-4-8, fable-5, sonnet-4-6.'
   contents: |-
