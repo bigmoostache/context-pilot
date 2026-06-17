@@ -7,7 +7,6 @@ import {
   Settings2,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { agents } from "@/lib/mock"
 import { accentVar, fmtCost } from "@/lib/panelMeta"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -28,10 +27,12 @@ type Modal = { mode: "create" } | { mode: "manage"; agent: Agent } | null
  * create / manage flows (the per-agent views no longer touch agent management).
  */
 export function FleetDashboard({
+  agents,
   onOpenAgent,
   autoCreate,
   onAutoCreateConsumed,
 }: {
+  agents: Agent[]
   onOpenAgent: (id: string) => void
   /** When flipped true (e.g. via the TopBar "New agent" entry), open the
    *  create dialog immediately and signal back so the flag can be cleared. */

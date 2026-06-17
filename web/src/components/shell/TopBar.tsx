@@ -1,6 +1,5 @@
 import { useState } from "react"
 import { Activity, LayoutGrid, MessagesSquare, FolderTree, Home, Settings2 } from "lucide-react"
-import { status, agents } from "@/lib/mock"
 import { fmtCost } from "@/lib/panelMeta"
 import { ThemeToggle } from "./ThemeToggle"
 import { AgentSwitcher } from "./AgentSwitcher"
@@ -10,7 +9,7 @@ import { StatsPopup } from "./StatsPopup"
 import { UserMenu } from "./UserMenu"
 import { AgentModal } from "@/components/agents/AgentModal"
 import { Tip } from "@/components/ui/tip"
-import type { ViewMode } from "@/lib/types"
+import type { Agent, ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface TopBarProps {
@@ -20,11 +19,12 @@ interface TopBarProps {
   onSwitchAgent: (id: string) => void
   /** Raise a "create new agent" request (→ fleet agents page + dialog). */
   onNewAgent: () => void
+  agents: Agent[]
 }
 
 /** Slim macOS-style title bar — app mark (→ fleet), workspace switcher,
  *  per-agent view tabs (Threads · Cockpit · Finder), branch, cost, theme. */
-export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNewAgent }: TopBarProps) {
+export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNewAgent, agents }: TopBarProps) {
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
   const inFleet = view === "fleet"
   const [configOpen, setConfigOpen] = useState(false)
@@ -55,6 +55,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
           Picking an agent here enters it (→ threads view). */}
       <span className="ml-1 text-muted-foreground/40">/</span>
       <AgentSwitcher
+        agents={agents}
         activeId={inFleet ? undefined : activeAgentId}
         onSwitch={
           inFleet
@@ -113,7 +114,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
         {/* cost is agent-scoped — only meaningful inside an agent */}
         {!inFleet && (
           <span className="text-[12px] tabular-nums text-muted-foreground">
-            {fmtCost(activeAgent?.costUsd ?? status.costUsd)}
+            {fmtCost(activeAgent?.costUsd ?? 0)}
           </span>
         )}
         {/* session vitals are agent-scoped — irrelevant at fleet altitude */}

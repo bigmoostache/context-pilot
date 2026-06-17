@@ -8,7 +8,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { agents } from "@/lib/mock"
 import { accentVar } from "@/lib/panelMeta"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -30,11 +29,13 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
  * always-available entry point to switch / create / manage agents.
  */
 export function AgentSwitcher({
+  agents,
   activeId,
   onSwitch,
   onFleet,
   onNewAgent,
 }: {
+  agents: Agent[]
   activeId?: string
   onSwitch: (id: string) => void
   /** Jump to the fleet dashboard — the only place agents are managed. */

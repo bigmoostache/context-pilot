@@ -1,7 +1,7 @@
 import { Boxes, MessagesSquare, Wallet } from "lucide-react"
-import { status, agents, threadDetails, cacheStats, tokenBudget } from "@/lib/mock"
+import { status, cacheStats, tokenBudget } from "@/lib/mock"
 import { fmtCost, fmtTokens } from "@/lib/panelMeta"
-import type { StreamPhase } from "@/lib/types"
+import type { Agent, StreamPhase } from "@/lib/types"
 
 const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
   ready: { label: "Ready", color: "var(--ok)" },
@@ -21,14 +21,15 @@ const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
  *   spend (clearly labelled). A "Needs you" count surfaces how many agents are
  *   waiting on input, so the footer doubles as a glanceable fleet pulse.
  */
-export function StatusBar({ fleet = false }: { fleet?: boolean }) {
-  return fleet ? <FleetStatus /> : <AgentStatus />
+export function StatusBar({ fleet = false, agents = [] }: { fleet?: boolean; agents?: Agent[] }) {
+  return fleet ? <FleetStatus agents={agents} /> : <AgentStatus />
 }
 
 /** Fleet-wide aggregates — shown when no single agent is focused. */
-function FleetStatus() {
+function FleetStatus({ agents }: { agents: Agent[] }) {
   const totalSpend = agents.reduce((sum, a) => sum + a.costUsd, 0)
   const needsYou = agents.filter((a) => a.status === "needs-you").length
+  const totalThreads = agents.reduce((sum, a) => sum + a.threads, 0)
 
   return (
     <footer className="vibrancy flex h-8 shrink-0 items-center gap-4 border-t border-border px-4 text-[12px]">
@@ -36,7 +37,7 @@ function FleetStatus() {
       <span className="h-3.5 w-px bg-border" />
 
       <Metric icon={Boxes} label="Agents" value={String(agents.length)} />
-      <Metric icon={MessagesSquare} label="Threads" value={String(threadDetails.length)} />
+      <Metric icon={MessagesSquare} label="Threads" value={String(totalThreads)} />
 
       {needsYou > 0 && (
         <span className="flex items-center gap-1.5 text-muted-foreground">

@@ -3,6 +3,7 @@ import { LayoutGrid, Library } from "lucide-react"
 import { FleetDashboard } from "./FleetDashboard"
 import { PromptsPage } from "./PromptsPage"
 import { cn } from "@/lib/utils"
+import type { Agent } from "@/lib/types"
 
 /**
  * Fleet shell — the mission-control workspace shown when no agent is focused.
@@ -28,10 +29,12 @@ type HomeTab = "agents" | "prompts"
 export const FLEET_MAX_W = "max-w-[960px]"
 
 export function FleetShell({
+  agents,
   onOpenAgent,
   openCreate,
   onCreateConsumed,
 }: {
+  agents: Agent[]
   onOpenAgent: (id: string) => void
   /** External request (from the workspace switcher's "New agent") to land on
    *  the Agents tab and pop the create dialog. */
@@ -64,6 +67,7 @@ export function FleetShell({
       {/* active sub-page (rendered untouched) */}
       {tab === "agents" ? (
         <FleetDashboard
+          agents={agents}
           onOpenAgent={onOpenAgent}
           autoCreate={openCreate}
           onAutoCreateConsumed={onCreateConsumed}

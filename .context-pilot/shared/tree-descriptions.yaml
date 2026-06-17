@@ -3802,6 +3802,10 @@ a37d1b3869ea7b71:
   path: crates/cp-base/src/tools/async_exec.rs
   description: Async tool execution — spawn_async_tool() runs blocking I/O on worker thread. ToolOutput struct (content, is_error, create_panel, preserves_tempo). BLOCKING_TOOL_SENTINEL constant. ChannelWatcher registration. Error encoding via ASYNC_ERROR_PREFIX in description.
   last_edited_ms: 0
+a3960e932051388b:
+  path: web/src/lib/live.ts
+  description: 'Generic useLiveQuery hook (fetch + SSE-invalidate + 5s poll backstop + 200ms debounce). 17 typed wrapper hooks: useFleet, useAgentMeta, useThreads, usePanels, useMemory, useTodos, useSpine, useQueue, useScratchpad, useTree, useCallbacks, useTools, useRadar, useEntities, useFs, useConversation, useLibrary. Re-exports sendCommand/mintTicket.'
+  last_edited_ms: 1781687538020
 a39ccb64ad178103:
   path: src/modules/overview/tools_blocks.rs
   description: Tools-only IR block builder. tools_blocks() renders grouped tool table with category descriptions, enable/disable status. No agents/skills/commands (those live in Library only).
@@ -4002,6 +4006,10 @@ acde3d0765ea24ec:
   path: crates/cp-mod-tree/src/tools.rs
   description: Tree tools with flame!(). compute_file_hash uses FNV-1a. Toggle/describe/filter. @-autocomplete via list_dir_entries.
   last_edited_ms: 1780565428707
+ad203a6c06c8271b:
+  path: web/src/lib/api.ts
+  description: Typed REST client for all 22 backend endpoints. Base URL from VITE_API_URL env (default localhost:7878). Fleet, agent meta, threads, panels (13 kinds), finder, usage, library, commands, ticket mint.
+  last_edited_ms: 1781687537990
 ad227afdb78366f4:
   path: crates/cp-mod-files/src/tools/write.rs
   description: file_write tool. flame!("file_write"). Creates parent dirs, writes content, updates/creates context Entry. Diff-style preview in result (first 20 lines).
@@ -4278,6 +4286,10 @@ b8250e826f6a39b7:
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 0
+b826d6fb5b883155:
+  path: web/src/lib/sse.ts
+  description: 'Reconnecting SSE client. Singleton per-agent via getOrCreateSseClient(). EventSource to /api/stream with ticket auth + Last-Event-ID replay. Exponential backoff with jitter. Named events: delta/stream/resync.'
+  last_edited_ms: 1781687538005
 b8637dcb7f3162bc:
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
@@ -4354,6 +4366,10 @@ bb05e2336216163a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
   last_edited_ms: 0
+bb8a674ef6c1a158:
+  path: web/vite.config.ts
+  description: 'Vite config: react + tailwind v4 plugins, @ alias to src. Dev server on port 5174.'
+  last_edited_ms: 1781687537974
 bba5399f6a7db655:
   path: crates/cp-mod-todo/src/tools.rs
   description: Todo CRUD tools with flame!("todo_create"), flame!("todo_update"), flame!("todo_move"). Nested parent_id validation. Status propagation (in_progress auto-cascades to parents). Orphan protection on delete. Move reorder with after_id.

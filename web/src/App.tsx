@@ -8,13 +8,14 @@ import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/lib/theme"
 import { AccountProvider } from "@/lib/account"
-import { activeAgentId as initialAgentId, agents } from "@/lib/mock"
+import { useFleet } from "@/lib/live"
 import type { ViewMode } from "@/lib/types"
 import "./App.css"
 
 function App() {
+  const { data: agents = [] } = useFleet()
   const [view, setView] = useState<ViewMode>("fleet")
-  const [activeAgentId, setActiveAgentId] = useState(initialAgentId)
+  const [activeAgentId, setActiveAgentId] = useState("")
   // One-shot request to pop the "create agent" dialog on the fleet dashboard
   // (raised by the workspace switcher's "New agent" entry).
   const [createAgent, setCreateAgent] = useState(false)
@@ -45,10 +46,12 @@ function App() {
             activeAgentId={activeAgentId}
             onSwitchAgent={setActiveAgentId}
             onNewAgent={newAgent}
+            agents={agents}
           />
 
           {view === "fleet" ? (
             <FleetShell
+              agents={agents}
               onOpenAgent={openAgent}
               openCreate={createAgent}
               onCreateConsumed={() => setCreateAgent(false)}
@@ -61,7 +64,7 @@ function App() {
             <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} />
           )}
 
-          <StatusBar fleet={view === "fleet"} />
+          <StatusBar fleet={view === "fleet"} agents={agents} />
         </div>
         </TooltipProvider>
       </AccountProvider>
