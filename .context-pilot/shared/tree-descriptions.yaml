@@ -1516,8 +1516,8 @@
   last_edited_ms: 0
 5e53f33137ef1dce:
   path: src/modules/mod.rs
-  description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
-  last_edited_ms: 0
+  description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools() preserves both enabled AND disabled tool states across rebuilds. Dependency validation.
+  last_edited_ms: 1781692537015
 5e7d3c2549cf9c18:
   path: crates/cp-mod-logs/src/tools.rs
   description: Log tool execution. flame!("log_create") and flame!("close_history"). push_log() helper. execute_log_create() creates entries from array. execute_close_conversation_history() processes panels array — per-panel logs (strings), timestamp from panel's last message, panel removal.
@@ -1808,8 +1808,8 @@
   last_edited_ms: 0
 72eac1f88f77b5fd:
   path: crates/cp-mod-mcp/src/bridge/panel.rs
-  description: 'McpPanel: fixed sidebar panel listing configured servers, their ConnStatus, and namespaced tools. Read-only (scroll only), no cache. Empty-state message when no servers.'
-  last_edited_ms: 0
+  description: 'McpPanel: fixed sidebar panel listing configured servers, their ConnStatus, and namespaced tools with descriptions (catalog for AI discovery). Header instructs to use tool_manage. Read-only (scroll only), no cache.'
+  last_edited_ms: 1781692536995
 73337f5800a6a2b2:
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
@@ -2644,8 +2644,8 @@ ac4a7fbbfcf664e7:
   last_edited_ms: 0
 ac50aeb126765b15:
   path: crates/cp-mod-mcp/src/bridge/mod.rs
-  description: 'Host integration: McpModule (Module trait impl). init_state reads .mcp.json + connects servers into McpState. Dispatches stdio via connect_stdio (AnyClient::Stdio) and url via connect_http (AnyClient::Http) with bearer_token. execute_tool dispatches {server}__{tool} via split_id. 4-phase dispatch: maybe_reconnect → call+take_tools_changed → error→Failed+client=None → refresh tools on list_changed. Fixed MCP status panel (fixed_order=20).'
-  last_edited_ms: 0
+  description: 'Host integration: McpModule (Module trait impl). init_state reads .mcp.json + connects servers into McpState. 4-phase dispatch: maybe_reconnect → call+take_tools_changed → error→Failed+client=None → refresh tools on list_changed. overview_context_section() provides compact MCP catalog summary. Fixed MCP status panel (fixed_order=20).'
+  last_edited_ms: 1781692537005
 ac90dcb6c012815a:
   path: docs/intermediate-rendering.md
   description: 'IR architecture design doc. Motivation (decouple ratatui), full-frame snapshot, semantic styling, typed regions, serialize-ready. Type hierarchy: Frame/Sidebar/StatusBar/Conversation/Overlay/Block. Panel trait blocks() migration. TUI adapter. Big-bang migration strategy.'
@@ -3624,8 +3624,8 @@ f6930563c8606410:
   last_edited_ms: 0
 f699153ea1c331c7:
   path: crates/cp-mod-mcp/src/bridge/tools.rs
-  description: 'MCP↔CP tool bridge. schema_to_params: JSON Schema→Vec<ToolParam> (type union, enum, required). tool_definition: ToolDefinition id={server}__{tool} via struct literal (no intent/verb — injected globally). namespaced_id/split_id on ''__''. call_result_to_tool_result, strip_metadata (drops intent/verb before forwarding).'
-  last_edited_ms: 0
+  description: 'MCP↔CP tool bridge. schema_to_params: JSON Schema→Vec<ToolParam> (type union, enum, required). tool_definition: ToolDefinition id={server}__{tool}, enabled=false by default (token optimization). namespaced_id/split_id on ''__''. call_result_to_tool_result, strip_metadata (drops intent/verb before forwarding).'
+  last_edited_ms: 1781692536985
 f7207867229d3d86:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'
