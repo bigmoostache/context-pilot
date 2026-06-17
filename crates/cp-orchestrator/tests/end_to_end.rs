@@ -37,6 +37,7 @@ mod common;
 // them for the per-target `unused-crate-dependencies` lint.
 use nix as _;
 use serde as _;
+use serde_yaml as _;
 
 use std::os::unix::net::UnixListener;
 use std::path::Path;

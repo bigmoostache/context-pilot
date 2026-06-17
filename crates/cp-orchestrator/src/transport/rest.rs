@@ -37,7 +37,7 @@ pub struct HttpReply {
 
 impl HttpReply {
     /// A `200 OK` carrying `value` serialized as JSON.
-    fn ok<T: Serialize>(value: &T) -> Self {
+    pub(crate) fn ok<T: Serialize>(value: &T) -> Self {
         Self::json(200, value)
     }
 
@@ -51,7 +51,7 @@ impl HttpReply {
     }
 
     /// An error reply with a `{"error": reason}` body.
-    fn error(status: u16, reason: &str) -> Self {
+    pub(crate) fn error(status: u16, reason: &str) -> Self {
         Self { status, body: format!("{{\"error\":{}}}", json_string(reason)) }
     }
 }
@@ -182,7 +182,7 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
 /// Load an agent's registry [`Entry`] from the configured agents directory.
 ///
 /// Returns an [`HttpReply`] error directly so handlers can `?`-style early-out.
-fn resolve_entry(state: &Mutex<Backend>, id: &str) -> Result<Entry, HttpReply> {
+pub(super) fn resolve_entry(state: &Mutex<Backend>, id: &str) -> Result<Entry, HttpReply> {
     let dir = {
         let backend = state.lock().map_err(|_| HttpReply::error(500, "backend lock poisoned"))?;
         backend.agents_dir.clone()

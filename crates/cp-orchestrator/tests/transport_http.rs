@@ -26,6 +26,7 @@ mod common;
 use cp_mod_bridge as _;
 use nix as _;
 use serde as _;
+use serde_yaml as _;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};

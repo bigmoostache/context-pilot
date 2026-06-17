@@ -23,6 +23,7 @@
 use cp_mod_bridge as _;
 use cp_oplog as _;
 use serde as _;
+use serde_yaml as _;
 use serde_json as _;
 use tiny_http as _;
 

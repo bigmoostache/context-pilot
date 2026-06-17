@@ -30,6 +30,7 @@
 //! | `POST` | `/api/ticket` | [`rest::mint_ticket`] |
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
+pub mod panels;
 pub mod rest;
 pub mod sse;
 pub mod ticket;
@@ -178,7 +179,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // ends here, before the request is moved into the response.
     let body_bytes = if method == Method::Post { read_body(&mut request) } else { Vec::new() };
 
-    let reply = route_rest(&method, &segments, state, body_bytes.as_slice());
+    let reply = route_rest(&method, &segments, state, body_bytes.as_slice(), &query);
     respond_json(request, &reply);
 }
 
@@ -195,6 +196,7 @@ fn route_rest(
     segments: &[&str],
     state: &Arc<Mutex<Backend>>,
     body_bytes: &[u8],
+    query: &str,
 ) -> rest::HttpReply {
     match (method, segments) {
         (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
@@ -202,6 +204,14 @@ fn route_rest(
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
         (Method::Get, ["api", "agent", id, "threads"]) => rest::threads(state, id),
+        (Method::Get, ["api", "agent", id, "panels"]) => panels::panel_list(state, id),
+        (Method::Get, ["api", "agent", id, "memory"]) => panels::memory(state, id),
+        (Method::Get, ["api", "agent", id, "todos"]) => panels::todos(state, id, query),
+        (Method::Get, ["api", "agent", id, "spine"]) => panels::spine(state, id, query),
+        (Method::Get, ["api", "agent", id, "queue"]) => panels::queue(state, id, query),
+        (Method::Get, ["api", "agent", id, "scratchpad"]) => panels::scratchpad(state, id, query),
+        (Method::Get, ["api", "agent", id, "tree"]) => panels::tree(state, id),
+        (Method::Get, ["api", "agent", id, "callbacks"]) => panels::callbacks(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state),
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },

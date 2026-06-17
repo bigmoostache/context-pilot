@@ -27,6 +27,7 @@
 // lint.
 use nix as _;
 use serde as _;
+use serde_yaml as _;
 use tiny_http as _;
 
 use std::os::unix::net::UnixListener;
