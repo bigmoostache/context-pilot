@@ -66,9 +66,9 @@
   - feature
   last_edited_ms: 0
 13a1d96ff4a4e7d0:
-  tl_dr: 'Context Pilot is a Rust TUI AI coding assistant (~15K LOC) built with Ratatui+Crossterm. Workspace has 18 module crates + 1 main binary. Branch: reverie-context-optimizer with +209 lines in src/app/reverie/tools.rs'
+  tl_dr: Context Pilot is a Rust TUI AI coding assistant (~15K LOC) built with Ratatui+Crossterm. Workspace has 23 module crates + 1 main binary. MCP Phase 1 complete on branch 'mcp-client'.
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1781677339413
 141fecab40a0635e:
   tl_dr: 'Claude Code V2: only `diagnostics` body field is internal-only (400). thinking/output_config/context_management/temperature/top_p/top_k all WORK with the 9 beta flags. V2 = headers + models opus-4-8, fable-5, sonnet-4-6.'
   contents: |-
