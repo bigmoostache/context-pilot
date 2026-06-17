@@ -34,13 +34,13 @@ pub mod rest;
 pub mod sse;
 pub mod ticket;
 
-use std::io::Read as _;
+use std::io::{Read as _, Write as _};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
+use tiny_http::{Header, Method, Request, Response, Server};
 
 use cp_wire::types::registry::Entry;
 use cp_wire::types::stream::Frame;
@@ -126,11 +126,21 @@ impl Backend {
 /// Returns an error string if the address cannot be bound.
 pub fn serve(addr: &str, state: Arc<Mutex<Backend>>) -> Result<(), String> {
     let server = Server::http(addr).map_err(|e| e.to_string())?;
+    serve_bound(server, state);
+    Ok(())
+}
+
+/// Serve transport requests on an already-bound [`Server`], thread-per-request,
+/// until the server is dropped.
+///
+/// Split out of [`serve`] so a caller that needs the bound address up-front —
+/// notably an integration test binding `127.0.0.1:0` to claim an ephemeral
+/// port — can read [`Server::server_addr`] before handing the server here.
+pub fn serve_bound(server: Server, state: Arc<Mutex<Backend>>) {
     for request in server.incoming_requests() {
         let state = Arc::clone(&state);
         let _handle = thread::spawn(move || handle(request, &state));
     }
-    Ok(())
 }
 
 /// Route one request: dispatch to a REST handler or the SSE stream.
@@ -210,8 +220,46 @@ fn handle_stream(request: Request, state: &Arc<Mutex<Backend>>, query: &str) {
     let oplog_dir = PathBuf::from(&entry.oplog_path);
     let _producer = thread::spawn(move || run_stream(&sink, &producer_state, &agent, &oplog_dir, last_rev));
 
-    let response = Response::new(StatusCode(200), sse_headers(), body, None, None);
-    let _sent = request.respond(response);
+    stream_to_client(request, body);
+}
+
+/// Stream an SSE body to the client, flushing **after every event**.
+///
+/// tiny_http's `Response`/`respond` path copies the whole body through a 1 KiB
+/// `BufWriter` and only flushes when that buffer fills or the response *ends* —
+/// fatal for an unbounded event stream, where small events would sit unsent in
+/// the buffer forever. So we take the raw connection writer, emit the status
+/// line and SSE headers ourselves, then copy each chunk the producer yields and
+/// **flush immediately**, so every event reaches the browser the instant it is
+/// produced. The loop ends when the producer finishes (EOF) or the client
+/// disconnects (a write error), at which point dropping `body` signals the
+/// producer thread to stop.
+fn stream_to_client(request: Request, mut body: sse::SseBody) {
+    let mut writer = request.into_writer();
+    let preamble = concat!(
+        "HTTP/1.1 200 OK\r\n",
+        "Content-Type: text/event-stream\r\n",
+        "Cache-Control: no-cache\r\n",
+        "Connection: keep-alive\r\n",
+        "\r\n",
+    );
+    if writer.write_all(preamble.as_bytes()).and_then(|()| writer.flush()).is_err() {
+        return;
+    }
+
+    let mut buf = [0u8; 4096];
+    loop {
+        match body.read(&mut buf) {
+            Ok(0) => break, // producer finished — clean end of stream.
+            Ok(n) => {
+                let Some(chunk) = buf.get(..n) else { break };
+                if writer.write_all(chunk).and_then(|()| writer.flush()).is_err() {
+                    break; // client disconnected.
+                }
+            }
+            Err(_) => break,
+        }
+    }
 }
 
 /// The SSE producer loop: replay-from-`rev`, then live oplog + stream tail.
@@ -295,21 +343,6 @@ fn load_entry(state: &Arc<Mutex<Backend>>, id: &str) -> Option<Entry> {
 
 
 
-/// HTTP headers for an SSE response.
-fn sse_headers() -> Vec<Header> {
-    let mut headers = Vec::new();
-    for (name, value) in [
-        (&b"Content-Type"[..], &b"text/event-stream"[..]),
-        (&b"Cache-Control"[..], &b"no-cache"[..]),
-        (&b"Connection"[..], &b"keep-alive"[..]),
-    ] {
-        if let Ok(header) = Header::from_bytes(name, value) {
-            headers.push(header);
-        }
-    }
-    headers
-}
-
 /// Respond with a JSON [`HttpReply`](rest::HttpReply).
 fn respond_json(request: Request, reply: &rest::HttpReply) {
     let mut response = Response::from_string(&reply.body).with_status_code(reply.status);
@@ -386,11 +419,5 @@ mod tests {
     fn query_params_handle_empty() {
         let q = QueryParams::parse("");
         assert_eq!(q.get("agent"), None);
-    }
-
-    #[test]
-    fn sse_headers_include_event_stream_content_type() {
-        let headers = sse_headers();
-        assert!(headers.iter().any(|h| h.value.as_str().contains("event-stream")));
     }
 }
