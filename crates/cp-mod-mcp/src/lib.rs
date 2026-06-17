@@ -24,5 +24,6 @@
 pub mod bridge;
 pub mod clients;
 pub mod errors;
+pub mod oauth;
 pub mod protocol;
 pub mod transport;

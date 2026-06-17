@@ -14,6 +14,8 @@ use cp_base as _;
 use cp_render as _;
 use crossterm as _;
 use reqwest as _;
+use base64 as _;
+use sha2 as _;
 
 
 /// Minimal MCP server: reads newline-delimited JSON-RPC requests on stdin and

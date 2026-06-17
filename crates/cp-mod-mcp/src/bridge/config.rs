@@ -7,7 +7,7 @@
 //! {
 //!   "mcpServers": {
 //!     "filesystem": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."] },
-//!     "notion":     { "url": "https://mcp.notion.com/mcp" }
+//!     "notion":     { "url": "https://mcp.notion.com/mcp", "bearer_token": "ntn_xxx" }
 //!   }
 //! }
 //! ```
@@ -43,6 +43,10 @@ pub struct ServerSpec {
     /// Remote endpoint for an HTTP/SSE server (Phase 3+).
     #[serde(default)]
     pub url: Option<String>,
+    /// Static bearer token for remote servers (sent as `Authorization: Bearer`).
+    /// Omit for unauthenticated servers or when using OAuth.
+    #[serde(default)]
+    pub bearer_token: Option<String>,
 }
 
 impl ServerSpec {

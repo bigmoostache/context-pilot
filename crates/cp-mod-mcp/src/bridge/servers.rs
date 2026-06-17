@@ -10,9 +10,8 @@ use std::sync::Mutex;
 
 use cp_base::state::runtime::State;
 
-use crate::clients::McpClient;
+use crate::clients::AnyClient;
 use crate::protocol::Tool;
-use crate::transport::pipe::SubprocessTransport;
 
 /// Connection outcome for a single configured server.
 #[derive(Debug, Clone)]
@@ -51,7 +50,7 @@ impl ConnStatus {
 pub struct McpServerEntry {
     /// Live client, behind a `Mutex` to satisfy the `Sync` bound of the state map.
     /// `None` when the server failed to connect or is unsupported.
-    pub client: Option<Mutex<McpClient<SubprocessTransport>>>,
+    pub client: Option<Mutex<AnyClient>>,
     /// Snapshot of the tools advertised at connection time.
     pub tools: Vec<Tool>,
     /// Connection outcome (drives the status panel).
@@ -61,7 +60,7 @@ pub struct McpServerEntry {
 impl McpServerEntry {
     /// A connected entry wrapping a live client and its discovered tools.
     #[must_use]
-    pub const fn connected(client: McpClient<SubprocessTransport>, tools: Vec<Tool>) -> Self {
+    pub const fn connected(client: AnyClient, tools: Vec<Tool>) -> Self {
         let status = ConnStatus::Connected { tool_count: tools.len() };
         Self { client: Some(Mutex::new(client)), tools, status }
     }

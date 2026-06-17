@@ -173,3 +173,57 @@ impl<T: Transport> McpClient<T> {
         self.transport.send_line(&line)
     }
 }
+
+// ---------------------------------------------------------------------------
+// Transport-erased wrapper
+// ---------------------------------------------------------------------------
+
+/// Transport-erased MCP client.
+///
+/// Wraps either a stdio or HTTP client behind a uniform API so
+/// [`McpServerEntry`](crate::bridge::servers::McpServerEntry) can hold either
+/// variant without leaking the generic parameter.
+#[derive(Debug)]
+pub enum AnyClient {
+    /// Subprocess (stdio) transport.
+    Stdio(McpClient<SubprocessTransport>),
+    /// Remote HTTP / SSE transport.
+    Http(McpClient<HttpTransport>),
+}
+
+impl AnyClient {
+    /// Invoke a tool by name with JSON `arguments`.
+    ///
+    /// Delegates to the underlying transport-specific client.
+    ///
+    /// # Errors
+    ///
+    /// Propagates transport/timeout/protocol failures.
+    pub fn call_tool(&mut self, name: &str, arguments: &Value) -> Result<CallToolResult, McpError> {
+        match self {
+            Self::Stdio(client) => client.call_tool(name, arguments),
+            Self::Http(client) => client.call_tool(name, arguments),
+        }
+    }
+
+    /// Fetch the server's advertised tools, refreshing the cached snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Propagates transport/timeout/protocol failures.
+    pub fn list_tools(&mut self) -> Result<&[Tool], McpError> {
+        match self {
+            Self::Stdio(client) => client.list_tools(),
+            Self::Http(client) => client.list_tools(),
+        }
+    }
+
+    /// Server identity reported during `initialize`, if any.
+    #[must_use]
+    pub const fn server_info(&self) -> Option<&ServerInfo> {
+        match self {
+            Self::Stdio(client) => client.server_info(),
+            Self::Http(client) => client.server_info(),
+        }
+    }
+}

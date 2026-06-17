@@ -25,7 +25,7 @@ use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 use self::panel::{MCP_KIND, McpPanel};
 use self::servers::{McpServerEntry, McpState};
 
-use crate::clients::McpClient;
+use crate::clients::{AnyClient, McpClient};
 
 /// Host module bridging runtime-discovered MCP tools into Context Pilot.
 #[derive(Debug, Clone, Copy)]
@@ -61,12 +61,13 @@ impl McpModule {
         names.sort();
         for name in names {
             let Some(spec) = cfg.servers.get(&name) else { continue };
-            let entry = match spec.stdio() {
-                Some((command, args)) => Self::connect_stdio(command, args),
-                None if spec.url.is_some() => {
-                    McpServerEntry::unsupported("remote (url) transport — Phase 3")
-                }
-                None => McpServerEntry::failed("no 'command' or 'url' in spec"),
+            let entry = if let Some((command, args)) = spec.stdio() {
+                Self::connect_stdio(command, args)
+            } else if let Some(url) = spec.url.as_deref() {
+                let token = spec.bearer_token.as_deref().unwrap_or("");
+                Self::connect_http(url, token)
+            } else {
+                McpServerEntry::failed("no 'command' or 'url' in spec")
             };
             let _prev = mcp.servers.insert(name, entry);
         }
@@ -81,7 +82,22 @@ impl McpModule {
         match client.list_tools() {
             Ok(tools) => {
                 let tools = tools.to_vec();
-                McpServerEntry::connected(client, tools)
+                McpServerEntry::connected(AnyClient::Stdio(client), tools)
+            }
+            Err(e) => McpServerEntry::failed(e.to_string()),
+        }
+    }
+
+    /// Connect to one remote HTTP/SSE server, handshake, and fetch its tool list.
+    fn connect_http(url: &str, token: &str) -> McpServerEntry {
+        let mut client = match McpClient::connect_http(url, token) {
+            Ok(c) => c,
+            Err(e) => return McpServerEntry::failed(e.to_string()),
+        };
+        match client.list_tools() {
+            Ok(tools) => {
+                let tools = tools.to_vec();
+                McpServerEntry::connected(AnyClient::Http(client), tools)
             }
             Err(e) => McpServerEntry::failed(e.to_string()),
         }
