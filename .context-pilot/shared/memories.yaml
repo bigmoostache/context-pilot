@@ -72,14 +72,15 @@
     - Phase 1 (ed7cf02): protocol.rs, stdio transport, client (handshake/list/call).
     - Phase 2 (1b7b94a): dynamic tool registration, dispatch ({server}__{tool}), .mcp.json config, McpPanel status panel. dynamic_tool_definitions is an associated fn on McpModule (no Module trait method — would break missing_trait_methods=deny across ~22 impls), injected concretely by rebuild_tools mirroring optimize_context. 16 unit + 1 integration + 1 doctest green.
     - Phase 3: transport/streamable.rs = HttpTransport (Streamable HTTP + SSE). Pull-based: send_line POSTs JSON-RPC to single endpoint w/ optional static bearer token + Mcp-Session-Id echo, drains response (202 / application/json / text-event-stream) into VecDeque inbox; recv pops. parse_sse + parse_json_messages free fns, 7 new unit tests. clients.rs gained connect_http(url, token). reqwest workspace dep (blocking+json) added to crate Cargo.toml.
-    - Phase 4 (372365d): OAuth 2.1 + PKCE in oauth.rs (718 lines). discover_metadata, generate_pkce, build_auth_url (AuthFlowParams), wait_for_callback (non-blocking poll loop), exchange_code, refresh_access_token, register_client (RFC 7591), store_token (mcp-tokens.json), authorize orchestrator. 6 unit tests, 15 clippy fixes, zero suppressions. AnyClient enum (Stdio|Http) in clients.rs with delegating call_tool/list_tools/server_info. McpServerEntry uses AnyClient. bridge/mod.rs wires url entries through connect_http with bearer_token. config.rs gains optional bearer_token field. sha2+base64 workspace deps.
+    - Phase 4 (372365d): OAuth 2.1 + PKCE in oauth.rs (718 lines). discover_metadata, generate_pkce, build_auth_url (AuthFlowParams struct), wait_for_callback (non-blocking poll loop), exchange_code, refresh_access_token, register_client (RFC 7591), store_token (mcp-tokens.json), authorize orchestrator. 6 unit tests, 15 clippy fixes, zero suppressions. AnyClient enum (Stdio|Http) in clients.rs with delegating call_tool/list_tools/server_info. McpServerEntry uses AnyClient. bridge/mod.rs wires url entries through connect_http with bearer_token. config.rs gains optional bearer_token field. sha2+base64 workspace deps.
+    - Phase 5 (40e07c0): Polish. allow_tools/deny_tools per-server tool filtering (config→ServerSpec→McpServerEntry→is_tool_exposed()→dynamic_tool_definitions). Auto-reconnect via maybe_reconnect() on Failed servers using stored spec. tools/list_changed notification detection in McpClient recv loop (tools_changed flag, take_tools_changed()), wired into 4-phase dispatch (reconnect→call+flag→error→refresh). Invalid config entries produce McpServerEntry::failed.
     - Lint cleanup: all tests rewritten without expect/unwrap/indexing. cargo clippy -p cp-mod-mcp --all-targets = exit 0, zero suppressions. Conformant M19.
 
     Module renames to dodge module_name_repetitions: client.rs->clients.rs, error.rs->errors.rs, transport/stdio.rs->transport/pipe.rs (type SubprocessTransport), bridge/state.rs->bridge/servers.rs (type McpState).
 
-    Next: Phase 5 polish (reconnection on reload, tools/list_changed, resources/prompts, allow/deny tool filter, error UX, ConnStatus::Unsupported cleanup).
+    All 5 phases complete. 27/27 todos done. Branch: mcp-client.
   importance: high
-  last_edited_ms: 1781688923208
+  last_edited_ms: 1781689508131
 141fecab40a0635e:
   tl_dr: 'Claude Code V2: only `diagnostics` body field is internal-only (400). thinking/output_config/context_management/temperature/top_p/top_k all WORK with the 9 beta flags. V2 = headers + models opus-4-8, fable-5, sonnet-4-6.'
   contents: |-
