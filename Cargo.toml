@@ -1071,6 +1071,7 @@ cp-mod-files = { path = "crates/cp-mod-files" }
 cp-mod-spine = { path = "crates/cp-mod-spine" }
 cp-mod-threads = { path = "crates/cp-mod-threads" }
 cp-mod-bridge = { path = "crates/cp-mod-bridge" }
+cp-wire = { path = "crates/cp-wire" }
 cp-mod-prompt = { path = "crates/cp-mod-prompt" }
 cp-mod-brave = { path = "crates/cp-mod-brave" }
 cp-mod-firecrawl = { path = "crates/cp-mod-firecrawl" }

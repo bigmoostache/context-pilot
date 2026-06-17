@@ -133,6 +133,7 @@ impl App {
             }
 
             // === BACKGROUND PROCESSING ===
+            super::threads::poll_bridge_commands(self);
             super::streaming::process_stream_events(self, ch.rx);
             super::streaming::handle_retry(self, ch.tx);
             super::streaming::process_typewriter(self);

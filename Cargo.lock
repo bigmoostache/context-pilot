@@ -3066,6 +3066,7 @@ dependencies = [
  "cp-mod-tree",
  "cp-mod-utilities",
  "cp-render",
+ "cp-wire",
  "crossterm",
  "dotenvy",
  "log",

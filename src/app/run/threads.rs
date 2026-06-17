@@ -8,8 +8,12 @@ use crate::app::App;
 use crate::app::panels::now_ms;
 use cp_base::state::data::message::{MsgKind, MsgStatus, ToolResultRecord, ToolUseRecord};
 use cp_base::tools::ToolUse;
+use cp_mod_bridge::BridgeState;
 use cp_mod_spine::types::{NotificationType, SpineState};
-use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
+use cp_mod_threads::types::{
+    FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState,
+};
+use cp_wire::types::command::{Command, Kind as CommandKind};
 
 /// Inject a synthetic `Read` tool call when auto-continuation fires
 /// for a thread notification while the AI is unfocused.
@@ -202,4 +206,243 @@ fn extract_thread_ids(content: &str) -> Vec<String> {
         }
     }
     ids
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Bridge command polling — accepts inbound commands from the backend and
+// applies them on the main loop (K7 path).
+// ═══════════════════════════════════════════════════════════════════════
+
+use std::time::Duration;
+
+/// Maximum time the main loop will wait for a single command connection to
+/// finish reading.  A wedged commander is dropped after this window.
+const READ_TIMEOUT: Duration = Duration::from_millis(500);
+
+/// Poll the bridge listener for an inbound command connection and apply any
+/// accepted commands.
+///
+/// Safe to call every tick: returns immediately when the bridge is OFF, the
+/// listener is absent, or no connection is pending.
+pub(super) fn poll_bridge_commands(app: &mut App) {
+    let commands = accept_commands(&mut app.state);
+    for cmd in commands {
+        apply_command(app, cmd);
+    }
+}
+
+/// Try to accept one connection and process it through the command intake.
+///
+/// Returns the (possibly empty) list of freshly-accepted [`Command`]s.
+fn accept_commands(state: &mut cp_base::state::runtime::State) -> Vec<Command> {
+    let bs = state.ext_mut::<BridgeState>();
+
+    // Split borrows: &boot (for listener + oplog) and &mut intake.
+    let (Some(boot), Some(intake)) = (&bs.boot, &mut bs.intake) else {
+        return Vec::new();
+    };
+
+    // Non-blocking accept — returns WouldBlock when no connection is pending.
+    let Ok((mut stream, _addr)) = boot.listener().accept() else {
+        return Vec::new();
+    };
+
+    // Bound how long we wait for the commander to finish writing.
+    let _ignored = stream.set_read_timeout(Some(READ_TIMEOUT));
+
+    match intake.handle_connection(boot.oplog(), &mut stream) {
+        Ok(cmds) => cmds,
+        Err(e) => {
+            log::error!("bridge: command intake error: {e:?}");
+            Vec::new()
+        }
+    }
+}
+
+/// Dispatch a single accepted command to the appropriate agent action.
+fn apply_command(app: &mut App, cmd: Command) {
+    match cmd.kind {
+        CommandKind::SendMessage { thread_id, content } => {
+            apply_send_message(&mut app.state, &thread_id, &content);
+        }
+        CommandKind::CreateThread { name } => {
+            apply_create_thread(&mut app.state, &name);
+        }
+        CommandKind::ArchiveThread { thread_id } => {
+            apply_archive_thread(&mut app.state, &thread_id);
+        }
+        CommandKind::RestoreThread { thread_id } => {
+            apply_restore_thread(&app.state, &thread_id);
+        }
+        CommandKind::Stop | CommandKind::InterruptStream => {
+            apply_stop(&mut app.state);
+        }
+        CommandKind::Unknown => {
+            log::warn!("bridge: ignoring unknown command {}", cmd.id);
+        }
+    }
+}
+
+// ── SendMessage (K7) ────────────────────────────────────────────────────
+
+/// Inject a user message into the given thread and create a spine
+/// notification so the agent attends to it.
+///
+/// This is the **K7 path**: commands enter the agent through the same
+/// mechanism as local user input — a `ThreadMessage(User)` on the thread,
+/// a `MyTurn` status flip, and a spine notification.
+fn apply_send_message(
+    state: &mut cp_base::state::runtime::State,
+    thread_id: &str,
+    content: &str,
+) {
+    let threads_state = ThreadsState::get_mut(state);
+    let Some(thread) = threads_state.threads.iter_mut().find(|t| t.id == thread_id) else {
+        log::warn!("bridge: SendMessage for unknown thread {thread_id}");
+        return;
+    };
+
+    let thread_name = thread.name.clone();
+
+    thread.messages.push(ThreadMessage {
+        author: ThreadAuthor::User,
+        content: Some(content.to_owned()),
+        file_path: None,
+        question: None,
+        timestamp: now_ms(),
+        acknowledged: false,
+    });
+    thread.status = ThreadStatus::MyTurn;
+
+    // Spine notification — mirrors handle_thread_input_submit in input.rs.
+    let msg_preview = if content.len() > 120 {
+        let mut s = content
+            .get(..content.floor_char_boundary(120))
+            .unwrap_or("")
+            .to_owned();
+        s.push_str("...");
+        s
+    } else {
+        content.to_owned()
+    };
+    let body = format!(
+        "New message in thread \"{thread_name}\" ({thread_id}): {msg_preview}\n\
+         Use Read(thread_id=\"{thread_id}\") to see the conversation.",
+    );
+    let _r = SpineState::create_notification(
+        state,
+        NotificationType::Custom,
+        "bridge_command".to_owned(),
+        body,
+    );
+
+    for module in crate::modules::all_modules() {
+        module.on_user_message(state);
+    }
+
+    state.flags.ui.dirty = true;
+    log::info!("bridge: applied SendMessage on thread {thread_id}");
+}
+
+// ── CreateThread ────────────────────────────────────────────────────────
+
+/// Create a new thread with the given name.
+fn apply_create_thread(state: &mut cp_base::state::runtime::State, name: &str) {
+    let ts = ThreadsState::get_mut(state);
+    let id = format!("T{}", ts.next_id);
+    ts.next_id = ts.next_id.saturating_add(1);
+
+    ts.threads.push(cp_mod_threads::types::Thread {
+        id: id.clone(),
+        name: name.to_owned(),
+        status: ThreadStatus::TheirTurn,
+        messages: vec![],
+        created_at: now_ms(),
+    });
+
+    state.flags.ui.dirty = true;
+    log::info!("bridge: created thread {id} \"{name}\"");
+}
+
+// ── ArchiveThread ───────────────────────────────────────────────────────
+
+/// Remove the thread from the active list (archive = remove from state).
+fn apply_archive_thread(state: &mut cp_base::state::runtime::State, thread_id: &str) {
+    let ts = ThreadsState::get_mut(state);
+    let before = ts.threads.len();
+    ts.threads.retain(|t| t.id != thread_id);
+    let removed = ts.threads.len() < before;
+
+    if removed {
+        // Clean up focus references (mirrors archive_confirm in threads.rs).
+        let focus = FocusState::get_mut(state);
+        if focus.focused_thread_id.as_deref() == Some(thread_id) {
+            focus.focused_thread_id = None;
+            focus.dangling_remaining = 0;
+            focus.escalation_level = 0;
+        }
+        let _prev = focus.last_read_count.remove(thread_id);
+        if focus.notified_my_turn_id.as_deref() == Some(thread_id) {
+            focus.notified_my_turn_id = None;
+        }
+        // Clamp selection index.
+        let len = ThreadsState::get(state).threads.len();
+        let focus_clamp = FocusState::get_mut(state);
+        if focus_clamp.selected_thread_idx >= len && len > 0 {
+            focus_clamp.selected_thread_idx = len.saturating_sub(1);
+        }
+        state.flags.ui.dirty = true;
+        log::info!("bridge: archived thread {thread_id}");
+    } else {
+        log::warn!("bridge: ArchiveThread for unknown thread {thread_id}");
+    }
+}
+
+// ── RestoreThread ───────────────────────────────────────────────────────
+
+/// Restore is a no-op in the current model (archived threads are removed,
+/// not hidden).  Log a warning so the backend caller knows.
+fn apply_restore_thread(
+    _state: &cp_base::state::runtime::State,
+    thread_id: &str,
+) {
+    log::warn!(
+        "bridge: RestoreThread({thread_id}) is a no-op — \
+         archived threads are removed, not hidden",
+    );
+}
+
+// ── Stop / Interrupt ────────────────────────────────────────────────────
+
+/// Stop the current stream (mirrors the Esc-key `StopStreaming` action).
+fn apply_stop(state: &mut cp_base::state::runtime::State) {
+    use cp_base::state::flags::StreamPhase;
+
+    if state.flags.stream.phase.is_streaming() {
+        state.flags.stream.phase.transition(StreamPhase::Idle);
+        if let Some(ctx) = state
+            .context
+            .iter_mut()
+            .find(|c| c.context_type.as_str() == cp_base::state::context::Kind::CONVERSATION)
+        {
+            ctx.token_count = ctx
+                .token_count
+                .saturating_sub(state.streaming_estimated_tokens);
+        }
+        state.streaming_estimated_tokens = 0;
+        if let Some(msg) = state.messages.last_mut()
+            && msg.role == "assistant" && !msg.content.is_empty()
+        {
+            msg.content.push_str("\n[Stopped]");
+        }
+        // Prevent spine from immediately relaunching.
+        SpineState::get_mut(state).config.user_stopped = true;
+        state.flags.ui.dirty = true;
+        log::info!("bridge: stopped streaming");
+    }
+
+    // Notify modules (stream stop hooks).
+    for module in crate::modules::all_modules() {
+        module.on_stream_stop(state);
+    }
 }

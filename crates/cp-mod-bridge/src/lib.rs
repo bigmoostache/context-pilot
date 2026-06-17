@@ -26,6 +26,7 @@ use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 use cp_wire::types::stream::{Frame as StreamFrame, Kind as StreamKind};
 
 use crate::boot::Boot;
+use crate::command::Intake;
 use crate::tee::Tee;
 
 pub mod body;
@@ -50,6 +51,10 @@ pub struct BridgeState {
     /// setup failed. Publishes live [`StreamFrame`]s to an observing backend
     /// (design doc tier ③).
     pub tee: Option<Tee>,
+
+    /// The command intake processor, or `None` when the bridge is OFF.
+    /// Handles bearer-auth, journal-then-ack, and dedup for inbound commands.
+    pub intake: Option<Intake>,
 
     /// Per-stream monotonic frame sequence counter for gap detection.
     pub tee_seq: u64,
@@ -94,7 +99,7 @@ impl Module for BridgeModule {
     fn init_state(&self, state: &mut State) {
         let active = std::env::var("CP_BRIDGE").as_deref() == Ok("1");
         if !active {
-            state.set_ext(BridgeState { boot: None, tee: None, tee_seq: 0 });
+            state.set_ext(BridgeState { boot: None, tee: None, intake: None, tee_seq: 0 });
             return;
         }
 
@@ -102,7 +107,7 @@ impl Module for BridgeModule {
             Ok(f) => f,
             Err(e) => {
                 log::error!("bridge: cannot determine working directory: {e}");
-                state.set_ext(BridgeState { boot: None, tee: None, tee_seq: 0 });
+                state.set_ext(BridgeState { boot: None, tee: None, intake: None, tee_seq: 0 });
                 return;
             }
         };
@@ -130,11 +135,31 @@ impl Module for BridgeModule {
                     }
                 };
 
-                state.set_ext(BridgeState { boot: Some(boot), tee, tee_seq: 0 });
+                // Set the command listener to non-blocking so the main-loop
+                // poll never stalls when no commander is connected.
+                let _nb = boot.listener().set_nonblocking(true);
+
+                // Seed the command intake from the oplog replay (populates
+                // the SeenSet for dedup across deadman re-exec).
+                let intake = match Intake::new(
+                    std::path::Path::new(&boot.entry().oplog_path),
+                    boot.cap_token().to_owned(),
+                ) {
+                    Ok(i) => {
+                        log::info!("bridge: command intake ready");
+                        Some(i)
+                    }
+                    Err(e) => {
+                        log::error!("bridge: intake setup failed: {e:?}");
+                        None
+                    }
+                };
+
+                state.set_ext(BridgeState { boot: Some(boot), tee, intake, tee_seq: 0 });
             }
             Err(e) => {
                 log::error!("bridge: boot failed: {e:?}");
-                state.set_ext(BridgeState { boot: None, tee: None, tee_seq: 0 });
+                state.set_ext(BridgeState { boot: None, tee: None, intake: None, tee_seq: 0 });
             }
         }
     }
@@ -324,9 +349,10 @@ mod tests {
 
     #[test]
     fn bridge_state_default_is_none() {
-        let bs = BridgeState { boot: None, tee: None, tee_seq: 0 };
+        let bs = BridgeState { boot: None, tee: None, intake: None, tee_seq: 0 };
         assert!(bs.boot.is_none());
         assert!(bs.tee.is_none());
+        assert!(bs.intake.is_none());
         assert_eq!(bs.tee_seq, 0);
     }
 }
