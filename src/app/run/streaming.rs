@@ -21,6 +21,9 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
         app.state.flags.ui.dirty = true;
         match evt {
             StreamEvent::Chunk(text) => {
+                for module in crate::modules::all_modules() {
+                    module.on_stream_chunk(&text, &mut app.state);
+                }
                 app.typewriter.add_chunk(&text);
             }
             StreamEvent::ToolProgress { name, input_so_far } => {

@@ -296,6 +296,8 @@ impl Module for SpineModule {
         SpineState::get_mut(state).config.user_stopped = true;
     }
 
+    fn on_stream_chunk(&self, _text: &str, _state: &mut State) {}
+
     fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
 
     fn on_tool_complete(&self, _tool_name: &str, _state: &mut State) {}

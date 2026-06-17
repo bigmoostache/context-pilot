@@ -201,6 +201,13 @@ pub trait Module: Send + Sync {
     /// Modules can update their state to reflect the stop.
     fn on_stream_stop(&self, _state: &mut State) {}
 
+    /// Called for each text chunk the LLM streams.
+    ///
+    /// Fires before the chunk reaches the typewriter.  The bridge module
+    /// uses this to tee tokens to the stream socket for sub-second
+    /// backend observation.
+    fn on_stream_chunk(&self, _text: &str, _state: &mut State) {}
+
     /// Called when a tool call is being streamed (progress update).
     ///
     /// Fires each time the LLM emits more JSON for a tool call.
