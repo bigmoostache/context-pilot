@@ -149,6 +149,23 @@ export interface CommandReceipt {
   accepted: boolean
 }
 
+/** Build a full Command envelope around a Kind payload. */
+function buildCommandEnvelope(kind: Record<string, unknown>): object {
+  return {
+    schema_version: 1,
+    id: crypto.randomUUID(),
+    seq: 0,
+    dedup_token: crypto.randomUUID(),
+    kind,
+  }
+}
+
+/**
+ * Send a command to an agent. Accepts just the `kind` payload —
+ * the envelope (schema_version, id, seq, dedup_token) is auto-generated.
+ *
+ * Example: `sendCommand("agent1", { kind: "send_message", thread_id: "T1", content: "hi" })`
+ */
 export async function sendCommand(
   agentId: string,
   kind: Record<string, unknown>,
@@ -156,7 +173,7 @@ export async function sendCommand(
   return request(`/api/agent/${agentId}/command`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(kind),
+    body: JSON.stringify(buildCommandEnvelope(kind)),
   })
 }
 

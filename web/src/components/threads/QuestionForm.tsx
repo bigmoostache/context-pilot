@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
  * user a structured question inside a conversation. Decorative (design only)
  * but fully interactive so the selection state feels real.
  */
-export function QuestionForm({ q }: { q: ThreadQuestion }) {
+export function QuestionForm({ q, onSubmit }: { q: ThreadQuestion; onSubmit?: (answer: string) => void }) {
   const [picked, setPicked] = useState<number[]>([])
   const toggle = (i: number) => {
     setPicked((cur) => {
@@ -77,6 +77,12 @@ export function QuestionForm({ q }: { q: ThreadQuestion }) {
             {picked.length > 0 ? `${picked.length} selected` : "No selection"}
           </span>
           <button
+            onClick={() => {
+              if (picked.length === 0 || !onSubmit) return
+              const answers = picked.map((i) => q.options[i])
+              onSubmit(answers.join(", "))
+            }}
+            disabled={picked.length === 0}
             className={cn(
               "rounded-lg px-3.5 py-1.5 text-[12px] font-medium transition-[filter]",
               picked.length > 0

@@ -1,10 +1,9 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { FolderGit2 } from "lucide-react"
 import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
 import { NewThreadDialog } from "./NewThreadDialog"
-import { threadDetails, agents } from "@/lib/mock"
-import type { ThreadDetail } from "@/lib/types"
+import { useThreads, useFleet, sendCommand } from "@/lib/live"
 
 /**
  * Thread-centered view — the conversation-first layout: thread list (left) |
@@ -26,51 +25,46 @@ export function ThreadsView({
 }: {
   activeAgentId: string
 }) {
+  const { data: agents = [] } = useFleet()
+  const { data: threads = [] } = useThreads(activeAgentId)
   const agent = agents.find((a) => a.id === activeAgentId)
 
-  const [threads, setThreads] = useState<ThreadDetail[]>(() =>
-    threadDetails.filter((t) => t.agentId === activeAgentId),
-  )
-  const [selectedId, setSelectedId] = useState(
-    () => threads.find((t) => !t.archived)?.id ?? threads[0]?.id ?? "",
-  )
+  const [selectedId, setSelectedId] = useState("")
   const [query, setQuery] = useState("")
   const [showArchived, setShowArchived] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
 
-  const thread = threads.find((t) => t.id === selectedId) ?? threads[0]
+  // Auto-select first non-archived thread if current selection is invalid
+  const validSelection = threads.some((t) => t.id === selectedId)
+  const effectiveSelectedId = validSelection
+    ? selectedId
+    : threads.find((t) => !t.archived)?.id ?? threads[0]?.id ?? ""
 
-  // archive ↔ restore; keep the selection valid if we just archived it
-  const handleArchive = (id: string) => {
-    setThreads((prev) => {
-      const next = prev.map((t) => (t.id === id ? { ...t, archived: !t.archived } : t))
-      if (id === selectedId) {
-        const fallback = next.find((t) => !t.archived && t.id !== id) ?? next.find((t) => t.id !== id)
-        if (fallback) setSelectedId(fallback.id)
-      }
-      return next
-    })
-  }
+  const thread = threads.find((t) => t.id === effectiveSelectedId)
 
-  const handleCreate = (title: string) => {
-    const id = `local-${Date.now()}`
-    const created: ThreadDetail = {
-      id,
-      name: title.trim() || "Untitled thread",
-      status: "MY_TURN",
-      agentId: activeAgentId,
-      agent: agent?.name ?? "agent",
-      createdAt: "just now",
-      lastActivity: "just now",
-      unread: 0,
-      log: [],
-    }
-    setThreads((prev) => [created, ...prev])
-    setSelectedId(id)
-    setShowArchived(false)
-    setQuery("")
+  const handleArchive = useCallback((id: string) => {
+    const t = threads.find((th) => th.id === id)
+    if (!t) return
+    const kind = t.archived ? "restore_thread" : "archive_thread"
+    sendCommand(activeAgentId, { kind, thread_id: id }).catch(console.error)
+  }, [threads, activeAgentId])
+
+  const handleCreate = useCallback((title: string) => {
+    sendCommand(activeAgentId, { kind: "create_thread", name: title.trim() || "Untitled thread" })
+      .catch(console.error)
     setNewOpen(false)
-  }
+    setQuery("")
+    setShowArchived(false)
+  }, [activeAgentId])
+
+  const handleSend = useCallback((text: string) => {
+    if (!effectiveSelectedId || !text.trim()) return
+    sendCommand(activeAgentId, {
+      kind: "send_message",
+      thread_id: effectiveSelectedId,
+      content: text.trim(),
+    }).catch(console.error)
+  }, [activeAgentId, effectiveSelectedId])
 
   if (!agent || threads.length === 0) {
     return <EmptyRealm agentName={agent?.name} />
@@ -80,7 +74,7 @@ export function ThreadsView({
     <div className="flex min-h-0 flex-1">
       <ThreadList
         threads={threads}
-        selectedId={thread?.id ?? ""}
+        selectedId={effectiveSelectedId}
         onSelect={setSelectedId}
         query={query}
         onQueryChange={setQuery}
@@ -90,7 +84,7 @@ export function ThreadsView({
         onNewThread={() => setNewOpen(true)}
       />
 
-      {thread && <ThreadConversation thread={thread} />}
+      {thread && <ThreadConversation thread={thread} onSend={handleSend} />}
 
       <NewThreadDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={handleCreate} />
     </div>

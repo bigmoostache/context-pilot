@@ -26,8 +26,10 @@ function toChatMessage(m: ThreadMsg): ChatMessage {
  */
 export function ThreadConversation({
   thread,
+  onSend,
 }: {
   thread: ThreadDetail
+  onSend?: (text: string) => void
 }) {
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-background">
@@ -47,7 +49,7 @@ export function ThreadConversation({
               <Message msg={toChatMessage(m)} />
               {m.questions?.map((q, i) => (
                 <div key={i} className="pb-1.5 pl-7">
-                  <QuestionForm q={q} />
+                  <QuestionForm q={q} onSubmit={(answer) => onSend?.(answer)} />
                 </div>
               ))}
               {m.fileRef && (
@@ -63,7 +65,7 @@ export function ThreadConversation({
       </ScrollArea>
 
       <div className="mx-auto w-full max-w-[720px]">
-        <ThreadComposer status={thread.status} />
+        <ThreadComposer status={thread.status} onSend={onSend} />
       </div>
     </main>
   )
