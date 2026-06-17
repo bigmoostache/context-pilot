@@ -3462,6 +3462,10 @@
   path: ui/src/components/agents/AgentsView.tsx
   description: 'Agents launcher. Two modes: ''fleet'' (default, FleetDashboard welcome page) and ''browse'' (FileBrowser | AgentDetail with back bar). Manage→browse at agent''s folder; New→browse at root. findByPath DFS helper.'
   last_edited_ms: 1781515390696
+91dcb92cae6ef499:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (confined to agent realm). Uses useFs(agentId, cwd) for live directory listings. Tabs+history+nav+selection+drag-drop+statusbar. buildCrumbs/pathName helpers replace mock tree navigation. Four view modes (grid/list/columns/gallery), keyboard control, marquee selection.
+  last_edited_ms: 1781695707834
 91faf7c4fd9fd3ee:
   path: LICENSE
   description: MIT License
