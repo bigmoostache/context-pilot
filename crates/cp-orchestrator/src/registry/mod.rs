@@ -36,6 +36,7 @@ use std::time::{Duration, SystemTime};
 use cp_wire::heartbeat::{Heartbeat, DEFAULT_MAX_AGE};
 use cp_wire::types::registry::{AgentStatus, Entry};
 
+pub mod channel;
 pub mod liveness;
 
 use self::liveness::{verdict, Liveness};

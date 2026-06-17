@@ -1382,6 +1382,10 @@
   path: ui/src/components/shell/LeftRail.tsx
   description: Cockpit context navigator (w-240, unified with threads/finder rails). Context-budget meter + scrollable panel list (icon+name+tokens). Dense per-panel telemetry omitted for calm enterprise feel.
   last_edited_ms: 1781531986900
+3ad9658ed4018658:
+  path: crates/cp-orchestrator/src/lib.rs
+  description: Backend library root. Declares channel+inspect+registry+runtime+services+supervisor+transport. Re-exports registry::{channel,liveness} at crate root.
+  last_edited_ms: 1781682988833
 3b6333a154f242aa:
   path: src/state/persistence/save.rs
   description: 'Save operations: flame!("save_batch") + flame!("save_state"). build_save_batch() serializes config/worker/panels/messages/logs into WriteBatch. save_state() blocking sync persist. check_ownership(). log_error() to disk.'
@@ -4946,6 +4950,10 @@ d480dfbe8c4b7ba0:
   path: crates/cp-oplog/src/compact.rs
   description: 'Phase 7 (X774): segment compaction + GAP3 grace rule. compact(dir) deletes every segment older than the newest checkpoint-bearing segment (replay fast-path already ignores them → replay output unchanged; checkpoint Snapshot carries live heads+seen, so the checkpoint IS the ack-rev barrier). CompactReport{segments_removed,oldest_index}. total_bytes/should_compact size trigger (256MiB). body_gc_eligible(age,grace) const predicate for GAP3: only GC bodies older than DEFAULT_GC_GRACE(60s) >> I13 barrier window, so in-flight spills never collected, only crash-orphans. OplogResult from crate::error. 7 tests incl replay-identical-after-compaction.'
   last_edited_ms: 1781623209051
+d484653c157e056a:
+  path: crates/cp-orchestrator/src/inspect.rs
+  description: 'Read-only, mtime-cached inspection of agent on-disk state (tier-② files). StateReader: read_config (config.json with mtime cache + torn-read fallback), read_worker (states/<id>.json), list_workers, read_shared (raw bytes), list_messages, read_message, read_panel. Per-agent AgentCache. 7 tests.'
+  last_edited_ms: 1781682988818
 d486285ed7025782:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.

@@ -46,6 +46,7 @@ use cp_wire::types::registry::Entry;
 use cp_wire::types::stream::Frame;
 
 use crate::channel::Tailer;
+use crate::inspect::StateReader;
 use crate::services::{CostBreaker, MaterializedView, StreamHub};
 use ticket::TicketStore;
 
@@ -75,6 +76,8 @@ pub struct Backend {
     pub(crate) hub: StreamHub,
     /// Single-use SSE upgrade tickets.
     pub(crate) tickets: TicketStore,
+    /// Read-only, mtime-cached reader of agent persistence files.
+    pub(crate) inspect: StateReader,
     /// Directory of agent registry records (`<id>.json`).
     pub(crate) agents_dir: PathBuf,
 }
@@ -88,6 +91,7 @@ impl Backend {
             breaker: CostBreaker::new(budget_usd),
             hub: StreamHub::new(DEFAULT_SUB_CAPACITY),
             tickets: TicketStore::new(),
+            inspect: StateReader::new(),
             agents_dir,
         }
     }
@@ -107,10 +111,15 @@ impl Backend {
         &mut self.hub
     }
 
+    /// Mutable access to the state reader (for inspection endpoints).
+    pub fn inspect_mut(&mut self) -> &mut StateReader {
+        &mut self.inspect
+    }
+
     /// Construct a backend from explicit services — used by tests.
     #[cfg(test)]
     pub(crate) fn for_test(agents_dir: PathBuf, view: MaterializedView, breaker: CostBreaker) -> Self {
-        Self { view, breaker, hub: StreamHub::new(DEFAULT_SUB_CAPACITY), tickets: TicketStore::new(), agents_dir }
+        Self { view, breaker, hub: StreamHub::new(DEFAULT_SUB_CAPACITY), tickets: TicketStore::new(), inspect: StateReader::new(), agents_dir }
     }
 }
 
