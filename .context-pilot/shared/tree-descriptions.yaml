@@ -1542,6 +1542,10 @@
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail: grouped thread sidebar (''Needs you''=MY_TURN / ''In progress''=THEIR_TURN). Each row: status dot, name, last-msg preview, time, unread badge, selection bar. + New Thread button, search box.'
   last_edited_ms: 0
+3fdc7378f1993dda:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 (reads cwd + state.current_model(), stores BridgeState{Option<Boot>} in TypeMap). Inert when OFF. is_global=true, no tools/panels. Declares body+boot+command+error+heartbeat+register+tee modules. Deps: cp-base, cp-render, cp-wire, cp-oplog, log, nix(fs), serde_json.'
+  last_edited_ms: 1781696683755
 3ffcdfcd3170e1ea:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
@@ -5398,6 +5402,10 @@ e1f54075ea2f5313:
   path: crates/cp-mod-files/Cargo.toml
   description: 'Files module deps: cp-base, cp-mod-tree, cp-mod-queue, cp-render, crossterm, serde_json.'
   last_edited_ms: 0
+e2965ad068447bda:
+  path: crates/cp-mod-bridge/Cargo.toml
+  description: 'Bridge module deps: cp-base, cp-render, cp-wire, cp-oplog, log 0.4, nix 0.30 (fs, for Flock RAII), serde_json. dev: tempfile. Workspace lints.'
+  last_edited_ms: 1781696683775
 e29a9e64463f2ec8:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated list of allowed #[expect]/#[allow] annotations (10 entries). Every occurrence in the codebase MUST have an entry here. Fields: path, match, reason, strategy.'
