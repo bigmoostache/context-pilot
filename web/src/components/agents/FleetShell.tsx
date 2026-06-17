@@ -73,7 +73,7 @@ export function FleetShell({
           onAutoCreateConsumed={onCreateConsumed}
         />
       ) : (
-        <PromptsPage />
+        <PromptsPage agentId={agents[0]?.id} />
       )}
     </div>
   )

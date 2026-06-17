@@ -64,7 +64,7 @@ function App() {
             <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} />
           )}
 
-          <StatusBar fleet={view === "fleet"} agents={agents} />
+          <StatusBar fleet={view === "fleet"} agents={agents} activeAgent={activeAgent} />
         </div>
         </TooltipProvider>
       </AccountProvider>

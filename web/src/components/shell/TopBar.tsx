@@ -169,7 +169,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
 
       <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
-      <StatsPopup open={statsOpen} onClose={() => setStatsOpen(false)} />
+      <StatsPopup open={statsOpen} onClose={() => setStatsOpen(false)} agentId={activeAgentId} />
     </header>
 
     {/* Rendered as a SIBLING of the .vibrancy header (never a descendant) so its

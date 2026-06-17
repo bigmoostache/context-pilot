@@ -1,5 +1,5 @@
 import { Boxes, MessagesSquare, Wallet } from "lucide-react"
-import { status, cacheStats, tokenBudget } from "@/lib/mock"
+import { cacheStats, tokenBudget } from "@/lib/mock"
 import { fmtCost, fmtTokens } from "@/lib/panelMeta"
 import type { Agent, StreamPhase } from "@/lib/types"
 
@@ -21,8 +21,8 @@ const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
  *   spend (clearly labelled). A "Needs you" count surfaces how many agents are
  *   waiting on input, so the footer doubles as a glanceable fleet pulse.
  */
-export function StatusBar({ fleet = false, agents = [] }: { fleet?: boolean; agents?: Agent[] }) {
-  return fleet ? <FleetStatus agents={agents} /> : <AgentStatus />
+export function StatusBar({ fleet = false, agents = [], activeAgent }: { fleet?: boolean; agents?: Agent[]; activeAgent?: Agent }) {
+  return fleet ? <FleetStatus agents={agents} /> : <AgentStatus agent={activeAgent} />
 }
 
 /** Fleet-wide aggregates — shown when no single agent is focused. */
@@ -57,8 +57,11 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
 }
 
 /** Single-agent session vitals — shown while an agent is focused. */
-function AgentStatus() {
-  const p = phaseMeta[status.phase]
+function AgentStatus({ agent }: { agent?: Agent }) {
+  // Derive phase from agent status when available
+  const phase: StreamPhase = agent?.status === "working" ? "streaming" : agent?.status === "needs-you" ? "ready" : "ready"
+  const p = phaseMeta[phase]
+  const costUsd = agent?.costUsd ?? 0
   return (
     <footer className="vibrancy flex h-8 shrink-0 items-center gap-3 border-t border-border px-4 text-[12px]">
       <span className="flex items-center gap-1.5">
@@ -69,7 +72,7 @@ function AgentStatus() {
       <span className="ml-auto flex items-center gap-3">
         <ContextBar hit={cacheStats.hit} miss={cacheStats.miss} budget={tokenBudget.budget} />
         <span className="h-3.5 w-px bg-border" />
-        <span className="tabular-nums text-muted-foreground">{fmtCost(status.costUsd)}</span>
+        <span className="tabular-nums text-muted-foreground">{fmtCost(costUsd)}</span>
       </span>
     </footer>
   )

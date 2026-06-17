@@ -1,7 +1,9 @@
+import { useMemo } from "react"
 import { Activity, X } from "lucide-react"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
-import { stats, tokenBudget } from "@/lib/mock"
+import { usePanels, useAgentMeta } from "@/lib/live"
 import { accentVar, fmtTokens } from "@/lib/panelMeta"
+import type { StatRow } from "@/lib/types"
 
 /**
  * Session "vitals" popup — the stats that used to live in the cockpit's right
@@ -17,11 +19,24 @@ import { accentVar, fmtTokens } from "@/lib/panelMeta"
 export function StatsPopup({
   open,
   onClose,
+  agentId,
 }: {
   open: boolean
   onClose: () => void
+  agentId: string
 }) {
-  const pct = Math.round((tokenBudget.used / tokenBudget.budget) * 100)
+  const { data: panels = [] } = usePanels(agentId)
+  const { data: agent } = useAgentMeta(agentId)
+  const totalTokens = useMemo(() => panels.reduce((s, p) => s + p.tokens, 0), [panels])
+  const budget = 200_000
+  const threshold = 170_000
+  const pct = Math.round((totalTokens / budget) * 100)
+
+  const stats: StatRow[] = useMemo(() => [
+    { label: "Context", value: `${fmtTokens(totalTokens)} / ${fmtTokens(budget)}`, accent: "signal" },
+    { label: "Panels", value: String(panels.length) },
+    { label: "Session cost", value: agent ? `$${agent.costUsd.toFixed(2)}` : "—", accent: "warn" },
+  ], [totalTokens, panels.length, agent])
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -52,7 +67,7 @@ export function StatsPopup({
           <div className="flex items-baseline justify-between">
             <span className="text-[12px] text-muted-foreground">Context budget</span>
             <span className="font-mono text-[12px] tabular-nums text-foreground/85">
-              {fmtTokens(tokenBudget.used)} / {fmtTokens(tokenBudget.budget)}
+              {fmtTokens(totalTokens)} / {fmtTokens(budget)}
             </span>
           </div>
           <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
@@ -63,12 +78,12 @@ export function StatsPopup({
             {/* threshold tick */}
             <span
               className="absolute inset-y-0 w-px bg-[var(--warn)]/70"
-              style={{ left: `${(tokenBudget.threshold / tokenBudget.budget) * 100}%` }}
+              style={{ left: `${(threshold / budget) * 100}%` }}
             />
           </div>
           <span className="text-[10.5px] text-muted-foreground/55">
             {pct}% used · cleaning threshold at{" "}
-            {Math.round((tokenBudget.threshold / tokenBudget.budget) * 100)}%
+            {Math.round((threshold / budget) * 100)}%
           </span>
         </div>
 

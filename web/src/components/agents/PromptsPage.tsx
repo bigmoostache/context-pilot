@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { Bot, Download, Plus, TerminalSquare, Zap } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { library } from "@/lib/mock"
+import { library as mockLibrary } from "@/lib/mock"
+import { useLibrary } from "@/lib/live"
 import type { LibraryItem, LibraryKind } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { ImportModal, PromptModal } from "./PromptModal"
@@ -25,7 +26,9 @@ const KIND_META: Record<
 
 const TABS: (LibraryKind | "all")[] = ["all", "agent", "skill", "command"]
 
-export function PromptsPage() {
+export function PromptsPage({ agentId }: { agentId?: string }) {
+  const { data: liveLibrary } = useLibrary(agentId ?? "")
+  const library = agentId && liveLibrary ? liveLibrary : mockLibrary
   const [tab, setTab] = useState<LibraryKind | "all">("all")
   const [editing, setEditing] = useState<LibraryItem | "new" | null>(null)
   const [importing, setImporting] = useState(false)
