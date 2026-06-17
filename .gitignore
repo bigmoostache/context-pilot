@@ -16,6 +16,7 @@ test
 output
 !.context-pilot/shared/
 .context-pilot/shared/entities/
+.context-pilot/shared/mcp.json
 !.context-pilot/agents/
 !.context-pilot/skills/
 !.context-pilot/commands/
