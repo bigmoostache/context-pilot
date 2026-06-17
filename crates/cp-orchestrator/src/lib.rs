@@ -31,11 +31,15 @@
 //!   [`StreamHub`](services::StreamHub) (stream fan-out).
 
 pub mod channel;
-pub mod liveness;
 pub mod registry;
+pub mod runtime;
 pub mod services;
 pub mod supervisor;
 pub mod transport;
+
+// Re-export liveness at the crate root so external consumers (tests) that
+// imported `cp_orchestrator::liveness` continue to compile unchanged.
+pub use registry::liveness;
 
 // `cp-mod-bridge` is a dev-dependency the `tests/registry_channel.rs` integration
 // suite uses to boot a real agent across the backend↔agent seam. The library's

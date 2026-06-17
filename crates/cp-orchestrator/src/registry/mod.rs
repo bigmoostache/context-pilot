@@ -5,7 +5,7 @@
 //! `~/.context-pilot/agents/<id>.json` at boot (`cp-mod-bridge`'s registry
 //! writer) and rewriting `<folder>/heartbeat` at a fixed cadence
 //! (`cp_wire::heartbeat`). [`AgentRegistry`] reads that directory, derives a
-//! [`Liveness`] verdict per record (see [`crate::liveness`]), and diffs each
+//! [`Liveness`] verdict per record (see [`liveness`]), and diffs each
 //! pass against the last to emit fleet-change [`Event`]s.
 //!
 //! # Scan-and-diff, not a kernel watch
@@ -36,7 +36,9 @@ use std::time::{Duration, SystemTime};
 use cp_wire::heartbeat::{Heartbeat, DEFAULT_MAX_AGE};
 use cp_wire::types::registry::{AgentStatus, Entry};
 
-use crate::liveness::{verdict, Liveness};
+pub mod liveness;
+
+use self::liveness::{verdict, Liveness};
 
 /// File-name suffix of a published registry record.
 const RECORD_SUFFIX: &str = ".json";

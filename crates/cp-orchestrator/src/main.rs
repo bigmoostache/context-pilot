@@ -1,35 +1,16 @@
 //! Standalone orchestration backend binary — discovers, observes, and commands
 //! a fleet of Context Pilot agents.
 //!
-//! This is the **backend** half of the orchestration architecture (design doc
-//! §4). Its machinery lives in the [`cp_orchestrator`] library (so it is
-//! unit-testable without spawning processes); this binary is the thin entry
-//! point that will wire those pieces into a runtime:
-//!
-//! - [`AgentRegistry`](cp_orchestrator::registry::AgentRegistry) — discovers
-//!   agents via `~/.context-pilot/agents/` and derives per-agent liveness.
-//! - `AgentChannel` — per-agent oplog tail + stream + command channel (later).
-//! - `AgentSupervisor` — lifecycle (spawn/stop/restart), allow-list gated.
-//! - `StreamHub` — fan-out from per-agent UDS to N frontend WebSockets.
-//! - `CostBreaker` — durable fleet-wide spend circuit-breaker.
-//! - `MaterializedView` — in-memory cache rebuilt from oplog heads.
-//!
-//! Phase 15: the registry exists and self-tests; the binary still boots, prints
-//! its identity, and exits — the live scan loop arrives with the supervisor.
+//! Reads configuration from environment variables (see [`runtime::Config`]),
+//! spawns a background driver thread that scans the registry and tails every
+//! agent's oplog, then blocks on the HTTP transport serving REST + SSE.
 
-use cp_orchestrator::registry;
+use cp_orchestrator::runtime::{Config, Runtime};
 
-// `nix`, `serde`, `serde_json`, `cp_oplog`, and `tiny_http` are dependencies of
-// this package's *library* half (`liveness`, `registry`, `services`,
-// `transport`); the binary does not name them directly, so the per-target
-// `unused-crate-dependencies` lint needs an explicit acknowledgement here (the
-// canonical `use … as _;` form Cargo itself suggests, not a lint suppression).
-// `tempfile` is a dev-dependency used only by the library's tests, acknowledged
-// under `cfg(test)` so non-test builds never reference it. `cp-mod-bridge` is a
-// dev-dependency the integration suite uses to boot a real agent across the
-// backend↔agent seam; the bin's own test target links it but does not name it.
-use nix as _;
+// Acknowledge crate-level dependencies used only by the library half or by
+// dev-dependencies linked into the bin-test target.
 use cp_oplog as _;
+use nix as _;
 use serde as _;
 use serde_json as _;
 use tiny_http as _;
@@ -44,9 +25,24 @@ fn main() {
         env!("CARGO_PKG_VERSION"),
         cp_wire::PROTOCOL_VERSION,
     );
-    match registry::default_agents_dir() {
-        Ok(dir) => eprintln!("agents directory: {}", dir.display()),
-        Err(e) => eprintln!("agents directory unavailable: {e}"),
+
+    let config = match Config::from_env() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("configuration error: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    eprintln!("agents directory: {}", config.agents_dir.display());
+    eprintln!("cost budget: ${:.2}/agent", config.budget_usd);
+    eprintln!("scan interval: {}ms", config.scan_interval.as_millis());
+
+    let runtime = Runtime::new(config);
+    let _driver = runtime.start_driver();
+
+    if let Err(e) = runtime.serve() {
+        eprintln!("serve failed: {e}");
+        std::process::exit(1);
     }
-    eprintln!("Phase 15 — AgentRegistry ready; no runtime loop yet.");
 }

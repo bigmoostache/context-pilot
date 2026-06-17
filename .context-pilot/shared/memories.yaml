@@ -178,6 +178,40 @@ bc38d2fd0bcf015a:
   - gotcha
   - bridge
   last_edited_ms: 1781649648561
+caf6de1cb65ac661:
+  tl_dr: 'DEMAQUETTING (final frontend-wiring sequence, branch ''demaquetting''): wire live frontend↔backend, keep ui/ maquette FROZEN as reference, build live app in sibling web/ dir. Full plan in contents.'
+  contents: |-
+    ## DEMAQUETTING — captain's final sequence (T36)
+
+    Goal: EVERYTHING working — frontend wired, active, performant. DO NOT touch ui/ (frozen maquette reference for comparison). Build live app in sibling `web/` dir.
+
+    ## Locked architecture — TWO PLANES (Philosophy B)
+    1. **Orchestration plane (durable, EXISTS)**: oplog → AgentView + SSE deltas (liveness, commands exactly-once, cost breaker, stream hints).
+    2. **Inspection plane (read-only, NEW)**: backend reads agent's tier-② state files (as specified in design doc v7 three-tier model) → reshapes to maquette JSON. NO agent writes, NO oplog bloat. Matches original T31 'disk-as-truth(read)' pillar.
+
+    ## Agent state layout (tier-② files, per design doc v7)
+    - `<folder>/.context-pilot/config.json` → `modules` map = GLOBAL (is_global) module data: `threads` (full thread list+message logs), `memory`, `tree`, `logs`. Also active_theme, view_mode. (~386KB; mtime memo-cache.)
+    - `<folder>/.context-pilot/states/<worker>.json` → `modules` map = PER-WORKER data: todo, queue, scratchpad, spine, callback_worker, tree_worker, threads_worker(=FocusState only), git, console, cache_engine, search, core_worker, questions_worker. Plus important_panel_uids, panel_uid_to_local_id, cost.
+    - `shared/{memories.yaml, callbacks.yaml, tree-descriptions.yaml, entities/entities.db}`.
+    - `messages/*.yaml` (conversation msgs), `panels/*.json`.
+    Save path: cp-base save.rs build_save_batch → global module data into config.json SharedConfig.modules; per-worker into states/<worker>.json modules (with _worker suffix for worker_data).
+
+    ## 18-phase plan (4 workstreams)
+    W1 Backend runtime: P1 orchestrator runtime loop (runtime.rs: AgentRegistry+per-agent Tailer+MaterializedView+CostBreaker+StreamHub bg thread folds oplog→view+feeds hub; serve() on port default 7878; main.rs starts runtime; CORS for vite :5174; /api/health; graceful shutdown).
+    W2 Inspection REST (read tier-② files→JSON): P2 inspect/ state reader core (locate folder from Entry.folder, read config.json+states+shared, mtime memo-cache). P3 threads endpoints GET /api/agent/{id}/threads (ThreadDetail{log:ThreadMsg[]} from config.json modules.threads). P4 cockpit panels: /panels + /memory /todos /spine /queue /scratchpad /entities /tree /callbacks /tools /radar. P5 agent meta + fleet enrichment (name=folder basename, branch via git -C, model from Entry, status from phase/liveness, cost from worker, task, threads count, lastActivity). P6 finder fs (GET /fs?path= confined dir listing→FinderNode[]) + conversation (messages/). P7 usage + library.
+    W3 Bridge activation (gated CP_BRIDGE=1, additive): P8 bridge boot wiring (Boot::start_in writes registry/heartbeat/oplog/socket on TUI boot, Drop cleanup). P9 heartbeat Beacon + stream tee at streaming.rs. P10 command intake+application via actions/input.rs user-message path (K7): SendMessage→inject user msg into thread; CreateThread/Archive/Restore→threads module; Stop/Interrupt.
+    W4 Web client: P11 scaffold web/ (copy ui/, dev port 5174, lib/api.ts REST+ticket mint, lib/sse.ts EventSource+Last-Event-ID+resync, lib/live.ts hooks useFleet/useAgent/useThreads/usePanels SWR-style fetch+SSE-invalidate+poll fallback; mock.ts kept as fallback). P12 fleet live. P13 threads live (composer→real input→POST SendMessage; NewThreadDialog→CreateThread; archive→ArchiveThread; QuestionForm submit→answer; SSE new messages). P14 cockpit live. P15 finder live. P16 TopBar/Config/Usage/Prompts live.
+    W5 Integration+perf+ship: P17 e2e demo (orchestrator + bridge-ON TUI + web together) + perf (SSE-invalidate, debounce, shadcn skeletons). P18 run-stack.sh + README + docs, commit/push.
+
+    ## Sequencing: W1→W2→W4 first (frontend live fast against tier-② files, even hand-registered agent), then W3 (live self-registering agent), then W5. W3 highest risk (touches running TUI) — additive+gated.
+    ## Notes: web dir = web/. CORS allow localhost. perf = SSE push invalidates query + 2-3s poll backstop. X787 (Phase 20 M4 ship gate) deferred until after demaquetting.
+  importance: critical
+  labels:
+  - demaquetting
+  - frontend
+  - plan
+  - active
+  last_edited_ms: 1781681945821
 ceac945d9376fcf2:
   tl_dr: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
   contents: |-

@@ -149,6 +149,16 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     let method = request.method().clone();
 
+    // CORS preflight — return 204 with permissive headers.
+    if method == Method::Options {
+        let mut response = Response::from_string("").with_status_code(204);
+        for header in cors_headers() {
+            response = response.with_header(header);
+        }
+        let _sent = request.respond(response);
+        return;
+    }
+
     // SSE stream is the one route that takes ownership of the request to stream.
     if method == Method::Get && segments.as_slice() == ["api", "stream"] {
         handle_stream(request, state, &query);
@@ -178,6 +188,7 @@ fn route_rest(
     body_bytes: &[u8],
 ) -> rest::HttpReply {
     match (method, segments) {
+        (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
         (Method::Get, ["api", "fleet"]) => rest::fleet(state),
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
@@ -241,6 +252,9 @@ fn stream_to_client(request: Request, mut body: sse::SseBody) {
         "Content-Type: text/event-stream\r\n",
         "Cache-Control: no-cache\r\n",
         "Connection: keep-alive\r\n",
+        "Access-Control-Allow-Origin: *\r\n",
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n",
+        "Access-Control-Allow-Headers: Content-Type, Last-Event-ID\r\n",
         "\r\n",
     );
     if writer.write_all(preamble.as_bytes()).and_then(|()| writer.flush()).is_err() {
@@ -343,10 +357,28 @@ fn load_entry(state: &Arc<Mutex<Backend>>, id: &str) -> Option<Entry> {
 
 
 
-/// Respond with a JSON [`HttpReply`](rest::HttpReply).
+/// CORS response headers permitting the Vite dev server (or any origin) to
+/// call the backend. Tighten to a specific origin in production if needed.
+fn cors_headers() -> Vec<Header> {
+    [
+        Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]),
+        Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, OPTIONS"[..]),
+        Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type, Last-Event-ID"[..]),
+    ]
+    .into_iter()
+    .filter_map(Result::ok)
+    .collect()
+}
+
+
+
+/// Respond with a JSON [`HttpReply`](rest::HttpReply), including CORS headers.
 fn respond_json(request: Request, reply: &rest::HttpReply) {
     let mut response = Response::from_string(&reply.body).with_status_code(reply.status);
     if let Ok(header) = Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]) {
+        response = response.with_header(header);
+    }
+    for header in cors_headers() {
         response = response.with_header(header);
     }
     let _sent = request.respond(response);

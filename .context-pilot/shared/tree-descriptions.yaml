@@ -490,6 +490,10 @@
   path: src/app/actions/history.rs
   description: Prompt history navigation and panel clipboard copy. PromptHistoryNav struct with lazy-load from JSONL. Safe indexing via .get(), saturating arithmetic. handle_history_prev/next (Ctrl+U/D), handle_copy_panel_content (Ctrl+C via pbcopy).
   last_edited_ms: 1780563343160
+154b07c36871b093:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Phase 19/30 + P1: transport hub. Backend shared state + serve/serve_bound + route_rest + handle_stream SSE. CORS headers (Access-Control-Allow-Origin: *) on all responses + OPTIONS preflight 204. /api/health endpoint. stream_to_client uses into_writer() + per-event flush (tiny_http 0.12 SSE fix).'
+  last_edited_ms: 1781682420783
 155349883e8b8d6d:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -926,6 +930,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+285ec297c757dfeb:
+  path: crates/cp-orchestrator/src/lib.rs
+  description: Backend library root. Declares channel+registry+runtime+services+supervisor+transport. Re-exports registry::liveness at crate root. cfg(test) use cp_mod_bridge as _ for seam-test dev-dep.
+  last_edited_ms: 1781682420769
 2886480e48a90922:
   path: crates/cp-mod-files/src/panel.rs
   description: File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based).
@@ -2738,6 +2746,10 @@
   path: .github/workflows/rust.yml
   description: 'CI: fmt + clippy + build + test on ubuntu-latest. Pins Rust 1.93.0. Triggers on push/PR to master.'
   last_edited_ms: 0
+777520ad355d687a:
+  path: crates/cp-orchestrator/src/runtime.rs
+  description: 'Phase P1: Runtime — env-driven Config (port/agents_dir/budget/scan_interval) + Runtime struct (shared Backend + config). start_driver() spawns bg thread: registry scan → per-agent Tailer poll → MaterializedView fold → CostBreaker observe, on configurable cadence. serve() blocks on HTTP transport. driver_loop/process_registry_events/tail_all_agents helpers. 1 test.'
+  last_edited_ms: 1781682420739
 779b69188111fc33:
   path: src/llms/oai_providers/deepseek.rs
   description: DeepSeek client. OpenAI-compatible with reasoning_content for deepseek-reasoner. DsMessage wrapper. Cache hit/miss tokens. DEEPSEEK_API_KEY auth.
@@ -4322,6 +4334,10 @@ bbdfcbbfb7916f2e:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
   last_edited_ms: 0
+bc066e73562ed9f0:
+  path: crates/cp-orchestrator/src/main.rs
+  description: Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval, creates Runtime, starts driver thread, serves HTTP (blocking). use as _ for lib-only deps.
+  last_edited_ms: 1781682420754
 bc239ff9124d6fdf:
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers for panel rendering. Align enum + TextCell + render_table_text() (plain-text for LLM context). Tree output parsing helpers (find_size_pattern, find_children_pattern). Sub-modules: question_form, render_cache.'
