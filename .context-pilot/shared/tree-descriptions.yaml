@@ -670,6 +670,10 @@
   path: crates/cp-mod-memory/Cargo.toml
   description: 'Memory module deps: cp-base, cp-render, crossterm, serde, serde_json, cp-mod-utilities.'
   last_edited_ms: 1780565428702
+1c49b357ace70d2c:
+  path: web/src/components/shell/CockpitView.tsx
+  description: 'Cockpit (panel-centered) view assembler. Accepts agentId, passes to LeftRail + PanelPane. Two columns: LeftRail (context navigator) | PanelPane (selected surface). Default selected = ''conversation''.'
+  last_edited_ms: 1781695333798
 1c60356763e64307:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, sha2, serde_json, secrecy.'
@@ -1586,6 +1590,14 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+41357190a18004a8:
+  path: web/src/components/panels/cockpit/TodoPanel.tsx
+  description: Todo List panel — uses useTodos(agentId) for live task plan. Depth-indented, status-colored glyphs, progress bar.
+  last_edited_ms: 1781695333858
+41806aede16bafe2:
+  path: web/src/components/panels/cockpit/PanelPane.tsx
+  description: Cockpit panel router. Accepts agentId, uses usePanels() for lookup. Routes to 12 panel components by kind, each receiving agentId. 'conversation' sentinel renders Conversation. EmptyState fallback.
+  last_edited_ms: 1781695333828
 418649fa3656f5e6:
   path: crates/cp-mod-memory/src/types.rs
   description: Memory types. MemoryItem (id, yaml_key, tl_dr, contents, importance, labels, open). Importance enum (Low/Medium/High/Critical). MemoryState (memories, next_id, open_ids).
@@ -1886,6 +1898,10 @@
   path: src/modules/conversation/render_blocks.rs
   description: 'IR-based message renderer: emits Vec<Block>. Handles tool calls (YAML params with wrapping), tool results (custom visualizers + fallback), text messages (markdown parsing via markdown_ir, code blocks, tables). Complex visualizer blocks passed through as-is. Dev-mode token counts.'
   last_edited_ms: 0
+5051f0f56f88879c:
+  path: web/src/components/panels/cockpit/MemoryPanel.tsx
+  description: Memories panel — uses useMemory(agentId) for live recall cards. ImportanceDot + labels + tl;dr.
+  last_edited_ms: 1781695333843
 508e691c9dc8712f:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
@@ -2370,6 +2386,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+655d8de2d1aa6116:
+  path: web/src/components/panels/cockpit/StatsPanel.tsx
+  description: Statistics panel — uses usePanels(agentId) for live context elements. Session stats/cache/tokenBudget remain mock (P16).
+  last_edited_ms: 1781695334007
 659f277c49ed38f1:
   path: crates/cp-mod-github/src/parse.rs
   description: GitHub API response parsing. sha256_hex uses FNV-1a for change detection. PR JSON parsing. Token redaction.
@@ -2438,6 +2458,10 @@
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet shell — mission-control workspace shown when no agent is focused. NO sidebar (T18): collapsed to a single page. Slim top bar with a segmented [Agents | Prompts] toggle; renders FleetDashboard or PromptsPage full-bleed below. Usage moved into the Settings dialog (ConfigPanel ''usage'' category); Settings reachable only via TopBar gear. Only prop: onOpenAgent.'
   last_edited_ms: 1781544801616
+676d245887a27c5d:
+  path: web/src/components/panels/cockpit/ScratchpadPanel.tsx
+  description: Scratchpad panel — uses useScratchpad(agentId) for live working cells. Id/title/preview per cell.
+  last_edited_ms: 1781695333917
 676f2d57d118cabb:
   path: crates/cp-wire/src/lib.rs
   description: 'Versioning primitives: PROTOCOL_VERSION const + accepts(their_major) N-1 compat check. 4 tests. Phase 2 adds wire types.'
@@ -3470,6 +3494,10 @@
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
   last_edited_ms: 0
+93c14e241b0494c8:
+  path: web/src/components/panels/cockpit/ToolsPanel.tsx
+  description: Tools panel — uses useTools(agentId) for live tool registry. Grouped by category, enabled/disabled status.
+  last_edited_ms: 1781695333947
 93f2a0cb0233f725:
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, AgentCard grid (status badge + one-line task summary + model·cost meta — no git branch, general-user UI; Open→agent threads, Manage→modal), New-agent card. AgentModal (Apple-grade): backdrop-fade+modal-pop, gradient hero header, name-as-star field w/ live slugified realm preview, rich model cards (MODEL_META tier/blurb/price/icon, opt-rise stagger), quiet Archive ghost, name-gated primary, autofocus+Esc+⌘↵.'
@@ -3710,6 +3738,10 @@
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+9e01430ac7cfc462:
+  path: web/src/components/panels/cockpit/SpinePanel.tsx
+  description: Spine panel — uses useSpine(agentId) for live notifications. Kind-colored dots, config section (mock).
+  last_edited_ms: 1781695333887
 9e202c919322b366:
   path: crates/cp-mod-brave/src/panel.rs
   description: Brave result panel. Static content persisted in metadata (META_CONTENT). Cache restore from metadata post-reload. Pagination support. BRAVE_PANEL_TYPE constant.
@@ -3734,6 +3766,10 @@
   path: website/docs/configuration.html
   description: 'Docs: configuration reference'
   last_edited_ms: 0
+9ea8b973e763f2b8:
+  path: web/src/components/panels/cockpit/RadarPanel.tsx
+  description: Context Radar panel — uses useRadar(agentId) for live anchors + scored results. Importance dots, score meters.
+  last_edited_ms: 1781695333962
 9ef52cb9c50c2ed2:
   path: src/ui/ir/conversation.rs
   description: 'Conversation + overlay IR builder. Messages, history sections, streaming tools, input area. Overlays: Autocomplete, PerfOverlay (build_perf_overlay with frame budgets, CPU/Meili stats, FD count, op table), Config, SearchIndex. No QuestionForm overlay. Perf builder calls PERF.snapshot() and cp_mod_search::overlay_info().'
@@ -4234,6 +4270,10 @@ b41e9edd57e06bd2:
   path: src/ui/threads_view/mod.rs
   description: Threads view layout + thread list rendering. Two-pane layout (thread list | messages). Virtual '+ New Thread' entry. IR pipeline for list items (status dots, unread indicators, selection highlight). maybe_activate_thread_question() lazy question form init. truncate_str helper.
   last_edited_ms: 1781447392429
+b430fe89da0040d6:
+  path: web/src/components/shell/LeftRail.tsx
+  description: Cockpit context navigator. Accepts agentId, uses usePanels() for live panel list. Context-budget meter (mock tokenBudget), Conversation nav button, scrollable panel list with token counts.
+  last_edited_ms: 1781695333813
 b43754bbbc122964:
   path: crates/cp-mod-console/src/ring_buffer.rs
   description: 'RingBuffer: fixed-capacity circular buffer for console output lines'
@@ -4266,6 +4306,10 @@ b5351f796f673460:
   path: yamls/tools/brave.yaml
   description: Brave Search tools YAML. brave_search (snippets, Tier 1) + brave_llm_context (deep content, Tier 2). Query params, freshness filters, goggles.
   last_edited_ms: 0
+b53adc676ed7e654:
+  path: web/src/components/panels/cockpit/CallbacksPanel.tsx
+  description: Callbacks panel — uses useCallbacks(agentId) for live edit hooks. Pattern/blocking/timeout/scope per callback.
+  last_edited_ms: 1781695333932
 b5605bee566a2c94:
   path: .github/workflows/build.yml
   description: 'Cross-platform build workflow. 4-target matrix: linux-x86_64 (native), linux-aarch64 (cross), macos-x86_64 (macos-13), macos-aarch64 (macos-latest). Pins Rust 1.93.0. Builds tui + cp-console-server. 30-day artifact retention.'
@@ -4466,6 +4510,10 @@ bccd6076aebcf1e7:
   path: crates/cp-mod-memory/src/tools.rs
   description: Memory tools with flame!("memory_create") and flame!("memory_update"). tl_dr validation (80 token cap). Importance/labels. Batch create/update/delete.
   last_edited_ms: 0
+bcd16ce7cee3eae0:
+  path: web/src/components/panels/cockpit/QueuePanel.tsx
+  description: Queue panel — uses useQueue(agentId) for live staged actions. Index/tool/intent/preview per action.
+  last_edited_ms: 1781695333902
 bd2f1faa83138934:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (ID/name/pattern/blocking/timeout/scope/success_msg/cwd). Editor sub-view shows script content for one callback. No Active column.
@@ -4974,6 +5022,10 @@ d1dd4051e2c729cb:
   path: README.md
   description: 'Project manifesto + flame graph telemetry docs. Philosophy: compiler-as-reviewer, 961 lints, hash chain trust, structure constraints, boss hunt, self-hosting loop. Flame section: ./run.sh --telemetry, inferno-flamegraph, ~60 spans coverage map.'
   last_edited_ms: 0
+d1ff6c27744eb1b7:
+  path: web/src/components/panels/cockpit/EntitiesPanel.tsx
+  description: Entities panel — uses useEntities(agentId) for live SQLite tables. Row count, column sig, sample rows.
+  last_edited_ms: 1781695333977
 d24d5105e0077023:
   path: crates/cp-mod-callback/src/tools_upsert.rs
   description: Callback upsert tool. Create/update/delete callback definitions. Script file management. Diff-based script editing (old_string/new_string). YAML sync on every mutation.
@@ -5198,6 +5250,10 @@ dc4017c2ecae89a3:
   path: web/src/components/threads/QuestionForm.tsx
   description: Embedded question form — single/multi-select options, interactive pick state, onSubmit callback sends formatted answers via sendCommand.
   last_edited_ms: 1781694593940
+dc51430942c025f7:
+  path: web/src/components/panels/cockpit/ThreadsPanel.tsx
+  description: Threads panel (cockpit) — uses useThreads(agentId) for live thread roster. Status dots, message count, last activity.
+  last_edited_ms: 1781695333992
 dc669315644ebb28:
   path: crates/cp-mod-git/src/types.rs
   description: GitChangeType, GitFileChange, GitState (branch/changes/diff_base) with ext/ext_mut, GitResultRequest
@@ -5674,6 +5730,10 @@ f51a2491e78e66d4:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
   last_edited_ms: 0
+f5335c7b1de0ea46:
+  path: web/src/components/panels/cockpit/TreePanel.tsx
+  description: Directory Tree panel — uses useTree(agentId) for live annotated project tree. Depth-indented, [!] change marker.
+  last_edited_ms: 1781695333872
 f54924eedb3c09b1:
   path: ui/src/components/panels/cockpit/TodoPanel.tsx
   description: 'Cockpit Todo List maquette: depth-indented hierarchical tasks, status glyph (pending/in-progress/done), header progress bar. Reads mock todoItems.'
